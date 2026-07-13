@@ -201,3 +201,7 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# Templates are safe to commit (documentation only, no real secrets)
+!.env.example
+!**/.env.example

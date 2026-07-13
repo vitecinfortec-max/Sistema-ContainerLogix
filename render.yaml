@@ -23,3 +23,9 @@ services:
         sync: false
       - key: JWT_SECRET_KEY
         sync: false
+      # Opcionais: usados para envio de e-mail (ex: recuperação de senha) via Resend.
+      # Deixe em branco no Render se essa funcionalidade não for usada.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SENDER_EMAIL
+        sync: false
