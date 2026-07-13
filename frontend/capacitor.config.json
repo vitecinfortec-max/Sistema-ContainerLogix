@@ -1,0 +1,16 @@
+{
+  "appId": "com.jalogistica.containerlogix",
+  "appName": "ContainerLogix",
+  "webDir": "build",
+  "server": {
+    "url": "https://sistema.containerlogix.com.br",
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": "",
+      "keystoreAlias": ""
+    }
+  }
+}

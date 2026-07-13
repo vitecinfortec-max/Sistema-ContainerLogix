@@ -1,0 +1,89 @@
+{
+  "summary": "Complete testing of new billing features: service_value field, billing status indicators, and billing report generation. All 11 backend tests passed. All frontend features verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_billing_features.py",
+    "/app/test_reports/pytest/pytest_billing_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_billing_features.py"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (all features verified)"
+  },
+  "passed_tests": [
+    {
+      "feature": "Campo 'Valor do Serviço (R$)' no formulário de nova movimentação",
+      "status": "PASS",
+      "notes": "Input field com data-testid='service-value-input' encontrado com helper text 'Este valor aparecerá apenas no relatório de faturamento'"
+    },
+    {
+      "feature": "Campo 'Valor do Serviço (R$)' no formulário de edição de movimentação",
+      "status": "PASS",
+      "notes": "Campo visível na página de edição com valor preenchido (ex: 175)"
+    },
+    {
+      "feature": "Valor do serviço NÃO aparece na página de impressão/detalhes",
+      "status": "PASS",
+      "notes": "MovementDetailPage NÃO mostra 'Valor do Serviço' - comportamento correto conforme requisito"
+    },
+    {
+      "feature": "Coluna 'Valor' na página de Faturamento",
+      "status": "PASS",
+      "notes": "Coluna VALOR visível mostrando valores em formato R$ (ex: R$ 175,00, R$ 250,50)"
+    },
+    {
+      "feature": "Coluna 'Faturamento' com status (Faturado/Pendente)",
+      "status": "PASS",
+      "notes": "Badge verde 'Faturado 16/02' com data e badge âmbar 'Pendente' visíveis"
+    },
+    {
+      "feature": "Filtro 'Status de Faturamento' na página de Faturamento",
+      "status": "PASS",
+      "notes": "Dropdown com opções: Todos, Não Faturados, Faturados. Filtro funcionando corretamente"
+    },
+    {
+      "feature": "Botão 'Gerar Faturamento' com contador",
+      "status": "PASS",
+      "notes": "Botão atualiza contador (0 -> 1 -> 9) ao selecionar itens. Total selecionado exibido"
+    },
+    {
+      "feature": "Backend: service_value campo na criação/atualização",
+      "status": "PASS",
+      "notes": "API aceita service_value e retorna no response"
+    },
+    {
+      "feature": "Backend: billed e billed_at campos atualizados após faturamento",
+      "status": "PASS",
+      "notes": "POST /api/billing/report marca movimentações como faturadas com timestamp"
+    },
+    {
+      "feature": "Backend: billing report gera Excel com valor do serviço",
+      "status": "PASS",
+      "notes": "generate_billing_excel inclui coluna 'VALOR DA OPERAÇÃO' com service_value"
+    },
+    {
+      "feature": "Select All/Deselect All funcionalidade",
+      "status": "PASS",
+      "notes": "Botão 'Selecionar Todos' e 'Desmarcar Todos' funcionando"
+    }
+  ],
+  "test_credentials": {
+    "user1": {"email": "test@teste.com", "password": "teste123"}
+  },
+  "seed_data_creation": "Test data prefixed with TEST_ created and cleaned up during tests. Movements com service_value: 150.50, 200.00, 250.00, etc.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Todas as funcionalidades de faturamento testadas e funcionando: 1) Campo service_value presente em New/Edit Movement; 2) service_value NÃO aparece na impressão/detalhes; 3) Página de Faturamento mostra colunas Valor e Faturamento com status; 4) Filtro de status de faturamento funcional; 5) Geração de relatório marca movimentações como faturadas. Backend tests em test_billing_features.py (11 testes)."
+}

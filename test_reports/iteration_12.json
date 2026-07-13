@@ -1,0 +1,125 @@
+{
+  "summary": "Tested invoice edit feature (PUT /api/invoices/{id}). Backend: 10/10 tests passed including update client name, notes, movements validation, PDF/Excel download. Frontend: Edit modal opens correctly, form fields work (client name, CNPJ, notes), movements tables display with add/remove buttons, save works with success toast 'Fatura atualizada com sucesso!'",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_invoice_update.py",
+    "/app/test_reports/pytest/pytest_invoice_update_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_invoice_update.py"
+  ],
+  "success_rate": {
+    "backend": "100% (10/10 tests passed)",
+    "frontend": "100% (all edit invoice flows verified)"
+  },
+  "passed_tests": [
+    {
+      "feature": "GET /api/invoices - list invoices",
+      "status": "PASS",
+      "notes": "Returns list of invoices with correct structure"
+    },
+    {
+      "feature": "GET /api/invoices/count",
+      "status": "PASS",
+      "notes": "Returns invoice count correctly"
+    },
+    {
+      "feature": "PUT /api/invoices/{id} - update client name",
+      "status": "PASS",
+      "notes": "Successfully updates and persists client name"
+    },
+    {
+      "feature": "PUT /api/invoices/{id} - update notes",
+      "status": "PASS",
+      "notes": "Successfully updates and persists notes"
+    },
+    {
+      "feature": "PUT /api/invoices/{id} - 404 for non-existent",
+      "status": "PASS",
+      "notes": "Returns 404 for non-existent invoice ID"
+    },
+    {
+      "feature": "GET /api/invoices/{id}/movements",
+      "status": "PASS",
+      "notes": "Returns movement details for invoice"
+    },
+    {
+      "feature": "GET /api/movements/unbilled",
+      "status": "PASS",
+      "notes": "Returns unbilled movements for selection"
+    },
+    {
+      "feature": "PUT /api/invoices/{id} - cannot remove all movements",
+      "status": "PASS",
+      "notes": "Returns 400 error when trying to remove all movements"
+    },
+    {
+      "feature": "GET /api/invoices/{id}/pdf",
+      "status": "PASS",
+      "notes": "Downloads PDF successfully"
+    },
+    {
+      "feature": "GET /api/invoices/{id}/excel",
+      "status": "PASS",
+      "notes": "Downloads Excel successfully"
+    },
+    {
+      "feature": "UI - Navigate to billing page",
+      "status": "PASS",
+      "notes": "Faturamento > Faturas navigation works"
+    },
+    {
+      "feature": "UI - Invoices list displayed",
+      "status": "PASS",
+      "notes": "3 invoices displayed with all columns"
+    },
+    {
+      "feature": "UI - Edit button clicks",
+      "status": "PASS",
+      "notes": "Edit button (pencil icon) opens modal"
+    },
+    {
+      "feature": "UI - Edit modal structure",
+      "status": "PASS",
+      "notes": "Modal shows client name, CNPJ, notes fields"
+    },
+    {
+      "feature": "UI - Current movements listed",
+      "status": "PASS",
+      "notes": "Movements table with remove (X) buttons"
+    },
+    {
+      "feature": "UI - Available movements listed",
+      "status": "PASS",
+      "notes": "Available movements with add (+) buttons"
+    },
+    {
+      "feature": "UI - Save changes",
+      "status": "PASS",
+      "notes": "Save button works, shows 'Fatura atualizada com sucesso!' toast"
+    },
+    {
+      "feature": "UI - Data persistence",
+      "status": "PASS",
+      "notes": "Changes persist after reopening modal"
+    }
+  ],
+  "test_credentials": {
+    "email": "joao.victor@jalogisticas.com",
+    "password": "password123"
+  },
+  "seed_data_creation": "No new test data created, used existing invoices",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Invoice edit feature fully functional. Key test IDs: edit-invoice-dialog, edit-client-name-input, edit-client-cnpj-input, edit-notes-input, save-invoice-button. Edit modal accessed via pencil icon in invoice row actions. PUT /api/invoices/{id} supports: client_name, client_cnpj, notes, movement_ids_to_add, movement_ids_to_remove fields."
+}

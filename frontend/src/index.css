@@ -1,0 +1,207 @@
+@import url('https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 215 25% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+    --primary: 174 100% 26%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 90% 55%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 174 40% 96%;
+    --accent-foreground: 215 25% 15%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 174 100% 26%;
+    --radius: 0.375rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Chivo', sans-serif;
+  }
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer base {
+  [data-debug-wrapper="true"] {
+    display: contents !important;
+  }
+}
+
+/* Classes de impressão */
+.print-only {
+  display: none !important;
+}
+
+.no-print {
+  display: block;
+}
+
+@media print {
+  @page {
+    margin: 0;
+    size: A4 portrait;
+  }
+  
+  /* Reset completo para impressão */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  
+  /* Reset do root container do React */
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+  
+  /* Remover alturas e espaços dos containers */
+  .min-h-screen,
+  .flex-1,
+  .flex-col,
+  main,
+  .max-w-5xl,
+  .max-w-screen-2xl,
+  [class*="mx-auto"] {
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+  
+  /* Esconder elementos que não devem aparecer na impressão */
+  .no-print,
+  nav, aside, header, footer, button,
+  [data-testid="sidebar"],
+  [data-testid="top-header"],
+  [data-testid="mobile-navigation"] {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    left: -9999px !important;
+  }
+  
+  /* Mostrar elementos print-only */
+  .print-only {
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: auto !important;
+    height: auto !important;
+  }
+  
+  /* Via Section - cada uma em uma página A4 */
+  .via-section {
+    display: block !important;
+    visibility: visible !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    overflow: hidden !important;
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    break-inside: avoid !important;
+    margin: 0 !important;
+    padding: 8mm 12mm !important;
+    box-sizing: border-box !important;
+    background: white !important;
+    position: relative !important;
+  }
+  
+  /* Última via não precisa de quebra de página após */
+  .via-section:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+  
+  /* Garantir que imagens apareçam */
+  .via-section img {
+    display: inline-block !important;
+    max-width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Print Registry - Registro Fotográfico */
+  .print-registry {
+    display: block !important;
+    visibility: visible !important;
+    width: 210mm !important;
+    min-height: 297mm !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    box-sizing: border-box !important;
+    background: white !important;
+  }
+  
+  .print-registry img {
+    display: inline-block !important;
+    max-width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Esconder badge "Made with Emergent" */
+[class*="emergent"],
+[id*="emergent"],
+a[href*="emergentagent.com"]:not([href*="preview"]),
+div[style*="Made with Emergent"],
+.emergent-badge,
+div:has(> img[alt*="Emergent"]),
+div:has(> span:contains("Made with Emergent")) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Selector mais específico para o badge fixo no canto */
+body > div[style*="position: fixed"][style*="bottom"],
+body > div[style*="position:fixed"][style*="bottom"] {
+  display: none !important;
+}

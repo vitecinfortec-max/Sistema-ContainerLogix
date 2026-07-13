@@ -1,0 +1,45 @@
+{
+  "summary": "Completed testing of Yard Control 'Estoque Atual' filter and print functionality. Backend: 7/7 tests passed. Frontend: All features working correctly - dropdown has 'Estoque Atual' option, filter returns only in_stock=true containers, print view shows receipt without blank pages.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_yard_control_estoque.py",
+    "/app/test_reports/pytest/pytest_yard_control_estoque_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_yard_control_estoque.py"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 tests passed)",
+    "frontend": "100% (all UI tests passed)"
+  },
+  "passed_tests": [
+    {"feature": "GET /api/yard-control?movement_type=ESTOQUE returns only in_stock=true", "status": "PASS", "notes": "200 containers all with in_stock=true"},
+    {"feature": "GET /api/yard-control?movement_type=ESTOQUE with date range filters by entry_date", "status": "PASS", "notes": "Correctly filters by entry date within range"},
+    {"feature": "ESTOQUE filter excludes exited containers", "status": "PASS", "notes": "All ESTOQUE containers have exit_date=null"},
+    {"feature": "TODOS filter returns all movements", "status": "PASS", "notes": "Returns containers with both in_stock=true and false"},
+    {"feature": "ENTRADA filter works", "status": "PASS", "notes": "Returns entry movements"},
+    {"feature": "SAIDA filter works", "status": "PASS", "notes": "Returns exit movements with in_stock=false"},
+    {"feature": "UI - Dropdown has 'Estoque Atual' option", "status": "PASS", "notes": "Option found at line 338 in YardControlPage.js"},
+    {"feature": "UI - Selecting 'Estoque Atual' shows in_stock containers", "status": "PASS", "notes": "Table shows 20+ containers after filtering"},
+    {"feature": "UI - Print view has no blank page", "status": "PASS", "notes": "2 via-sections rendered, no-print elements hidden"},
+    {"feature": "UI - Print receipt shows complete movement data", "status": "PASS", "notes": "Receipt shows J.A LOGÍSTICA header, transaction info, vehicle info, container info, signatures"}
+  ],
+  "test_credentials": {
+    "email": "joao.victor@jalogisticas.com",
+    "password": "password123"
+  },
+  "seed_data_creation": "None - used existing data",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Yard Control 'Estoque Atual' filter fully functional. Key data-testids: yard-control-page, filter-movement-type, filter-client, print-button. Navigation: Movimentações > Controle de Pátio (/yard-control). Dropdown options: Todos, Entrada, Saída, Estoque Atual. ESTOQUE filter queries backend with movement_type=ESTOQUE and returns only containers with in_stock=true. Print CSS uses @media print rules in index.css lines 65-170 with .via-section class for each receipt page."
+}

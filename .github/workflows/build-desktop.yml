@@ -1,0 +1,143 @@
+name: Build ContainerLogix Desktop
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - windows
+          - linux
+          - macos
+
+jobs:
+  build-windows:
+    name: Build Windows Installer
+    runs-on: windows-latest
+    if: ${{ github.event.inputs.platform == 'windows' || github.event.inputs.platform == 'all' || github.event.inputs.platform == '' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'yarn'
+          cache-dependency-path: desktop/yarn.lock
+      
+      - name: Install dependencies
+        working-directory: ./desktop
+        run: yarn install --frozen-lockfile
+      
+      - name: Build Windows installers
+        working-directory: ./desktop
+        run: yarn build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload Windows MSI
+        uses: actions/upload-artifact@v3
+        with:
+          name: ContainerLogix-Windows-MSI
+          path: desktop/dist/*.msi
+          if-no-files-found: warn
+      
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v3
+        with:
+          name: ContainerLogix-Windows-EXE
+          path: desktop/dist/*.exe
+          if-no-files-found: warn
+
+  build-linux:
+    name: Build Linux AppImage
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.platform == 'linux' || github.event.inputs.platform == 'all' || github.event.inputs.platform == '' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'yarn'
+          cache-dependency-path: desktop/yarn.lock
+      
+      - name: Install dependencies
+        working-directory: ./desktop
+        run: yarn install --frozen-lockfile
+      
+      - name: Build Linux AppImage
+        working-directory: ./desktop
+        run: yarn build:linux
+      
+      - name: Upload Linux AppImage
+        uses: actions/upload-artifact@v3
+        with:
+          name: ContainerLogix-Linux-AppImage
+          path: desktop/dist/*.AppImage
+
+  build-macos:
+    name: Build macOS DMG
+    runs-on: macos-latest
+    if: ${{ github.event.inputs.platform == 'macos' || github.event.inputs.platform == 'all' || github.event.inputs.platform == '' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'yarn'
+          cache-dependency-path: desktop/yarn.lock
+      
+      - name: Install dependencies
+        working-directory: ./desktop
+        run: yarn install --frozen-lockfile
+      
+      - name: Build macOS DMG
+        working-directory: ./desktop
+        run: yarn build:mac
+      
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v3
+        with:
+          name: ContainerLogix-macOS-DMG
+          path: desktop/dist/*.dmg
+
+  create-release:
+    name: Create Release
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ContainerLogix-Windows-MSI/*.msi
+            ContainerLogix-Windows-EXE/*.exe
+            ContainerLogix-Linux-AppImage/*.AppImage
+            ContainerLogix-macOS-DMG/*.dmg
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

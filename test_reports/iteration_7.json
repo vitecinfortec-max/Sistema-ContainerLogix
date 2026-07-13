@@ -1,0 +1,95 @@
+{
+  "summary": "Comprehensive testing of Client entity CRUD, phone/CNPJ masks in forms, client dropdown in movements, and sidebar navigation. All features working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_clients_api.py",
+    "/app/test_reports/pytest/pytest_clients_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_clients_api.py"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (all features verified)"
+  },
+  "passed_tests": [
+    {
+      "feature": "Clients API - CRUD Operations",
+      "status": "PASS",
+      "notes": "All CRUD operations tested: POST /api/clients, GET /api/clients, PUT /api/clients/{id}, DELETE /api/clients/{id}"
+    },
+    {
+      "feature": "Sidebar Navigation - Correct Menu Labels",
+      "status": "PASS",
+      "notes": "Verified: 'Cadastro de Motorista', 'Cadastro de Transportadora', 'Cadastro de Cliente', 'Cadastro de Armadores'"
+    },
+    {
+      "feature": "Clients Page - CNPJ Mask",
+      "status": "PASS",
+      "notes": "Input '12345678000199' correctly formatted to '12.345.678/0001-99'"
+    },
+    {
+      "feature": "Clients Page - Phone Mask",
+      "status": "PASS",
+      "notes": "Input '11987654321' correctly formatted to '(11) 98765-4321'"
+    },
+    {
+      "feature": "Drivers Page - Phone Mask",
+      "status": "PASS",
+      "notes": "Input '21998765432' correctly formatted to '(21) 99876-5432'"
+    },
+    {
+      "feature": "Companies Page - CNPJ Mask",
+      "status": "PASS",
+      "notes": "Input '98765432000188' correctly formatted to '98.765.432/0001-88'"
+    },
+    {
+      "feature": "Companies Page - Phone Mask",
+      "status": "PASS",
+      "notes": "Input '1134567890' correctly formatted to '(11) 3456-7890'"
+    },
+    {
+      "feature": "New Movement Page - Client Dropdown",
+      "status": "PASS",
+      "notes": "Select dropdown with 'Nenhum' (none) option and registered clients visible. data-testid='client-name-select' present"
+    },
+    {
+      "feature": "Edit Movement Page - Client Dropdown",
+      "status": "PASS",
+      "notes": "Same Client dropdown present on Edit Movement page with same options"
+    },
+    {
+      "feature": "Client Field - Helper Text (Not Printable)",
+      "status": "PASS",
+      "notes": "Both New and Edit movement pages show helper text 'Este campo não aparece na impressão'"
+    },
+    {
+      "feature": "Movements API - client_name field",
+      "status": "PASS",
+      "notes": "API accepts and persists client_name field in movements. Optional field works correctly."
+    },
+    {
+      "feature": "Clients Page - Full CRUD UI Flow",
+      "status": "PASS",
+      "notes": "Create, list, edit buttons, and delete buttons present and functional"
+    }
+  ],
+  "test_credentials": {
+    "registered_user": {"email": "test_ui_p0a1mp@teste.com", "password": "teste123"},
+    "existing_user": {"email": "test@teste.com", "password": "teste123"}
+  },
+  "seed_data_creation": "Created test client 'TEST_Cliente UI Teste' with CNPJ 12.345.678/0001-99 and phone (11) 98765-4321",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Client entity fully implemented and tested. All phone masks (XX) XXXXX-XXXX working in Drivers, Companies, and Clients forms. All CNPJ masks working in Companies and Clients forms. Client dropdown present in both NewMovementPage and EditMovementPage with 'Nenhum' option. Backend API tests in test_clients_api.py (11 tests, all passing)."
+}

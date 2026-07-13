@@ -1,0 +1,71 @@
+{
+  "summary": "All 5 requested features tested and verified working. Backend PUT /movements/{id} correctly preserves transaction_id. Frontend edit flow, print dropdown, compact detail layout, and autoprint redirect all working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Dashboard/MovementsPage tables",
+        "issues": ["React hydration warning: '<tr> cannot be child of <span>' - cosmetic console warning, does not affect functionality"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_movement_crud.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_movement_crud.py"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 tests passed)",
+    "frontend": "100% (all 5 requested features verified)"
+  },
+  "passed_tests": [
+    {
+      "feature": "Edit movement saves correctly",
+      "description": "PUT /movements/{id} endpoint preserves transaction_id. UI edit flow works: navigate to edit, modify fields, save successfully, redirects to detail page with success toast",
+      "status": "PASS"
+    },
+    {
+      "feature": "transaction_id preserved after edit",
+      "description": "Backend test test_update_movement_preserves_transaction_id passed - confirmed transaction_id stays unchanged after PUT update",
+      "status": "PASS"
+    },
+    {
+      "feature": "Detail page compact layout",
+      "description": "MovementDetailPage shows all info in compact cards: Informações da Operação, Veículo e Motorista, Contêiner, Responsável. Layout fits A4 single page",
+      "status": "PASS"
+    },
+    {
+      "feature": "Print dropdown with A4 and Térmica options",
+      "description": "Print button shows dropdown with 'Folha A4' (data-testid=print-a4-option) and 'Térmica 80mm' (data-testid=print-thermal-option) options",
+      "status": "PASS"
+    },
+    {
+      "feature": "Autoprint redirect after save",
+      "description": "After creating new movement, redirects to /movements/{id}?autoprint=true and shows 'Abrindo impressão...' toast",
+      "status": "PASS"
+    },
+    {
+      "feature": "Notifications hook present",
+      "description": "useNotifications hook imported and used in NewMovementPage. Calls requestPermission() on page load when permission is 'default'. notifyNewMovement() called after save",
+      "status": "PASS"
+    }
+  ],
+  "test_credentials": {
+    "email": "test@teste.com",
+    "password": "teste123",
+    "user_name": "João Carlos da Silva Santos"
+  },
+  "seed_data_creation": "Test movements with container numbers TESTEDIT12345 and TESTAUTOPRINT1 were created and deleted during testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All bug fixes verified working. Backend PUT /movements/{id} preserves transaction_id by reading from existing document (line 355 in server.py). Detail page layout is compact with print-card class on cards. Print dropdown uses DropdownMenu component with Folha A4 and Térmica 80mm options. Notifications use Service Worker via useNotifications hook. There's a minor cosmetic React hydration warning about table structure that doesn't affect functionality."
+}

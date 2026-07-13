@@ -1,0 +1,67 @@
+{
+  "summary": "Frontend testing completed for ContainerLogix bug fixes. All 5 requested features verified and working correctly: Logo visibility on login page, user name truncation, print button enabled with dropdown options, and autoprint redirect after saving movement.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Dashboard/MovementsPage tables",
+        "issues": ["React hydration warning: '<tr> cannot be child of <span>' - cosmetic console warning, does not affect functionality"]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/.screenshots/login_logo_visibility.png",
+    "/.screenshots/dashboard_user_info.png",
+    "/.screenshots/print_dropdown.png",
+    "/.screenshots/new_movement_form.png",
+    "/.screenshots/after_save_redirect.png"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend-only testing)",
+    "frontend": "100% (all 5 requested features verified)"
+  },
+  "passed_tests": [
+    {
+      "feature": "Logo visibility on login page",
+      "description": "Logo is visible with white background container (bg-white/95 rounded-2xl)",
+      "status": "PASS"
+    },
+    {
+      "feature": "User name truncation in header",
+      "description": "User name 'João Carlos da Silva Santos' correctly displays as 'João Carlos' (only 2 first names)",
+      "status": "PASS"
+    },
+    {
+      "feature": "Print button enabled",
+      "description": "Print button 'Imprimir Via' is enabled and visible on movement detail page",
+      "status": "PASS"
+    },
+    {
+      "feature": "Print dropdown with A4 option",
+      "description": "Dropdown shows 'Folha A4' and 'Térmica 80mm' options",
+      "status": "PASS"
+    },
+    {
+      "feature": "Autoprint redirect after save",
+      "description": "After saving new movement, redirects to /movements/{id}?autoprint=true and shows 'Abrindo impressão...' toast",
+      "status": "PASS"
+    }
+  ],
+  "test_credentials": {
+    "email": "test@teste.com",
+    "password": "teste123",
+    "user_name": "João Carlos da Silva Santos"
+  },
+  "seed_data_creation": "Created test movement with container TESTAUTO012345 for autoprint testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All bug fixes from the request are working correctly. The useReactToPrint implementation with contentRef is working. Print dropdown shows both A4 and Thermal 80mm options. Username truncation using split(' ').slice(0, 2).join(' ') works correctly. There is a minor React hydration warning in console about table structure (span as child of tbody/tr) but this is cosmetic and doesn't affect functionality."
+}

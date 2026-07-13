@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: containerlogix-backend
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/
+    disk:
+      name: containerlogix-uploads
+      # Corresponde a UPLOADS_DIR em backend/server.py (ROOT_DIR.parent / 'uploads'),
+      # ou seja, a pasta uploads/ na raiz do repo, um nível acima de backend/.
+      mountPath: /opt/render/project/src/uploads
+      sizeGB: 10
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: JWT_SECRET_KEY
+        sync: false

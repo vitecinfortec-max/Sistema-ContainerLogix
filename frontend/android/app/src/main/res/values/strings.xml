@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ContainerLogix</string>
+    <string name="title_activity_main">ContainerLogix</string>
+    <string name="package_name">com.jalogistica.containerlogix</string>
+    <string name="custom_url_scheme">com.jalogistica.containerlogix</string>
+</resources>

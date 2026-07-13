@@ -1,0 +1,119 @@
+{
+  "summary": "Comprehensive testing of Invoice (Fatura) system - Manual billing functionality for port container management. All 16 backend API tests passed. Frontend UI fully functional with invoice listing, creation modal, details modal, and delete confirmation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_invoices_api.py",
+    "/app/test_reports/pytest/pytest_invoices_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Invoice endpoints properly handle CRUD operations with proper auth validation",
+    "InvoiceCreate correctly validates that movements are not already billed before creating invoice",
+    "Delete endpoint properly unbills associated movements when invoice is deleted",
+    "Frontend BillingPage.js has proper data-testid attributes for testing"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_invoices_api.py"
+  ],
+  "success_rate": {
+    "backend": "100% (16/16 invoice API tests passed)",
+    "frontend": "100% (all invoice UI features verified)"
+  },
+  "passed_tests": [
+    {
+      "feature": "GET /api/invoices",
+      "status": "PASS",
+      "notes": "Returns list of invoices with pagination support"
+    },
+    {
+      "feature": "GET /api/invoices/count",
+      "status": "PASS",
+      "notes": "Returns total count of invoices"
+    },
+    {
+      "feature": "POST /api/invoices",
+      "status": "PASS",
+      "notes": "Creates invoice with selected movements, marks movements as billed"
+    },
+    {
+      "feature": "GET /api/invoices/{id}",
+      "status": "PASS",
+      "notes": "Returns specific invoice by ID, returns 404 for non-existent"
+    },
+    {
+      "feature": "GET /api/invoices/{id}/movements",
+      "status": "PASS",
+      "notes": "Returns movement details for an invoice"
+    },
+    {
+      "feature": "DELETE /api/invoices/{id}",
+      "status": "PASS",
+      "notes": "Deletes invoice and unbills associated movements"
+    },
+    {
+      "feature": "GET /api/movements/unbilled",
+      "status": "PASS",
+      "notes": "Returns unbilled movements with search and client filter support"
+    },
+    {
+      "feature": "Invoice validation - no movements",
+      "status": "PASS",
+      "notes": "Returns 400 when trying to create invoice without movements"
+    },
+    {
+      "feature": "Invoice validation - already billed",
+      "status": "PASS",
+      "notes": "Returns 400 when trying to bill already billed movements"
+    },
+    {
+      "feature": "Auth requirements",
+      "status": "PASS",
+      "notes": "All invoice endpoints require authentication (401 without token)"
+    },
+    {
+      "feature": "Frontend - Billing Page",
+      "status": "PASS",
+      "notes": "Page loads with invoice list, 'GERAR FATURAMENTO' button visible"
+    },
+    {
+      "feature": "Frontend - Invoice List",
+      "status": "PASS",
+      "notes": "Shows Nº FATURA, DATA, CLIENTE, CNPJ, QTD. MOVIM., VALOR TOTAL, USUÁRIO, AÇÕES"
+    },
+    {
+      "feature": "Frontend - New Invoice Modal",
+      "status": "PASS",
+      "notes": "Search input, client filter, movement selection, summary section all working"
+    },
+    {
+      "feature": "Frontend - Movement Selection",
+      "status": "PASS",
+      "notes": "Checkboxes, 'Selecionar Todos'/'Desmarcar Todos' toggle, summary updates"
+    },
+    {
+      "feature": "Frontend - Invoice Details Modal",
+      "status": "PASS",
+      "notes": "Shows invoice info (Data, Cliente, CNPJ, Valor Total) and movements list"
+    },
+    {
+      "feature": "Frontend - Delete Confirmation Modal",
+      "status": "PASS",
+      "notes": "Shows confirmation message, explains movements will be unbilled, Cancelar/Excluir Fatura buttons"
+    }
+  ],
+  "test_credentials": {
+    "user": {"email": "test_invoice@test.com", "password": "test123"}
+  },
+  "seed_data_creation": "Test movements created with TEST_InvoiceClient prefix, 3 invoices exist in system for testing",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Invoice (Fatura) system is fully functional. Backend tests in test_invoices_api.py (16 tests). Existing invoices: #1, #2, #4. Unbilled movements available for testing. Client filter dropdown shows registered clients. Search works by container number and transaction ID."
+}

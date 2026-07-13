@@ -1,0 +1,94 @@
+{
+  "summary": "Comprehensive testing of CRUD operations with EDIT functionality for Drivers, Transport Companies, and Shipping Lines. All 23 backend tests passed. Frontend tests verified CPF/CNPJ masks, edit dialogs, sidebar collapse, billing page with filters and multi-select, and reports page with PDF/Excel download.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_crud_updates.py",
+    "/app/test_reports/pytest/pytest_crud_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_crud_updates.py"
+  ],
+  "success_rate": {
+    "backend": "100% (23/23 tests passed)",
+    "frontend": "100% (all features verified)"
+  },
+  "passed_tests": [
+    {
+      "feature": "CRUD de Motoristas - Criar, Listar, Editar e Deletar",
+      "status": "PASS",
+      "notes": "All CRUD operations working. Edit dialog shows 'Editar Motorista' with 'Atualizar' button."
+    },
+    {
+      "feature": "Máscara de CPF (000.000.000-00)",
+      "status": "PASS",
+      "notes": "Input '12345678900' correctly formats to '123.456.789-00'"
+    },
+    {
+      "feature": "CRUD de Transportadoras - Criar, Listar, Editar e Deletar",
+      "status": "PASS",
+      "notes": "All CRUD operations working. Edit dialog shows 'Editar Transportadora' with 'Atualizar' button."
+    },
+    {
+      "feature": "Máscara de CNPJ (00.000.000/0000-00)",
+      "status": "PASS",
+      "notes": "Input '12345678000190' correctly formats to '12.345.678/0001-90'"
+    },
+    {
+      "feature": "CRUD de Armadores - Criar, Listar, Editar e Deletar",
+      "status": "PASS",
+      "notes": "All CRUD operations working. Edit dialog shows 'Editar Armador' with 'Atualizar' button."
+    },
+    {
+      "feature": "Sidebar colapsável",
+      "status": "PASS",
+      "notes": "Sidebar collapses to icons only and expands back correctly."
+    },
+    {
+      "feature": "Página de Faturamento - filtros, seleção múltipla, geração XLS",
+      "status": "PASS",
+      "notes": "Filters (company, date from, date to) working. Select all checkbox works. Generate billing button enables when items selected."
+    },
+    {
+      "feature": "Página de Relatórios - filtros e download PDF/XLS",
+      "status": "PASS",
+      "notes": "Filters (operation type, status, date range) working. PDF and Excel download buttons present and enabled."
+    },
+    {
+      "feature": "PUT /api/drivers/{id}",
+      "status": "PASS",
+      "notes": "Backend test verified driver update with persistence check."
+    },
+    {
+      "feature": "PUT /api/transport-companies/{id}",
+      "status": "PASS",
+      "notes": "Backend test verified transport company update with persistence check."
+    },
+    {
+      "feature": "PUT /api/shipping-lines/{id}",
+      "status": "PASS",
+      "notes": "Backend test verified shipping line update with persistence check."
+    },
+    {
+      "feature": "POST /api/billing/report",
+      "status": "PASS",
+      "notes": "Backend test verified billing report generation with single and multiple movements."
+    }
+  ],
+  "test_credentials": {
+    "user1": {"email": "test@teste.com", "password": "teste123"}
+  },
+  "seed_data_creation": "Test data prefixed with TEST_ and UITEST_ created and cleaned up during tests.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All requested features tested and working: CRUD with EDIT for Drivers/Companies/ShippingLines, CPF/CNPJ masks, collapsible sidebar, Billing page with multi-select and XLS generation, Reports page with filters and PDF/Excel download. Backend has 23 tests in test_crud_updates.py covering all PUT endpoints and billing report."
+}

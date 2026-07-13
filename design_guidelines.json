@@ -1,0 +1,109 @@
+{
+  "identity": {
+    "persona": "E1: The Anti-AI Designer",
+    "strategy": "Industrial Precision & High Contrast",
+    "voice": "Direct, Functional, authoritative"
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Chivo, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-black tracking-tight leading-tight",
+      "h2": "text-3xl font-bold tracking-tight",
+      "h3": "text-2xl font-bold tracking-normal",
+      "body": "text-base font-normal leading-relaxed text-slate-600",
+      "small": "text-sm font-medium text-slate-500 uppercase tracking-wider"
+    },
+    "rules": "Headings must be bold and commanding. Use JetBrains Mono for all data points (IDs, Container Numbers, Dates)."
+  },
+  "colors": {
+    "primary": {
+      "name": "Container Red",
+      "hex": "#DC2626",
+      "tailwind": "bg-red-600 text-white hover:bg-red-700"
+    },
+    "secondary": {
+      "name": "Industrial Slate",
+      "hex": "#475569",
+      "tailwind": "bg-slate-600 text-white"
+    },
+    "background": {
+      "default": "bg-slate-50",
+      "paper": "bg-white",
+      "sidebar": "bg-slate-900"
+    },
+    "text": {
+      "primary": "text-slate-900",
+      "secondary": "text-slate-500",
+      "accent": "text-red-600"
+    },
+    "status": {
+      "success": "text-emerald-600 bg-emerald-50 border-emerald-200",
+      "warning": "text-amber-600 bg-amber-50 border-amber-200",
+      "error": "text-red-600 bg-red-50 border-red-200",
+      "info": "text-blue-600 bg-blue-50 border-blue-200"
+    }
+  },
+  "spacing": {
+    "container_padding": "p-6 md:p-8",
+    "grid_gap": "gap-6",
+    "section_spacing": "my-8"
+  },
+  "layout_strategy": {
+    "dashboard": "Bento Grid: Mixed span cards. Key stats = 1x1. Activity Feed = 1x2 (tall). Maps/Charts = 2x2 or full width.",
+    "forms": "Split Layout or Single Column with generous whitespace. Group related fields with visible borders or varied background shades.",
+    "tables": "Dense, highly readable. Sticky headers. Alternating row colors optional but borders are mandatory.",
+    "sidebar": "Fixed width (64 or 250px). Collapsible. Dark mode heavily preferred for sidebar to anchor the design."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-red-600 hover:bg-red-700 text-white rounded-md font-bold shadow-sm transition-all active:scale-95",
+      "secondary": "bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-md font-medium shadow-sm",
+      "ghost": "text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md"
+    },
+    "cards": {
+      "style": "bg-white border border-slate-200 shadow-sm rounded-lg overflow-hidden",
+      "header": "border-b border-slate-100 p-4 bg-slate-50/50"
+    },
+    "inputs": {
+      "style": "border-slate-300 focus:border-red-500 focus:ring-red-500 rounded-md bg-white text-slate-900 shadow-sm placeholder:text-slate-400"
+    }
+  },
+  "visual_enhancers": {
+    "shadows": "shadow-sm for cards, shadow-md for dropdowns/modals. Avoid large diffuse shadows.",
+    "borders": "1px solid slate-200 default. Active elements get 1px solid red-600.",
+    "radius": "rounded-md (6px) or rounded-lg (8px). Avoid full rounded/pill shapes for containers.",
+    "icons": "Lucide React. Use stroke-width-2 for clarity."
+  },
+  "motion": {
+    "hover": "transition-all duration-200 ease-in-out",
+    "enter": "animate-in fade-in zoom-in-95 duration-300",
+    "exit": "animate-out fade-out zoom-out-95 duration-200"
+  },
+  "images": {
+    "login_bg": "https://images.unsplash.com/photo-1761307234324-0c9eadb951de?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwzfHxzaGlwcGluZyUyMGNvbnRhaW5lciUyMHRlcm1pbmFsJTIwYWVyaWFsJTIwdmlld3xlbnwwfHx8fDE3NzE5NzkwMzd8MA&ixlib=rb-4.1.0&q=85",
+    "ship_sunset": "https://images.pexels.com/photos/11032492/pexels-photo-11032492.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "warehouse_worker": "https://images.pexels.com/photos/6699416/pexels-photo-6699416.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+    "driver_red_truck": "https://images.unsplash.com/photo-1760944016312-93ac6f9402fe?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwzfHx0cnVjayUyMGRyaXZlciUyMHBvcnRyYWl0JTIwc2VtaSUyMHRydWNrfGVufDB8fHx8MTc3MTk3OTA0MHww&ixlib=rb-4.1.0&q=85",
+    "container_pattern": "https://images.unsplash.com/photo-1769144256181-698b8f807066?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxNzV8MHwxfHNlYXJjaHwxfHxzaGlwcGluZyUyMGNvbnRhaW5lciUyMHRlcm1pbmFsJTIwYWVyaWFsJTIwdmlld3xlbnwwfHx8fDE3NzE5NzkwMzd8MA&ixlib=rb-4.1.0&q=85"
+  },
+  "instructions_to_main_agent": [
+    "REFACTOR: Update tailwind.config.js to use Red-600 as the primary color. Remove the Teal.",
+    "LAYOUT: Sidebar must be Dark Slate (bg-slate-900) with White text. Active link = Red-600 background.",
+    "LOGIN: Use the 'login_bg' image for the left side of the split screen. Right side white.",
+    "DASHBOARD: Create a summary grid at the top. Use 'driver_red_truck' or 'ship_sunset' as cover images for specific widget cards.",
+    "FORMS: Ensure all inputs have red focus rings (focus:ring-red-500).",
+    "TABLES: Use a clean, dense layout. Header row: bg-slate-100 text-slate-700 font-bold.",
+    "GLOBAL: Add a subtle top border (h-1 bg-red-600) to the body or main layout to brand the app immediately.",
+    "CRITICAL: Do not break existing functionality. Only update styles and layout structure."
+  ],
+  "universal_guidelines": [
+    "Avoid gradients for backgrounds, use solid colors or subtle noise.",
+    "Use uppercase, tracking-wide text for small labels (STATUS, ID, TYPE).",
+    "Ensure high contrast: Black text on White, White text on Red/Dark Slate.",
+    "Use 'sonner' for all toast notifications."
+  ]
+}

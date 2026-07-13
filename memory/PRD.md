@@ -1,0 +1,307 @@
+# ContainerLogix - Sistema de Gestão de Movimentação de Contêineres
+
+## Descrição do Produto
+Sistema completo de entrada, saída e inventário de contêineres para empresas de logística portuária.
+
+## Funcionalidades Principais
+
+### Core (Implementado ✅)
+- **Movimentações**: Registrar, editar, clonar movimentações de contêineres
+- **Fotos**: Upload de fotos (frente, traseira, lados) para cada movimentação
+- **Observações**: Campo de observações em cada movimentação
+- **Entidades**: CRUD completo para Motoristas, Transportadoras, Armadores, Clientes, Tipos de Serviço
+- **Dashboard**: Métricas e atalhos personalizáveis
+- **Relatórios**: Exportação Excel para movimentações e faturamento
+- **Faturamento**: Módulo completo com histórico de alterações
+- **Comprovante de Impressão**: Layout A4 com 2 vias (Terminal/Motorista) por página
+- **Recuperação de Senha**: Via email com Resend
+- **Registro Fotográfico**: Módulo completo para registro de fotos de contêineres ✅
+- **Vistoria de Container**: Similar ao registro fotográfico com observações ✅
+- **Flex Tank**: Gerenciamento de estoque de bolsas Flex Tank ✅
+- **Controle de Pátio**: Visualização de containers no pátio com dias de permanência ✅
+- **Frota (Fleet)**: Controle de revisão de veículos com PDF ✅
+
+### Registro Fotográfico (Implementado 04/03/2026) ✅
+- CRUD completo para registros fotográficos (criar, listar, visualizar, editar, excluir)
+- **Campos:**
+  - Número do Container (obrigatório)
+  - Numeração do Container (lacre)
+  - Terminal de Coleta
+  - Booking
+  - Cliente (dropdown com busca)
+  - Armador (dropdown com busca)
+- Upload de 4 fotos: Frente, Traseira, Lateral Esquerda, Lateral Direita
+- **Layout diferenciado:**
+  - Frente e Traseira: formato horizontal (landscape) - mais amplo
+  - Laterais: formato vertical - com altura adequada
+  - Fotos com `object-fit: contain` para visibilidade completa
+- Captura de foto via câmera ou importação de arquivo
+- **Download de fotos** individualmente
+- **Página de edição** para alterar dados do registro
+- Visualização PDF para impressão com metadados (usuário, data criação, data emissão)
+- Numeração sequencial automática
+
+### Autenticação
+- JWT-based authentication
+- Perfis de usuário
+
+## Stack Técnica
+- **Frontend**: React, TailwindCSS, Shadcn/UI, lucide-react
+- **Backend**: FastAPI, Python
+- **Database**: MongoDB
+- **Integrações**: openpyxl (Excel), JsBarcode, Resend (email)
+
+## Estrutura de Arquivos Principais
+```
+/app/
+├── backend/
+│   ├── server.py        # API principal
+│   ├── models.py        # Modelos Pydantic
+│   └── reports.py       # Geração de relatórios
+├── frontend/
+│   └── src/
+│       ├── pages/
+│       │   ├── MovementDetailPage.js  # Detalhes + impressão
+│       │   ├── NewMovementPage.js
+│       │   ├── EditMovementPage.js
+│       │   ├── BillingPage.js
+│       │   ├── PhotoRegistriesPage.js     # Lista de registros fotográficos
+│       │   ├── NewPhotoRegistryPage.js    # Novo registro fotográfico
+│       │   ├── PhotoRegistryDetailPage.js # Detalhes + impressão
+│       │   └── ...
+│       └── components/
+```
+
+## Histórico de Alterações Recentes
+
+### 11/03/2026 (Sessão Atual)
+- **Novo Módulo "Segregação de Unidade" ✅**
+  - Backend: modelo UnitSegregation, endpoints CRUD, geração de PDF
+  - Frontend: página completa com listagem, filtros, modais de criar/editar/detalhes
+  - Menu lateral: sub-item em "Movimentações"
+  - Controle de Pátio: badge "SEGREGADO" para containers reservados
+  - Funcionalidades: criar, editar, liberar, excluir, gerar PDF, filtrar por status
+
+### 10/03/2026 (Sessão Anterior)
+- **Novo Campo "Entrega Finalizada" no Status de Entrega ✅**
+  - Campo `delivery_completed` adicionado ao modelo `DeliveryStatusItem` (backend/models.py)
+  - Nova coluna "ENTREGA" no PDF (12 colunas total, ainda cabe em 1 página)
+  - Formulário atualizado com grid de 6 colunas (frontend)
+  - Tabela de detalhes com nova coluna "Entrega Final."
+
+### 09/03/2026 (Sessão Anterior)
+- **Finalização do PDF Status de Entrega ✅**
+  - Layout ajustado para corresponder exatamente ao PDF de "Programação de Carregamento"
+  - Tabela de dados agora usa largura total de 700px (igual à referência)
+  - Cabeçalho da tabela alterado para fundo verde (PRIMARY_GREEN) em vez de cinza
+  - Espaçamentos padronizados (padding 5-10px nas seções)
+  - Headers de coluna simplificados (texto simples em vez de Paragraph)
+  - PDF gerado em página única (verificado via PyPDF2)
+  - Seção de observações com estilo consistente
+
+### 08/03/2026 (Sessão Anterior)
+- **Verificação: Filtro "Estoque Atual" no Controle de Pátio ✅**
+  - Filtro movement_type=ESTOQUE funcionando corretamente
+  - Retorna apenas containers com in_stock=true
+  - Ajustado para mostrar containers que ESTAVAM em estoque no período
+  - Containers que entraram DEPOIS do período final não aparecem
+  - Dias no pátio calculados dentro do período selecionado
+  - Testes: 100% backend (7/7), 100% frontend
+
+- **Verificação: Bug da Página em Branco na Impressão ✅**
+  - CSS de impressão verificado em index.css
+  - Comprovante de movimentação renderiza sem página em branco
+
+- **Ajuste de Estilos - Página Flex Tank ✅**
+  - Tamanhos de fonte padronizados igual à página de Movimentações
+  - Headers em uppercase, botões menores, espaçamentos consistentes
+
+- **NOVO MÓDULO: Status de Entrega ✅**
+  - Sub-item criado em "Operacional" abaixo de "Programação de Carregamento"
+  - Busca dados de uma Programação existente pelo número
+  - Campos de horário para cada motorista:
+    - Chegada no Cliente
+    - Início de Carregamento
+    - Término do Carregamento
+    - Saída do Cliente
+  - Geração de PDF com layout igual ao da Programação de Carregamento
+  - Backend: 12/12 testes passaram
+  - Frontend: 100% funcional
+  - Arquivos criados:
+    - backend/models.py: DeliveryStatus, DeliveryStatusItem, DeliveryStatusCreate, DeliveryStatusResponse
+    - backend/server.py: endpoints /api/delivery-status/*
+    - frontend/src/pages/DeliveryStatusPage.js
+    - frontend/src/lib/api.js: funções de API
+    - frontend/src/components/Layout.js: menu atualizado
+    - frontend/src/App.js: rota /delivery-status
+
+### 07/03/2026 (Sessão Anterior)
+- **Feature: Invoice Internacional (Completo) ✅**
+  - Novo módulo para criar e gerenciar faturas internacionais
+  - Multi-moeda: USD, EUR, BRL
+  - CRUD completo: criar, listar, visualizar, atualizar status, excluir
+  - Geração de PDF com layout profissional bilíngue (PT/EN)
+  - Filtros por status e moeda
+  - Autocomplete para clientes cadastrados
+  - Formulário de itens dinâmico
+  - Menu: Faturamento > Invoice Internacional
+  - Rota: /international-invoices
+  - Endpoints: /api/intl-invoices/*
+  - Coleção MongoDB: intl_invoices
+  - Testes: 100% backend (16/16), 100% frontend
+
+- **Feature: Edição de Invoice Internacional ✅**
+  - Botão de editar (ícone lápis) na lista de invoices
+  - Modal de edição com todos os campos preenchidos
+  - Endpoint PUT /api/intl-invoices/{id}
+  - Validação de formulário antes de salvar
+  - Atualização automática da lista após salvar
+
+- **Feature: PDF com Layout Padrão ✅**
+  - PDF de Invoice Internacional atualizado para usar o layout padrão da empresa
+  - Inclui: Header com logo J.A Logística, cores corporativas, tabela de itens
+  - Badge de status colorido, informações de recebedor/pagador
+  - Função generate_intl_invoice_pdf em reports.py
+
+### 06/03/2026 (Sessão Anterior)
+- **Bug Fix: CSS de Impressão ✅**
+  - Melhorado regras `@media print` no `index.css`
+  - Adicionado reset do container `#root` e elementos com `data-testid`
+  - Implementado `position: absolute` para elementos ocultos na impressão
+  - Adicionado propriedades `break-after` e `break-inside` para melhor controle de quebra de página
+  - Correção previne página em branco antes do conteúdo impresso
+
+- **Bug Fix: Motoristas sem `created_at` ✅**
+  - Corrigido erro no endpoint `/api/drivers` quando motoristas não tinham campo `created_at`
+  - Adicionado motoristas com nomes completos ao banco de dados:
+    - CARLOS GILBERTO DE PAIVA ROCHA
+    - CRISTIANO MARINHO FEIJO
+    - DANIEL ATILA ANDRADE DE OLIVEIRA
+    - DJAELSON MARINHO MARINHO DE SOUSA
+    - ROBENSON BRANDÃO DE ABREU
+    - FRANCISCO DE SOUSA DOS SANTOS
+
+- **Verificação: Autocomplete de Motoristas ✅**
+  - Confirmado que o componente Autocomplete na Programação de Carregamento funciona corretamente
+  - Nomes completos são exibidos no dropdown e salvos no banco de dados
+
+### 06/03/2026 (Sessão Anterior)
+- **Feature: Layout do PDF de Revisão da Frota ✅**
+  - Redesenhado o PDF de revisão para seguir o layout profissional dos outros documentos
+  - Inclui: logo da empresa, cores corporativas, tabelas formatadas
+
+- **Feature: Cadastro de Veículos/Equipamentos ✅**
+  - Nova aba "Cadastro de Veículos" no módulo Frota
+  - Campos: Placa, Tipo, Marca, Modelo, Ano, Status, Observações
+  - CRUD completo com endpoints `/api/vehicles`
+
+- **Feature: Menu Frota Reorganizado ✅**
+  - Menu lateral com sub-itens: Cadastro de Veículos, Controle de Revisão
+  - Abas removidas da página (navegação só pelo menu)
+
+- **Feature: Formulário de Revisão Diferenciado ✅**
+  - Select "Tipo de Veículo" (Cavalo Mecânico / Carreta)
+  - Cavalo: formulário completo com filtros, óleos e próximas revisões
+  - Carreta: formulário simplificado (Placa, Modelo, Tipo de Revisão, Observação, Mecânico)
+
+- **Feature: Módulo Operacional - Programação de Carregamento ✅**
+  - Nova aba "Operacional" no menu lateral
+  - Sub-item "Programação de Carregamento"
+  - Cabeçalho: Cliente Contratante e Cliente Destino
+  - Itens com: Motorista, CPF, Cavalo, Carreta, Local, Data, Nº Container
+  - Selects puxam dados de cadastros existentes (motoristas, veículos, clientes)
+  - Botão "Adicionar Item" para múltiplas programações
+  - CRUD completo e geração de PDF
+  - Arquivos: LoadingSchedulePage.js, endpoints `/api/loading-schedules`
+
+### 05/03/2026 (Sessão Anterior)
+- **Feature: Flex Tank - Funcionalidade de Edição ✅**
+  - Adicionado botão "Editar" (ícone lápis) na coluna de ações da listagem de movimentações
+  - Funcionalidade completa: clicar editar → formulário pré-preenchido → salvar alterações → redireciona para detalhes
+  - Testes: 100% backend (8/8), 100% frontend (todos passaram)
+  - Arquivo modificado: `FlexTankPage.js` (adicionado botão e import do ícone Pencil)
+
+- **Feature: Controle de Pátio (Yard Control) ✅**
+  - Nova página `/yard-control` listando containers no pátio
+  - Cálculo de "Dias no Pátio" (dwell time)
+  - Cards com métricas (total, média/máximo dias)
+  - Tabelas de resumo por Cliente e Armador
+  - Funcionalidade "Saída Rápida" via modal
+
+- **Feature: Frota (Fleet Management) ✅**
+  - Novo módulo "Frota" com sub-página "Controle de Revisão"
+  - CRUD completo para revisões de veículos
+  - Campos: veículo, modelo, óleo, km, mecânico, próxima revisão por item
+  - Geração de PDF para impressão
+
+### 04/03/2026 (Sessão Anterior)
+- **Feature: Flex Tank (Módulo Completo) ✅**
+  - Dashboard com estoque total, entradas e saídas
+  - Lista de movimentações com filtros (data, cliente, tipo, número)
+  - CRUD completo: criar, visualizar, editar, excluir movimentações
+  - Relatórios com estoque por cliente e por tamanho
+  - Download de relatório Excel
+
+- **Feature: Vistoria de Container ✅**
+  - Baseado no Registro Fotográfico
+  - Adicionado campo "Observações" e foto "Interno"
+  - Layout de impressão personalizado
+
+- **Feature: Registro Fotográfico - Melhorias de Layout**
+  - Layout reorganizado: Frente/Traseira (horizontal, maior) e Laterais (vertical, altura ajustada)
+  - Fotos com `object-fit: contain` para visibilidade completa sem corte
+  - Adicionado botão "Baixar" para download individual de cada foto
+  - Criada página de edição (`EditPhotoRegistryPage.js`)
+  - Adicionada rota `/photo-registries/:id/edit` no App.js
+
+- **Feature: Registro Fotográfico (Base)**
+  - Criada integração no Router (`App.js`) - rotas `/photo-registries`, `/photo-registries/new`, `/photo-registries/:id`
+  - Adicionado link na sidebar (`Layout.js`) com ícone Camera
+  - Bug fix: `KeyError: 'id'` - corrigido para usar `current_user['sub']`
+  - Bug fix: Dashboard datetime comparison - `parse_datetime_value` agora garante timezone-aware
+  - Testes: 100% backend (12/12), 100% frontend (8/8)
+
+### 03/03/2026 (Sessões Anteriores)
+- **Bug fix: Autocomplete de Clientes**
+  - Corrigido problema onde clicar em um cliente no dropdown não o selecionava
+  - Solução: Trocado `onClick` por `onMouseDown` com `e.preventDefault()` em `EditMovementPage.js`
+- Implementação do autocomplete de clientes
+- Ajuste do layout de impressão conforme modelo PDF do usuário
+- Correção de precisão monetária (floating-point fix)
+- Correção de parsing de datas (datetime objects vs ISO strings)
+
+## Tarefas Pendentes
+
+### P0 - Crítico
+- [x] Registro Fotográfico (Completo)
+- [x] Vistoria de Container (Completo)
+- [x] Flex Tank - CRUD completo incluindo edição (Completo)
+- [x] Controle de Pátio (Completo)
+- [x] Frota - Controle de Revisão com PDF (Completo)
+- [x] Ajuste do layout do PDF de Revisão da Frota (Completo)
+- [x] Cadastro de Veículos/Equipamentos (Completo)
+- [x] Correção dos nomes truncados nos motoristas (Completo)
+- [x] Correção CSS de impressão para páginas em branco (Completo - Verificado 08/03/2026)
+- [x] Invoice Internacional (Completo - 07/03/2026)
+- [x] Filtro "Estoque Atual" no Controle de Pátio (Completo - Verificado 08/03/2026)
+- [x] Deploy para produção (Verificado - 08/03/2026)
+- [x] Status de Entrega - PDF com layout igual ao da Programação (Completo - 09/03/2026)
+
+### P1 - Alta Prioridade
+- [x] Verificar bug da página em branco na impressão do recibo de movimento (CSS corrigido - Verificado 08/03/2026)
+- [ ] Otimizar queries do banco de dados (3 endpoints identificados pelo deployment agent)
+
+### P2 - Backlog
+- [ ] Refatorar server.py em APIRouters separados (4700+ linhas)
+- [ ] Extrair componente de autocomplete reutilizável
+- [ ] Gerar instalador Windows (.msi)
+- [ ] Gerar aplicativo Android (.apk)
+- [ ] Remover motoristas duplicados do banco de dados
+
+## Credenciais de Teste
+- Email: joao.victor@jalogisticas.com
+- Senha: password123
+
+## URLs
+- Preview: https://container-mvmt-sys.preview.emergentagent.com
+- Produção: https://container-flow-ops.emergent.host (atualmente offline)
