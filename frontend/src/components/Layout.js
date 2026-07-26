@@ -25,7 +25,6 @@ import {
   Settings,
   Plus,
   List,
-  Camera,
   ClipboardCheck,
   Package,
   Clock,
@@ -105,7 +104,8 @@ export default function Layout({ children }) {
   const isFrotaActive = location.pathname === '/fleet' || location.pathname === '/fleet/vehicles' || location.pathname === '/fleet/revisions' || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/ordem-servico');
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
-  const isTerminalActive = isFlexTankActive;
+  const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
+  const isTerminalActive = isFlexTankActive || isContainerInspectionsActive;
 
   useEffect(() => {
     if (isMovimentacoesActive && !movimentacoesOpen) setMovimentacoesOpen(true);
@@ -172,7 +172,9 @@ export default function Layout({ children }) {
 
   const mainNavItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/photo-registries', label: 'Registro Fotográfico', icon: Camera },
+  ];
+
+  const terminalItems = [
     { path: '/container-inspections', label: 'Vistoria de Container', icon: ClipboardCheck },
   ];
 
@@ -215,7 +217,7 @@ export default function Layout({ children }) {
   ];
 
   const allSearchableItems = useMemo(() => [
-    ...mainNavItems, ...movimentacoesItems, ...frotaItems, ...cadastroItems, ...financeiroItems, ...operacionalItems,
+    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...frotaItems, ...cadastroItems, ...financeiroItems, ...operacionalItems,
   ], []);
 
   const filteredItems = searchQuery
@@ -430,6 +432,7 @@ export default function Layout({ children }) {
                 {renderGroupHeader('Terminal', Anchor, terminalOpen, toggleTerminal, isTerminalActive, 'nav-terminal-toggle')}
                 {terminalOpen && sidebarOpen && (
                   <div>
+                    {terminalItems.map((item) => renderNavItem(item, true, true))}
                     {renderGroupHeader('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, 'nav-flex-tank-toggle', true)}
                     {flexTankOpen && (
                       <div>{flexTankItems.map((item) => renderNavItem(item, true, true))}</div>
