@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Loader2, Plus } from 'lucide-react';
@@ -27,6 +28,7 @@ export default function EditContainerInspectionPage() {
   const [formData, setFormData] = useState({
     container_number: '',
     container_seal: '',
+    size_type: '20DC',
     collection_terminal: '',
     booking: '',
     client_id: '',
@@ -59,6 +61,7 @@ export default function EditContainerInspectionPage() {
       setFormData({
         container_number: inspection.container_number || '',
         container_seal: inspection.container_seal || '',
+        size_type: inspection.size_type || '20DC',
         collection_terminal: inspection.collection_terminal || '',
         booking: inspection.booking || '',
         client_id: inspection.client_id || '',
@@ -135,6 +138,7 @@ export default function EditContainerInspectionPage() {
       await api.updateContainerInspection(id, {
         container_number: formData.container_number,
         container_seal: formData.container_seal || null,
+        size_type: formData.size_type || null,
         collection_terminal: formData.collection_terminal || null,
         booking: formData.booking || null,
         client_id: formData.client_id || null,
@@ -209,7 +213,7 @@ export default function EditContainerInspectionPage() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="container_seal">Numeração do Container</Label>
+                  <Label htmlFor="container_seal">Numeração de Container</Label>
                   <Input
                     id="container_seal"
                     value={formData.container_seal}
@@ -218,7 +222,27 @@ export default function EditContainerInspectionPage() {
                     data-testid="container-seal-input"
                   />
                 </div>
-                
+
+                <div>
+                  <Label htmlFor="size_type">Tamanho/Tipo</Label>
+                  <Select value={formData.size_type} onValueChange={(value) => handleInputChange('size_type', value)}>
+                    <SelectTrigger id="size_type" data-testid="size-type-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="20DC">20DC</SelectItem>
+                      <SelectItem value="20RF">20RF</SelectItem>
+                      <SelectItem value="20OT">20OT</SelectItem>
+                      <SelectItem value="20FR">20FR</SelectItem>
+                      <SelectItem value="40HC">40HC</SelectItem>
+                      <SelectItem value="40RF">40RF</SelectItem>
+                      <SelectItem value="40OT">40OT</SelectItem>
+                      <SelectItem value="40FR">40FR</SelectItem>
+                      <SelectItem value="40DRY">40DRY</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div>
                   <Label htmlFor="collection_terminal">Terminal de Coleta</Label>
                   <Input

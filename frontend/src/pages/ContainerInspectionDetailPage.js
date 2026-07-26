@@ -227,8 +227,12 @@ export default function ContainerInspectionDetailPage() {
               <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.container_number}</div>
             </div>
             <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Numeração do Container</div>
+              <div style={{ fontSize: '8px', color: '#666' }}>Numeração de Container</div>
               <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.container_seal || '-'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '8px', color: '#666' }}>Tamanho/Tipo</div>
+              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.size_type || '-'}</div>
             </div>
             <div>
               <div style={{ fontSize: '8px', color: '#666' }}>Terminal de Coleta</div>
@@ -542,8 +546,12 @@ export default function ContainerInspectionDetailPage() {
                 <p className="font-semibold">{inspection.container_number}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Numeração do Container</p>
+                <p className="text-sm text-muted-foreground">Numeração de Container</p>
                 <p className="font-semibold">{inspection.container_seal || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Tamanho/Tipo</p>
+                <p className="font-semibold">{inspection.size_type || '-'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Terminal de Coleta</p>

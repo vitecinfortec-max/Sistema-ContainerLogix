@@ -400,6 +400,7 @@ class ContainerInspection(BaseModel):
     inspection_number: int  # Número sequencial da vistoria
     container_number: str
     container_seal: Optional[str] = None  # Numeração do Container (lacre)
+    size_type: Optional[str] = None  # Tamanho/Tipo do container (ex: 20DC, 40HC)
     collection_terminal: Optional[str] = None  # Terminal de Coleta
     booking: Optional[str] = None
     client_id: Optional[str] = None
@@ -428,6 +429,7 @@ class ContainerInspection(BaseModel):
 class ContainerInspectionCreate(BaseModel):
     container_number: str
     container_seal: Optional[str] = None
+    size_type: Optional[str] = None
     collection_terminal: Optional[str] = None
     booking: Optional[str] = None
     client_id: Optional[str] = None
@@ -439,6 +441,7 @@ class ContainerInspectionCreate(BaseModel):
 class ContainerInspectionUpdate(BaseModel):
     container_number: Optional[str] = None
     container_seal: Optional[str] = None
+    size_type: Optional[str] = None
     collection_terminal: Optional[str] = None
     booking: Optional[str] = None
     client_id: Optional[str] = None
@@ -452,6 +455,7 @@ class ContainerInspectionResponse(BaseModel):
     inspection_number: int
     container_number: str
     container_seal: Optional[str] = None
+    size_type: Optional[str] = None
     collection_terminal: Optional[str] = None
     booking: Optional[str] = None
     client_id: Optional[str] = None
