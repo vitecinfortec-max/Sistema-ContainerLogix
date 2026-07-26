@@ -21,6 +21,7 @@ export default function NewMovementPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [drivers, setDrivers] = useState([]);
   const [companies, setCompanies] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [clients, setClients] = useState([]);
   const [shippingLines, setShippingLines] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
@@ -89,26 +90,29 @@ export default function NewMovementPage() {
       console.log('[NewMovementPage] Iniciando carregamento de dados...');
       
       // Carregar todos os dados em paralelo
-      const [driversRes, companiesRes, clientsRes, shippingLinesRes, serviceTypesRes] = await Promise.all([
+      const [driversRes, companiesRes, clientsRes, shippingLinesRes, serviceTypesRes, vehiclesRes] = await Promise.all([
         api.getDrivers(),
         api.getTransportCompanies(),
         api.getClients(),
         api.getShippingLines(),
-        api.getServiceTypes()
+        api.getServiceTypes(),
+        api.getVehicles({ per_page: 1000 })
       ]);
-      
+
       // Definir os dados com validação
       const driversData = Array.isArray(driversRes.data) ? driversRes.data : [];
       const companiesData = Array.isArray(companiesRes.data) ? companiesRes.data : [];
       const clientsData = Array.isArray(clientsRes.data) ? clientsRes.data : [];
       const shippingLinesData = Array.isArray(shippingLinesRes.data) ? shippingLinesRes.data : [];
       const serviceTypesData = Array.isArray(serviceTypesRes.data) ? serviceTypesRes.data : [];
-      
+      const vehiclesData = Array.isArray(vehiclesRes.data?.items) ? vehiclesRes.data.items : [];
+
       setDrivers(driversData);
       setCompanies(companiesData);
       setClients(clientsData);
       setShippingLines(shippingLinesData);
       setServiceTypes(serviceTypesData);
+      setVehicles(vehiclesData);
       
       // Log detalhado
       console.log('[NewMovementPage] Dados carregados com sucesso:');
@@ -179,6 +183,27 @@ export default function NewMovementPage() {
     const company = companies.find(c => c.name.toLowerCase() === companyName.toLowerCase());
     if (company) {
       toast.success('Transportadora encontrada no cadastro');
+    }
+  };
+
+  const cavaloVehicles = vehicles.filter(v => v.vehicle_type === 'CAVALO');
+  const carretaVehicles = vehicles.filter(v => v.vehicle_type === 'CARRETA');
+
+  const handleTruckPlateChange = (plate) => {
+    const upper = plate.toUpperCase();
+    setValue('truck_plate', upper);
+    const vehicle = cavaloVehicles.find(v => v.plate.toUpperCase() === upper);
+    if (vehicle) {
+      toast.success('Placa encontrada no cadastro de veículos');
+    }
+  };
+
+  const handleTrailerPlateChange = (plate) => {
+    const upper = plate.toUpperCase();
+    setValue('trailer_plate_1', upper);
+    const vehicle = carretaVehicles.find(v => v.plate.toUpperCase() === upper);
+    if (vehicle) {
+      toast.success('Placa encontrada no cadastro de veículos');
     }
   };
 
@@ -291,31 +316,34 @@ export default function NewMovementPage() {
                     id="truck_plate"
                     data-testid="truck-plate-input"
                     {...register('truck_plate', { required: true })}
+                    onChange={(e) => handleTruckPlateChange(e.target.value)}
                     className="h-12 font-mono uppercase"
                     placeholder="ABC-1234"
+                    list="trucks-list"
                   />
+                  <datalist id="trucks-list">
+                    {cavaloVehicles.map(vehicle => (
+                      <option key={vehicle.id} value={vehicle.plate} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="trailer_plate_1">Placa 1º Carreta *</Label>
+                  <Label htmlFor="trailer_plate_1">Placa Carreta *</Label>
                   <Input
                     id="trailer_plate_1"
                     data-testid="trailer-plate-1-input"
                     {...register('trailer_plate_1', { required: true })}
+                    onChange={(e) => handleTrailerPlateChange(e.target.value)}
                     className="h-12 font-mono uppercase"
                     placeholder="ABC-1234"
+                    list="trailers-list"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="trailer_plate_2">Placa 2º Carreta</Label>
-                  <Input
-                    id="trailer_plate_2"
-                    data-testid="trailer-plate-2-input"
-                    {...register('trailer_plate_2')}
-                    className="h-12 font-mono uppercase"
-                    placeholder="ABC-1234 (opcional)"
-                  />
+                  <datalist id="trailers-list">
+                    {carretaVehicles.map(vehicle => (
+                      <option key={vehicle.id} value={vehicle.plate} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div className="space-y-2">

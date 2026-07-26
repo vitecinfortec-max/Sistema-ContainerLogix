@@ -21,6 +21,7 @@ export default function EditMovementPage() {
   const [clients, setClients] = useState([]);
   const [shippingLines, setShippingLines] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [containerPhotos, setContainerPhotos] = useState(null);
   const [containerDamages, setContainerDamages] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
@@ -91,19 +92,22 @@ export default function EditMovementPage() {
     try {
       console.log('[EditMovementPage] Iniciando carregamento de dados auxiliares...');
       
-      const [clientsRes, shippingLinesRes, serviceTypesRes] = await Promise.all([
+      const [clientsRes, shippingLinesRes, serviceTypesRes, vehiclesRes] = await Promise.all([
         api.getClients(),
         api.getShippingLines(),
-        api.getServiceTypes()
+        api.getServiceTypes(),
+        api.getVehicles({ per_page: 1000 })
       ]);
-      
+
       const clientsData = Array.isArray(clientsRes.data) ? clientsRes.data : [];
       const shippingLinesData = Array.isArray(shippingLinesRes.data) ? shippingLinesRes.data : [];
       const serviceTypesData = Array.isArray(serviceTypesRes.data) ? serviceTypesRes.data : [];
-      
+      const vehiclesData = Array.isArray(vehiclesRes.data?.items) ? vehiclesRes.data.items : [];
+
       setClients(clientsData);
       setShippingLines(shippingLinesData);
       setServiceTypes(serviceTypesData);
+      setVehicles(vehiclesData);
       
       console.log('[EditMovementPage] Dados auxiliares carregados:');
       console.log(`  - Clientes: ${clientsData.length}`);
@@ -138,6 +142,27 @@ export default function EditMovementPage() {
       toast.error(error.response?.data?.detail || 'Erro ao atualizar movimentação');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cavaloVehicles = vehicles.filter(v => v.vehicle_type === 'CAVALO');
+  const carretaVehicles = vehicles.filter(v => v.vehicle_type === 'CARRETA');
+
+  const handleTruckPlateChange = (plate) => {
+    const upper = plate.toUpperCase();
+    setValue('truck_plate', upper);
+    const vehicle = cavaloVehicles.find(v => v.plate.toUpperCase() === upper);
+    if (vehicle) {
+      toast.success('Placa encontrada no cadastro de veículos');
+    }
+  };
+
+  const handleTrailerPlateChange = (plate) => {
+    const upper = plate.toUpperCase();
+    setValue('trailer_plate_1', upper);
+    const vehicle = carretaVehicles.find(v => v.plate.toUpperCase() === upper);
+    if (vehicle) {
+      toast.success('Placa encontrada no cadastro de veículos');
     }
   };
 
@@ -218,15 +243,33 @@ export default function EditMovementPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="truck_plate">Placa do Cavalo *</Label>
-                  <Input id="truck_plate" {...register('truck_plate', { required: true })} className="h-12 font-mono uppercase" />
+                  <Input
+                    id="truck_plate"
+                    {...register('truck_plate', { required: true })}
+                    onChange={(e) => handleTruckPlateChange(e.target.value)}
+                    className="h-12 font-mono uppercase"
+                    list="trucks-list"
+                  />
+                  <datalist id="trucks-list">
+                    {cavaloVehicles.map(vehicle => (
+                      <option key={vehicle.id} value={vehicle.plate} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="trailer_plate_1">Placa Carreta 1º *</Label>
-                  <Input id="trailer_plate_1" {...register('trailer_plate_1', { required: true })} className="h-12 font-mono uppercase" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="trailer_plate_2">Placa Carreta 2º</Label>
-                  <Input id="trailer_plate_2" {...register('trailer_plate_2')} className="h-12 font-mono uppercase" />
+                  <Label htmlFor="trailer_plate_1">Placa Carreta *</Label>
+                  <Input
+                    id="trailer_plate_1"
+                    {...register('trailer_plate_1', { required: true })}
+                    onChange={(e) => handleTrailerPlateChange(e.target.value)}
+                    className="h-12 font-mono uppercase"
+                    list="trailers-list"
+                  />
+                  <datalist id="trailers-list">
+                    {carretaVehicles.map(vehicle => (
+                      <option key={vehicle.id} value={vehicle.plate} />
+                    ))}
+                  </datalist>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="transport_company">Transportadora *</Label>
