@@ -205,3 +205,11 @@ credentials.json
 # Templates are safe to commit (documentation only, no real secrets)
 !.env.example
 !**/.env.example
+
+# Binários baixados para empacotar o app desktop (Python embutido, MongoDB portátil).
+# Não versionar: são recriados por desktop/build-windows.bat, não fazem parte do código.
+desktop/resources/
+
+# Backups locais de teste do app desktop (dump do Mongo + uploads) - dados de runtime,
+# não código.
+desktop/ContainerLogix-Backups/

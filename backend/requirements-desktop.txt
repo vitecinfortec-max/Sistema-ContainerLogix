@@ -1,0 +1,26 @@
+# Dependências reais do runtime do app desktop (server.py, models.py, reports.py, auth.py).
+# Gerado a partir de requirements.txt removendo libs não importadas em runtime
+# (pandas/numpy/litellm/openai/google-generativeai/boto3/stripe/s5cmd só existiam
+# em scripts avulsos ou não eram usadas; mypy/black/flake8/pytest são ferramentas de dev).
+fastapi==0.110.1
+uvicorn==0.25.0
+starlette==0.37.2
+motor==3.3.1
+pymongo==4.5.0
+dnspython==2.8.0
+python-dotenv==1.2.1
+pydantic==2.12.5
+pydantic_core==2.41.5
+email-validator==2.3.0
+python-jose==3.5.0
+passlib==1.7.4
+bcrypt==4.0.1
+cryptography==46.0.4
+python-multipart==0.0.22
+reportlab==4.4.9
+openpyxl==3.1.5
+pillow==12.1.0
+requests==2.32.5
+resend==2.22.0
+websockets==15.0.1
+python-barcode==0.16.1

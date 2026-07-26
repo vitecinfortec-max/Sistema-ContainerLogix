@@ -66,6 +66,11 @@ echo.
 echo Isso pode levar alguns minutos...
 echo.
 
+REM Evita que o electron-builder tente baixar a ferramenta de assinatura de
+REM codigo do macOS (winCodeSign), que falha ao extrair no Windows sem
+REM privilegio de criar link simbolico e nao e necessaria para build Windows.
+set CSC_IDENTITY_AUTO_DISCOVERY=false
+
 call yarn build:win
 if %ERRORLEVEL% NEQ 0 (
     echo [ERRO] Falha ao gerar instalador

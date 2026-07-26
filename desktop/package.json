@@ -5,13 +5,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder",
     "build:win": "electron-builder --win --x64",
     "build:win-msi": "electron-builder --win msi --x64",
-    "build:win-portable": "electron-builder --win portable --x64",
-    "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux",
-    "build:all": "electron-builder -mwl"
+    "build:win-portable": "electron-builder --win portable --x64"
   },
   "build": {
     "appId": "com.jalogistica.containerlogix",
@@ -24,71 +20,68 @@
     "files": [
       "main.js",
       "preload.js",
-      "icon.png"
+      "icon.png",
+      "icon.ico",
+      "lib/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/python-runtime",
+        "to": "python-runtime",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      },
+      {
+        "from": "resources/mongo-bin",
+        "to": "mongo-bin"
+      },
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!venv",
+          "!venv/**",
+          "!tests/**",
+          "!scripts/**",
+          "!__pycache__/**",
+          "!**/__pycache__/**",
+          "!*.pyc",
+          "!.env",
+          "!requirements.txt",
+          "!requirements-desktop.txt"
+        ]
+      },
+      {
+        "from": "../frontend/build",
+        "to": "frontend-build"
+      }
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
           "arch": ["x64"]
-        },
-        {
-          "target": "msi",
-          "arch": ["x64"]
-        },
-        {
-          "target": "portable",
-          "arch": ["x64"]
         }
       ],
-      "icon": "icon.png",
+      "icon": "icon.ico",
       "publisherName": "J.A Logística",
+      "signAndEditExecutable": false,
       "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "allowElevation": true,
-      "installerIcon": "icon.png",
-      "uninstallerIcon": "icon.png",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "ContainerLogix",
       "artifactName": "${productName}-Setup-${version}.${ext}"
-    },
-    "msi": {
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "perMachine": true,
-      "runAfterFinish": true,
-      "artifactName": "${productName}-${version}-x64.${ext}"
-    },
-    "portable": {
-      "artifactName": "${productName}-${version}-Portable.${ext}"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "icon.png",
-      "category": "public.app-category.business"
-    },
-    "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    },
-    "linux": {
-      "target": ["AppImage"],
-      "icon": "icon.png",
-      "category": "Office"
     }
   },
   "author": "J.A Logística",
