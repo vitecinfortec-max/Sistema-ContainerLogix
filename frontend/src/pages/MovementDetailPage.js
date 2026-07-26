@@ -258,19 +258,15 @@ export default function MovementDetailPage() {
               <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.transport_company}</div>
             </div>
           </div>
-          {/* Linha 2: Placa Cavalo | Placa Carreta 1º | Placa Carreta 2º */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+          {/* Linha 2: Placa Cavalo | Placa Carreta */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div>
               <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Placa Cavalo</div>
               <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.truck_plate}</div>
             </div>
             <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Placa Carreta 1º</div>
+              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Placa Carreta</div>
               <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.trailer_plate_1}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Placa Carreta 2º</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.trailer_plate_2 || '-'}</div>
             </div>
           </div>
         </div>
@@ -596,18 +592,14 @@ export default function MovementDetailPage() {
                   <p className="font-bold text-xs">{movement.transport_company}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-xs">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <p className="text-[10px] text-muted-foreground">Placa Cavalo</p>
                   <p className="font-bold font-mono text-xs">{movement.truck_plate}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Placa Carreta 1º</p>
+                  <p className="text-[10px] text-muted-foreground">Placa Carreta</p>
                   <p className="font-bold font-mono text-xs">{movement.trailer_plate_1}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground">Placa Carreta 2º</p>
-                  <p className="font-bold font-mono text-xs">{movement.trailer_plate_2 || '-'}</p>
                 </div>
               </div>
             </div>

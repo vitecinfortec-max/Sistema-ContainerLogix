@@ -260,14 +260,14 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
     # 15 columns matching template
     data = [[
         'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista', 'CPF',
-        'Placa Cavalo', 'Placa 1ª Carreta', 'Placa 2ª Carreta', 'Transportadora',
+        'Placa Cavalo', 'Placa Carreta', 'Transportadora',
         'Status', 'Tamanho', 'Tara', 'Armador', 'Booking'
     ]]
-    
+
     for m in movements:
         dt_brt = to_brt(m.get('created_at'))
         created_at = dt_brt.strftime('%d/%m/%Y %H:%M') if dt_brt else str(m.get('created_at', '-'))
-        
+
         data.append([
             str(m.get('transaction_id', '-')),
             created_at,
@@ -277,7 +277,6 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
             m.get('driver_cpf', '-'),
             m.get('truck_plate', '-'),
             m.get('trailer_plate_1', '') or '-',
-            m.get('trailer_plate_2', '') or '-',
             m.get('transport_company', '-'),
             m.get('status', 'VAZIO'),
             m.get('size_type', '-'),
@@ -286,8 +285,8 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
             m.get('booking', '') or '-'
         ])
 
-    # Column widths for 15 columns in landscape A4 (~780 points available)
-    col_widths = [30, 56, 42, 58, 75, 48, 46, 52, 52, 72, 38, 38, 32, 52, 42]
+    # Column widths for 14 columns in landscape A4 (~780 points available)
+    col_widths = [30, 56, 42, 58, 75, 48, 46, 52, 72, 38, 38, 32, 52, 42]
     
     table = Table(data, colWidths=col_widths, repeatRows=1)
     
@@ -318,19 +317,18 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
         # Alignments
         ('ALIGN', (0, 1), (0, -1), 'CENTER'),   # ID Trans.
         ('ALIGN', (2, 1), (2, -1), 'CENTER'),   # Tipo
-        ('ALIGN', (10, 1), (10, -1), 'CENTER'), # Status
-        ('ALIGN', (11, 1), (11, -1), 'CENTER'), # Tamanho
-        ('ALIGN', (12, 1), (12, -1), 'CENTER'), # Tara
+        ('ALIGN', (9, 1), (9, -1), 'CENTER'),   # Status
+        ('ALIGN', (10, 1), (10, -1), 'CENTER'), # Tamanho
+        ('ALIGN', (11, 1), (11, -1), 'CENTER'), # Tara
         ('ALIGN', (1, 1), (1, -1), 'LEFT'),     # Data/Hora
         ('ALIGN', (3, 1), (3, -1), 'LEFT'),     # Nº Container
         ('ALIGN', (4, 1), (4, -1), 'LEFT'),     # Motorista
         ('ALIGN', (5, 1), (5, -1), 'LEFT'),     # CPF
         ('ALIGN', (6, 1), (6, -1), 'LEFT'),     # Placa Cavalo
-        ('ALIGN', (7, 1), (7, -1), 'LEFT'),     # Placa 1ª Carreta
-        ('ALIGN', (8, 1), (8, -1), 'LEFT'),     # Placa 2ª Carreta
-        ('ALIGN', (9, 1), (9, -1), 'LEFT'),     # Transportadora
-        ('ALIGN', (13, 1), (13, -1), 'LEFT'),   # Armador
-        ('ALIGN', (14, 1), (14, -1), 'LEFT'),   # Booking
+        ('ALIGN', (7, 1), (7, -1), 'LEFT'),     # Placa Carreta
+        ('ALIGN', (8, 1), (8, -1), 'LEFT'),     # Transportadora
+        ('ALIGN', (12, 1), (12, -1), 'LEFT'),   # Armador
+        ('ALIGN', (13, 1), (13, -1), 'LEFT'),   # Booking
         
         # Thin gray borders
         ('GRID', (0, 0), (-1, -1), 0.25, border_gray),
@@ -603,10 +601,10 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
         else:
             stats_text = f"Total: {total_records}  |  Entradas: {total_entries}  |  Saídas: {total_exits}"
 
-        # Headers matching template (15 columns, with Placa 2ª Carreta)
+        # Headers matching template (14 columns)
         headers = [
             'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista', 'CPF',
-            'Placa Cavalo', 'Placa 1ª Carreta', 'Placa 2ª Carreta', 'Transportadora',
+            'Placa Cavalo', 'Placa Carreta', 'Transportadora',
             'Status', 'Tamanho', 'Tara', 'Armador', 'Booking'
         ]
 
@@ -623,7 +621,6 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
                 m.get('driver_cpf', '-'),
                 m.get('truck_plate', '-'),
                 m.get('trailer_plate_1', '-') or '-',
-                m.get('trailer_plate_2', '-') or '-',
                 m.get('transport_company', '-'),
                 m.get('status', 'VAZIO'),
                 m.get('size_type', '-'),
@@ -632,15 +629,15 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
                 m.get('booking', '') or '-'
             ])
 
-        # Column widths matching template (15 columns: B to P)
+        # Column widths matching template (14 columns: B to O)
         col_widths = {
             'B': 7.3, 'C': 13.7, 'D': 8, 'E': 14, 'F': 30, 'G': 14,
-            'H': 12, 'I': 14, 'J': 14, 'K': 27.3, 'L': 5.6, 'M': 7.6,
-            'N': 4.5, 'O': 13.2, 'P': 12
+            'H': 12, 'I': 14, 'J': 27.3, 'K': 5.6, 'L': 7.6,
+            'M': 4.5, 'N': 13.2, 'O': 12
         }
 
-        # Center alignment for: ID Trans.(0), Tipo(2), Status(10), Tamanho(11), Tara(12)
-        center_cols = {0, 2, 10, 11, 12}
+        # Center alignment for: ID Trans.(0), Tipo(2), Status(9), Tamanho(10), Tara(11)
+        center_cols = {0, 2, 9, 10, 11}
 
         _bsoft_style_excel(
             ws, report_title, stats_text, headers, data_rows, col_widths,
