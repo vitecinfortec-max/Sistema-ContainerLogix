@@ -74,7 +74,42 @@ Sistema completo de entrada, saída e inventário de contêineres para empresas 
 
 ## Histórico de Alterações Recentes
 
-### 11/03/2026 (Sessão Atual)
+### 26/07/2026 (Sessão Atual)
+- **Checklist de Avarias na Vistoria de Container ✅**
+  - Campos `no_damage` (bool) e `damage_items` (lista) no modelo `ContainerInspection`
+  - Checkbox "Container sem avarias" ou seleção de itens (lista sugerida + personalizados)
+  - Badges coloridos (verde/vermelho) na tela de detalhe e no layout de impressão
+  - Arquivos: `backend/models.py`, `backend/server.py`, `frontend/src/lib/inspectionItems.js`,
+    `NewContainerInspectionPage.js`, `EditContainerInspectionPage.js`, `ContainerInspectionDetailPage.js`
+  - Testado manualmente (criar, editar, alternar "sem avarias") rodando backend+frontend localmente
+
+- **Rebranding: logo local + menu Financeiro/Terminal ✅**
+  - Logo trocado de URL externa (Emergent) para arquivo local `frontend/public/logo-containerlogix.png`
+  - Menu "Faturamento" renomeado para "Financeiro"; "Flex Tank" agrupado sob novo grupo "Terminal"
+
+- **App Desktop: reempacotado como standalone (Python + MongoDB embutidos) ✅**
+  - Instalador Windows agora embute runtime Python portátil + MongoDB portátil (via `extraResources`
+    do electron-builder) — não depende mais de nada pré-instalado na máquina do usuário
+  - `desktop/lib/`: novos módulos (`backendProcess.js`, `mongoProcess.js`, `paths.js`,
+    `staticServer.js`, `config.js`) orquestram os processos e servem o build do React
+  - Backup/restauração automática (mongodump + uploads) numa pasta do Google Drive escolhida
+    pelo usuário no primeiro uso; menu "Arquivo" tem backup manual e troca de pasta
+  - `backend/requirements-desktop.txt`: subconjunto mínimo de dependências de runtime
+  - `frontend/src/index.js`: força novo login e ignora cache do Service Worker de PWA dentro do Electron
+  - Removida dependência não utilizada `emergentintegrations` de `requirements.txt`
+
+- **Nota de ambiente:** a instalação local do Python 3.11 nesta máquina estava com o módulo
+  stdlib `tempfile.py` corrompido/ausente (impedia até o `pip` de funcionar). Corrigido reinstalando
+  o Python oficial (python.org) e restaurando o arquivo a partir do código-fonte oficial do CPython.
+  Se `pip`/venv derem erro estranho novamente nesta máquina, verificar isso primeiro.
+
+- **Pendência aberta:** `scripts_servico/*.bat` têm mudanças não commitadas trocando os caminhos
+  de `I:\...` / usuário `victo` para `G:\...` / usuário `joaov` — parece ser artefato de edição
+  em outra máquina sincronizada pelo mesmo Google Drive. Não commitado; decidir com o usuário como
+  lidar com scripts que têm caminho de máquina hardcoded num repo compartilhado por Drive entre
+  máquinas diferentes.
+
+### 11/03/2026 (Sessão Anterior)
 - **Novo Módulo "Segregação de Unidade" ✅**
   - Backend: modelo UnitSegregation, endpoints CRUD, geração de PDF
   - Frontend: página completa com listagem, filtros, modais de criar/editar/detalhes
