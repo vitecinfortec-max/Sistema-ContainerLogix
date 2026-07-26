@@ -2810,10 +2810,12 @@ async def create_container_inspection(
         shipping_line_id=data.shipping_line_id,
         shipping_line_name=shipping_line_name,
         observations=data.observations,
+        no_damage=data.no_damage,
+        damage_items=data.damage_items,
         created_by=current_user["sub"],
         created_by_name=current_user["name"]
     )
-    
+
     inspection_dict = inspection.model_dump()
     inspection_dict["created_at"] = inspection_dict["created_at"].isoformat()
     
@@ -2845,10 +2847,16 @@ async def update_container_inspection(
     
     if data.booking is not None:
         update_data["booking"] = data.booking
-    
+
     if data.observations is not None:
         update_data["observations"] = data.observations
-    
+
+    if data.no_damage is not None:
+        update_data["no_damage"] = data.no_damage
+
+    if data.damage_items is not None:
+        update_data["damage_items"] = data.damage_items
+
     if data.client_id is not None:
         update_data["client_id"] = data.client_id
         if data.client_id:

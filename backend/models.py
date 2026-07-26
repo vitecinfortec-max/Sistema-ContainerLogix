@@ -407,14 +407,18 @@ class ContainerInspection(BaseModel):
     shipping_line_id: Optional[str] = None
     shipping_line_name: Optional[str] = None
     observations: Optional[str] = None  # Campo de observação
-    
+
+    # Vistoria de avarias
+    no_damage: bool = False  # Container sem avarias
+    damage_items: List[str] = Field(default_factory=list)  # Itens marcados com avaria
+
     # Fotos (URLs dos arquivos) - inclui Interno
     photo_front: Optional[str] = None
     photo_back: Optional[str] = None
     photo_left: Optional[str] = None
     photo_right: Optional[str] = None
     photo_internal: Optional[str] = None  # Foto interna
-    
+
     # Metadados
     created_by: str
     created_by_name: str
@@ -429,6 +433,8 @@ class ContainerInspectionCreate(BaseModel):
     client_id: Optional[str] = None
     shipping_line_id: Optional[str] = None
     observations: Optional[str] = None
+    no_damage: bool = False
+    damage_items: List[str] = Field(default_factory=list)
 
 class ContainerInspectionUpdate(BaseModel):
     container_number: Optional[str] = None
@@ -438,6 +444,8 @@ class ContainerInspectionUpdate(BaseModel):
     client_id: Optional[str] = None
     shipping_line_id: Optional[str] = None
     observations: Optional[str] = None
+    no_damage: Optional[bool] = None
+    damage_items: Optional[List[str]] = None
 
 class ContainerInspectionResponse(BaseModel):
     id: str
@@ -451,6 +459,8 @@ class ContainerInspectionResponse(BaseModel):
     shipping_line_id: Optional[str] = None
     shipping_line_name: Optional[str] = None
     observations: Optional[str] = None
+    no_damage: bool = False
+    damage_items: List[str] = Field(default_factory=list)
     photo_front: Optional[str] = None
     photo_back: Optional[str] = None
     photo_left: Optional[str] = None

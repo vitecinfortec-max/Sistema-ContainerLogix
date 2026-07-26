@@ -6,9 +6,11 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
+import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Plus } from 'lucide-react';
+import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
 
 export default function EditContainerInspectionPage() {
   const { id } = useParams();
@@ -33,7 +35,11 @@ export default function EditContainerInspectionPage() {
     shipping_line_name: '',
     observations: ''
   });
-  
+
+  const [noDamage, setNoDamage] = useState(false);
+  const [damageItems, setDamageItems] = useState([]);
+  const [customItem, setCustomItem] = useState('');
+
   const [inspectionNumber, setInspectionNumber] = useState(null);
 
   useEffect(() => {
@@ -61,6 +67,8 @@ export default function EditContainerInspectionPage() {
         shipping_line_name: inspection.shipping_line_name || '',
         observations: inspection.observations || ''
       });
+      setNoDamage(inspection.no_damage || false);
+      setDamageItems(inspection.damage_items || []);
       setClientSearch(inspection.client_name || '');
       setShippingLineSearch(inspection.shipping_line_name || '');
       
@@ -98,6 +106,21 @@ export default function EditContainerInspectionPage() {
     setShowShippingLineDropdown(false);
   };
 
+  const handleToggleDamageItem = (item) => {
+    setDamageItems(prev =>
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
+
+  const handleAddCustomItem = () => {
+    const value = customItem.trim();
+    if (!value) return;
+    if (!damageItems.includes(value)) {
+      setDamageItems(prev => [...prev, value]);
+    }
+    setCustomItem('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -116,9 +139,11 @@ export default function EditContainerInspectionPage() {
         booking: formData.booking || null,
         client_id: formData.client_id || null,
         shipping_line_id: formData.shipping_line_id || null,
-        observations: formData.observations || null
+        observations: formData.observations || null,
+        no_damage: noDamage,
+        damage_items: noDamage ? [] : damageItems
       });
-      
+
       toast.success('Vistoria atualizada com sucesso!');
       navigate(`/container-inspections/${id}`);
     } catch (error) {
@@ -292,6 +317,73 @@ export default function EditContainerInspectionPage() {
                   data-testid="observations-input"
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Itens de Vistoria */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Itens de Vistoria</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="no_damage"
+                  checked={noDamage}
+                  onCheckedChange={(checked) => {
+                    setNoDamage(checked === true);
+                    if (checked) setDamageItems([]);
+                  }}
+                  data-testid="no-damage-checkbox"
+                />
+                <Label htmlFor="no_damage" className="cursor-pointer font-semibold">
+                  Container sem avarias
+                </Label>
+              </div>
+
+              {!noDamage && (
+                <>
+                  <div>
+                    <Label className="mb-2 block">Marque os itens com avaria</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {Array.from(new Set([...SUGGESTED_INSPECTION_ITEMS, ...damageItems])).map(item => (
+                        <div key={item} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`damage-item-${item}`}
+                            checked={damageItems.includes(item)}
+                            onCheckedChange={() => handleToggleDamageItem(item)}
+                          />
+                          <Label htmlFor={`damage-item-${item}`} className="cursor-pointer font-normal">
+                            {item}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <Label htmlFor="custom_item">Adicionar item personalizado</Label>
+                      <Input
+                        id="custom_item"
+                        value={customItem}
+                        onChange={(e) => setCustomItem(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCustomItem();
+                          }
+                        }}
+                        placeholder="Ex: Vazamento, Ferrugem localizada..."
+                      />
+                    </div>
+                    <Button type="button" variant="outline" onClick={handleAddCustomItem}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 

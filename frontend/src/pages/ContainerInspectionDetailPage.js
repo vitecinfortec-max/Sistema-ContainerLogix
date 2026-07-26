@@ -169,8 +169,8 @@ export default function ContainerInspectionDetailPage() {
           gap: '12px'
         }}>
           <img 
-            src="https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png" 
-            alt="J.A Logística" 
+            src="/logo-containerlogix.png"
+            alt="ContainerLogix"
             style={{ height: '40px', width: 'auto' }}
           />
           <div style={{ textAlign: 'center' }}>
@@ -271,6 +271,33 @@ export default function ContainerInspectionDetailPage() {
             </div>
           </div>
         )}
+
+        {/* Itens de Vistoria */}
+        <div style={{
+          border: '1px solid #000',
+          borderRadius: '4px',
+          marginBottom: '8px',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            backgroundColor: '#f0f0f0',
+            padding: '4px 8px',
+            borderBottom: '1px solid #000',
+            fontWeight: 'bold',
+            fontSize: '10px'
+          }}>
+            Itens de Vistoria
+          </div>
+          <div style={{ padding: '8px', fontSize: '10px' }}>
+            {inspection.no_damage ? (
+              <strong>Container sem avarias</strong>
+            ) : inspection.damage_items && inspection.damage_items.length > 0 ? (
+              inspection.damage_items.join(' • ')
+            ) : (
+              'Nenhum item informado.'
+            )}
+          </div>
+        </div>
 
         {/* Fotos - Frente, Traseira, Interno (primeira linha) */}
         <div style={{ 
@@ -549,6 +576,33 @@ export default function ContainerInspectionDetailPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Itens de Vistoria */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Itens de Vistoria</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {inspection.no_damage ? (
+              <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-800 font-semibold text-sm">
+                Container sem avarias
+              </span>
+            ) : inspection.damage_items && inspection.damage_items.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {inspection.damage_items.map(item => (
+                  <span
+                    key={item}
+                    className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-800 font-semibold text-sm"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">Nenhum item informado.</p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Fotos - Frente, Traseira, Interno */}
         <Card className="mb-6">
