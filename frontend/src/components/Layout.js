@@ -33,7 +33,8 @@ import {
   Car,
   Calendar,
   Clipboard,
-  Globe
+  Globe,
+  Anchor
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/button';
@@ -74,10 +75,11 @@ export default function Layout({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [movimentacoesOpen, setMovimentacoesOpen] = useState(false);
   const [cadastroOpen, setCadastroOpen] = useState(false);
-  const [faturamentoOpen, setFaturamentoOpen] = useState(false);
+  const [financeiroOpen, setFinanceiroOpen] = useState(false);
   const [frotaOpen, setFrotaOpen] = useState(false);
   const [operacionalOpen, setOperacionalOpen] = useState(false);
   const [flexTankOpen, setFlexTankOpen] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -85,30 +87,34 @@ export default function Layout({ children }) {
     if (saved !== null) setSidebarOpen(JSON.parse(saved));
     const savedMovimentacoes = localStorage.getItem('movimentacoesOpen');
     if (savedMovimentacoes !== null) setMovimentacoesOpen(JSON.parse(savedMovimentacoes));
-    const savedFaturamento = localStorage.getItem('faturamentoOpen');
-    if (savedFaturamento !== null) setFaturamentoOpen(JSON.parse(savedFaturamento));
+    const savedFinanceiro = localStorage.getItem('financeiroOpen');
+    if (savedFinanceiro !== null) setFinanceiroOpen(JSON.parse(savedFinanceiro));
     const savedFrota = localStorage.getItem('frotaOpen');
     if (savedFrota !== null) setFrotaOpen(JSON.parse(savedFrota));
     const savedOperacional = localStorage.getItem('operacionalOpen');
     if (savedOperacional !== null) setOperacionalOpen(JSON.parse(savedOperacional));
     const savedFlexTank = localStorage.getItem('flexTankOpen');
     if (savedFlexTank !== null) setFlexTankOpen(JSON.parse(savedFlexTank));
+    const savedTerminal = localStorage.getItem('terminalOpen');
+    if (savedTerminal !== null) setTerminalOpen(JSON.parse(savedTerminal));
   }, []);
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control';
   const isCadastroActive = ['/drivers', '/companies', '/clients', '/shipping-lines', '/service-types'].includes(location.pathname);
-  const isFaturamentoActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices';
+  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices';
   const isFrotaActive = location.pathname === '/fleet' || location.pathname === '/fleet/vehicles' || location.pathname === '/fleet/revisions' || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/ordem-servico');
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
+  const isTerminalActive = isFlexTankActive;
 
   useEffect(() => {
     if (isMovimentacoesActive && !movimentacoesOpen) setMovimentacoesOpen(true);
     if (isCadastroActive && !cadastroOpen) setCadastroOpen(true);
-    if (isFaturamentoActive && !faturamentoOpen) setFaturamentoOpen(true);
+    if (isFinanceiroActive && !financeiroOpen) setFinanceiroOpen(true);
     if (isFrotaActive && !frotaOpen) setFrotaOpen(true);
     if (isOperacionalActive && !operacionalOpen) setOperacionalOpen(true);
     if (isFlexTankActive && !flexTankOpen) setFlexTankOpen(true);
+    if (isTerminalActive && !terminalOpen) setTerminalOpen(true);
   }, [location.pathname]);
 
   const toggleSidebar = () => {
@@ -129,10 +135,10 @@ export default function Layout({ children }) {
     localStorage.setItem('cadastroOpen', JSON.stringify(newState));
   };
 
-  const toggleFaturamento = () => {
-    const newState = !faturamentoOpen;
-    setFaturamentoOpen(newState);
-    localStorage.setItem('faturamentoOpen', JSON.stringify(newState));
+  const toggleFinanceiro = () => {
+    const newState = !financeiroOpen;
+    setFinanceiroOpen(newState);
+    localStorage.setItem('financeiroOpen', JSON.stringify(newState));
   };
 
   const toggleFrota = () => {
@@ -151,6 +157,12 @@ export default function Layout({ children }) {
     const newState = !flexTankOpen;
     setFlexTankOpen(newState);
     localStorage.setItem('flexTankOpen', JSON.stringify(newState));
+  };
+
+  const toggleTerminal = () => {
+    const newState = !terminalOpen;
+    setTerminalOpen(newState);
+    localStorage.setItem('terminalOpen', JSON.stringify(newState));
   };
 
   const handleLogout = () => {
@@ -191,7 +203,7 @@ export default function Layout({ children }) {
     { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList },
   ];
 
-  const faturamentoItems = [
+  const financeiroItems = [
     { path: '/billing', label: 'Faturas', icon: Receipt },
     { path: '/international-invoices', label: 'Invoice Internacional', icon: Globe },
     { path: '/reports/billing', label: 'Relatório de Faturamento', icon: BarChart3 },
@@ -203,7 +215,7 @@ export default function Layout({ children }) {
   ];
 
   const allSearchableItems = useMemo(() => [
-    ...mainNavItems, ...movimentacoesItems, ...frotaItems, ...cadastroItems, ...faturamentoItems, ...operacionalItems,
+    ...mainNavItems, ...movimentacoesItems, ...frotaItems, ...cadastroItems, ...financeiroItems, ...operacionalItems,
   ], []);
 
   const filteredItems = searchQuery
@@ -231,7 +243,7 @@ export default function Layout({ children }) {
   };
 
   // Bsoft-style nav item
-  const renderNavItem = (item, isSubItem = false) => {
+  const renderNavItem = (item, isSubItem = false, deepIndent = false) => {
     const Icon = item.icon;
     // Para comparação, considerar pathname + search para URLs com query strings
     const currentFullPath = location.pathname + location.search;
@@ -262,7 +274,7 @@ export default function Layout({ children }) {
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
           className={`flex items-center py-3 transition-colors border-b border-slate-100 ${
             isActive ? 'text-primary font-semibold' : 'text-slate-700 hover:text-primary'
-          } pl-10 pr-5 text-[13px] gap-2`}
+          } ${deepIndent ? 'pl-14' : 'pl-10'} pr-5 text-[13px] gap-2`}
         >
           <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
           <span>{item.label}</span>
@@ -287,9 +299,12 @@ export default function Layout({ children }) {
   };
 
   // Bsoft-style group header
-  const renderGroupHeader = (label, icon, isOpen, toggle, isActive, testId) => {
+  const renderGroupHeader = (label, icon, isOpen, toggle, isActive, testId, nested = false) => {
     const Icon = icon;
     if (!sidebarOpen) {
+      // Subgrupos aninhados (ex: Flex Tank dentro de Terminal) só aparecem com a
+      // sidebar expandida — no modo recolhido só o grupo de topo mostra ícone.
+      if (nested) return null;
       return (
         <div
           className="flex items-center justify-center h-11 cursor-pointer border-b border-slate-100 transition-colors hover:text-primary"
@@ -304,7 +319,7 @@ export default function Layout({ children }) {
     return (
       <button
         onClick={toggle}
-        className={`w-full flex items-center justify-between px-5 py-3 transition-colors border-b border-slate-100 text-[13px] ${
+        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors border-b border-slate-100 text-[13px] ${
           isActive ? 'text-primary font-semibold' : 'text-slate-700 hover:text-primary'
         }`}
         data-testid={testId}
@@ -358,8 +373,8 @@ export default function Layout({ children }) {
           <div className={`flex items-center h-14 border-b border-slate-200 ${sidebarOpen ? 'px-5 gap-3' : 'justify-center px-2'}`}>
             <Link to="/dashboard" className="flex items-center gap-2.5" data-testid="logo-link">
               <img 
-                src="https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png" 
-                alt="J.A Logística" 
+                src="/logo-containerlogix.png"
+                alt="ContainerLogix"
                 className="h-9 w-auto"
               />
               {sidebarOpen && (
@@ -411,10 +426,15 @@ export default function Layout({ children }) {
               <div>
                 {mainNavItems.map((item) => renderNavItem(item))}
 
-                {/* Flex Tank */}
-                {renderGroupHeader('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, 'nav-flex-tank-toggle')}
-                {flexTankOpen && sidebarOpen && (
-                  <div>{flexTankItems.map((item) => renderNavItem(item, true))}</div>
+                {/* Terminal */}
+                {renderGroupHeader('Terminal', Anchor, terminalOpen, toggleTerminal, isTerminalActive, 'nav-terminal-toggle')}
+                {terminalOpen && sidebarOpen && (
+                  <div>
+                    {renderGroupHeader('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, 'nav-flex-tank-toggle', true)}
+                    {flexTankOpen && (
+                      <div>{flexTankItems.map((item) => renderNavItem(item, true, true))}</div>
+                    )}
+                  </div>
                 )}
 
                 {/* Movimentações */}
@@ -435,10 +455,10 @@ export default function Layout({ children }) {
                   <div>{cadastroItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
-                {/* Faturamento */}
-                {renderGroupHeader('Faturamento', DollarSign, faturamentoOpen, toggleFaturamento, isFaturamentoActive, 'nav-faturamento-toggle')}
-                {faturamentoOpen && sidebarOpen && (
-                  <div>{faturamentoItems.map((item) => renderNavItem(item, true))}</div>
+                {/* Financeiro */}
+                {renderGroupHeader('Financeiro', DollarSign, financeiroOpen, toggleFinanceiro, isFinanceiroActive, 'nav-financeiro-toggle')}
+                {financeiroOpen && sidebarOpen && (
+                  <div>{financeiroItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
                 {/* Operacional */}
@@ -479,8 +499,8 @@ export default function Layout({ children }) {
             <div className="flex items-center justify-between h-14">
               <Link to="/dashboard" className="flex items-center gap-2">
                 <img 
-                  src="https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png" 
-                  alt="J.A Logística" 
+                  src="/logo-containerlogix.png"
+                  alt="ContainerLogix"
                   className="h-8 w-auto"
                 />
                 <span className="font-bold text-sm text-primary" style={{ fontFamily: 'Chivo, sans-serif' }}>ContainerLogix</span>
@@ -566,19 +586,19 @@ export default function Layout({ children }) {
                   );
                 })}
 
-                {/* Faturamento Mobile */}
-                <button onClick={toggleFaturamento}
+                {/* Financeiro Mobile */}
+                <button onClick={toggleFinanceiro}
                   className={`w-full flex items-center justify-between px-4 py-3 text-sm border-b border-slate-100 ${
-                    isFaturamentoActive ? 'text-primary font-semibold' : 'text-slate-700'
+                    isFinanceiroActive ? 'text-primary font-semibold' : 'text-slate-700'
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     <DollarSign className="w-5 h-5 text-slate-800" strokeWidth={1.8} />
-                    <span>Faturamento</span>
+                    <span>Financeiro</span>
                   </div>
-                  <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${faturamentoOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${financeiroOpen ? 'rotate-90' : ''}`} />
                 </button>
-                {faturamentoOpen && faturamentoItems.map((item) => {
+                {financeiroOpen && financeiroItems.map((item) => {
                   const isActive = location.pathname === item.path;
                   return (
                     <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}

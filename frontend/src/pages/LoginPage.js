@@ -63,8 +63,8 @@ export default function LoginPage() {
         <div className="relative z-10 flex flex-col items-center justify-center w-full p-12">
           <div className="bg-white rounded-2xl p-6 shadow-2xl mb-8">
             <img 
-              src="https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png" 
-              alt="J.A Logística" 
+              src="/logo-containerlogix.png"
+              alt="ContainerLogix"
               className="h-24"
             />
           </div>
@@ -90,8 +90,8 @@ export default function LoginPage() {
           <div className="lg:hidden text-center mb-8">
             <div className="inline-block bg-primary/10 rounded-xl p-4 mb-4">
               <img 
-                src="https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png" 
-                alt="J.A Logística" 
+                src="/logo-containerlogix.png"
+                alt="ContainerLogix"
                 className="h-16 mx-auto"
               />
             </div>

@@ -117,8 +117,8 @@ export default function MovementDetailPage() {
         gap: '12px'
       }}>
         <img 
-          src="https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png" 
-          alt="J.A Logística" 
+          src="/logo-containerlogix.png"
+          alt="ContainerLogix"
           style={{ height: '50px', width: 'auto' }}
         />
         <div style={{ textAlign: 'center' }}>
