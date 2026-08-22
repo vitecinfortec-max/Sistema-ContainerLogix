@@ -8,9 +8,12 @@ import { Label } from '../components/ui/label';
 import { Tabs, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
 import { api } from '../lib/api';
+import { cn } from '../lib/utils';
 import { toast } from 'sonner';
-import { Truck, Wrench, Plus, Eye, Trash2, FileText, Search, Printer, Pencil, Car } from 'lucide-react';
+import { Truck, Wrench, Plus, Eye, Trash2, FileText, Search, Printer, Pencil, Car, Check, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -85,8 +88,11 @@ export default function FleetPage() {
     year: '',
     vehicle_type: '',
     status: 'ATIVO',
-    observations: ''
+    observations: '',
+    driver_id: ''
   });
+  const [drivers, setDrivers] = useState([]);
+  const [driverPopoverOpen, setDriverPopoverOpen] = useState(false);
 
   const vehicleTypes = [
     { value: 'CAMINHÃO', label: 'Caminhão' },
@@ -109,8 +115,19 @@ export default function FleetPage() {
       loadRevisions();
     } else if (activeTab === 'vehicles') {
       loadVehicles();
+      loadDrivers();
     }
   }, [activeTab, pagination.page, vehiclePagination.page]);
+
+  const loadDrivers = async () => {
+    try {
+      const response = await api.getDrivers();
+      setDrivers(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Erro ao carregar motoristas:', error);
+      toast.error('Erro ao carregar motoristas');
+    }
+  };
 
   // ========== FUNÇÕES DE VEÍCULOS ==========
   const loadVehicles = async (search = '') => {
@@ -150,7 +167,8 @@ export default function FleetPage() {
       year: '',
       vehicle_type: '',
       status: 'ATIVO',
-      observations: ''
+      observations: '',
+      driver_id: ''
     });
     setEditingVehicle(null);
   };
@@ -169,7 +187,8 @@ export default function FleetPage() {
       year: vehicle.year?.toString() || '',
       vehicle_type: vehicle.vehicle_type || '',
       status: vehicle.status || 'ATIVO',
-      observations: vehicle.observations || ''
+      observations: vehicle.observations || '',
+      driver_id: vehicle.driver_id || ''
     });
     setVehicleModalOpen(true);
   };
@@ -189,17 +208,19 @@ export default function FleetPage() {
         year: vehicleForm.year ? parseInt(vehicleForm.year) : null,
         vehicle_type: vehicleForm.vehicle_type,
         status: vehicleForm.status,
-        observations: vehicleForm.observations || null
+        observations: vehicleForm.observations || null,
+        driver_id: vehicleForm.driver_id || null
       };
 
       if (editingVehicle) {
+        if (!vehicleForm.driver_id) data.clear_driver = true;
         await api.updateVehicle(editingVehicle.id, data);
         toast.success('Veículo atualizado com sucesso!');
       } else {
         await api.createVehicle(data);
         toast.success('Veículo cadastrado com sucesso!');
       }
-      
+
       setVehicleModalOpen(false);
       resetVehicleForm();
       loadVehicles();
@@ -225,7 +246,7 @@ export default function FleetPage() {
   const getStatusBadge = (status) => {
     const styles = {
       'ATIVO': 'bg-green-100 text-green-800',
-      'INATIVO': 'bg-gray-100 text-gray-800',
+      'INATIVO': 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200',
       'MANUTENCAO': 'bg-yellow-100 text-yellow-800',
     };
     const labels = {
@@ -389,7 +410,13 @@ export default function FleetPage() {
     try {
       const response = await api.getVehicleRevisionPDF(revisionId);
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      window.open(url, '_blank');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `revisao_${revisionId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       toast.error('Erro ao gerar PDF: ' + (error.response?.data?.detail || error.message));
@@ -406,10 +433,10 @@ export default function FleetPage() {
       <div className="space-y-6" data-testid="fleet-page">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Frota
             </h1>
-            <p className="text-muted-foreground mt-1">Gerenciamento de veículos e manutenção</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerenciamento de veículos e manutenção</p>
           </div>
         </div>
 
@@ -461,6 +488,7 @@ export default function FleetPage() {
                           <th className="text-left py-3 px-4 font-medium">Marca</th>
                           <th className="text-left py-3 px-4 font-medium">Modelo</th>
                           <th className="text-left py-3 px-4 font-medium">Ano</th>
+                          <th className="text-left py-3 px-4 font-medium">Motorista</th>
                           <th className="text-left py-3 px-4 font-medium">Status</th>
                           <th className="text-left py-3 px-4 font-medium">Ações</th>
                         </tr>
@@ -473,6 +501,7 @@ export default function FleetPage() {
                             <td className="py-3 px-4">{vehicle.brand || '-'}</td>
                             <td className="py-3 px-4">{vehicle.model || '-'}</td>
                             <td className="py-3 px-4">{vehicle.year || '-'}</td>
+                            <td className="py-3 px-4">{vehicle.driver_name || '-'}</td>
                             <td className="py-3 px-4">{getStatusBadge(vehicle.status)}</td>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-1">
@@ -1075,6 +1104,62 @@ export default function FleetPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div>
+              <Label>Motorista Responsável</Label>
+              <Popover open={driverPopoverOpen} onOpenChange={setDriverPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={driverPopoverOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {vehicleForm.driver_id
+                      ? drivers.find(driver => driver.id === vehicleForm.driver_id)?.name
+                      : 'Selecione o motorista (opcional)'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar motorista..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum motorista encontrado</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="Nenhum"
+                          onSelect={() => {
+                            handleVehicleFormChange('driver_id', '');
+                            setDriverPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={cn('mr-2 h-4 w-4', !vehicleForm.driver_id ? 'opacity-100' : 'opacity-0')} />
+                          Nenhum
+                        </CommandItem>
+                        {drivers.map(driver => (
+                          <CommandItem
+                            key={driver.id}
+                            value={driver.name}
+                            onSelect={() => {
+                              handleVehicleFormChange('driver_id', driver.id);
+                              setDriverPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={cn('mr-2 h-4 w-4', vehicleForm.driver_id === driver.id ? 'opacity-100' : 'opacity-0')} />
+                            {driver.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground mt-1">
+                Ao vincular, a placa deste veículo é preenchida automaticamente ao selecionar esse motorista em uma Movimentação ou RPA.
+              </p>
             </div>
 
             <div>

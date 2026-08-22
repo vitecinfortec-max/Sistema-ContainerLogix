@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@capacitor-community/sqlite": "^5.7.4",
     "@capacitor/android": "5.7.0",
+    "@capacitor/camera": "^5.0.10",
     "@capacitor/cli": "5.7.0",
     "@capacitor/core": "5.7.0",
+    "@capacitor/filesystem": "^5.2.2",
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-accordion": "^1.2.8",
     "@radix-ui/react-alert-dialog": "^1.1.11",
@@ -41,6 +44,7 @@
     "cra-template": "1.2.0",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "fflate": "^0.8.3",
     "input-otp": "^1.4.2",
     "jsbarcode": "^3.12.3",
     "jspdf": "^4.1.0",
@@ -63,9 +67,13 @@
     "xlsx": "^0.18.5",
     "zod": "^3.24.4"
   },
+  "resolutions": {
+    "webpack": "5.94.0"
+  },
   "scripts": {
     "start": "craco start",
     "build": "craco build",
+    "build:offline": "cross-env REACT_APP_OFFLINE_MODE=true craco build",
     "test": "craco test"
   },
   "browserslist": {
@@ -85,6 +93,7 @@
     "@craco/craco": "^7.1.0",
     "@eslint/js": "9.23.0",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^7.0.3",
     "eslint": "9.23.0",
     "eslint-plugin-import": "2.31.0",
     "eslint-plugin-jsx-a11y": "6.10.2",

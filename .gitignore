@@ -85,6 +85,11 @@ agenthub/agents/youtube/db
 .cache/
 
 # Mobile development
+# Chave de assinatura do APK/AAB Android — NUNCA versionar (perder o controle dela
+# expõe a chave que assina o app; perder o arquivo em si impede futuras atualizações).
+frontend/android/*.keystore
+frontend/android/*.jks
+frontend/android/keystore.properties
 android-sdk/ frontend/node_modules/.cache/default-development/0.pack
 frontend/node_modules/.cache/default-development/0.pack
 desktop/node_modules/electron/dist/electron

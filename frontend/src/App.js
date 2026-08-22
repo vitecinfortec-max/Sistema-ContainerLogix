@@ -1,6 +1,7 @@
 import '@/App.css';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
@@ -15,6 +16,7 @@ import DriversPage from './pages/DriversPage';
 import CompaniesPage from './pages/CompaniesPage';
 import ShippingLinesPage from './pages/ShippingLinesPage';
 import ClientsPage from './pages/ClientsPage';
+import SuppliersPage from './pages/SuppliersPage';
 import ServiceTypesPage from './pages/ServiceTypesPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
@@ -33,15 +35,20 @@ import FlexTankMovementDetailPage from './pages/FlexTankMovementDetailPage';
 import EditFlexTankMovementPage from './pages/EditFlexTankMovementPage';
 import YardControlPage from './pages/YardControlPage';
 import FleetPage from './pages/FleetPage';
+import VehicleChecklistPage from './pages/VehicleChecklistPage';
 import LoadingSchedulePage from './pages/LoadingSchedulePage';
+import DailyRateRequestPage from './pages/DailyRateRequestPage';
+import ExpenseReportsPage from './pages/ExpenseReportsPage';
 import DeliveryStatusPage from './pages/DeliveryStatusPage';
 import InternationalInvoicePage from './pages/InternationalInvoicePage';
 import UnitSegregationPage from './pages/UnitSegregationPage';
 import RPATerceiroPage from './pages/RPATerceiroPage';
 import OrdemServicoPage from './pages/OrdemServicoPage';
+import CompanySettingsPage from './pages/CompanySettingsPage';
 
 function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -112,7 +119,7 @@ function App() {
           <Route
             path="/fleet/rpa-terceiro"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <RPATerceiroPage rpaType="terceiro" />
               </ProtectedRoute>
             }
@@ -122,6 +129,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <OrdemServicoPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/checklist"
+            element={
+              <ProtectedRoute>
+                <VehicleChecklistPage />
               </ProtectedRoute>
             }
           />
@@ -142,6 +157,14 @@ function App() {
             }
           />
           <Route
+            path="/company-settings"
+            element={
+              <ProtectedRoute>
+                <CompanySettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/shipping-lines"
             element={
               <ProtectedRoute>
@@ -154,6 +177,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ClientsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/suppliers"
+            element={
+              <ProtectedRoute>
+                <SuppliersPage />
               </ProtectedRoute>
             }
           />
@@ -180,7 +211,7 @@ function App() {
           <Route
             path="/reports/billing"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <ReportsBillingPage />
               </ProtectedRoute>
             }
@@ -188,7 +219,7 @@ function App() {
           <Route
             path="/billing"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <BillingPage />
               </ProtectedRoute>
             }
@@ -298,6 +329,22 @@ function App() {
             }
           />
           <Route
+            path="/daily-rate-requests"
+            element={
+              <ProtectedRoute adminOnly>
+                <DailyRateRequestPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/expense-reports"
+            element={
+              <ProtectedRoute adminOnly>
+                <ExpenseReportsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/delivery-status"
             element={
               <ProtectedRoute>
@@ -316,7 +363,7 @@ function App() {
           <Route
             path="/international-invoices"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute adminOnly>
                 <InternationalInvoicePage />
               </ProtectedRoute>
             }
@@ -325,6 +372,7 @@ function App() {
         <Toaster position="top-right" richColors />
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

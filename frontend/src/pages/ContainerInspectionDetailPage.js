@@ -9,6 +9,15 @@ import { ArrowLeft, Printer, Download, Camera, Upload, X, Edit, Loader2 } from '
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
+import { CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS } from './NewContainerInspectionPage';
+import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Label } from '../components/ui/label';
+
+const PHOTO_LABELS = CONTAINER_INSPECTION_PHOTO_TYPES.reduce((acc, { value, label }) => {
+  acc[value] = label;
+  return acc;
+}, {});
 
 // Função para gerar código de barras como imagem base64
 function generateBarcodeImage(value) {
@@ -28,19 +37,14 @@ export default function ContainerInspectionDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const company = useCompanySettings();
   const [inspection, setInspection] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState({});
+  const [uploading, setUploading] = useState(false);
+  const [newPhotoType, setNewPhotoType] = useState('front');
   const [barcodeImage, setBarcodeImage] = useState(null);
   const printTriggered = useRef(false);
-  
-  const fileInputRefs = {
-    front: useRef(null),
-    back: useRef(null),
-    left: useRef(null),
-    right: useRef(null),
-    internal: useRef(null)
-  };
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadInspection();
@@ -73,30 +77,46 @@ export default function ContainerInspectionDetailPage() {
     }
   };
 
-  const handlePhotoUpload = async (position, file) => {
+  const handlePhotoUpload = async (file) => {
     if (!file) return;
-    
-    setUploading(prev => ({ ...prev, [position]: true }));
-    
+    const currentCount = (inspection?.photos || []).length;
+    if (currentCount >= MAX_CONTAINER_INSPECTION_PHOTOS) {
+      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria`);
+      return;
+    }
+
+    setUploading(true);
+
     try {
-      await api.uploadContainerInspectionPhoto(id, position, file);
+      await api.uploadContainerInspectionPhoto(id, newPhotoType, file);
       toast.success('Foto enviada com sucesso!');
       loadInspection();
     } catch (error) {
       toast.error('Erro ao enviar foto');
     } finally {
-      setUploading(prev => ({ ...prev, [position]: false }));
+      setUploading(false);
     }
   };
 
-  const handlePhotoDelete = async (position) => {
+  const handlePhotoDelete = async (photoId) => {
     try {
-      await api.deleteContainerInspectionPhoto(id, position);
+      await api.deleteContainerInspectionPhoto(id, photoId);
       toast.success('Foto removida com sucesso!');
       loadInspection();
     } catch (error) {
       toast.error('Erro ao remover foto');
     }
+  };
+
+  const triggerFileInput = (useCamera) => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    if (useCamera) {
+      input.setAttribute('capture', 'environment');
+    } else {
+      input.removeAttribute('capture');
+    }
+    input.click();
   };
 
   const handleDownloadPhoto = async (photoUrl, label) => {
@@ -121,14 +141,6 @@ export default function ContainerInspectionDetailPage() {
   const getPhotoUrl = (path) => {
     if (!path) return null;
     return api.getFileUrl(path);
-  };
-
-  const photoLabels = {
-    front: 'Frente',
-    back: 'Traseira',
-    left: 'Lateral Esquerda',
-    right: 'Lateral Direita',
-    internal: 'Interno'
   };
 
   if (loading) {
@@ -168,22 +180,19 @@ export default function ContainerInspectionDetailPage() {
           marginBottom: '10px',
           gap: '12px'
         }}>
-          <img 
-            src="/logo-containerlogix.png"
-            alt="ContainerLogix"
+          <img
+            src={getCompanyLogoUrl(company)}
+            alt={company.name}
             style={{ height: '40px', width: 'auto' }}
           />
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              fontSize: '20px', 
-              fontWeight: 'bold', 
+            <div style={{
+              fontSize: '20px',
+              fontWeight: 'bold',
               color: '#000',
               fontFamily: 'Arial Black, sans-serif'
             }}>
-              J.A LOGÍSTICA
-            </div>
-            <div style={{ fontSize: '10px', color: '#000' }}>
-              Logística e Armazenagem
+              {company.name}
             </div>
           </div>
         </div>
@@ -303,103 +312,52 @@ export default function ContainerInspectionDetailPage() {
           </div>
         </div>
 
-        {/* Fotos - Frente, Traseira, Interno (primeira linha) */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: '1fr 1fr 1fr', 
-          gap: '6px',
-          marginBottom: '6px'
-        }}>
-          {['front', 'back', 'internal'].map(position => (
-            <div key={position} style={{ 
-              border: '1px solid #000', 
-              borderRadius: '4px',
-              overflow: 'hidden'
-            }}>
-              <div style={{ 
-                backgroundColor: '#f0f0f0', 
-                padding: '3px 8px', 
-                borderBottom: '1px solid #000',
-                fontWeight: 'bold',
-                fontSize: '9px',
-                textAlign: 'center'
+        {/* Fotos da Vistoria */}
+        {inspection.photos && inspection.photos.length > 0 && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr 1fr',
+            gap: '6px',
+            marginBottom: '8px'
+          }}>
+            {inspection.photos.map(photo => (
+              <div key={photo.id} style={{
+                border: '1px solid #000',
+                borderRadius: '4px',
+                overflow: 'hidden'
               }}>
-                {photoLabels[position]}
-              </div>
-              <div style={{ 
-                height: '55mm', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                backgroundColor: '#fafafa',
-                padding: '4px'
-              }}>
-                {inspection[`photo_${position}`] ? (
-                  <img 
-                    src={getPhotoUrl(inspection[`photo_${position}`])} 
-                    alt={photoLabels[position]}
-                    style={{ 
-                      width: '100%', 
-                      height: '100%', 
+                <div style={{
+                  backgroundColor: '#f0f0f0',
+                  padding: '3px 8px',
+                  borderBottom: '1px solid #000',
+                  fontWeight: 'bold',
+                  fontSize: '9px',
+                  textAlign: 'center'
+                }}>
+                  {PHOTO_LABELS[photo.type] || photo.type}
+                </div>
+                <div style={{
+                  height: '45mm',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#fafafa',
+                  padding: '4px'
+                }}>
+                  <img
+                    src={getPhotoUrl(photo.url)}
+                    alt={PHOTO_LABELS[photo.type] || photo.type}
+                    style={{
+                      width: '100%',
+                      height: '100%',
                       objectFit: 'contain'
                     }}
                   />
-                ) : (
-                  <span style={{ fontSize: '9px', color: '#666' }}>Sem foto</span>
-                )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Fotos - Laterais (segunda linha) */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: '1fr 1fr', 
-          gap: '6px',
-          marginBottom: '8px'
-        }}>
-          {['left', 'right'].map(position => (
-            <div key={position} style={{ 
-              border: '1px solid #000', 
-              borderRadius: '4px',
-              overflow: 'hidden'
-            }}>
-              <div style={{ 
-                backgroundColor: '#f0f0f0', 
-                padding: '3px 8px', 
-                borderBottom: '1px solid #000',
-                fontWeight: 'bold',
-                fontSize: '9px',
-                textAlign: 'center'
-              }}>
-                {photoLabels[position]}
-              </div>
-              <div style={{ 
-                height: '50mm', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                backgroundColor: '#fafafa',
-                padding: '4px'
-              }}>
-                {inspection[`photo_${position}`] ? (
-                  <img 
-                    src={getPhotoUrl(inspection[`photo_${position}`])} 
-                    alt={photoLabels[position]}
-                    style={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      objectFit: 'contain'
-                    }}
-                  />
-                ) : (
-                  <span style={{ fontSize: '9px', color: '#666' }}>Sem foto</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Rodapé */}
         <div style={{ 
@@ -426,79 +384,14 @@ export default function ContainerInspectionDetailPage() {
             )}
           </div>
           <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', borderTop: '1px solid #ddd', paddingTop: '4px' }}>
-            J.A LOGÍSTICA - Logística e Armazenagem | Este documento é válido como vistoria de container
+            {company.name} | Este documento é válido como vistoria de container
           </div>
         </div>
       </div>
     </div>
   );
 
-  const renderPhotoSection = (position, isLarge = false) => {
-    const photo = inspection[`photo_${position}`];
-    const label = photoLabels[position];
-    
-    return (
-      <div className="border rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold">{label}</h4>
-          {photo && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDownloadPhoto(photo, label)}
-            >
-              <Download className="w-4 h-4 mr-1" />
-              Baixar
-            </Button>
-          )}
-        </div>
-        
-        {photo ? (
-          <div className="relative">
-            <img
-              src={getPhotoUrl(photo)}
-              alt={label}
-              className={`w-full ${isLarge ? 'h-64' : 'h-48'} object-contain rounded-lg bg-gray-50`}
-            />
-            <Button
-              variant="destructive"
-              size="icon"
-              className="absolute top-2 right-2"
-              onClick={() => handlePhotoDelete(position)}
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        ) : (
-          <div className={`${isLarge ? 'h-64' : 'h-48'} border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50`}>
-            {uploading[position] ? (
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRefs[position].current?.click()}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Importar
-                </Button>
-                <input
-                  ref={fileInputRefs[position]}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handlePhotoUpload(position, file);
-                  }}
-                />
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
+  const photos = inspection.photos || [];
 
   return (
     <Layout>
@@ -514,10 +407,10 @@ export default function ContainerInspectionDetailPage() {
               Voltar
             </Button>
             <div>
-              <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+              <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
                 Vistoria #{inspection.inspection_number}
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                 Criado em {format(new Date(inspection.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </p>
             </div>
@@ -612,36 +505,94 @@ export default function ContainerInspectionDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Fotos - Frente, Traseira, Interno */}
+        {/* Fotos do Container */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Camera className="w-5 h-5" />
-              Frente, Traseira e Interno
+              Fotos do Container ({photos.length}/{MAX_CONTAINER_INSPECTION_PHOTOS})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {renderPhotoSection('front', true)}
-              {renderPhotoSection('back', true)}
-              {renderPhotoSection('internal', true)}
+            <div className="flex flex-wrap items-end gap-2 mb-4">
+              <div className="w-56">
+                <Label htmlFor="new_photo_type">Tipo da foto</Label>
+                <Select value={newPhotoType} onValueChange={setNewPhotoType}>
+                  <SelectTrigger id="new_photo_type" data-testid="new-photo-type-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CONTAINER_INSPECTION_PHOTO_TYPES.map(({ value, label }) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => triggerFileInput(true)}
+                disabled={uploading || photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS}
+              >
+                {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                Câmera
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => triggerFileInput(false)}
+                disabled={uploading || photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Galeria
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  handlePhotoUpload(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+                data-testid="new-photo-input"
+              />
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Fotos - Laterais */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Camera className="w-5 h-5" />
-              Laterais
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {renderPhotoSection('left')}
-              {renderPhotoSection('right')}
-            </div>
+            {photos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma foto adicionada.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {photos.map((photo) => (
+                  <div key={photo.id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold">{PHOTO_LABELS[photo.type] || photo.type}</h4>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDownloadPhoto(photo.url, PHOTO_LABELS[photo.type] || photo.type)}
+                      >
+                        <Download className="w-4 h-4 mr-1" />
+                        Baixar
+                      </Button>
+                    </div>
+                    <div className="relative">
+                      <img
+                        src={getPhotoUrl(photo.url)}
+                        alt={PHOTO_LABELS[photo.type] || photo.type}
+                        className="w-full h-48 object-contain rounded-lg bg-gray-50 dark:bg-slate-800"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2"
+                        onClick={() => handlePhotoDelete(photo.id)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

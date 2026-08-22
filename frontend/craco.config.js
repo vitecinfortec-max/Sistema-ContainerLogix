@@ -65,6 +65,18 @@ const webpackConfig = {
       if (config.enableHealthCheck && healthPluginInstance) {
         webpackConfig.plugins.push(healthPluginInstance);
       }
+
+      // O app Android offline roda 100% local (sem servidor) e já desregistra
+      // qualquer Service Worker no boot (ver src/index.js) — o GenerateSW do
+      // CRA (usado só para a versão PWA em nuvem) não serve pra nada aqui, e
+      // depende de uma cadeia de pacotes (workbox-build > babel) que puxa
+      // bastante coisa desnecessária para este build.
+      if (process.env.REACT_APP_OFFLINE_MODE === 'true') {
+        webpackConfig.plugins = webpackConfig.plugins.filter(
+          (plugin) => plugin.constructor.name !== 'GenerateSW'
+        );
+      }
+
       return webpackConfig;
     },
   },

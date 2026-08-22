@@ -2,7 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import "@/index.css";
 import App from "@/App";
+import OfflineApp from "@/offline/OfflineApp";
 
+const isOfflineMode = process.env.REACT_APP_OFFLINE_MODE === 'true';
 const isElectron = navigator.userAgent.toLowerCase().includes('electron');
 
 // No app desktop, sempre exige login de novo a cada abertura (por segurança,
@@ -15,15 +17,16 @@ if (isElectron) {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <App />
+    {isOfflineMode ? <OfflineApp /> : <App />}
   </React.StrictMode>,
 );
 
 // Registrar Service Worker para PWA — só faz sentido no navegador (versão nuvem).
-// Dentro do app desktop (Electron) o sistema já roda localmente, e um Service
-// Worker só serve pra prender a UI numa versão antiga em cache entre updates.
+// Dentro do app desktop (Electron) ou do app Android offline o sistema já roda
+// localmente, e um Service Worker só serve pra prender a UI numa versão antiga
+// em cache entre updates.
 if ('serviceWorker' in navigator) {
-  if (isElectron) {
+  if (isElectron || isOfflineMode) {
     navigator.serviceWorker.getRegistrations().then((registrations) => {
       registrations.forEach((registration) => registration.unregister());
     });

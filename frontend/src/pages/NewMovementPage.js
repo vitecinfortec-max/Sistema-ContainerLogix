@@ -87,8 +87,6 @@ export default function NewMovementPage() {
   const loadData = async () => {
     setLoadingData(true);
     try {
-      console.log('[NewMovementPage] Iniciando carregamento de dados...');
-      
       // Carregar todos os dados em paralelo
       const [driversRes, companiesRes, clientsRes, shippingLinesRes, serviceTypesRes, vehiclesRes] = await Promise.all([
         api.getDrivers(),
@@ -114,23 +112,9 @@ export default function NewMovementPage() {
       setServiceTypes(serviceTypesData);
       setVehicles(vehiclesData);
       
-      // Log detalhado
-      console.log('[NewMovementPage] Dados carregados com sucesso:');
-      console.log(`  - Motoristas: ${driversData.length}`);
-      console.log(`  - Transportadoras: ${companiesData.length}`);
-      console.log(`  - Clientes: ${clientsData.length}`);
-      console.log(`  - Armadores: ${shippingLinesData.length}`);
-      console.log(`  - Tipos de Serviço: ${serviceTypesData.length}`);
-      
-      if (shippingLinesData.length > 0) {
-        console.log('[NewMovementPage] Lista de Armadores:');
-        shippingLinesData.forEach((a, i) => {
-          console.log(`  ${i + 1}. ${a.name} (ID: ${a.id})`);
-        });
-      } else {
-        console.warn('[NewMovementPage] ATENÇÃO: Nenhum armador encontrado!');
+      if (shippingLinesData.length === 0) {
+        console.warn('[NewMovementPage] Nenhum armador encontrado!');
       }
-      
     } catch (error) {
       console.error('[NewMovementPage] ERRO ao carregar dados:', error);
       console.error('[NewMovementPage] Detalhes:', error.response?.data || error.message);
@@ -174,7 +158,44 @@ export default function NewMovementPage() {
     const driver = drivers.find(d => d.name.toLowerCase() === driverName.toLowerCase());
     if (driver) {
       setValue('driver_cpf', driver.cpf);
-      toast.success('CPF preenchido automaticamente');
+
+      // Veículo(s) cadastrados com esse motorista como responsável (Cadastro de Veículos)
+      const driverVehicles = vehicles.filter(v => v.driver_id === driver.id);
+      const truckVehicle = driverVehicles.find(v => v.vehicle_type === 'CAVALO' || v.vehicle_type === 'CAMINHÃO');
+      const trailerVehicle = driverVehicles.find(v => v.vehicle_type === 'CARRETA');
+      if (truckVehicle) setValue('truck_plate', truckVehicle.plate);
+      if (trailerVehicle) setValue('trailer_plate_1', trailerVehicle.plate);
+
+      if (truckVehicle || trailerVehicle) {
+        toast.success('CPF e placas do veículo preenchidos automaticamente');
+      } else {
+        toast.success('CPF preenchido automaticamente');
+      }
+    }
+  };
+
+  const handleContainerNumberBlur = async (e) => {
+    if (operationType !== 'SAIDA') return;
+    const containerNumber = e.target.value.trim().toUpperCase();
+    if (!containerNumber) return;
+    try {
+      const response = await api.getOpenEntryForContainer(containerNumber);
+      const entry = response.data?.entry;
+      if (!entry) return;
+
+      setValue('size_type', entry.size_type);
+      setValue('shipping_line', entry.shipping_line);
+      if (entry.client_name) {
+        setValue('client_name', entry.client_name);
+        setClientSearch(entry.client_name);
+      }
+      if (entry.tare) setValue('tare', entry.tare);
+      if (entry.booking) setValue('booking', entry.booking);
+      if (entry.service_type) setValue('service_type', entry.service_type);
+
+      toast.success(`Dados da entrada #${entry.transaction_id} preenchidos automaticamente`);
+    } catch (error) {
+      // Sem entrada em aberto para esse container — segue com preenchimento manual
     }
   };
 
@@ -220,11 +241,11 @@ export default function NewMovementPage() {
       <div className="max-w-5xl mx-auto" data-testid="new-movement-page">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Nova Movimentação
             </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-muted-foreground">Registre uma nova entrada ou saída de contêiner</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-[13px] text-slate-500 dark:text-slate-400">Registre uma nova entrada ou saída de contêiner</p>
               {autoSaved && (
                 <span className="inline-flex items-center text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
                   <Check className="w-3 h-3 mr-1" />
@@ -241,7 +262,7 @@ export default function NewMovementPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <Card>
-            <CardHeader className="bg-slate-50">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800">
               <CardTitle className="text-lg">Tipo de Operação</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
@@ -276,7 +297,7 @@ export default function NewMovementPage() {
           </Card>
 
           <Card>
-            <CardHeader className="bg-slate-50">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800">
               <CardTitle className="text-lg">Informações do Veículo e Motorista</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
@@ -385,7 +406,7 @@ export default function NewMovementPage() {
                     {clientSearch && (
                       <button
                         type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400"
                         onClick={() => {
                           setClientSearch('');
                           setValue('client_name', '');
@@ -397,7 +418,7 @@ export default function NewMovementPage() {
                     )}
                   </div>
                   {showClientDropdown && clientSearch && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-auto">
                       {clients
                         .filter(client => 
                           client.name.toLowerCase().includes(clientSearch.toLowerCase())
@@ -406,7 +427,7 @@ export default function NewMovementPage() {
                         .map(client => (
                           <div
                             key={client.id}
-                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer text-sm"
                             onMouseDown={(e) => {
                               e.preventDefault();
                               setClientSearch(client.name);
@@ -421,7 +442,7 @@ export default function NewMovementPage() {
                       {clients.filter(client => 
                         client.name.toLowerCase().includes(clientSearch.toLowerCase())
                       ).length === 0 && (
-                        <div className="px-4 py-2 text-sm text-gray-500">
+                        <div className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400">
                           Nenhum cliente encontrado
                         </div>
                       )}
@@ -434,7 +455,7 @@ export default function NewMovementPage() {
           </Card>
 
           <Card>
-            <CardHeader className="bg-slate-50">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800">
               <CardTitle className="text-lg">Informações do Contêiner</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
@@ -444,7 +465,7 @@ export default function NewMovementPage() {
                   <Input
                     id="container_number"
                     data-testid="container-number-input"
-                    {...register('container_number', { required: true })}
+                    {...register('container_number', { required: true, onBlur: handleContainerNumberBlur })}
                     className="h-12 font-mono uppercase"
                     placeholder="ABCD1234567"
                   />

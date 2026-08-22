@@ -43,6 +43,7 @@ export default function NewFlexTankMovementPage() {
       setClients(response.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
+      toast.error('Erro ao carregar clientes');
     }
   };
 
@@ -131,10 +132,10 @@ export default function NewFlexTankMovementPage() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Nova Movimentação
             </h1>
-            <p className="text-muted-foreground mt-1">Registre uma entrada ou saída de bolsa Flex Tank</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Registre uma entrada ou saída de bolsa Flex Tank</p>
           </div>
         </div>
 
@@ -220,11 +221,11 @@ export default function NewFlexTankMovementPage() {
                     data-testid="client-input"
                   />
                   {showClientDropdown && filteredClients.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
                       {filteredClients.map(client => (
                         <div
                           key={client.id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
                           onMouseDown={() => handleClientSelect(client)}
                         >
                           {client.name}
@@ -263,11 +264,11 @@ export default function NewFlexTankMovementPage() {
                     data-testid="destination-client-input"
                   />
                   {showDestinationClientDropdown && filteredDestinationClients.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
                       {filteredDestinationClients.map(client => (
                         <div
                           key={client.id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
                           onMouseDown={() => handleDestinationClientSelect(client)}
                         >
                           {client.name}

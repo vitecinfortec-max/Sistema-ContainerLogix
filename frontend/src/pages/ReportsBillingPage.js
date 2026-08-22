@@ -30,6 +30,7 @@ export default function ReportsBillingPage() {
       setClients(response.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
+      toast.error('Erro ao carregar clientes');
     }
   };
 
@@ -102,18 +103,18 @@ export default function ReportsBillingPage() {
       <div className="space-y-5" data-testid="reports-billing-page">
         {/* Header */}
         <div>
-          <h1 className="text-lg font-semibold text-slate-800">
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
             Relatório de Faturamento
           </h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">Gere relatórios financeiros com dados de faturamento das movimentações</p>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gere relatórios financeiros com dados de faturamento das movimentações</p>
         </div>
 
-        <div className="border-t border-slate-200"></div>
+        <div className="border-t border-slate-200 dark:border-slate-700"></div>
 
         {/* Filters */}
         <Card className="shadow-sm">
-          <CardHeader className="bg-slate-50/50 pb-3 pt-4">
-            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700">
+          <CardHeader className="bg-slate-50 dark:bg-slate-800/50 pb-3 pt-4">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
               <Calendar className="w-4 h-4" />
               Filtros
             </CardTitle>
@@ -121,7 +122,7 @@ export default function ReportsBillingPage() {
           <CardContent className="pt-4 space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="w-36">
-                <Label className="text-[11px] text-slate-500 mb-1 block">Data Início</Label>
+                <Label className="text-[11px] text-slate-500 dark:text-slate-400 mb-1 block">Data Início</Label>
                 <Input
                   type="date"
                   value={dateFrom}
@@ -131,7 +132,7 @@ export default function ReportsBillingPage() {
                 />
               </div>
               <div className="w-36">
-                <Label className="text-[11px] text-slate-500 mb-1 block">Data Fim</Label>
+                <Label className="text-[11px] text-slate-500 dark:text-slate-400 mb-1 block">Data Fim</Label>
                 <Input
                   type="date"
                   value={dateTo}
@@ -145,7 +146,7 @@ export default function ReportsBillingPage() {
                   variant="outline"
                   size="sm"
                   onClick={clearFilters}
-                  className="h-10 text-[13px] text-slate-600"
+                  className="h-10 text-[13px] text-slate-600 dark:text-slate-400"
                   data-testid="report-billing-clear-filters"
                 >
                   <X className="w-3.5 h-3.5 mr-1" />
@@ -206,13 +207,13 @@ export default function ReportsBillingPage() {
         {/* Download Card - Only Excel */}
         <Card className="border-l-4 border-l-amber-400 shadow-sm hover:shadow-md transition-shadow max-w-md">
           <CardHeader className="pb-2 pt-4">
-            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
               <FileSpreadsheet className="w-4 h-4 text-amber-500" />
               Faturamento Excel
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-4">
-            <p className="text-[11px] text-slate-500 mb-3">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
               Exporta planilha com valores de operação e totais para controle financeiro.
             </p>
             <Button

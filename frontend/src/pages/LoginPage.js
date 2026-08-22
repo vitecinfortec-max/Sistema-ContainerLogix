@@ -61,7 +61,7 @@ export default function LoginPage() {
         
         {/* Conteúdo */}
         <div className="relative z-10 flex flex-col items-center justify-center w-full p-12">
-          <div className="bg-white rounded-2xl p-6 shadow-2xl mb-8">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-2xl mb-8">
             <img 
               src="/logo-containerlogix.png"
               alt="ContainerLogix"
@@ -84,7 +84,7 @@ export default function LoginPage() {
       </div>
 
       {/* Lado Direito - Formulário */}
-      <div className="flex-1 flex items-center justify-center bg-white p-8">
+      <div className="flex-1 flex items-center justify-center bg-white dark:bg-slate-900 p-8">
         <div className="w-full max-w-md">
           {/* Logo Mobile */}
           <div className="lg:hidden text-center mb-8">
@@ -95,17 +95,17 @@ export default function LoginPage() {
                 className="h-16 mx-auto"
               />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100" style={{ fontFamily: 'Chivo, sans-serif' }}>
               ContainerLogix
             </h1>
           </div>
 
           {/* Cabeçalho do Formulário */}
           <div className="mb-8">
-            <h2 className="text-3xl font-bold text-slate-900" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100" style={{ fontFamily: 'Chivo, sans-serif' }}>
               {isLogin ? 'Bem-vindo!' : 'Criar Conta'}
             </h2>
-            <p className="text-slate-500 mt-2">
+            <p className="text-slate-500 dark:text-slate-400 mt-2">
               {isLogin ? 'Entre com suas credenciais para acessar o sistema' : 'Preencha os dados para criar sua conta'}
             </p>
           </div>
@@ -113,9 +113,9 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-slate-700 font-medium">Nome Completo</Label>
+                <Label htmlFor="name" className="text-slate-700 dark:text-slate-300 font-medium">Nome Completo</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
                   <Input
                     id="name"
                     data-testid="name-input"
@@ -124,16 +124,16 @@ export default function LoginPage() {
                     onChange={(e) => setName(e.target.value)}
                     required={!isLogin}
                     placeholder="Seu nome completo"
-                    className="h-12 pl-11 border-slate-300 focus:border-primary focus:ring-primary"
+                    className="h-12 pl-11 border-slate-300 dark:border-slate-600 focus:border-primary focus:ring-primary"
                   />
                 </div>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700 font-medium">Email</Label>
+              <Label htmlFor="email" className="text-slate-700 dark:text-slate-300 font-medium">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
                 <Input
                   id="email"
                   data-testid="email-input"
@@ -142,15 +142,15 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="seu@email.com"
-                  className="h-12 pl-11 border-slate-300 focus:border-primary focus:ring-primary"
+                  className="h-12 pl-11 border-slate-300 dark:border-slate-600 focus:border-primary focus:ring-primary"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700 font-medium">Senha</Label>
+              <Label htmlFor="password" className="text-slate-700 dark:text-slate-300 font-medium">Senha</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
                 <Input
                   id="password"
                   data-testid="password-input"
@@ -159,12 +159,12 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="Sua senha"
-                  className="h-12 pl-11 pr-11 border-slate-300 focus:border-primary focus:ring-primary"
+                  className="h-12 pl-11 pr-11 border-slate-300 dark:border-slate-600 focus:border-primary focus:ring-primary"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -178,9 +178,9 @@ export default function LoginPage() {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary"
                   />
-                  <span className="text-sm text-slate-600">Lembrar-me</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Lembrar-me</span>
                 </label>
               </div>
             )}
@@ -220,7 +220,7 @@ export default function LoginPage() {
               {isLogin && (
                 <Link
                   to="/forgot-password"
-                  className="text-sm text-slate-500 hover:text-primary hover:underline inline-flex items-center"
+                  className="text-sm text-slate-500 dark:text-slate-400 hover:text-primary hover:underline inline-flex items-center"
                   data-testid="forgot-password-link"
                 >
                   <KeyRound className="w-3 h-3 mr-1" />
@@ -232,7 +232,7 @@ export default function LoginPage() {
 
           {/* Rodapé */}
           <div className="mt-12 text-center">
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 dark:text-slate-500">
               J.A Logística - Sistema de Gestão de Contêineres
             </p>
           </div>

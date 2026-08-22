@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -7,7 +8,8 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Plus, Trash2, Building2, Edit } from 'lucide-react';
+import { useConfirm } from '../hooks/useConfirm';
+import { Plus, Trash2, Building2, Edit, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -31,6 +33,7 @@ const formatPhone = (value) => {
 };
 
 export default function CompaniesPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -38,8 +41,12 @@ export default function CompaniesPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({ name: '', cnpj: '', phone: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+  const location = useLocation();
 
   useEffect(() => {
+    const qFromUrl = new URLSearchParams(location.search).get('q');
+    if (qFromUrl) setSearch(qFromUrl);
     loadCompanies();
   }, []);
 
@@ -100,7 +107,7 @@ export default function CompaniesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Tem certeza que deseja deletar esta transportadora?')) {
+    if (await confirm('Tem certeza que deseja deletar esta transportadora?')) {
       try {
         await api.deleteTransportCompany(id);
         toast.success('Transportadora deletada com sucesso');
@@ -121,6 +128,16 @@ export default function CompaniesPage() {
     setFormData({ ...formData, phone: formatted });
   };
 
+  const filteredCompanies = companies.filter((company) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      company.name?.toLowerCase().includes(term) ||
+      company.cnpj?.toLowerCase().includes(term) ||
+      company.phone?.toLowerCase().includes(term)
+    );
+  });
+
   if (loading) {
     return (
       <Layout>
@@ -136,10 +153,10 @@ export default function CompaniesPage() {
       <div className="space-y-5" data-testid="companies-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Transportadoras
             </h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">Gerencie o cadastro de empresas de transporte</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie o cadastro de empresas de transporte</p>
           </div>
           <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
@@ -212,26 +229,37 @@ export default function CompaniesPage() {
           </Dialog>
         </div>
 
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+          <Input
+            placeholder="Buscar por nome, CNPJ ou telefone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10 text-[13px] pl-9"
+            data-testid="search-company-input"
+          />
+        </div>
+
         <Card>
-          <CardHeader className="bg-slate-50 py-3">
-            <CardTitle className="text-[13px] font-medium">Lista de Transportadoras ({companies.length})</CardTitle>
+          <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
+            <CardTitle className="text-[13px] font-medium">Lista de Transportadoras ({filteredCompanies.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {companies.length > 0 ? (
+            {filteredCompanies.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 border-b">
+                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nome</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">CNPJ</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Telefone</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cadastrado em</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ações</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nome</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">CNPJ</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Telefone</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {companies.map((company) => (
-                      <tr key={company.id} className="hover:bg-slate-50 transition-colors" data-testid="company-row">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {filteredCompanies.map((company) => (
+                      <tr key={company.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" data-testid="company-row">
                         <td className="px-4 py-2.5 text-[13px] font-medium">{company.name}</td>
                         <td className="px-4 py-2.5 text-[13px] font-mono">{company.cnpj || '-'}</td>
                         <td className="px-4 py-2.5 text-[13px] font-mono">{company.phone || '-'}</td>
@@ -268,14 +296,17 @@ export default function CompaniesPage() {
                 </table>
               </div>
             ) : (
-              <div className="p-10 text-center text-slate-500" data-testid="no-companies">
+              <div className="p-10 text-center text-slate-500 dark:text-slate-400" data-testid="no-companies">
                 <Building2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">Nenhuma transportadora cadastrada</p>
+                <p className="text-[13px] font-medium">
+                  {search ? 'Nenhuma transportadora encontrada' : 'Nenhuma transportadora cadastrada'}
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog />
     </Layout>
   );
 }

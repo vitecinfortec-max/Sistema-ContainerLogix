@@ -7,11 +7,13 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Plus, Trash2, Ship, Edit } from 'lucide-react';
+import { useConfirm } from '../hooks/useConfirm';
+import { Plus, Trash2, Ship, Edit, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function ShippingLinesPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [lines, setLines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -19,6 +21,7 @@ export default function ShippingLinesPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({ name: '', code: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     loadShippingLines();
@@ -80,7 +83,7 @@ export default function ShippingLinesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Tem certeza que deseja deletar este armador?')) {
+    if (await confirm('Tem certeza que deseja deletar este armador?')) {
       try {
         await api.deleteShippingLine(id);
         toast.success('Armador deletado com sucesso');
@@ -90,6 +93,15 @@ export default function ShippingLinesPage() {
       }
     }
   };
+
+  const filteredLines = lines.filter((line) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      line.name?.toLowerCase().includes(term) ||
+      line.code?.toLowerCase().includes(term)
+    );
+  });
 
   if (loading) {
     return (
@@ -106,10 +118,10 @@ export default function ShippingLinesPage() {
       <div className="space-y-5" data-testid="shipping-lines-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Armadores
             </h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">Gerencie o cadastro de armadores (shipping lines)</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie o cadastro de armadores (shipping lines)</p>
           </div>
           <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
@@ -171,25 +183,36 @@ export default function ShippingLinesPage() {
           </Dialog>
         </div>
 
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+          <Input
+            placeholder="Buscar por nome ou código..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10 text-[13px] pl-9"
+            data-testid="search-line-input"
+          />
+        </div>
+
         <Card>
-          <CardHeader className="bg-slate-50 py-3">
-            <CardTitle className="text-[13px] font-medium">Lista de Armadores ({lines.length})</CardTitle>
+          <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
+            <CardTitle className="text-[13px] font-medium">Lista de Armadores ({filteredLines.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {lines.length > 0 ? (
+            {filteredLines.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 border-b">
+                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nome</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Código</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cadastrado em</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ações</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nome</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Código</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {lines.map((line) => (
-                      <tr key={line.id} className="hover:bg-slate-50 transition-colors" data-testid="line-row">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {filteredLines.map((line) => (
+                      <tr key={line.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" data-testid="line-row">
                         <td className="px-4 py-2.5 text-[13px] font-medium">{line.name}</td>
                         <td className="px-4 py-2.5 text-[13px] font-mono">{line.code || '-'}</td>
                         <td className="px-4 py-2.5 text-[13px]">
@@ -225,14 +248,17 @@ export default function ShippingLinesPage() {
                 </table>
               </div>
             ) : (
-              <div className="p-10 text-center text-slate-500" data-testid="no-lines">
+              <div className="p-10 text-center text-slate-500 dark:text-slate-400" data-testid="no-lines">
                 <Ship className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">Nenhum armador cadastrado</p>
+                <p className="text-[13px] font-medium">
+                  {search ? 'Nenhum armador encontrado' : 'Nenhum armador cadastrado'}
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog />
     </Layout>
   );
 }

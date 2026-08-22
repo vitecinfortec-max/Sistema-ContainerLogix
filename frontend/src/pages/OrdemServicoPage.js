@@ -14,6 +14,7 @@ import {
 } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Download, Search, Save, X, FileText } from 'lucide-react';
 
@@ -28,6 +29,7 @@ const fmtMoney = (v) =>
   Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function OrdemServicoPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -170,7 +172,7 @@ export default function OrdemServicoPage() {
   };
 
   const handleDelete = async (id, num) => {
-    if (!window.confirm(`Excluir OS Nº ${num}?`)) return;
+    if (!(await confirm(`Excluir OS Nº ${num}?`))) return;
     try {
       await api.deleteOrdemServico(id);
       toast.success('OS excluída');
@@ -199,21 +201,21 @@ export default function OrdemServicoPage() {
       <div className="space-y-5" data-testid="ordem-servico-page">
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">Ordem de Serviço</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">Gestão de OS para manutenção da frota</p>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Ordem de Serviço</h1>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gestão de OS para manutenção da frota</p>
           </div>
           <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="os-new-btn">
             <Plus className="w-4 h-4 mr-2" />Nova OS
           </Button>
         </div>
 
-        <div className="border-t border-slate-200" />
+        <div className="border-t border-slate-200 dark:border-slate-700" />
 
         <Card className="shadow-sm">
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative max-w-md flex-1 min-w-[280px]">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <Input placeholder="Buscar por cliente, placa, descrição..." value={search}
                   onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-[13px]" data-testid="os-search" />
               </div>
@@ -235,15 +237,15 @@ export default function OrdemServicoPage() {
 
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-[13px] text-slate-700">
+            <CardTitle className="text-[13px] text-slate-700 dark:text-slate-300">
               {loading ? 'Carregando...' : `${list.length} Ordem(s) de Serviço`}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="rounded-md border border-slate-200 overflow-hidden">
+            <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50">
+                  <TableRow className="bg-slate-50 dark:bg-slate-800">
                     <TableHead className="text-[12px] font-semibold">Nº</TableHead>
                     <TableHead className="text-[12px] font-semibold">Abertura</TableHead>
                     <TableHead className="text-[12px] font-semibold">Pessoa</TableHead>
@@ -256,10 +258,10 @@ export default function OrdemServicoPage() {
                 </TableHeader>
                 <TableBody>
                   {list.length === 0 && !loading && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-slate-400 py-8 text-sm">Nenhuma OS cadastrada.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma OS cadastrada.</TableCell></TableRow>
                   )}
                   {list.map((o) => (
-                    <TableRow key={o.id} className="hover:bg-slate-50" data-testid={`os-row-${o.os_number}`}>
+                    <TableRow key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800" data-testid={`os-row-${o.os_number}`}>
                       <TableCell className="text-[13px] font-semibold text-emerald-700">Nº {o.os_number}</TableCell>
                       <TableCell className="text-[12px]">{o.opened_at ? format(new Date(o.opened_at), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
                       <TableCell className="text-[13px]">{o.person_name || '-'}</TableCell>
@@ -273,7 +275,7 @@ export default function OrdemServicoPage() {
                             <Download className="w-3.5 h-3.5 text-emerald-600" />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => openEdit(o.id)} className="h-8 px-2" data-testid={`os-edit-${o.os_number}`} title="Editar">
-                            <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                            <Pencil className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => handleDelete(o.id, o.os_number)} className="h-8 px-2" data-testid={`os-del-${o.os_number}`} title="Excluir">
                             <Trash2 className="w-3.5 h-3.5 text-red-500" />
@@ -369,7 +371,7 @@ export default function OrdemServicoPage() {
                 onChange={(i, f, v) => setItem('services', i, f, v)}
                 showUnit={true} />
 
-              <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-200">
+              <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
                 <TotalBox label="Total Produtos" value={t.products_total} />
                 <TotalBox label="Total Serviços" value={t.services_total} />
                 <TotalBox label="VALOR TOTAL" value={t.grand_total} highlight />
@@ -385,6 +387,7 @@ export default function OrdemServicoPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }
@@ -415,7 +418,7 @@ function SectionTitle({ children }) {
 function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
       <Input type={type} value={value ?? ''} placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
@@ -425,7 +428,7 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
 function SelectField({ label, value, onChange, options, testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
       <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
         <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
         <SelectContent>
@@ -442,7 +445,7 @@ function CheckboxField({ label, value, onChange }) {
   return (
     <div className="flex items-center gap-2 mt-5">
       <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4" />
-      <Label className="text-[12px] text-slate-700">{label}</Label>
+      <Label className="text-[12px] text-slate-700 dark:text-slate-300">{label}</Label>
     </div>
   );
 }
@@ -450,7 +453,7 @@ function CheckboxField({ label, value, onChange }) {
 function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
       <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
     </div>
   );
@@ -467,41 +470,41 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit 
       </div>
       <div className="space-y-2">
         {items.length === 0 && (
-          <div className="text-center py-4 text-[12px] text-slate-400 border border-dashed border-slate-200 rounded">
+          <div className="text-center py-4 text-[12px] text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded">
             Nenhum {title === 'Produtos' ? 'produto' : 'serviço'} adicionado
           </div>
         )}
         {items.map((it, idx) => (
-          <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 rounded border border-slate-200">
+          <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
             <div className="col-span-2">
-              <Label className="text-[10px] text-slate-500 mb-1 block">Código</Label>
+              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Código</Label>
               <Input value={it.code || ''} onChange={(e) => onChange(idx, 'code', e.target.value)} className="h-8 text-sm" data-testid={`${kind}-code-${idx}`} />
             </div>
             <div className="col-span-4">
-              <Label className="text-[10px] text-slate-500 mb-1 block">Descrição</Label>
+              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Descrição</Label>
               <Input value={it.description || ''} onChange={(e) => onChange(idx, 'description', e.target.value)} className="h-8 text-sm" data-testid={`${kind}-desc-${idx}`} />
             </div>
             <div className="col-span-1">
-              <Label className="text-[10px] text-slate-500 mb-1 block">Qtd</Label>
+              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Qtd</Label>
               <Input type="number" step="0.01" value={it.quantity ?? ''} onChange={(e) => onChange(idx, 'quantity', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-qty-${idx}`} />
             </div>
             {showUnit && (
               <div className="col-span-1">
-                <Label className="text-[10px] text-slate-500 mb-1 block">Un.</Label>
+                <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Un.</Label>
                 <Input value={it.unit || ''} onChange={(e) => onChange(idx, 'unit', e.target.value)} className="h-8 text-sm" data-testid={`${kind}-unit-${idx}`} />
               </div>
             )}
             <div className="col-span-1">
-              <Label className="text-[10px] text-slate-500 mb-1 block">V. Unit.</Label>
+              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">V. Unit.</Label>
               <Input type="number" step="0.01" value={it.unit_price ?? ''} onChange={(e) => onChange(idx, 'unit_price', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-unitprice-${idx}`} />
             </div>
             <div className="col-span-1">
-              <Label className="text-[10px] text-slate-500 mb-1 block">Desc.</Label>
+              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Desc.</Label>
               <Input type="number" step="0.01" value={it.discount ?? ''} onChange={(e) => onChange(idx, 'discount', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-disc-${idx}`} />
             </div>
             <div className="col-span-1">
-              <Label className="text-[10px] text-slate-500 mb-1 block">Total</Label>
-              <Input value={fmtMoney(it.total)} readOnly className="h-8 text-sm text-right font-semibold bg-white" />
+              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Total</Label>
+              <Input value={fmtMoney(it.total)} readOnly className="h-8 text-sm text-right font-semibold bg-white dark:bg-slate-900" />
             </div>
             <div className="col-span-1">
               <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(idx)} className="h-8 px-2 text-red-500 hover:text-red-700">
@@ -517,9 +520,9 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit 
 
 function TotalBox({ label, value, highlight }) {
   return (
-    <div className={`p-3 rounded-lg border-2 ${highlight ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-      <div className={`text-[10px] uppercase tracking-wider ${highlight ? 'text-emerald-700' : 'text-slate-500'} font-semibold`}>{label}</div>
-      <div className={`text-xl font-bold ${highlight ? 'text-emerald-700' : 'text-slate-800'}`}>{fmtMoney(value)}</div>
+    <div className={`p-3 rounded-lg border-2 ${highlight ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>
+      <div className={`text-[10px] uppercase tracking-wider ${highlight ? 'text-emerald-700' : 'text-slate-500 dark:text-slate-400'} font-semibold`}>{label}</div>
+      <div className={`text-xl font-bold ${highlight ? 'text-emerald-700' : 'text-slate-800 dark:text-slate-200'}`}>{fmtMoney(value)}</div>
     </div>
   );
 }

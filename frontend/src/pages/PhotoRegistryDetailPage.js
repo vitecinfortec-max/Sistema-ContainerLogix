@@ -9,6 +9,7 @@ import { ArrowLeft, Printer, Download, Camera, Upload, X, Edit, Loader2 } from '
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
+import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings';
 
 // Função para gerar código de barras como imagem base64
 function generateBarcodeImage(value) {
@@ -28,6 +29,7 @@ export default function PhotoRegistryDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const company = useCompanySettings();
   const [registry, setRegistry] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState({});
@@ -197,22 +199,19 @@ export default function PhotoRegistryDetailPage() {
           marginBottom: '10px',
           gap: '12px'
         }}>
-          <img 
-            src="/logo-containerlogix.png"
-            alt="ContainerLogix"
+          <img
+            src={getCompanyLogoUrl(company)}
+            alt={company.name}
             style={{ height: '40px', width: 'auto' }}
           />
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              fontSize: '20px', 
-              fontWeight: 'bold', 
+            <div style={{
+              fontSize: '20px',
+              fontWeight: 'bold',
               color: '#000',
               fontFamily: 'Arial Black, sans-serif'
             }}>
-              J.A LOGÍSTICA
-            </div>
-            <div style={{ fontSize: '10px', color: '#000' }}>
-              Logística e Armazenagem
+              {company.name}
             </div>
           </div>
         </div>
@@ -479,7 +478,7 @@ export default function PhotoRegistryDetailPage() {
             )}
           </div>
           <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', borderTop: '1px solid #ddd', paddingTop: '4px' }}>
-            J.A LOGÍSTICA - Logística e Armazenagem | Este documento é válido como registro fotográfico
+            {company.name} | Este documento é válido como registro fotográfico
           </div>
         </div>
       </div>
@@ -500,10 +499,10 @@ export default function PhotoRegistryDetailPage() {
               Voltar
             </Button>
             <div>
-              <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+              <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
                 Registro Fotográfico #{registry.registry_number}
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                 Criado em {format(new Date(registry.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </p>
             </div>
@@ -587,7 +586,7 @@ export default function PhotoRegistryDetailPage() {
                     <img
                       src={getPhotoUrl(registry.photo_front)}
                       alt="Frente"
-                      className="w-full h-64 object-contain rounded-lg bg-gray-50"
+                      className="w-full h-64 object-contain rounded-lg bg-gray-50 dark:bg-slate-800"
                     />
                     <Button
                       variant="destructive"
@@ -599,7 +598,7 @@ export default function PhotoRegistryDetailPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50">
+                  <div className="h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-slate-800">
                     {uploading.front ? (
                       <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                     ) : (
@@ -660,7 +659,7 @@ export default function PhotoRegistryDetailPage() {
                     <img
                       src={getPhotoUrl(registry.photo_back)}
                       alt="Traseira"
-                      className="w-full h-64 object-contain rounded-lg bg-gray-50"
+                      className="w-full h-64 object-contain rounded-lg bg-gray-50 dark:bg-slate-800"
                     />
                     <Button
                       variant="destructive"
@@ -672,7 +671,7 @@ export default function PhotoRegistryDetailPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50">
+                  <div className="h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-slate-800">
                     {uploading.back ? (
                       <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                     ) : (
@@ -746,7 +745,7 @@ export default function PhotoRegistryDetailPage() {
                     <img
                       src={getPhotoUrl(registry.photo_left)}
                       alt="Lateral Esquerda"
-                      className="w-full h-56 object-contain rounded-lg bg-gray-50"
+                      className="w-full h-56 object-contain rounded-lg bg-gray-50 dark:bg-slate-800"
                     />
                     <Button
                       variant="destructive"
@@ -758,7 +757,7 @@ export default function PhotoRegistryDetailPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="h-56 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50">
+                  <div className="h-56 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-slate-800">
                     {uploading.left ? (
                       <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                     ) : (
@@ -819,7 +818,7 @@ export default function PhotoRegistryDetailPage() {
                     <img
                       src={getPhotoUrl(registry.photo_right)}
                       alt="Lateral Direita"
-                      className="w-full h-56 object-contain rounded-lg bg-gray-50"
+                      className="w-full h-56 object-contain rounded-lg bg-gray-50 dark:bg-slate-800"
                     />
                     <Button
                       variant="destructive"
@@ -831,7 +830,7 @@ export default function PhotoRegistryDetailPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="h-56 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50">
+                  <div className="h-56 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-slate-800">
                     {uploading.right ? (
                       <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                     ) : (

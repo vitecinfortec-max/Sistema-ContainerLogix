@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -10,8 +10,14 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, Plus, Camera, Upload, X } from 'lucide-react';
 import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
+import { CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS } from './NewContainerInspectionPage';
+
+const PHOTO_LABELS = CONTAINER_INSPECTION_PHOTO_TYPES.reduce((acc, { value, label }) => {
+  acc[value] = label;
+  return acc;
+}, {});
 
 export default function EditContainerInspectionPage() {
   const { id } = useParams();
@@ -43,6 +49,10 @@ export default function EditContainerInspectionPage() {
   const [customItem, setCustomItem] = useState('');
 
   const [inspectionNumber, setInspectionNumber] = useState(null);
+  const [photos, setPhotos] = useState([]);
+  const [newPhotoType, setNewPhotoType] = useState('front');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -55,7 +65,7 @@ export default function EditContainerInspectionPage() {
         api.getClients(),
         api.getShippingLines()
       ]);
-      
+
       const inspection = inspectionRes.data;
       setInspectionNumber(inspection.inspection_number);
       setFormData({
@@ -74,7 +84,8 @@ export default function EditContainerInspectionPage() {
       setDamageItems(inspection.damage_items || []);
       setClientSearch(inspection.client_name || '');
       setShippingLineSearch(inspection.shipping_line_name || '');
-      
+      setPhotos(inspection.photos || []);
+
       setClients(clientsRes.data);
       setShippingLines(shippingLinesRes.data);
     } catch (error) {
@@ -83,6 +94,46 @@ export default function EditContainerInspectionPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddPhoto = async (file) => {
+    if (!file) return;
+    if (photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS) {
+      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria`);
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const response = await api.uploadContainerInspectionPhoto(id, newPhotoType, file);
+      setPhotos(prev => [...prev, response.data]);
+      toast.success('Foto adicionada!');
+    } catch (error) {
+      toast.error('Erro ao enviar foto');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = async (photoId) => {
+    try {
+      await api.deleteContainerInspectionPhoto(id, photoId);
+      setPhotos(prev => prev.filter(p => p.id !== photoId));
+      toast.success('Foto removida!');
+    } catch (error) {
+      toast.error('Erro ao remover foto');
+    }
+  };
+
+  const triggerFileInput = (useCamera) => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    if (useCamera) {
+      input.setAttribute('capture', 'environment');
+    } else {
+      input.removeAttribute('capture');
+    }
+    input.click();
   };
 
   const handleInputChange = (field, value) => {
@@ -185,10 +236,10 @@ export default function EditContainerInspectionPage() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Editar Vistoria #{inspectionNumber}
             </h1>
-            <p className="text-muted-foreground mt-1">Edite as informações da vistoria de container</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Edite as informações da vistoria de container</p>
           </div>
         </div>
 
@@ -283,11 +334,11 @@ export default function EditContainerInspectionPage() {
                     data-testid="client-input"
                   />
                   {showClientDropdown && filteredClients.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
                       {filteredClients.map(client => (
                         <div
                           key={client.id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
                           onMouseDown={() => handleClientSelect(client)}
                         >
                           {client.name}
@@ -315,11 +366,11 @@ export default function EditContainerInspectionPage() {
                     data-testid="shipping-line-input"
                   />
                   {showShippingLineDropdown && filteredShippingLines.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
                       {filteredShippingLines.map(line => (
                         <div
                           key={line.id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
                           onMouseDown={() => handleShippingLineSelect(line)}
                         >
                           {line.name}
@@ -407,6 +458,94 @@ export default function EditContainerInspectionPage() {
                     </Button>
                   </div>
                 </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Fotos do Container */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Camera className="w-5 h-5" />
+                Fotos do Container ({photos.length}/{MAX_CONTAINER_INSPECTION_PHOTOS})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Adicione até {MAX_CONTAINER_INSPECTION_PHOTOS} fotos e informe o que cada uma representa.
+              </p>
+
+              <div className="flex flex-wrap items-end gap-2 mb-4">
+                <div className="w-56">
+                  <Label htmlFor="new_photo_type">Tipo da foto</Label>
+                  <Select value={newPhotoType} onValueChange={setNewPhotoType}>
+                    <SelectTrigger id="new_photo_type" data-testid="new-photo-type-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONTAINER_INSPECTION_PHOTO_TYPES.map(({ value, label }) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => triggerFileInput(true)}
+                  disabled={uploadingPhoto || photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS}
+                >
+                  {uploadingPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                  Câmera
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => triggerFileInput(false)}
+                  disabled={uploadingPhoto || photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Galeria
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleAddPhoto(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                  data-testid="new-photo-input"
+                />
+              </div>
+
+              {photos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma foto adicionada.</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="border rounded-lg p-2">
+                      <div className="relative">
+                        <img
+                          src={api.getFileUrl(photo.url)}
+                          alt={PHOTO_LABELS[photo.type]}
+                          className="w-full h-32 object-cover rounded-lg bg-gray-50 dark:bg-slate-800"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6"
+                          onClick={() => handleRemovePhoto(photo.id)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-center font-medium mt-1">{PHOTO_LABELS[photo.type]}</p>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

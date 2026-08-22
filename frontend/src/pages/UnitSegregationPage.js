@@ -8,11 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { Package, Plus, Eye, Trash2, Search, Printer, Pencil, Unlock, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function UnitSegregationPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [segregations, setSegregations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,6 +62,7 @@ export default function UnitSegregationPage() {
       setShippingLines(shippingRes.data || []);
     } catch (error) {
       console.error('Erro ao carregar dados auxiliares:', error);
+      toast.error('Erro ao carregar dados auxiliares');
     }
   };
 
@@ -205,7 +208,7 @@ export default function UnitSegregationPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta segregação?')) return;
+    if (!(await confirm('Tem certeza que deseja excluir esta segregação?'))) return;
     try {
       await api.deleteUnitSegregation(id);
       toast.success('Segregação excluída!');
@@ -216,7 +219,7 @@ export default function UnitSegregationPage() {
   };
 
   const handleRelease = async (id) => {
-    if (!window.confirm('Tem certeza que deseja liberar esta segregação?')) return;
+    if (!(await confirm('Tem certeza que deseja liberar esta segregação?'))) return;
     try {
       await api.releaseUnitSegregation(id);
       toast.success('Segregação liberada com sucesso!');
@@ -231,7 +234,13 @@ export default function UnitSegregationPage() {
       const response = await api.getUnitSegregationPDF(id);
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `segregacao_${id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       toast.error('Erro ao gerar PDF');
     }
@@ -248,7 +257,7 @@ export default function UnitSegregationPage() {
       'LIBERADO': 'bg-blue-100 text-blue-800',
       'CANCELADO': 'bg-red-100 text-red-800'
     };
-    return styles[status] || 'bg-gray-100 text-gray-800';
+    return styles[status] || 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200';
   };
 
   return (
@@ -257,8 +266,8 @@ export default function UnitSegregationPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">Segregação de Unidade</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">Reserva de containers para clientes específicos</p>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Segregação de Unidade</h1>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Reserva de containers para clientes específicos</p>
           </div>
           <Button
             onClick={() => { resetForm(); setModalOpen(true); }}
@@ -271,9 +280,9 @@ export default function UnitSegregationPage() {
         </div>
 
         {/* Filtros */}
-        <Card className="border border-slate-200 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100">
-            <CardTitle className="text-[13px] font-medium text-slate-700 flex items-center gap-2">
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-[13px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
               <Search className="w-4 h-4" />
               Filtrar
             </CardTitle>
@@ -281,7 +290,7 @@ export default function UnitSegregationPage() {
           <CardContent className="p-4">
             <div className="flex gap-3 items-end flex-wrap">
               <div className="flex-1 min-w-[180px] max-w-xs">
-                <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Container</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Container</Label>
                 <Input
                   placeholder="Nº do Container"
                   value={searchQuery}
@@ -291,7 +300,7 @@ export default function UnitSegregationPage() {
                 />
               </div>
               <div className="w-40">
-                <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Status</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Status</Label>
                 <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Todos" />
@@ -316,9 +325,9 @@ export default function UnitSegregationPage() {
         </Card>
 
         {/* Lista */}
-        <Card className="border border-slate-200 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100">
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
               <span className="flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 Segregações ({pagination.total})
@@ -327,31 +336,31 @@ export default function UnitSegregationPage() {
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
-              <div className="text-center py-8 text-sm text-slate-500">Carregando...</div>
+              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
             ) : segregations.length === 0 ? (
-              <div className="text-center py-8 text-sm text-slate-500">Nenhuma segregação encontrada</div>
+              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Nenhuma segregação encontrada</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cliente Reservado</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Containers</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ações</th>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Reservado</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Containers</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {segregations.map((item, idx) => (
-                      <tr key={item.id} className={`hover:bg-slate-50/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`}>
-                        <td className="px-4 py-2.5 text-sm font-semibold text-slate-800">#{item.segregation_number}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600">{item.client_name}</td>
+                      <tr key={item.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}>
+                        <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{item.segregation_number}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{item.client_name}</td>
                         <td className="px-4 py-2.5">
                           <div className="flex flex-wrap gap-1">
                             {(item.items || []).slice(0, 3).map((container, i) => (
-                              <span key={i} className="inline-flex px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 text-slate-700">
+                              <span key={i} className="inline-flex px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
                                 {container.container_number}
                               </span>
                             ))}
@@ -361,11 +370,11 @@ export default function UnitSegregationPage() {
                               </span>
                             )}
                             {(!item.items || item.items.length === 0) && (
-                              <span className="text-xs text-slate-400">-</span>
+                              <span className="text-xs text-slate-400 dark:text-slate-500">-</span>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-slate-500">
+                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
                           {item.created_at ? format(new Date(item.created_at), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                         </td>
                         <td className="px-4 py-2.5">
@@ -405,8 +414,8 @@ export default function UnitSegregationPage() {
 
             {/* Paginação */}
             {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-                <div className="text-xs text-slate-400">Página {pagination.page} de {pagination.pages}</div>
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="text-xs text-slate-400 dark:text-slate-500">Página {pagination.page} de {pagination.pages}</div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
                     Anterior
@@ -434,7 +443,7 @@ export default function UnitSegregationPage() {
           <div className="space-y-5 py-4">
             {/* Cliente - Autocomplete */}
             <div className="relative">
-              <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">
+              <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">
                 Cliente Reservado <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
@@ -454,7 +463,7 @@ export default function UnitSegregationPage() {
                   <button
                     type="button"
                     onClick={clearClient}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -462,13 +471,13 @@ export default function UnitSegregationPage() {
               </div>
               
               {showClientSuggestions && clientSuggestions.length > 0 && (
-                <div className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg max-h-48 overflow-y-auto">
                   {clientSuggestions.map((client) => (
                     <button
                       key={client.id}
                       type="button"
                       onClick={() => selectClient(client)}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 focus:bg-slate-100 focus:outline-none border-b border-slate-100 last:border-b-0"
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 focus:outline-none border-b border-slate-100 dark:border-slate-800 last:border-b-0"
                     >
                       {client.name}
                     </button>
@@ -487,7 +496,7 @@ export default function UnitSegregationPage() {
             {/* Lista de Containers */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">
                   Unidades a Segregar <span className="text-red-500">*</span>
                 </Label>
                 <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-7 text-xs">
@@ -498,10 +507,10 @@ export default function UnitSegregationPage() {
 
               <div className="space-y-2">
                 {formData.items.map((item, index) => (
-                  <div key={index} className="flex gap-2 items-start p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <div key={index} className="flex gap-2 items-start p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div className="flex-1 grid grid-cols-3 gap-2">
                       <div>
-                        <Label className="text-[9px] text-slate-400 mb-1 block uppercase">Container *</Label>
+                        <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase">Container *</Label>
                         <Input
                           placeholder="ABCD1234567"
                           value={item.container_number}
@@ -511,7 +520,7 @@ export default function UnitSegregationPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-[9px] text-slate-400 mb-1 block uppercase">Tara</Label>
+                        <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase">Tara</Label>
                         <Input
                           placeholder="3800"
                           value={item.tare}
@@ -521,7 +530,7 @@ export default function UnitSegregationPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-[9px] text-slate-400 mb-1 block uppercase">Armador *</Label>
+                        <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase">Armador *</Label>
                         <Select value={item.shipping_line} onValueChange={(v) => updateItem(index, 'shipping_line', v)}>
                           <SelectTrigger className="h-8 text-sm" data-testid={`shipping-${index}`}>
                             <SelectValue placeholder="Selecione" />
@@ -552,7 +561,7 @@ export default function UnitSegregationPage() {
 
             {/* Observações */}
             <div>
-              <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Observações</Label>
+              <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Observações</Label>
               <textarea
                 className="w-full h-20 p-3 border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                 value={formData.observations}
@@ -584,23 +593,23 @@ export default function UnitSegregationPage() {
 
           {selectedItem && (
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                 <div>
-                  <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block">Cliente Reservado</span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Cliente Reservado</span>
                   <span className="text-sm font-semibold text-primary">{selectedItem.client_name}</span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block">Status</span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Status</span>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${getStatusBadge(selectedItem.status)}`}>
                     {selectedItem.status}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block">Criado em</span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Criado em</span>
                   <span className="text-sm">{selectedItem.created_at ? format(new Date(selectedItem.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '-'}</span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block">Total de Containers</span>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Total de Containers</span>
                   <span className="text-sm font-semibold">{(selectedItem.items || []).length}</span>
                 </div>
               </div>
@@ -608,16 +617,16 @@ export default function UnitSegregationPage() {
               {/* Tabela de containers */}
               {selectedItem.items && selectedItem.items.length > 0 && (
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-slate-100 px-4 py-2 border-b">
-                    <span className="text-[11px] text-slate-600 uppercase tracking-wider font-semibold">Containers Segregados</span>
+                  <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 border-b">
+                    <span className="text-[11px] text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">Containers Segregados</span>
                   </div>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b bg-slate-50">
-                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400">#</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400">Container</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400">Tara</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400">Armador</th>
+                      <tr className="border-b bg-slate-50 dark:bg-slate-800">
+                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">#</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Container</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Tara</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Armador</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -648,8 +657,8 @@ export default function UnitSegregationPage() {
               )}
 
               {selectedItem.observations && (
-                <div className="p-4 bg-slate-50 rounded-lg">
-                  <span className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold block mb-1">Observações</span>
+                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block mb-1">Observações</span>
                   <span className="text-sm">{selectedItem.observations}</span>
                 </div>
               )}
@@ -665,6 +674,7 @@ export default function UnitSegregationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
 import { DAMAGE_LABELS } from '../components/ContainerPhotoUpload';
+import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings';
 
 // Função para gerar código de barras como imagem base64
 function generateBarcodeImage(value) {
@@ -35,6 +36,7 @@ export default function MovementDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const company = useCompanySettings();
   const [movement, setMovement] = useState(null);
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
@@ -116,28 +118,20 @@ export default function MovementDetailPage() {
         marginBottom: '10px',
         gap: '12px'
       }}>
-        <img 
-          src="/logo-containerlogix.png"
-          alt="ContainerLogix"
+        <img
+          src={getCompanyLogoUrl(company)}
+          alt={company.name}
           style={{ height: '50px', width: 'auto' }}
         />
         <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            fontSize: '24px', 
-            fontWeight: 'bold', 
+          <div style={{
+            fontSize: '24px',
+            fontWeight: 'bold',
             color: '#000',
             fontFamily: 'Arial Black, sans-serif',
             letterSpacing: '1px'
           }}>
-            J.A LOGÍSTICA
-          </div>
-          <div style={{ 
-            fontSize: '12px', 
-            color: '#000',
-            fontWeight: '500',
-            textAlign: 'center'
-          }}>
-            Logística e Armazenagem
+            {company.name}
           </div>
         </div>
       </div>
@@ -484,7 +478,7 @@ export default function MovementDetailPage() {
       {/* RODAPÉ */}
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontSize: '9px', color: '#000' }}>
-          J.A LOGÍSTICA - Logística e Armazenagem | Este documento é válido como comprovante de movimentação
+          {company.name} | Este documento é válido como comprovante de movimentação
         </div>
       </div>
     </div>
@@ -515,10 +509,10 @@ export default function MovementDetailPage() {
         <div className="no-print">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+              <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
                 Detalhes da Movimentação
               </h1>
-              <p className="text-muted-foreground mt-1">Visualização</p>
+              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Visualização</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => navigate('/movements')} data-testid="back-button">
@@ -538,8 +532,8 @@ export default function MovementDetailPage() {
 
           {/* ===== CONTEÚDO PARA VISUALIZAÇÃO NA TELA ===== */}
           {/* Informações da Operação */}
-          <div className="mb-2 border-2 border-black rounded-lg bg-white overflow-hidden">
-            <div className="px-3 py-1 border-b border-black bg-slate-100">
+          <div className="mb-2 border-2 border-black rounded-lg bg-white dark:bg-slate-900 overflow-hidden">
+            <div className="px-3 py-1 border-b border-black bg-slate-100 dark:bg-slate-700">
               <p className="text-xs font-bold">Informações da Operação</p>
             </div>
             <div className="px-3 py-2">
@@ -573,8 +567,8 @@ export default function MovementDetailPage() {
           </div>
 
           {/* Informações do Veículo e Motorista */}
-          <div className="mb-2 border-2 border-black rounded-lg bg-white overflow-hidden">
-            <div className="px-3 py-1 border-b border-black bg-slate-100">
+          <div className="mb-2 border-2 border-black rounded-lg bg-white dark:bg-slate-900 overflow-hidden">
+            <div className="px-3 py-1 border-b border-black bg-slate-100 dark:bg-slate-700">
               <p className="text-xs font-bold">Informações do Veículo e Motorista</p>
             </div>
             <div className="px-3 py-2">
@@ -606,8 +600,8 @@ export default function MovementDetailPage() {
           </div>
 
           {/* Informações do Contêiner */}
-          <div className="mb-2 border-2 border-black rounded-lg bg-white overflow-hidden">
-            <div className="px-3 py-1 border-b border-black bg-slate-100">
+          <div className="mb-2 border-2 border-black rounded-lg bg-white dark:bg-slate-900 overflow-hidden">
+            <div className="px-3 py-1 border-b border-black bg-slate-100 dark:bg-slate-700">
               <p className="text-xs font-bold">Informações do Contêiner</p>
             </div>
             <div className="px-3 py-2">
@@ -662,8 +656,8 @@ export default function MovementDetailPage() {
 
           {/* Observações - Exibir apenas se houver */}
           {movement.observations && (
-            <div className="mb-2 border-2 border-black rounded-lg bg-white overflow-hidden">
-              <div className="px-3 py-1 border-b border-black bg-slate-100">
+            <div className="mb-2 border-2 border-black rounded-lg bg-white dark:bg-slate-900 overflow-hidden">
+              <div className="px-3 py-1 border-b border-black bg-slate-100 dark:bg-slate-700">
                 <p className="text-xs font-bold">Observações</p>
               </div>
               <div className="px-3 py-2">
@@ -675,7 +669,7 @@ export default function MovementDetailPage() {
           {/* Fotos do Container */}
           {movement.container_photos && Object.keys(movement.container_photos).length > 0 && (
             <Card className="mb-2">
-              <CardHeader className="bg-slate-50 py-2">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800 py-2">
                 <CardTitle className="text-sm font-bold flex items-center gap-2">
                   <Camera className="w-4 h-4" />
                   Fotos do Container ({Object.keys(movement.container_photos).length})

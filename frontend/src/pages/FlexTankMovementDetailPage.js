@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { ArrowLeft, Edit, Trash2, Loader2, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function FlexTankMovementDetailPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const { id } = useParams();
   const navigate = useNavigate();
   const [movement, setMovement] = useState(null);
@@ -32,7 +34,7 @@ export default function FlexTankMovementDetailPage() {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Tem certeza que deseja excluir esta movimentação?')) return;
+    if (!(await confirm('Tem certeza que deseja excluir esta movimentação?'))) return;
     
     try {
       await api.deleteFlexTankMovement(id);
@@ -71,10 +73,10 @@ export default function FlexTankMovementDetailPage() {
               Voltar
             </Button>
             <div>
-              <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+              <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
                 Movimentação #{movement.movement_number}
               </h1>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                 Registrado em {format(new Date(movement.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </p>
             </div>
@@ -177,6 +179,7 @@ export default function FlexTankMovementDetailPage() {
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog />
     </Layout>
   );
 }

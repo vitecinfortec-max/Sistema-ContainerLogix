@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
       <Card className="w-full max-w-md relative z-10 shadow-2xl">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="bg-white p-3 rounded-xl shadow-md">
+            <div className="bg-white dark:bg-slate-900 p-3 rounded-xl shadow-md">
               <img 
                 src="/logo-containerlogix.png"
                 alt="ContainerLogix"

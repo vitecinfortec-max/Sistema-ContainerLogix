@@ -13,6 +13,16 @@ import { toast } from 'sonner';
 import { ArrowLeft, Save, Camera, Upload, X, Loader2, Plus } from 'lucide-react';
 import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
 
+export const CONTAINER_INSPECTION_PHOTO_TYPES = [
+  { value: 'front', label: 'Frente' },
+  { value: 'back', label: 'Traseira' },
+  { value: 'internal', label: 'Interno' },
+  { value: 'left', label: 'Lateral Esquerda' },
+  { value: 'right', label: 'Lateral Direita' },
+];
+
+export const MAX_CONTAINER_INSPECTION_PHOTOS = 8;
+
 export default function NewContainerInspectionPage() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
@@ -40,21 +50,9 @@ export default function NewContainerInspectionPage() {
   const [damageItems, setDamageItems] = useState([]);
   const [customItem, setCustomItem] = useState('');
 
-  const [photos, setPhotos] = useState({
-    front: null,
-    back: null,
-    left: null,
-    right: null,
-    internal: null
-  });
-
-  const fileInputRefs = {
-    front: useRef(null),
-    back: useRef(null),
-    left: useRef(null),
-    right: useRef(null),
-    internal: useRef(null)
-  };
+  const [photos, setPhotos] = useState([]); // { id, type, file }
+  const [newPhotoType, setNewPhotoType] = useState('front');
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadData();
@@ -70,6 +68,7 @@ export default function NewContainerInspectionPage() {
       setShippingLines(shippingLinesRes.data);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+      toast.error('Erro ao carregar dados');
     }
   };
 
@@ -112,17 +111,28 @@ export default function NewContainerInspectionPage() {
     setCustomItem('');
   };
 
-  const handlePhotoSelect = (position, file) => {
-    if (file) {
-      setPhotos(prev => ({ ...prev, [position]: file }));
+  const handleAddPhoto = (file) => {
+    if (!file) return;
+    if (photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS) {
+      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria`);
+      return;
     }
+    setPhotos(prev => [...prev, { id: `local-${Date.now()}-${Math.random()}`, type: newPhotoType, file }]);
   };
 
-  const handlePhotoRemove = (position) => {
-    setPhotos(prev => ({ ...prev, [position]: null }));
-    if (fileInputRefs[position].current) {
-      fileInputRefs[position].current.value = '';
+  const handlePhotoRemove = (id) => {
+    setPhotos(prev => prev.filter(p => p.id !== id));
+  };
+
+  const triggerFileInput = (useCamera) => {
+    const input = fileInputRef.current;
+    if (!input) return;
+    if (useCamera) {
+      input.setAttribute('capture', 'environment');
+    } else {
+      input.removeAttribute('capture');
     }
+    input.click();
   };
 
   const handleSubmit = async (e) => {
@@ -151,15 +161,12 @@ export default function NewContainerInspectionPage() {
       });
 
       const inspectionId = response.data.id;
-      
-      // Upload das fotos
-      const photoPositions = ['front', 'back', 'left', 'right', 'internal'];
-      for (const position of photoPositions) {
-        if (photos[position]) {
-          await api.uploadContainerInspectionPhoto(inspectionId, position, photos[position]);
-        }
+
+      // Upload das fotos, cada uma com o tipo informado
+      for (const photo of photos) {
+        await api.uploadContainerInspectionPhoto(inspectionId, photo.type, photo.file);
       }
-      
+
       toast.success('Vistoria criada com sucesso!');
       navigate(`/container-inspections/${inspectionId}`);
     } catch (error) {
@@ -178,13 +185,10 @@ export default function NewContainerInspectionPage() {
     l.name.toLowerCase().includes(shippingLineSearch.toLowerCase())
   );
 
-  const photoLabels = {
-    front: 'Frente',
-    back: 'Traseira',
-    left: 'Lateral Esquerda',
-    right: 'Lateral Direita',
-    internal: 'Interno'
-  };
+  const photoLabels = CONTAINER_INSPECTION_PHOTO_TYPES.reduce((acc, { value, label }) => {
+    acc[value] = label;
+    return acc;
+  }, {});
 
   return (
     <Layout>
@@ -195,10 +199,10 @@ export default function NewContainerInspectionPage() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Nova Vistoria de Container
             </h1>
-            <p className="text-muted-foreground mt-1">Preencha os dados da vistoria</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Preencha os dados da vistoria</p>
           </div>
         </div>
 
@@ -293,11 +297,11 @@ export default function NewContainerInspectionPage() {
                     data-testid="client-input"
                   />
                   {showClientDropdown && filteredClients.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
                       {filteredClients.map(client => (
                         <div
                           key={client.id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
                           onMouseDown={() => handleClientSelect(client)}
                         >
                           {client.name}
@@ -325,11 +329,11 @@ export default function NewContainerInspectionPage() {
                     data-testid="shipping-line-input"
                   />
                   {showShippingLineDropdown && filteredShippingLines.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
                       {filteredShippingLines.map(line => (
                         <div
                           key={line.id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
                           onMouseDown={() => handleShippingLineSelect(line)}
                         >
                           {line.name}
@@ -421,103 +425,91 @@ export default function NewContainerInspectionPage() {
             </CardContent>
           </Card>
 
-          {/* Fotos - Frente, Traseira, Interno */}
+          {/* Fotos do Container */}
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Camera className="w-5 h-5" />
-                Fotos do Container
+                Fotos do Container ({photos.length}/{MAX_CONTAINER_INSPECTION_PHOTOS})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {['front', 'back', 'internal'].map(position => (
-                  <div key={position} className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-3">{photoLabels[position]}</h4>
-                    {photos[position] ? (
+              <p className="text-sm text-muted-foreground mb-4">
+                Adicione até {MAX_CONTAINER_INSPECTION_PHOTOS} fotos e informe o que cada uma representa.
+              </p>
+
+              <div className="flex flex-wrap items-end gap-2 mb-4">
+                <div className="w-56">
+                  <Label htmlFor="new_photo_type">Tipo da foto</Label>
+                  <Select value={newPhotoType} onValueChange={setNewPhotoType}>
+                    <SelectTrigger id="new_photo_type" data-testid="new-photo-type-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONTAINER_INSPECTION_PHOTO_TYPES.map(({ value, label }) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => triggerFileInput(true)}
+                  disabled={photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS}
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Câmera
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => triggerFileInput(false)}
+                  disabled={photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Galeria
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleAddPhoto(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                  data-testid="new-photo-input"
+                />
+              </div>
+
+              {photos.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma foto adicionada.</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {photos.map((photo) => (
+                    <div key={photo.id} className="border rounded-lg p-2">
                       <div className="relative">
                         <img
-                          src={URL.createObjectURL(photos[position])}
-                          alt={photoLabels[position]}
-                          className="w-full h-48 object-contain rounded-lg bg-gray-50"
+                          src={URL.createObjectURL(photo.file)}
+                          alt={photoLabels[photo.type]}
+                          className="w-full h-32 object-cover rounded-lg bg-gray-50 dark:bg-slate-800"
                         />
                         <Button
                           type="button"
                           variant="destructive"
                           size="icon"
-                          className="absolute top-2 right-2"
-                          onClick={() => handlePhotoRemove(position)}
+                          className="absolute top-1 right-1 h-6 w-6"
+                          onClick={() => handlePhotoRemove(photo.id)}
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3 h-3" />
                         </Button>
                       </div>
-                    ) : (
-                      <div className="h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 bg-gray-50">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => fileInputRefs[position].current?.click()}
-                        >
-                          <Upload className="w-4 h-4 mr-2" />
-                          Importar
-                        </Button>
-                        <input
-                          ref={fileInputRefs[position]}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handlePhotoSelect(position, e.target.files?.[0])}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              {/* Fotos Laterais */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {['left', 'right'].map(position => (
-                  <div key={position} className="border rounded-lg p-4">
-                    <h4 className="font-semibold mb-3">{photoLabels[position]}</h4>
-                    {photos[position] ? (
-                      <div className="relative">
-                        <img
-                          src={URL.createObjectURL(photos[position])}
-                          alt={photoLabels[position]}
-                          className="w-full h-48 object-contain rounded-lg bg-gray-50"
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2"
-                          onClick={() => handlePhotoRemove(position)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 bg-gray-50">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => fileInputRefs[position].current?.click()}
-                        >
-                          <Upload className="w-4 h-4 mr-2" />
-                          Importar
-                        </Button>
-                        <input
-                          ref={fileInputRefs[position]}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handlePhotoSelect(position, e.target.files?.[0])}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+                      <p className="text-xs text-center font-medium mt-1">{photoLabels[photo.type]}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

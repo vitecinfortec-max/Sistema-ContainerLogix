@@ -2,12 +2,31 @@ const { app, BrowserWindow, Menu, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+const { execFileSync } = require('child_process');
+
 const { ensureConfig, changeDriveFolder } = require('./lib/config');
 const mongo = require('./lib/mongoProcess');
 const backend = require('./lib/backendProcess');
 const { startStaticServer } = require('./lib/staticServer');
+const { pythonExe, runtimeBackendDir } = require('./lib/paths');
 
 const ICON_PATH = path.join(__dirname, 'icon.ico');
+
+// Só uma instância por vez: a segunda travaria tentando reiniciar o Mongo/backend
+// nas mesmas portas e pastas da primeira (que já está usando tudo isso). Em vez
+// de deixar isso quebrar com um erro técnico, focamos a janela já aberta.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
 
 let mainWindow;
 let mongodChild = null;
@@ -72,8 +91,17 @@ function buildMenu() {
           click: () => openBackupsFolder(),
         },
         {
+          label: 'Restaurar Backup...',
+          click: () => restoreBackupNow(),
+        },
+        {
           label: 'Trocar Pasta de Backup do Google Drive...',
           click: () => changeBackupFolder(),
+        },
+        { type: 'separator' },
+        {
+          label: 'Exportar Backup para Android...',
+          click: () => exportPortableBackup(),
         },
         { type: 'separator' },
         {
@@ -196,6 +224,56 @@ function openBackupsFolder() {
   shell.openPath(backupsRoot);
 }
 
+async function restoreBackupNow() {
+  if (!appConfig) return;
+
+  const backupsRoot = path.join(appConfig.driveBackupFolder, 'ContainerLogix-Backups');
+  fs.mkdirSync(backupsRoot, { recursive: true });
+
+  const picked = dialog.showOpenDialogSync(mainWindow, {
+    title: 'Selecione a pasta do backup a restaurar',
+    defaultPath: backupsRoot,
+    properties: ['openDirectory'],
+  });
+  if (!picked || picked.length === 0) return;
+  const backupDir = picked[0];
+
+  if (!fs.existsSync(path.join(backupDir, 'dump.archive.gz'))) {
+    dialog.showErrorBox(
+      'Pasta de backup inválida',
+      `A pasta selecionada não contém um arquivo "dump.archive.gz":\n${backupDir}`
+    );
+    return;
+  }
+
+  const confirmed = dialog.showMessageBoxSync(mainWindow, {
+    type: 'warning',
+    title: 'Restaurar backup',
+    message: 'Isso vai substituir TODOS os dados atuais pelos dados desse backup. Essa ação não pode ser desfeita.',
+    detail: `Pasta selecionada:\n${backupDir}`,
+    buttons: ['Cancelar', 'Restaurar'],
+    defaultId: 0,
+    cancelId: 0,
+  });
+  if (confirmed !== 1) return;
+
+  try {
+    await backend.stopProcess(backendChild);
+    mongo.restoreFromBackupDir(appConfig, backupDir);
+    backendChild = backend.startBackend(appConfig);
+    await backend.waitForHealth(appConfig.backendPort, 60000);
+
+    dialog.showMessageBoxSync(mainWindow, {
+      type: 'info',
+      title: 'Backup restaurado',
+      message: 'Os dados do backup selecionado foram restaurados com sucesso.',
+    });
+    if (mainWindow) mainWindow.reload();
+  } catch (err) {
+    dialog.showErrorBox('Falha ao restaurar backup', String(err.message || err));
+  }
+}
+
 async function changeBackupFolder() {
   if (!appConfig) return;
   appConfig = await changeDriveFolder(mainWindow, appConfig);
@@ -204,6 +282,44 @@ async function changeBackupFolder() {
     title: 'Pasta de backup atualizada',
     message: `Novos backups serão salvos em:\n${appConfig.driveBackupFolder}`,
   });
+}
+
+function exportPortableBackup() {
+  if (!appConfig) return;
+
+  const picked = dialog.showOpenDialogSync(mainWindow, {
+    title: 'Selecione a pasta onde salvar o backup para o Android',
+    properties: ['openDirectory'],
+  });
+  if (!picked || picked.length === 0) return;
+  const destDir = picked[0];
+
+  try {
+    const output = execFileSync(
+      pythonExe(),
+      ['export_portable_backup.py', destDir],
+      {
+        cwd: runtimeBackendDir(),
+        env: {
+          ...process.env,
+          MONGO_URL: `mongodb://127.0.0.1:${appConfig.mongoPort}`,
+          DB_NAME: 'containerlogix',
+        },
+      }
+    ).toString('utf-8');
+
+    const lastLine = output.trim().split('\n').pop();
+    const { zip_path: zipPath } = JSON.parse(lastLine);
+
+    dialog.showMessageBoxSync(mainWindow, {
+      type: 'info',
+      title: 'Backup para Android gerado',
+      message: 'O arquivo de backup foi gerado com sucesso. Copie-o para o celular e importe dentro do app ContainerLogix.',
+      detail: zipPath,
+    });
+  } catch (err) {
+    dialog.showErrorBox('Falha ao gerar backup para Android', String(err.message || err));
+  }
 }
 
 async function bootServices() {

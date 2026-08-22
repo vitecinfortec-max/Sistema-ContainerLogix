@@ -35,7 +35,13 @@ export const api = {
   createClient: (data) => axios.post(`${API}/clients`, data),
   updateClient: (id, data) => axios.put(`${API}/clients/${id}`, data),
   deleteClient: (id) => axios.delete(`${API}/clients/${id}`),
-  
+
+  // Suppliers (Fornecedores)
+  getSuppliers: () => axios.get(`${API}/suppliers`),
+  createSupplier: (data) => axios.post(`${API}/suppliers`, data),
+  updateSupplier: (id, data) => axios.put(`${API}/suppliers/${id}`, data),
+  deleteSupplier: (id) => axios.delete(`${API}/suppliers/${id}`),
+
   // Service Types
   getServiceTypes: () => axios.get(`${API}/service-types`),
   createServiceType: (data) => axios.post(`${API}/service-types`, data),
@@ -48,6 +54,7 @@ export const api = {
   getMovement: (id) => axios.get(`${API}/movements/${id}`),
   updateMovement: (id, data) => axios.put(`${API}/movements/${id}`, data),
   deleteMovement: (id) => axios.delete(`${API}/movements/${id}`),
+  getOpenEntryForContainer: (containerNumber) => axios.get(`${API}/movements/open-entry/${containerNumber}`),
   
   // Reports
   downloadPDFReport: (params) => axios.get(`${API}/reports/pdf`, { params, responseType: 'blob' }),
@@ -57,6 +64,8 @@ export const api = {
   
   // Yard Control (Controle de Pátio)
   getYardControl: (params) => axios.get(`${API}/yard-control`, { params }),
+  getAlertsSummary: () => axios.get(`${API}/alerts/summary`),
+  globalSearch: (q) => axios.get(`${API}/search`, { params: { q } }),
   downloadYardControlExcel: (params) => axios.get(`${API}/yard-control/excel`, { params, responseType: 'blob' }),
   registerQuickExit: (data) => axios.post(`${API}/yard-control/quick-exit`, data),
   
@@ -91,6 +100,10 @@ export const api = {
   getUserShortcuts: () => axios.get(`${API}/user/shortcuts`),
   updateUserShortcuts: (shortcuts) => axios.put(`${API}/user/shortcuts`, { shortcuts }),
   
+  // Company Settings (Dados da Empresa)
+  getCompanySettings: () => axios.get(`${API}/company-settings`),
+  updateCompanySettings: (data) => axios.put(`${API}/company-settings`, data),
+
   // File Upload
   uploadFile: (file) => {
     const formData = new FormData();
@@ -123,14 +136,14 @@ export const api = {
   createContainerInspection: (data) => axios.post(`${API}/container-inspections`, data),
   updateContainerInspection: (id, data) => axios.put(`${API}/container-inspections/${id}`, data),
   deleteContainerInspection: (id) => axios.delete(`${API}/container-inspections/${id}`),
-  uploadContainerInspectionPhoto: (id, position, file) => {
+  uploadContainerInspectionPhoto: (id, type, file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return axios.post(`${API}/container-inspections/${id}/upload-photo?position=${position}`, formData, {
+    return axios.post(`${API}/container-inspections/${id}/upload-photo?type=${type}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
-  deleteContainerInspectionPhoto: (id, position) => axios.delete(`${API}/container-inspections/${id}/photo/${position}`),
+  deleteContainerInspectionPhoto: (id, photoId) => axios.delete(`${API}/container-inspections/${id}/photo/${photoId}`),
   
   // Flex Tank (Controle de Estoque de Bolsas)
   getFlexTankMovements: (params) => axios.get(`${API}/flex-tank/movements`, { params }),
@@ -148,6 +161,14 @@ export const api = {
   updateVehicleRevision: (id, data) => axios.put(`${API}/vehicle-revisions/${id}`, data),
   deleteVehicleRevision: (id) => axios.delete(`${API}/vehicle-revisions/${id}`),
   getVehicleRevisionPDF: (id) => axios.get(`${API}/vehicle-revisions/${id}/pdf`, { responseType: 'blob' }),
+
+  getVehicleChecklistTemplate: () => axios.get(`${API}/vehicle-checklists/template`),
+  getVehicleChecklists: (params) => axios.get(`${API}/vehicle-checklists`, { params }),
+  getVehicleChecklist: (id) => axios.get(`${API}/vehicle-checklists/${id}`),
+  createVehicleChecklist: (data) => axios.post(`${API}/vehicle-checklists`, data),
+  updateVehicleChecklist: (id, data) => axios.put(`${API}/vehicle-checklists/${id}`, data),
+  deleteVehicleChecklist: (id) => axios.delete(`${API}/vehicle-checklists/${id}`),
+  getVehicleChecklistPDF: (id) => axios.get(`${API}/vehicle-checklists/${id}/pdf`, { responseType: 'blob' }),
   getVehiclePlates: () => axios.get(`${API}/vehicles/plates`),
   
   // Fleet - Vehicles (Frota - Cadastro de Veículos)
@@ -166,7 +187,34 @@ export const api = {
   deleteLoadingSchedule: (id) => axios.delete(`${API}/loading-schedules/${id}`),
   updateLoadingScheduleStatus: (id, status) => axios.put(`${API}/loading-schedules/${id}/status?status=${status}`),
   getLoadingSchedulePDF: (id) => axios.get(`${API}/loading-schedules/${id}/pdf`, { responseType: 'blob' }),
-  
+
+  // Financeiro - Solicitação de Diária
+  getDailyRateRequests: (params) => axios.get(`${API}/daily-rate-requests`, { params }),
+  getDailyRateRequest: (id) => axios.get(`${API}/daily-rate-requests/${id}`),
+  createDailyRateRequest: (data) => axios.post(`${API}/daily-rate-requests`, data),
+  updateDailyRateRequest: (id, data) => axios.put(`${API}/daily-rate-requests/${id}`, data),
+  deleteDailyRateRequest: (id) => axios.delete(`${API}/daily-rate-requests/${id}`),
+  updateDailyRateRequestStatus: (id, status) => axios.put(`${API}/daily-rate-requests/${id}/update-status?new_status=${status}`),
+  getDailyRateRequestPDF: (id) => axios.get(`${API}/daily-rate-requests/${id}/pdf`, { responseType: 'blob' }),
+
+  // Financeiro - Prestação de Contas
+  getExpenseReports: (params) => axios.get(`${API}/expense-reports`, { params }),
+  getExpenseReport: (id) => axios.get(`${API}/expense-reports/${id}`),
+  createExpenseReport: (data) => axios.post(`${API}/expense-reports`, data),
+  updateExpenseReport: (id, data) => axios.put(`${API}/expense-reports/${id}`, data),
+  deleteExpenseReport: (id) => axios.delete(`${API}/expense-reports/${id}`),
+  updateExpenseReportStatus: (id, status) => axios.put(`${API}/expense-reports/${id}/status?status=${status}`),
+  uploadExpenseReportReceipt: (reportId, itemId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/expense-reports/${reportId}/purchases/${itemId}/upload-receipt`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteExpenseReportReceipt: (reportId, itemId, receiptId) =>
+    axios.delete(`${API}/expense-reports/${reportId}/purchases/${itemId}/receipt/${receiptId}`),
+  getExpenseReportPDF: (id) => axios.get(`${API}/expense-reports/${id}/pdf`, { responseType: 'blob' }),
+
   // Operacional - Status de Entrega
   getDeliveryStatuses: (params) => axios.get(`${API}/delivery-status`, { params }),
   getDeliveryStatus: (id) => axios.get(`${API}/delivery-status/${id}`),
@@ -176,6 +224,7 @@ export const api = {
   deleteDeliveryStatus: (id) => axios.delete(`${API}/delivery-status/${id}`),
   updateDeliveryStatusStatus: (id, status) => axios.put(`${API}/delivery-status/${id}/update-status?new_status=${status}`),
   getDeliveryStatusPDF: (id) => axios.get(`${API}/delivery-status/${id}/pdf`, { responseType: 'blob' }),
+  getDeliveryStatusExcel: (id) => axios.get(`${API}/delivery-status/${id}/excel`, { responseType: 'blob' }),
   
   // Unit Segregation
   getUnitSegregations: (params) => axios.get(`${API}/unit-segregations`, { params }),

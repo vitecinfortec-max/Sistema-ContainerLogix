@@ -12,6 +12,10 @@ import { Calendar, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText } fro
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// Cliente para o qual exibimos o campo "Nº da Bolsa" (flexitank) na Programação
+// de Carregamento e no Status de Entrega
+const BAG_NUMBER_CLIENT_NAME = 'MANUPORT LIQUIDS DO BRASIL LTDA';
+
 // Componente Autocomplete
 function Autocomplete({ value, onChange, options, placeholder, displayField = 'name', valueField = 'id', onSelect, className = '' }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -70,7 +74,7 @@ function Autocomplete({ value, onChange, options, placeholder, displayField = 'n
         placeholder={placeholder}
       />
       {isOpen && filteredOptions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
           {filteredOptions.map((option, idx) => {
             const display = typeof displayField === 'function' ? displayField(option) : option[displayField];
             return (
@@ -123,6 +127,7 @@ export default function LoadingSchedulePage() {
 
   function createEmptyItem() {
     return {
+      operation_type: 'COLETA',
       driver_id: '',
       driver_name: '',
       driver_cpf: '',
@@ -131,7 +136,8 @@ export default function LoadingSchedulePage() {
       loading_location: '',
       loading_date: new Date().toISOString().split('T')[0],
       container_number: '',
-      seal_number: ''
+      seal_number: '',
+      bag_number: ''
     };
   }
 
@@ -152,6 +158,7 @@ export default function LoadingSchedulePage() {
       setVehicles(vehiclesRes.data.items || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
+      toast.error('Erro ao carregar dados');
     }
   };
 
@@ -214,19 +221,18 @@ export default function LoadingSchedulePage() {
     setModalOpen(true);
   };
 
-  const handleClientChange = (field, clientId) => {
-    const client = clients.find(c => c.id === clientId);
+  const handleClientChange = (field, client) => {
     if (field === 'destination') {
       setFormData(prev => ({
         ...prev,
-        destination_client_id: clientId,
-        destination_client_name: client?.name || ''
+        destination_client_id: client.id,
+        destination_client_name: client.name
       }));
     } else {
       setFormData(prev => ({
         ...prev,
-        contracting_client_id: clientId,
-        contracting_client_name: client?.name || ''
+        contracting_client_id: client.id,
+        contracting_client_name: client.name
       }));
     }
   };
@@ -274,7 +280,7 @@ export default function LoadingSchedulePage() {
     // Validar itens
     for (let i = 0; i < formData.items.length; i++) {
       const item = formData.items[i];
-      if (!item.driver_name || !item.cavalo_plate || !item.loading_location || !item.loading_date) {
+      if (!item.operation_type || !item.driver_name || !item.cavalo_plate || !item.loading_location || !item.loading_date) {
         toast.error(`Preencha os campos obrigatórios do item ${i + 1}`);
         return;
       }
@@ -358,8 +364,8 @@ export default function LoadingSchedulePage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Programação de Carregamento</h1>
-            <p className="text-muted-foreground">Gerencie as programações de carregamento</p>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Programação de Carregamento</h1>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie as programações de carregamento</p>
           </div>
         </div>
 
@@ -478,29 +484,27 @@ export default function LoadingSchedulePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Cliente Contratante *</Label>
-                  <Select value={formData.contracting_client_id} onValueChange={(v) => handleClientChange('contracting', v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o cliente contratante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map(client => (
-                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Autocomplete
+                    value={formData.contracting_client_name}
+                    onChange={(val) => setFormData(prev => ({ ...prev, contracting_client_name: val, contracting_client_id: '' }))}
+                    options={clients}
+                    placeholder="Digite o nome do cliente contratante..."
+                    displayField="name"
+                    valueField="id"
+                    onSelect={(client) => handleClientChange('contracting', client)}
+                  />
                 </div>
                 <div>
                   <Label>Cliente Destino *</Label>
-                  <Select value={formData.destination_client_id} onValueChange={(v) => handleClientChange('destination', v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o cliente destino" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map(client => (
-                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Autocomplete
+                    value={formData.destination_client_name}
+                    onChange={(val) => setFormData(prev => ({ ...prev, destination_client_name: val, destination_client_id: '' }))}
+                    options={clients}
+                    placeholder="Digite o nome do cliente destino..."
+                    displayField="name"
+                    valueField="id"
+                    onSelect={(client) => handleClientChange('destination', client)}
+                  />
                 </div>
                 <div>
                   <Label>Booking</Label>
@@ -512,9 +516,9 @@ export default function LoadingSchedulePage() {
                 </div>
                 <div>
                   <Label>Viagem</Label>
-                  <Input 
-                    value={formData.voyage} 
-                    onChange={(e) => setFormData(prev => ({ ...prev, voyage: e.target.value.toUpperCase() }))} 
+                  <Input
+                    value={formData.voyage}
+                    onChange={(e) => setFormData(prev => ({ ...prev, voyage: e.target.value.toUpperCase() }))}
                     placeholder="Número da Viagem"
                   />
                 </div>
@@ -541,6 +545,18 @@ export default function LoadingSchedulePage() {
                     <div className="text-sm font-medium text-muted-foreground mb-3">Item #{index + 1}</div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div>
+                        <Label className="text-xs">Tipo *</Label>
+                        <Select value={item.operation_type} onValueChange={(v) => handleItemChange(index, 'operation_type', v)}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Coleta ou Entrega" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="COLETA">Coleta</SelectItem>
+                            <SelectItem value="ENTREGA">Entrega</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div>
                         <Label className="text-xs">Motorista *</Label>
                         <Autocomplete
@@ -605,6 +621,19 @@ export default function LoadingSchedulePage() {
                         <Label className="text-xs">Lacre</Label>
                         <Input className="h-9" value={item.seal_number} onChange={(e) => handleItemChange(index, 'seal_number', e.target.value.toUpperCase())} placeholder="Nº do Lacre" />
                       </div>
+                      {(formData.contracting_client_name === BAG_NUMBER_CLIENT_NAME || formData.destination_client_name === BAG_NUMBER_CLIENT_NAME) && (
+                        <div>
+                          <Label className="text-xs">Nº da Bolsa</Label>
+                          <Input
+                            className="h-9"
+                            value={item.bag_number}
+                            onChange={(e) => handleItemChange(index, 'bag_number', e.target.value)}
+                            placeholder="Ex: 245250701171065"
+                            maxLength={30}
+                            data-testid={`loading-schedule-bag-number-${index}`}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -662,6 +691,7 @@ export default function LoadingSchedulePage() {
                     <thead className="bg-muted">
                       <tr>
                         <th className="text-left p-2">#</th>
+                        <th className="text-left p-2">Tipo</th>
                         <th className="text-left p-2">Motorista</th>
                         <th className="text-left p-2">CPF</th>
                         <th className="text-left p-2">Cavalo</th>
@@ -670,12 +700,24 @@ export default function LoadingSchedulePage() {
                         <th className="text-left p-2">Data</th>
                         <th className="text-left p-2">Container</th>
                         <th className="text-left p-2">Lacre</th>
+                        {selectedSchedule.items?.some(i => i.bag_number) && (
+                          <th className="text-left p-2">Nº da Bolsa</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {selectedSchedule.items?.map((item, idx) => (
                         <tr key={idx} className="border-t">
                           <td className="p-2">{idx + 1}</td>
+                          <td className="p-2">
+                            {item.operation_type ? (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                item.operation_type === 'COLETA' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                              }`}>
+                                {item.operation_type === 'COLETA' ? 'Coleta' : 'Entrega'}
+                              </span>
+                            ) : '-'}
+                          </td>
                           <td className="p-2">{item.driver_name}</td>
                           <td className="p-2">{item.driver_cpf || '-'}</td>
                           <td className="p-2 font-mono">{item.cavalo_plate}</td>
@@ -684,6 +726,9 @@ export default function LoadingSchedulePage() {
                           <td className="p-2">{item.loading_date ? format(new Date(item.loading_date), 'dd/MM/yyyy') : '-'}</td>
                           <td className="p-2 font-mono">{item.container_number || '-'}</td>
                           <td className="p-2 font-mono">{item.seal_number || '-'}</td>
+                          {selectedSchedule.items?.some(i => i.bag_number) && (
+                            <td className="p-2 font-mono">{item.bag_number || '-'}</td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

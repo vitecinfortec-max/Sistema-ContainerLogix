@@ -83,10 +83,10 @@ export default function PhotoRegistriesPage() {
       <div className="max-w-7xl mx-auto" data-testid="photo-registries-page">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Registro Fotográfico
             </h1>
-            <p className="text-muted-foreground mt-1">Gerenciamento de fotos de contêineres</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerenciamento de fotos de contêineres</p>
           </div>
           <Button onClick={() => navigate('/photo-registries/new')} data-testid="new-registry-btn">
             <Plus className="w-4 h-4 mr-2" />
@@ -98,7 +98,7 @@ export default function PhotoRegistriesPage() {
           <CardContent className="pt-6">
             <form onSubmit={handleSearch} className="flex gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-slate-500 w-4 h-4" />
                 <Input
                   placeholder="Buscar por container, booking ou cliente..."
                   value={search}
@@ -164,7 +164,7 @@ export default function PhotoRegistriesPage() {
                                 ? 'bg-green-100 text-green-700' 
                                 : countPhotos(registry) > 0 
                                   ? 'bg-yellow-100 text-yellow-700'
-                                  : 'bg-gray-100 text-gray-700'
+                                  : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300'
                             }`}>
                               <Camera className="w-3 h-3" />
                               {countPhotos(registry)}/4

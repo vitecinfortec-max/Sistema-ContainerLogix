@@ -310,7 +310,7 @@ export default function ContainerPhotoUpload({ photos, onChange, damages = [], o
   return (
     <>
       <Card>
-        <CardHeader className="bg-slate-50">
+        <CardHeader className="bg-slate-50 dark:bg-slate-800">
           <CardTitle className="text-lg flex items-center gap-2">
             <ClipboardCheck className="w-5 h-5" />
             Vistoria de Container
@@ -394,7 +394,7 @@ export default function ContainerPhotoUpload({ photos, onChange, damages = [], o
                             className="w-full h-full object-cover opacity-50"
                           />
                         )}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60">
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-slate-900/60">
                           <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
                           <span className="text-xs text-muted-foreground font-medium">Enviando...</span>
                         </div>

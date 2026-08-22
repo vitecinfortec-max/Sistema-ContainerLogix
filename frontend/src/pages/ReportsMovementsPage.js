@@ -46,6 +46,7 @@ export default function ReportsMovementsPage() {
       setClients(response.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
+      toast.error('Erro ao carregar clientes');
     }
   };
 
@@ -147,18 +148,18 @@ export default function ReportsMovementsPage() {
       <div className="space-y-5" data-testid="reports-movements-page">
         {/* Header */}
         <div>
-          <h1 className="text-lg font-semibold text-slate-800">
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
             Relatório de Movimentações
           </h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">Gere e exporte relatórios das movimentações de containers</p>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gere e exporte relatórios das movimentações de containers</p>
         </div>
 
-        <div className="border-t border-slate-200"></div>
+        <div className="border-t border-slate-200 dark:border-slate-700"></div>
 
         {/* Filters */}
         <Card className="shadow-sm">
-          <CardHeader className="bg-slate-50/50 pb-3 pt-4">
-            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700">
+          <CardHeader className="bg-slate-50 dark:bg-slate-800/50 pb-3 pt-4">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
               <Calendar className="w-4 h-4" />
               Filtros
             </CardTitle>
@@ -166,7 +167,7 @@ export default function ReportsMovementsPage() {
           <CardContent className="pt-4 space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="w-36">
-                <Label className="text-[11px] text-slate-500 mb-1 block">Data Início</Label>
+                <Label className="text-[11px] text-slate-500 dark:text-slate-400 mb-1 block">Data Início</Label>
                 <Input
                   type="date"
                   value={dateFrom}
@@ -176,7 +177,7 @@ export default function ReportsMovementsPage() {
                 />
               </div>
               <div className="w-36">
-                <Label className="text-[11px] text-slate-500 mb-1 block">Data Fim</Label>
+                <Label className="text-[11px] text-slate-500 dark:text-slate-400 mb-1 block">Data Fim</Label>
                 <Input
                   type="date"
                   value={dateTo}
@@ -190,7 +191,7 @@ export default function ReportsMovementsPage() {
                   variant="outline"
                   size="sm"
                   onClick={clearFilters}
-                  className="h-10 text-[13px] text-slate-600"
+                  className="h-10 text-[13px] text-slate-600 dark:text-slate-400"
                   data-testid="report-clear-filters"
                 >
                   <X className="w-3.5 h-3.5 mr-1" />
@@ -241,7 +242,7 @@ export default function ReportsMovementsPage() {
                   <button
                     type="button"
                     onClick={clearClient}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                     data-testid="report-filter-client-clear"
                   >
                     <X className="w-4 h-4" />
@@ -250,7 +251,7 @@ export default function ReportsMovementsPage() {
 
                 {showClientSuggestions && clientSuggestions.length > 0 && (
                   <div
-                    className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                    className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto"
                     data-testid="report-filter-client-suggestions"
                   >
                     {clientSuggestions.map((client) => (
@@ -258,7 +259,7 @@ export default function ReportsMovementsPage() {
                         key={client.id}
                         type="button"
                         onClick={() => selectClient(client)}
-                        className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-100 focus:bg-slate-100 focus:outline-none border-b border-slate-100 last:border-b-0"
+                        className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 focus:outline-none border-b border-slate-100 dark:border-slate-800 last:border-b-0"
                       >
                         {client.name}
                       </button>
@@ -267,7 +268,7 @@ export default function ReportsMovementsPage() {
                 )}
 
                 {showClientSuggestions && clientSearch.length >= 1 && clientSuggestions.length === 0 && (
-                  <div className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500">
+                  <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500 dark:text-slate-400">
                     Nenhum cliente encontrado
                   </div>
                 )}
@@ -279,7 +280,7 @@ export default function ReportsMovementsPage() {
         {/* Download Card - Only Excel */}
         <Card className="border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow max-w-md">
           <CardHeader className="pb-2 pt-4">
-            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
               <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
               Relatório Excel
             </CardTitle>

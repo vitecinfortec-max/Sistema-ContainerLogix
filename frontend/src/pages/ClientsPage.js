@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -7,7 +8,8 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Plus, Trash2, Users, Edit } from 'lucide-react';
+import { useConfirm } from '../hooks/useConfirm';
+import { Plus, Trash2, Users, Edit, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -30,6 +32,7 @@ const formatPhone = (value) => {
 };
 
 export default function ClientsPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -37,8 +40,12 @@ export default function ClientsPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({ name: '', cnpj: '', phone: '', email: '', address: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+  const location = useLocation();
 
   useEffect(() => {
+    const qFromUrl = new URLSearchParams(location.search).get('q');
+    if (qFromUrl) setSearch(qFromUrl);
     loadClients();
   }, []);
 
@@ -101,7 +108,7 @@ export default function ClientsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Tem certeza que deseja deletar este cliente?')) {
+    if (await confirm('Tem certeza que deseja deletar este cliente?')) {
       try {
         await api.deleteClient(id);
         toast.success('Cliente deletado com sucesso');
@@ -122,6 +129,17 @@ export default function ClientsPage() {
     setFormData({ ...formData, phone: formatted });
   };
 
+  const filteredClients = clients.filter((client) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      client.name?.toLowerCase().includes(term) ||
+      client.cnpj?.toLowerCase().includes(term) ||
+      client.phone?.toLowerCase().includes(term) ||
+      client.email?.toLowerCase().includes(term)
+    );
+  });
+
   if (loading) {
     return (
       <Layout>
@@ -137,10 +155,10 @@ export default function ClientsPage() {
       <div className="space-y-5" data-testid="clients-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Cadastro de Cliente
             </h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">Gerencie o cadastro de clientes</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie o cadastro de clientes</p>
           </div>
           <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
@@ -236,27 +254,38 @@ export default function ClientsPage() {
           </Dialog>
         </div>
 
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+          <Input
+            placeholder="Buscar por nome, CNPJ, telefone ou email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10 text-[13px] pl-9"
+            data-testid="search-client-input"
+          />
+        </div>
+
         <Card>
-          <CardHeader className="bg-slate-50 py-3">
-            <CardTitle className="text-[13px] font-medium">Lista de Clientes ({clients.length})</CardTitle>
+          <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
+            <CardTitle className="text-[13px] font-medium">Lista de Clientes ({filteredClients.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {clients.length > 0 ? (
+            {filteredClients.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 border-b">
+                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nome</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">CNPJ</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Telefone</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Email</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cadastrado em</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ações</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nome</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">CNPJ</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Telefone</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Email</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {clients.map((client) => (
-                      <tr key={client.id} className="hover:bg-slate-50 transition-colors" data-testid="client-row">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {filteredClients.map((client) => (
+                      <tr key={client.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" data-testid="client-row">
                         <td className="px-4 py-2.5 text-[13px] font-medium">{client.name}</td>
                         <td className="px-4 py-2.5 text-[13px] font-mono">{client.cnpj || '-'}</td>
                         <td className="px-4 py-2.5 text-[13px] font-mono">{client.phone || '-'}</td>
@@ -294,14 +323,17 @@ export default function ClientsPage() {
                 </table>
               </div>
             ) : (
-              <div className="p-10 text-center text-slate-500" data-testid="no-clients">
+              <div className="p-10 text-center text-slate-500 dark:text-slate-400" data-testid="no-clients">
                 <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">Nenhum cliente cadastrado</p>
+                <p className="text-[13px] font-medium">
+                  {search ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog />
     </Layout>
   );
 }

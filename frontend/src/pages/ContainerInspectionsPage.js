@@ -6,11 +6,13 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Eye, Printer, Trash2, Search, ClipboardCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function ContainerInspectionsPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const navigate = useNavigate();
   const [inspections, setInspections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +49,7 @@ export default function ContainerInspectionsPage() {
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
-    if (!window.confirm('Tem certeza que deseja excluir esta vistoria?')) return;
+    if (!(await confirm('Tem certeza que deseja excluir esta vistoria?'))) return;
     
     try {
       await api.deleteContainerInspection(id);
@@ -58,15 +60,7 @@ export default function ContainerInspectionsPage() {
     }
   };
 
-  const getPhotoCount = (inspection) => {
-    let count = 0;
-    if (inspection.photo_front) count++;
-    if (inspection.photo_back) count++;
-    if (inspection.photo_left) count++;
-    if (inspection.photo_right) count++;
-    if (inspection.photo_internal) count++;
-    return count;
-  };
+  const getPhotoCount = (inspection) => (inspection.photos || []).length;
 
   const filteredInspections = inspections.filter(i => 
     i.container_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -79,10 +73,10 @@ export default function ContainerInspectionsPage() {
       <div className="space-y-6" data-testid="container-inspections-page">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Vistoria de Container
             </h1>
-            <p className="text-muted-foreground mt-1">Gerenciamento de vistorias de containers</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerenciamento de vistorias de containers</p>
           </div>
           <Button onClick={() => navigate('/container-inspections/new')} data-testid="new-inspection-btn">
             <Plus className="w-4 h-4 mr-2" />
@@ -142,11 +136,10 @@ export default function ContainerInspectionsPage() {
                         <td className="py-3 px-4">{inspection.client_name || '-'}</td>
                         <td className="py-3 px-4">
                           <span className={`px-2 py-1 rounded-full text-xs ${
-                            getPhotoCount(inspection) === 5 ? 'bg-green-100 text-green-800' :
-                            getPhotoCount(inspection) > 0 ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
+                            getPhotoCount(inspection) > 0 ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200'
                           }`}>
-                            {getPhotoCount(inspection)}/5
+                            {getPhotoCount(inspection)}/8
                           </span>
                         </td>
                         <td className="py-3 px-4 text-sm">
@@ -220,6 +213,7 @@ export default function ContainerInspectionsPage() {
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog />
     </Layout>
   );
 }

@@ -54,7 +54,6 @@ export default function EditMovementPage() {
 
   const loadMovement = async () => {
     try {
-      console.log(`[EditMovementPage] Carregando movimentação ID: ${id}`);
       const response = await api.getMovement(id);
       const movement = response.data;
       
@@ -72,8 +71,6 @@ export default function EditMovementPage() {
         setContainerDamages(movement.container_damages);
       }
       
-      console.log(`[EditMovementPage] Movimentação carregada. Armador: ${movement.shipping_line}, Cliente: ${movement.client_name || 'N/A'}`);
-      
       // Atualizar o campo de busca do cliente
       if (movement.client_name) {
         setClientSearch(movement.client_name);
@@ -90,8 +87,6 @@ export default function EditMovementPage() {
   const loadAuxData = async () => {
     setLoadingAux(true);
     try {
-      console.log('[EditMovementPage] Iniciando carregamento de dados auxiliares...');
-      
       const [clientsRes, shippingLinesRes, serviceTypesRes, vehiclesRes] = await Promise.all([
         api.getClients(),
         api.getShippingLines(),
@@ -108,14 +103,8 @@ export default function EditMovementPage() {
       setShippingLines(shippingLinesData);
       setServiceTypes(serviceTypesData);
       setVehicles(vehiclesData);
-      
-      console.log('[EditMovementPage] Dados auxiliares carregados:');
-      console.log(`  - Clientes: ${clientsData.length}`);
-      console.log(`  - Armadores: ${shippingLinesData.length}`);
-      console.log(`  - Tipos de Serviço: ${serviceTypesData.length}`);
-      
     } catch (error) {
-      console.error('[EditMovementPage] ERRO ao carregar dados auxiliares:', error);
+      console.error('[EditMovementPage] Erro ao carregar dados auxiliares:', error);
       toast.error('Erro ao carregar dados auxiliares');
     } finally {
       setLoadingAux(false);
@@ -181,10 +170,10 @@ export default function EditMovementPage() {
       <div className="max-w-5xl mx-auto" data-testid="edit-movement-page">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Editar Movimentação
             </h1>
-            <p className="text-muted-foreground mt-1">Atualize as informações da movimentação</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Atualize as informações da movimentação</p>
           </div>
           <Button variant="outline" onClick={() => navigate(`/movements/${id}`)} data-testid="back-button">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -194,7 +183,7 @@ export default function EditMovementPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <Card>
-            <CardHeader className="bg-slate-50">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800">
               <CardTitle className="text-lg">Tipo de Operação</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
@@ -228,7 +217,7 @@ export default function EditMovementPage() {
           </Card>
 
           <Card>
-            <CardHeader className="bg-slate-50">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800">
               <CardTitle className="text-lg">Informações do Veículo e Motorista</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
@@ -296,7 +285,7 @@ export default function EditMovementPage() {
                     {clientSearch && (
                       <button
                         type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400"
                         onClick={() => {
                           setClientSearch('');
                           setValue('client_name', '');
@@ -308,7 +297,7 @@ export default function EditMovementPage() {
                     )}
                   </div>
                   {showClientDropdown && clientSearch && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-auto">
                       {clients
                         .filter(client => 
                           client.name.toLowerCase().includes(clientSearch.toLowerCase())
@@ -317,7 +306,7 @@ export default function EditMovementPage() {
                         .map(client => (
                           <div
                             key={client.id}
-                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer text-sm"
                             onMouseDown={(e) => {
                               e.preventDefault();
                               setClientSearch(client.name);
@@ -332,7 +321,7 @@ export default function EditMovementPage() {
                       {clients.filter(client => 
                         client.name.toLowerCase().includes(clientSearch.toLowerCase())
                       ).length === 0 && (
-                        <div className="px-4 py-2 text-sm text-gray-500">
+                        <div className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400">
                           Nenhum cliente encontrado
                         </div>
                       )}
@@ -345,7 +334,7 @@ export default function EditMovementPage() {
           </Card>
 
           <Card>
-            <CardHeader className="bg-slate-50">
+            <CardHeader className="bg-slate-50 dark:bg-slate-800">
               <CardTitle className="text-lg">Informações do Contêiner</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">

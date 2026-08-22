@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -7,7 +8,8 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Plus, Trash2, Truck, Edit } from 'lucide-react';
+import { useConfirm } from '../hooks/useConfirm';
+import { Plus, Trash2, Truck, Edit, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -29,6 +31,7 @@ const formatPhone = (value) => {
 };
 
 export default function DriversPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -36,8 +39,12 @@ export default function DriversPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({ name: '', cpf: '', phone: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+  const location = useLocation();
 
   useEffect(() => {
+    const qFromUrl = new URLSearchParams(location.search).get('q');
+    if (qFromUrl) setSearch(qFromUrl);
     loadDrivers();
   }, []);
 
@@ -98,7 +105,7 @@ export default function DriversPage() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Tem certeza que deseja deletar esta pessoa?')) {
+    if (await confirm('Tem certeza que deseja deletar esta pessoa?')) {
       try {
         await api.deleteDriver(id);
         toast.success('Pessoa deletada com sucesso');
@@ -119,6 +126,16 @@ export default function DriversPage() {
     setFormData({ ...formData, phone: formatted });
   };
 
+  const filteredDrivers = drivers.filter((driver) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      driver.name?.toLowerCase().includes(term) ||
+      driver.cpf?.toLowerCase().includes(term) ||
+      driver.phone?.toLowerCase().includes(term)
+    );
+  });
+
   if (loading) {
     return (
       <Layout>
@@ -134,10 +151,10 @@ export default function DriversPage() {
       <div className="space-y-5" data-testid="drivers-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Pessoas
             </h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">Gerencie o cadastro de pessoas</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie o cadastro de pessoas</p>
           </div>
           <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
@@ -211,26 +228,37 @@ export default function DriversPage() {
           </Dialog>
         </div>
 
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+          <Input
+            placeholder="Buscar por nome, CPF ou telefone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10 text-[13px] pl-9"
+            data-testid="search-driver-input"
+          />
+        </div>
+
         <Card>
-          <CardHeader className="bg-slate-50 py-3">
-            <CardTitle className="text-[13px] font-medium">Lista de Pessoas ({drivers.length})</CardTitle>
+          <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
+            <CardTitle className="text-[13px] font-medium">Lista de Pessoas ({filteredDrivers.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {drivers.length > 0 ? (
+            {filteredDrivers.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 border-b">
+                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nome</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">CPF</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Telefone</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cadastrado em</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ações</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nome</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">CPF</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Telefone</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {drivers.map((driver) => (
-                      <tr key={driver.id} className="hover:bg-slate-50 transition-colors" data-testid="driver-row">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {filteredDrivers.map((driver) => (
+                      <tr key={driver.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" data-testid="driver-row">
                         <td className="px-4 py-2.5 text-[13px] font-medium">{driver.name}</td>
                         <td className="px-4 py-2.5 text-[13px] font-mono">{driver.cpf}</td>
                         <td className="px-4 py-2.5 text-[13px] font-mono">{driver.phone || '-'}</td>
@@ -267,14 +295,17 @@ export default function DriversPage() {
                 </table>
               </div>
             ) : (
-              <div className="p-10 text-center text-slate-500" data-testid="no-drivers">
+              <div className="p-10 text-center text-slate-500 dark:text-slate-400" data-testid="no-drivers">
                 <Truck className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">Nenhuma pessoa cadastrada</p>
+                <p className="text-[13px] font-medium">
+                  {search ? 'Nenhuma pessoa encontrada' : 'Nenhuma pessoa cadastrada'}
+                </p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog />
     </Layout>
   );
 }

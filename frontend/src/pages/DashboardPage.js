@@ -3,20 +3,44 @@ import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
-import { 
-  ArrowDownCircle, ArrowUpCircle, Container, Package, Plus, Calendar, ArrowRight, 
-  FileText, Receipt, Truck, Users, BarChart3, DollarSign, Ship, Building2, 
-  ClipboardList, X, Check, Settings2
+import {
+  ArrowDownCircle, ArrowUpCircle, Container, Package, Plus, Calendar, ArrowRight,
+  FileText, Receipt, Truck, Users, BarChart3, DollarSign, Ship, Building2,
+  ClipboardList, X, Check, Settings2, Trophy, Medal, Award
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useWebSocket } from '../hooks/useWebSocket';
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  PieChart, Pie, Cell
+} from 'recharts';
+
+const RANK_STYLES = [
+  { icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+  { icon: Medal, color: 'text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700' },
+  { icon: Award, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-500/10' },
+];
+
+function ChartTooltip({ active, payload, label }) {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg px-3 py-2 text-xs">
+      <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">{label}</p>
+      {payload.map((entry) => (
+        <p key={entry.dataKey} style={{ color: entry.color }} className="font-medium">
+          {entry.name}: {entry.value}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 const ALL_SHORTCUTS = [
   { id: 'new-movement', label: 'Nova Movimentação', icon: Plus, path: '/movements/new', color: 'text-primary', bg: 'bg-primary/10' },
-  { id: 'movements', label: 'Movimentações', icon: Container, path: '/movements', color: 'text-slate-600', bg: 'bg-slate-100' },
+  { id: 'movements', label: 'Movimentações', icon: Container, path: '/movements', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700' },
   { id: 'report-movements', label: 'Rel. Movimentações', icon: BarChart3, path: '/reports/movements', color: 'text-blue-600', bg: 'bg-blue-50' },
   { id: 'report-billing', label: 'Rel. Faturamento', icon: DollarSign, path: '/reports/billing', color: 'text-amber-600', bg: 'bg-amber-50' },
   { id: 'invoices', label: 'Faturas', icon: Receipt, path: '/billing', color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -69,6 +93,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Erro ao carregar atalhos:', error);
+      toast.error('Erro ao carregar atalhos personalizados');
     }
   };
 
@@ -115,10 +140,10 @@ export default function DashboardPage() {
         {/* Atalhos */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider" data-testid="shortcuts-title">Atalhos</h2>
+            <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider" data-testid="shortcuts-title">Atalhos</h2>
             <button
               onClick={openEditor}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-primary transition-colors"
+              className="flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-500 hover:text-primary transition-colors"
               data-testid="edit-shortcuts-button"
             >
               <Settings2 className="w-3.5 h-3.5" />
@@ -132,13 +157,13 @@ export default function DashboardPage() {
                 <button
                   key={shortcut.id}
                   onClick={() => navigate(shortcut.path)}
-                  className="flex flex-col items-center gap-2 p-4 rounded-lg border border-slate-200 bg-white hover:border-primary/40 hover:shadow-sm transition-all group cursor-pointer"
+                  className="flex flex-col items-center gap-2 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-primary/40 hover:shadow-sm transition-all group cursor-pointer"
                   data-testid={`shortcut-${shortcut.id}`}
                 >
                   <div className={`w-10 h-10 rounded-lg ${shortcut.bg} flex items-center justify-center group-hover:scale-110 transition-transform`}>
                     <Icon className={`w-5 h-5 ${shortcut.color}`} />
                   </div>
-                  <span className="text-xs font-medium text-slate-600 text-center leading-tight">{shortcut.label}</span>
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400 text-center leading-tight">{shortcut.label}</span>
                 </button>
               );
             })}
@@ -146,13 +171,13 @@ export default function DashboardPage() {
             {/* Add shortcut button */}
             <button
               onClick={openEditor}
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-slate-200 bg-white hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
               data-testid="add-shortcut-button"
             >
-              <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center">
-                <Plus className="w-5 h-5 text-slate-400" />
+              <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
+                <Plus className="w-5 h-5 text-slate-400 dark:text-slate-500" />
               </div>
-              <span className="text-xs font-medium text-slate-400">Adicionar</span>
+              <span className="text-xs font-medium text-slate-400 dark:text-slate-500">Adicionar</span>
             </button>
           </div>
         </div>
@@ -160,15 +185,15 @@ export default function DashboardPage() {
         {/* Shortcuts Editor Modal */}
         {showEditor && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" data-testid="shortcuts-editor-modal">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                <h3 className="text-base font-semibold text-slate-800">Personalizar Atalhos</h3>
-                <button onClick={() => setShowEditor(false)} className="text-slate-400 hover:text-slate-600">
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+                <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">Personalizar Atalhos</h3>
+                <button onClick={() => setShowEditor(false)} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400">
                   <X className="w-5 h-5" />
                 </button>
               </div>
               <div className="p-5">
-                <p className="text-sm text-slate-500 mb-4">Selecione os atalhos que deseja exibir no dashboard:</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Selecione os atalhos que deseja exibir no dashboard:</p>
                 <div className="grid grid-cols-2 gap-2">
                   {ALL_SHORTCUTS.map((shortcut) => {
                     const Icon = shortcut.icon;
@@ -180,14 +205,14 @@ export default function DashboardPage() {
                         className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
                           isSelected
                             ? 'border-primary bg-primary/5'
-                            : 'border-slate-200 hover:border-slate-300'
+                            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                         }`}
                         data-testid={`editor-shortcut-${shortcut.id}`}
                       >
                         <div className={`w-8 h-8 rounded-md ${shortcut.bg} flex items-center justify-center flex-shrink-0`}>
                           <Icon className={`w-4 h-4 ${shortcut.color}`} />
                         </div>
-                        <span className={`text-sm font-medium flex-1 ${isSelected ? 'text-primary' : 'text-slate-600'}`}>
+                        <span className={`text-sm font-medium flex-1 ${isSelected ? 'text-primary' : 'text-slate-600 dark:text-slate-400'}`}>
                           {shortcut.label}
                         </span>
                         {isSelected && (
@@ -198,8 +223,8 @@ export default function DashboardPage() {
                   })}
                 </div>
               </div>
-              <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100 bg-slate-50/50">
-                <span className="text-xs text-slate-400">{editorSelection.length} selecionados</span>
+              <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                <span className="text-xs text-slate-400 dark:text-slate-500">{editorSelection.length} selecionados</span>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -226,51 +251,51 @@ export default function DashboardPage() {
 
         {/* Stats Grid - 4 cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border border-slate-200 shadow-none hover:border-primary/30 transition-colors" data-testid="stat-entries-today">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-primary/30 transition-colors" data-testid="stat-entries-today">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                   <ArrowDownCircle className="w-5 h-5 text-primary" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-800">{stats?.entries_today || 0}</div>
-              <p className="text-xs text-slate-500 mt-0.5">Entradas Hoje</p>
+              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.entries_today || 0}</div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Entradas Hoje</p>
             </CardContent>
           </Card>
 
-          <Card className="border border-slate-200 shadow-none hover:border-amber-300 transition-colors" data-testid="stat-exits-today">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-amber-300 transition-colors" data-testid="stat-exits-today">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
                   <ArrowUpCircle className="w-5 h-5 text-amber-500" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-800">{stats?.exits_today || 0}</div>
-              <p className="text-xs text-slate-500 mt-0.5">Saídas Hoje</p>
+              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.exits_today || 0}</div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Saídas Hoje</p>
             </CardContent>
           </Card>
 
-          <Card className="border border-slate-200 shadow-none hover:border-emerald-300 transition-colors" data-testid="stat-stock-full">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-emerald-300 transition-colors" data-testid="stat-stock-full">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
                   <Package className="w-5 h-5 text-emerald-500" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-800">{stats?.stock_full || 0}</div>
-              <p className="text-xs text-slate-500 mt-0.5">Estoque Cheios</p>
+              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.stock_full || 0}</div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque Cheios</p>
             </CardContent>
           </Card>
 
-          <Card className="border border-slate-200 shadow-none hover:border-slate-300 transition-colors" data-testid="stat-stock-empty">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-slate-300 dark:hover:border-slate-600 transition-colors" data-testid="stat-stock-empty">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center">
-                  <Container className="w-5 h-5 text-slate-500" />
+                <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                  <Container className="w-5 h-5 text-slate-500 dark:text-slate-400" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-800">{stats?.stock_empty || 0}</div>
-              <p className="text-xs text-slate-500 mt-0.5">Estoque Vazios</p>
+              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.stock_empty || 0}</div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque Vazios</p>
             </CardContent>
           </Card>
         </div>
@@ -285,8 +310,8 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-slate-800">{stats?.entries_month || 0}</div>
-                  <p className="text-xs text-slate-500 mt-0.5">{capitalizedMonth}</p>
+                  <div className="text-3xl font-bold text-slate-800 dark:text-slate-200">{stats?.entries_month || 0}</div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
                 </div>
                 <ArrowDownCircle className="w-10 h-10 text-primary/20" />
               </div>
@@ -301,8 +326,8 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-slate-800">{stats?.exits_month || 0}</div>
-                  <p className="text-xs text-slate-500 mt-0.5">{capitalizedMonth}</p>
+                  <div className="text-3xl font-bold text-slate-800 dark:text-slate-200">{stats?.exits_month || 0}</div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
                 </div>
                 <ArrowUpCircle className="w-10 h-10 text-amber-500/20" />
               </div>
@@ -310,11 +335,165 @@ export default function DashboardPage() {
           </Card>
         </div>
 
+        {/* Daily Entries/Exits Chart */}
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-chart-card">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-primary" />
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Entradas e Saídas por Dia</CardTitle>
+              <span className="text-xs text-slate-400 dark:text-slate-500">(últimos 14 dias)</span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            {stats?.daily_chart && stats.daily_chart.length > 0 ? (
+              <div className="h-72 w-full" data-testid="daily-chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={stats.daily_chart.map(d => ({
+                    ...d,
+                    label: format(new Date(d.date + 'T00:00:00'), 'dd/MM', { locale: ptBR })
+                  }))} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100 dark:stroke-slate-800" />
+                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Bar dataKey="entries" name="Entradas" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={28} />
+                    <Bar dataKey="exits" name="Saídas" fill="#f59e0b" radius={[3, 3, 0, 0]} maxBarSize={28} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-slate-400 dark:text-slate-500">
+                <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Driver Ranking + Stock Distribution */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="driver-ranking-card">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-amber-500" />
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Ranking de Motoristas</CardTitle>
+                <span className="text-xs text-slate-400 dark:text-slate-500">({capitalizedMonth})</span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {stats?.driver_ranking && stats.driver_ranking.length > 0 ? (
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-96 overflow-y-auto">
+                  {stats.driver_ranking.map((driver, idx) => {
+                    const rankStyle = RANK_STYLES[idx];
+                    const RankIcon = rankStyle?.icon;
+                    return (
+                      <div
+                        key={driver.driver_name}
+                        className="flex items-center gap-3 px-4 py-2.5"
+                        data-testid="driver-ranking-row"
+                      >
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                          rankStyle ? rankStyle.bg : 'bg-slate-50 dark:bg-slate-800'
+                        } ${rankStyle ? rankStyle.color : 'text-slate-400 dark:text-slate-500'}`}>
+                          {RankIcon ? <RankIcon className="w-3.5 h-3.5" /> : idx + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{driver.driver_name}</p>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs flex-shrink-0">
+                          <span className="flex items-center gap-1 text-primary" title="Entradas">
+                            <ArrowDownCircle className="w-3.5 h-3.5" />
+                            {driver.entries}
+                          </span>
+                          <span className="flex items-center gap-1 text-amber-600" title="Saídas">
+                            <ArrowUpCircle className="w-3.5 h-3.5" />
+                            {driver.exits}
+                          </span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 w-6 text-right">{driver.total}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-400 dark:text-slate-500" data-testid="no-driver-ranking">
+                  <Trophy className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">Nenhuma movimentação registrada neste mês</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="stock-distribution-card">
+            <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-emerald-500" />
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Estoque Atual no Pátio</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4">
+              {(stats?.stock_full || 0) + (stats?.stock_empty || 0) > 0 ? (
+                <div className="flex items-center gap-4">
+                  <div className="h-52 w-1/2" data-testid="stock-distribution-chart">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Cheios', value: stats?.stock_full || 0 },
+                            { name: 'Vazios', value: stats?.stock_empty || 0 },
+                          ]}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={45}
+                          outerRadius={75}
+                          paddingAngle={3}
+                        >
+                          <Cell fill="#10b981" />
+                          <Cell fill="#94a3b8" />
+                        </Pie>
+                        <Tooltip content={<ChartTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                        Cheios
+                      </span>
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{stats?.stock_full || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block" />
+                        Vazios
+                      </span>
+                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{stats?.stock_empty || 0}</span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <span className="text-sm text-slate-500 dark:text-slate-400">Total</span>
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                        {(stats?.stock_full || 0) + (stats?.stock_empty || 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center text-slate-400 dark:text-slate-500">
+                  <Package className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">Nenhum container em estoque</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Recent Movements Table */}
-        <Card className="border border-slate-200 shadow-none" data-testid="recent-movements-card">
-          <CardHeader className="border-b border-slate-100 py-3 px-4">
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="recent-movements-card">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-slate-700">Movimentações Recentes</CardTitle>
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Movimentações Recentes</CardTitle>
               <Button 
                 variant="ghost" 
                 size="sm"
@@ -332,22 +511,22 @@ export default function DashboardPage() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Data/Hora</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tipo</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Container</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Motorista</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data/Hora</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motorista</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stats.recent_movements.map((movement, idx) => (
                       <tr 
                         key={movement.id} 
-                        className={`hover:bg-slate-50/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`}
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
                         data-testid="movement-row"
                       >
-                        <td className="px-4 py-2.5 text-sm text-slate-600">
+                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">
                           {format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                         </td>
                         <td className="px-4 py-2.5">
@@ -359,13 +538,13 @@ export default function DashboardPage() {
                             {movement.operation_type}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-sm font-mono font-medium text-slate-800">{movement.container_number}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600">{movement.driver_name}</td>
+                        <td className="px-4 py-2.5 text-sm font-mono font-medium text-slate-800 dark:text-slate-200">{movement.container_number}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.driver_name}</td>
                         <td className="px-4 py-2.5">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                             movement.status === 'CHEIO' 
                               ? 'bg-emerald-50 text-emerald-700' 
-                              : 'bg-slate-100 text-slate-600'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                           }`}>
                             {movement.status}
                           </span>
@@ -376,7 +555,7 @@ export default function DashboardPage() {
                 </table>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400" data-testid="no-movements">
+              <div className="p-8 text-center text-slate-400 dark:text-slate-500" data-testid="no-movements">
                 <Container className="w-10 h-10 mx-auto mb-3 opacity-40" />
                 <p className="text-sm">Nenhuma movimentação registrada ainda</p>
               </div>

@@ -117,6 +117,7 @@ export default function BillingPage() {
       setClients(res.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
+      toast.error('Erro ao carregar clientes');
     }
   };
 
@@ -450,7 +451,7 @@ export default function BillingPage() {
       case 'CREATED': return { label: 'Criada', color: 'bg-green-100 text-green-800' };
       case 'UPDATED': return { label: 'Atualizada', color: 'bg-blue-100 text-blue-800' };
       case 'DELETED': return { label: 'Excluída', color: 'bg-red-100 text-red-800' };
-      default: return { label: action, color: 'bg-slate-100 text-slate-800' };
+      default: return { label: action, color: 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200' };
     }
   };
 
@@ -584,10 +585,10 @@ export default function BillingPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Faturamento
             </h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
               Gerencie as faturas do sistema
             </p>
           </div>
@@ -603,18 +604,18 @@ export default function BillingPage() {
         </div>
 
         {/* Separador */}
-        <div className="border-t border-slate-200"></div>
+        <div className="border-t border-slate-200 dark:border-slate-700"></div>
 
         {/* Lista de Faturas */}
         <Card className="shadow-sm">
-          <CardHeader className="bg-slate-50/50 py-3">
-            <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700">
+          <CardHeader className="bg-slate-50 dark:bg-slate-800/50 py-3">
+            <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300">
               <span className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 Faturas Geradas ({totalInvoices})
               </span>
               {totalPages > 1 && (
-                <span className="text-[11px] font-normal text-slate-500">
+                <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
                   Página {currentPage} de {totalPages}
                 </span>
               )}
@@ -624,23 +625,23 @@ export default function BillingPage() {
             {invoices.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-slate-50 border-b">
+                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Nº Fatura</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Cliente</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">CNPJ</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Qtd. Movim.</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Valor Total</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Usuário</th>
-                      <th className="px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ações</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nº Fatura</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Data</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cliente</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">CNPJ</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Qtd. Movim.</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Valor Total</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Usuário</th>
+                      <th className="px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ações</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {invoices.map((invoice) => (
                       <tr 
                         key={invoice.id} 
-                        className="hover:bg-slate-50 transition-colors"
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                         data-testid="invoice-row"
                       >
                         <td className="px-4 py-2.5 text-[13px] font-bold text-primary">
@@ -659,14 +660,14 @@ export default function BillingPage() {
                         <td className="px-4 py-2.5 text-[13px] font-mono font-bold text-green-700">
                           {formatCurrency(invoice.total_value)}
                         </td>
-                        <td className="px-4 py-2.5 text-[13px] text-slate-600">{shortenName(invoice.user_name)}</td>
+                        <td className="px-4 py-2.5 text-[13px] text-slate-600 dark:text-slate-400">{shortenName(invoice.user_name)}</td>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center justify-center gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => viewInvoiceDetails(invoice)}
-                              className="h-8 w-8 p-0 text-slate-600 hover:text-primary"
+                              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:text-primary"
                               title="Ver detalhes"
                               data-testid={`view-invoice-${invoice.id}`}
                             >
@@ -675,7 +676,7 @@ export default function BillingPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 text-slate-600 hover:text-green-600"
+                              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:text-green-600"
                               title="Baixar Excel"
                               data-testid={`download-invoice-${invoice.id}`}
                               disabled={downloadingExcel === invoice.id}
@@ -691,7 +692,7 @@ export default function BillingPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => openEditModal(invoice)}
-                              className="h-8 w-8 p-0 text-slate-600 hover:text-blue-600"
+                              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:text-blue-600"
                               title="Editar fatura"
                               data-testid={`edit-invoice-${invoice.id}`}
                             >
@@ -701,7 +702,7 @@ export default function BillingPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => confirmDelete(invoice)}
-                              className="h-8 w-8 p-0 text-slate-600 hover:text-red-600"
+                              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:text-red-600"
                               title="Excluir fatura"
                               data-testid={`delete-invoice-${invoice.id}`}
                             >
@@ -716,11 +717,11 @@ export default function BillingPage() {
               </div>
             ) : (
               <div className="text-center py-10">
-                <FileText className="w-12 h-12 text-slate-400 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium text-slate-600">
+                <FileText className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-3 opacity-50" />
+                <p className="text-[13px] font-medium text-slate-600 dark:text-slate-400">
                   Nenhuma fatura gerada
                 </p>
-                <p className="text-[11px] text-slate-500 mt-1">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                   Clique em "Gerar Faturamento" para criar uma nova fatura
                 </p>
               </div>
@@ -728,8 +729,8 @@ export default function BillingPage() {
 
             {/* Controles de Paginação */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-2.5 border-t bg-slate-50">
-                <div className="text-[11px] text-slate-500">
+              <div className="flex items-center justify-between px-4 py-2.5 border-t bg-slate-50 dark:bg-slate-800">
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
                   Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, totalInvoices)} de {totalInvoices} faturas
                 </div>
                 <div className="flex items-center gap-2">
@@ -775,10 +776,10 @@ export default function BillingPage() {
 
           <div className="flex-1 overflow-y-auto space-y-4 py-4">
             {/* Campos de Busca */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
               {/* Busca por ID/Container (Código de Barras) */}
               <div>
-                <Label className="text-xs text-slate-500 mb-1 block">Buscar por ID ou Container</Label>
+                <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Buscar por ID ou Container</Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="Ex: 123 ou CONT1234567 (escaneie o código de barras)"
@@ -792,12 +793,12 @@ export default function BillingPage() {
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">Pressione Enter ou clique + para adicionar</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Pressione Enter ou clique + para adicionar</p>
               </div>
 
               {/* Busca por Cliente (Nome ou CNPJ) */}
               <div>
-                <Label className="text-xs text-slate-500 mb-1 block">Cliente (Nome ou CNPJ)</Label>
+                <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Cliente (Nome ou CNPJ)</Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="Ex: Empresa LTDA ou 12.345.678/0001-90"
@@ -812,7 +813,7 @@ export default function BillingPage() {
                     Buscar
                   </Button>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">Buscar movimentações pendentes do cliente</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Buscar movimentações pendentes do cliente</p>
               </div>
             </div>
 
@@ -820,22 +821,22 @@ export default function BillingPage() {
             {addedMovements.length > 0 && (
               <div className="border rounded-lg border-primary/30">
                 <div className="flex items-center justify-between px-4 py-2 bg-primary/10 border-b border-primary/30">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Movimentações Adicionadas ({addedMovements.length})
                   </span>
-                  <span className="text-xs text-slate-500">Adicionadas via busca por ID/Código de Barras</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Adicionadas via busca por ID/Código de Barras</span>
                 </div>
                 <div className="max-h-[200px] overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 sticky top-0">
+                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
                       <tr>
                         <th className="px-3 py-2 text-left w-10"></th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">ID</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Data</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Container</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Cliente</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Tipo Serviço</th>
-                        <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500">Valor</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">ID</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Data</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Container</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Cliente</th>
+                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Tipo Serviço</th>
+                        <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Valor</th>
                         <th className="px-3 py-2 w-10"></th>
                       </tr>
                     </thead>
@@ -843,7 +844,7 @@ export default function BillingPage() {
                       {addedMovements.map((movement) => (
                         <tr 
                           key={movement.id}
-                          className={`hover:bg-slate-50 transition-colors ${selectedMovements.has(movement.id) ? 'bg-primary/5' : ''}`}
+                          className={`hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${selectedMovements.has(movement.id) ? 'bg-primary/5' : ''}`}
                         >
                           <td className="px-3 py-2">
                             <Checkbox
@@ -852,7 +853,7 @@ export default function BillingPage() {
                             />
                           </td>
                           <td className="px-3 py-2 font-bold text-primary">#{movement.transaction_id}</td>
-                          <td className="px-3 py-2 text-slate-600">
+                          <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
                             {format(new Date(movement.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                           </td>
                           <td className="px-3 py-2 font-mono font-medium">{movement.container_number}</td>
@@ -882,8 +883,8 @@ export default function BillingPage() {
             {/* Lista de Movimentações do Cliente (Pendentes) */}
             {(unbilledMovements.length > 0 || loadingMovements) && (
               <div className="border rounded-lg">
-                <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b">
-                  <span className="text-sm font-medium text-slate-700">
+                <div className="flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-slate-800 border-b">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Movimentações Pendentes do Cliente ({unbilledMovements.filter(m => !addedMovements.some(am => am.id === m.id)).length})
                   </span>
                   {unbilledMovements.length > 0 && (
@@ -900,15 +901,15 @@ export default function BillingPage() {
                 ) : (
                   <div className="max-h-[250px] overflow-y-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-50 sticky top-0">
+                      <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
                         <tr>
                           <th className="px-3 py-2 text-left w-10"></th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">ID</th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Data</th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Container</th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Cliente</th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Tipo Serviço</th>
-                          <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500">Valor</th>
+                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">ID</th>
+                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Data</th>
+                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Container</th>
+                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Cliente</th>
+                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Tipo Serviço</th>
+                          <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Valor</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
@@ -917,7 +918,7 @@ export default function BillingPage() {
                           .map((movement) => (
                           <tr 
                             key={movement.id}
-                            className={`hover:bg-slate-50 cursor-pointer transition-colors ${selectedMovements.has(movement.id) ? 'bg-primary/5' : ''}`}
+                            className={`hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors ${selectedMovements.has(movement.id) ? 'bg-primary/5' : ''}`}
                             onClick={() => toggleMovement(movement.id)}
                             data-testid={`movement-row-${movement.id}`}
                           >
@@ -928,7 +929,7 @@ export default function BillingPage() {
                               />
                             </td>
                             <td className="px-3 py-2 font-bold text-primary">#{movement.transaction_id}</td>
-                            <td className="px-3 py-2 text-slate-600">
+                            <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
                               {format(new Date(movement.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                             </td>
                             <td className="px-3 py-2 font-mono font-medium">{movement.container_number}</td>
@@ -948,10 +949,10 @@ export default function BillingPage() {
 
             {/* Mensagem quando não há movimentações */}
             {addedMovements.length === 0 && unbilledMovements.length === 0 && !loadingMovements && (
-              <div className="text-center py-12 border rounded-lg bg-slate-50">
-                <Package className="w-12 h-12 mx-auto mb-3 text-slate-400 opacity-50" />
-                <p className="text-slate-600 font-medium">Nenhuma movimentação adicionada</p>
-                <p className="text-sm text-slate-500 mt-1">
+              <div className="text-center py-12 border rounded-lg bg-slate-50 dark:bg-slate-800">
+                <Package className="w-12 h-12 mx-auto mb-3 text-slate-400 dark:text-slate-500 opacity-50" />
+                <p className="text-slate-600 dark:text-slate-400 font-medium">Nenhuma movimentação adicionada</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                   Use o campo "Buscar por ID" para adicionar movimentações pelo código de barras,<br/>
                   ou busque por cliente para ver todas as movimentações pendentes.
                 </p>
@@ -961,28 +962,28 @@ export default function BillingPage() {
             {/* Resumo da Fatura */}
             {selectedMovements.size > 0 && (
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <h4 className="font-bold text-slate-800 mb-3">Resumo da Fatura</h4>
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3">Resumo da Fatura</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <Label className="text-xs text-slate-500">Cliente</Label>
+                    <Label className="text-xs text-slate-500 dark:text-slate-400">Cliente</Label>
                     <p className="font-medium">{getSelectedClient() || '-'}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500">CNPJ</Label>
+                    <Label className="text-xs text-slate-500 dark:text-slate-400">CNPJ</Label>
                     <p className="font-mono">{getSelectedClientCnpj() || '-'}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500">Qtd. Movimentações</Label>
+                    <Label className="text-xs text-slate-500 dark:text-slate-400">Qtd. Movimentações</Label>
                     <p className="font-bold text-primary">{selectedMovements.size}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500">Valor Total</Label>
+                    <Label className="text-xs text-slate-500 dark:text-slate-400">Valor Total</Label>
                     <p className="font-bold text-green-700 text-lg">{formatCurrency(getTotalValue())}</p>
                   </div>
                 </div>
                 
                 <div className="mt-4">
-                  <Label className="text-xs text-slate-500 mb-1 block">Observações (opcional)</Label>
+                  <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Observações (opcional)</Label>
                   <Textarea
                     placeholder="Adicione observações para esta fatura..."
                     value={invoiceNotes}
@@ -1034,9 +1035,9 @@ export default function BillingPage() {
           {selectedInvoice && (
             <div className="flex-1 overflow-y-auto space-y-4 py-4">
               {/* Informações da Fatura */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-lg">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                 <div>
-                  <Label className="text-xs text-slate-500 flex items-center gap-1">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                     <Calendar className="w-3 h-3" /> Data
                   </Label>
                   <p className="font-medium">
@@ -1044,17 +1045,17 @@ export default function BillingPage() {
                   </p>
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 flex items-center gap-1">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                     <User className="w-3 h-3" /> Cliente
                   </Label>
                   <p className="font-medium">{selectedInvoice.client_name}</p>
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500">CNPJ</Label>
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">CNPJ</Label>
                   <p className="font-mono">{selectedInvoice.client_cnpj || '-'}</p>
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 flex items-center gap-1">
+                  <Label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                     <DollarSign className="w-3 h-3" /> Valor Total
                   </Label>
                   <p className="font-bold text-green-700 text-lg">{formatCurrency(selectedInvoice.total_value)}</p>
@@ -1069,14 +1070,14 @@ export default function BillingPage() {
               )}
 
               {/* Abas */}
-              <div className="border-b border-slate-200">
+              <div className="border-b border-slate-200 dark:border-slate-700">
                 <div className="flex gap-1">
                   <button
                     onClick={() => handleTabChange('movements')}
                     className={`px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
                       detailsTab === 'movements'
                         ? 'border-primary text-primary'
-                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                     data-testid="tab-movements"
                   >
@@ -1088,7 +1089,7 @@ export default function BillingPage() {
                     className={`px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
                       detailsTab === 'history'
                         ? 'border-primary text-primary'
-                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
                     }`}
                     data-testid="tab-history"
                   >
@@ -1108,19 +1109,19 @@ export default function BillingPage() {
                   ) : (
                     <div className="border rounded-lg overflow-hidden">
                       <table className="w-full text-sm">
-                        <thead className="bg-slate-50">
+                        <thead className="bg-slate-50 dark:bg-slate-800">
                           <tr>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">ID</th>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Data</th>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Container</th>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Operação</th>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500">Tipo Serviço</th>
-                            <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500">Valor</th>
+                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">ID</th>
+                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Data</th>
+                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Container</th>
+                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Operação</th>
+                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Tipo Serviço</th>
+                            <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Valor</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
                           {invoiceMovements.map((m) => (
-                            <tr key={m.id} className="hover:bg-slate-50">
+                            <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
                               <td className="px-3 py-2 font-bold text-primary">#{m.transaction_id}</td>
                               <td className="px-3 py-2">
                                 {format(new Date(m.created_at), 'dd/MM/yyyy', { locale: ptBR })}
@@ -1158,24 +1159,24 @@ export default function BillingPage() {
                         const actionInfo = formatHistoryAction(h.action);
                         const changesList = formatChanges(h.changes);
                         return (
-                          <div key={h.id} className="border rounded-lg p-3 bg-white">
+                          <div key={h.id} className="border rounded-lg p-3 bg-white dark:bg-slate-900">
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2">
                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${actionInfo.color}`}>
                                   {actionInfo.label}
                                 </span>
-                                <span className="text-[13px] font-medium text-slate-700">{h.user_name}</span>
+                                <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">{h.user_name}</span>
                               </div>
-                              <span className="text-xs text-slate-500 flex items-center gap-1">
+                              <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
                                 {format(new Date(h.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                               </span>
                             </div>
                             {changesList.length > 0 && (
-                              <ul className="mt-2 text-[12px] text-slate-600 space-y-0.5">
+                              <ul className="mt-2 text-[12px] text-slate-600 dark:text-slate-400 space-y-0.5">
                                 {changesList.map((change, idx) => (
                                   <li key={idx} className="flex items-center gap-1.5">
-                                    <span className="w-1 h-1 rounded-full bg-slate-400"></span>
+                                    <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-slate-500"></span>
                                     {change}
                                   </li>
                                 ))}
@@ -1186,7 +1187,7 @@ export default function BillingPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-slate-500">
+                    <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                       <History className="w-10 h-10 mx-auto mb-2 opacity-30" />
                       <p className="text-[13px]">Nenhum histórico de alterações</p>
                     </div>
@@ -1277,8 +1278,8 @@ export default function BillingPage() {
 
               {/* Movimentações Atuais */}
               <div className="border rounded-lg">
-                <div className="bg-slate-50 px-3 py-2 border-b flex items-center justify-between">
-                  <span className="text-[13px] font-medium text-slate-700">
+                <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 border-b flex items-center justify-between">
+                  <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
                     Movimentações na Fatura ({editMovements.length - movementsToRemove.size})
                   </span>
                   {movementsToRemove.size > 0 && (
@@ -1289,23 +1290,23 @@ export default function BillingPage() {
                 </div>
                 <div className="max-h-40 overflow-y-auto">
                   {loadingEditMovements ? (
-                    <div className="p-4 text-center text-[13px] text-slate-500">Carregando...</div>
+                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Carregando...</div>
                   ) : editMovements.length > 0 ? (
                     <table className="w-full">
-                      <thead className="bg-slate-50 border-b sticky top-0">
+                      <thead className="bg-slate-50 dark:bg-slate-800 border-b sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500">ID</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500">Container</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500">Tipo</th>
-                          <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase text-slate-500">Valor</th>
-                          <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase text-slate-500">Remover</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">ID</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Container</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Tipo</th>
+                          <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Valor</th>
+                          <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Remover</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {editMovements.map((mov) => (
                           <tr 
                             key={mov.id} 
-                            className={`${movementsToRemove.has(mov.id) ? 'bg-red-50 line-through opacity-60' : 'hover:bg-slate-50'}`}
+                            className={`${movementsToRemove.has(mov.id) ? 'bg-red-50 line-through opacity-60' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                           >
                             <td className="px-3 py-1.5 text-[12px] font-mono">{mov.transaction_id}</td>
                             <td className="px-3 py-1.5 text-[12px]">{mov.container_number}</td>
@@ -1326,15 +1327,15 @@ export default function BillingPage() {
                       </tbody>
                     </table>
                   ) : (
-                    <div className="p-4 text-center text-[13px] text-slate-500">Nenhuma movimentação</div>
+                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Nenhuma movimentação</div>
                   )}
                 </div>
               </div>
 
               {/* Adicionar Movimentações */}
               <div className="border rounded-lg">
-                <div className="bg-slate-50 px-3 py-2 border-b flex items-center justify-between">
-                  <span className="text-[13px] font-medium text-slate-700">
+                <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 border-b flex items-center justify-between">
+                  <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
                     Adicionar Movimentações
                   </span>
                   {movementsToAdd.size > 0 && (
@@ -1345,7 +1346,7 @@ export default function BillingPage() {
                 </div>
                 
                 {/* Busca por ID */}
-                <div className="p-3 border-b bg-slate-50/50">
+                <div className="p-3 border-b bg-slate-50 dark:bg-slate-800/50">
                   <div className="flex gap-2">
                     <Input
                       placeholder="Buscar por Nº da movimentação..."
@@ -1364,20 +1365,20 @@ export default function BillingPage() {
                 <div className="max-h-40 overflow-y-auto">
                   {editAvailableMovements.length > 0 ? (
                     <table className="w-full">
-                      <thead className="bg-slate-50 border-b sticky top-0">
+                      <thead className="bg-slate-50 dark:bg-slate-800 border-b sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500">ID</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500">Container</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500">Tipo</th>
-                          <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase text-slate-500">Valor</th>
-                          <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase text-slate-500">Adicionar</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">ID</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Container</th>
+                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Tipo</th>
+                          <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Valor</th>
+                          <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Adicionar</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {editAvailableMovements.map((mov) => (
                           <tr 
                             key={mov.id} 
-                            className={`${movementsToAdd.has(mov.id) ? 'bg-green-50' : 'hover:bg-slate-50'}`}
+                            className={`${movementsToAdd.has(mov.id) ? 'bg-green-50' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                           >
                             <td className="px-3 py-1.5 text-[12px] font-mono">{mov.transaction_id}</td>
                             <td className="px-3 py-1.5 text-[12px]">{mov.container_number}</td>
@@ -1398,7 +1399,7 @@ export default function BillingPage() {
                       </tbody>
                     </table>
                   ) : (
-                    <div className="p-4 text-center text-[13px] text-slate-500">
+                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">
                       Nenhuma movimentação disponível para adicionar
                     </div>
                   )}

@@ -5,6 +5,26 @@ const AuthContext = createContext();
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Sessão expirada ou token inválido: limpa a sessão e manda pro login a partir de
+// qualquer tela. Fica aqui (fora de componente) porque chamadas de API disparam de
+// qualquer lugar do app, não só de dentro da árvore React.
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = error?.config?.url || '';
+    const isAuthFlow = ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password'].some((p) => url.includes(p));
+    if (status === 401 && !isAuthFlow) {
+      localStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);

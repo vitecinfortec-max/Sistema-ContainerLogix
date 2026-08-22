@@ -227,10 +227,10 @@ export default function NewPhotoRegistryPage() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-4xl font-bold tracking-tight" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Novo Registro Fotográfico
             </h1>
-            <p className="text-muted-foreground mt-1">Cadastre um novo registro de fotos</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Cadastre um novo registro de fotos</p>
           </div>
         </div>
 
@@ -305,11 +305,11 @@ export default function NewPhotoRegistryPage() {
                     data-testid="client-input"
                   />
                   {showClientDropdown && filteredClients.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
                       {filteredClients.map(client => (
                         <div
                           key={client.id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
                           onMouseDown={() => handleClientSelect(client)}
                         >
                           {client.name}
@@ -337,11 +337,11 @@ export default function NewPhotoRegistryPage() {
                     data-testid="shipping-line-input"
                   />
                   {showShippingLineDropdown && filteredShippingLines.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
                       {filteredShippingLines.map(line => (
                         <div
                           key={line.id}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
                           onMouseDown={() => handleShippingLineSelect(line)}
                         >
                           {line.name}
@@ -386,7 +386,7 @@ export default function NewPhotoRegistryPage() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50">
+                      <div className="h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 bg-gray-50 dark:bg-slate-800">
                         <div className="flex gap-2">
                           <Button
                             type="button"

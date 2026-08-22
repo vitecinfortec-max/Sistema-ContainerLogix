@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -17,6 +17,7 @@ const ITEMS_PER_PAGE = 20;
 
 export default function YardControlPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [containers, setContainers] = useState([]);
   const [stats, setStats] = useState({
     total: 0,
@@ -62,7 +63,14 @@ export default function YardControlPage() {
   });
   const [clientInputFocused, setClientInputFocused] = useState(false);
   useEffect(() => {
-    loadData();
+    // Link do sino de alertas chega com ?min_days=61 para já abrir filtrado
+    const minDaysFromUrl = new URLSearchParams(location.search).get('min_days');
+    if (minDaysFromUrl) {
+      setFilters(prev => ({ ...prev, min_days: minDaysFromUrl }));
+      loadData({ min_days: minDaysFromUrl });
+    } else {
+      loadData();
+    }
     loadFiltersData();
   }, []);
 
@@ -80,6 +88,7 @@ export default function YardControlPage() {
       setCompanies(companiesRes.data);
     } catch (error) {
       console.error('Erro ao carregar filtros:', error);
+      toast.error('Erro ao carregar filtros');
     }
   };
 
@@ -235,10 +244,10 @@ export default function YardControlPage() {
       <div className="space-y-6" data-testid="yard-control-page">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Controle de Pátio
             </h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">Containers em estoque e tempo de permanência</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Containers em estoque e tempo de permanência</p>
           </div>
           <Button onClick={downloadExcel} data-testid="download-excel-btn" className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90">
             <FileSpreadsheet className="w-4 h-4 mr-2" />
@@ -252,7 +261,7 @@ export default function YardControlPage() {
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Total no Pátio</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Total no Pátio</p>
                   <p className="text-2xl font-bold text-primary">{stats.total}</p>
                 </div>
                 <Package className="w-8 h-8 text-primary/20" />
@@ -264,7 +273,7 @@ export default function YardControlPage() {
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Média de Dias</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Média de Dias</p>
                   <p className="text-2xl font-bold text-blue-600">{stats.avg_days}</p>
                 </div>
                 <Clock className="w-8 h-8 text-blue-600/20" />
@@ -276,7 +285,7 @@ export default function YardControlPage() {
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Máximo de Dias</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Máximo de Dias</p>
                   <p className="text-2xl font-bold text-orange-600">{stats.max_days}</p>
                 </div>
                 <AlertTriangle className="w-8 h-8 text-orange-600/20" />
@@ -288,7 +297,7 @@ export default function YardControlPage() {
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">&gt;30 dias</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">&gt;30 dias</p>
                   <p className="text-2xl font-bold text-red-600">{stats.over_30_days}</p>
                 </div>
                 <AlertTriangle className="w-8 h-8 text-red-600/20" />
@@ -314,7 +323,7 @@ export default function YardControlPage() {
         {/* Filtros */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700">
+            <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300">
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4" />
                 Filtros
@@ -324,7 +333,7 @@ export default function YardControlPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div>
-                <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Status</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Status</Label>
                 <Select
                   value={filters.status_filter || 'all'}
                   onValueChange={(value) => setFilters(prev => ({ ...prev, status_filter: value === 'all' ? '' : value }))}
@@ -341,7 +350,7 @@ export default function YardControlPage() {
               </div>
               
               <div>
-                <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
                 <Select
                   value={filters.movement_type || 'all'}
                   onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
@@ -359,7 +368,7 @@ export default function YardControlPage() {
               </div>
               
               <div>
-                <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
                 <div className="relative">
                   <Input
                     value={filters.client_name}
@@ -371,7 +380,7 @@ export default function YardControlPage() {
                     className="h-9 text-sm"
                   />
                   {clientInputFocused && filters.client_name && filters.client_name.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-y-auto">
                       {clients
                         .filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase()))
                         .slice(0, 10)
@@ -399,7 +408,7 @@ export default function YardControlPage() {
               </div>
               
               <div>
-                <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Armador</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Armador</Label>
                 <Select
                   value={filters.shipping_line || 'all'}
                   onValueChange={(value) => setFilters(prev => ({ ...prev, shipping_line: value === 'all' ? '' : value }))}
@@ -421,7 +430,7 @@ export default function YardControlPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
-                <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Dias mínimos</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Dias mínimos</Label>
                 <Input
                   type="number"
                   min="0"
@@ -434,7 +443,7 @@ export default function YardControlPage() {
               </div>
               
               <div>
-                <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Data Inicial</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Inicial</Label>
                 <Input
                   type="date"
                   value={filters.date_from}
@@ -445,7 +454,7 @@ export default function YardControlPage() {
               </div>
               
               <div>
-                <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Data Final</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Final</Label>
                 <Input
                   type="date"
                   value={filters.date_to}
@@ -471,7 +480,7 @@ export default function YardControlPage() {
         {/* Tabela de Containers */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
+            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
               <span>Containers no Pátio ({containers.length})</span>
               <div className="flex gap-2 text-[11px]">
                 <span className="px-2 py-1 bg-green-100 text-green-800 rounded">Vazios: {stats.empty}</span>
@@ -493,16 +502,16 @@ export default function YardControlPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Container</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tipo</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Status</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tamanho</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Armador</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cliente</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Data Entrada</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Data Saída</th>
-                      <th className="text-center py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Dias no Pátio</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ações</th>
+                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
+                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
+                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
+                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tamanho</th>
+                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Armador</th>
+                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
+                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data Entrada</th>
+                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data Saída</th>
+                      <th className="text-center py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Dias no Pátio</th>
+                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -514,7 +523,7 @@ export default function YardControlPage() {
                       >
                         <td className="py-2.5 px-4">
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-mono font-bold text-slate-700">{container.container_number}</span>
+                            <span className="text-sm font-mono font-bold text-slate-700 dark:text-slate-300">{container.container_number}</span>
                             {container.is_segregated && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300" title={`Reservado para: ${container.segregation_client}`}>
                                 SEGREGADO
@@ -531,18 +540,18 @@ export default function YardControlPage() {
                         </td>
                         <td className="py-2.5 px-4">
                           <span className={`px-2 py-1 rounded text-[10px] font-medium ${
-                            container.status === 'CHEIO' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                            container.status === 'CHEIO' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200'
                           }`}>
                             {container.status}
                           </span>
                         </td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600">{container.size_type}</td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600">{container.shipping_line}</td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600">{container.client_name || '-'}</td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600">
+                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">{container.size_type}</td>
+                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">{container.shipping_line}</td>
+                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">{container.client_name || '-'}</td>
+                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">
                           {container.entry_date ? format(new Date(container.entry_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                         </td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600">
+                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">
                           {container.exit_date ? format(new Date(container.exit_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                         </td>
                         <td className="py-2.5 px-4 text-center">
@@ -627,7 +636,7 @@ export default function YardControlPage() {
           {/* Estoque por Cliente */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
                 <Users className="w-4 h-4" />
                 Estoque por Cliente
               </CardTitle>
@@ -641,7 +650,7 @@ export default function YardControlPage() {
                     <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded">
                       <span className="font-medium truncate flex-1">{item.client}</span>
                       <div className="flex gap-2 text-sm">
-                        <span className="px-2 py-0.5 bg-gray-100 rounded">{item.empty} V</span>
+                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 rounded">{item.empty} V</span>
                         <span className="px-2 py-0.5 bg-blue-100 rounded">{item.full} C</span>
                         <span className="px-2 py-0.5 bg-primary text-primary-foreground rounded font-bold">{item.total}</span>
                       </div>
@@ -669,7 +678,7 @@ export default function YardControlPage() {
                     <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded">
                       <span className="font-medium truncate flex-1">{item.shipping_line}</span>
                       <div className="flex gap-2 text-sm">
-                        <span className="px-2 py-0.5 bg-gray-100 rounded">{item.empty} V</span>
+                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 rounded">{item.empty} V</span>
                         <span className="px-2 py-0.5 bg-blue-100 rounded">{item.full} C</span>
                         <span className="px-2 py-0.5 bg-primary text-primary-foreground rounded font-bold">{item.total}</span>
                       </div>

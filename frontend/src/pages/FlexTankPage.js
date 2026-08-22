@@ -8,11 +8,13 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Eye, Pencil, Trash2, Search, Package, TrendingUp, TrendingDown, FileSpreadsheet, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function FlexTankPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const navigate = useNavigate();
   const location = useLocation();
   const [movements, setMovements] = useState([]);
@@ -82,6 +84,7 @@ export default function FlexTankPage() {
       setClients(response.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
+      toast.error('Erro ao carregar clientes');
     }
   };
 
@@ -119,12 +122,13 @@ export default function FlexTankPage() {
       setStock(response.data);
     } catch (error) {
       console.error('Erro ao carregar estoque:', error);
+      toast.error('Erro ao carregar estoque');
     }
   };
 
   const handleDelete = async (id, e) => {
     e.stopPropagation();
-    if (!window.confirm('Tem certeza que deseja excluir esta movimentação?')) return;
+    if (!(await confirm('Tem certeza que deseja excluir esta movimentação?'))) return;
     
     try {
       await api.deleteFlexTankMovement(id);
@@ -196,10 +200,10 @@ export default function FlexTankPage() {
       <div className="space-y-5" data-testid="flex-tank-page">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Flex Tank
             </h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">Controle de estoque de bolsas</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de estoque de bolsas</p>
           </div>
           <Button onClick={() => navigate('/flex-tank/movements/new')} className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90" data-testid="new-movement-btn">
             <Plus className="w-4 h-4 mr-1.5" />
@@ -209,38 +213,38 @@ export default function FlexTankPage() {
 
         {/* Dashboard de Estoque */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border border-slate-200 shadow-none">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
+              <CardTitle className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">
                 {appliedFilters.client_id ? `Estoque - ${getSelectedClientName()}` : 'Estoque Total'}
               </CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">{stock.total_bags}</div>
-              <p className="text-[11px] text-slate-400">bolsas disponíveis</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">bolsas disponíveis</p>
             </CardContent>
           </Card>
           
-          <Card className="border border-slate-200 shadow-none">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Total de Entradas</CardTitle>
+              <CardTitle className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Total de Entradas</CardTitle>
               <TrendingUp className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">{stock.total_entries}</div>
-              <p className="text-[11px] text-slate-400">bolsas recebidas</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">bolsas recebidas</p>
             </CardContent>
           </Card>
           
-          <Card className="border border-slate-200 shadow-none">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Total de Saídas</CardTitle>
+              <CardTitle className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Total de Saídas</CardTitle>
               <TrendingDown className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{stock.total_exits}</div>
-              <p className="text-[11px] text-slate-400">bolsas expedidas</p>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">bolsas expedidas</p>
             </CardContent>
           </Card>
         </div>
@@ -249,9 +253,9 @@ export default function FlexTankPage() {
         {activeTab === 'movements' && (
           <div className="space-y-4">
             {/* Filtros */}
-            <Card className="border border-slate-200 shadow-none">
-              <CardHeader className="py-3 px-4 border-b border-slate-100">
-                <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700">
+            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300">
                   <span className="flex items-center gap-2">
                     <Filter className="w-4 h-4" />
                     Filtros
@@ -261,7 +265,7 @@ export default function FlexTankPage() {
               <CardContent className="p-4">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                   <div>
-                    <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Data Inicial</Label>
+                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Inicial</Label>
                     <Input
                       type="date"
                       value={filters.start_date}
@@ -270,7 +274,7 @@ export default function FlexTankPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Data Final</Label>
+                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Final</Label>
                     <Input
                       type="date"
                       value={filters.end_date}
@@ -279,7 +283,7 @@ export default function FlexTankPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
+                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
                     <Select
                       value={filters.client_id}
                       onValueChange={(value) => setFilters(prev => ({ ...prev, client_id: value === 'all' ? '' : value }))}
@@ -296,7 +300,7 @@ export default function FlexTankPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Nº Registro</Label>
+                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Registro</Label>
                     <Input
                       type="number"
                       value={filters.movement_number}
@@ -306,7 +310,7 @@ export default function FlexTankPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
+                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
                     <Select
                       value={filters.movement_type}
                       onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
@@ -336,52 +340,52 @@ export default function FlexTankPage() {
             </Card>
 
             {/* Lista de Movimentações */}
-            <Card className="border border-slate-200 shadow-none">
-              <CardHeader className="py-3 px-4 border-b border-slate-100">
-                <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
+            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
                   <span className="flex items-center gap-2">
                     <Package className="w-4 h-4" />
                     Movimentações ({pagination.total})
                   </span>
                   {pagination.totalPages > 1 && (
-                    <span className="text-xs font-normal text-slate-400">Página {pagination.page} de {pagination.totalPages}</span>
+                    <span className="text-xs font-normal text-slate-400 dark:text-slate-500">Página {pagination.page} de {pagination.totalPages}</span>
                   )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 {loading ? (
-                  <div className="text-center py-8 text-sm text-slate-500">Carregando...</div>
+                  <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
                 ) : movements.length === 0 ? (
-                  <div className="text-center py-8 text-sm text-slate-500">
+                  <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">
                     Nenhuma movimentação encontrada
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-slate-100">
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Nº</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Nº Bolsa</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tamanho</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Data</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tipo</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cliente</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Container</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">Ações</th>
+                        <tr className="border-b border-slate-100 dark:border-slate-800">
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº Bolsa</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tamanho</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
                         {movements.map((movement, idx) => (
                           <tr 
                             key={movement.id} 
-                            className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`}
+                            className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors cursor-pointer ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
                             onClick={() => navigate(`/flex-tank/movements/${movement.id}`)}
                             data-testid={`movement-row-${movement.id}`}
                           >
-                            <td className="px-4 py-2.5 text-sm font-semibold text-slate-800">#{movement.movement_number}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600">{movement.bag_number}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600">{movement.bag_size}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-500">
+                            <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{movement.movement_number}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.bag_number}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.bag_size}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
                               {format(new Date(movement.movement_date), "dd/MM/yyyy", { locale: ptBR })}
                             </td>
                             <td className="px-4 py-2.5">
@@ -393,8 +397,8 @@ export default function FlexTankPage() {
                                 {movement.movement_type}
                               </span>
                             </td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600">{movement.client_name || '-'}</td>
-                            <td className="px-4 py-2.5 text-sm font-mono text-slate-700">{movement.container_number || '-'}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.client_name || '-'}</td>
+                            <td className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300">{movement.container_number || '-'}</td>
                             <td className="px-4 py-2.5">
                               <div className="flex items-center gap-0.5">
                                 <Button 
@@ -438,8 +442,8 @@ export default function FlexTankPage() {
 
                 {/* Paginação */}
                 {pagination.totalPages > 1 && (
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
-                    <div className="text-xs text-slate-400">
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
+                    <div className="text-xs text-slate-400 dark:text-slate-500">
                       Página {pagination.page} de {pagination.totalPages}
                     </div>
                     <div className="flex gap-2">
@@ -471,23 +475,23 @@ export default function FlexTankPage() {
 
         {activeTab === 'reports' && (
           <div className="space-y-4">
-            <Card className="border border-slate-200 shadow-none">
-              <CardHeader className="py-3 px-4 border-b border-slate-100">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
                   <FileSpreadsheet className="w-4 h-4" />
                   Relatórios
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 space-y-6">
                 {/* Filtros do Relatório */}
-                <div className="p-4 border rounded-lg bg-slate-50/50">
+                <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-800/50">
                   <div className="flex items-center gap-2 mb-4">
-                    <Filter className="w-4 h-4 text-slate-500" />
-                    <h3 className="text-[13px] font-semibold text-slate-700">Filtros do Relatório</h3>
+                    <Filter className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <h3 className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">Filtros do Relatório</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                     <div>
-                      <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Data Início</Label>
+                      <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Início</Label>
                       <Input
                         type="date"
                         value={reportFilters.start_date}
@@ -497,7 +501,7 @@ export default function FlexTankPage() {
                       />
                     </div>
                     <div>
-                      <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Data Fim</Label>
+                      <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Fim</Label>
                       <Input
                         type="date"
                         value={reportFilters.end_date}
@@ -507,7 +511,7 @@ export default function FlexTankPage() {
                       />
                     </div>
                     <div>
-                      <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
+                      <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
                       <Select
                         value={reportFilters.client_id}
                         onValueChange={(value) => setReportFilters(prev => ({ ...prev, client_id: value === 'all' ? '' : value }))}
@@ -526,7 +530,7 @@ export default function FlexTankPage() {
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-[11px] text-slate-400 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
+                      <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
                       <Select
                         value={reportFilters.movement_type}
                         onValueChange={(value) => setReportFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
@@ -554,7 +558,7 @@ export default function FlexTankPage() {
                   </div>
                   {(reportFilters.start_date || reportFilters.end_date || reportFilters.client_id || reportFilters.movement_type) && (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="text-[11px] text-slate-400">Filtros ativos:</span>
+                      <span className="text-[11px] text-slate-400 dark:text-slate-500">Filtros ativos:</span>
                       {reportFilters.start_date && (
                         <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px]">
                           De: {format(new Date(reportFilters.start_date + 'T00:00:00'), 'dd/MM/yyyy')}
@@ -585,27 +589,27 @@ export default function FlexTankPage() {
 
                 {/* Estoque por Cliente */}
                 <div>
-                  <h3 className="text-[13px] font-semibold text-slate-700 mb-3">Estoque por Cliente</h3>
+                  <h3 className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 mb-3">Estoque por Cliente</h3>
                   {stock.by_client.length === 0 ? (
-                    <p className="text-sm text-slate-400">Nenhum dado disponível</p>
+                    <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum dado disponível</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
-                          <tr className="border-b border-slate-100">
-                            <th className="text-left py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cliente</th>
-                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Entradas</th>
-                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Saídas</th>
-                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Estoque</th>
+                          <tr className="border-b border-slate-100 dark:border-slate-800">
+                            <th className="text-left py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
+                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Entradas</th>
+                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Saídas</th>
+                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Estoque</th>
                           </tr>
                         </thead>
                         <tbody>
                           {stock.by_client.map((item, idx) => (
-                            <tr key={idx} className={`border-b border-slate-50 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`}>
-                              <td className="py-2 px-4 text-sm text-slate-600">{item.client_name}</td>
+                            <tr key={idx} className={`border-b border-slate-50 dark:border-slate-800 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}>
+                              <td className="py-2 px-4 text-sm text-slate-600 dark:text-slate-400">{item.client_name}</td>
                               <td className="py-2 px-4 text-right text-sm text-green-600">{item.entries}</td>
                               <td className="py-2 px-4 text-right text-sm text-red-600">{item.exits}</td>
-                              <td className="py-2 px-4 text-right text-sm font-semibold text-slate-700">{item.stock}</td>
+                              <td className="py-2 px-4 text-right text-sm font-semibold text-slate-700 dark:text-slate-300">{item.stock}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -616,27 +620,27 @@ export default function FlexTankPage() {
 
                 {/* Estoque por Tamanho */}
                 <div>
-                  <h3 className="text-[13px] font-semibold text-slate-700 mb-3">Estoque por Tamanho</h3>
+                  <h3 className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 mb-3">Estoque por Tamanho</h3>
                   {stock.by_size.length === 0 ? (
-                    <p className="text-sm text-slate-400">Nenhum dado disponível</p>
+                    <p className="text-sm text-slate-400 dark:text-slate-500">Nenhum dado disponível</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
-                          <tr className="border-b border-slate-100">
-                            <th className="text-left py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tamanho</th>
-                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Entradas</th>
-                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Saídas</th>
-                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Estoque</th>
+                          <tr className="border-b border-slate-100 dark:border-slate-800">
+                            <th className="text-left py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tamanho</th>
+                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Entradas</th>
+                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Saídas</th>
+                            <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Estoque</th>
                           </tr>
                         </thead>
                         <tbody>
                           {stock.by_size.map((item, idx) => (
-                            <tr key={idx} className={`border-b border-slate-50 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`}>
-                              <td className="py-2 px-4 text-sm text-slate-600">{item.size}</td>
+                            <tr key={idx} className={`border-b border-slate-50 dark:border-slate-800 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}>
+                              <td className="py-2 px-4 text-sm text-slate-600 dark:text-slate-400">{item.size}</td>
                               <td className="py-2 px-4 text-right text-sm text-green-600">{item.entries}</td>
                               <td className="py-2 px-4 text-right text-sm text-red-600">{item.exits}</td>
-                              <td className="py-2 px-4 text-right text-sm font-semibold text-slate-700">{item.stock}</td>
+                              <td className="py-2 px-4 text-right text-sm font-semibold text-slate-700 dark:text-slate-300">{item.stock}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -649,6 +653,7 @@ export default function FlexTankPage() {
           </div>
         )}
       </div>
+      <ConfirmDialog />
     </Layout>
   );
 }

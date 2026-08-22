@@ -1,10 +1,20 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const WS_URL = BACKEND_URL
+const WS_BASE_URL = BACKEND_URL
   ? BACKEND_URL.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws'
   : (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws';
 const API_URL = BACKEND_URL || '';
+
+// O feed em tempo real transmite dados operacionais (motorista, contêiner,
+// cliente) a cada movimentação — o backend agora exige o mesmo token JWT da
+// API, passado por query string já que o WebSocket do navegador não permite
+// cabeçalhos customizados no handshake. Lido a cada tentativa de conexão (não
+// numa constante do módulo) porque o token pode mudar entre login/logout.
+const getWsUrl = () => {
+  const token = localStorage.getItem('token');
+  return token ? `${WS_BASE_URL}?token=${encodeURIComponent(token)}` : null;
+};
 
 export function useWebSocket(onMessage) {
   const ws = useRef(null);
@@ -83,8 +93,14 @@ export function useWebSocket(onMessage) {
         return;
       }
 
-      ws.current = new WebSocket(WS_URL);
-      
+      const wsUrl = getWsUrl();
+      if (!wsUrl) {
+        // Sem token (usuário deslogado) — nada a sincronizar em tempo real ainda.
+        return;
+      }
+
+      ws.current = new WebSocket(wsUrl);
+
       // Timeout para fallback
       const connectionTimeout = setTimeout(() => {
         if (ws.current?.readyState !== WebSocket.OPEN) {

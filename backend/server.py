@@ -14,30 +14,37 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 import io
+import re
 import uuid
 import json
 import shutil
+from urllib.parse import quote as url_quote
 
 from models import (
     User, UserCreate, UserLogin, UserResponse, Token,
     Driver, DriverCreate, DriverResponse,
     TransportCompany, TransportCompanyCreate, TransportCompanyResponse,
     ContainerMovement, ContainerMovementCreate, ContainerMovementResponse,
-    DashboardStats,
+    DashboardStats, DailyMovementPoint, DriverRankingEntry,
     ShippingLine, ShippingLineCreate, ShippingLineResponse,
     Client, ClientCreate, ClientResponse,
+    Supplier, SupplierCreate, SupplierResponse,
     ServiceType, ServiceTypeCreate, ServiceTypeResponse,
     Invoice, InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceMovementDetail,
     InvoiceHistory, InvoiceHistoryResponse,
     PhotoRegistry, PhotoRegistryCreate, PhotoRegistryUpdate, PhotoRegistryResponse,
     ContainerInspection, ContainerInspectionCreate, ContainerInspectionUpdate, ContainerInspectionResponse,
+    CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS,
     FlexTankMovement, FlexTankMovementCreate, FlexTankMovementUpdate, FlexTankMovementResponse, FlexTankStockSummary,
     VehicleRevision, VehicleRevisionCreate, VehicleRevisionResponse,
-    IntlInvoice, IntlInvoiceCreate, IntlInvoiceResponse, IntlInvoiceItem
+    VehicleChecklist, VehicleChecklistCreate, VehicleChecklistResponse,
+    VEHICLE_CHECKLIST_TEMPLATE, VEHICLE_CHECKLIST_SECTION_LABELS,
+    IntlInvoice, IntlInvoiceCreate, IntlInvoiceResponse, IntlInvoiceItem,
+    CompanySettings, CompanySettingsUpdate
 )
 from pydantic import BaseModel as PydanticBaseModel
-from auth import get_password_hash, verify_password, create_access_token, get_current_user
-from reports import generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel, now_brt, to_brt
+from auth import get_password_hash, verify_password, create_access_token, get_current_user, decode_token
+from reports import generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel, now_brt, to_brt, merge_company, DEFAULT_COMPANY
 
 # Helper function to parse datetime from MongoDB (handles both string and datetime objects)
 def parse_datetime_value(dt_value):
@@ -62,15 +69,71 @@ def round_money(value):
         return None
     return round(float(value), 2)
 
+def migrate_inspection_photos(inspection: dict) -> dict:
+    """Converte vistorias antigas (photo_front/back/left/right/internal) para o formato de lista 'photos'"""
+    if inspection.get("photos"):
+        return inspection
+    legacy_photos = []
+    for photo_type in CONTAINER_INSPECTION_PHOTO_TYPES:
+        url = inspection.get(f"photo_{photo_type}")
+        if url:
+            legacy_photos.append({"id": str(uuid.uuid4()), "type": photo_type, "url": url})
+    inspection["photos"] = legacy_photos
+    return inspection
+
 ROOT_DIR = Path(__file__).parent
 UPLOADS_DIR = ROOT_DIR.parent / 'uploads'
 UPLOADS_DIR.mkdir(exist_ok=True)
+LOGO_PATH = ROOT_DIR / 'assets' / 'logo.png'
+
+
+def load_logo_buffer(company: dict = None):
+    """Lê o logo local (sem depender de internet - importante no app desktop offline).
+    Prioriza o logo enviado pelo usuário em 'Dados da Empresa'; senão usa o logo padrão do sistema."""
+    try:
+        if company and company.get('logo_filename'):
+            uploaded_path = UPLOADS_DIR / company['logo_filename']
+            if uploaded_path.exists():
+                return io.BytesIO(uploaded_path.read_bytes())
+        if LOGO_PATH.exists():
+            return io.BytesIO(LOGO_PATH.read_bytes())
+    except Exception:
+        pass
+    return None
 
 load_dotenv(ROOT_DIR / '.env')
 
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+async def get_current_active_user(current_user: dict = Depends(get_current_user)) -> dict:
+    """Confirma que o usuário do token ainda existe na base. Sem isso, apagar um
+    usuário (ex: funcionário desligado) não revoga o acesso dele até o token
+    expirar sozinho (até 7 dias) — o token continuava sendo aceito só por
+    decodificar certo, sem checar se a conta por trás dele ainda existe."""
+    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "id": 1})
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário não encontrado ou removido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return current_user
+
+async def get_current_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
+    """Dependência para endpoints restritos ao perfil admin (módulo Financeiro).
+    Também confirma que o usuário ainda existe, pela mesma razão de get_current_active_user."""
+    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "role": 1})
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário não encontrado ou removido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user_doc.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Acesso restrito a administradores")
+    return current_user
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -106,6 +169,11 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+async def get_company_settings() -> dict:
+    """Retorna os dados cadastrados em 'Dados da Empresa', ou {} se ainda não configurado."""
+    settings = await db.company_settings.find_one({}, {"_id": 0})
+    return settings or {}
+
 # Função para obter próximo transaction_id (sequencial, nunca reutiliza)
 async def get_next_transaction_id():
     """Obtém o próximo transaction_id usando um contador atômico"""
@@ -131,7 +199,7 @@ async def register(user_input: UserCreate):
         name=user_input.name,
         email=user_input.email,
         password=get_password_hash(user_input.password),
-        role=user_input.role
+        role="operator"  # Autocadastro nunca concede admin; promoção deve ser feita direto no banco por um admin
     )
     
     doc = user.model_dump()
@@ -237,7 +305,7 @@ async def forgot_password(request: ForgotPasswordRequest):
     return {"message": "Se o email estiver cadastrado, você receberá uma senha provisória."}
 
 @api_router.post("/auth/change-password")
-async def change_password(request: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+async def change_password(request: ChangePasswordRequest, current_user: dict = Depends(get_current_active_user)):
     """Altera a senha do usuário logado"""
     user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0})
     if not user_doc:
@@ -279,7 +347,7 @@ async def login(credentials: UserLogin):
     return Token(access_token=access_token, token_type="bearer", user=user_response)
 
 @api_router.get("/auth/me", response_model=UserResponse)
-async def get_me(current_user: dict = Depends(get_current_user)):
+async def get_me(current_user: dict = Depends(get_current_active_user)):
     user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
@@ -293,8 +361,30 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         created_at=datetime.fromisoformat(user_doc['created_at'])
     )
 
+@api_router.get("/company-settings")
+async def get_company_settings_endpoint(current_user: dict = Depends(get_current_active_user)):
+    """Retorna os dados cadastrados em 'Dados da Empresa' (usados nos PDFs/Excel gerados pelo sistema)."""
+    return await get_company_settings()
+
+@api_router.put("/company-settings")
+async def update_company_settings(data: CompanySettingsUpdate, current_user: dict = Depends(get_current_active_user)):
+    """Atualiza os dados da empresa. Restrito a administradores."""
+    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0})
+    if not user_doc or user_doc.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Apenas administradores podem editar os dados da empresa")
+
+    settings = CompanySettings(**data.model_dump(exclude_unset=True))
+    doc = settings.model_dump()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    await db.company_settings.replace_one({}, doc, upsert=True)
+    return doc
+
 @api_router.post("/drivers", response_model=DriverResponse)
-async def create_driver(driver_input: DriverCreate, current_user: dict = Depends(get_current_user)):
+async def create_driver(driver_input: DriverCreate, current_user: dict = Depends(get_current_active_user)):
+    existing_cpf = await db.drivers.find_one({"cpf": driver_input.cpf}, {"_id": 0, "id": 1})
+    if existing_cpf:
+        raise HTTPException(status_code=400, detail="Já existe uma pessoa cadastrada com este CPF")
+
     driver = Driver(
         name=driver_input.name,
         cpf=driver_input.cpf,
@@ -318,7 +408,7 @@ async def create_driver(driver_input: DriverCreate, current_user: dict = Depends
 async def get_drivers(
     page: int = 1,
     per_page: int = 0,  # 0 = sem limite
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     # Se per_page = 0, retorna todos os motoristas
     if per_page == 0:
@@ -338,11 +428,17 @@ async def get_drivers(
     ]
 
 @api_router.put("/drivers/{driver_id}", response_model=DriverResponse)
-async def update_driver(driver_id: str, driver_input: DriverCreate, current_user: dict = Depends(get_current_user)):
+async def update_driver(driver_id: str, driver_input: DriverCreate, current_user: dict = Depends(get_current_active_user)):
     existing = await db.drivers.find_one({"id": driver_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
-    
+
+    existing_cpf = await db.drivers.find_one(
+        {"cpf": driver_input.cpf, "id": {"$ne": driver_id}}, {"_id": 0, "id": 1}
+    )
+    if existing_cpf:
+        raise HTTPException(status_code=400, detail="Já existe uma pessoa cadastrada com este CPF")
+
     update_data = {
         "id": driver_id,
         "name": driver_input.name,
@@ -363,14 +459,14 @@ async def update_driver(driver_id: str, driver_input: DriverCreate, current_user
     )
 
 @api_router.delete("/drivers/{driver_id}")
-async def delete_driver(driver_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_driver(driver_id: str, current_user: dict = Depends(get_current_active_user)):
     result = await db.drivers.delete_one({"id": driver_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
     return {"message": "Motorista deletado com sucesso"}
 
 @api_router.post("/transport-companies", response_model=TransportCompanyResponse)
-async def create_transport_company(company_input: TransportCompanyCreate, current_user: dict = Depends(get_current_user)):
+async def create_transport_company(company_input: TransportCompanyCreate, current_user: dict = Depends(get_current_active_user)):
     company = TransportCompany(
         name=company_input.name,
         cnpj=company_input.cnpj,
@@ -394,7 +490,7 @@ async def create_transport_company(company_input: TransportCompanyCreate, curren
 async def get_transport_companies(
     page: int = 1,
     per_page: int = 0,  # 0 = sem limite
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     if per_page == 0:
         companies = await db.transport_companies.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
@@ -413,7 +509,7 @@ async def get_transport_companies(
     ]
 
 @api_router.post("/shipping-lines", response_model=ShippingLineResponse)
-async def create_shipping_line(line_input: ShippingLineCreate, current_user: dict = Depends(get_current_user)):
+async def create_shipping_line(line_input: ShippingLineCreate, current_user: dict = Depends(get_current_active_user)):
     line = ShippingLine(
         name=line_input.name,
         code=line_input.code,
@@ -435,7 +531,7 @@ async def create_shipping_line(line_input: ShippingLineCreate, current_user: dic
 async def get_shipping_lines(
     page: int = 1,
     per_page: int = 0,  # 0 = sem limite
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     if per_page == 0:
         lines = await db.shipping_lines.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
@@ -453,7 +549,7 @@ async def get_shipping_lines(
     ]
 
 @api_router.put("/shipping-lines/{line_id}", response_model=ShippingLineResponse)
-async def update_shipping_line(line_id: str, line_input: ShippingLineCreate, current_user: dict = Depends(get_current_user)):
+async def update_shipping_line(line_id: str, line_input: ShippingLineCreate, current_user: dict = Depends(get_current_active_user)):
     existing = await db.shipping_lines.find_one({"id": line_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Armador não encontrado")
@@ -476,14 +572,14 @@ async def update_shipping_line(line_id: str, line_input: ShippingLineCreate, cur
     )
 
 @api_router.delete("/shipping-lines/{line_id}")
-async def delete_shipping_line(line_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_shipping_line(line_id: str, current_user: dict = Depends(get_current_active_user)):
     result = await db.shipping_lines.delete_one({"id": line_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Armador não encontrado")
     return {"message": "Armador deletado com sucesso"}
 
 @api_router.put("/transport-companies/{company_id}", response_model=TransportCompanyResponse)
-async def update_transport_company(company_id: str, company_input: TransportCompanyCreate, current_user: dict = Depends(get_current_user)):
+async def update_transport_company(company_id: str, company_input: TransportCompanyCreate, current_user: dict = Depends(get_current_active_user)):
     existing = await db.transport_companies.find_one({"id": company_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Transportadora não encontrada")
@@ -508,7 +604,7 @@ async def update_transport_company(company_id: str, company_input: TransportComp
     )
 
 @api_router.delete("/transport-companies/{company_id}")
-async def delete_transport_company(company_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_transport_company(company_id: str, current_user: dict = Depends(get_current_active_user)):
     result = await db.transport_companies.delete_one({"id": company_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Transportadora não encontrada")
@@ -516,7 +612,7 @@ async def delete_transport_company(company_id: str, current_user: dict = Depends
 
 # CRUD de Clientes
 @api_router.post("/clients", response_model=ClientResponse)
-async def create_client(client_input: ClientCreate, current_user: dict = Depends(get_current_user)):
+async def create_client(client_input: ClientCreate, current_user: dict = Depends(get_current_active_user)):
     client = Client(
         name=client_input.name,
         cnpj=client_input.cnpj,
@@ -544,7 +640,7 @@ async def create_client(client_input: ClientCreate, current_user: dict = Depends
 async def get_clients(
     page: int = 1,
     per_page: int = 100,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     skip = (page - 1) * per_page
     clients = await db.clients.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
@@ -562,7 +658,7 @@ async def get_clients(
     ]
 
 @api_router.put("/clients/{client_id}", response_model=ClientResponse)
-async def update_client(client_id: str, client_input: ClientCreate, current_user: dict = Depends(get_current_user)):
+async def update_client(client_id: str, client_input: ClientCreate, current_user: dict = Depends(get_current_active_user)):
     existing = await db.clients.find_one({"id": client_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -591,15 +687,98 @@ async def update_client(client_id: str, client_input: ClientCreate, current_user
     )
 
 @api_router.delete("/clients/{client_id}")
-async def delete_client(client_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_client(client_id: str, current_user: dict = Depends(get_current_active_user)):
     result = await db.clients.delete_one({"id": client_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
     return {"message": "Cliente deletado com sucesso"}
 
+# CRUD de Fornecedores
+@api_router.post("/suppliers", response_model=SupplierResponse)
+async def create_supplier(supplier_input: SupplierCreate, current_user: dict = Depends(get_current_active_user)):
+    supplier = Supplier(
+        name=supplier_input.name,
+        cnpj=supplier_input.cnpj,
+        phone=supplier_input.phone,
+        email=supplier_input.email,
+        address=supplier_input.address,
+        created_by=current_user['sub']
+    )
+
+    doc = supplier.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.suppliers.insert_one(doc)
+
+    return SupplierResponse(
+        id=supplier.id,
+        name=supplier.name,
+        cnpj=supplier.cnpj,
+        phone=supplier.phone,
+        email=supplier.email,
+        address=supplier.address,
+        created_at=supplier.created_at
+    )
+
+@api_router.get("/suppliers", response_model=List[SupplierResponse])
+async def get_suppliers(
+    page: int = 1,
+    per_page: int = 100,
+    current_user: dict = Depends(get_current_active_user)
+):
+    skip = (page - 1) * per_page
+    suppliers = await db.suppliers.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    return [
+        SupplierResponse(
+            id=s['id'],
+            name=s['name'],
+            cnpj=s.get('cnpj'),
+            phone=s.get('phone'),
+            email=s.get('email'),
+            address=s.get('address'),
+            created_at=datetime.fromisoformat(s['created_at'])
+        )
+        for s in suppliers
+    ]
+
+@api_router.put("/suppliers/{supplier_id}", response_model=SupplierResponse)
+async def update_supplier(supplier_id: str, supplier_input: SupplierCreate, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
+
+    update_data = {
+        "id": supplier_id,
+        "name": supplier_input.name,
+        "cnpj": supplier_input.cnpj,
+        "phone": supplier_input.phone,
+        "email": supplier_input.email,
+        "address": supplier_input.address,
+        "created_at": existing['created_at'],
+        "created_by": existing['created_by']
+    }
+
+    await db.suppliers.replace_one({"id": supplier_id}, update_data)
+
+    return SupplierResponse(
+        id=supplier_id,
+        name=update_data['name'],
+        cnpj=update_data['cnpj'],
+        phone=update_data['phone'],
+        email=update_data['email'],
+        address=update_data['address'],
+        created_at=datetime.fromisoformat(update_data['created_at'])
+    )
+
+@api_router.delete("/suppliers/{supplier_id}")
+async def delete_supplier(supplier_id: str, current_user: dict = Depends(get_current_active_user)):
+    result = await db.suppliers.delete_one({"id": supplier_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
+    return {"message": "Fornecedor deletado com sucesso"}
+
 # CRUD de Tipos de Serviço
 @api_router.post("/service-types", response_model=ServiceTypeResponse)
-async def create_service_type(service_type_input: ServiceTypeCreate, current_user: dict = Depends(get_current_user)):
+async def create_service_type(service_type_input: ServiceTypeCreate, current_user: dict = Depends(get_current_active_user)):
     service_type = ServiceType(
         name=service_type_input.name,
         description=service_type_input.description,
@@ -621,7 +800,7 @@ async def create_service_type(service_type_input: ServiceTypeCreate, current_use
 async def get_service_types(
     page: int = 1,
     per_page: int = 100,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     skip = (page - 1) * per_page
     service_types = await db.service_types.find({}, {"_id": 0}).sort("name", 1).skip(skip).limit(per_page).to_list(per_page)
@@ -636,7 +815,7 @@ async def get_service_types(
     ]
 
 @api_router.put("/service-types/{service_type_id}", response_model=ServiceTypeResponse)
-async def update_service_type(service_type_id: str, service_type_input: ServiceTypeCreate, current_user: dict = Depends(get_current_user)):
+async def update_service_type(service_type_id: str, service_type_input: ServiceTypeCreate, current_user: dict = Depends(get_current_active_user)):
     existing = await db.service_types.find_one({"id": service_type_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Tipo de Serviço não encontrado")
@@ -659,7 +838,7 @@ async def update_service_type(service_type_id: str, service_type_input: ServiceT
     )
 
 @api_router.delete("/service-types/{service_type_id}")
-async def delete_service_type(service_type_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_service_type(service_type_id: str, current_user: dict = Depends(get_current_active_user)):
     result = await db.service_types.delete_one({"id": service_type_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Tipo de Serviço não encontrado")
@@ -670,7 +849,7 @@ ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 @api_router.post("/upload")
-async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+async def upload_file(file: UploadFile = File(...), current_user: dict = Depends(get_current_active_user)):
     """Upload de arquivo (imagem) para o servidor"""
     logging.info(f"[Upload] Recebendo arquivo: {file.filename}, content_type: {file.content_type}")
     
@@ -724,7 +903,7 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
     }
 
 @api_router.delete("/upload/{filename}")
-async def delete_file(filename: str, current_user: dict = Depends(get_current_user)):
+async def delete_file(filename: str, current_user: dict = Depends(get_current_active_user)):
     """Deletar arquivo do servidor"""
     file_path = UPLOADS_DIR / filename
     
@@ -739,7 +918,7 @@ async def delete_file(filename: str, current_user: dict = Depends(get_current_us
         raise HTTPException(status_code=500, detail="Erro ao deletar arquivo")
 
 @api_router.post("/movements", response_model=ContainerMovementResponse)
-async def create_movement(movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_user)):
+async def create_movement(movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_active_user)):
     # Usar contador atômico para garantir sequência única
     next_transaction_id = await get_next_transaction_id()
     
@@ -836,13 +1015,19 @@ async def create_movement(movement_input: ContainerMovementCreate, current_user:
     
     return response
 
-@api_router.get("/movements", response_model=List[ContainerMovementResponse])
+@api_router.get("/movements")
 async def get_movements(
     operation_type: Optional[str] = None,
     status_filter: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    transaction_id: Optional[str] = None,
+    container_number: Optional[str] = None,
+    driver_name: Optional[str] = None,
+    client_name: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 0,  # 0 = sem limite (compatível com quem já chamava sem paginar)
+    current_user: dict = Depends(get_current_active_user)
 ):
     # Caso especial: Estoque Atual - containers que entraram mas não saíram
     if operation_type == "ESTOQUE":
@@ -939,10 +1124,40 @@ async def get_movements(
         query['operation_type'] = operation_type
     if status_filter:
         query['status'] = status_filter
-    
-    movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
-    
-    return [
+    if transaction_id:
+        try:
+            query['transaction_id'] = int(transaction_id)
+        except ValueError:
+            query['transaction_id'] = -1  # nº inválido -> nenhum resultado, em vez de ignorar o filtro
+    if container_number:
+        query['container_number'] = {"$regex": re.escape(container_number), "$options": "i"}
+    if driver_name:
+        query['driver_name'] = {"$regex": re.escape(driver_name), "$options": "i"}
+    if client_name:
+        query['client_name'] = {"$regex": re.escape(client_name), "$options": "i"}
+    # created_at é salvo como string ISO 8601 (sempre UTC) — comparação de string
+    # funciona corretamente para ordenar/filtrar por data nesse formato.
+    date_range = {}
+    if date_from:
+        try:
+            date_range['$gte'] = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            date_range['$lte'] = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            pass
+    if date_range:
+        query['created_at'] = date_range
+
+    total = await db.movements.count_documents(query) if per_page else None
+    cursor = db.movements.find(query, {"_id": 0}).sort("created_at", -1)
+    if per_page:
+        cursor = cursor.skip((page - 1) * per_page).limit(per_page)
+    movements = await cursor.to_list(None if not per_page else per_page)
+
+    items = [
         ContainerMovementResponse(
             id=m['id'],
             transaction_id=m.get('transaction_id', 0),
@@ -975,12 +1190,22 @@ async def get_movements(
         for m in movements
     ]
 
+    if per_page:
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": (total + per_page - 1) // per_page
+        }
+    return items
+
 @api_router.get("/movements/unbilled", response_model=List[ContainerMovementResponse])
 async def get_unbilled_movements(
     client_name: Optional[str] = None,
     client_cnpj: Optional[str] = None,
     search: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Lista movimentações não faturadas para seleção"""
     query = {"billed": {"$ne": True}}
@@ -1057,8 +1282,31 @@ async def get_unbilled_movements(
         for m in movements
     ]
 
+@api_router.get("/movements/open-entry/{container_number}")
+async def get_open_entry_for_container(container_number: str, current_user: dict = Depends(get_current_active_user)):
+    """Retorna a ENTRADA mais recente desse container que ainda não teve uma SAÍDA
+    correspondente — usado para autopreencher a Saída com os dados da Entrada."""
+    entry = await db.movements.find_one(
+        {"container_number": container_number.upper(), "operation_type": "ENTRADA"},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+    if not entry:
+        return {"entry": None}
+
+    existing_exit = await db.movements.find_one({
+        "container_number": entry["container_number"],
+        "operation_type": "SAIDA",
+        "created_at": {"$gt": entry["created_at"]}
+    }, {"_id": 0})
+
+    if existing_exit:
+        return {"entry": None}
+
+    return {"entry": entry}
+
 @api_router.get("/movements/{movement_id}", response_model=ContainerMovementResponse)
-async def get_movement(movement_id: str, current_user: dict = Depends(get_current_user)):
+async def get_movement(movement_id: str, current_user: dict = Depends(get_current_active_user)):
     movement = await db.movements.find_one({"id": movement_id}, {"_id": 0})
     if not movement:
         raise HTTPException(status_code=404, detail="Movimentação não encontrada")
@@ -1095,11 +1343,16 @@ async def get_movement(movement_id: str, current_user: dict = Depends(get_curren
     )
 
 @api_router.put("/movements/{movement_id}", response_model=ContainerMovementResponse)
-async def update_movement(movement_id: str, movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_user)):
+async def update_movement(movement_id: str, movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_active_user)):
     existing = await db.movements.find_one({"id": movement_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Movimentação não encontrada")
-    
+
+    if existing.get('billed'):
+        requester = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "role": 1})
+        if not requester or requester.get('role') != 'admin':
+            raise HTTPException(status_code=403, detail="Movimentação já faturada não pode ser editada. Solicite a um administrador.")
+
     update_data = movement_input.model_dump()
     update_data['id'] = movement_id
     update_data['transaction_id'] = existing.get('transaction_id', 0)
@@ -1147,11 +1400,20 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     )
 
 @api_router.delete("/movements/{movement_id}")
-async def delete_movement(movement_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_movement(movement_id: str, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.movements.find_one({"id": movement_id}, {"_id": 0, "billed": 1})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Movimentação não encontrada")
+
+    if existing.get('billed'):
+        requester = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "role": 1})
+        if not requester or requester.get('role') != 'admin':
+            raise HTTPException(status_code=403, detail="Movimentação já faturada não pode ser excluída. Solicite a um administrador.")
+
     result = await db.movements.delete_one({"id": movement_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Movimentação não encontrada")
-    
+
     # Notificar todos os clientes conectados via WebSocket
     await manager.broadcast({
         "type": "MOVEMENT_DELETED",
@@ -1161,7 +1423,7 @@ async def delete_movement(movement_id: str, current_user: dict = Depends(get_cur
     return {"message": "Movimentação deletada com sucesso"}
 
 @api_router.get("/user/shortcuts")
-async def get_user_shortcuts(current_user: dict = Depends(get_current_user)):
+async def get_user_shortcuts(current_user: dict = Depends(get_current_active_user)):
     user = await db.users.find_one({"email": current_user["email"]}, {"_id": 0, "shortcuts": 1})
     if user and "shortcuts" in user:
         return {"shortcuts": user["shortcuts"]}
@@ -1169,7 +1431,7 @@ async def get_user_shortcuts(current_user: dict = Depends(get_current_user)):
 
 
 @api_router.put("/user/shortcuts")
-async def update_user_shortcuts(data: dict, current_user: dict = Depends(get_current_user)):
+async def update_user_shortcuts(data: dict, current_user: dict = Depends(get_current_active_user)):
     shortcuts = data.get("shortcuts", [])
     await db.users.update_one(
         {"email": current_user["email"]},
@@ -1179,7 +1441,7 @@ async def update_user_shortcuts(data: dict, current_user: dict = Depends(get_cur
 
 
 @api_router.get("/dashboard", response_model=DashboardStats)
-async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
+async def get_dashboard_stats(current_user: dict = Depends(get_current_active_user)):
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     # Início do mês atual
     first_day_of_month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -1189,8 +1451,8 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
     # Otimização: usar agregação do MongoDB para estatísticas
     # Buscar apenas campos necessários com projeção
     all_movements = await db.movements.find(
-        {}, 
-        {"_id": 0, "operation_type": 1, "status": 1, "created_at": 1, "container_number": 1}
+        {},
+        {"_id": 0, "operation_type": 1, "status": 1, "created_at": 1, "container_number": 1, "driver_name": 1}
     ).to_list(10000)
     
     entries_today = sum(1 for m in all_movements if m['operation_type'] == 'ENTRADA' and parse_datetime_value(m['created_at']) >= today)
@@ -1230,6 +1492,52 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
             elif data['last_status'] == 'CHEIO':
                 stock_full += 1
     
+    # Gráfico de entradas/saídas por dia (últimos 14 dias)
+    daily_chart = []
+    for i in range(13, -1, -1):
+        day_start = today - timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        day_entries = sum(
+            1 for m in all_movements
+            if m['operation_type'] == 'ENTRADA' and day_start <= parse_datetime_value(m['created_at']) < day_end
+        )
+        day_exits = sum(
+            1 for m in all_movements
+            if m['operation_type'] == 'SAIDA' and day_start <= parse_datetime_value(m['created_at']) < day_end
+        )
+        daily_chart.append(DailyMovementPoint(
+            date=day_start.strftime('%Y-%m-%d'),
+            entries=day_entries,
+            exits=day_exits
+        ))
+
+    # Ranking de motoristas no mês vigente
+    driver_stats = {}
+    for m in all_movements:
+        if parse_datetime_value(m['created_at']) < first_day_of_month:
+            continue
+        driver_name = m.get('driver_name') or 'Não informado'
+        if driver_name not in driver_stats:
+            driver_stats[driver_name] = {'entries': 0, 'exits': 0}
+        if m['operation_type'] == 'ENTRADA':
+            driver_stats[driver_name]['entries'] += 1
+        elif m['operation_type'] == 'SAIDA':
+            driver_stats[driver_name]['exits'] += 1
+
+    driver_ranking = sorted(
+        [
+            DriverRankingEntry(
+                driver_name=name,
+                entries=data['entries'],
+                exits=data['exits'],
+                total=data['entries'] + data['exits']
+            )
+            for name, data in driver_stats.items()
+        ],
+        key=lambda x: x.total,
+        reverse=True
+    )[:10]
+
     recent = await db.movements.find({}, {"_id": 0}).sort("created_at", -1).limit(5).to_list(5)
     recent_movements = [
         ContainerMovementResponse(
@@ -1269,7 +1577,9 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         stock_full=stock_full,
         entries_month=entries_month,
         exits_month=exits_month,
-        recent_movements=recent_movements
+        recent_movements=recent_movements,
+        daily_chart=daily_chart,
+        driver_ranking=driver_ranking
     )
 
 # ==================== CONTROLE DE ESTOQUE / CONTAINERS NO PÁTIO ====================
@@ -1283,7 +1593,7 @@ async def get_yard_control(
     movement_type: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Retorna containers em estoque no pátio com contagem de dias"""
     all_movements = await db.movements.find({}, {"_id": 0}).sort("created_at", -1).to_list(10000)
@@ -1543,6 +1853,80 @@ async def get_yard_control(
         'by_shipping': by_shipping
     }
 
+@api_router.get("/search")
+async def global_search(q: str, current_user: dict = Depends(get_current_active_user)):
+    """Busca global usada pela paleta de comandos (Ctrl+K): contêineres, motoristas,
+    clientes e transportadoras que batem com o termo digitado."""
+    term = q.strip()
+    if len(term) < 2:
+        return {"results": []}
+
+    regex = {"$regex": re.escape(term), "$options": "i"}
+    results = []
+
+    movements = await db.movements.find(
+        {"container_number": regex},
+        {"_id": 0, "id": 1, "container_number": 1, "operation_type": 1, "status": 1, "driver_name": 1}
+    ).sort("created_at", -1).limit(20).to_list(20)
+    seen_containers = set()
+    for m in movements:
+        if m['container_number'] in seen_containers:
+            continue
+        seen_containers.add(m['container_number'])
+        op_label = 'Entrada' if m['operation_type'] == 'ENTRADA' else 'Saída'
+        results.append({
+            "type": "container",
+            "label": m['container_number'],
+            "subtitle": f"{op_label} · {m['status']}" + (f" · {m['driver_name']}" if m.get('driver_name') else ""),
+            "path": f"/movements/{m['id']}",
+        })
+        if len(seen_containers) >= 6:
+            break
+
+    drivers = await db.drivers.find(
+        {"$or": [{"name": regex}, {"cpf": regex}]}, {"_id": 0, "name": 1, "cpf": 1}
+    ).limit(6).to_list(6)
+    for d in drivers:
+        results.append({
+            "type": "driver",
+            "label": d['name'],
+            "subtitle": f"Motorista · CPF {d['cpf']}" if d.get('cpf') else "Motorista",
+            "path": f"/drivers?q={url_quote(d['name'])}",
+        })
+
+    clients = await db.clients.find(
+        {"$or": [{"name": regex}, {"cnpj": regex}]}, {"_id": 0, "name": 1, "cnpj": 1}
+    ).limit(6).to_list(6)
+    for c in clients:
+        results.append({
+            "type": "client",
+            "label": c['name'],
+            "subtitle": f"Cliente · {c['cnpj']}" if c.get('cnpj') else "Cliente",
+            "path": f"/clients?q={url_quote(c['name'])}",
+        })
+
+    companies = await db.transport_companies.find(
+        {"$or": [{"name": regex}, {"cnpj": regex}]}, {"_id": 0, "name": 1, "cnpj": 1}
+    ).limit(6).to_list(6)
+    for c in companies:
+        results.append({
+            "type": "company",
+            "label": c['name'],
+            "subtitle": f"Transportadora · {c['cnpj']}" if c.get('cnpj') else "Transportadora",
+            "path": f"/companies?q={url_quote(c['name'])}",
+        })
+
+    return {"results": results}
+
+@api_router.get("/alerts/summary")
+async def get_alerts_summary(current_user: dict = Depends(get_current_active_user)):
+    """Resumo leve de alertas para o sino do topo (hoje: containers parados no pátio há mais de 60 dias)."""
+    yard = await get_yard_control(current_user=current_user)
+    return {
+        'yard_over_60_days': yard['stats']['over_60_days'],
+        'yard_over_90_days': yard['stats']['over_90_days'],
+    }
+
 from pydantic import BaseModel as PydanticBaseModel
 
 class QuickExitRequest(PydanticBaseModel):
@@ -1557,7 +1941,7 @@ class QuickExitRequest(PydanticBaseModel):
 @api_router.post("/yard-control/quick-exit")
 async def register_quick_exit(
     data: QuickExitRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Registra saída rápida de container do pátio"""
     # Buscar movimentação de entrada
@@ -1632,7 +2016,7 @@ async def download_yard_control_excel(
     movement_type: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Gera relatório Excel de containers no pátio"""
     from openpyxl import Workbook
@@ -1781,7 +2165,7 @@ async def download_pdf_report(
     client_name: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     # Caso especial: Estoque Atual
     if operation_type == "ESTOQUE":
@@ -1850,8 +2234,9 @@ async def download_pdf_report(
     if client_name:
         report_title += f" - Cliente: {client_name}"
     
-    pdf_buffer = generate_pdf_report(movements, report_title)
-    
+    company = await get_company_settings()
+    pdf_buffer = generate_pdf_report(movements, report_title, company=company)
+
     return StreamingResponse(
         io.BytesIO(pdf_buffer),
         media_type="application/pdf",
@@ -1865,7 +2250,7 @@ async def download_excel_report(
     client_name: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     # Caso especial: Estoque Atual
     if operation_type == "ESTOQUE":
@@ -1934,8 +2319,9 @@ async def download_excel_report(
     if client_name:
         report_title += f" - Cliente: {client_name}"
     
-    excel_buffer = generate_excel_report(movements, report_title)
-    
+    company = await get_company_settings()
+    excel_buffer = generate_excel_report(movements, report_title, company=company)
+
     return StreamingResponse(
         io.BytesIO(excel_buffer),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1952,7 +2338,7 @@ async def download_billing_pdf_report(
     billed_filter: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     query = {}
     if operation_type and operation_type != 'all':
@@ -1986,7 +2372,8 @@ async def download_billing_pdf_report(
     if client_name and client_name != 'all':
         report_title += f" - Cliente: {client_name}"
 
-    pdf_buffer = generate_billing_pdf_report(movements, report_title)
+    company = await get_company_settings()
+    pdf_buffer = generate_billing_pdf_report(movements, report_title, company=company)
 
     return StreamingResponse(
         io.BytesIO(pdf_buffer),
@@ -2003,7 +2390,7 @@ async def download_billing_excel_report(
     billed_filter: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     query = {}
     if operation_type and operation_type != 'all':
@@ -2037,7 +2424,8 @@ async def download_billing_excel_report(
     if client_name and client_name != 'all':
         report_title += f" - Cliente: {client_name}"
 
-    excel_buffer = generate_billing_excel(movements)
+    company = await get_company_settings()
+    excel_buffer = generate_billing_excel(movements, company=company)
 
     return StreamingResponse(
         io.BytesIO(excel_buffer),
@@ -2054,7 +2442,7 @@ class BillingRequest(BaseModel):
 @api_router.post("/billing/report")
 async def generate_billing_report(
     request: BillingRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     from reports import generate_billing_excel
     
@@ -2076,9 +2464,10 @@ async def generate_billing_report(
     
     # Ordenar por transaction_id
     movements.sort(key=lambda x: x.get('transaction_id', 0), reverse=True)
-    
-    excel_buffer = generate_billing_excel(movements)
-    
+
+    company = await get_company_settings()
+    excel_buffer = generate_billing_excel(movements, company=company)
+
     return StreamingResponse(
         io.BytesIO(excel_buffer),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -2116,7 +2505,7 @@ async def log_invoice_history(invoice_id: str, invoice_number: int, action: str,
 @api_router.post("/invoices", response_model=InvoiceResponse)
 async def create_invoice(
     invoice_input: InvoiceCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Cria uma nova fatura a partir das movimentações selecionadas"""
     
@@ -2204,7 +2593,7 @@ async def get_invoices(
     page: int = 1,
     per_page: int = 15,
     client_name: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Lista todas as faturas com paginação"""
     query = {}
@@ -2233,7 +2622,7 @@ async def get_invoices(
 @api_router.get("/invoices/count")
 async def get_invoices_count(
     client_name: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Retorna a contagem total de faturas"""
     query = {}
@@ -2244,7 +2633,7 @@ async def get_invoices_count(
     return {"count": count}
 
 @api_router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
-async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Busca uma fatura específica por ID"""
     invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
     if not invoice:
@@ -2263,7 +2652,7 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
     )
 
 @api_router.put("/invoices/{invoice_id}", response_model=InvoiceResponse)
-async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current_user: dict = Depends(get_current_user)):
+async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current_user: dict = Depends(get_current_admin_user)):
     """Atualiza uma fatura existente (dados e movimentações)"""
     # Buscar fatura existente
     invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
@@ -2371,7 +2760,7 @@ async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current
     )
 
 @api_router.get("/invoices/{invoice_id}/movements", response_model=List[InvoiceMovementDetail])
-async def get_invoice_movements(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def get_invoice_movements(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Retorna detalhes das movimentações de uma fatura"""
     invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
     if not invoice:
@@ -2396,7 +2785,7 @@ async def get_invoice_movements(invoice_id: str, current_user: dict = Depends(ge
     ]
 
 @api_router.get("/invoices/{invoice_id}/pdf")
-async def download_invoice_pdf(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def download_invoice_pdf(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Gera PDF da fatura para download"""
     from reports import generate_invoice_pdf
     
@@ -2409,8 +2798,9 @@ async def download_invoice_pdf(invoice_id: str, current_user: dict = Depends(get
         {"_id": 0}
     ).to_list(None)
     
-    pdf_buffer = generate_invoice_pdf(invoice, movements)
-    
+    company = await get_company_settings()
+    pdf_buffer = generate_invoice_pdf(invoice, movements, company=company)
+
     filename = f"fatura_{invoice['invoice_number']}.pdf"
     
     return StreamingResponse(
@@ -2420,7 +2810,7 @@ async def download_invoice_pdf(invoice_id: str, current_user: dict = Depends(get
     )
 
 @api_router.get("/invoices/{invoice_id}/excel")
-async def download_invoice_excel(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def download_invoice_excel(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Gera Excel da fatura para download"""
     from reports import generate_invoice_excel
     
@@ -2433,8 +2823,9 @@ async def download_invoice_excel(invoice_id: str, current_user: dict = Depends(g
         {"_id": 0}
     ).to_list(None)
     
-    excel_buffer = generate_invoice_excel(invoice, movements)
-    
+    company = await get_company_settings()
+    excel_buffer = generate_invoice_excel(invoice, movements, company=company)
+
     filename = f"fatura_{invoice['invoice_number']}.xlsx"
     
     return StreamingResponse(
@@ -2444,7 +2835,7 @@ async def download_invoice_excel(invoice_id: str, current_user: dict = Depends(g
     )
 
 @api_router.delete("/invoices/{invoice_id}")
-async def delete_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_invoice(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Exclui uma fatura e desmarca as movimentações como faturadas"""
     invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
     if not invoice:
@@ -2476,7 +2867,7 @@ async def delete_invoice(invoice_id: str, current_user: dict = Depends(get_curre
     return {"message": "Fatura excluída com sucesso"}
 
 @api_router.get("/invoices/{invoice_id}/history", response_model=List[InvoiceHistoryResponse])
-async def get_invoice_history(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def get_invoice_history(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Retorna o histórico de alterações de uma fatura"""
     history = await db.invoice_history.find(
         {"invoice_id": invoice_id},
@@ -2514,7 +2905,7 @@ async def list_photo_registries(
     page_size: int = 20,
     search: Optional[str] = None,
     client_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Lista registros fotográficos com paginação"""
     query = {}
@@ -2545,7 +2936,7 @@ async def list_photo_registries(
     }
 
 @api_router.get("/photo-registries/{registry_id}", response_model=PhotoRegistryResponse)
-async def get_photo_registry(registry_id: str, current_user: dict = Depends(get_current_user)):
+async def get_photo_registry(registry_id: str, current_user: dict = Depends(get_current_active_user)):
     """Obtém um registro fotográfico específico"""
     registry = await db.photo_registries.find_one({"id": registry_id}, {"_id": 0})
     if not registry:
@@ -2555,7 +2946,7 @@ async def get_photo_registry(registry_id: str, current_user: dict = Depends(get_
 @api_router.post("/photo-registries", response_model=PhotoRegistryResponse)
 async def create_photo_registry(
     data: PhotoRegistryCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Cria um novo registro fotográfico"""
     registry_number = await get_next_registry_number()
@@ -2599,7 +2990,7 @@ async def create_photo_registry(
 async def update_photo_registry(
     registry_id: str,
     data: PhotoRegistryUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Atualiza um registro fotográfico"""
     registry = await db.photo_registries.find_one({"id": registry_id}, {"_id": 0})
@@ -2648,7 +3039,7 @@ async def upload_photo_registry_photo(
     registry_id: str,
     position: str,  # front, back, left, right
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Upload de foto para um registro fotográfico"""
     if position not in ["front", "back", "left", "right"]:
@@ -2690,7 +3081,7 @@ async def upload_photo_registry_photo(
 async def delete_photo_registry_photo(
     registry_id: str,
     position: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Remove uma foto de um registro fotográfico"""
     if position not in ["front", "back", "left", "right"]:
@@ -2723,7 +3114,7 @@ async def delete_photo_registry_photo(
 @api_router.delete("/photo-registries/{registry_id}")
 async def delete_photo_registry(
     registry_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Exclui um registro fotográfico"""
     registry = await db.photo_registries.find_one({"id": registry_id}, {"_id": 0})
@@ -2748,14 +3139,15 @@ async def delete_photo_registry(
 async def list_container_inspections(
     page: int = 1,
     per_page: int = 20,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todas as vistorias de container"""
     skip = (page - 1) * per_page
     
     total = await db.container_inspections.count_documents({})
     inspections = await db.container_inspections.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
-    
+    inspections = [migrate_inspection_photos(i) for i in inspections]
+
     return {
         "items": inspections,
         "total": total,
@@ -2765,17 +3157,17 @@ async def list_container_inspections(
     }
 
 @api_router.get("/container-inspections/{inspection_id}", response_model=ContainerInspectionResponse)
-async def get_container_inspection(inspection_id: str, current_user: dict = Depends(get_current_user)):
+async def get_container_inspection(inspection_id: str, current_user: dict = Depends(get_current_active_user)):
     """Obtém uma vistoria de container pelo ID"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
     if not inspection:
         raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
-    return ContainerInspectionResponse(**inspection)
+    return ContainerInspectionResponse(**migrate_inspection_photos(inspection))
 
 @api_router.post("/container-inspections", response_model=ContainerInspectionResponse)
 async def create_container_inspection(
     data: ContainerInspectionCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Cria uma nova vistoria de container"""
     # Gerar número sequencial
@@ -2828,7 +3220,7 @@ async def create_container_inspection(
 async def update_container_inspection(
     inspection_id: str,
     data: ContainerInspectionUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Atualiza uma vistoria de container"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
@@ -2882,75 +3274,82 @@ async def update_container_inspection(
         await db.container_inspections.update_one({"id": inspection_id}, {"$set": update_data})
     
     updated = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
-    return ContainerInspectionResponse(**updated)
+    return ContainerInspectionResponse(**migrate_inspection_photos(updated))
 
 @api_router.post("/container-inspections/{inspection_id}/upload-photo")
 async def upload_container_inspection_photo(
     inspection_id: str,
-    position: str = Query(..., regex="^(front|back|left|right|internal)$"),
+    photo_type: str = Query(..., alias="type", regex="^(front|back|left|right|internal)$"),
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
-    """Faz upload de uma foto para uma vistoria de container"""
+    """Faz upload de uma foto para uma vistoria de container (até 8 fotos, cada uma com um tipo)"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
     if not inspection:
         raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
-    
+
+    inspection = migrate_inspection_photos(inspection)
+    if len(inspection["photos"]) >= MAX_CONTAINER_INSPECTION_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"Limite de {MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria atingido")
+
     # Criar diretório
     photo_dir = UPLOADS_DIR / "container_inspections" / inspection_id
     photo_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Salvar arquivo
+    photo_id = str(uuid.uuid4())
     file_ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    file_path = photo_dir / f"{position}.{file_ext}"
-    
+    file_path = photo_dir / f"{photo_id}.{file_ext}"
+
     with open(file_path, "wb") as buffer:
         content = await file.read()
         buffer.write(content)
-    
+
     # Atualizar banco
-    photo_url = f"/api/uploads/container_inspections/{inspection_id}/{position}.{file_ext}"
+    photo_url = f"/api/uploads/container_inspections/{inspection_id}/{photo_id}.{file_ext}"
+    photo_entry = {"id": photo_id, "type": photo_type, "url": photo_url}
     await db.container_inspections.update_one(
         {"id": inspection_id},
-        {"$set": {f"photo_{position}": photo_url, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {
+            "$set": {"photos": inspection["photos"] + [photo_entry], "updated_at": datetime.now(timezone.utc).isoformat()}
+        }
     )
-    
-    return {"url": photo_url, "position": position}
 
-@api_router.delete("/container-inspections/{inspection_id}/photo/{position}")
+    return photo_entry
+
+@api_router.delete("/container-inspections/{inspection_id}/photo/{photo_id}")
 async def delete_container_inspection_photo(
     inspection_id: str,
-    position: str,
-    current_user: dict = Depends(get_current_user)
+    photo_id: str,
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Remove uma foto de uma vistoria de container"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
     if not inspection:
         raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
-    
-    photo_field = f"photo_{position}"
-    if photo_field not in inspection or not inspection[photo_field]:
+
+    inspection = migrate_inspection_photos(inspection)
+    remaining_photos = [p for p in inspection["photos"] if p["id"] != photo_id]
+    if len(remaining_photos) == len(inspection["photos"]):
         raise HTTPException(status_code=404, detail="Foto não encontrada")
-    
+
     # Remover arquivo
     photo_dir = UPLOADS_DIR / "container_inspections" / inspection_id
-    for ext in ["jpg", "jpeg", "png", "webp"]:
-        file_path = photo_dir / f"{position}.{ext}"
-        if file_path.exists():
-            file_path.unlink()
-    
+    for file_path in photo_dir.glob(f"{photo_id}.*"):
+        file_path.unlink()
+
     # Atualizar banco
     await db.container_inspections.update_one(
         {"id": inspection_id},
-        {"$set": {photo_field: None, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"photos": remaining_photos, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
-    
+
     return {"message": "Foto removida com sucesso"}
 
 @api_router.delete("/container-inspections/{inspection_id}")
 async def delete_container_inspection(
     inspection_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Exclui uma vistoria de container"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
@@ -2980,7 +3379,7 @@ async def list_flex_tank_movements(
     client_id: Optional[str] = None,
     movement_number: Optional[int] = None,
     movement_type: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todas as movimentações de Flex Tank com filtros"""
     query = {}
@@ -3023,7 +3422,7 @@ async def list_flex_tank_movements(
 @api_router.get("/flex-tank/stock")
 async def get_flex_tank_stock(
     client_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Retorna o resumo do estoque de Flex Tank"""
     query = {}
@@ -3072,7 +3471,7 @@ async def get_flex_tank_stock(
     }
 
 @api_router.get("/flex-tank/movements/{movement_id}", response_model=FlexTankMovementResponse)
-async def get_flex_tank_movement(movement_id: str, current_user: dict = Depends(get_current_user)):
+async def get_flex_tank_movement(movement_id: str, current_user: dict = Depends(get_current_active_user)):
     """Obtém uma movimentação de Flex Tank pelo ID"""
     movement = await db.flex_tank_movements.find_one({"id": movement_id}, {"_id": 0})
     if not movement:
@@ -3082,7 +3481,7 @@ async def get_flex_tank_movement(movement_id: str, current_user: dict = Depends(
 @api_router.post("/flex-tank/movements", response_model=FlexTankMovementResponse)
 async def create_flex_tank_movement(
     data: FlexTankMovementCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Cria uma nova movimentação de Flex Tank"""
     # Gerar número sequencial
@@ -3134,7 +3533,7 @@ async def create_flex_tank_movement(
 async def update_flex_tank_movement(
     movement_id: str,
     data: FlexTankMovementUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Atualiza uma movimentação de Flex Tank"""
     movement = await db.flex_tank_movements.find_one({"id": movement_id}, {"_id": 0})
@@ -3187,7 +3586,7 @@ async def update_flex_tank_movement(
 @api_router.delete("/flex-tank/movements/{movement_id}")
 async def delete_flex_tank_movement(
     movement_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Exclui uma movimentação de Flex Tank"""
     movement = await db.flex_tank_movements.find_one({"id": movement_id}, {"_id": 0})
@@ -3204,7 +3603,7 @@ async def download_flex_tank_report(
     end_date: Optional[str] = None,
     client_id: Optional[str] = None,
     movement_type: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Gera relatório Excel das movimentações de Flex Tank"""
     from openpyxl import Workbook
@@ -3348,7 +3747,7 @@ async def get_vehicles(
     status: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todos os veículos cadastrados"""
     query = {}
@@ -3382,7 +3781,7 @@ async def get_vehicles(
 
 
 @api_router.get("/vehicles/{vehicle_id}", response_model=VehicleResponse)
-async def get_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_user)):
+async def get_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_active_user)):
     """Busca veículo por ID"""
     vehicle = await db.vehicles.find_one({"id": vehicle_id}, {"_id": 0})
     if not vehicle:
@@ -3391,13 +3790,20 @@ async def get_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_
 
 
 @api_router.post("/vehicles", response_model=VehicleResponse)
-async def create_vehicle(data: VehicleCreate, current_user: dict = Depends(get_current_user)):
+async def create_vehicle(data: VehicleCreate, current_user: dict = Depends(get_current_active_user)):
     """Cadastra novo veículo"""
     # Verificar se placa já existe
     existing = await db.vehicles.find_one({"plate": data.plate.upper()})
     if existing:
         raise HTTPException(status_code=400, detail="Placa já cadastrada")
-    
+
+    driver_name = None
+    if data.driver_id:
+        driver = await db.drivers.find_one({"id": data.driver_id}, {"_id": 0, "name": 1})
+        if not driver:
+            raise HTTPException(status_code=404, detail="Motorista não encontrado")
+        driver_name = driver["name"]
+
     vehicle_data = {
         "id": str(uuid.uuid4()),
         "plate": data.plate.upper(),
@@ -3407,20 +3813,22 @@ async def create_vehicle(data: VehicleCreate, current_user: dict = Depends(get_c
         "vehicle_type": data.vehicle_type.upper(),
         "status": data.status.upper(),
         "observations": data.observations,
+        "driver_id": data.driver_id,
+        "driver_name": driver_name,
         "created_by": current_user["sub"],
         "created_by_name": current_user.get("name", "Sistema"),
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": None
     }
-    
+
     await db.vehicles.insert_one(vehicle_data)
     vehicle_data.pop("_id", None)
-    
+
     return vehicle_data
 
 
 @api_router.put("/vehicles/{vehicle_id}", response_model=VehicleResponse)
-async def update_vehicle(vehicle_id: str, data: VehicleUpdate, current_user: dict = Depends(get_current_user)):
+async def update_vehicle(vehicle_id: str, data: VehicleUpdate, current_user: dict = Depends(get_current_active_user)):
     """Atualiza veículo"""
     vehicle = await db.vehicles.find_one({"id": vehicle_id})
     if not vehicle:
@@ -3445,7 +3853,17 @@ async def update_vehicle(vehicle_id: str, data: VehicleUpdate, current_user: dic
         update_data["status"] = data.status.upper()
     if data.observations is not None:
         update_data["observations"] = data.observations
-    
+
+    if data.clear_driver:
+        update_data["driver_id"] = None
+        update_data["driver_name"] = None
+    elif data.driver_id is not None:
+        driver = await db.drivers.find_one({"id": data.driver_id}, {"_id": 0, "name": 1})
+        if not driver:
+            raise HTTPException(status_code=404, detail="Motorista não encontrado")
+        update_data["driver_id"] = data.driver_id
+        update_data["driver_name"] = driver["name"]
+
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     await db.vehicles.update_one({"id": vehicle_id}, {"$set": update_data})
@@ -3455,7 +3873,7 @@ async def update_vehicle(vehicle_id: str, data: VehicleUpdate, current_user: dic
 
 
 @api_router.delete("/vehicles/{vehicle_id}")
-async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_active_user)):
     """Exclui veículo"""
     vehicle = await db.vehicles.find_one({"id": vehicle_id})
     if not vehicle:
@@ -3466,7 +3884,7 @@ async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_curre
 
 
 @api_router.get("/vehicles/types/list")
-async def get_vehicle_types(current_user: dict = Depends(get_current_user)):
+async def get_vehicle_types(current_user: dict = Depends(get_current_active_user)):
     """Lista tipos de veículos disponíveis"""
     return [
         {"value": "CAMINHÃO", "label": "Caminhão"},
@@ -3479,6 +3897,124 @@ async def get_vehicle_types(current_user: dict = Depends(get_current_user)):
     ]
 
 
+# ==================== FROTA - CHECKLIST DE VEÍCULO (LVT) ====================
+
+@api_router.get("/vehicle-checklists/template")
+async def get_vehicle_checklist_template(current_user: dict = Depends(get_current_active_user)):
+    """Retorna a lista fixa de itens do checklist, agrupados por seção"""
+    return {
+        "sections": [
+            {"key": key, "label": VEHICLE_CHECKLIST_SECTION_LABELS[key], "items": items}
+            for key, items in VEHICLE_CHECKLIST_TEMPLATE.items()
+        ]
+    }
+
+@api_router.get("/vehicle-checklists")
+async def get_vehicle_checklists(
+    search: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Lista os checklists de veículo com paginação e busca por placa/motorista/cliente"""
+    query = {}
+    if search:
+        query["$or"] = [
+            {"cavalo_plate": {"$regex": search, "$options": "i"}},
+            {"driver_name": {"$regex": search, "$options": "i"}},
+            {"client_name": {"$regex": search, "$options": "i"}},
+        ]
+
+    skip = (page - 1) * per_page
+    total = await db.vehicle_checklists.count_documents(query)
+    checklists = await db.vehicle_checklists.find(query, {"_id": 0}).sort("checklist_number", -1).skip(skip).limit(per_page).to_list(per_page)
+
+    return {
+        "items": checklists,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page
+    }
+
+@api_router.get("/vehicle-checklists/{checklist_id}", response_model=VehicleChecklistResponse)
+async def get_vehicle_checklist(checklist_id: str, current_user: dict = Depends(get_current_active_user)):
+    """Busca um checklist de veículo pelo ID"""
+    checklist = await db.vehicle_checklists.find_one({"id": checklist_id}, {"_id": 0})
+    if not checklist:
+        raise HTTPException(status_code=404, detail="Checklist não encontrado")
+    return VehicleChecklistResponse(**checklist)
+
+@api_router.post("/vehicle-checklists", response_model=VehicleChecklistResponse)
+async def create_vehicle_checklist(data: VehicleChecklistCreate, current_user: dict = Depends(get_current_active_user)):
+    """Cria um novo checklist de veículo"""
+    counter = await db.counters.find_one_and_update(
+        {"_id": "vehicle_checklist_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    checklist_number = counter["seq"]
+
+    checklist = VehicleChecklist(
+        **data.model_dump(),
+        checklist_number=checklist_number,
+        created_by=current_user["sub"],
+        created_by_name=current_user["name"]
+    )
+
+    doc = checklist.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.vehicle_checklists.insert_one(doc)
+    doc.pop("_id", None)
+
+    return VehicleChecklistResponse(**doc)
+
+@api_router.put("/vehicle-checklists/{checklist_id}", response_model=VehicleChecklistResponse)
+async def update_vehicle_checklist(checklist_id: str, data: VehicleChecklistCreate, current_user: dict = Depends(get_current_active_user)):
+    """Atualiza um checklist de veículo existente"""
+    existing = await db.vehicle_checklists.find_one({"id": checklist_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Checklist não encontrado")
+
+    update_data = data.model_dump()
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    await db.vehicle_checklists.update_one({"id": checklist_id}, {"$set": update_data})
+    result = await db.vehicle_checklists.find_one({"id": checklist_id}, {"_id": 0})
+    return VehicleChecklistResponse(**result)
+
+@api_router.delete("/vehicle-checklists/{checklist_id}")
+async def delete_vehicle_checklist(checklist_id: str, current_user: dict = Depends(get_current_active_user)):
+    """Exclui um checklist de veículo"""
+    result = await db.vehicle_checklists.delete_one({"id": checklist_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Checklist não encontrado")
+    return {"message": "Checklist excluído com sucesso"}
+
+@api_router.get("/vehicle-checklists/{checklist_id}/pdf")
+async def download_vehicle_checklist_pdf(checklist_id: str, current_user: dict = Depends(get_current_active_user)):
+    """Gera o PDF do checklist de veículo (modelo Petrobras/LVT ou modelo padrão, conforme o template do checklist)"""
+    from reports import generate_vehicle_checklist_pdf, generate_petrobras_lvt_pdf
+
+    checklist = await db.vehicle_checklists.find_one({"id": checklist_id}, {"_id": 0})
+    if not checklist:
+        raise HTTPException(status_code=404, detail="Checklist não encontrado")
+
+    company = await get_company_settings()
+    if checklist.get("template") == "petrobras_lvt":
+        pdf_bytes = generate_petrobras_lvt_pdf(checklist, company=company)
+    else:
+        pdf_bytes = generate_vehicle_checklist_pdf(checklist, company=company)
+
+    filename = f"checklist_veiculo_{checklist['checklist_number']}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 # ==================== FROTA - CONTROLE DE REVISÃO ====================
 
 @api_router.get("/vehicle-revisions")
@@ -3486,7 +4022,7 @@ async def get_vehicle_revisions(
     vehicle_plate: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todas as revisões de veículos"""
     query = {}
@@ -3509,7 +4045,7 @@ async def get_vehicle_revisions(
 @api_router.get("/vehicle-revisions/{revision_id}", response_model=VehicleRevisionResponse)
 async def get_vehicle_revision(
     revision_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Busca uma revisão específica"""
     revision = await db.vehicle_revisions.find_one({"id": revision_id}, {"_id": 0})
@@ -3520,7 +4056,7 @@ async def get_vehicle_revision(
 @api_router.post("/vehicle-revisions", response_model=VehicleRevisionResponse)
 async def create_vehicle_revision(
     data: VehicleRevisionCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Cria uma nova revisão de veículo"""
     counter = await db.counters.find_one_and_update(
@@ -3569,7 +4105,7 @@ async def create_vehicle_revision(
 @api_router.delete("/vehicle-revisions/{revision_id}")
 async def delete_vehicle_revision(
     revision_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Exclui uma revisão"""
     result = await db.vehicle_revisions.delete_one({"id": revision_id})
@@ -3582,7 +4118,7 @@ async def delete_vehicle_revision(
 async def update_vehicle_revision(
     revision_id: str,
     data: VehicleRevisionCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Atualiza uma revisão existente."""
     existing = await db.vehicle_revisions.find_one({"id": revision_id}, {"_id": 0})
@@ -3608,7 +4144,7 @@ async def update_vehicle_revision(
 @api_router.get("/vehicle-revisions/{revision_id}/pdf")
 async def generate_revision_pdf(
     revision_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Gera PDF da revisão - Layout profissional igual ao comprovante de movimentação"""
     from reportlab.lib.pagesizes import A4
@@ -3622,7 +4158,8 @@ async def generate_revision_pdf(
     revision = await db.vehicle_revisions.find_one({"id": revision_id}, {"_id": 0})
     if not revision:
         raise HTTPException(status_code=404, detail="Revisão não encontrada")
-    
+
+    company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
     
     # Cores corporativas (igual aos outros relatórios)
@@ -3642,15 +4179,8 @@ async def generate_revision_pdf(
     styles = getSampleStyleSheet()
     
     # ========== DOWNLOAD LOGO ==========
-    logo_buffer = None
-    LOGO_URL = os.environ.get('LOGO_URL', "https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png")
-    try:
-        response = requests.get(LOGO_URL, timeout=5)
-        if response.status_code == 200:
-            logo_buffer = io.BytesIO(response.content)
-    except:
-        pass
-    
+    logo_buffer = load_logo_buffer(company)
+
     # ========== HEADER SECTION ==========
     company_style = ParagraphStyle(
         'CompanyName',
@@ -3669,20 +4199,22 @@ async def generate_revision_pdf(
         alignment=TA_CENTER,
         leading=10
     )
-    
+
     logo_cell = ""
     if logo_buffer:
         try:
             logo_cell = Image(logo_buffer, width=50, height=50)
         except:
             pass
-    
+
+    address_lines = [line.strip() for line in company['address'].split('\n') if line.strip()]
     company_info = [
-        Paragraph("J.A LOGÍSTICA E ARMAZENAGEM LTDA", company_style),
-        Paragraph("CNPJ: 58.180.321/0001-03", address_style),
-        Paragraph("Rodovia CE-155, 16226 - Distrito Industrial", address_style),
-        Paragraph("São Gonçalo do Amarante - CE", address_style),
-        Paragraph("operacional@jalogisticas.com | (85) 9 9175-1472", address_style),
+        Paragraph(company['name'], company_style),
+        Paragraph(f"CNPJ: {company['cnpj']}", address_style),
+    ] + [
+        Paragraph(line, address_style) for line in address_lines
+    ] + [
+        Paragraph(f"{company['email']} | {company['phone']}", address_style),
     ]
     
     header_data = [[logo_cell, company_info, ""]]
@@ -3885,7 +4417,7 @@ async def generate_revision_pdf(
     elements.append(Spacer(1, 20))
     
     elements.append(Paragraph(f"Registrado por: {revision['created_by_name']} em {created_at.strftime('%d/%m/%Y às %H:%M')}", footer_style))
-    elements.append(Paragraph("ContainerLogix - J.A Logística", footer_style))
+    elements.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
     
     doc.build(elements)
     buffer.seek(0)
@@ -3894,7 +4426,7 @@ async def generate_revision_pdf(
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 @api_router.get("/vehicles/plates")
-async def get_vehicle_plates(current_user: dict = Depends(get_current_user)):
+async def get_vehicle_plates(current_user: dict = Depends(get_current_active_user)):
     """Lista todas as placas de veículos"""
     movements_plates = await db.movements.distinct("truck_plate")
     revisions_plates = await db.vehicle_revisions.distinct("vehicle_plate")
@@ -3913,7 +4445,7 @@ async def get_loading_schedules(
     status: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todas as programações de carregamento"""
     query = {}
@@ -3945,7 +4477,7 @@ async def get_loading_schedules(
 
 
 @api_router.get("/loading-schedules/{schedule_id}", response_model=LoadingScheduleResponse)
-async def get_loading_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+async def get_loading_schedule(schedule_id: str, current_user: dict = Depends(get_current_active_user)):
     """Busca programação por ID"""
     schedule = await db.loading_schedules.find_one({"id": schedule_id}, {"_id": 0})
     if not schedule:
@@ -3954,7 +4486,7 @@ async def get_loading_schedule(schedule_id: str, current_user: dict = Depends(ge
 
 
 @api_router.post("/loading-schedules", response_model=LoadingScheduleResponse)
-async def create_loading_schedule(data: LoadingScheduleCreate, current_user: dict = Depends(get_current_user)):
+async def create_loading_schedule(data: LoadingScheduleCreate, current_user: dict = Depends(get_current_active_user)):
     """Cria nova programação de carregamento"""
     counter = await db.counters.find_one_and_update(
         {"_id": "loading_schedule_number"},
@@ -3989,7 +4521,7 @@ async def create_loading_schedule(data: LoadingScheduleCreate, current_user: dic
 
 
 @api_router.put("/loading-schedules/{schedule_id}", response_model=LoadingScheduleResponse)
-async def update_loading_schedule(schedule_id: str, data: LoadingScheduleCreate, current_user: dict = Depends(get_current_user)):
+async def update_loading_schedule(schedule_id: str, data: LoadingScheduleCreate, current_user: dict = Depends(get_current_active_user)):
     """Atualiza programação de carregamento"""
     schedule = await db.loading_schedules.find_one({"id": schedule_id})
     if not schedule:
@@ -4006,14 +4538,14 @@ async def update_loading_schedule(schedule_id: str, data: LoadingScheduleCreate,
         "observations": data.observations,
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
-    
+
     await db.loading_schedules.update_one({"id": schedule_id}, {"$set": update_data})
     updated = await db.loading_schedules.find_one({"id": schedule_id}, {"_id": 0})
     return updated
 
 
 @api_router.delete("/loading-schedules/{schedule_id}")
-async def delete_loading_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_loading_schedule(schedule_id: str, current_user: dict = Depends(get_current_active_user)):
     """Exclui programação de carregamento"""
     schedule = await db.loading_schedules.find_one({"id": schedule_id})
     if not schedule:
@@ -4024,7 +4556,7 @@ async def delete_loading_schedule(schedule_id: str, current_user: dict = Depends
 
 
 @api_router.put("/loading-schedules/{schedule_id}/update-status")
-async def update_loading_schedule_status(schedule_id: str, new_status: str, current_user: dict = Depends(get_current_user)):
+async def update_loading_schedule_status(schedule_id: str, new_status: str, current_user: dict = Depends(get_current_active_user)):
     """Atualiza status da programação"""
     if new_status not in ["ATIVO", "CONCLUIDO", "CANCELADO"]:
         raise HTTPException(status_code=400, detail="Status inválido")
@@ -4040,7 +4572,7 @@ async def update_loading_schedule_status(schedule_id: str, new_status: str, curr
 
 
 @api_router.get("/loading-schedules/{schedule_id}/pdf")
-async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = Depends(get_current_user)):
+async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = Depends(get_current_active_user)):
     """Gera PDF da programação de carregamento - Layout similar ao comprovante de movimentação"""
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
@@ -4055,9 +4587,10 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     schedule = await db.loading_schedules.find_one({"id": schedule_id}, {"_id": 0})
     if not schedule:
         raise HTTPException(status_code=404, detail="Programação não encontrada")
-    
+
+    company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
-    
+
     # Cores
     BLACK = colors.black
     BORDER_COLOR = colors.black
@@ -4077,21 +4610,14 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     styles = getSampleStyleSheet()
     
     # Download logo
-    logo_buffer = None
-    LOGO_URL = os.environ.get('LOGO_URL', "https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png")
-    try:
-        response = requests.get(LOGO_URL, timeout=5)
-        if response.status_code == 200:
-            logo_buffer = io.BytesIO(response.content)
-    except:
-        pass
-    
+    logo_buffer = load_logo_buffer(company)
+
     # ========== HEADER com Logo, Empresa, Código de Barras ==========
     company_style = ParagraphStyle('Company', parent=styles['Normal'], fontSize=18, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=20)
     slogan_style = ParagraphStyle('Slogan', parent=styles['Normal'], fontSize=9, fontName='Helvetica', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=11)
     address_style = ParagraphStyle('Address', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_CENTER, textColor=BLACK, leading=10)
     info_right_style = ParagraphStyle('InfoRight', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_RIGHT, textColor=BLACK)
-    
+
     # Logo
     logo_cell = ""
     if logo_buffer:
@@ -4099,13 +4625,12 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
             logo_cell = Image(logo_buffer, width=45, height=45)
         except:
             pass
-    
+
     # Informações da empresa (centro)
-    company_text = Paragraph("J.A LOGÍSTICA", company_style)
-    slogan_text = Paragraph("LOGÍSTICA E ARMAZENAGEM", slogan_style)
-    address_text = Paragraph("Rodovia CE-155, 16226 - Industrial - CEP: 61668-150 - Caucaia/CE", address_style)
-    
-    center_content = [[company_text], [slogan_text], [address_text]]
+    company_text = Paragraph(company['name'], company_style)
+    address_text = Paragraph(company['address'].replace('\n', ' - '), address_style)
+
+    center_content = [[company_text], [address_text]]
     center_table = Table(center_content, colWidths=[400])
     center_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -4219,8 +4744,9 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
         [Paragraph("Booking", label_style), Paragraph(booking_value, value_style)],
         [Paragraph("Viagem", label_style), Paragraph(voyage_value, value_style)]
     ]
-    
+
     client_content = [client_row1, client_row2]
+
     client_table = Table(client_content, colWidths=[350, 350])
     client_table.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
@@ -4247,9 +4773,13 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     elements.append(prog_header_table)
     
     # Tabela de dados
-    table_header = ["#", "MOTORISTA", "CPF", "CAVALO", "CARRETA", "LOCAL DE CARREG.", "DATA", "CONTAINER", "LACRE"]
+    cell_wrap_style = ParagraphStyle('CellWrap', parent=styles['Normal'], fontSize=7.5, fontName='Helvetica', leading=9)
+    has_bag_numbers = any((item.get('bag_number') or '').strip() for item in schedule['items'])
+    table_header = ["#", "TIPO", "MOTORISTA", "CPF", "CAVALO", "CARRETA", "LOCAL DE CARREG.", "DATA", "CONTAINER", "LACRE"]
+    if has_bag_numbers:
+        table_header.append("Nº DA BOLSA")
     table_data = [table_header]
-    
+
     for idx, item in enumerate(schedule['items'], 1):
         loading_date = item.get('loading_date', '')
         if loading_date:
@@ -4279,20 +4809,26 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
         
         row = [
             str(idx),
+            item.get('operation_type') or '-',
             driver_display_name,
             item.get('driver_cpf', '-') or '-',
             item.get('cavalo_plate', '-'),
             item.get('carreta_plate', '-') or '-',
-            item.get('loading_location', '-'),
+            Paragraph(item.get('loading_location', '-') or '-', cell_wrap_style),
             loading_date or '-',
-            item.get('container_number', '-') or '-',
+            Paragraph(item.get('container_number', '-') or '-', cell_wrap_style),
             item.get('seal_number', '-') or '-'
         ]
+        if has_bag_numbers:
+            row.append(item.get('bag_number') or '-')
         table_data.append(row)
-    
-    col_widths = [20, 110, 80, 60, 60, 125, 65, 100, 80]  # Total = 700 para alinhar com cabeçalho
+
+    if has_bag_numbers:
+        col_widths = [20, 45, 95, 60, 50, 50, 110, 55, 70, 55, 90]  # Total = 700 para alinhar com cabeçalho
+    else:
+        col_widths = [20, 55, 100, 70, 55, 55, 130, 60, 90, 65]  # Total = 700 para alinhar com cabeçalho
     main_table = Table(table_data, colWidths=col_widths)
-    main_table.setStyle(TableStyle([
+    main_table_style = [
         # Header row - verde padrão
         ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_GREEN),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -4314,7 +4850,10 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
         ('RIGHTPADDING', (0, 0), (-1, -1), 4),
         # Alternating row colors
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F9F9F9')]),
-    ]))
+    ]
+    if has_bag_numbers:
+        main_table_style.append(('ALIGN', (10, 1), (10, -1), 'CENTER'))  # Nº da Bolsa
+    main_table.setStyle(TableStyle(main_table_style))
     elements.append(main_table)
     elements.append(Spacer(1, 12))
     
@@ -4346,12 +4885,400 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     # ========== RODAPÉ ==========
     footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
     elements.append(Spacer(1, 15))
-    elements.append(Paragraph("ContainerLogix - J.A Logística", footer_style))
+    elements.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
     
     doc.build(elements)
     buffer.seek(0)
     
     filename = f"programacao_carregamento_{schedule['schedule_number']}.pdf"
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+# ==================== FINANCEIRO - SOLICITAÇÃO DE DIÁRIA ====================
+
+from models import DailyRateRequest, DailyRateRequestCreate, DailyRateRequestResponse, DailyRateRequestItem
+
+
+def calculate_daily_rate_item_total(item: DailyRateRequestItem) -> float:
+    return round(
+        item.others_value + item.commission_value + item.lunch_value
+        + item.daily_rate_quantity * item.daily_rate_value,
+        2
+    )
+
+
+@api_router.get("/daily-rate-requests")
+async def get_daily_rate_requests(
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Lista todas as solicitações de diária"""
+    query = {}
+
+    if search:
+        query["$or"] = [
+            {"items.driver_name": {"$regex": search, "$options": "i"}},
+            {"items.vehicle_plate": {"$regex": search, "$options": "i"}},
+            {"items.client_name": {"$regex": search, "$options": "i"}}
+        ]
+
+    if status:
+        query["status"] = status
+
+    total = await db.daily_rate_requests.count_documents(query)
+    skip = (page - 1) * per_page
+
+    cursor = db.daily_rate_requests.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page)
+    requests_list = await cursor.to_list(length=per_page)
+
+    return {
+        "items": requests_list,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page
+    }
+
+
+@api_router.get("/daily-rate-requests/{request_id}", response_model=DailyRateRequestResponse)
+async def get_daily_rate_request(request_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Busca solicitação de diária por ID"""
+    daily_request = await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0})
+    if not daily_request:
+        raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
+    return daily_request
+
+
+@api_router.post("/daily-rate-requests", response_model=DailyRateRequestResponse)
+async def create_daily_rate_request(data: DailyRateRequestCreate, current_user: dict = Depends(get_current_admin_user)):
+    """Cria nova solicitação de diária"""
+    counter = await db.counters.find_one_and_update(
+        {"_id": "daily_rate_request_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    request_number = counter["seq"]
+
+    items_data = []
+    total_value = 0.0
+    for item in data.items:
+        item.total = calculate_daily_rate_item_total(item)
+        total_value += item.total
+        items_data.append(item.model_dump())
+    total_value = round(total_value, 2)
+
+    request_data = {
+        "id": str(uuid.uuid4()),
+        "request_number": request_number,
+        "items": items_data,
+        "total_value": total_value,
+        "status": "PENDENTE",
+        "observations": data.observations,
+        "created_by": current_user["sub"],
+        "created_by_name": current_user.get("name", "Sistema"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None
+    }
+
+    await db.daily_rate_requests.insert_one(request_data)
+    request_data.pop("_id", None)
+
+    return request_data
+
+
+@api_router.put("/daily-rate-requests/{request_id}", response_model=DailyRateRequestResponse)
+async def update_daily_rate_request(request_id: str, data: DailyRateRequestCreate, current_user: dict = Depends(get_current_admin_user)):
+    """Atualiza solicitação de diária"""
+    daily_request = await db.daily_rate_requests.find_one({"id": request_id})
+    if not daily_request:
+        raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
+
+    items_data = []
+    total_value = 0.0
+    for item in data.items:
+        item.total = calculate_daily_rate_item_total(item)
+        total_value += item.total
+        items_data.append(item.model_dump())
+    total_value = round(total_value, 2)
+
+    update_data = {
+        "items": items_data,
+        "total_value": total_value,
+        "observations": data.observations,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+
+    await db.daily_rate_requests.update_one({"id": request_id}, {"$set": update_data})
+    updated = await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/daily-rate-requests/{request_id}")
+async def delete_daily_rate_request(request_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Exclui solicitação de diária"""
+    daily_request = await db.daily_rate_requests.find_one({"id": request_id})
+    if not daily_request:
+        raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
+
+    await db.daily_rate_requests.delete_one({"id": request_id})
+    return {"message": "Solicitação de diária excluída com sucesso"}
+
+
+@api_router.put("/daily-rate-requests/{request_id}/update-status")
+async def update_daily_rate_request_status(request_id: str, new_status: str, current_user: dict = Depends(get_current_admin_user)):
+    """Atualiza status da solicitação de diária"""
+    if new_status not in ["PENDENTE", "PAGO", "CANCELADO"]:
+        raise HTTPException(status_code=400, detail="Status inválido")
+
+    result = await db.daily_rate_requests.update_one(
+        {"id": request_id},
+        {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
+
+    return {"message": "Status atualizado"}
+
+
+@api_router.get("/daily-rate-requests/{request_id}/pdf")
+async def generate_daily_rate_request_pdf(request_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Gera PDF da solicitação de diária - Layout similar ao comprovante de programação de carregamento"""
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.graphics.barcode import code128
+    import requests
+
+    daily_request = await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0})
+    if not daily_request:
+        raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
+
+    company = merge_company(await get_company_settings())
+    buffer = io.BytesIO()
+
+    BLACK = colors.black
+    BORDER_COLOR = colors.black
+    HEADER_BG = colors.HexColor('#F5F5F5')
+    PRIMARY_GREEN = colors.HexColor('#008B7B')
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=12*mm,
+        leftMargin=12*mm,
+        topMargin=10*mm,
+        bottomMargin=10*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = load_logo_buffer(company)
+
+    company_style = ParagraphStyle('Company', parent=styles['Normal'], fontSize=18, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=20)
+    slogan_style = ParagraphStyle('Slogan', parent=styles['Normal'], fontSize=9, fontName='Helvetica', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=11)
+    address_style = ParagraphStyle('Address', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_CENTER, textColor=BLACK, leading=10)
+    info_right_style = ParagraphStyle('InfoRight', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_RIGHT, textColor=BLACK)
+
+    logo_cell = ""
+    if logo_buffer:
+        try:
+            logo_cell = Image(logo_buffer, width=45, height=45)
+        except:
+            pass
+
+    company_text = Paragraph(company['name'], company_style)
+    address_text = Paragraph(company['address'].replace('\n', ' - '), address_style)
+
+    center_content = [[company_text], [address_text]]
+    center_table = Table(center_content, colWidths=[400])
+    center_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+
+    barcode_value = f"DIAR{daily_request['request_number']:06d}"
+    barcode = code128.Code128(barcode_value, barWidth=1.2, barHeight=30)
+
+    from zoneinfo import ZoneInfo
+    created_at = parse_datetime_value(daily_request['created_at'])
+    brasilia_tz = ZoneInfo('America/Sao_Paulo')
+    created_at_brasilia = created_at.astimezone(brasilia_tz)
+    date_str = created_at_brasilia.strftime('%d/%m/%Y')
+    time_str = created_at_brasilia.strftime('%H:%M')
+
+    full_creator_name = daily_request.get('created_by_name', 'Sistema')
+    if full_creator_name:
+        name_parts = full_creator_name.strip().split()
+        preposicoes = ['DE', 'DA', 'DO', 'DOS', 'DAS', 'E']
+        nomes_filtrados = [p for p in name_parts if p.upper() not in preposicoes]
+        if len(nomes_filtrados) >= 2:
+            creator_short_name = f"{nomes_filtrados[0]} {nomes_filtrados[1]}"
+        elif len(nomes_filtrados) == 1:
+            creator_short_name = nomes_filtrados[0]
+        else:
+            creator_short_name = ' '.join(name_parts[:2]) if len(name_parts) >= 2 else name_parts[0] if name_parts else 'Sistema'
+    else:
+        creator_short_name = 'Sistema'
+
+    barcode_info = Paragraph(f"<b>Nº {daily_request['request_number']}</b>", ParagraphStyle('BarcodeNum', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', alignment=TA_CENTER))
+    date_info = Paragraph(f"Data: {date_str}", info_right_style)
+    user_info = Paragraph(f"Criado por: {creator_short_name}", info_right_style)
+
+    right_content = [[barcode], [barcode_info], [date_info], [user_info]]
+    right_table = Table(right_content, colWidths=[150])
+    right_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+    ]))
+
+    header_data = [[logo_cell, center_table, right_table]]
+    header_table = Table(header_data, colWidths=[55, 450, 160])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+    ]))
+    elements.append(header_table)
+
+    elements.append(Spacer(1, 5))
+    line_data = [[""]]
+    line_table = Table(line_data, colWidths=[700])
+    line_table.setStyle(TableStyle([
+        ('LINEBELOW', (0, 0), (-1, -1), 2, PRIMARY_GREEN),
+    ]))
+    elements.append(line_table)
+    elements.append(Spacer(1, 10))
+
+    title_style = ParagraphStyle('Title', parent=styles['Normal'], fontSize=12, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=PRIMARY_GREEN)
+
+    title_content = [[Paragraph("SOLICITAÇÃO DE DIÁRIA", title_style)]]
+    title_table = Table(title_content, colWidths=[700])
+    title_table.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 2, BORDER_COLOR),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(title_table)
+    elements.append(Spacer(1, 10))
+
+    section_title = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
+
+    items_header = [[Paragraph("Itens da Solicitação", section_title)]]
+    items_header_table = Table(items_header, colWidths=[700])
+    items_header_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
+        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    elements.append(items_header_table)
+
+    table_header = ["#", "MOTORISTA", "PLACA", "CLIENTE", "DATA SAÍDA", "OUTROS", "COMISSÃO", "ALMOÇO", "QTD. DIÁRIA", "DIÁRIA", "TOTAL"]
+    table_data = [table_header]
+
+    for idx, item in enumerate(daily_request['items'], 1):
+        departure_date = item.get('departure_date', '')
+        if departure_date:
+            try:
+                dt = datetime.fromisoformat(departure_date.replace('Z', '+00:00'))
+                departure_date = dt.strftime('%d/%m/%Y')
+            except:
+                pass
+
+        row = [
+            str(idx),
+            item.get('driver_name', '-'),
+            item.get('vehicle_plate', '-'),
+            item.get('client_name', '-'),
+            departure_date or '-',
+            f"R$ {item.get('others_value', 0):.2f}",
+            f"R$ {item.get('commission_value', 0):.2f}",
+            f"R$ {item.get('lunch_value', 0):.2f}",
+            f"{item.get('daily_rate_quantity', 0):.0f}",
+            f"R$ {item.get('daily_rate_value', 0):.2f}",
+            f"R$ {item.get('total', 0):.2f}",
+        ]
+        table_data.append(row)
+
+    total_row = ["", "", "", "", "", "", "", "", "", "TOTAL GERAL", f"R$ {daily_request.get('total_value', 0):.2f}"]
+    table_data.append(total_row)
+
+    col_widths = [20, 105, 60, 90, 60, 60, 60, 55, 60, 60, 70]  # Total = 700 para alinhar com cabeçalho
+    main_table = Table(table_data, colWidths=col_widths)
+    main_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_GREEN),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 7),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+        ('ALIGN', (4, 1), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('SPAN', (0, -1), (8, -1)),
+        ('ALIGN', (9, -1), (9, -1), 'RIGHT'),
+        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F9F9F9')]),
+        ('BACKGROUND', (0, -1), (-1, -1), HEADER_BG),
+    ]))
+    elements.append(main_table)
+    elements.append(Spacer(1, 12))
+
+    if daily_request.get('observations'):
+        obs_header = [[Paragraph("Observações", section_title)]]
+        obs_header_table = Table(obs_header, colWidths=[700])
+        obs_header_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
+            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        elements.append(obs_header_table)
+
+        obs_content_style = ParagraphStyle('ObsContent', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK)
+        obs_content = [[Paragraph(daily_request['observations'], obs_content_style)]]
+        obs_table = Table(obs_content, colWidths=[700])
+        obs_table.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        elements.append(obs_table)
+        elements.append(Spacer(1, 12))
+
+    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
+    elements.append(Spacer(1, 15))
+    elements.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    filename = f"solicitacao_diaria_{daily_request['request_number']}.pdf"
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
@@ -4365,7 +5292,7 @@ async def get_delivery_statuses(
     per_page: int = 20,
     status: Optional[str] = None,
     schedule_number: Optional[int] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todos os status de entrega com paginação e filtros"""
     query = {}
@@ -4387,7 +5314,7 @@ async def get_delivery_statuses(
     }
 
 @api_router.get("/delivery-status/schedule/{schedule_number}")
-async def get_schedule_for_delivery_status(schedule_number: int, current_user: dict = Depends(get_current_user)):
+async def get_schedule_for_delivery_status(schedule_number: int, current_user: dict = Depends(get_current_active_user)):
     """Busca uma programação de carregamento pelo número para criar um status de entrega"""
     schedule = await db.loading_schedules.find_one({"schedule_number": schedule_number}, {"_id": 0})
     if not schedule:
@@ -4395,7 +5322,7 @@ async def get_schedule_for_delivery_status(schedule_number: int, current_user: d
     return schedule
 
 @api_router.get("/delivery-status/{status_id}", response_model=DeliveryStatusResponse)
-async def get_delivery_status(status_id: str, current_user: dict = Depends(get_current_user)):
+async def get_delivery_status(status_id: str, current_user: dict = Depends(get_current_active_user)):
     """Busca um status de entrega pelo ID"""
     status = await db.delivery_statuses.find_one({"id": status_id}, {"_id": 0})
     if not status:
@@ -4403,7 +5330,7 @@ async def get_delivery_status(status_id: str, current_user: dict = Depends(get_c
     return status
 
 @api_router.post("/delivery-status", response_model=DeliveryStatusResponse)
-async def create_delivery_status(data: DeliveryStatusCreate, current_user: dict = Depends(get_current_user)):
+async def create_delivery_status(data: DeliveryStatusCreate, current_user: dict = Depends(get_current_active_user)):
     """Cria um novo status de entrega baseado em uma programação"""
     # Buscar a programação de carregamento
     schedule = await db.loading_schedules.find_one({"schedule_number": data.schedule_number}, {"_id": 0})
@@ -4436,7 +5363,7 @@ async def create_delivery_status(data: DeliveryStatusCreate, current_user: dict 
     return result
 
 @api_router.put("/delivery-status/{status_id}", response_model=DeliveryStatusResponse)
-async def update_delivery_status(status_id: str, data: DeliveryStatusCreate, current_user: dict = Depends(get_current_user)):
+async def update_delivery_status(status_id: str, data: DeliveryStatusCreate, current_user: dict = Depends(get_current_active_user)):
     """Atualiza um status de entrega existente"""
     existing = await db.delivery_statuses.find_one({"id": status_id}, {"_id": 0})
     if not existing:
@@ -4448,14 +5375,14 @@ async def update_delivery_status(status_id: str, data: DeliveryStatusCreate, cur
         "observations": data.observations,
         "updated_at": datetime.now(timezone.utc)
     }
-    
+
     await db.delivery_statuses.update_one({"id": status_id}, {"$set": update_data})
     
     result = await db.delivery_statuses.find_one({"id": status_id}, {"_id": 0})
     return result
 
 @api_router.delete("/delivery-status/{status_id}")
-async def delete_delivery_status(status_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_delivery_status(status_id: str, current_user: dict = Depends(get_current_active_user)):
     """Deleta um status de entrega"""
     result = await db.delivery_statuses.delete_one({"id": status_id})
     if result.deleted_count == 0:
@@ -4463,7 +5390,7 @@ async def delete_delivery_status(status_id: str, current_user: dict = Depends(ge
     return {"message": "Status de entrega deletado com sucesso"}
 
 @api_router.put("/delivery-status/{status_id}/update-status")
-async def update_delivery_status_status(status_id: str, new_status: str, current_user: dict = Depends(get_current_user)):
+async def update_delivery_status_status(status_id: str, new_status: str, current_user: dict = Depends(get_current_active_user)):
     """Atualiza o status (ATIVO, CONCLUIDO, CANCELADO)"""
     if new_status not in ["ATIVO", "CONCLUIDO", "CANCELADO"]:
         raise HTTPException(status_code=400, detail="Status inválido")
@@ -4477,7 +5404,7 @@ async def update_delivery_status_status(status_id: str, new_status: str, current
     return {"message": "Status atualizado com sucesso"}
 
 @api_router.get("/delivery-status/{status_id}/pdf")
-async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depends(get_current_user)):
+async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depends(get_current_active_user)):
     """Gera PDF do status de entrega - Layout similar à programação de carregamento"""
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
@@ -4491,7 +5418,8 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
     delivery_status = await db.delivery_statuses.find_one({"id": status_id}, {"_id": 0})
     if not delivery_status:
         raise HTTPException(status_code=404, detail="Status de entrega não encontrado")
-    
+
+    company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
     
     # Cores
@@ -4513,21 +5441,14 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
     styles = getSampleStyleSheet()
     
     # Download logo
-    logo_buffer = None
-    LOGO_URL = os.environ.get('LOGO_URL', "https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png")
-    try:
-        response = requests.get(LOGO_URL, timeout=5)
-        if response.status_code == 200:
-            logo_buffer = io.BytesIO(response.content)
-    except:
-        pass
-    
+    logo_buffer = load_logo_buffer(company)
+
     # ========== HEADER ==========
     company_style = ParagraphStyle('Company', parent=styles['Normal'], fontSize=18, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=20)
     slogan_style = ParagraphStyle('Slogan', parent=styles['Normal'], fontSize=9, fontName='Helvetica', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=11)
     address_style = ParagraphStyle('Address', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_CENTER, textColor=BLACK, leading=10)
     info_right_style = ParagraphStyle('InfoRight', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_RIGHT, textColor=BLACK)
-    
+
     # Logo
     logo_cell = ""
     if logo_buffer:
@@ -4535,13 +5456,12 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
             logo_cell = Image(logo_buffer, width=45, height=45)
         except:
             pass
-    
+
     # Informações da empresa (centro)
-    company_text = Paragraph("J.A LOGÍSTICA", company_style)
-    slogan_text = Paragraph("LOGÍSTICA E ARMAZENAGEM", slogan_style)
-    address_text = Paragraph("Rodovia CE-155, 16226 - Industrial - CEP: 61668-150 - Caucaia/CE", address_style)
-    
-    center_content = [[company_text], [slogan_text], [address_text]]
+    company_text = Paragraph(company['name'], company_style)
+    address_text = Paragraph(company['address'].replace('\n', ' - '), address_style)
+
+    center_content = [[company_text], [address_text]]
     center_table = Table(center_content, colWidths=[400])
     center_table.setStyle(TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -4549,7 +5469,7 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
         ('TOPPADDING', (0, 0), (-1, -1), 0),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
     ]))
-    
+
     # Código de barras e informações (direita)
     barcode_value = f"ENTR{delivery_status['status_number']:06d}"
     barcode = code128.Code128(barcode_value, barWidth=1.2, barHeight=30)
@@ -4670,8 +5590,9 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
         [Paragraph("Booking", label_style), Paragraph(booking_value, value_style)],
         [Paragraph("Viagem", label_style), Paragraph(voyage_value, value_style)]
     ]
-    
+
     info_content = [info_row1, info_row2, info_row3]
+
     info_table = Table(info_content, colWidths=[SECTION_WIDTH/2, SECTION_WIDTH/2])
     info_table.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
@@ -4698,9 +5619,13 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
     elements.append(status_header_table)
     
     # Tabela de dados - headers como strings simples (igual ao PDF de referência)
+    cell_wrap_style = ParagraphStyle('CellWrap', parent=styles['Normal'], fontSize=7.5, fontName='Helvetica', leading=9)
+    has_bag_numbers = any((item.get('bag_number') or '').strip() for item in delivery_status['items'])
     table_header = ["#", "MOTORISTA", "CPF", "CAVALO", "CONTAINER", "LOCAL", "CHEGADA", "INÍCIO", "TÉRMINO", "SAÍDA", "AGEND.", "ENTREGA"]
+    if has_bag_numbers:
+        table_header.append("Nº DA BOLSA")
     table_data = [table_header]
-    
+
     for idx, item in enumerate(delivery_status['items'], 1):
         # Abreviar nome do motorista
         driver_full_name = item.get('driver_name', '-')
@@ -4722,8 +5647,8 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
             driver_display_name,
             item.get('driver_cpf', '-') or '-',
             item.get('cavalo_plate', '-') or '-',
-            item.get('container_number', '-') or '-',
-            item.get('loading_location', '-') or '-',
+            Paragraph(item.get('container_number', '-') or '-', cell_wrap_style),
+            Paragraph(item.get('loading_location', '-') or '-', cell_wrap_style),
             item.get('arrival_time', '-') or '-',
             item.get('loading_start_time', '-') or '-',
             item.get('loading_end_time', '-') or '-',
@@ -4731,11 +5656,16 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
             item.get('port_schedule_time', '-') or '-',
             item.get('delivery_completed', '-') or '-'
         ]
+        if has_bag_numbers:
+            row.append(item.get('bag_number') or '-')
         table_data.append(row)
-    
-    # Larguras ajustadas para 700px total (12 colunas - igual ao padrão do PDF de Programação)
+
+    # Larguras ajustadas para 700px total (igual ao padrão do PDF de Programação)
     # Total = 700px para alinhar perfeitamente com o cabeçalho e demais seções
-    col_widths = [20, 85, 70, 50, 80, 85, 52, 52, 52, 52, 52, 50]  # Total = 700
+    if has_bag_numbers:
+        col_widths = [20, 65, 60, 40, 65, 60, 52, 52, 52, 52, 52, 50, 80]  # Total = 700
+    else:
+        col_widths = [20, 85, 70, 50, 80, 85, 52, 52, 52, 52, 52, 50]  # Total = 700
     data_table = Table(table_data, colWidths=col_widths)
     data_table.setStyle(TableStyle([
         # Header row - verde padrão (igual ao PDF de referência)
@@ -4791,13 +5721,33 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
     # ========== Rodapé ==========
     footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
     elements.append(Spacer(1, 15))
-    elements.append(Paragraph("ContainerLogix - J.A Logística", footer_style))
+    elements.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
     
     doc.build(elements)
     buffer.seek(0)
     
     filename = f"status_entrega_{delivery_status['status_number']}.pdf"
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+@api_router.get("/delivery-status/{status_id}/excel")
+async def download_delivery_status_excel(status_id: str, current_user: dict = Depends(get_current_active_user)):
+    """Gera Excel (XLS) do status de entrega"""
+    from reports import generate_delivery_status_excel
+
+    delivery_status = await db.delivery_statuses.find_one({"id": status_id}, {"_id": 0})
+    if not delivery_status:
+        raise HTTPException(status_code=404, detail="Status de entrega não encontrado")
+
+    company = await get_company_settings()
+    excel_bytes = generate_delivery_status_excel(delivery_status, company=company)
+
+    filename = f"status_entrega_{delivery_status['status_number']}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 
@@ -4812,7 +5762,7 @@ async def get_unit_segregations(
     status: Optional[str] = None,
     client_id: Optional[str] = None,
     container_number: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todas as segregações de unidade com filtros"""
     query = {}
@@ -4840,7 +5790,7 @@ async def get_unit_segregations(
 
 
 @api_router.get("/unit-segregations/{segregation_id}")
-async def get_unit_segregation(segregation_id: str, current_user: dict = Depends(get_current_user)):
+async def get_unit_segregation(segregation_id: str, current_user: dict = Depends(get_current_active_user)):
     """Busca uma segregação específica"""
     segregation = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
     if not segregation:
@@ -4849,7 +5799,7 @@ async def get_unit_segregation(segregation_id: str, current_user: dict = Depends
 
 
 @api_router.post("/unit-segregations", response_model=UnitSegregationResponse)
-async def create_unit_segregation(data: UnitSegregationCreate, current_user: dict = Depends(get_current_user)):
+async def create_unit_segregation(data: UnitSegregationCreate, current_user: dict = Depends(get_current_active_user)):
     """Cria uma nova segregação de unidade com múltiplos containers"""
     
     if not data.items or len(data.items) == 0:
@@ -4902,7 +5852,7 @@ async def create_unit_segregation(data: UnitSegregationCreate, current_user: dic
 
 
 @api_router.put("/unit-segregations/{segregation_id}")
-async def update_unit_segregation(segregation_id: str, data: UnitSegregationUpdate, current_user: dict = Depends(get_current_user)):
+async def update_unit_segregation(segregation_id: str, data: UnitSegregationUpdate, current_user: dict = Depends(get_current_active_user)):
     """Atualiza uma segregação de unidade"""
     segregation = await db.unit_segregations.find_one({"id": segregation_id})
     if not segregation:
@@ -4948,7 +5898,7 @@ async def update_unit_segregation(segregation_id: str, data: UnitSegregationUpda
 
 
 @api_router.delete("/unit-segregations/{segregation_id}")
-async def delete_unit_segregation(segregation_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_unit_segregation(segregation_id: str, current_user: dict = Depends(get_current_active_user)):
     """Exclui uma segregação de unidade"""
     result = await db.unit_segregations.delete_one({"id": segregation_id})
     if result.deleted_count == 0:
@@ -4957,7 +5907,7 @@ async def delete_unit_segregation(segregation_id: str, current_user: dict = Depe
 
 
 @api_router.post("/unit-segregations/{segregation_id}/release")
-async def release_unit_segregation(segregation_id: str, current_user: dict = Depends(get_current_user)):
+async def release_unit_segregation(segregation_id: str, current_user: dict = Depends(get_current_active_user)):
     """Libera uma segregação de unidade"""
     segregation = await db.unit_segregations.find_one({"id": segregation_id})
     if not segregation:
@@ -4981,7 +5931,7 @@ async def release_unit_segregation(segregation_id: str, current_user: dict = Dep
 
 
 @api_router.get("/unit-segregations/{segregation_id}/pdf")
-async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Depends(get_current_user)):
+async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Depends(get_current_active_user)):
     """Gera PDF da segregação de unidade - Formato Horizontal (Landscape)"""
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
@@ -4993,7 +5943,8 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
     segregation = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
     if not segregation:
         raise HTTPException(status_code=404, detail="Segregação não encontrada")
-    
+
+    company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
     # Usar landscape para orientação horizontal
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=40, rightMargin=40, topMargin=30, bottomMargin=30)
@@ -5014,15 +5965,8 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
     # Logo
     # ========== DOWNLOAD LOGO ==========
     import requests
-    logo_buffer = None
-    LOGO_URL = os.environ.get('LOGO_URL', "https://customer-assets.emergentagent.com/job_da181895-6b28-4daf-bef5-4444909581e8/artifacts/i8vfweuv_logo.png")
-    try:
-        response = requests.get(LOGO_URL, timeout=5)
-        if response.status_code == 200:
-            logo_buffer = io.BytesIO(response.content)
-    except:
-        pass
-    
+    logo_buffer = load_logo_buffer(company)
+
     # Logo
     logo_cell = ""
     if logo_buffer:
@@ -5032,15 +5976,14 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
             logo_cell = Paragraph("", styles['Normal'])
     else:
         logo_cell = Paragraph("", styles['Normal'])
-    
+
     # Informações centrais
     company_style = ParagraphStyle('Company', parent=styles['Normal'], fontSize=12, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
     subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK, alignment=TA_CENTER)
-    
+
     center_content = [
-        [Paragraph("J.A LOGÍSTICA", company_style)],
-        [Paragraph("LOGÍSTICA E ARMAZENAGEM", subtitle_style)],
-        [Paragraph("Rodovia CE-155, 16226 - Industrial - CEP: 61668-150 - Caucaia/CE", subtitle_style)]
+        [Paragraph(company['name'], company_style)],
+        [Paragraph(company['address'].replace('\n', ' - '), subtitle_style)]
     ]
     center_table = Table(center_content, colWidths=[450])
     center_table.setStyle(TableStyle([
@@ -5250,7 +6193,7 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
     # ========== Rodapé ==========
     footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
     elements.append(Spacer(1, 15))
-    elements.append(Paragraph("ContainerLogix - J.A Logística", footer_style))
+    elements.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
     
     doc.build(elements)
     buffer.seek(0)
@@ -5260,7 +6203,7 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
 
 
 @api_router.get("/check-segregation/{container_number}")
-async def check_container_segregation(container_number: str, current_user: dict = Depends(get_current_user)):
+async def check_container_segregation(container_number: str, current_user: dict = Depends(get_current_active_user)):
     """Verifica se um container está segregado"""
     segregation = await db.unit_segregations.find_one({
         "items.container_number": container_number.upper(),
@@ -5278,17 +6221,22 @@ async def check_container_segregation(container_number: str, current_user: dict 
 
 # ==================== INVOICE ENDPOINTS ====================
 
-# Dados fixos do recebedor (J.A Logística)
-RECEIVER_DATA = {
-    "company": "J.A LOGÍSTICA E ARMAZENAGEM LTDA",
-    "cnpj": "58.180.321/0001-03",
-    "email": "operacional@jalogisticas.com",
-    "phone": "(85) 9 9175-1472",
-    "address": "Rodovia CE-155, 16226 - Distrito Industrial",
-    "city_state": "São Gonçalo do Amarante - CE",
-    "zip": "62670-000",
-    "complement": ""
-}
+DEFAULT_RECEIVER_ZIP = "62670-000"
+
+async def build_receiver_data() -> dict:
+    """Monta os dados do recebedor (nossa empresa) a partir de 'Dados da Empresa'."""
+    company = merge_company(await get_company_settings())
+    address_parts = [line.strip() for line in company['address'].split('\n') if line.strip()]
+    return {
+        "company": company['name'],
+        "cnpj": company['cnpj'],
+        "email": company['email'],
+        "phone": company['phone'],
+        "address": address_parts[0] if address_parts else '',
+        "city_state": address_parts[1] if len(address_parts) > 1 else '',
+        "zip": DEFAULT_RECEIVER_ZIP,
+        "complement": ""
+    }
 
 @api_router.get("/intl-invoices")
 async def get_intl_invoices(
@@ -5296,7 +6244,7 @@ async def get_intl_invoices(
     per_page: int = 20,
     status: Optional[str] = None,
     currency: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Lista todas as invoices internacionais"""
     query = {}
@@ -5319,12 +6267,12 @@ async def get_intl_invoices(
     }
 
 @api_router.get("/intl-invoices/receiver-data")
-async def get_intl_receiver_data(current_user: dict = Depends(get_current_user)):
+async def get_intl_receiver_data(current_user: dict = Depends(get_current_admin_user)):
     """Retorna dados pré-preenchidos do recebedor"""
-    return RECEIVER_DATA
+    return await build_receiver_data()
 
 @api_router.get("/intl-invoices/movement/{transaction_id}")
-async def get_movement_for_invoice(transaction_id: str, current_user: dict = Depends(get_current_user)):
+async def get_movement_for_invoice(transaction_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Busca uma movimentação pelo número para adicionar como item na invoice"""
     # Tentar converter para inteiro se possível
     try:
@@ -5352,7 +6300,7 @@ async def get_movement_for_invoice(transaction_id: str, current_user: dict = Dep
 @api_router.post("/intl-invoices")
 async def create_intl_invoice(
     data: IntlInvoiceCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Cria uma nova invoice internacional"""
     
@@ -5379,17 +6327,18 @@ async def create_intl_invoice(
             "total": item.quantity * item.unit_price
         })
     
+    receiver_data = await build_receiver_data()
     invoice_data = {
         "id": str(uuid.uuid4()),
         "invoice_number": invoice_number,
-        "receiver_company": RECEIVER_DATA["company"],
-        "receiver_cnpj": RECEIVER_DATA["cnpj"],
-        "receiver_email": RECEIVER_DATA["email"],
-        "receiver_phone": RECEIVER_DATA["phone"],
-        "receiver_address": RECEIVER_DATA["address"],
-        "receiver_city_state": RECEIVER_DATA["city_state"],
-        "receiver_zip": RECEIVER_DATA["zip"],
-        "receiver_complement": RECEIVER_DATA["complement"],
+        "receiver_company": receiver_data["company"],
+        "receiver_cnpj": receiver_data["cnpj"],
+        "receiver_email": receiver_data["email"],
+        "receiver_phone": receiver_data["phone"],
+        "receiver_address": receiver_data["address"],
+        "receiver_city_state": receiver_data["city_state"],
+        "receiver_zip": receiver_data["zip"],
+        "receiver_complement": receiver_data["complement"],
         "payer_client_id": data.payer_client_id,
         "payer_company": data.payer_company,
         "payer_cnpj": data.payer_cnpj,
@@ -5418,7 +6367,7 @@ async def create_intl_invoice(
     return invoice_data
 
 @api_router.get("/intl-invoices/{invoice_id}")
-async def get_intl_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def get_intl_invoice(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Retorna uma invoice internacional específica"""
     invoice = await db.intl_invoices.find_one({"id": invoice_id}, {"_id": 0})
     if not invoice:
@@ -5429,7 +6378,7 @@ async def get_intl_invoice(invoice_id: str, current_user: dict = Depends(get_cur
 async def update_intl_invoice_status(
     invoice_id: str,
     status: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Atualiza o status de uma invoice internacional"""
     if status not in ["EMITIDA", "PAGA", "CANCELADA"]:
@@ -5446,7 +6395,7 @@ async def update_intl_invoice_status(
     return {"message": "Status atualizado com sucesso"}
 
 @api_router.delete("/intl-invoices/{invoice_id}")
-async def delete_intl_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_intl_invoice(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Exclui uma invoice internacional"""
     result = await db.intl_invoices.delete_one({"id": invoice_id})
     if result.deleted_count == 0:
@@ -5457,7 +6406,7 @@ async def delete_intl_invoice(invoice_id: str, current_user: dict = Depends(get_
 async def update_intl_invoice(
     invoice_id: str,
     data: IntlInvoiceCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Atualiza uma invoice internacional"""
     invoice = await db.intl_invoices.find_one({"id": invoice_id}, {"_id": 0})
@@ -5505,7 +6454,7 @@ async def update_intl_invoice(
     return updated_invoice
 
 @api_router.get("/intl-invoices/{invoice_id}/pdf")
-async def generate_intl_invoice_pdf(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def generate_intl_invoice_pdf(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Gera PDF da invoice internacional"""
     from reports import generate_intl_invoice_pdf as gen_pdf
     
@@ -5513,8 +6462,9 @@ async def generate_intl_invoice_pdf(invoice_id: str, current_user: dict = Depend
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice não encontrada")
     
-    pdf_buffer = gen_pdf(invoice)
-    
+    company = await get_company_settings()
+    pdf_buffer = gen_pdf(invoice, company=company)
+
     return StreamingResponse(
         io.BytesIO(pdf_buffer),
         media_type="application/pdf",
@@ -5554,7 +6504,7 @@ async def list_rpa_terceiro(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     rpa_type: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Listar RPAs (todos, sem paginação)."""
     query = {}
@@ -5590,7 +6540,7 @@ async def list_rpa_terceiro(
 @api_router.get("/rpa-terceiro/next-number")
 async def get_next_rpa_number(
     rpa_type: Optional[str] = "terceiro",
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Próximo número sequencial do RPA (separado por tipo)."""
     if rpa_type == "terceiro":
@@ -5603,30 +6553,41 @@ async def get_next_rpa_number(
 
 
 @api_router.get("/rpa-terceiro/driver-info/{driver_id}")
-async def get_rpa_driver_info(driver_id: str, current_user: dict = Depends(get_current_user)):
-    """Retorna info do motorista + última movimentação para autopreencher RPA."""
+async def get_rpa_driver_info(driver_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Retorna info do motorista para autopreencher RPA. Prioriza o(s) veículo(s)
+    cadastrados com esse motorista como responsável; se não houver nenhum, cai
+    para a última movimentação desse motorista (comportamento antigo)."""
     driver = await db.drivers.find_one({"id": driver_id}, {"_id": 0})
     if not driver:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
 
-    last_mov = await db.movements.find_one(
-        {"driver_name": driver["name"]},
-        {"_id": 0},
-        sort=[("created_at", -1)]
-    )
+    driver_vehicles = await db.vehicles.find({"driver_id": driver_id}, {"_id": 0}).to_list(50)
+    truck_plate = next((v["plate"] for v in driver_vehicles if v.get("vehicle_type") in ("CAVALO", "CAMINHÃO")), None)
+    trailer_plate = next((v["plate"] for v in driver_vehicles if v.get("vehicle_type") == "CARRETA"), None)
+    truck_owner = None
+
+    if not truck_plate and not trailer_plate:
+        last_mov = await db.movements.find_one(
+            {"driver_name": driver["name"]},
+            {"_id": 0},
+            sort=[("created_at", -1)]
+        )
+        truck_plate = (last_mov or {}).get("truck_plate")
+        trailer_plate = (last_mov or {}).get("trailer_plate_1")
+        truck_owner = (last_mov or {}).get("transport_company")
 
     return {
         "driver_name": driver.get("name"),
         "driver_cpf": driver.get("cpf"),
         "driver_phone": driver.get("phone"),
-        "truck_plate": (last_mov or {}).get("truck_plate"),
-        "trailer_plate": (last_mov or {}).get("trailer_plate_1"),
-        "truck_owner": (last_mov or {}).get("transport_company"),
+        "truck_plate": truck_plate,
+        "trailer_plate": trailer_plate,
+        "truck_owner": truck_owner,
     }
 
 
 @api_router.get("/rpa-terceiro/{rpa_id}", response_model=RPATerceiroResponse)
-async def get_rpa_terceiro(rpa_id: str, current_user: dict = Depends(get_current_user)):
+async def get_rpa_terceiro(rpa_id: str, current_user: dict = Depends(get_current_admin_user)):
     rpa = await db.rpa_terceiro.find_one({"id": rpa_id}, {"_id": 0})
     if not rpa:
         raise HTTPException(status_code=404, detail="RPA não encontrado")
@@ -5634,7 +6595,7 @@ async def get_rpa_terceiro(rpa_id: str, current_user: dict = Depends(get_current
 
 
 @api_router.post("/rpa-terceiro", response_model=RPATerceiroResponse)
-async def create_rpa_terceiro(data: RPATerceiroCreate, current_user: dict = Depends(get_current_user)):
+async def create_rpa_terceiro(data: RPATerceiroCreate, current_user: dict = Depends(get_current_admin_user)):
     # Próximo número - separado por tipo (terceiro / agregado)
     rpa_type = data.rpa_type or "terceiro"
     if rpa_type == "terceiro":
@@ -5657,7 +6618,7 @@ async def create_rpa_terceiro(data: RPATerceiroCreate, current_user: dict = Depe
 
 
 @api_router.put("/rpa-terceiro/{rpa_id}", response_model=RPATerceiroResponse)
-async def update_rpa_terceiro(rpa_id: str, data: RPATerceiroUpdate, current_user: dict = Depends(get_current_user)):
+async def update_rpa_terceiro(rpa_id: str, data: RPATerceiroUpdate, current_user: dict = Depends(get_current_admin_user)):
     existing = await db.rpa_terceiro.find_one({"id": rpa_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="RPA não encontrado")
@@ -5671,7 +6632,7 @@ async def update_rpa_terceiro(rpa_id: str, data: RPATerceiroUpdate, current_user
 
 
 @api_router.delete("/rpa-terceiro/{rpa_id}")
-async def delete_rpa_terceiro(rpa_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_rpa_terceiro(rpa_id: str, current_user: dict = Depends(get_current_admin_user)):
     result = await db.rpa_terceiro.delete_one({"id": rpa_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="RPA não encontrado")
@@ -5679,7 +6640,7 @@ async def delete_rpa_terceiro(rpa_id: str, current_user: dict = Depends(get_curr
 
 
 @api_router.get("/rpa-terceiro/{rpa_id}/pdf")
-async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(get_current_user)):
+async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Gera PDF do RPA seguindo o modelo da J.A Logística."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
@@ -5694,6 +6655,7 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
         raise HTTPException(status_code=404, detail="RPA não encontrado")
 
     rpa['balance'] = _rpa_calc_balance(rpa)
+    company = merge_company(await get_company_settings())
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -5729,7 +6691,7 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
     MUTED_COLOR = colors.HexColor('#718096')  # cinza para textos secundários
 
     # ===== HEADER CENTRALIZADO (logo + nome + tagline + título) =====
-    logo_buffer = download_logo()
+    logo_buffer = download_logo(company)
     if logo_buffer:
         logo_img = Image(logo_buffer, width=18 * mm, height=18 * mm)
         logo_img.hAlign = 'CENTER'
@@ -5739,13 +6701,8 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
         'CompanyName', parent=styles['Normal'], fontSize=14, leading=15,
         alignment=TA_CENTER, fontName='Helvetica-Bold', textColor=PRIMARY
     )
-    elements.append(Paragraph("J.A LOGÍSTICA", company_name_style))
+    elements.append(Paragraph(company['name'], company_name_style))
 
-    tagline_style = ParagraphStyle(
-        'Tagline', parent=styles['Normal'], fontSize=7, leading=9,
-        alignment=TA_CENTER, fontName='Helvetica-Oblique', textColor=MUTED_COLOR
-    )
-    elements.append(Paragraph("Logística e Armazenagem", tagline_style))
     elements.append(Spacer(1, 3))
 
     doc_title_style = ParagraphStyle(
@@ -5962,7 +6919,7 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
         alignment=TA_CENTER, fontName='Helvetica-Oblique', textColor=MUTED_COLOR
     )
     elements.append(Paragraph(
-        "Declaro para os devidos fins, que recebi da J.A LOGISTICA LTDA - CNPJ 58.180.321/0001-03, "
+        f"Declaro para os devidos fins, que recebi da {company['name']} - CNPJ {company['cnpj']}, "
         "os valores descritos neste recibo referente aos serviços prestados por mim, sem mais nada a declarar.",
         decl_style
     ))
@@ -6004,7 +6961,7 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
     elements.append(Spacer(1, 3))
 
     elements.append(Paragraph(
-        "<b>J.A LOGÍSTICA</b> - Logística e Armazenagem | Este documento é válido como recibo de pagamento",
+        f"<b>{company['name']}</b> | Este documento é válido como recibo de pagamento",
         ParagraphStyle('FooterCo', parent=styles['Normal'], fontSize=7, leading=9,
                        alignment=TA_CENTER, textColor=MUTED_COLOR)
     ))
@@ -6050,7 +7007,7 @@ def _os_serialize(os_doc: dict) -> dict:
 async def list_ordem_servico(
     search: Optional[str] = None,
     status: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     query = {}
     if status:
@@ -6067,13 +7024,13 @@ async def list_ordem_servico(
 
 
 @api_router.get("/ordem-servico/next-number")
-async def get_next_os_number(current_user: dict = Depends(get_current_user)):
+async def get_next_os_number(current_user: dict = Depends(get_current_active_user)):
     last = await db.ordem_servico.find_one({}, sort=[("os_number", -1)])
     return {"next_number": (last["os_number"] + 1) if last else 1}
 
 
 @api_router.get("/ordem-servico/{os_id}", response_model=OrdemServicoResponse)
-async def get_ordem_servico(os_id: str, current_user: dict = Depends(get_current_user)):
+async def get_ordem_servico(os_id: str, current_user: dict = Depends(get_current_active_user)):
     doc = await db.ordem_servico.find_one({"id": os_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Ordem de Serviço não encontrada")
@@ -6081,7 +7038,7 @@ async def get_ordem_servico(os_id: str, current_user: dict = Depends(get_current
 
 
 @api_router.post("/ordem-servico", response_model=OrdemServicoResponse)
-async def create_ordem_servico(data: OrdemServicoCreate, current_user: dict = Depends(get_current_user)):
+async def create_ordem_servico(data: OrdemServicoCreate, current_user: dict = Depends(get_current_active_user)):
     last = await db.ordem_servico.find_one({}, sort=[("os_number", -1)])
     next_num = (last["os_number"] + 1) if last else 1
 
@@ -6098,7 +7055,7 @@ async def create_ordem_servico(data: OrdemServicoCreate, current_user: dict = De
 
 
 @api_router.put("/ordem-servico/{os_id}", response_model=OrdemServicoResponse)
-async def update_ordem_servico(os_id: str, data: OrdemServicoUpdate, current_user: dict = Depends(get_current_user)):
+async def update_ordem_servico(os_id: str, data: OrdemServicoUpdate, current_user: dict = Depends(get_current_active_user)):
     existing = await db.ordem_servico.find_one({"id": os_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Ordem de Serviço não encontrada")
@@ -6110,7 +7067,7 @@ async def update_ordem_servico(os_id: str, data: OrdemServicoUpdate, current_use
 
 
 @api_router.delete("/ordem-servico/{os_id}")
-async def delete_ordem_servico(os_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_ordem_servico(os_id: str, current_user: dict = Depends(get_current_active_user)):
     result = await db.ordem_servico.delete_one({"id": os_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Ordem de Serviço não encontrada")
@@ -6118,7 +7075,7 @@ async def delete_ordem_servico(os_id: str, current_user: dict = Depends(get_curr
 
 
 @api_router.get("/ordem-servico/{os_id}/pdf")
-async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(get_current_user)):
+async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(get_current_active_user)):
     """Gera PDF da Ordem de Serviço seguindo o modelo Bsoft TMS."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
@@ -6131,6 +7088,7 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     if not os_doc:
         raise HTTPException(status_code=404, detail="Ordem de Serviço não encontrada")
     os_doc = _os_serialize(os_doc)
+    company = merge_company(await get_company_settings())
 
     def money(v):
         try:
@@ -6159,7 +7117,7 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     # ===== HEADER: Logo + Empresa (esquerda) + Título OS (direita) =====
     from reports import download_logo
     from reportlab.platypus import Image as RLImage
-    logo_buffer = download_logo()
+    logo_buffer = download_logo(company)
     if logo_buffer:
         logo_img = RLImage(logo_buffer, width=22 * mm, height=22 * mm)
     else:
@@ -6167,11 +7125,12 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
 
     company_style = ParagraphStyle('CompHead', parent=styles['Normal'], fontSize=9, leading=11,
                                    fontName='Helvetica-Bold')
+    company_address_line = company['address'].replace('\n', ', ')
     company_para = Paragraph(
-        "<b>J. A. LOGISTICA LTDA - ME</b><br/>"
-        "<font size='8'>RODOVIA CE-155, 16226 - INDUSTRIAL<br/>"
-        "CEP: 61668-150, CAUCAIA - CE, IE: 07224458-5 - Fone:<br/>"
-        "CNPJ: 58.180.321/0001-03, e-mail:</font>", company_style)
+        f"<b>{company['name']}</b><br/>"
+        f"<font size='8'>{company_address_line}<br/>"
+        f"CNPJ: {company['cnpj']}, Fone: {company['phone']}<br/>"
+        f"E-mail: {company['email']}</font>", company_style)
 
     os_title_style = ParagraphStyle('OSTit', parent=styles['Normal'], fontSize=14, leading=16,
                                     alignment=TA_RIGHT, fontName='Helvetica-Bold')
@@ -6434,7 +7393,7 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     # ===== Rodapé =====
     elements.append(Paragraph(
         f"<font size='7' color='#888'>{now_brt().strftime('%d/%m/%Y %H:%M')} &nbsp;&nbsp; "
-        f"J.A Logística - Sistema de Gestão</font>",
+        f"{company['name']} - Sistema de Gestão</font>",
         ParagraphStyle('Footer', parent=styles['Normal'], alignment=TA_CENTER)
     ))
 
@@ -6446,11 +7405,306 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
                              headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
+# ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================
+
+from models import (
+    ExpenseReport, ExpenseReportCreate, ExpenseReportResponse,
+    ExpenseReportDeposit, ExpenseReportPurchase, ExpenseReportReceipt
+)
+
+
+async def get_next_expense_report_number():
+    """Obtém o próximo número de Prestação de Contas, reiniciando em 0001 a cada ano civil."""
+    year = now_brt().year
+    counter = await db.counters.find_one_and_update(
+        {"_id": f"expense_report_number_{year}"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    seq = counter["seq"]
+    return seq, f"{year}{seq:04d}"
+
+
+def calculate_expense_report_totals(deposits: list, purchases: list):
+    total_deposits = round(sum(d.amount for d in deposits), 2)
+    total_purchases = round(sum(p.amount for p in purchases), 2)
+    balance = round(total_purchases - total_deposits, 2)
+    return total_deposits, total_purchases, balance
+
+
+async def resolve_expense_report_purchases(purchases: list) -> list:
+    """Garante item_id em cada compra e resolve supplier_name a partir do supplier_id."""
+    resolved = []
+    for p in purchases:
+        d = p.model_dump()
+        if not d.get("item_id"):
+            d["item_id"] = str(uuid.uuid4())
+        if d.get("supplier_id"):
+            supplier = await db.suppliers.find_one({"id": d["supplier_id"]}, {"_id": 0, "name": 1})
+            d["supplier_name"] = supplier.get("name") if supplier else d.get("supplier_name")
+        resolved.append(d)
+    return resolved
+
+
+@api_router.get("/expense-reports")
+async def get_expense_reports(
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Lista as prestações de contas"""
+    query = {}
+
+    if search:
+        query["$or"] = [
+            {"report_number_formatted": {"$regex": search, "$options": "i"}},
+            {"purchases.supplier_name": {"$regex": search, "$options": "i"}}
+        ]
+
+    if status:
+        query["status"] = status
+
+    total = await db.expense_reports.count_documents(query)
+    skip = (page - 1) * per_page
+
+    cursor = db.expense_reports.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page)
+    reports_list = await cursor.to_list(length=per_page)
+
+    return {
+        "items": reports_list,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page
+    }
+
+
+@api_router.get("/expense-reports/{report_id}", response_model=ExpenseReportResponse)
+async def get_expense_report(report_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Busca prestação de contas por ID"""
+    report = await db.expense_reports.find_one({"id": report_id}, {"_id": 0})
+    if not report:
+        raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
+    return report
+
+
+@api_router.post("/expense-reports", response_model=ExpenseReportResponse)
+async def create_expense_report(data: ExpenseReportCreate, current_user: dict = Depends(get_current_admin_user)):
+    """Cria nova prestação de contas"""
+    seq, formatted = await get_next_expense_report_number()
+
+    purchases_data = await resolve_expense_report_purchases(data.purchases)
+    total_deposits, total_purchases, balance = calculate_expense_report_totals(
+        data.deposits, [ExpenseReportPurchase(**p) for p in purchases_data]
+    )
+
+    report_data = {
+        "id": str(uuid.uuid4()),
+        "report_number": seq,
+        "report_number_formatted": formatted,
+        "period_start": data.period_start,
+        "period_end": data.period_end,
+        "deposits": [d.model_dump() for d in data.deposits],
+        "purchases": purchases_data,
+        "total_deposits": total_deposits,
+        "total_purchases": total_purchases,
+        "balance": balance,
+        "status": "EM_ANDAMENTO",
+        "created_by": current_user["sub"],
+        "created_by_name": current_user.get("name", "Sistema"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": None
+    }
+
+    await db.expense_reports.insert_one(report_data)
+    report_data.pop("_id", None)
+
+    return report_data
+
+
+@api_router.put("/expense-reports/{report_id}", response_model=ExpenseReportResponse)
+async def update_expense_report(report_id: str, data: ExpenseReportCreate, current_user: dict = Depends(get_current_admin_user)):
+    """Atualiza prestação de contas (bloqueado se já estiver concluída)"""
+    existing = await db.expense_reports.find_one({"id": report_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
+
+    if existing["status"] == "CONCLUIDA":
+        raise HTTPException(status_code=400, detail="Prestação de contas concluída não pode ser editada. Reabra antes de editar.")
+
+    # Preserva os recibos já anexados a cada lançamento, casando por item_id
+    existing_by_id = {p["item_id"]: p for p in existing.get("purchases", [])}
+    purchases_data = await resolve_expense_report_purchases(data.purchases)
+    for p in purchases_data:
+        prior = existing_by_id.get(p["item_id"])
+        p["receipts"] = prior["receipts"] if prior else []
+
+    total_deposits, total_purchases, balance = calculate_expense_report_totals(
+        data.deposits, [ExpenseReportPurchase(**p) for p in purchases_data]
+    )
+
+    update_data = {
+        "period_start": data.period_start,
+        "period_end": data.period_end,
+        "deposits": [d.model_dump() for d in data.deposits],
+        "purchases": purchases_data,
+        "total_deposits": total_deposits,
+        "total_purchases": total_purchases,
+        "balance": balance,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+
+    await db.expense_reports.update_one({"id": report_id}, {"$set": update_data})
+    updated = await db.expense_reports.find_one({"id": report_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/expense-reports/{report_id}")
+async def delete_expense_report(report_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Exclui prestação de contas"""
+    result = await db.expense_reports.delete_one({"id": report_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
+
+    receipt_dir = UPLOADS_DIR / "expense_reports" / report_id
+    if receipt_dir.exists():
+        shutil.rmtree(receipt_dir, ignore_errors=True)
+
+    return {"message": "Prestação de contas excluída com sucesso"}
+
+
+@api_router.put("/expense-reports/{report_id}/status")
+async def update_expense_report_status(report_id: str, status: str, current_user: dict = Depends(get_current_admin_user)):
+    """Conclui ou reabre uma prestação de contas"""
+    if status not in ["EM_ANDAMENTO", "CONCLUIDA"]:
+        raise HTTPException(status_code=400, detail="Status inválido")
+
+    result = await db.expense_reports.update_one(
+        {"id": report_id},
+        {"$set": {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
+
+    return {"message": "Status atualizado"}
+
+
+@api_router.post("/expense-reports/{report_id}/purchases/{item_id}/upload-receipt")
+async def upload_expense_report_receipt(
+    report_id: str,
+    item_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Anexa um recibo (foto/scan) a um lançamento de compra específico"""
+    report = await db.expense_reports.find_one(
+        {"id": report_id, "purchases.item_id": item_id}, {"_id": 0}
+    )
+    if not report:
+        raise HTTPException(status_code=404, detail="Prestação de contas ou lançamento de compra não encontrado")
+
+    receipt_dir = UPLOADS_DIR / "expense_reports" / report_id
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+
+    receipt_id = str(uuid.uuid4())
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    file_path = receipt_dir / f"{receipt_id}.{file_ext}"
+
+    with open(file_path, "wb") as buffer:
+        content = await file.read()
+        buffer.write(content)
+
+    receipt_url = f"/api/uploads/expense_reports/{report_id}/{receipt_id}.{file_ext}"
+    receipt_entry = {"id": receipt_id, "url": receipt_url}
+
+    await db.expense_reports.update_one(
+        {"id": report_id, "purchases.item_id": item_id},
+        {
+            "$push": {"purchases.$.receipts": receipt_entry},
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
+        }
+    )
+
+    return receipt_entry
+
+
+@api_router.delete("/expense-reports/{report_id}/purchases/{item_id}/receipt/{receipt_id}")
+async def delete_expense_report_receipt(
+    report_id: str,
+    item_id: str,
+    receipt_id: str,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Remove um recibo de um lançamento de compra"""
+    report = await db.expense_reports.find_one({"id": report_id}, {"_id": 0})
+    if not report:
+        raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
+
+    purchase = next((p for p in report.get("purchases", []) if p["item_id"] == item_id), None)
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Lançamento de compra não encontrado")
+
+    remaining = [r for r in purchase.get("receipts", []) if r["id"] != receipt_id]
+    if len(remaining) == len(purchase.get("receipts", [])):
+        raise HTTPException(status_code=404, detail="Recibo não encontrado")
+
+    receipt_dir = UPLOADS_DIR / "expense_reports" / report_id
+    for file_path in receipt_dir.glob(f"{receipt_id}.*"):
+        file_path.unlink()
+
+    await db.expense_reports.update_one(
+        {"id": report_id, "purchases.item_id": item_id},
+        {"$set": {"purchases.$.receipts": remaining, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    return {"message": "Recibo removido com sucesso"}
+
+
+@api_router.get("/expense-reports/{report_id}/pdf")
+async def download_expense_report_pdf(report_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Gera PDF final da prestação de contas (somente quando concluída)"""
+    from reports import generate_expense_report_pdf
+
+    report = await db.expense_reports.find_one({"id": report_id}, {"_id": 0})
+    if not report:
+        raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
+
+    if report["status"] != "CONCLUIDA":
+        raise HTTPException(status_code=400, detail="Só é possível gerar o PDF de uma prestação de contas concluída")
+
+    company = await get_company_settings()
+    pdf_bytes = generate_expense_report_pdf(report, company=company)
+
+    filename = f"prestacao_contas_{report['report_number_formatted']}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 app.include_router(api_router)
 
 # WebSocket endpoint para sincronização em tempo real
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
+    # O feed em tempo real transmite dados operacionais (motorista, contêiner,
+    # cliente) a cada movimentação — precisa do mesmo token JWT usado na API,
+    # passado por query string já que o WebSocket do navegador não permite
+    # cabeçalhos customizados no handshake.
+    if not token:
+        await websocket.close(code=1008)
+        return
+    try:
+        decode_token(token)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
     await manager.connect(websocket)
     try:
         while True:
@@ -6487,6 +7741,27 @@ async def startup_event():
         last_movement = await db.movements.find_one({}, {"_id": 0, "transaction_id": 1}, sort=[("transaction_id", -1)])
         max_id = last_movement.get('transaction_id', 0) if last_movement else 0
         await db.counters.insert_one({"_id": "transaction_id", "seq": max_id})
+
+    # Índices para os campos mais consultados — sem eles, toda busca por e-mail,
+    # contêiner ou data faz varredura completa da coleção, e isso fica cada vez
+    # mais lento conforme a base cresce. create_index é idempotente, então é
+    # seguro rodar isso a cada início do processo.
+    try:
+        await db.users.create_index("email", unique=True)
+    except Exception as e:
+        # Se já existirem e-mails duplicados na base, o índice único falha —
+        # não pode travar o startup do sistema por causa disso.
+        logger.warning(f"Não foi possível criar índice único em users.email (pode haver e-mails duplicados na base): {e}")
+    # Consultado em toda requisição autenticada (get_current_active_user /
+    # get_current_admin_user checam se o usuário do token ainda existe).
+    await db.users.create_index("id")
+    await db.movements.create_index("container_number")
+    await db.movements.create_index("created_at")
+    await db.movements.create_index("transaction_id")
+    await db.movements.create_index([("operation_type", 1), ("created_at", -1)])
+    await db.drivers.create_index("cpf")
+    await db.clients.create_index("cnpj")
+    await db.transport_companies.create_index("cnpj")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

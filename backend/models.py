@@ -26,7 +26,6 @@ class UserCreate(BaseModel):
     name: str
     email: str
     password: str
-    role: Literal["admin", "operator"] = "operator"
 
 class UserLogin(BaseModel):
     email: str
@@ -36,6 +35,33 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     user: UserResponse
+
+class CompanySettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    name: Optional[str] = None
+    cnpj: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    pix_key: Optional[str] = None
+    logo_filename: Optional[str] = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CompanySettingsUpdate(BaseModel):
+    name: Optional[str] = None
+    cnpj: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    pix_key: Optional[str] = None
+    logo_filename: Optional[str] = None
 
 class Driver(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -102,6 +128,35 @@ class ClientCreate(BaseModel):
     address: Optional[str] = None
 
 class ClientResponse(BaseModel):
+    id: str
+    name: str
+    cnpj: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    created_at: datetime
+
+# Supplier Model (baseado em Client) - Fornecedor
+class Supplier(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    cnpj: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+class SupplierCreate(BaseModel):
+    name: str
+    cnpj: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+
+class SupplierResponse(BaseModel):
     id: str
     name: str
     cnpj: Optional[str] = None
@@ -200,6 +255,17 @@ class ContainerMovementResponse(BaseModel):
     created_at: datetime
     user_name: Optional[str] = None
 
+class DailyMovementPoint(BaseModel):
+    date: str  # YYYY-MM-DD
+    entries: int
+    exits: int
+
+class DriverRankingEntry(BaseModel):
+    driver_name: str
+    entries: int
+    exits: int
+    total: int
+
 class DashboardStats(BaseModel):
     total_movements: int
     entries_today: int
@@ -214,6 +280,8 @@ class DashboardStats(BaseModel):
     entries_month: int  # Entradas do mês
     exits_month: int    # Saídas do mês
     recent_movements: list[ContainerMovementResponse]
+    daily_chart: list[DailyMovementPoint] = []  # Entradas/saídas por dia (últimos 14 dias)
+    driver_ranking: list[DriverRankingEntry] = []  # Ranking de motoristas no mês vigente
 
 class ShippingLine(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -392,10 +460,19 @@ class PhotoRegistryResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+# Tipos de foto disponíveis para a Vistoria de Container
+CONTAINER_INSPECTION_PHOTO_TYPES = ["front", "back", "left", "right", "internal"]
+MAX_CONTAINER_INSPECTION_PHOTOS = 8
+
+class ContainerInspectionPhoto(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    type: str  # front, back, left, right ou internal
+    url: str
+
 # ===== VISTORIA DE CONTAINER =====
 class ContainerInspection(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     inspection_number: int  # Número sequencial da vistoria
     container_number: str
@@ -413,12 +490,8 @@ class ContainerInspection(BaseModel):
     no_damage: bool = False  # Container sem avarias
     damage_items: List[str] = Field(default_factory=list)  # Itens marcados com avaria
 
-    # Fotos (URLs dos arquivos) - inclui Interno
-    photo_front: Optional[str] = None
-    photo_back: Optional[str] = None
-    photo_left: Optional[str] = None
-    photo_right: Optional[str] = None
-    photo_internal: Optional[str] = None  # Foto interna
+    # Fotos (até 8, cada uma com um tipo: front, back, left, right, internal)
+    photos: List[ContainerInspectionPhoto] = Field(default_factory=list)
 
     # Metadados
     created_by: str
@@ -465,11 +538,7 @@ class ContainerInspectionResponse(BaseModel):
     observations: Optional[str] = None
     no_damage: bool = False
     damage_items: List[str] = Field(default_factory=list)
-    photo_front: Optional[str] = None
-    photo_back: Optional[str] = None
-    photo_left: Optional[str] = None
-    photo_right: Optional[str] = None
-    photo_internal: Optional[str] = None
+    photos: List[ContainerInspectionPhoto] = Field(default_factory=list)
     created_by: str
     created_by_name: str
     created_at: datetime
@@ -559,7 +628,9 @@ class Vehicle(BaseModel):
     vehicle_type: str  # Tipo: CAMINHÃO, CARRETA, EQUIPAMENTO, etc.
     status: str = "ATIVO"  # ATIVO, INATIVO, MANUTENÇÃO
     observations: Optional[str] = None
-    
+    driver_id: Optional[str] = None  # Motorista responsável (para autopreencher RPA/Movimentação)
+    driver_name: Optional[str] = None
+
     # Metadados
     created_by: str
     created_by_name: str
@@ -574,6 +645,7 @@ class VehicleCreate(BaseModel):
     vehicle_type: str
     status: str = "ATIVO"
     observations: Optional[str] = None
+    driver_id: Optional[str] = None
 
 class VehicleUpdate(BaseModel):
     plate: Optional[str] = None
@@ -583,6 +655,8 @@ class VehicleUpdate(BaseModel):
     vehicle_type: Optional[str] = None
     status: Optional[str] = None
     observations: Optional[str] = None
+    driver_id: Optional[str] = None
+    clear_driver: bool = False  # True para remover o motorista vinculado (driver_id=None não dá pra distinguir de "não alterar")
 
 class VehicleResponse(BaseModel):
     id: str
@@ -593,6 +667,195 @@ class VehicleResponse(BaseModel):
     vehicle_type: str
     status: str
     observations: Optional[str] = None
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+# ==================== FROTA - CHECKLIST DE VEÍCULO (LVT) ====================
+# Modelo baseado na Lista de Verificação de Transporte (LVT) para transporte
+# rodoviário de derivados de petróleo. Os itens abaixo são fixos (mesmo texto
+# e agrupamento do documento original) — cada checklist criado recebe uma
+# cópia desses itens para ser respondida (SIM/NÃO).
+
+VEHICLE_CHECKLIST_TEMPLATE = {
+    "documentos": [
+        "CNH - Carteira Nacional de Habilitação válida e compatível c/ veículo (ou Habilitação p/ transporte internacional)",
+        "CRLV – Certificado de Registro e Licenciamento de Veículo válido",
+        "Certificado da ANTT do RNTRC (Registro Nacional de Transportadores Rodoviários de Carga) válido",
+    ],
+    "vehicle_condition": [
+        "Pneus e estepe em bom estado (com sulcos mínimos TWI >= 1,6mm)",
+        "Rodas possuem todos os parafusos",
+        "Faróis (alto e baixo), setas, pisca alerta, lanternas, luzes de freio, luzes de marcha ré com sinal sonoro obrigatório, buzina, limpador de para-brisa em perfeito estado de funcionamento",
+        "Emissões (fumaça preta) dentro dos limites estipulados pela legislação vigente. Portaria 85/1996 IBAMA",
+        "Fiação elétrica em dutos metálicos ou de PVC (isolamento perfeito e bateria isolada)",
+        "Integridade dos espelhos retrovisores externos, interno e integridade do para-brisa",
+        "Cinto de segurança de três pontos",
+        "Operacionalidade da Chave geral (blindada com L/D ligado no polo positivo da bateria)",
+        "Pala de proteção interna (contra o sol) para o motorista",
+        "Chave de rodas, triângulo e macaco",
+        "Tacógrafo ou controlador eletrônico",
+        "Extintor de incêndio de cabine dentro da validade",
+    ],
+    "epi": [
+        "Equipamentos de Proteção Individual (EPI) conforme NBR-9735 e NR-06",
+    ],
+    "kit": [
+        "Equipamentos de emergência conforme norma NBR-9735",
+    ],
+    "tank": [
+        "O produto a ser carregado é compatível com os produtos carregados na viagem anterior ou o tanque do CT está isento de remanescentes (Inclusive ÁGUA)",
+        "O tanque e todos os seus dispositivos que entrem em contato com o produto (mangotes, tubulações, engates, bombas, válvulas, vedações e inclusive seus lubrificantes) são compatíveis com o produto transportado",
+        "Dois pontos de aterramento, instalados em cada lateral do tanque, fixados por solda ou parafuso, isento de pintura e corrosão",
+        "Painéis de segurança, rótulos de risco e número ONU conforme produto(s) a ser(em) carregado(s)",
+        "Escada de acesso e plataforma com piso antiderrapante junto a boca de carregamento",
+        "Capacidade dos compartimentos demarcados",
+        "Juntas de vedação, válvulas, flanges, tampões (CAP) limpos e sem vazamentos",
+        "Dispositivo de alívio de pressão e vácuo em perfeito funcionamento (suspiros)",
+        "Todas as saídas de produtos em bom estado e sem vazamento",
+        "Parte superior do tanque isenta de qualquer objeto estranho (NBR 7500)",
+        "Todos os eixos da composição abaixados",
+        "Os acessórios (mangotes, funis, conexões, prolongadores etc.) que venham a ser utilizados no carregamento ou descarregamento estão em perfeitas condições de uso, sem vazamentos e não possuindo emendas",
+        "Possui faixas reflexivas no tanque de acordo com a Deliberação nº 30 do CONTRAN de 19/12/2001",
+        "Para-choque traseiro, com altura máxima 400 mm (ou 450 mm, se enquadrado nos Art. 1º e 2º da Resolução CONTRAN 952/2022), faixas oblíquas nas cores vermelha e branca reflexivas",
+        "Tanques/tubulações epicotados de alumínio, aço inoxidável ou aço carbono revestido com tinta epóxi",
+        "Ponto baixo dotado de dreno e estanqueidade em relação à penetração de água e outros contaminantes",
+        "Ausência de acessórios de cobre, zinco, chumbo, cádmio ou ligas desses metais, que tenham contato com o produto",
+        "Existência de cabo duplo (dupla ligação elétrica entre chassis e tanque)",
+        "Setas de nível",
+    ],
+    "post_loading": [
+        "Documento Auxiliar da Nota Fiscal Eletrônica – DANFE",
+    ],
+}
+
+VEHICLE_CHECKLIST_SECTION_LABELS = {
+    "documentos": "Documentos",
+    "vehicle_condition": "Condições do Veículo",
+    "epi": "EPI",
+    "kit": "Kit",
+    "tank": "Condições do Tanque / Carreta",
+    "post_loading": "Documentos Pós Carregamento",
+}
+
+
+class VehicleChecklistItem(BaseModel):
+    """Um item de verificação (pergunta SIM/NÃO), com vencimento opcional (usado nos itens de documentos)"""
+    text: str
+    answer: Optional[str] = None  # "SIM", "NAO" ou None (não respondido)
+    expiry: Optional[str] = None  # Data de vencimento (YYYY-MM-DD), só usado nos itens de Documentos
+
+
+class VehicleChecklistProduct(BaseModel):
+    """Linha da tabela de produtos transportados (rótulo de risco)"""
+    product: Optional[str] = None
+    un_number: Optional[str] = None  # Número ONU
+    risk_number: Optional[str] = None  # Nº de risco
+    subclass: Optional[str] = None  # Subclasse
+
+
+def default_checklist_items(section: str) -> List["VehicleChecklistItem"]:
+    return [VehicleChecklistItem(text=t) for t in VEHICLE_CHECKLIST_TEMPLATE[section]]
+
+
+class VehicleChecklistFields(BaseModel):
+    """Campos compartilhados entre Create/Update/Response do checklist"""
+    # Modelo do documento: "petrobras_lvt" (réplica do LVT Petrobras, usado quando o
+    # cliente contratante é a Manuport) ou "generic" (checklist padrão do sistema)
+    template: str = "generic"
+
+    # Cabeçalho
+    expedidor: Optional[str] = None
+    un: Optional[str] = None
+    inspection_datetime: Optional[str] = None  # Data e hora da vistoria (ISO)
+    scheduling_code: Optional[str] = None  # Cód. do Agendamento
+    un_address: Optional[str] = None
+    phone: Optional[str] = None
+    fax: Optional[str] = None
+    client_id: Optional[str] = None
+    client_name: Optional[str] = None
+    orp_odp_number: Optional[str] = None
+    nf_number: Optional[str] = None
+    transport_company_id: Optional[str] = None
+    transport_company_name: Optional[str] = None
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
+    products_description: Optional[str] = None
+    cavalo_plate: Optional[str] = None
+    cavalo_year: Optional[str] = None
+    carreta1_plate: Optional[str] = None
+    carreta1_year: Optional[str] = None
+    carreta1_capacity: Optional[str] = None
+    carreta2_plate: Optional[str] = None
+    carreta2_year: Optional[str] = None
+    carreta2_capacity: Optional[str] = None
+    cnh_number: Optional[str] = None
+    cnh_category: Optional[str] = None
+    cnh_expiry: Optional[str] = None
+    sap_code: Optional[str] = None
+
+    # Itens do checklist por seção
+    documentos_items: List[VehicleChecklistItem] = Field(default_factory=lambda: default_checklist_items("documentos"))
+    vehicle_condition_items: List[VehicleChecklistItem] = Field(default_factory=lambda: default_checklist_items("vehicle_condition"))
+    epi_items: List[VehicleChecklistItem] = Field(default_factory=lambda: default_checklist_items("epi"))
+    kit_items: List[VehicleChecklistItem] = Field(default_factory=lambda: default_checklist_items("kit"))
+    tank_items: List[VehicleChecklistItem] = Field(default_factory=lambda: default_checklist_items("tank"))
+    post_loading_items: List[VehicleChecklistItem] = Field(default_factory=lambda: default_checklist_items("post_loading"))
+
+    # Produtos / rótulos de risco
+    products: List[VehicleChecklistProduct] = Field(default_factory=list)
+
+    # Kit de emergência - validades dos calços/extintor
+    kit_validity_1: Optional[str] = None
+    kit_validity_2: Optional[str] = None
+    kit_validity_3: Optional[str] = None
+
+    # Últimas 3 viagens (produtos transportados)
+    last_trip_product_1: Optional[str] = None
+    last_trip_product_2: Optional[str] = None
+    last_trip_product_3: Optional[str] = None
+
+    observations: Optional[str] = None
+
+    # Responsáveis (nome digitado, sem captura de assinatura)
+    transport_responsible_name: Optional[str] = None
+    transport_responsible_rg: Optional[str] = None
+    lvt_receiver_name: Optional[str] = None
+    lvt_receiver_registration: Optional[str] = None
+    inspection_responsible_name: Optional[str] = None
+    inspection_responsible_registration: Optional[str] = None
+    merit_record: Optional[str] = None
+    occurrence_record: Optional[str] = None
+    driver_document: Optional[str] = None
+    release_datetime: Optional[str] = None  # Data e horário da liberação do veículo
+
+
+class VehicleChecklist(VehicleChecklistFields):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    checklist_number: int  # Número sequencial
+    status: str = "ATIVO"  # ATIVO, CANCELADO
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+
+class VehicleChecklistCreate(VehicleChecklistFields):
+    pass
+
+
+class VehicleChecklistResponse(VehicleChecklistFields):
+    id: str
+    checklist_number: int
+    status: str
     created_by: str
     created_by_name: str
     created_at: datetime
@@ -695,6 +958,7 @@ class VehicleRevisionResponse(BaseModel):
 
 class LoadingScheduleItem(BaseModel):
     """Item individual da programação de carregamento"""
+    operation_type: Optional[str] = None  # COLETA ou ENTREGA
     driver_id: Optional[str] = None
     driver_name: str
     driver_cpf: Optional[str] = None
@@ -704,6 +968,7 @@ class LoadingScheduleItem(BaseModel):
     loading_date: str  # Data do carregamento (formato YYYY-MM-DD)
     container_number: Optional[str] = None  # Número do container
     seal_number: Optional[str] = None  # Número do lacre
+    bag_number: Optional[str] = None  # Nº da Bolsa (flexitank) - usado por clientes de líquidos (ex: MANUPORT)
 
 class LoadingSchedule(BaseModel):
     """Programação de carregamento completa"""
@@ -720,7 +985,7 @@ class LoadingSchedule(BaseModel):
     items: List[LoadingScheduleItem]  # Lista de programações
     status: str = "ATIVO"  # ATIVO, CONCLUIDO, CANCELADO
     observations: Optional[str] = None
-    
+
     created_by: str
     created_by_name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -746,6 +1011,55 @@ class LoadingScheduleResponse(BaseModel):
     booking: Optional[str] = None
     voyage: Optional[str] = None
     items: List[LoadingScheduleItem]
+    status: str
+    observations: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+# ==================== FINANCEIRO - SOLICITAÇÃO DE DIÁRIA ====================
+
+class DailyRateRequestItem(BaseModel):
+    """Item individual da solicitação de diária (uma viagem/motorista)"""
+    driver_id: Optional[str] = None
+    driver_name: str
+    vehicle_plate: str
+    client_name: str
+    departure_date: str  # Data de saída (formato YYYY-MM-DD)
+    others_value: float = 0
+    commission_value: float = 0
+    lunch_value: float = 0
+    daily_rate_quantity: float = 0
+    daily_rate_value: float = 0
+    total: float = 0  # Calculado no backend: others + commission + lunch + quantity * daily_rate_value
+
+class DailyRateRequest(BaseModel):
+    """Solicitação de diária completa"""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    request_number: int  # Número sequencial da solicitação
+    items: List[DailyRateRequestItem]
+    total_value: float = 0  # Soma dos totais dos itens
+    status: str = "PENDENTE"  # PENDENTE, PAGO, CANCELADO
+    observations: Optional[str] = None
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+class DailyRateRequestCreate(BaseModel):
+    items: List[DailyRateRequestItem]
+    observations: Optional[str] = None
+
+class DailyRateRequestResponse(BaseModel):
+    id: str
+    request_number: int
+    items: List[DailyRateRequestItem]
+    total_value: float
     status: str
     observations: Optional[str] = None
     created_by: str
@@ -864,6 +1178,7 @@ class DeliveryStatusItem(BaseModel):
     loading_end_time: Optional[str] = None  # Término do Carregamento (HH:MM)
     departure_time: Optional[str] = None  # Saída do Cliente (HH:MM)
     delivery_completed: Optional[str] = None  # Entrega Finalizada (HH:MM)
+    bag_number: Optional[str] = None  # Nº da Bolsa (flexitank) - usado por clientes de líquidos (ex: MANUPORT)
 
 class DeliveryStatus(BaseModel):
     """Status de entrega baseado em uma programação de carregamento"""
@@ -881,16 +1196,16 @@ class DeliveryStatus(BaseModel):
     contracting_client_name: str
     booking: Optional[str] = None
     voyage: Optional[str] = None
-    
+
     # Data do status
     status_date: str  # Data do status (YYYY-MM-DD)
-    
+
     # Itens com horários de cada motorista
     items: List[DeliveryStatusItem]
-    
+
     # Observações
     observations: Optional[str] = None
-    
+
     # Controle
     status: str = "ATIVO"  # ATIVO, CONCLUIDO, CANCELADO
     created_by: str
@@ -1269,3 +1584,56 @@ class OrdemServicoResponse(OrdemServico):
     products_total: float = 0.0
     services_total: float = 0.0
     grand_total: float = 0.0
+
+
+# ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================
+
+class ExpenseReportReceipt(BaseModel):
+    """Comprovante/recibo anexado a um lançamento de compra"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    url: str
+
+class ExpenseReportDeposit(BaseModel):
+    """Depósito recebido do setor financeiro para cobrir as compras"""
+    amount: float
+    date: str  # YYYY-MM-DD
+    sent_by: str  # Enviado Por
+
+class ExpenseReportPurchase(BaseModel):
+    """Lançamento de compra realizado durante o período"""
+    item_id: str = Field(default_factory=lambda: str(uuid.uuid4()))  # gerado no client antes do save
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None  # snapshot resolvido no backend a partir do supplier_id
+    purchase_date: str  # YYYY-MM-DD
+    amount: float
+    observation: Optional[str] = None
+    receipts: List[ExpenseReportReceipt] = Field(default_factory=list)
+
+class ExpenseReport(BaseModel):
+    """Prestação de contas completa de um período"""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    report_number: int  # Sequencial dentro do ano civil
+    report_number_formatted: str  # Ex: "20260001" (ano + sequencial de 4 dígitos)
+    period_start: str  # YYYY-MM-DD
+    period_end: str  # YYYY-MM-DD
+    deposits: List[ExpenseReportDeposit] = Field(default_factory=list)
+    purchases: List[ExpenseReportPurchase] = Field(default_factory=list)
+    total_deposits: float = 0
+    total_purchases: float = 0
+    balance: float = 0  # total_purchases - total_deposits
+    status: str = "EM_ANDAMENTO"  # EM_ANDAMENTO, CONCLUIDA
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+class ExpenseReportCreate(BaseModel):
+    period_start: str
+    period_end: str
+    deposits: List[ExpenseReportDeposit] = Field(default_factory=list)
+    purchases: List[ExpenseReportPurchase] = Field(default_factory=list)
+
+class ExpenseReportResponse(ExpenseReport):
+    pass

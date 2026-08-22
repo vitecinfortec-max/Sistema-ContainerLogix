@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { 
   LayoutDashboard, 
   Truck, 
@@ -33,10 +34,23 @@ import {
   Calendar,
   Clipboard,
   Globe,
-  Anchor
+  Anchor,
+  Wallet,
+  Store,
+  Calculator,
+  Sun,
+  Moon
 } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { Button } from './ui/button';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { api } from '../lib/api';
+import CommandPalette from './CommandPalette';
+
+// Intervalo de checagem do alerta de containers parados no pátio
+const YARD_ALERT_POLL_MS = 5 * 60 * 1000;
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
@@ -47,9 +61,12 @@ const PAGE_TITLES = {
   '/fleet/rpa-terceiro': 'RPA Terceiro',
   '/fleet/rpa-terceiro/new': 'Novo RPA Terceiro',
   '/fleet/ordem-servico': 'Ordem de Serviço',
+  '/fleet/checklist': 'Checklist de Veículo',
   '/drivers': 'Pessoas',
   '/companies': 'Transportadoras',
+  '/company-settings': 'Dados da Empresa',
   '/clients': 'Clientes',
+  '/suppliers': 'Fornecedores',
   '/shipping-lines': 'Armadores',
   '/service-types': 'Tipos de Serviço',
   '/reports/movements': 'Relatório de Movimentação',
@@ -64,10 +81,14 @@ const PAGE_TITLES = {
   '/flex-tank/movements/new': 'Nova Movimentação Flex Tank',
   '/loading-schedules': 'Programação de Carregamento',
   '/delivery-status': 'Status de Entrega',
+  '/daily-rate-requests': 'Solicitação de Diária',
+  '/expense-reports': 'Prestação de Contas',
 };
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -80,6 +101,87 @@ export default function Layout({ children }) {
   const [flexTankOpen, setFlexTankOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef(null);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef(null);
+  const [yardAlert, setYardAlert] = useState({ over_60: 0, over_90: 0 });
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchYardAlert = async () => {
+      try {
+        const res = await api.getAlertsSummary();
+        if (!cancelled) {
+          setYardAlert({
+            over_60: res.data.yard_over_60_days || 0,
+            over_90: res.data.yard_over_90_days || 0,
+          });
+        }
+      } catch (err) {
+        // Falha ao buscar alertas não deve quebrar a navegação — só não mostra o aviso
+      }
+    };
+    fetchYardAlert();
+    const interval = setInterval(fetchYardAlert, YARD_ALERT_POLL_MS);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  const handleWsNotification = useCallback((message) => {
+    if (message.type === 'MOVEMENT_CREATED') {
+      const d = message.data || {};
+      const opLabel = d.operation_type === 'ENTRADA' ? 'Entrada' : d.operation_type === 'SAIDA' ? 'Saída' : (d.operation_type || 'Movimentação');
+      setNotifications((prev) => [
+        {
+          id: `created-${d.id}-${Date.now()}`,
+          title: 'Nova movimentação',
+          description: `${opLabel} · Container ${d.container_number || '-'}`,
+          path: d.id ? `/movements/${d.id}` : '/movements',
+          timestamp: new Date(),
+          read: false,
+        },
+        ...prev,
+      ].slice(0, 30));
+    } else if (message.type === 'MOVEMENT_DELETED') {
+      setNotifications((prev) => [
+        {
+          id: `deleted-${message.data?.id}-${Date.now()}`,
+          title: 'Movimentação removida',
+          description: 'Uma movimentação foi excluída',
+          path: '/movements',
+          timestamp: new Date(),
+          read: false,
+        },
+        ...prev,
+      ].slice(0, 30));
+    }
+  }, []);
+
+  useWebSocket(handleWsNotification);
+
+  const hasYardAlert = yardAlert.over_60 > 0;
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length + (hasYardAlert ? 1 : 0);
+
+  const toggleNotifications = () => {
+    setNotificationsOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setNotifications((list) => list.map((n) => ({ ...n, read: true })));
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target)) {
+        setNotificationsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('sidebarOpen');
@@ -99,13 +201,13 @@ export default function Layout({ children }) {
   }, []);
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control';
-  const isCadastroActive = ['/drivers', '/companies', '/clients', '/shipping-lines', '/service-types'].includes(location.pathname);
-  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices';
-  const isFrotaActive = location.pathname === '/fleet' || location.pathname === '/fleet/vehicles' || location.pathname === '/fleet/revisions' || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/ordem-servico');
+  const isCadastroActive = ['/drivers', '/companies', '/clients', '/suppliers', '/shipping-lines', '/service-types'].includes(location.pathname);
+  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname.startsWith('/fleet/rpa-terceiro');
+  const isFrotaActive = location.pathname === '/fleet' || location.pathname === '/fleet/vehicles' || location.pathname === '/fleet/revisions' || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname.startsWith('/fleet/checklist');
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
-  const isTerminalActive = isFlexTankActive || isContainerInspectionsActive;
+  const isTerminalActive = isFlexTankActive || isContainerInspectionsActive || isMovimentacoesActive;
 
   useEffect(() => {
     if (isMovimentacoesActive && !movimentacoesOpen) setMovimentacoesOpen(true);
@@ -116,6 +218,19 @@ export default function Layout({ children }) {
     if (isFlexTankActive && !flexTankOpen) setFlexTankOpen(true);
     if (isTerminalActive && !terminalOpen) setTerminalOpen(true);
   }, [location.pathname]);
+
+  // Atalho global Ctrl+K / Cmd+K abre a busca global (funciona em qualquer tela, sidebar aberta ou não)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
 
   const toggleSidebar = () => {
     const newState = !sidebarOpen;
@@ -193,22 +308,27 @@ export default function Layout({ children }) {
   const frotaItems = [
     { path: '/fleet', label: 'Cadastro de Veículos', icon: Car },
     { path: '/fleet?tab=revisions', label: 'Controle de Revisão', icon: Wrench },
-    { path: '/fleet/rpa-terceiro', label: 'RPA Terceiro', icon: FileText },
     { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList },
+    { path: '/fleet/checklist', label: 'Checklist de Veículo', icon: ClipboardCheck },
   ];
 
   const cadastroItems = [
     { path: '/drivers', label: 'Pessoas', icon: Truck },
     { path: '/companies', label: 'Transportadora', icon: Building2 },
     { path: '/clients', label: 'Cliente', icon: Users },
+    { path: '/suppliers', label: 'Fornecedor', icon: Store },
     { path: '/shipping-lines', label: 'Armador', icon: Ship },
     { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList },
+    { path: '/company-settings', label: 'Dados da Empresa', icon: Settings },
   ];
 
   const financeiroItems = [
     { path: '/billing', label: 'Faturas', icon: Receipt },
     { path: '/international-invoices', label: 'Invoice Internacional', icon: Globe },
     { path: '/reports/billing', label: 'Relatório de Faturamento', icon: BarChart3 },
+    { path: '/daily-rate-requests', label: 'Solicitação de Diária', icon: Wallet },
+    { path: '/expense-reports', label: 'Prestação de Contas', icon: Calculator },
+    { path: '/fleet/rpa-terceiro', label: 'RPA Terceiro', icon: FileText },
   ];
 
   const operacionalItems = [
@@ -217,8 +337,9 @@ export default function Layout({ children }) {
   ];
 
   const allSearchableItems = useMemo(() => [
-    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...frotaItems, ...cadastroItems, ...financeiroItems, ...operacionalItems,
-  ], []);
+    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...frotaItems, ...cadastroItems,
+    ...(isAdmin ? financeiroItems : []), ...operacionalItems,
+  ], [isAdmin]);
 
   const filteredItems = searchQuery
     ? allSearchableItems.filter(item => item.label.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -258,11 +379,11 @@ export default function Layout({ children }) {
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
           title={item.label}
-          className={`flex items-center justify-center h-11 border-b border-slate-100 transition-colors ${
-            isActive ? 'text-primary' : 'text-slate-700 hover:text-primary'
+          className={`flex items-center justify-center h-11 border-b border-slate-100 dark:border-slate-800 transition-colors ${
+            isActive ? 'text-primary' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
           }`}
         >
-          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
         </Link>
       );
     }
@@ -274,11 +395,11 @@ export default function Layout({ children }) {
           key={item.path}
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-          className={`flex items-center py-3 transition-colors border-b border-slate-100 ${
-            isActive ? 'text-primary font-semibold' : 'text-slate-700 hover:text-primary'
+          className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 ${
+            isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
           } ${deepIndent ? 'pl-14' : 'pl-10'} pr-5 text-[13px] gap-2`}
         >
-          <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
+          <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
           <span>{item.label}</span>
         </Link>
       );
@@ -290,13 +411,47 @@ export default function Layout({ children }) {
         key={item.path}
         to={item.path}
         data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-        className={`flex items-center py-3 transition-colors border-b border-slate-100 ${
-          isActive ? 'text-primary font-semibold' : 'text-slate-700 hover:text-primary'
+        className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 ${
+          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
         } px-5 gap-3 text-[13px]`}
       >
-        <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+        <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
         <span>{item.label}</span>
       </Link>
+    );
+  };
+
+  // Mobile: item de navegação simples
+  const renderMobileNavItem = (item, nested = false) => {
+    const currentFullPath = location.pathname + location.search;
+    const isActive = location.pathname === item.path || currentFullPath === item.path;
+    return (
+      <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
+        className={`flex items-center gap-2 ${nested ? 'pl-14' : 'pl-10'} pr-4 py-2.5 text-[13px] border-b border-slate-100 dark:border-slate-800 ${
+          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
+        }`}
+      >
+        <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
+        <span>{item.label}</span>
+      </Link>
+    );
+  };
+
+  // Mobile: cabeçalho de grupo expansível
+  const renderMobileGroupToggle = (label, icon, isOpen, toggle, isActive, nested = false) => {
+    const Icon = icon;
+    return (
+      <button onClick={toggle}
+        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-4' : 'px-4'} py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
+          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <Icon className="w-5 h-5 text-slate-800 dark:text-slate-200" strokeWidth={1.8} />
+          <span>{label}</span>
+        </div>
+        <ChevronRight className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+      </button>
     );
   };
 
@@ -309,56 +464,135 @@ export default function Layout({ children }) {
       if (nested) return null;
       return (
         <div
-          className="flex items-center justify-center h-11 cursor-pointer border-b border-slate-100 transition-colors hover:text-primary"
+          className="flex items-center justify-center h-11 cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-colors hover:text-primary"
           title={label}
           onClick={() => handleGroupClickCollapsed(toggle)}
           data-testid={testId}
         >
-          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800'}`} strokeWidth={1.8} />
+          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={1.8} />
         </div>
       );
     }
     return (
       <button
         onClick={toggle}
-        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors border-b border-slate-100 text-[13px] ${
-          isActive ? 'text-primary font-semibold' : 'text-slate-700 hover:text-primary'
+        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors border-b border-slate-100 dark:border-slate-800 text-[13px] ${
+          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
         }`}
         data-testid={testId}
       >
         <div className="flex items-center gap-3">
-          <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-800'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+          <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
           <span>{label}</span>
         </div>
-        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${isActive ? 'text-primary' : 'text-slate-400'}`} />
+        <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
       </button>
     );
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
+    <div className="min-h-screen bg-white dark:bg-slate-900 flex flex-col">
       {/* Top Header Bar */}
-      <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white border-b border-slate-200 fixed top-0 right-0 z-30 transition-all duration-300 ${
+      <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 right-0 z-30 transition-all duration-300 ${
         sidebarOpen ? 'left-[260px]' : 'left-16'
       }`} data-testid="top-header">
         <div className="flex items-center h-full px-6">
-          <h1 className="text-[15px] font-semibold text-slate-800" style={{ fontFamily: 'Chivo, sans-serif' }} data-testid="page-title">
+          <h1 className="text-[15px] font-semibold text-slate-800 dark:text-slate-200" style={{ fontFamily: 'Chivo, sans-serif' }} data-testid="page-title">
             {pageTitle}
           </h1>
         </div>
         <div className="flex items-center gap-1 px-4">
-          <button className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors" title="Notificações" data-testid="header-notifications">
-            <Bell className="w-[18px] h-[18px]" />
+          <button
+            onClick={() => setCommandPaletteOpen(true)}
+            className="flex items-center gap-2 h-8 px-3 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors text-xs"
+            title="Busca global"
+            data-testid="header-search"
+          >
+            <Search className="w-[15px] h-[15px]" />
+            <span className="hidden lg:inline">Buscar</span>
+            <kbd className="hidden lg:inline text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5">Ctrl+K</kbd>
           </button>
-          <button className="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors" title="Configurações" data-testid="header-settings">
+          <div className="relative" ref={notificationsRef}>
+            <button
+              onClick={toggleNotifications}
+              className="relative p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors"
+              title="Notificações"
+              data-testid="header-notifications"
+            >
+              <Bell className="w-[18px] h-[18px]" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute top-0.5 right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">
+                  {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+            {notificationsOpen && (
+              <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-50" data-testid="notifications-panel">
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-900">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Notificações</span>
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={() => setNotifications([])}
+                      className="text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
+                {hasYardAlert && (
+                  <button
+                    onClick={() => { navigate('/yard-control?min_days=61'); setNotificationsOpen(false); }}
+                    className="w-full text-left px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-amber-50 hover:bg-amber-100 transition-colors"
+                    data-testid="yard-alert-item"
+                  >
+                    <p className="text-sm text-amber-800 font-medium">
+                      {yardAlert.over_60} container{yardAlert.over_60 > 1 ? 's' : ''} parado{yardAlert.over_60 > 1 ? 's' : ''} no pátio há mais de 60 dias
+                    </p>
+                    {yardAlert.over_90 > 0 && (
+                      <p className="text-xs text-amber-700 mt-0.5">{yardAlert.over_90} deles já passam de 90 dias</p>
+                    )}
+                  </button>
+                )}
+                {notifications.length === 0 && !hasYardAlert ? (
+                  <p className="px-4 py-6 text-sm text-slate-400 dark:text-slate-500 text-center">Nenhuma notificação por enquanto</p>
+                ) : (
+                  notifications.map((n) => (
+                    <button
+                      key={n.id}
+                      onClick={() => { navigate(n.path); setNotificationsOpen(false); }}
+                      className="w-full text-left px-4 py-3 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">{n.title}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{n.description}</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{format(n.timestamp, 'HH:mm', { locale: ptBR })}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => navigate('/company-settings')}
+            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 dark:text-slate-400 dark:dark:text-slate-500 transition-colors"
+            title="Configurações"
+            data-testid="header-settings"
+          >
             <Settings className="w-[18px] h-[18px]" />
           </button>
-          <div className="w-px h-5 bg-slate-200 mx-2"></div>
-          <div className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-slate-50 transition-colors cursor-default" data-testid="header-user-info">
+          <button
+            onClick={toggleTheme}
+            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 dark:text-slate-400 dark:dark:text-slate-500 transition-colors"
+            title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+            data-testid="header-theme-toggle"
+          >
+            {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+          </button>
+          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-2"></div>
+          <div className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-default" data-testid="header-user-info">
             <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
               <User className="w-3.5 h-3.5 text-primary" />
             </div>
-            <span className="text-sm text-slate-700">{user?.name?.split(' ').slice(0, 2).join(' ')}</span>
+            <span className="text-sm text-slate-700 dark:text-slate-300">{user?.name?.split(' ').slice(0, 2).join(' ')}</span>
           </div>
         </div>
       </header>
@@ -366,13 +600,13 @@ export default function Layout({ children }) {
       <div className="flex flex-1">
         {/* Sidebar - Desktop */}
         <aside 
-          className={`no-print hidden md:flex flex-col bg-white border-r border-slate-200 fixed left-0 top-0 h-screen z-40 transition-all duration-300 ${
+          className={`no-print hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 transition-all duration-300 ${
             sidebarOpen ? 'w-[260px]' : 'w-16'
           }`}
           data-testid="sidebar"
         >
           {/* Logo */}
-          <div className={`flex items-center h-14 border-b border-slate-200 ${sidebarOpen ? 'px-5 gap-3' : 'justify-center px-2'}`}>
+          <div className={`flex items-center h-14 border-b border-slate-200 dark:border-slate-700 ${sidebarOpen ? 'px-5 gap-3' : 'justify-center px-2'}`}>
             <Link to="/dashboard" className="flex items-center gap-2.5" data-testid="logo-link">
               <img 
                 src="/logo-containerlogix.png"
@@ -389,25 +623,26 @@ export default function Layout({ children }) {
 
           {/* Search */}
           {sidebarOpen && (
-            <div className="px-4 py-3 border-b border-slate-200">
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
               <div className="relative">
                 <input
+                  ref={searchInputRef}
                   type="text"
-                  placeholder="Pesquisar (Ctrl+K)"
+                  placeholder="Pesquisar"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-9 pl-3 pr-8 text-sm bg-slate-50 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40 placeholder:text-slate-400"
+                  className="w-full h-9 pl-3 pr-8 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   data-testid="sidebar-search"
                 />
                 {searchQuery ? (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 ) : (
-                  <X className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                  <X className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 dark:text-slate-600" />
                 )}
               </div>
             </div>
@@ -417,11 +652,11 @@ export default function Layout({ children }) {
           <nav className="flex-1 overflow-y-auto">
             {filteredItems ? (
               <div>
-                <p className="px-5 py-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Resultados</p>
+                <p className="px-5 py-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Resultados</p>
                 {filteredItems.length > 0 ? (
                   filteredItems.map((item) => renderNavItem(item))
                 ) : (
-                  <p className="px-5 py-3 text-sm text-slate-400">Nenhum resultado</p>
+                  <p className="px-5 py-3 text-sm text-slate-400 dark:text-slate-500">Nenhum resultado</p>
                 )}
               </div>
             ) : (
@@ -433,17 +668,15 @@ export default function Layout({ children }) {
                 {terminalOpen && sidebarOpen && (
                   <div>
                     {terminalItems.map((item) => renderNavItem(item, true, true))}
+                    {renderGroupHeader('Movimentações', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, 'nav-movimentacoes-toggle', true)}
+                    {movimentacoesOpen && (
+                      <div>{movimentacoesItems.map((item) => renderNavItem(item, true, true))}</div>
+                    )}
                     {renderGroupHeader('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, 'nav-flex-tank-toggle', true)}
                     {flexTankOpen && (
                       <div>{flexTankItems.map((item) => renderNavItem(item, true, true))}</div>
                     )}
                   </div>
-                )}
-
-                {/* Movimentações */}
-                {renderGroupHeader('Movimentações', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, 'nav-movimentacoes-toggle')}
-                {movimentacoesOpen && sidebarOpen && (
-                  <div>{movimentacoesItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
                 {/* Frota */}
@@ -459,8 +692,8 @@ export default function Layout({ children }) {
                 )}
 
                 {/* Financeiro */}
-                {renderGroupHeader('Financeiro', DollarSign, financeiroOpen, toggleFinanceiro, isFinanceiroActive, 'nav-financeiro-toggle')}
-                {financeiroOpen && sidebarOpen && (
+                {isAdmin && renderGroupHeader('Financeiro', DollarSign, financeiroOpen, toggleFinanceiro, isFinanceiroActive, 'nav-financeiro-toggle')}
+                {isAdmin && financeiroOpen && sidebarOpen && (
                   <div>{financeiroItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
@@ -474,12 +707,12 @@ export default function Layout({ children }) {
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-slate-200 px-3 py-2">
+          <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2">
             <div className="flex items-center justify-between">
               <button 
                 onClick={handleLogout} 
                 data-testid="logout-button"
-                className={`flex items-center gap-2 text-slate-500 hover:text-red-600 transition-colors text-[13px] py-1.5 px-2 rounded ${!sidebarOpen ? 'justify-center w-full' : ''}`}
+                className={`flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-red-600 transition-colors text-[13px] py-1.5 px-2 rounded ${!sidebarOpen ? 'justify-center w-full' : ''}`}
                 title={!sidebarOpen ? 'Sair' : undefined}
               >
                 <LogOut className="w-[18px] h-[18px]" />
@@ -488,7 +721,7 @@ export default function Layout({ children }) {
               <button
                 onClick={toggleSidebar}
                 data-testid="toggle-sidebar"
-                className="text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded"
+                className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 transition-colors p-1.5 rounded"
               >
                 {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
@@ -497,7 +730,7 @@ export default function Layout({ children }) {
         </aside>
 
         {/* Mobile Header */}
-        <nav className="no-print md:hidden bg-white border-b border-slate-200 fixed top-0 left-0 right-0 z-50 shadow-sm" data-testid="mobile-navigation">
+        <nav className="no-print md:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 left-0 right-0 z-50 shadow-sm" data-testid="mobile-navigation">
           <div className="px-4">
             <div className="flex items-center justify-between h-14">
               <Link to="/dashboard" className="flex items-center gap-2">
@@ -509,9 +742,9 @@ export default function Layout({ children }) {
                 <span className="font-bold text-sm text-primary" style={{ fontFamily: 'Chivo, sans-serif' }}>ContainerLogix</span>
               </Link>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 hidden sm:block">{user?.name?.split(' ')[0]}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">{user?.name?.split(' ')[0]}</span>
                 <button
-                  className="p-2 rounded-md hover:bg-slate-100 text-slate-600"
+                  className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400"
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   data-testid="mobile-menu-toggle"
                 >
@@ -521,99 +754,49 @@ export default function Layout({ children }) {
             </div>
 
             {mobileMenuOpen && (
-              <div className="py-1 border-t border-slate-200 max-h-[calc(100vh-56px)] overflow-y-auto -mx-4 px-2 pb-4 bg-white" data-testid="mobile-menu">
+              <div className="py-1 border-t border-slate-200 dark:border-slate-700 max-h-[calc(100vh-56px)] overflow-y-auto -mx-4 px-2 pb-4 bg-white dark:bg-slate-900" data-testid="mobile-menu">
                 {mainNavItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path;
                   return (
                     <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-3 text-sm border-b border-slate-100 ${
-                        isActive ? 'text-primary font-semibold' : 'text-slate-700'
+                      className={`flex items-center gap-3 px-4 py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
+                        isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-slate-800'}`} strokeWidth={1.8} />
+                      <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={1.8} />
                       <span>{item.label}</span>
                     </Link>
                   );
                 })}
 
-                {/* Movimentações Mobile */}
-                <button onClick={toggleMovimentacoes}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-sm border-b border-slate-100 ${
-                    isMovimentacoesActive ? 'text-primary font-semibold' : 'text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Container className="w-5 h-5 text-slate-800" strokeWidth={1.8} />
-                    <span>Movimentações</span>
+                {/* Terminal Mobile */}
+                {renderMobileGroupToggle('Terminal', Anchor, terminalOpen, toggleTerminal, isTerminalActive)}
+                {terminalOpen && (
+                  <div>
+                    {terminalItems.map((item) => renderMobileNavItem(item, true))}
+                    {renderMobileGroupToggle('Movimentações', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, true)}
+                    {movimentacoesOpen && movimentacoesItems.map((item) => renderMobileNavItem(item, true))}
+                    {renderMobileGroupToggle('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, true)}
+                    {flexTankOpen && flexTankItems.map((item) => renderMobileNavItem(item, true))}
                   </div>
-                  <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${movimentacoesOpen ? 'rotate-90' : ''}`} />
-                </button>
-                {movimentacoesOpen && movimentacoesItems.map((item) => {
-                  const isActive = location.pathname === item.path;
-                  return (
-                    <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-2 pl-10 pr-4 py-2.5 text-[13px] border-b border-slate-100 ${
-                        isActive ? 'text-primary font-semibold' : 'text-slate-700'
-                      }`}
-                    >
-                      <ChevronRight className={`w-3.5 h-3.5 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
+                )}
+
+                {/* Frota Mobile */}
+                {renderMobileGroupToggle('Frota', Truck, frotaOpen, toggleFrota, isFrotaActive)}
+                {frotaOpen && frotaItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Cadastro Mobile */}
-                <button onClick={toggleCadastro}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-sm border-b border-slate-100 ${
-                    isCadastroActive ? 'text-primary font-semibold' : 'text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <FolderOpen className="w-5 h-5 text-slate-800" strokeWidth={1.8} />
-                    <span>Cadastro</span>
-                  </div>
-                  <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${cadastroOpen ? 'rotate-90' : ''}`} />
-                </button>
-                {cadastroOpen && cadastroItems.map((item) => {
-                  const isActive = location.pathname === item.path;
-                  return (
-                    <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-2 pl-10 pr-4 py-2.5 text-[13px] border-b border-slate-100 ${
-                        isActive ? 'text-primary font-semibold' : 'text-slate-700'
-                      }`}
-                    >
-                      <ChevronRight className={`w-3.5 h-3.5 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
+                {renderMobileGroupToggle('Cadastro', FolderOpen, cadastroOpen, toggleCadastro, isCadastroActive)}
+                {cadastroOpen && cadastroItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Financeiro Mobile */}
-                <button onClick={toggleFinanceiro}
-                  className={`w-full flex items-center justify-between px-4 py-3 text-sm border-b border-slate-100 ${
-                    isFinanceiroActive ? 'text-primary font-semibold' : 'text-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <DollarSign className="w-5 h-5 text-slate-800" strokeWidth={1.8} />
-                    <span>Financeiro</span>
-                  </div>
-                  <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${financeiroOpen ? 'rotate-90' : ''}`} />
-                </button>
-                {financeiroOpen && financeiroItems.map((item) => {
-                  const isActive = location.pathname === item.path;
-                  return (
-                    <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-2 pl-10 pr-4 py-2.5 text-[13px] border-b border-slate-100 ${
-                        isActive ? 'text-primary font-semibold' : 'text-slate-700'
-                      }`}
-                    >
-                      <ChevronRight className={`w-3.5 h-3.5 ${isActive ? 'text-primary' : 'text-slate-400'}`} />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
+                {isAdmin && renderMobileGroupToggle('Financeiro', DollarSign, financeiroOpen, toggleFinanceiro, isFinanceiroActive)}
+                {isAdmin && financeiroOpen && financeiroItems.map((item) => renderMobileNavItem(item))}
+
+                {/* Operacional Mobile */}
+                {renderMobileGroupToggle('Operacional', Clipboard, operacionalOpen, toggleOperacional, isOperacionalActive)}
+                {operacionalOpen && operacionalItems.map((item) => renderMobileNavItem(item))}
 
                 <button onClick={handleLogout}
                   className="flex items-center gap-3 px-4 py-3 text-sm text-red-600 w-full"
@@ -635,6 +818,12 @@ export default function Layout({ children }) {
           </div>
         </main>
       </div>
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        items={allSearchableItems}
+      />
     </div>
   );
 }

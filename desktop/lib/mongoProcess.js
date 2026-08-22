@@ -123,6 +123,32 @@ function restoreFromDriveIfNeeded(config) {
   }
 }
 
+// Restaura um backup específico escolhido pelo usuário (via menu), substituindo
+// todo o conteúdo atual do banco/uploads locais. Diferente de restoreFromDriveIfNeeded,
+// pode ser chamada com o mongod já no ar e dados existentes — por isso é sempre uma
+// ação explícita e destrutiva (--drop), nunca automática.
+function restoreFromBackupDir(config, backupDir) {
+  const archivePath = path.join(backupDir, 'dump.archive.gz');
+  if (!fs.existsSync(archivePath)) {
+    throw new Error(`Arquivo de backup não encontrado em: ${archivePath}`);
+  }
+
+  execFileSync(mongorestoreExe(), [
+    '--host', '127.0.0.1',
+    '--port', String(config.mongoPort),
+    '--archive=' + archivePath,
+    '--gzip',
+    '--drop',
+  ]);
+
+  const backupUploadsDir = path.join(backupDir, 'uploads');
+  if (fs.existsSync(backupUploadsDir)) {
+    fs.rmSync(uploadsDir(), { recursive: true, force: true });
+    fs.mkdirSync(uploadsDir(), { recursive: true });
+    fs.cpSync(backupUploadsDir, uploadsDir(), { recursive: true });
+  }
+}
+
 function timestampForBackup() {
   return new Date().toISOString().replace(/[:.]/g, '-');
 }
@@ -169,5 +195,6 @@ module.exports = {
   waitForPort,
   isMongoDataEmpty,
   restoreFromDriveIfNeeded,
+  restoreFromBackupDir,
   runBackup,
 };

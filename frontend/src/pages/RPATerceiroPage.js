@@ -14,6 +14,7 @@ import {
 import { Badge } from '../components/ui/badge';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import {
   Plus, Pencil, Trash2, FileText, Download, Search, X, Save, Calculator,
@@ -42,6 +43,7 @@ const fmtMoney = (v) => {
 };
 
 export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
+  const { confirm, ConfirmDialog } = useConfirm();
   const typeLabel = rpaType === 'agregado' ? 'Agregado' : 'Terceiro';
   const typeDescription = rpaType === 'agregado'
     ? 'Recibo de Pagamento - motoristas agregados'
@@ -99,6 +101,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       setClients(r.data || []);
     } catch (e) {
       console.error('Erro ao carregar clientes:', e);
+      toast.error('Erro ao carregar clientes');
     }
   };
 
@@ -135,6 +138,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       setDrivers(r.data || []);
     } catch (e) {
       console.error('Erro ao carregar motoristas:', e);
+      toast.error('Erro ao carregar motoristas');
     }
   };
 
@@ -345,7 +349,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
   };
 
   const handleDelete = async (id, num) => {
-    if (!window.confirm(`Excluir RPA Nº ${num}?`)) return;
+    if (!(await confirm(`Excluir RPA Nº ${num}?`))) return;
     try {
       await api.deleteRPATerceiro(id);
       toast.success('RPA excluído');
@@ -376,8 +380,8 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       <div className="space-y-5" data-testid="rpa-terceiro-page">
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800">RPA {typeLabel}</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">RPA {typeLabel}</h1>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
               {typeDescription}
             </p>
           </div>
@@ -391,13 +395,13 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
           </Button>
         </div>
 
-        <div className="border-t border-slate-200" />
+        <div className="border-t border-slate-200 dark:border-slate-700" />
 
         {/* Search */}
         <Card className="shadow-sm">
           <CardContent className="pt-4 pb-4">
             <div className="relative max-w-md">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <Input
                 placeholder="Buscar por motorista, cliente, container, placa..."
                 value={search}
@@ -409,7 +413,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 <button
                   type="button"
                   onClick={() => setSearch('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -421,15 +425,15 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
         {/* List */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-[13px] text-slate-700">
+            <CardTitle className="text-[13px] text-slate-700 dark:text-slate-300">
               {loading ? 'Carregando...' : `${rpas.length} RPA(s)`}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="rounded-md border border-slate-200 overflow-hidden">
+            <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50">
+                  <TableRow className="bg-slate-50 dark:bg-slate-800">
                     <TableHead className="text-[12px] font-semibold">Nº</TableHead>
                     <TableHead className="text-[12px] font-semibold">Motorista</TableHead>
                     <TableHead className="text-[12px] font-semibold">CPF</TableHead>
@@ -443,18 +447,18 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 <TableBody>
                   {rpas.length === 0 && !loading && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-slate-400 py-8 text-sm">
+                      <TableCell colSpan={8} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">
                         Nenhum RPA cadastrado.
                       </TableCell>
                     </TableRow>
                   )}
                   {rpas.map((r) => (
-                    <TableRow key={r.id} className="hover:bg-slate-50" data-testid={`rpa-row-${r.rpa_number}`}>
+                    <TableRow key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800" data-testid={`rpa-row-${r.rpa_number}`}>
                       <TableCell className="text-[13px] font-semibold text-emerald-700">
                         Nº {r.rpa_number}
                       </TableCell>
                       <TableCell className="text-[13px]">{r.driver_name || '-'}</TableCell>
-                      <TableCell className="text-[12px] text-slate-500">{r.driver_cpf || '-'}</TableCell>
+                      <TableCell className="text-[12px] text-slate-500 dark:text-slate-400">{r.driver_cpf || '-'}</TableCell>
                       <TableCell className="text-[13px]">{r.client_name || '-'}</TableCell>
                       <TableCell className="text-[12px] font-mono">{r.container_number || '-'}</TableCell>
                       <TableCell className="text-[12px]">
@@ -483,7 +487,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                             data-testid={`rpa-edit-${r.rpa_number}`}
                             title="Editar"
                           >
-                            <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                            <Pencil className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -527,7 +531,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <div className="grid grid-cols-2 gap-3">
               {/* Motorista - Autocomplete */}
               <div className="relative" ref={driverBoxRef}>
-                <Label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">
+                <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">
                   Motorista * <span className="text-emerald-600 normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <div className="relative">
@@ -548,7 +552,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     <button
                       type="button"
                       onClick={clearDriver}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                       data-testid="rpa-driver-clear"
                     >
                       <X className="w-4 h-4" />
@@ -557,16 +561,16 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 </div>
 
                 {showDriverSuggestions && driverSuggestions.length > 0 && (
-                  <div className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto" data-testid="rpa-driver-suggestions">
+                  <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto" data-testid="rpa-driver-suggestions">
                     {driverSuggestions.map((driver) => (
                       <button
                         key={driver.id}
                         type="button"
                         onClick={() => selectDriver(driver)}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 focus:bg-slate-100 focus:outline-none border-b border-slate-100 last:border-b-0"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 focus:outline-none border-b border-slate-100 dark:border-slate-800 last:border-b-0"
                       >
-                        <div className="font-medium text-slate-800">{driver.name}</div>
-                        <div className="text-[11px] text-slate-500">
+                        <div className="font-medium text-slate-800 dark:text-slate-200">{driver.name}</div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
                           CPF: {driver.cpf || '-'}
                           {driver.phone ? ` · ${driver.phone}` : ''}
                         </div>
@@ -576,7 +580,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 )}
 
                 {showDriverSuggestions && driverSearch.length >= 1 && driverSuggestions.length === 0 && (
-                  <div className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500">
+                  <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500 dark:text-slate-400">
                     Nenhum motorista cadastrado encontrado. Você pode digitar manualmente.
                   </div>
                 )}
@@ -607,7 +611,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Field label="Nº Container" value={form.container_number} onChange={(v) => onChange('container_number', v)} testid="rpa-container-number" />
               {/* Cliente - Autocomplete */}
               <div className="relative" ref={clientBoxRef}>
-                <Label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">
+                <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">
                   Cliente <span className="text-emerald-600 normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <div className="relative">
@@ -628,7 +632,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     <button
                       type="button"
                       onClick={clearClient}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                       data-testid="rpa-client-clear"
                     >
                       <X className="w-4 h-4" />
@@ -637,17 +641,17 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 </div>
 
                 {showClientSuggestions && clientSuggestions.length > 0 && (
-                  <div className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto" data-testid="rpa-client-suggestions">
+                  <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto" data-testid="rpa-client-suggestions">
                     {clientSuggestions.map((client) => (
                       <button
                         key={client.id}
                         type="button"
                         onClick={() => selectClient(client)}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 focus:bg-slate-100 focus:outline-none border-b border-slate-100 last:border-b-0"
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 focus:outline-none border-b border-slate-100 dark:border-slate-800 last:border-b-0"
                       >
-                        <div className="font-medium text-slate-800">{client.name}</div>
+                        <div className="font-medium text-slate-800 dark:text-slate-200">{client.name}</div>
                         {client.cnpj && (
-                          <div className="text-[11px] text-slate-500">CNPJ: {client.cnpj}</div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">CNPJ: {client.cnpj}</div>
                         )}
                       </button>
                     ))}
@@ -655,7 +659,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 )}
 
                 {showClientSuggestions && clientSearch.length >= 1 && clientSuggestions.length === 0 && (
-                  <div className="absolute z-[100] w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500">
+                  <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500 dark:text-slate-400">
                     Nenhum cliente cadastrado encontrado. Você pode digitar manualmente.
                   </div>
                 )}
@@ -672,9 +676,9 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             </div>
             <div className="space-y-2">
               {form.services.map((s, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 rounded border border-slate-200">
+                <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
                   <div className="col-span-8">
-                    <Label className="text-[10px] text-slate-500 mb-1 block">Descrição do Serviço</Label>
+                    <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Descrição do Serviço</Label>
                     <Input
                       value={s.description}
                       onChange={(e) => updateService(idx, 'description', e.target.value)}
@@ -684,7 +688,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     />
                   </div>
                   <div className="col-span-3">
-                    <Label className="text-[10px] text-slate-500 mb-1 block">Valor (R$)</Label>
+                    <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Valor (R$)</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -743,7 +747,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
 
             {/* OBSERVAÇÃO */}
             <div>
-              <Label className="text-[11px] text-slate-500 mb-1 block uppercase tracking-wide">
+              <Label className="text-[11px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">
                 Observação (rodapé do PDF)
               </Label>
               <Textarea
@@ -772,6 +776,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }
@@ -789,7 +794,7 @@ function SectionHeader({ title, noMargin }) {
 function Field({ label, value, onChange, type = 'text', testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
       <Input
         type={type}
         value={value || ''}

@@ -129,6 +129,7 @@ export default function InternationalInvoicePage() {
       setClients(res.data || []);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
+      toast.error('Erro ao carregar clientes');
     }
   };
 
@@ -138,6 +139,7 @@ export default function InternationalInvoicePage() {
       setReceiverData(res.data);
     } catch (error) {
       console.error('Erro ao carregar dados do recebedor:', error);
+      toast.error('Erro ao carregar dados do recebedor');
     }
   };
 
@@ -517,7 +519,7 @@ export default function InternationalInvoicePage() {
 
   const getStatusBadge = (status) => {
     const found = STATUS_OPTIONS.find(s => s.value === status);
-    return found ? found : { label: status, color: 'bg-gray-100 text-gray-800' };
+    return found ? found : { label: status, color: 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200' };
   };
 
   const totalPages = Math.ceil(totalInvoices / ITEMS_PER_PAGE);
@@ -528,11 +530,11 @@ export default function InternationalInvoicePage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <Globe className="h-7 w-7 text-primary" />
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <Globe className="h-4 w-4 text-primary" />
               Invoices Internacionais
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
               Gerencie suas faturas para clientes internacionais
             </p>
           </div>
@@ -551,7 +553,7 @@ export default function InternationalInvoicePage() {
           <CardContent className="pt-6">
             <div className="flex flex-wrap gap-4">
               <div className="w-48">
-                <Label className="text-xs text-slate-500 mb-1 block">Status</Label>
+                <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Status</Label>
                 <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val === "ALL" ? "" : val)}>
                   <SelectTrigger data-testid="filter-status">
                     <SelectValue placeholder="Todos" />
@@ -565,7 +567,7 @@ export default function InternationalInvoicePage() {
                 </Select>
               </div>
               <div className="w-48">
-                <Label className="text-xs text-slate-500 mb-1 block">Moeda</Label>
+                <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Moeda</Label>
                 <Select value={filterCurrency} onValueChange={(val) => setFilterCurrency(val === "ALL" ? "" : val)}>
                   <SelectTrigger data-testid="filter-currency">
                     <SelectValue placeholder="Todas" />
@@ -596,7 +598,7 @@ export default function InternationalInvoicePage() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : invoices.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
+              <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                 <Globe className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Nenhuma invoice encontrada</p>
               </div>
@@ -604,7 +606,7 @@ export default function InternationalInvoicePage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b bg-slate-50">
+                    <tr className="border-b bg-slate-50 dark:bg-slate-800">
                       <th className="text-left p-3 font-semibold">Nº</th>
                       <th className="text-left p-3 font-semibold">Pagador</th>
                       <th className="text-left p-3 font-semibold">Emissão</th>
@@ -619,7 +621,7 @@ export default function InternationalInvoicePage() {
                     {invoices.map((invoice) => {
                       const statusBadge = getStatusBadge(invoice.status);
                       return (
-                        <tr key={invoice.id} className="border-b hover:bg-slate-50">
+                        <tr key={invoice.id} className="border-b hover:bg-slate-50 dark:hover:bg-slate-800">
                           <td className="p-3 font-medium">#{invoice.invoice_number}</td>
                           <td className="p-3">{invoice.payer_company}</td>
                           <td className="p-3">
@@ -697,7 +699,7 @@ export default function InternationalInvoicePage() {
             {/* Paginação */}
             {totalPages > 1 && (
               <div className="flex justify-between items-center mt-4 pt-4 border-t">
-                <span className="text-sm text-slate-500">
+                <span className="text-sm text-slate-500 dark:text-slate-400">
                   Página {currentPage} de {totalPages}
                 </span>
                 <div className="flex gap-2">
@@ -739,18 +741,18 @@ export default function InternationalInvoicePage() {
             <div className="space-y-6 py-4">
               {/* Dados do Recebedor (fixo) */}
               {receiverData && (
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-sm text-slate-700 mb-2">Recebedor (Emissor)</h3>
+                <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+                  <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 mb-2">Recebedor (Emissor)</h3>
                   <p className="text-sm font-medium">{receiverData.company}</p>
-                  <p className="text-xs text-slate-500">{receiverData.address}</p>
-                  <p className="text-xs text-slate-500">{receiverData.city_state} - CEP: {receiverData.zip}</p>
-                  <p className="text-xs text-slate-500">{receiverData.email}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.address}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.city_state} - CEP: {receiverData.zip}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.email}</p>
                 </div>
               )}
 
               {/* Dados do Pagador */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-slate-700 border-b pb-2">Dados do Pagador</h3>
+                <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Dados do Pagador</h3>
                 
                 <div className="relative">
                   <Label>Cliente (buscar)</Label>
@@ -766,11 +768,11 @@ export default function InternationalInvoicePage() {
                     data-testid="client-search"
                   />
                   {showClientDropdown && clientSearch && filteredClients.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-y-auto">
                       {filteredClients.map(client => (
                         <div
                           key={client.id}
-                          className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                          className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-sm"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             handleClientSelect(client);
@@ -778,7 +780,7 @@ export default function InternationalInvoicePage() {
                         >
                           <p className="font-medium">{client.name}</p>
                           {client.address && (
-                            <p className="text-xs text-slate-500">{client.address}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{client.address}</p>
                           )}
                         </div>
                       ))}
@@ -841,7 +843,7 @@ export default function InternationalInvoicePage() {
 
               {/* Detalhes da Invoice */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-slate-700 border-b pb-2">Detalhes da Invoice</h3>
+                <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Detalhes da Invoice</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -884,7 +886,7 @@ export default function InternationalInvoicePage() {
               {/* Itens */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center border-b pb-2">
-                  <h3 className="font-semibold text-sm text-slate-700">Itens da Invoice</h3>
+                  <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300">Itens da Invoice</h3>
                   <Button variant="outline" size="sm" onClick={addInvoiceItem} data-testid="add-item-btn">
                     <Plus className="h-4 w-4 mr-1" /> Adicionar Item
                   </Button>
@@ -921,7 +923,7 @@ export default function InternationalInvoicePage() {
                 </div>
 
                 {invoiceItems.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-end bg-slate-50 p-3 rounded-lg">
+                  <div key={index} className="grid grid-cols-12 gap-2 items-end bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
                     <div className="col-span-5">
                       <Label className="text-xs">Descrição</Label>
                       <Input
@@ -958,7 +960,7 @@ export default function InternationalInvoicePage() {
                       <Input
                         value={item.total.toFixed(2)}
                         disabled
-                        className="bg-slate-100"
+                        className="bg-slate-100 dark:bg-slate-700"
                       />
                     </div>
                     <div className="col-span-1">
@@ -979,7 +981,7 @@ export default function InternationalInvoicePage() {
                 {/* Subtotal */}
                 <div className="flex justify-end pt-2 border-t">
                   <div className="text-right">
-                    <span className="text-sm text-slate-500">Subtotal: </span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Subtotal: </span>
                     <span className="font-bold text-lg">
                       {getCurrencySymbol(formData.currency)} {calculateSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
@@ -1036,7 +1038,7 @@ export default function InternationalInvoicePage() {
                 {/* Status */}
                 <div className="flex justify-between items-center">
                   <div>
-                    <span className="text-sm text-slate-500">Status:</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Status:</span>
                     <span className={`ml-2 px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(selectedInvoice.status).color}`}>
                       {getStatusBadge(selectedInvoice.status).label}
                     </span>
@@ -1058,44 +1060,44 @@ export default function InternationalInvoicePage() {
 
                 {/* Dados */}
                 <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-slate-50 p-3 rounded">
-                    <h4 className="font-semibold text-slate-700 mb-2">Recebedor</h4>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
+                    <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Recebedor</h4>
                     <p className="font-medium">{selectedInvoice.receiver_company}</p>
-                    <p className="text-slate-500">{selectedInvoice.receiver_address}</p>
-                    <p className="text-slate-500">{selectedInvoice.receiver_city_state}</p>
+                    <p className="text-slate-500 dark:text-slate-400">{selectedInvoice.receiver_address}</p>
+                    <p className="text-slate-500 dark:text-slate-400">{selectedInvoice.receiver_city_state}</p>
                   </div>
-                  <div className="bg-slate-50 p-3 rounded">
-                    <h4 className="font-semibold text-slate-700 mb-2">Pagador</h4>
+                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
+                    <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Pagador</h4>
                     <p className="font-medium">{selectedInvoice.payer_company}</p>
-                    <p className="text-slate-500">{selectedInvoice.payer_address}</p>
+                    <p className="text-slate-500 dark:text-slate-400">{selectedInvoice.payer_address}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
-                    <span className="text-slate-500">Emissão:</span>
+                    <span className="text-slate-500 dark:text-slate-400">Emissão:</span>
                     <p className="font-medium">
                       {selectedInvoice.issue_date ? format(parseISO(selectedInvoice.issue_date), 'dd/MM/yyyy') : '-'}
                     </p>
                   </div>
                   <div>
-                    <span className="text-slate-500">Vencimento:</span>
+                    <span className="text-slate-500 dark:text-slate-400">Vencimento:</span>
                     <p className="font-medium">
                       {selectedInvoice.due_date ? format(parseISO(selectedInvoice.due_date), 'dd/MM/yyyy') : '-'}
                     </p>
                   </div>
                   <div>
-                    <span className="text-slate-500">Moeda:</span>
+                    <span className="text-slate-500 dark:text-slate-400">Moeda:</span>
                     <p className="font-medium">{selectedInvoice.currency}</p>
                   </div>
                 </div>
 
                 {/* Itens */}
                 <div>
-                  <h4 className="font-semibold text-slate-700 mb-2">Itens</h4>
+                  <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Itens</h4>
                   <div className="border rounded overflow-hidden">
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-100">
+                      <thead className="bg-slate-100 dark:bg-slate-700">
                         <tr>
                           <th className="text-left p-2">Descrição</th>
                           <th className="text-right p-2">Qtd</th>
@@ -1117,7 +1119,7 @@ export default function InternationalInvoicePage() {
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-slate-50">
+                      <tfoot className="bg-slate-50 dark:bg-slate-800">
                         <tr className="border-t">
                           <td colSpan={3} className="p-2 text-right font-semibold">TOTAL:</td>
                           <td className="p-2 text-right font-bold text-lg">
@@ -1131,12 +1133,12 @@ export default function InternationalInvoicePage() {
 
                 {selectedInvoice.notes && (
                   <div>
-                    <h4 className="font-semibold text-slate-700 mb-2">Observações</h4>
-                    <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded">{selectedInvoice.notes}</p>
+                    <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Observações</h4>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-3 rounded">{selectedInvoice.notes}</p>
                   </div>
                 )}
 
-                <div className="text-xs text-slate-400 pt-4 border-t">
+                <div className="text-xs text-slate-400 dark:text-slate-500 pt-4 border-t">
                   Criada por {selectedInvoice.created_by_name} em{' '}
                   {selectedInvoice.created_at ? format(parseISO(selectedInvoice.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}
                 </div>
@@ -1201,18 +1203,18 @@ export default function InternationalInvoicePage() {
             <div className="space-y-6 py-4">
               {/* Dados do Recebedor (fixo) */}
               {receiverData && (
-                <div className="bg-slate-50 p-4 rounded-lg">
-                  <h3 className="font-semibold text-sm text-slate-700 mb-2">Recebedor (Emissor)</h3>
+                <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+                  <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 mb-2">Recebedor (Emissor)</h3>
                   <p className="text-sm font-medium">{receiverData.company}</p>
-                  <p className="text-xs text-slate-500">{receiverData.address}</p>
-                  <p className="text-xs text-slate-500">{receiverData.city_state} - CEP: {receiverData.zip}</p>
-                  <p className="text-xs text-slate-500">{receiverData.email}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.address}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.city_state} - CEP: {receiverData.zip}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.email}</p>
                 </div>
               )}
 
               {/* Dados do Pagador */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-slate-700 border-b pb-2">Dados do Pagador</h3>
+                <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Dados do Pagador</h3>
                 
                 <div className="relative">
                   <Label>Cliente (buscar)</Label>
@@ -1229,13 +1231,13 @@ export default function InternationalInvoicePage() {
                   {showEditClientDropdown && editClientSearch && clients.filter(c => 
                     c.name.toLowerCase().includes(editClientSearch.toLowerCase())
                   ).length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-y-auto">
                       {clients.filter(c => 
                         c.name.toLowerCase().includes(editClientSearch.toLowerCase())
                       ).map(client => (
                         <div
                           key={client.id}
-                          className="px-3 py-2 hover:bg-slate-100 cursor-pointer text-sm"
+                          className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer text-sm"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             handleEditClientSelect(client);
@@ -1243,7 +1245,7 @@ export default function InternationalInvoicePage() {
                         >
                           <p className="font-medium">{client.name}</p>
                           {client.address && (
-                            <p className="text-xs text-slate-500">{client.address}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{client.address}</p>
                           )}
                         </div>
                       ))}
@@ -1306,7 +1308,7 @@ export default function InternationalInvoicePage() {
 
               {/* Detalhes da Invoice */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-slate-700 border-b pb-2">Detalhes da Invoice</h3>
+                <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Detalhes da Invoice</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -1349,7 +1351,7 @@ export default function InternationalInvoicePage() {
               {/* Itens */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center border-b pb-2">
-                  <h3 className="font-semibold text-sm text-slate-700">Itens da Invoice</h3>
+                  <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300">Itens da Invoice</h3>
                   <Button variant="outline" size="sm" onClick={addEditInvoiceItem} data-testid="edit-add-item-btn">
                     <Plus className="h-4 w-4 mr-1" /> Adicionar Item
                   </Button>
@@ -1386,7 +1388,7 @@ export default function InternationalInvoicePage() {
                 </div>
 
                 {editInvoiceItems.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 items-end bg-slate-50 p-3 rounded-lg">
+                  <div key={index} className="grid grid-cols-12 gap-2 items-end bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
                     <div className="col-span-5">
                       <Label className="text-xs">Descrição</Label>
                       <Input
@@ -1423,7 +1425,7 @@ export default function InternationalInvoicePage() {
                       <Input
                         value={item.total.toFixed(2)}
                         disabled
-                        className="bg-slate-100"
+                        className="bg-slate-100 dark:bg-slate-700"
                       />
                     </div>
                     <div className="col-span-1">
@@ -1444,7 +1446,7 @@ export default function InternationalInvoicePage() {
                 {/* Subtotal */}
                 <div className="flex justify-end pt-2 border-t">
                   <div className="text-right">
-                    <span className="text-sm text-slate-500">Subtotal: </span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Subtotal: </span>
                     <span className="font-bold text-lg">
                       {getCurrencySymbol(editFormData.currency)} {calculateEditSubtotal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
