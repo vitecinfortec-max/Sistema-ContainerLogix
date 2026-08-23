@@ -560,7 +560,7 @@ export default function YardControlPage() {
                           {container.exit_date ? format(new Date(container.exit_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                         </td>
                         <td className="py-2.5 px-4 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${getDaysColor(container.days_in_yard)}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${getDaysColor(container.days_in_yard)}`}>
                             {container.days_in_yard} dias
                           </span>
                         </td>
