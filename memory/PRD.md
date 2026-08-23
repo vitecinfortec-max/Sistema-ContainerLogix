@@ -410,7 +410,16 @@ Sistema completo de entrada, saída e inventário de contêineres para empresas 
 - [x] Extrair componente de autocomplete reutilizável (Completo - 23/08/2026)
 - [x] Gerar instalador Windows (Completo - 26/07/2026: ContainerLogix-Setup-1.0.0.exe via
       electron-builder, standalone com Python/MongoDB embutidos - formato .exe, não .msi)
-- [ ] Gerar aplicativo Android (.apk)
+- [x] Gerar aplicativo Android (Completo - 23/08/2026: projeto Capacitor já existia em
+      frontend/android desde julho, mas estava desatualizado (build de 12/07) e com o módulo
+      capacitor-cordova-android-plugins/build.gradle corrompido/vazio, quebrando o build - corrigido
+      regenerando esse arquivo a partir do template do Capacitor CLI + restaurando o `apply from:
+      'cordova.variables.gradle'` que faltava. APK release gerado com sucesso, assinado com o
+      keystore já existente (containerlogix-release.keystore, válido até 2053), buildado apontando
+      pra REACT_APP_BACKEND_URL=https://sistema-containerlogix.onrender.com. Ainda não confirmado se
+      o CORS_ORIGINS do backend em produção aceita a origem que o WebView do Capacitor usa
+      (tipicamente `https://localhost`) - se o login falhar por CORS no teste, adicionar essa origem
+      nas variáveis de ambiente do Render.)
 - [x] Remover motoristas duplicados do banco de dados (Verificado - 23/08/2026: checado em produção,
       não há duplicatas reais - item já não se aplicava)
 - [ ] Ativar rate limiting em endpoints adicionais além de login/forgot-password, se necessário
