@@ -1,3 +1,4 @@
+import asyncio
 import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
@@ -589,91 +590,80 @@ async def update_user_shortcuts(data: dict, current_user: dict = Depends(get_cur
     return {"message": "Atalhos atualizados", "shortcuts": shortcuts}
 
 
-@api_router.get("/dashboard", response_model=DashboardStats)
-async def get_dashboard_stats(current_user: dict = Depends(get_current_active_user)):
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    # Início do mês atual
-    first_day_of_month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
-    total_movements = await db.movements.count_documents({})
-    
-    # Otimização: usar agregação do MongoDB para estatísticas
-    # Buscar apenas campos necessários com projeção
-    all_movements = await db.movements.find(
-        {},
-        {"_id": 0, "operation_type": 1, "status": 1, "created_at": 1, "container_number": 1, "driver_name": 1}
-    ).to_list(None)
-    
-    entries_today = sum(1 for m in all_movements if m['operation_type'] == 'ENTRADA' and parse_datetime_value(m['created_at']) >= today)
-    exits_today = sum(1 for m in all_movements if m['operation_type'] == 'SAIDA' and parse_datetime_value(m['created_at']) >= today)
-    full_containers = sum(1 for m in all_movements if m['status'] == 'CHEIO')
-    empty_containers = sum(1 for m in all_movements if m['status'] == 'VAZIO')
-    
-    total_entries = sum(1 for m in all_movements if m['operation_type'] == 'ENTRADA')
-    total_exits = sum(1 for m in all_movements if m['operation_type'] == 'SAIDA')
-    current_stock = total_entries - total_exits
-    
-    # Entradas e saídas do mês vigente
-    entries_month = sum(1 for m in all_movements if m['operation_type'] == 'ENTRADA' and parse_datetime_value(m['created_at']) >= first_day_of_month)
-    exits_month = sum(1 for m in all_movements if m['operation_type'] == 'SAIDA' and parse_datetime_value(m['created_at']) >= first_day_of_month)
-    
-    # Calcular estoque atual de vazios e cheios
-    # Precisamos agrupar por container e verificar quais estão em estoque
-    container_status = {}
-    for m in sorted(all_movements, key=lambda x: parse_datetime_value(x['created_at'])):
-        container = m['container_number']
-        if container not in container_status:
-            container_status[container] = {'entries': 0, 'exits': 0, 'last_status': None}
-        
-        if m['operation_type'] == 'ENTRADA':
-            container_status[container]['entries'] += 1
-            container_status[container]['last_status'] = m['status']
-        elif m['operation_type'] == 'SAIDA':
-            container_status[container]['exits'] += 1
-    
-    # Contar containers em estoque por status
-    stock_empty = 0
-    stock_full = 0
-    for container, data in container_status.items():
-        if data['entries'] > data['exits']:  # Container em estoque
-            if data['last_status'] == 'VAZIO':
-                stock_empty += 1
-            elif data['last_status'] == 'CHEIO':
-                stock_full += 1
-    
-    # Gráfico de entradas/saídas por dia (últimos 14 dias)
+def _created_at_gte(dt: datetime) -> dict:
+    """Filtro de data sobre 'created_at' (armazenado como string ISO), convertendo
+    para Date dentro do próprio MongoDB - evita comparação de string frágil e evita
+    trazer a coleção inteira para o Python só para filtrar por data."""
+    return {"$expr": {"$gte": [{"$toDate": "$created_at"}, dt]}}
+
+
+async def _compute_stock_by_status() -> dict:
+    """Para cada container, soma entradas/saídas e pega o status da última entrada
+    (histórico completo, feito no MongoDB via agregação em vez de carregar todas as
+    movimentações em memória no Python)."""
+    pipeline = [
+        {"$sort": {"created_at": 1}},
+        {"$group": {
+            "_id": "$container_number",
+            "entries": {"$sum": {"$cond": [{"$eq": ["$operation_type", "ENTRADA"]}, 1, 0]}},
+            "exits": {"$sum": {"$cond": [{"$eq": ["$operation_type", "SAIDA"]}, 1, 0]}},
+            "last_status": {"$last": "$status"},
+        }},
+        {"$match": {"$expr": {"$gt": ["$entries", "$exits"]}}},
+        {"$group": {"_id": "$last_status", "count": {"$sum": 1}}},
+    ]
+    result = {r["_id"]: r["count"] async for r in db.movements.aggregate(pipeline)}
+    return {"VAZIO": result.get("VAZIO", 0), "CHEIO": result.get("CHEIO", 0)}
+
+
+async def _compute_daily_chart(today: datetime) -> list[DailyMovementPoint]:
+    """Entradas/saídas por dia dos últimos 14 dias - agregação restrita à janela de
+    datas (usa o índice de created_at) em vez de escanear a coleção inteira."""
+    day0 = today - timedelta(days=13)
+    pipeline = [
+        {"$match": _created_at_gte(day0)},
+        {"$addFields": {"_day": {"$dateToString": {
+            "format": "%Y-%m-%d", "date": {"$toDate": "$created_at"}, "timezone": "UTC"
+        }}}},
+        {"$group": {"_id": {"day": "$_day", "op": "$operation_type"}, "count": {"$sum": 1}}},
+    ]
+    by_day: dict = {}
+    async for r in db.movements.aggregate(pipeline):
+        by_day.setdefault(r["_id"]["day"], {})[r["_id"]["op"]] = r["count"]
+
     daily_chart = []
     for i in range(13, -1, -1):
         day_start = today - timedelta(days=i)
-        day_end = day_start + timedelta(days=1)
-        day_entries = sum(
-            1 for m in all_movements
-            if m['operation_type'] == 'ENTRADA' and day_start <= parse_datetime_value(m['created_at']) < day_end
-        )
-        day_exits = sum(
-            1 for m in all_movements
-            if m['operation_type'] == 'SAIDA' and day_start <= parse_datetime_value(m['created_at']) < day_end
-        )
+        day_key = day_start.strftime('%Y-%m-%d')
+        counts = by_day.get(day_key, {})
         daily_chart.append(DailyMovementPoint(
-            date=day_start.strftime('%Y-%m-%d'),
-            entries=day_entries,
-            exits=day_exits
+            date=day_key,
+            entries=counts.get('ENTRADA', 0),
+            exits=counts.get('SAIDA', 0)
         ))
+    return daily_chart
 
-    # Ranking de motoristas no mês vigente
-    driver_stats = {}
-    for m in all_movements:
-        if parse_datetime_value(m['created_at']) < first_day_of_month:
-            continue
-        driver_name = m.get('driver_name') or 'Não informado'
-        if driver_name not in driver_stats:
-            driver_stats[driver_name] = {'entries': 0, 'exits': 0}
-        if m['operation_type'] == 'ENTRADA':
-            driver_stats[driver_name]['entries'] += 1
-        elif m['operation_type'] == 'SAIDA':
-            driver_stats[driver_name]['exits'] += 1
 
-    driver_ranking = sorted(
+async def _compute_driver_ranking(first_day_of_month: datetime) -> list[DriverRankingEntry]:
+    """Ranking de motoristas no mês vigente - agregação restrita ao mês (usa o índice
+    de created_at) em vez de escanear a coleção inteira."""
+    pipeline = [
+        {"$match": _created_at_gte(first_day_of_month)},
+        {"$group": {
+            "_id": {"driver": {"$ifNull": ["$driver_name", "Não informado"]}, "op": "$operation_type"},
+            "count": {"$sum": 1}
+        }},
+    ]
+    driver_stats: dict = {}
+    async for r in db.movements.aggregate(pipeline):
+        name = r["_id"]["driver"]
+        data = driver_stats.setdefault(name, {"entries": 0, "exits": 0})
+        if r["_id"]["op"] == "ENTRADA":
+            data["entries"] = r["count"]
+        elif r["_id"]["op"] == "SAIDA":
+            data["exits"] = r["count"]
+
+    return sorted(
         [
             DriverRankingEntry(
                 driver_name=name,
@@ -687,7 +677,46 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_active_us
         reverse=True
     )[:10]
 
-    recent = await db.movements.find({}, {"_id": 0}).sort("created_at", -1).limit(5).to_list(5)
+
+@api_router.get("/dashboard", response_model=DashboardStats)
+async def get_dashboard_stats(current_user: dict = Depends(get_current_active_user)):
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    # Início do mês atual
+    first_day_of_month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # Otimização: cada estatística vira uma query indexada/agregação enxuta no
+    # MongoDB (executadas em paralelo) em vez de trazer a coleção inteira de
+    # movimentações para o Python a cada carregamento do dashboard.
+    (
+        total_movements,
+        entries_today, exits_today,
+        full_containers, empty_containers,
+        total_entries, total_exits,
+        entries_month, exits_month,
+        stock_by_status,
+        daily_chart,
+        driver_ranking,
+        recent,
+    ) = await asyncio.gather(
+        db.movements.count_documents({}),
+        db.movements.count_documents({"operation_type": "ENTRADA", **_created_at_gte(today)}),
+        db.movements.count_documents({"operation_type": "SAIDA", **_created_at_gte(today)}),
+        db.movements.count_documents({"status": "CHEIO"}),
+        db.movements.count_documents({"status": "VAZIO"}),
+        db.movements.count_documents({"operation_type": "ENTRADA"}),
+        db.movements.count_documents({"operation_type": "SAIDA"}),
+        db.movements.count_documents({"operation_type": "ENTRADA", **_created_at_gte(first_day_of_month)}),
+        db.movements.count_documents({"operation_type": "SAIDA", **_created_at_gte(first_day_of_month)}),
+        _compute_stock_by_status(),
+        _compute_daily_chart(today),
+        _compute_driver_ranking(first_day_of_month),
+        db.movements.find({}, {"_id": 0}).sort("created_at", -1).limit(5).to_list(5),
+    )
+
+    current_stock = total_entries - total_exits
+    stock_empty = stock_by_status["VAZIO"]
+    stock_full = stock_by_status["CHEIO"]
+
     recent_movements = [
         ContainerMovementResponse(
             id=m['id'],
@@ -745,7 +774,15 @@ async def get_yard_control(
     current_user: dict = Depends(get_current_active_user)
 ):
     """Retorna containers em estoque no pátio com contagem de dias"""
-    all_movements = await db.movements.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    # Otimização: projeta só os campos usados abaixo (id, datas, status etc.) em vez
+    # do documento inteiro de cada movimentação (que inclui fotos, observações etc.
+    # não usados aqui) - reduz bastante o volume de dados trafegado, sem mudar a
+    # lógica de pareamento entrada/saída que continua precisando do histórico inteiro.
+    all_movements = await db.movements.find({}, {
+        "_id": 0, "id": 1, "transaction_id": 1, "container_number": 1, "status": 1,
+        "size_type": 1, "shipping_line": 1, "client_name": 1, "booking": 1,
+        "created_at": 1, "tare": 1, "seal": 1, "service_type": 1, "operation_type": 1,
+    }).sort("created_at", -1).to_list(None)
     
     # Agrupar por container - rastrear pares de entrada/saída
     container_data = {}
@@ -1307,6 +1344,59 @@ async def download_yard_control_excel(
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+async def _get_current_stock_movements(status_filter: Optional[str] = None, client_name: Optional[str] = None) -> list:
+    """Movimentação (última entrada) de cada container que ainda está em estoque
+    (mais entradas que saídas) - usado no relatório 'Estoque Atual' (PDF e Excel).
+
+    Otimização: descobrir quais containers estão em estoque exige olhar o histórico
+    inteiro (não tem como saber sem contar entradas/saídas de cada um), mas isso é
+    feito com uma projeção enxuta (poucos campos) em vez de carregar o documento
+    completo de cada movimentação. Só depois o documento completo é buscado, e
+    apenas para os containers que realmente estão em estoque hoje - normalmente uma
+    fração pequena do histórico total.
+    """
+    lean_movements = await db.movements.find(
+        {}, {"_id": 0, "id": 1, "container_number": 1, "operation_type": 1, "created_at": 1}
+    ).sort("created_at", -1).to_list(None)
+
+    container_counts: dict = {}
+    for m in sorted(lean_movements, key=lambda x: parse_datetime_value(x['created_at'])):
+        container = m['container_number']
+        counts = container_counts.setdefault(container, {'entries': 0, 'exits': 0, 'last_entry_id': None})
+        if m['operation_type'] == 'ENTRADA':
+            counts['entries'] += 1
+            counts['last_entry_id'] = m['id']
+        elif m['operation_type'] == 'SAIDA':
+            counts['exits'] += 1
+
+    in_stock_ids = [
+        counts['last_entry_id']
+        for counts in container_counts.values()
+        if counts['entries'] > counts['exits'] and counts['last_entry_id']
+    ]
+    if not in_stock_ids:
+        return []
+
+    full_docs = {
+        doc['id']: doc
+        for doc in await db.movements.find({"id": {"$in": in_stock_ids}}, {"_id": 0}).to_list(None)
+    }
+
+    movements = []
+    for mid in in_stock_ids:
+        m = full_docs.get(mid)
+        if not m:
+            continue
+        if status_filter and m['status'] != status_filter:
+            continue
+        if client_name and m.get('client_name') != client_name:
+            continue
+        movements.append(m)
+
+    movements.sort(key=lambda x: parse_datetime_value(x['created_at']), reverse=True)
+    return movements
+
+
 @api_router.get("/reports/pdf")
 async def download_pdf_report(
     operation_type: Optional[str] = None,
@@ -1318,33 +1408,7 @@ async def download_pdf_report(
 ):
     # Caso especial: Estoque Atual
     if operation_type == "ESTOQUE":
-        all_movements = await db.movements.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
-        
-        # Contar entradas e saídas por container
-        container_counts = {}
-        for m in sorted(all_movements, key=lambda x: parse_datetime_value(x['created_at'])):
-            container = m['container_number']
-            if container not in container_counts:
-                container_counts[container] = {'entries': 0, 'exits': 0, 'last_entry': None}
-            
-            if m['operation_type'] == 'ENTRADA':
-                container_counts[container]['entries'] += 1
-                container_counts[container]['last_entry'] = m
-            elif m['operation_type'] == 'SAIDA':
-                container_counts[container]['exits'] += 1
-        
-        # Coletar containers em estoque
-        movements = []
-        for container, counts in container_counts.items():
-            if counts['entries'] > counts['exits'] and counts['last_entry']:
-                m = counts['last_entry']
-                if status_filter and m['status'] != status_filter:
-                    continue
-                if client_name and m.get('client_name') != client_name:
-                    continue
-                movements.append(m)
-        
-        movements.sort(key=lambda x: parse_datetime_value(x['created_at']), reverse=True)
+        movements = await _get_current_stock_movements(status_filter, client_name)
     else:
         query = {}
         if operation_type:
@@ -1403,33 +1467,7 @@ async def download_excel_report(
 ):
     # Caso especial: Estoque Atual
     if operation_type == "ESTOQUE":
-        all_movements = await db.movements.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
-        
-        # Contar entradas e saídas por container
-        container_counts = {}
-        for m in sorted(all_movements, key=lambda x: parse_datetime_value(x['created_at'])):
-            container = m['container_number']
-            if container not in container_counts:
-                container_counts[container] = {'entries': 0, 'exits': 0, 'last_entry': None}
-            
-            if m['operation_type'] == 'ENTRADA':
-                container_counts[container]['entries'] += 1
-                container_counts[container]['last_entry'] = m
-            elif m['operation_type'] == 'SAIDA':
-                container_counts[container]['exits'] += 1
-        
-        # Coletar containers em estoque
-        movements = []
-        for container, counts in container_counts.items():
-            if counts['entries'] > counts['exits'] and counts['last_entry']:
-                m = counts['last_entry']
-                if status_filter and m['status'] != status_filter:
-                    continue
-                if client_name and m.get('client_name') != client_name:
-                    continue
-                movements.append(m)
-        
-        movements.sort(key=lambda x: parse_datetime_value(x['created_at']), reverse=True)
+        movements = await _get_current_stock_movements(status_filter, client_name)
     else:
         query = {}
         if operation_type:
@@ -1438,9 +1476,9 @@ async def download_excel_report(
             query['status'] = status_filter
         if client_name:
             query['client_name'] = client_name
-        
+
         movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
-    
+
     # Filtrar por data se fornecido
     if date_from or date_to:
         filtered_movements = []
