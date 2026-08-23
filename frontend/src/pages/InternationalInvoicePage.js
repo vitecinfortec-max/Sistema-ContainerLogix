@@ -92,7 +92,8 @@ export default function InternationalInvoicePage() {
   const [editInvoiceItems, setEditInvoiceItems] = useState([]);
   const [editClientSearch, setEditClientSearch] = useState('');
   const [showEditClientDropdown, setShowEditClientDropdown] = useState(false);
-  
+  const editClientInputRef = useRef(null);
+
   // Estado de Exclusão
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
@@ -104,6 +105,21 @@ export default function InternationalInvoicePage() {
     loadClients();
     loadReceiverData();
   }, [currentPage, filterStatus, filterCurrency]);
+
+  // Fecha os dropdowns de autocomplete de cliente ao clicar fora - sem isso eles
+  // ficavam abertos sobre o formulário até o usuário selecionar um cliente.
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (clientInputRef.current && !clientInputRef.current.contains(event.target)) {
+        setShowClientDropdown(false);
+      }
+      if (editClientInputRef.current && !editClientInputRef.current.contains(event.target)) {
+        setShowEditClientDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadInvoices = async () => {
     try {
@@ -754,10 +770,9 @@ export default function InternationalInvoicePage() {
               <div className="space-y-4">
                 <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Dados do Pagador</h3>
                 
-                <div className="relative">
+                <div className="relative" ref={clientInputRef}>
                   <Label>Cliente (buscar)</Label>
                   <Input
-                    ref={clientInputRef}
                     value={clientSearch}
                     onChange={(e) => {
                       setClientSearch(e.target.value);
@@ -1216,7 +1231,7 @@ export default function InternationalInvoicePage() {
               <div className="space-y-4">
                 <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Dados do Pagador</h3>
                 
-                <div className="relative">
+                <div className="relative" ref={editClientInputRef}>
                   <Label>Cliente (buscar)</Label>
                   <Input
                     value={editClientSearch}

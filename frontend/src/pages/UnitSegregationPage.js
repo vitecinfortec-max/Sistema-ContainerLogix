@@ -42,6 +42,7 @@ export default function UnitSegregationPage() {
   const [clientSuggestions, setClientSuggestions] = useState([]);
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [selectedClientName, setSelectedClientName] = useState('');
+  const clientAutocompleteRef = useRef(null);
 
   // Modal de detalhes
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -51,6 +52,18 @@ export default function UnitSegregationPage() {
     loadSegregations();
     loadAuxData();
   }, [pagination.page, statusFilter]);
+
+  // Fecha o dropdown de autocomplete de cliente ao clicar fora - antes ficava
+  // aberto sobre a lista de containers do formulário até selecionar um cliente.
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (clientAutocompleteRef.current && !clientAutocompleteRef.current.contains(event.target)) {
+        setShowClientSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadAuxData = async () => {
     try {
@@ -442,7 +455,7 @@ export default function UnitSegregationPage() {
 
           <div className="space-y-5 py-4">
             {/* Cliente - Autocomplete */}
-            <div className="relative">
+            <div className="relative" ref={clientAutocompleteRef}>
               <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">
                 Cliente Reservado <span className="text-red-500">*</span>
               </Label>

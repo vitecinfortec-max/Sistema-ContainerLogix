@@ -46,6 +46,45 @@ const SLOT_STATES = {
   ERROR: 'error',
 };
 
+// Redimensiona/comprime a foto no navegador antes do upload. Fotos de celular
+// costumam vir com vários MB e resolução muito maior do que o necessário para
+// uma vistoria (exibida em telas pequenas e impressa em PDF) - isso reduz o
+// tráfego de dados em campo (pátio, sinal fraco) em ~80-90% sem perda
+// perceptível. Se a compressão falhar por qualquer motivo, usa o arquivo
+// original em vez de bloquear o upload.
+const MAX_PHOTO_DIMENSION = 1600;
+const PHOTO_JPEG_QUALITY = 0.82;
+
+async function compressPhoto(file) {
+  // Não vale a pena reprocessar um arquivo que já é pequeno.
+  if (file.size <= 400 * 1024) return file;
+
+  try {
+    const imageBitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(imageBitmap.width, imageBitmap.height));
+    const targetWidth = Math.round(imageBitmap.width * scale);
+    const targetHeight = Math.round(imageBitmap.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imageBitmap, 0, 0, targetWidth, targetHeight);
+    imageBitmap.close?.();
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', PHOTO_JPEG_QUALITY);
+    });
+    if (!blob || blob.size >= file.size) return file;
+
+    const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+    return new File([blob], newName, { type: 'image/jpeg' });
+  } catch (error) {
+    console.error('[Upload] Falha ao comprimir foto, enviando original:', error);
+    return file;
+  }
+}
+
 // Construir a URL completa da foto
 const buildPhotoUrl = (path) => {
   if (!path) return null;
@@ -161,11 +200,12 @@ export default function ContainerPhotoUpload({ photos, onChange, damages = [], o
     }));
     
     try {
-      console.log(`[Upload] Iniciando upload para ${position}:`, file.name, file.size);
-      
-      const response = await api.uploadFile(file);
+      const uploadFile = await compressPhoto(file);
+      console.log(`[Upload] Iniciando upload para ${position}:`, uploadFile.name, uploadFile.size, `(original: ${file.size})`);
+
+      const response = await api.uploadFile(uploadFile);
       const { url, filename } = response.data;
-      
+
       console.log(`[Upload] Sucesso! ${position}:`, { url, filename });
       
       // Revogar preview local

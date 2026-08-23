@@ -4,14 +4,21 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import logging
 import os
 
 SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
 if not SECRET_KEY:
-    # Gerar uma chave segura se não configurada (para desenvolvimento)
-    import secrets
-    SECRET_KEY = secrets.token_hex(32)
-    print("WARNING: JWT_SECRET_KEY not set in environment. Using generated key (not recommended for production).")
+    # Antes gerava uma chave aleatória em memória e seguia normalmente - isso
+    # invalidava todos os tokens ativos a cada reinício do processo (e, com mais
+    # de um worker, cada um teria uma chave diferente e rejeitaria tokens dos
+    # outros). Preferível falhar o startup e forçar configuração explícita: o app
+    # desktop já gera e persiste um JWT_SECRET_KEY por máquina (desktop/lib/config.js),
+    # e o deploy web já tem a variável definida no .env.
+    logging.error("JWT_SECRET_KEY não configurada no ambiente - o backend não pode iniciar sem ela.")
+    raise RuntimeError(
+        "JWT_SECRET_KEY não configurada. Defina essa variável de ambiente antes de iniciar o servidor."
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 

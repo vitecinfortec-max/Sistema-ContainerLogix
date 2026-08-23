@@ -2,6 +2,7 @@ import '@/App.css';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { WebSocketProvider } from './context/WebSocketContext';
 import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
@@ -50,6 +51,7 @@ function App() {
   return (
     <ThemeProvider>
     <AuthProvider>
+    <WebSocketProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -371,6 +373,7 @@ function App() {
         </Routes>
         <Toaster position="top-right" richColors />
       </BrowserRouter>
+    </WebSocketProvider>
     </AuthProvider>
     </ThemeProvider>
   );

@@ -90,13 +90,13 @@ export default function MovementsPage() {
       filtered = filtered.filter(m => m.client_name && m.client_name.toLowerCase().includes(searchClient.toLowerCase()));
     }
     if (searchContainer) {
-      filtered = filtered.filter(m => m.container_number.toLowerCase().includes(searchContainer.toLowerCase()));
+      filtered = filtered.filter(m => m.container_number && m.container_number.toLowerCase().includes(searchContainer.toLowerCase()));
     }
     if (searchMovement) {
       filtered = filtered.filter(m => String(m.transaction_id).includes(searchMovement));
     }
     if (searchDriver) {
-      filtered = filtered.filter(m => m.driver_name.toLowerCase().includes(searchDriver.toLowerCase()));
+      filtered = filtered.filter(m => m.driver_name && m.driver_name.toLowerCase().includes(searchDriver.toLowerCase()));
     }
     if (filterType !== 'all') {
       filtered = filtered.filter(m => m.operation_type === filterType);

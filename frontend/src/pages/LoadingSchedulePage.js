@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
+import { Autocomplete } from '../components/Autocomplete';
 import { Calendar, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -16,84 +18,8 @@ import { ptBR } from 'date-fns/locale';
 // de Carregamento e no Status de Entrega
 const BAG_NUMBER_CLIENT_NAME = 'MANUPORT LIQUIDS DO BRASIL LTDA';
 
-// Componente Autocomplete
-function Autocomplete({ value, onChange, options, placeholder, displayField = 'name', valueField = 'id', onSelect, className = '' }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value || '');
-  const [filteredOptions, setFilteredOptions] = useState([]);
-  const wrapperRef = useRef(null);
-
-  useEffect(() => {
-    setInputValue(value || '');
-  }, [value]);
-
-  useEffect(() => {
-    if (inputValue.length > 0) {
-      const filtered = options.filter(opt => {
-        const display = typeof displayField === 'function' ? displayField(opt) : opt[displayField];
-        return display?.toLowerCase().includes(inputValue.toLowerCase());
-      });
-      setFilteredOptions(filtered.slice(0, 10));
-    } else {
-      setFilteredOptions(options.slice(0, 10));
-    }
-  }, [inputValue, options, displayField]);
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleInputChange = (e) => {
-    const val = e.target.value;
-    setInputValue(val);
-    onChange(val);
-    setIsOpen(true);
-  };
-
-  const handleSelect = (option) => {
-    const display = typeof displayField === 'function' ? displayField(option) : option[displayField];
-    setInputValue(display);
-    onChange(display);
-    if (onSelect) onSelect(option);
-    setIsOpen(false);
-  };
-
-  return (
-    <div ref={wrapperRef} className="relative">
-      <Input
-        className={`h-9 ${className}`}
-        value={inputValue}
-        onChange={handleInputChange}
-        onFocus={() => setIsOpen(true)}
-        placeholder={placeholder}
-      />
-      {isOpen && filteredOptions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
-          {filteredOptions.map((option, idx) => {
-            const display = typeof displayField === 'function' ? displayField(option) : option[displayField];
-            return (
-              <div
-                key={option[valueField] || idx}
-                className="px-3 py-2 cursor-pointer hover:bg-muted text-sm"
-                onClick={() => handleSelect(option)}
-              >
-                {display}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function LoadingSchedulePage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -306,7 +232,7 @@ export default function LoadingSchedulePage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Deseja realmente excluir esta programação?')) return;
+    if (!(await confirm('Deseja realmente excluir esta programação?'))) return;
 
     try {
       await api.deleteLoadingSchedule(id);
@@ -753,6 +679,7 @@ export default function LoadingSchedulePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

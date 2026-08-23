@@ -13,11 +13,13 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { Truck, Wrench, Plus, Eye, Trash2, FileText, Search, Printer, Pencil, Car, Check, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 export default function FleetPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
@@ -232,7 +234,7 @@ export default function FleetPage() {
   };
 
   const handleDeleteVehicle = async (id) => {
-    if (!confirm('Deseja realmente excluir este veículo?')) return;
+    if (!(await confirm('Deseja realmente excluir este veículo?'))) return;
     
     try {
       await api.deleteVehicle(id);
@@ -390,7 +392,7 @@ export default function FleetPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Deseja realmente excluir esta revisão?')) return;
+    if (!(await confirm('Deseja realmente excluir esta revisão?'))) return;
     
     try {
       await api.deleteVehicleRevision(id);
@@ -1182,6 +1184,7 @@ export default function FleetPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

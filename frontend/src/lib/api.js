@@ -235,6 +235,7 @@ export const api = {
   releaseUnitSegregation: (id) => axios.post(`${API}/unit-segregations/${id}/release`),
   getUnitSegregationPDF: (id) => axios.get(`${API}/unit-segregations/${id}/pdf`, { responseType: 'blob' }),
   checkContainerSegregation: (containerNumber) => axios.get(`${API}/check-segregation/${containerNumber}`),
+  checkContainerSegregationBatch: (containerNumbers) => axios.post(`${API}/check-segregation-batch`, { container_numbers: containerNumbers }),
 
   // RPA Terceiro / Agregado
   getRPATerceiros: (params) => axios.get(`${API}/rpa-terceiro`, { params }),

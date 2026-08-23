@@ -7,86 +7,11 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
+import { Autocomplete } from '../components/Autocomplete';
 import { Wallet, Plus, Eye, Trash2, Search, Printer, Pencil, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-// Componente Autocomplete (mesmo padrão usado em Programação de Carregamento)
-function Autocomplete({ value, onChange, options, placeholder, displayField = 'name', valueField = 'id', onSelect, className = '' }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value || '');
-  const [filteredOptions, setFilteredOptions] = useState([]);
-  const wrapperRef = useRef(null);
-
-  useEffect(() => {
-    setInputValue(value || '');
-  }, [value]);
-
-  useEffect(() => {
-    if (inputValue.length > 0) {
-      const filtered = options.filter(opt => {
-        const display = typeof displayField === 'function' ? displayField(opt) : opt[displayField];
-        return display?.toLowerCase().includes(inputValue.toLowerCase());
-      });
-      setFilteredOptions(filtered.slice(0, 10));
-    } else {
-      setFilteredOptions(options.slice(0, 10));
-    }
-  }, [inputValue, options, displayField]);
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleInputChange = (e) => {
-    const val = e.target.value;
-    setInputValue(val);
-    onChange(val);
-    setIsOpen(true);
-  };
-
-  const handleSelect = (option) => {
-    const display = typeof displayField === 'function' ? displayField(option) : option[displayField];
-    setInputValue(display);
-    onChange(display);
-    if (onSelect) onSelect(option);
-    setIsOpen(false);
-  };
-
-  return (
-    <div ref={wrapperRef} className="relative">
-      <Input
-        className={`h-9 ${className}`}
-        value={inputValue}
-        onChange={handleInputChange}
-        onFocus={() => setIsOpen(true)}
-        placeholder={placeholder}
-      />
-      {isOpen && filteredOptions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
-          {filteredOptions.map((option, idx) => {
-            const display = typeof displayField === 'function' ? displayField(option) : option[displayField];
-            return (
-              <div
-                key={option[valueField] || idx}
-                className="px-3 py-2 cursor-pointer hover:bg-muted text-sm"
-                onClick={() => handleSelect(option)}
-              >
-                {display}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function calculateItemTotal(item) {
   const others = parseFloat(item.others_value) || 0;
@@ -98,6 +23,7 @@ function calculateItemTotal(item) {
 }
 
 export default function DailyRateRequestPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -265,7 +191,7 @@ export default function DailyRateRequestPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Deseja realmente excluir esta solicitação?')) return;
+    if (!(await confirm('Deseja realmente excluir esta solicitação?'))) return;
 
     try {
       await api.deleteDailyRateRequest(id);
@@ -315,7 +241,7 @@ export default function DailyRateRequestPage() {
     );
   };
 
-  const formatMoney = (value) => `R$ ${(value || 0).toFixed(2)}`;
+  const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <Layout>
@@ -614,6 +540,7 @@ export default function DailyRateRequestPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

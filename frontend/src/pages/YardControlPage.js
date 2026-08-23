@@ -102,23 +102,28 @@ export default function YardControlPage() {
       
       const response = await api.getYardControl(params);
       const containersData = response.data.containers;
-      
-      // Verificar segregação para cada container
-      const containersWithSegregation = await Promise.all(
-        containersData.map(async (container) => {
-          try {
-            const segRes = await api.checkContainerSegregation(container.container_number);
-            return {
-              ...container,
-              is_segregated: segRes.data.is_segregated,
-              segregation_client: segRes.data.segregation?.client_name || null
-            };
-          } catch {
-            return { ...container, is_segregated: false, segregation_client: null };
-          }
-        })
-      );
-      
+
+      // Verificar segregação de todos os containers em uma única chamada em lote -
+      // antes disparava uma requisição HTTP por container (100-300 chamadas
+      // paralelas a cada carregamento de página com o pátio cheio).
+      let segregationByContainer = {};
+      try {
+        const containerNumbers = containersData.map((c) => c.container_number);
+        const segRes = await api.checkContainerSegregationBatch(containerNumbers);
+        segregationByContainer = segRes.data || {};
+      } catch {
+        segregationByContainer = {};
+      }
+
+      const containersWithSegregation = containersData.map((container) => {
+        const seg = segregationByContainer[container.container_number?.toUpperCase()];
+        return {
+          ...container,
+          is_segregated: seg?.is_segregated || false,
+          segregation_client: seg?.segregation_client || null
+        };
+      });
+
       setContainers(containersWithSegregation);
       setStats(response.data.stats);
       setByClient(response.data.by_client || []);
