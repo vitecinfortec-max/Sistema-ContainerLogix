@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -20,8 +20,25 @@ export default function ReportsBillingPage() {
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState([]);
 
+  // Autocomplete de cliente
+  const [clientSearch, setClientSearch] = useState('');
+  const [clientSuggestions, setClientSuggestions] = useState([]);
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  const clientBoxRef = useRef(null);
+
   useEffect(() => {
     loadClients();
+  }, []);
+
+  // Fechar sugestões ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (clientBoxRef.current && !clientBoxRef.current.contains(event.target)) {
+        setShowClientSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadClients = async () => {
@@ -34,6 +51,36 @@ export default function ReportsBillingPage() {
     }
   };
 
+  const handleClientSearch = (searchTerm) => {
+    setClientSearch(searchTerm);
+    // Resetar seleção se usuário começou a editar
+    if (filterClient !== 'all' && searchTerm !== filterClient) {
+      setFilterClient('all');
+    }
+    if (searchTerm.length >= 1) {
+      const filtered = clients.filter((c) =>
+        c.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setClientSuggestions(filtered.slice(0, 15));
+      setShowClientSuggestions(true);
+    } else {
+      setClientSuggestions([]);
+      setShowClientSuggestions(false);
+    }
+  };
+
+  const selectClient = (client) => {
+    setFilterClient(client.name);
+    setClientSearch(client.name);
+    setShowClientSuggestions(false);
+  };
+
+  const clearClient = () => {
+    setFilterClient('all');
+    setClientSearch('');
+    setShowClientSuggestions(false);
+  };
+
   const clearFilters = () => {
     setFilterType('all');
     setFilterStatus('all');
@@ -41,6 +88,8 @@ export default function ReportsBillingPage() {
     setBilledFilter('all');
     setDateFrom('');
     setDateTo('');
+    setClientSearch('');
+    setShowClientSuggestions(false);
   };
 
   const hasFilters = filterType !== 'all' || filterStatus !== 'all' || filterClient !== 'all' || billedFilter !== 'all' || dateFrom || dateTo;
@@ -178,17 +227,55 @@ export default function ReportsBillingPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={filterClient} onValueChange={setFilterClient}>
-                <SelectTrigger className="h-10 text-[13px]" data-testid="report-billing-filter-client">
-                  <SelectValue placeholder="Todos os Clientes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todos os Clientes</SelectItem>
-                  {clients.map(client => (
-                    <SelectItem key={client.id} value={client.name} className="text-[13px]">{client.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Cliente - Autocomplete (digite para buscar) */}
+              <div className="relative" ref={clientBoxRef}>
+                <Input
+                  placeholder="Digite para buscar cliente..."
+                  value={clientSearch}
+                  onChange={(e) => handleClientSearch(e.target.value)}
+                  onFocus={() => {
+                    if (clientSearch.length >= 1 && clientSuggestions.length > 0) {
+                      setShowClientSuggestions(true);
+                    }
+                  }}
+                  className={`h-10 text-[13px] pr-8 ${filterClient !== 'all' ? 'border-emerald-500 bg-emerald-50' : ''}`}
+                  data-testid="report-billing-filter-client"
+                />
+                {filterClient !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={clearClient}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+                    data-testid="report-billing-filter-client-clear"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+
+                {showClientSuggestions && clientSuggestions.length > 0 && (
+                  <div
+                    className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                    data-testid="report-billing-filter-client-suggestions"
+                  >
+                    {clientSuggestions.map((client) => (
+                      <button
+                        key={client.id}
+                        type="button"
+                        onClick={() => selectClient(client)}
+                        className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 focus:outline-none border-b border-slate-100 dark:border-slate-800 last:border-b-0"
+                      >
+                        {client.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showClientSuggestions && clientSearch.length >= 1 && clientSuggestions.length === 0 && (
+                  <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500 dark:text-slate-400">
+                    Nenhum cliente encontrado
+                  </div>
+                )}
+              </div>
 
               <Select value={billedFilter} onValueChange={setBilledFilter}>
                 <SelectTrigger className="h-10 text-[13px]" data-testid="report-billing-filter-billed">
