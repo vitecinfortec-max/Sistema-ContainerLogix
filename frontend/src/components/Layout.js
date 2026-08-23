@@ -41,7 +41,8 @@ import {
   Sun,
   Moon,
   ShieldCheck,
-  LayoutGrid
+  LayoutGrid,
+  Cog
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -61,8 +62,8 @@ const PAGE_TITLES = {
   '/movements/new': 'Nova Movimentação',
   '/yard-control': 'Controle de Pátio',
   '/fleet': 'Frota',
-  '/fleet/rpa-terceiro': 'RPA Terceiro',
-  '/fleet/rpa-terceiro/new': 'Novo RPA Terceiro',
+  '/fleet/rpa-terceiro': 'Contrato de Frete',
+  '/fleet/rpa-terceiro/new': 'Novo Contrato de Frete',
   '/fleet/ordem-servico': 'Ordem de Serviço',
   '/fleet/checklist': 'Checklist de Veículo',
   '/drivers': 'Pessoas',
@@ -95,7 +96,7 @@ const PAGE_TITLES = {
 // continuam com a cor binária ativo/inativo de sempre).
 // Alguns itens do menu apontam pra mesma rota, diferenciados só pela query
 // string `?tab=` (abas dentro de uma página, ex: Frota e Flex Tank) - comparar
-// só o pathname faria o item "sem aba" (ex: Cadastro de Veículos, path=/fleet)
+// só o pathname faria o item "sem aba" (ex: Cadastro de Veículo, path=/fleet)
 // ficar sempre marcado como ativo mesmo com outra aba selecionada. Comparar
 // especificamente o parâmetro `tab` (ignorando outras query strings, como o
 // `min_days` usado em deep links de alerta) resolve isso sem quebrar nada.
@@ -113,6 +114,8 @@ const GROUP_COLORS = {
   Cadastro: 'chart-3',
   Financeiro: 'chart-4',
   Operacional: 'chart-5',
+  Transporte: 'chart-6',
+  'Opções do Sistema': 'chart-7',
 };
 
 export default function Layout({ children }) {
@@ -132,6 +135,8 @@ export default function Layout({ children }) {
   const [operacionalOpen, setOperacionalOpen] = useState(false);
   const [flexTankOpen, setFlexTankOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [transporteOpen, setTransporteOpen] = useState(false);
+  const [opcoesSistemaOpen, setOpcoesSistemaOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
   const [notifications, setNotifications] = useState([]);
@@ -230,12 +235,22 @@ export default function Layout({ children }) {
     if (savedFlexTank !== null) setFlexTankOpen(JSON.parse(savedFlexTank));
     const savedTerminal = localStorage.getItem('terminalOpen');
     if (savedTerminal !== null) setTerminalOpen(JSON.parse(savedTerminal));
+    const savedTransporte = localStorage.getItem('transporteOpen');
+    if (savedTransporte !== null) setTransporteOpen(JSON.parse(savedTransporte));
+    const savedOpcoesSistema = localStorage.getItem('opcoesSistemaOpen');
+    if (savedOpcoesSistema !== null) setOpcoesSistemaOpen(JSON.parse(savedOpcoesSistema));
   }, []);
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control';
-  const isCadastroActive = ['/drivers', '/companies', '/clients', '/suppliers', '/shipping-lines', '/service-types', '/users'].includes(location.pathname);
-  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname.startsWith('/fleet/rpa-terceiro');
-  const isFrotaActive = location.pathname === '/fleet' || location.pathname === '/fleet/vehicles' || location.pathname === '/fleet/revisions' || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname.startsWith('/fleet/checklist');
+  const isCadastroActive = ['/drivers', '/companies', '/clients', '/suppliers', '/shipping-lines', '/service-types'].includes(location.pathname);
+  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports';
+  // '/fleet' é compartilhado por Frota (aba Controle de Revisão) e Transporte
+  // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
+  // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
+  const fleetTab = new URLSearchParams(location.search).get('tab');
+  const isFrotaActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico');
+  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname === '/fleet/checklist' || location.pathname.startsWith('/fleet/rpa-terceiro');
+  const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
@@ -246,6 +261,8 @@ export default function Layout({ children }) {
     if (isCadastroActive && !cadastroOpen) setCadastroOpen(true);
     if (isFinanceiroActive && !financeiroOpen) setFinanceiroOpen(true);
     if (isFrotaActive && !frotaOpen) setFrotaOpen(true);
+    if (isTransporteActive && !transporteOpen) setTransporteOpen(true);
+    if (isOpcoesSistemaActive && !opcoesSistemaOpen) setOpcoesSistemaOpen(true);
     if (isOperacionalActive && !operacionalOpen) setOperacionalOpen(true);
     if (isFlexTankActive && !flexTankOpen) setFlexTankOpen(true);
     if (isTerminalActive && !terminalOpen) setTerminalOpen(true);
@@ -312,6 +329,18 @@ export default function Layout({ children }) {
     localStorage.setItem('terminalOpen', JSON.stringify(newState));
   };
 
+  const toggleTransporte = () => {
+    const newState = !transporteOpen;
+    setTransporteOpen(newState);
+    localStorage.setItem('transporteOpen', JSON.stringify(newState));
+  };
+
+  const toggleOpcoesSistema = () => {
+    const newState = !opcoesSistemaOpen;
+    setOpcoesSistemaOpen(newState);
+    localStorage.setItem('opcoesSistemaOpen', JSON.stringify(newState));
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -341,10 +370,14 @@ export default function Layout({ children }) {
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const frotaItems = [
-    { path: '/fleet', label: 'Cadastro de Veículos', icon: Car, moduleKey: 'frota.veiculos' },
     { path: '/fleet?tab=revisions', label: 'Controle de Revisão', icon: Wrench, moduleKey: 'frota.revisao' },
     { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList, moduleKey: 'frota.ordem_servico' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
+  const transporteItems = [
+    { path: '/fleet', label: 'Cadastro de Veículo', icon: Car, moduleKey: 'frota.veiculos' },
     { path: '/fleet/checklist', label: 'Checklist de Veículo', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
+    { path: '/fleet/rpa-terceiro', label: 'Contrato de Frete', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const cadastroItems = [
@@ -355,15 +388,15 @@ export default function Layout({ children }) {
     { path: '/shipping-lines', label: 'Armador', icon: Ship, moduleKey: 'cadastro.armador' },
     { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList, moduleKey: 'cadastro.tipos_servico' },
     { path: '/company-settings', label: 'Dados da Empresa', icon: Settings },
-  ]
-    .filter((item) => isModuleEnabled(item.moduleKey))
-    .concat(
-      // Só admins veem o link de Usuários - o backend também bloqueia, mas
-      // não faz sentido mostrar pra quem não pode usar. "Módulos" é ainda
-      // mais restrito: só a conta do dono do sistema (superadmin) enxerga.
-      isAdmin ? [{ path: '/users', label: 'Usuários', icon: ShieldCheck }] : [],
-      isSuperadmin ? [{ path: '/modules', label: 'Módulos Contratados', icon: LayoutGrid }] : [],
-    );
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
+  // Só admins veem o link de Usuários - o backend também bloqueia, mas não
+  // faz sentido mostrar pra quem não pode usar. "Módulos" é ainda mais
+  // restrito: só a conta do dono do sistema (superadmin) enxerga.
+  const opcoesSistemaItems = [
+    isAdmin ? [{ path: '/users', label: 'Usuários', icon: ShieldCheck }] : [],
+    isSuperadmin ? [{ path: '/modules', label: 'Módulos Contratados', icon: LayoutGrid }] : [],
+  ].flat();
 
   const financeiroItems = [
     { path: '/billing', label: 'Faturas', icon: Receipt, moduleKey: 'financeiro.faturas' },
@@ -371,7 +404,6 @@ export default function Layout({ children }) {
     { path: '/reports/billing', label: 'Relatório de Faturamento', icon: BarChart3, moduleKey: 'financeiro.relatorio_faturamento' },
     { path: '/daily-rate-requests', label: 'Solicitação de Diária', icon: Wallet, moduleKey: 'financeiro.diaria' },
     { path: '/expense-reports', label: 'Prestação de Contas', icon: Calculator, moduleKey: 'financeiro.prestacao_contas' },
-    { path: '/fleet/rpa-terceiro', label: 'RPA Terceiro', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const operacionalItems = [
@@ -384,12 +416,14 @@ export default function Layout({ children }) {
   // some porque "Dados da Empresa" nunca é bloqueado por módulo contratado.
   const isTerminalGroupVisible = terminalItems.length > 0 || movimentacoesItems.length > 0 || flexTankItems.length > 0;
   const isFrotaGroupVisible = frotaItems.length > 0;
+  const isTransporteGroupVisible = transporteItems.length > 0;
   const isFinanceiroGroupVisible = financeiroItems.length > 0;
   const isOperacionalGroupVisible = operacionalItems.length > 0;
+  const isOpcoesSistemaGroupVisible = opcoesSistemaItems.length > 0;
 
   const allSearchableItems = useMemo(() => [
-    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...frotaItems, ...cadastroItems,
-    ...(isAdmin ? financeiroItems : []), ...operacionalItems,
+    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...frotaItems, ...transporteItems, ...cadastroItems,
+    ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems,
   ], [isAdmin]);
 
   const filteredItems = searchQuery
@@ -748,6 +782,12 @@ export default function Layout({ children }) {
                   <div>{frotaItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
+                {/* Transporte */}
+                {isTransporteGroupVisible && renderGroupHeader('Transporte', Car, transporteOpen, toggleTransporte, isTransporteActive, 'nav-transporte-toggle')}
+                {isTransporteGroupVisible && transporteOpen && sidebarOpen && (
+                  <div>{transporteItems.map((item) => renderNavItem(item, true))}</div>
+                )}
+
                 {/* Cadastro */}
                 {renderGroupHeader('Cadastro', FolderOpen, cadastroOpen, toggleCadastro, isCadastroActive, 'nav-cadastro-toggle')}
                 {cadastroOpen && sidebarOpen && (
@@ -764,6 +804,12 @@ export default function Layout({ children }) {
                 {isOperacionalGroupVisible && renderGroupHeader('Operacional', Clipboard, operacionalOpen, toggleOperacional, isOperacionalActive, 'nav-operacional-toggle')}
                 {isOperacionalGroupVisible && operacionalOpen && sidebarOpen && (
                   <div>{operacionalItems.map((item) => renderNavItem(item, true))}</div>
+                )}
+
+                {/* Opções do Sistema */}
+                {isOpcoesSistemaGroupVisible && renderGroupHeader('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive, 'nav-opcoes-sistema-toggle')}
+                {isOpcoesSistemaGroupVisible && opcoesSistemaOpen && sidebarOpen && (
+                  <div>{opcoesSistemaItems.map((item) => renderNavItem(item, true))}</div>
                 )}
               </div>
             )}
@@ -849,6 +895,10 @@ export default function Layout({ children }) {
                 {isFrotaGroupVisible && renderMobileGroupToggle('Frota', Truck, frotaOpen, toggleFrota, isFrotaActive)}
                 {isFrotaGroupVisible && frotaOpen && frotaItems.map((item) => renderMobileNavItem(item))}
 
+                {/* Transporte Mobile */}
+                {isTransporteGroupVisible && renderMobileGroupToggle('Transporte', Car, transporteOpen, toggleTransporte, isTransporteActive)}
+                {isTransporteGroupVisible && transporteOpen && transporteItems.map((item) => renderMobileNavItem(item))}
+
                 {/* Cadastro Mobile */}
                 {renderMobileGroupToggle('Cadastro', FolderOpen, cadastroOpen, toggleCadastro, isCadastroActive)}
                 {cadastroOpen && cadastroItems.map((item) => renderMobileNavItem(item))}
@@ -860,6 +910,10 @@ export default function Layout({ children }) {
                 {/* Operacional Mobile */}
                 {isOperacionalGroupVisible && renderMobileGroupToggle('Operacional', Clipboard, operacionalOpen, toggleOperacional, isOperacionalActive)}
                 {isOperacionalGroupVisible && operacionalOpen && operacionalItems.map((item) => renderMobileNavItem(item))}
+
+                {/* Opções do Sistema Mobile */}
+                {isOpcoesSistemaGroupVisible && renderMobileGroupToggle('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive)}
+                {isOpcoesSistemaGroupVisible && opcoesSistemaOpen && opcoesSistemaItems.map((item) => renderMobileNavItem(item))}
 
                 <button onClick={handleLogout}
                   className="flex items-center gap-3 px-4 py-3 text-sm text-red-600 w-full"
