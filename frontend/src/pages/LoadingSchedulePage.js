@@ -276,7 +276,7 @@ export default function LoadingSchedulePage() {
       'CANCELADO': 'Cancelado'
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || styles['ATIVO']}`}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${styles[status] || styles['ATIVO']}`}>
         {labels[status] || status}
       </span>
     );
@@ -287,87 +287,111 @@ export default function LoadingSchedulePage() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-5" data-testid="loading-schedule-page">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Programação de Carregamento</h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie as programações de carregamento</p>
           </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <Input
-              placeholder="Buscar por cliente, motorista ou container..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              data-testid="search-schedule-input"
-            />
-            <Button variant="outline" onClick={handleSearch}>
-              <Search className="w-4 h-4" />
-            </Button>
-          </div>
-          <Button onClick={openNewModal} data-testid="new-schedule-btn">
-            <Plus className="w-4 h-4 mr-2" />
+          <Button
+            onClick={openNewModal}
+            data-testid="new-schedule-btn"
+            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
             Nova Programação
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
+              <Search className="w-4 h-4" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:max-w-sm gap-3">
+              <div>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente, motorista ou container</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                  <Input
+                    placeholder="Buscar..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    className="h-9 text-sm pl-8"
+                    data-testid="search-schedule-input"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button size="sm" onClick={handleSearch} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
+                Filtrar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <Calendar className="w-4 h-4" />
               Programações ({pagination.total})
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : schedules.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="p-12 text-center text-muted-foreground">
                 Nenhuma programação encontrada
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left py-3 px-4 font-medium">Nº</th>
-                      <th className="text-left py-3 px-4 font-medium">Cliente Contratante</th>
-                      <th className="text-left py-3 px-4 font-medium">Cliente Destino</th>
-                      <th className="text-left py-3 px-4 font-medium">Itens</th>
-                      <th className="text-left py-3 px-4 font-medium">Status</th>
-                      <th className="text-left py-3 px-4 font-medium">Criado em</th>
-                      <th className="text-left py-3 px-4 font-medium">Ações</th>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Contratante</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Destino</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Itens</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado em</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {schedules.map(schedule => (
-                      <tr key={schedule.id} className="border-b hover:bg-muted/50">
-                        <td className="py-3 px-4 font-mono font-bold">#{schedule.schedule_number}</td>
-                        <td className="py-3 px-4">{schedule.contracting_client_name}</td>
-                        <td className="py-3 px-4">{schedule.destination_client_name}</td>
-                        <td className="py-3 px-4">{schedule.items?.length || 0}</td>
-                        <td className="py-3 px-4">{getStatusBadge(schedule.status)}</td>
-                        <td className="py-3 px-4">
+                    {schedules.map((schedule, idx) => (
+                      <tr
+                        key={schedule.id}
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                      >
+                        <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{schedule.schedule_number}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.contracting_client_name}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.destination_client_name}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.items?.length || 0}</td>
+                        <td className="px-4 py-2.5">{getStatusBadge(schedule.status)}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
                           {schedule.created_at && format(new Date(schedule.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openDetails(schedule)} title="Ver detalhes">
-                              <Eye className="w-4 h-4" />
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-0.5">
+                            <Button variant="ghost" size="sm" onClick={() => openDetails(schedule)} title="Ver detalhes" className="h-7 w-7 p-0">
+                              <Eye className="w-3.5 h-3.5 text-primary" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openEditModal(schedule)} title="Editar">
-                              <Pencil className="w-4 h-4" />
+                            <Button variant="ghost" size="sm" onClick={() => openEditModal(schedule)} title="Editar" className="h-7 w-7 p-0">
+                              <Pencil className="w-3.5 h-3.5 text-blue-600" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handlePrintPDF(schedule.id)} title="Gerar PDF">
-                              <Printer className="w-4 h-4" />
+                            <Button variant="ghost" size="sm" onClick={() => handlePrintPDF(schedule.id)} title="Gerar PDF" className="h-7 w-7 p-0">
+                              <Printer className="w-3.5 h-3.5 text-green-600" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(schedule.id)} title="Excluir" className="text-red-600 hover:text-red-700">
-                              <Trash2 className="w-4 h-4" />
+                            <Button variant="ghost" size="sm" onClick={() => handleDelete(schedule.id)} title="Excluir" className="h-7 w-7 p-0">
+                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
                             </Button>
                           </div>
                         </td>

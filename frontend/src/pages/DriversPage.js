@@ -228,20 +228,35 @@ export default function DriversPage() {
           </Dialog>
         </div>
 
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-          <Input
-            placeholder="Buscar por nome, CPF ou telefone..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-10 text-[13px] pl-9"
-            data-testid="search-driver-input"
-          />
-        </div>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
+              <Search className="w-4 h-4" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 sm:max-w-sm gap-3">
+              <div>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nome, CPF ou telefone</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                  <Input
+                    placeholder="Buscar..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="h-9 text-sm pl-8"
+                    data-testid="search-driver-input"
+                  />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <Card>
-          <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
-            <CardTitle className="text-[13px] font-medium">Lista de Pessoas ({filteredDrivers.length})</CardTitle>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Lista de Pessoas ({filteredDrivers.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {filteredDrivers.length > 0 ? (

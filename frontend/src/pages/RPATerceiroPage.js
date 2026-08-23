@@ -387,10 +387,10 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
           </div>
           <Button
             onClick={openCreate}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
             data-testid="rpa-new-button"
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="w-4 h-4 mr-1.5" />
             Novo RPA
           </Button>
         </div>
@@ -425,8 +425,8 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
         {/* List */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-[13px] text-slate-700 dark:text-slate-300">
-              {loading ? 'Carregando...' : `${rpas.length} RPA(s)`}
+            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {loading ? 'Carregando...' : `Lista de RPAs (${rpas.length})`}
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
@@ -454,7 +454,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                   )}
                   {rpas.map((r) => (
                     <TableRow key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800" data-testid={`rpa-row-${r.rpa_number}`}>
-                      <TableCell className="text-[13px] font-semibold text-emerald-700">
+                      <TableCell className="text-[13px] font-semibold text-primary">
                         Nº {r.rpa_number}
                       </TableCell>
                       <TableCell className="text-[13px]">{r.driver_name || '-'}</TableCell>
@@ -464,7 +464,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                       <TableCell className="text-[12px]">
                         {r.service_date ? format(new Date(r.service_date), 'dd/MM/yyyy') : '-'}
                       </TableCell>
-                      <TableCell className="text-[13px] font-semibold text-right text-emerald-700">
+                      <TableCell className="text-[13px] font-semibold text-right text-primary">
                         {fmtMoney(r.balance)}
                       </TableCell>
                       <TableCell className="text-center">
@@ -477,7 +477,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                             data-testid={`rpa-pdf-${r.rpa_number}`}
                             title="Baixar PDF"
                           >
-                            <Download className="w-3.5 h-3.5 text-emerald-600" />
+                            <Download className="w-3.5 h-3.5 text-green-600" />
                           </Button>
                           <Button
                             variant="ghost"

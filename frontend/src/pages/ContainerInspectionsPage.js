@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -70,110 +71,130 @@ export default function ContainerInspectionsPage() {
 
   return (
     <Layout>
-      <div className="space-y-6" data-testid="container-inspections-page">
-        <div className="flex items-center justify-between">
+      <div className="space-y-5" data-testid="container-inspections-page">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Vistoria de Container
             </h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerenciamento de vistorias de containers</p>
           </div>
-          <Button onClick={() => navigate('/container-inspections/new')} data-testid="new-inspection-btn">
-            <Plus className="w-4 h-4 mr-2" />
+          <Button
+            onClick={() => navigate('/container-inspections/new')}
+            data-testid="new-inspection-btn"
+            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
             Nova Vistoria
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardCheck className="w-5 h-5" />
-                Lista de Vistorias ({pagination.total})
-              </CardTitle>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
+              <Search className="w-4 h-4" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:max-w-sm gap-3">
+              <div>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Container, booking ou cliente</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                  <Input
+                    placeholder="Buscar..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-9 text-sm pl-8"
+                  />
+                </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <ClipboardCheck className="w-4 h-4" />
+              Lista de Vistorias ({pagination.total})
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {loading ? (
-              <div className="text-center py-8">Carregando...</div>
+              <div className="p-12 text-center text-muted-foreground">Carregando...</div>
             ) : filteredInspections.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="p-12 text-center text-muted-foreground">
                 Nenhuma vistoria de container encontrada
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-3 px-4 font-medium">Nº</th>
-                      <th className="text-left py-3 px-4 font-medium">Container</th>
-                      <th className="text-left py-3 px-4 font-medium">Cliente</th>
-                      <th className="text-left py-3 px-4 font-medium">Fotos</th>
-                      <th className="text-left py-3 px-4 font-medium">Criado em</th>
-                      <th className="text-left py-3 px-4 font-medium">Criado por</th>
-                      <th className="text-left py-3 px-4 font-medium">Ações</th>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Fotos</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado em</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado por</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredInspections.map(inspection => (
-                      <tr 
-                        key={inspection.id} 
-                        className="border-b hover:bg-muted/50 cursor-pointer"
+                    {filteredInspections.map((inspection, idx) => (
+                      <tr
+                        key={inspection.id}
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors cursor-pointer ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
                         onClick={() => navigate(`/container-inspections/${inspection.id}`)}
                         data-testid={`inspection-row-${inspection.id}`}
                       >
-                        <td className="py-3 px-4 font-medium">#{inspection.inspection_number}</td>
-                        <td className="py-3 px-4 text-sm whitespace-nowrap">{inspection.container_number}</td>
-                        <td className="py-3 px-4">{inspection.client_name || '-'}</td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            getPhotoCount(inspection) > 0 ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200'
+                        <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{inspection.inspection_number}</td>
+                        <td className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{inspection.container_number}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{inspection.client_name || '-'}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                            getPhotoCount(inspection) > 0 ? 'bg-emerald-50 text-emerald-700' :
+                            'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                           }`}>
                             {getPhotoCount(inspection)}/8
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-sm">
+                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
                           {format(new Date(inspection.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
                           {inspection.created_by_name?.split(' ').slice(0, 2).join(' ') || '-'}
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={(e) => { e.stopPropagation(); navigate(`/container-inspections/${inspection.id}`); }}
                               title="Visualizar"
+                              className="h-7 w-7 p-0"
                             >
-                              <Eye className="w-4 h-4" />
+                              <Eye className="w-3.5 h-3.5 text-primary" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={(e) => { e.stopPropagation(); navigate(`/container-inspections/${inspection.id}?print=true`); }}
                               title="Imprimir"
+                              className="h-7 w-7 p-0"
                             >
-                              <Printer className="w-4 h-4" />
+                              <Printer className="w-3.5 h-3.5 text-green-600" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={(e) => handleDelete(inspection.id, e)}
                               title="Excluir"
-                              className="text-red-600 hover:text-red-700"
+                              className="h-7 w-7 p-0"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
                             </Button>
                           </div>
                         </td>

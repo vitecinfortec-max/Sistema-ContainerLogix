@@ -350,7 +350,7 @@ export default function ExpenseReportsPage() {
       'CONCLUIDA': 'Concluída'
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || styles['EM_ANDAMENTO']}`}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${styles[status] || styles['EM_ANDAMENTO']}`}>
         {labels[status] || status}
       </span>
     );
@@ -368,111 +368,135 @@ export default function ExpenseReportsPage() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="space-y-5" data-testid="expense-reports-page">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Calculator className="w-4 h-4" />
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Prestação de Contas
             </h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de depósitos recebidos e compras realizadas por período</p>
           </div>
-        </div>
-
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <Input
-              placeholder="Buscar por número ou fornecedor..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              data-testid="search-expense-report-input"
-            />
-            <Button variant="outline" onClick={handleSearch}>
-              <Search className="w-4 h-4" />
-            </Button>
-          </div>
-          <Button onClick={openNewModal} data-testid="new-expense-report-btn">
-            <Plus className="w-4 h-4 mr-2" />
+          <Button
+            onClick={openNewModal}
+            data-testid="new-expense-report-btn"
+            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
             Nova Prestação de Contas
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calculator className="w-5 h-5" />
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
+              <Search className="w-4 h-4" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 space-y-3">
+            <div className="grid grid-cols-1 sm:max-w-sm gap-3">
+              <div>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Número ou fornecedor</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                  <Input
+                    placeholder="Buscar..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    className="h-9 text-sm pl-8"
+                    data-testid="search-expense-report-input"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Button size="sm" onClick={handleSearch} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
+                Filtrar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <Calculator className="w-4 h-4" />
               Prestações de Contas ({pagination.total})
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : reports.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="p-12 text-center text-muted-foreground">
                 Nenhuma prestação de contas encontrada
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left py-3 px-4 font-medium">Nº</th>
-                      <th className="text-left py-3 px-4 font-medium">Período</th>
-                      <th className="text-left py-3 px-4 font-medium">Total Compras</th>
-                      <th className="text-left py-3 px-4 font-medium">Saldo</th>
-                      <th className="text-left py-3 px-4 font-medium">Status</th>
-                      <th className="text-left py-3 px-4 font-medium">Ações</th>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Período</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Total Compras</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Saldo</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {reports.map(report => {
+                    {reports.map((report, idx) => {
                       const bi = balanceInfo(report.balance || 0);
                       return (
-                        <tr key={report.id} className="border-b hover:bg-muted/50">
-                          <td className="py-3 px-4 font-mono font-bold">#{report.report_number_formatted}</td>
-                          <td className="py-3 px-4">{formatPeriodDate(report.period_start)} a {formatPeriodDate(report.period_end)}</td>
-                          <td className="py-3 px-4">{formatMoney(report.total_purchases)}</td>
-                          <td className={`py-3 px-4 font-semibold ${bi.className}`}>{formatMoney(bi.value)}</td>
-                          <td className="py-3 px-4">{getStatusBadge(report.status)}</td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="icon" onClick={() => openDetails(report)} title="Ver detalhes">
-                                <Eye className="w-4 h-4" />
+                        <tr
+                          key={report.id}
+                          className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                        >
+                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{report.report_number_formatted}</td>
+                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{formatPeriodDate(report.period_start)} a {formatPeriodDate(report.period_end)}</td>
+                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{formatMoney(report.total_purchases)}</td>
+                          <td className={`px-4 py-2.5 text-sm font-semibold ${bi.className}`}>{formatMoney(bi.value)}</td>
+                          <td className="px-4 py-2.5">{getStatusBadge(report.status)}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-0.5">
+                              <Button variant="ghost" size="sm" onClick={() => openDetails(report)} title="Ver detalhes" className="h-7 w-7 p-0">
+                                <Eye className="w-3.5 h-3.5 text-primary" />
                               </Button>
                               {report.status === 'EM_ANDAMENTO' ? (
                                 <>
-                                  <Button variant="ghost" size="icon" onClick={() => openEditModal(report)} title="Editar">
-                                    <Pencil className="w-4 h-4" />
+                                  <Button variant="ghost" size="sm" onClick={() => openEditModal(report)} title="Editar" className="h-7 w-7 p-0">
+                                    <Pencil className="w-3.5 h-3.5 text-blue-600" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" onClick={() => handleComplete(report.id)} title="Concluir">
-                                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                  <Button variant="ghost" size="sm" onClick={() => handleComplete(report.id)} title="Concluir" className="h-7 w-7 p-0">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
                                   </Button>
                                 </>
                               ) : (
-                                <Button variant="ghost" size="icon" onClick={() => handleReopen(report.id)} title="Reabrir">
-                                  <RotateCcw className="w-4 h-4 text-blue-600" />
+                                <Button variant="ghost" size="sm" onClick={() => handleReopen(report.id)} title="Reabrir" className="h-7 w-7 p-0">
+                                  <RotateCcw className="w-3.5 h-3.5 text-blue-600" />
                                 </Button>
                               )}
                               <Button
                                 variant="ghost"
-                                size="icon"
+                                size="sm"
                                 onClick={() => handlePrintPDF(report.id)}
                                 title={report.status === 'CONCLUIDA' ? 'Gerar PDF' : 'Conclua a prestação de contas para gerar o PDF'}
                                 disabled={report.status !== 'CONCLUIDA'}
+                                className="h-7 w-7 p-0"
                               >
-                                <Printer className="w-4 h-4" />
+                                <Printer className="w-3.5 h-3.5 text-green-600" />
                               </Button>
                               <Button
                                 variant="ghost"
-                                size="icon"
+                                size="sm"
                                 onClick={() => handleDelete(report.id)}
                                 title="Excluir"
-                                className="text-red-600 hover:text-red-700"
+                                className="h-7 w-7 p-0"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
                               </Button>
                             </div>
                           </td>

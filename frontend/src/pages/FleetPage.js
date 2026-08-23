@@ -257,7 +257,7 @@ export default function FleetPage() {
       'MANUTENCAO': 'Manutenção',
     };
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || styles['ATIVO']}`}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${styles[status] || styles['ATIVO']}`}>
         {labels[status] || status}
       </span>
     );
@@ -432,8 +432,8 @@ export default function FleetPage() {
 
   return (
     <Layout>
-      <div className="space-y-6" data-testid="fleet-page">
-        <div className="flex items-center justify-between">
+      <div className="space-y-5" data-testid="fleet-page">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
               Frota
@@ -444,85 +444,113 @@ export default function FleetPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* ========== ABA CADASTRO DE VEÍCULOS ========== */}
-          <TabsContent value="vehicles" className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 flex-1 max-w-md">
-                <Input
-                  placeholder="Buscar por placa, modelo ou marca..."
-                  value={vehicleSearch}
-                  onChange={(e) => setVehicleSearch(e.target.value.toUpperCase())}
-                  onKeyPress={(e) => e.key === 'Enter' && handleVehicleSearch()}
-                  data-testid="search-vehicle-input"
-                />
-                <Button variant="outline" onClick={handleVehicleSearch}>
-                  <Search className="w-4 h-4" />
-                </Button>
-              </div>
-              <Button onClick={openNewVehicleModal} data-testid="new-vehicle-btn">
-                <Plus className="w-4 h-4 mr-2" />
+          <TabsContent value="vehicles" className="space-y-5">
+            <div className="flex justify-end">
+              <Button
+                onClick={openNewVehicleModal}
+                data-testid="new-vehicle-btn"
+                className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
                 Novo Veículo
               </Button>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Car className="w-5 h-5" />
+            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                  <Search className="w-4 h-4" />
+                  Filtrar
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                <div className="grid grid-cols-1 sm:max-w-sm gap-3">
+                  <div>
+                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Placa, modelo ou marca</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                      <Input
+                        placeholder="Buscar..."
+                        value={vehicleSearch}
+                        onChange={(e) => setVehicleSearch(e.target.value.toUpperCase())}
+                        onKeyPress={(e) => e.key === 'Enter' && handleVehicleSearch()}
+                        className="h-9 text-sm pl-8"
+                        data-testid="search-vehicle-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <Button size="sm" onClick={handleVehicleSearch} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
+                    Filtrar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  <Car className="w-4 h-4" />
                   Veículos Cadastrados ({vehiclePagination.total})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {vehiclesLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : vehicles.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="p-12 text-center text-muted-foreground">
                     Nenhum veículo cadastrado
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-left py-3 px-4 font-medium">Placa</th>
-                          <th className="text-left py-3 px-4 font-medium">Tipo</th>
-                          <th className="text-left py-3 px-4 font-medium">Marca</th>
-                          <th className="text-left py-3 px-4 font-medium">Modelo</th>
-                          <th className="text-left py-3 px-4 font-medium">Ano</th>
-                          <th className="text-left py-3 px-4 font-medium">Motorista</th>
-                          <th className="text-left py-3 px-4 font-medium">Status</th>
-                          <th className="text-left py-3 px-4 font-medium">Ações</th>
+                        <tr className="border-b border-slate-100 dark:border-slate-800">
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Marca</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modelo</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ano</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motorista</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {vehicles.map(vehicle => (
-                          <tr key={vehicle.id} className="border-b hover:bg-muted/50">
-                            <td className="py-3 px-4 font-mono font-bold">{vehicle.plate}</td>
-                            <td className="py-3 px-4">{vehicleTypes.find(t => t.value === vehicle.vehicle_type)?.label || vehicle.vehicle_type}</td>
-                            <td className="py-3 px-4">{vehicle.brand || '-'}</td>
-                            <td className="py-3 px-4">{vehicle.model || '-'}</td>
-                            <td className="py-3 px-4">{vehicle.year || '-'}</td>
-                            <td className="py-3 px-4">{vehicle.driver_name || '-'}</td>
-                            <td className="py-3 px-4">{getStatusBadge(vehicle.status)}</td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon"
+                        {vehicles.map((vehicle, idx) => (
+                          <tr
+                            key={vehicle.id}
+                            className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                          >
+                            <td className="px-4 py-2.5 text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{vehicle.plate}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicleTypes.find(t => t.value === vehicle.vehicle_type)?.label || vehicle.vehicle_type}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.brand || '-'}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.model || '-'}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.year || '-'}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.driver_name || '-'}</td>
+                            <td className="px-4 py-2.5">{getStatusBadge(vehicle.status)}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-0.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => openEditVehicleModal(vehicle)}
                                   title="Editar"
+                                  className="h-7 w-7 p-0"
                                 >
-                                  <Pencil className="w-4 h-4" />
+                                  <Pencil className="w-3.5 h-3.5 text-blue-600" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon"
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleDeleteVehicle(vehicle.id)}
                                   title="Excluir"
-                                  className="text-red-600 hover:text-red-700"
+                                  className="h-7 w-7 p-0"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
                                 </Button>
                               </div>
                             </td>
@@ -561,97 +589,125 @@ export default function FleetPage() {
           </TabsContent>
 
           {/* ========== ABA CONTROLE DE REVISÃO ========== */}
-          <TabsContent value="revisions" className="space-y-4 mt-4">
-            {/* Barra de ações */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 flex-1 max-w-md">
-                <Input
-                  placeholder="Buscar por placa..."
-                  value={searchPlate}
-                  onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  data-testid="search-plate-input"
-                />
-                <Button variant="outline" onClick={handleSearch}>
-                  <Search className="w-4 h-4" />
-                </Button>
-              </div>
-              <Button onClick={() => setNewModalOpen(true)} data-testid="new-revision-btn">
-                <Plus className="w-4 h-4 mr-2" />
+          <TabsContent value="revisions" className="space-y-5 mt-4">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setNewModalOpen(true)}
+                data-testid="new-revision-btn"
+                className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
                 Nova Revisão
               </Button>
             </div>
 
+            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                  <Search className="w-4 h-4" />
+                  Filtrar
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                <div className="grid grid-cols-1 sm:max-w-sm gap-3">
+                  <div>
+                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Placa</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                      <Input
+                        placeholder="Buscar por placa..."
+                        value={searchPlate}
+                        onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                        className="h-9 text-sm pl-8"
+                        data-testid="search-plate-input"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <Button size="sm" onClick={handleSearch} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
+                    Filtrar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Tabela de revisões */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Wrench className="w-5 h-5" />
+            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  <Wrench className="w-4 h-4" />
                   Revisões Registradas ({pagination.total})
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {loading ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : revisions.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="p-12 text-center text-muted-foreground">
                     Nenhuma revisão encontrada
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b bg-muted/50">
-                          <th className="text-left py-3 px-4 font-medium">Nº</th>
-                          <th className="text-left py-3 px-4 font-medium">Placa</th>
-                          <th className="text-left py-3 px-4 font-medium">Modelo</th>
-                          <th className="text-left py-3 px-4 font-medium">Data</th>
-                          <th className="text-left py-3 px-4 font-medium">KM Atual</th>
-                          <th className="text-left py-3 px-4 font-medium">Óleo</th>
-                          <th className="text-left py-3 px-4 font-medium">Mecânico</th>
-                          <th className="text-left py-3 px-4 font-medium">Ações</th>
+                        <tr className="border-b border-slate-100 dark:border-slate-800">
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modelo</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM Atual</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Óleo</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Mecânico</th>
+                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {revisions.map(revision => (
-                          <tr key={revision.id} className="border-b hover:bg-muted/50">
-                            <td className="py-3 px-4 font-mono">#{revision.revision_number}</td>
-                            <td className="py-3 px-4 font-mono font-bold">{revision.vehicle_plate}</td>
-                            <td className="py-3 px-4">{revision.vehicle_model || '-'}</td>
-                            <td className="py-3 px-4">
+                        {revisions.map((revision, idx) => (
+                          <tr
+                            key={revision.id}
+                            className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                          >
+                            <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{revision.revision_number}</td>
+                            <td className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300">{revision.vehicle_plate}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{revision.vehicle_model || '-'}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
                               {format(new Date(revision.revision_date), 'dd/MM/yyyy', { locale: ptBR })}
                             </td>
-                            <td className="py-3 px-4">{formatKM(revision.current_km)}</td>
-                            <td className="py-3 px-4">{revision.oil_used}</td>
-                            <td className="py-3 px-4">{revision.mechanic_name}</td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon"
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{formatKM(revision.current_km)}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{revision.oil_used}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{revision.mechanic_name}</td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-0.5">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleViewDetails(revision)}
                                   title="Ver Detalhes"
+                                  className="h-7 w-7 p-0"
                                 >
-                                  <Eye className="w-4 h-4" />
+                                  <Eye className="w-3.5 h-3.5 text-primary" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon"
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handlePrintPDF(revision.id)}
                                   title="Imprimir PDF"
+                                  className="h-7 w-7 p-0"
                                 >
-                                  <Printer className="w-4 h-4" />
+                                  <Printer className="w-3.5 h-3.5 text-blue-600" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon"
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleDelete(revision.id)}
                                   title="Excluir"
-                                  className="text-red-600 hover:text-red-700"
+                                  className="h-7 w-7 p-0"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
                                 </Button>
                               </div>
                             </td>
