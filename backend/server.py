@@ -29,6 +29,7 @@ from routers.intl_invoices import api_router as intl_invoices_router
 from routers.rpa_terceiro import api_router as rpa_terceiro_router
 from routers.ordem_servico import api_router as ordem_servico_router
 from routers.expense_reports import api_router as expense_reports_router
+from routers.users import api_router as users_router
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -59,6 +60,7 @@ app.include_router(intl_invoices_router)
 app.include_router(rpa_terceiro_router)
 app.include_router(ordem_servico_router)
 app.include_router(expense_reports_router)
+app.include_router(users_router)
 
 # WebSocket endpoint para sincronização em tempo real
 @app.websocket("/ws")
@@ -80,8 +82,8 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
     # assinatura/expiração, então um usuário removido continuava recebendo
     # eventos em tempo real até o token expirar sozinho (até 7 dias). Mesma
     # proteção que get_current_active_user já aplica ao resto da API.
-    user_doc = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0, "id": 1})
-    if not user_doc:
+    user_doc = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0, "id": 1, "active": 1})
+    if not user_doc or user_doc.get('active') is False:
         await websocket.close(code=1008)
         return
 

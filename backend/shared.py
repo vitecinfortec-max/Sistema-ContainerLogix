@@ -115,11 +115,17 @@ async def get_current_active_user(current_user: dict = Depends(get_current_user)
     usuário (ex: funcionário desligado) não revoga o acesso dele até o token
     expirar sozinho (até 7 dias) — o token continuava sendo aceito só por
     decodificar certo, sem checar se a conta por trás dele ainda existe."""
-    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "id": 1})
+    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "id": 1, "active": 1})
     if not user_doc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário não encontrado ou removido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user_doc.get('active') is False:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Acesso desativado por um administrador",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return current_user
@@ -128,11 +134,17 @@ async def get_current_active_user(current_user: dict = Depends(get_current_user)
 async def get_current_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
     """Dependência para endpoints restritos ao perfil admin (módulo Financeiro).
     Também confirma que o usuário ainda existe, pela mesma razão de get_current_active_user."""
-    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "role": 1})
+    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "role": 1, "active": 1})
     if not user_doc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Usuário não encontrado ou removido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user_doc.get('active') is False:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Acesso desativado por um administrador",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if user_doc.get('role') != 'admin':

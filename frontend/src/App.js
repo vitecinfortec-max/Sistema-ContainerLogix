@@ -46,6 +46,7 @@ import UnitSegregationPage from './pages/UnitSegregationPage';
 import RPATerceiroPage from './pages/RPATerceiroPage';
 import OrdemServicoPage from './pages/OrdemServicoPage';
 import CompanySettingsPage from './pages/CompanySettingsPage';
+import UsersPage from './pages/UsersPage';
 
 function App() {
   return (
@@ -163,6 +164,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CompanySettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute adminOnly>
+                <UsersPage />
               </ProtectedRoute>
             }
           />

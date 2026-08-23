@@ -12,6 +12,7 @@ class User(BaseModel):
     password: str
     role: Literal["admin", "operator"] = "operator"
     must_change_password: bool = False  # True quando usar senha provisória
+    active: bool = True  # False = acesso revogado por um admin, sem apagar o usuário
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserResponse(BaseModel):
@@ -20,6 +21,7 @@ class UserResponse(BaseModel):
     email: str
     role: str
     must_change_password: bool = False
+    active: bool = True
     created_at: datetime
 
 class UserCreate(BaseModel):
@@ -30,6 +32,12 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     email: str
     password: str
+
+class UserRoleUpdate(BaseModel):
+    role: Literal["admin", "operator"]
+
+class UserStatusUpdate(BaseModel):
+    active: bool
 
 class Token(BaseModel):
     access_token: str

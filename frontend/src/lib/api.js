@@ -104,6 +104,11 @@ export const api = {
   getCompanySettings: () => axios.get(`${API}/company-settings`),
   updateCompanySettings: (data) => axios.put(`${API}/company-settings`, data),
 
+  // Gestão de Usuários (admin)
+  getUsers: () => axios.get(`${API}/users`),
+  updateUserRole: (userId, role) => axios.put(`${API}/users/${userId}/role`, { role }),
+  updateUserStatus: (userId, active) => axios.put(`${API}/users/${userId}/status`, { active }),
+
   // File Upload
   uploadFile: (file) => {
     const formData = new FormData();

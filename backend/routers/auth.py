@@ -213,15 +213,19 @@ async def login(credentials: UserLogin, http_request: Request):
 
     if not verify_password(credentials.password, user_doc['password']):
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
-    
+
+    if user_doc.get('active') is False:
+        raise HTTPException(status_code=403, detail="Acesso desativado. Fale com um administrador.")
+
     access_token = create_access_token(data={"sub": user_doc['id'], "email": user_doc['email'], "name": user_doc['name']})
-    
+
     user_response = UserResponse(
         id=user_doc['id'],
         name=user_doc['name'],
         email=user_doc['email'],
         role=user_doc['role'],
         must_change_password=user_doc.get('must_change_password', False),
+        active=user_doc.get('active', True),
         created_at=datetime.fromisoformat(user_doc['created_at'])
     )
     

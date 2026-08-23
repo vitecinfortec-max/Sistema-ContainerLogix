@@ -39,7 +39,8 @@ import {
   Store,
   Calculator,
   Sun,
-  Moon
+  Moon,
+  ShieldCheck
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -65,6 +66,7 @@ const PAGE_TITLES = {
   '/drivers': 'Pessoas',
   '/companies': 'Transportadoras',
   '/company-settings': 'Dados da Empresa',
+  '/users': 'Gestão de Usuários',
   '/clients': 'Clientes',
   '/suppliers': 'Fornecedores',
   '/shipping-lines': 'Armadores',
@@ -201,7 +203,7 @@ export default function Layout({ children }) {
   }, []);
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control';
-  const isCadastroActive = ['/drivers', '/companies', '/clients', '/suppliers', '/shipping-lines', '/service-types'].includes(location.pathname);
+  const isCadastroActive = ['/drivers', '/companies', '/clients', '/suppliers', '/shipping-lines', '/service-types', '/users'].includes(location.pathname);
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname.startsWith('/fleet/rpa-terceiro');
   const isFrotaActive = location.pathname === '/fleet' || location.pathname === '/fleet/vehicles' || location.pathname === '/fleet/revisions' || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname.startsWith('/fleet/checklist');
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
@@ -320,6 +322,9 @@ export default function Layout({ children }) {
     { path: '/shipping-lines', label: 'Armador', icon: Ship },
     { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList },
     { path: '/company-settings', label: 'Dados da Empresa', icon: Settings },
+    // Só admins veem o link - o backend também bloqueia, mas não faz sentido
+    // mostrar pra quem não pode usar
+    ...(isAdmin ? [{ path: '/users', label: 'Usuários', icon: ShieldCheck }] : []),
   ];
 
   const financeiroItems = [
