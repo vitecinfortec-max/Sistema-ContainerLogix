@@ -90,6 +90,31 @@ const PAGE_TITLES = {
   '/expense-reports': 'Prestação de Contas',
 };
 
+// Cor de destaque por grupo de topo do menu lateral (subgrupos aninhados como
+// "Movimentações"/"Flex Tank" dentro de Terminal não entram aqui de propósito -
+// continuam com a cor binária ativo/inativo de sempre).
+// Alguns itens do menu apontam pra mesma rota, diferenciados só pela query
+// string `?tab=` (abas dentro de uma página, ex: Frota e Flex Tank) - comparar
+// só o pathname faria o item "sem aba" (ex: Cadastro de Veículos, path=/fleet)
+// ficar sempre marcado como ativo mesmo com outra aba selecionada. Comparar
+// especificamente o parâmetro `tab` (ignorando outras query strings, como o
+// `min_days` usado em deep links de alerta) resolve isso sem quebrar nada.
+function isNavItemActive(item, location) {
+  const [itemPath, itemQuery] = item.path.split('?');
+  if (location.pathname !== itemPath) return false;
+  const itemTab = new URLSearchParams(itemQuery || '').get('tab');
+  const currentTab = new URLSearchParams(location.search).get('tab');
+  return itemTab === currentTab;
+}
+
+const GROUP_COLORS = {
+  Terminal: 'chart-1',
+  Frota: 'chart-2',
+  Cadastro: 'chart-3',
+  Financeiro: 'chart-4',
+  Operacional: 'chart-5',
+};
+
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -394,9 +419,7 @@ export default function Layout({ children }) {
   // Bsoft-style nav item
   const renderNavItem = (item, isSubItem = false, deepIndent = false) => {
     const Icon = item.icon;
-    // Para comparação, considerar pathname + search para URLs com query strings
-    const currentFullPath = location.pathname + location.search;
-    const isActive = location.pathname === item.path || currentFullPath === item.path;
+    const isActive = isNavItemActive(item, location);
 
     if (!sidebarOpen) {
       return (
@@ -449,8 +472,7 @@ export default function Layout({ children }) {
 
   // Mobile: item de navegação simples
   const renderMobileNavItem = (item, nested = false) => {
-    const currentFullPath = location.pathname + location.search;
-    const isActive = location.pathname === item.path || currentFullPath === item.path;
+    const isActive = isNavItemActive(item, location);
     return (
       <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
         className={`flex items-center gap-2 ${nested ? 'pl-14' : 'pl-10'} pr-4 py-2.5 text-[13px] border-b border-slate-100 dark:border-slate-800 ${
@@ -466,6 +488,7 @@ export default function Layout({ children }) {
   // Mobile: cabeçalho de grupo expansível
   const renderMobileGroupToggle = (label, icon, isOpen, toggle, isActive, nested = false) => {
     const Icon = icon;
+    const accentVar = GROUP_COLORS[label];
     return (
       <button onClick={toggle}
         className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-4' : 'px-4'} py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
@@ -473,7 +496,11 @@ export default function Layout({ children }) {
         }`}
       >
         <div className="flex items-center gap-3">
-          <Icon className="w-5 h-5 text-slate-800 dark:text-slate-200" strokeWidth={1.8} />
+          <Icon
+            className={accentVar ? 'w-5 h-5' : 'w-5 h-5 text-slate-800 dark:text-slate-200'}
+            style={accentVar ? { color: `hsl(var(--${accentVar}))` } : undefined}
+            strokeWidth={1.8}
+          />
           <span>{label}</span>
         </div>
         <ChevronRight className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
@@ -484,6 +511,8 @@ export default function Layout({ children }) {
   // Bsoft-style group header
   const renderGroupHeader = (label, icon, isOpen, toggle, isActive, testId, nested = false) => {
     const Icon = icon;
+    const accentVar = GROUP_COLORS[label];
+    const accentStyle = accentVar ? { color: `hsl(var(--${accentVar}))` } : undefined;
     if (!sidebarOpen) {
       // Subgrupos aninhados (ex: Flex Tank dentro de Terminal) só aparecem com a
       // sidebar expandida — no modo recolhido só o grupo de topo mostra ícone.
@@ -495,7 +524,11 @@ export default function Layout({ children }) {
           onClick={() => handleGroupClickCollapsed(toggle)}
           data-testid={testId}
         >
-          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={1.8} />
+          <Icon
+            className={accentVar ? 'w-[18px] h-[18px]' : `w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`}
+            style={accentStyle}
+            strokeWidth={1.8}
+          />
         </div>
       );
     }
@@ -508,7 +541,11 @@ export default function Layout({ children }) {
         data-testid={testId}
       >
         <div className="flex items-center gap-3">
-          <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+          <Icon
+            className={accentVar ? 'w-[18px] h-[18px] flex-shrink-0' : `w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`}
+            style={accentStyle}
+            strokeWidth={isActive ? 2.2 : 1.8}
+          />
           <span>{label}</span>
         </div>
         <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />

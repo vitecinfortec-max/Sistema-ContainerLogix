@@ -1106,9 +1106,11 @@ async def global_search(q: str, current_user: dict = Depends(get_current_active_
 
 @api_router.get("/alerts/summary")
 async def get_alerts_summary(current_user: dict = Depends(get_current_active_user)):
-    """Resumo leve de alertas para o sino do topo (hoje: containers parados no pátio há mais de 60 dias)."""
+    """Resumo leve de alertas - usado pelo sino do topo e pelo card 'Alertas do
+    Sistema' do dashboard (containers parados no pátio há mais de 30/60/90 dias)."""
     yard = await get_yard_control(current_user=current_user)
     return {
+        'yard_over_30_days': yard['stats']['over_30_days'],
         'yard_over_60_days': yard['stats']['over_60_days'],
         'yard_over_90_days': yard['stats']['over_90_days'],
     }

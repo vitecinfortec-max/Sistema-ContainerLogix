@@ -26,6 +26,13 @@
     --input: 220 13% 91%;
     --ring: 174 100% 26%;
     --radius: 0.375rem;
+
+    /* Cores de destaque por grupo do menu lateral (Layout.js GROUP_COLORS) */
+    --chart-1: 217 91% 60%;  /* Terminal */
+    --chart-2: 262 83% 66%;  /* Frota */
+    --chart-3: 38 92% 50%;   /* Cadastro */
+    --chart-4: 340 82% 60%;  /* Financeiro */
+    --chart-5: 152 60% 40%;  /* Operacional */
   }
 
   .dark {
@@ -48,6 +55,13 @@
     --border: 222 15% 20%;
     --input: 222 15% 20%;
     --ring: 174 70% 45%;
+
+    /* Cores de destaque por grupo do menu lateral - mais claras/dessaturadas pro fundo escuro */
+    --chart-1: 217 85% 68%;
+    --chart-2: 262 75% 73%;
+    --chart-3: 38 85% 58%;
+    --chart-4: 340 75% 68%;
+    --chart-5: 152 55% 50%;
   }
 }
 
