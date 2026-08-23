@@ -416,13 +416,33 @@ Sistema completo de entrada, saída e inventário de contêineres para empresas 
       regenerando esse arquivo a partir do template do Capacitor CLI + restaurando o `apply from:
       'cordova.variables.gradle'` que faltava. APK release gerado com sucesso, assinado com o
       keystore já existente (containerlogix-release.keystore, válido até 2053), buildado apontando
-      pra REACT_APP_BACKEND_URL=https://sistema-containerlogix.onrender.com. Ainda não confirmado se
-      o CORS_ORIGINS do backend em produção aceita a origem que o WebView do Capacitor usa
-      (tipicamente `https://localhost`) - se o login falhar por CORS no teste, adicionar essa origem
-      nas variáveis de ambiente do Render.)
+      pra REACT_APP_BACKEND_URL=https://sistema-containerlogix.onrender.com. Login testado no
+      aparelho real deu erro de rede persistente mesmo após liberar CORS - causa raiz real era o
+      WebView do Capacitor usando `http://localhost` como origem (não `https://`, como assumido
+      inicialmente) - corrigido no CORS_ORIGINS do Render. App também estava seguindo o tema
+      escuro do sistema do celular (ThemeContext caía pra dark via prefers-color-scheme) e usando
+      cores nativas genéricas do Capacitor (sem colors.xml próprio) - corrigido forçando tema claro
+      dentro do Capacitor e criando um colors.xml com a paleta da marca.)
 - [x] Remover motoristas duplicados do banco de dados (Verificado - 23/08/2026: checado em produção,
       não há duplicatas reais - item já não se aplicava)
 - [ ] Ativar rate limiting em endpoints adicionais além de login/forgot-password, se necessário
+- [x] Polimento visual do sistema, inspirado numa revisão do TRANSLEO/Bsoft TMS (Completo -
+      23/08/2026):
+      - Cores de destaque por grupo no menu lateral (Terminal/Frota/Cadastro/Financeiro/
+        Operacional), usando os slots `--chart-1..5` do CSS (existiam só no tailwind.config.js,
+        nunca foram definidos)
+      - Corrigido bug achado nesse processo: itens de menu que só se diferenciam por query
+        string (`/fleet` vs `/fleet?tab=revisions`) ficavam os dois marcados como ativos ao
+        mesmo tempo - a comparação de rota ativa ignorava a query
+      - Card "Alertas do Sistema" no dashboard (containers +30/60/90 dias no pátio, clicável,
+        navega já filtrado)
+      - `MovementsPage.js` definida pelo usuário como tela de referência "perfeita" - todas as
+        outras páginas de listagem padronizadas contra ela (cabeçalho, card de filtro, tabela,
+        badges, botões de ação): FleetPage, LoadingSchedulePage, ExpenseReportsPage,
+        ContainerInspectionsPage, PhotoRegistriesPage (+ trocou AlertDialog cru por useConfirm),
+        RPATerceiroPage (só cor - tirou o verde-esmeralda fora da marca, manteve o componente
+        Table), DriversPage, ClientsPage, YardControlPage (1 badge). As telas de filtro
+        adicionadas preservam a busca já existente (não inventaram campo novo).
 - [x] Numeração sequencial (status/segregação/RPA/OS) com risco de duplicidade sob concorrência
       (Completo - 23/08/2026: movimentações, status de entrega, segregação de unidade e programação
       de carregamento já usavam contador atômico via `db.counters`; RPA e OS já tinham a criação
