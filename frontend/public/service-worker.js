@@ -1,8 +1,10 @@
-const CACHE_NAME = 'containerlogix-v1.5.0';
+const CACHE_NAME = 'containerlogix-v1.6.0';
+// O build do CRA gera nomes de arquivo com hash (ex: main.3e77797c.js), que
+// mudam a cada deploy - não dá pra listar um nome fixo aqui. Só pré-cacheia o
+// que realmente existe com nome estável; o resto é cacheado sob demanda pelo
+// fetch handler abaixo.
 const urlsToCache = [
   '/',
-  '/static/css/main.css',
-  '/static/js/main.js',
   '/manifest.json'
 ];
 
@@ -10,10 +12,8 @@ const urlsToCache = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Cache aberto');
-        return cache.addAll(urlsToCache);
-      })
+      .then((cache) => cache.addAll(urlsToCache))
+      .catch((err) => console.warn('Falha ao pré-cachear (não bloqueia a instalação):', err))
   );
   self.skipWaiting();
 });
@@ -46,27 +46,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Para outros recursos, usar cache-first
+  // Para o restante (HTML, JS, CSS, manifest) - network-first: busca a versão
+  // mais recente sempre que há conexão, e só cai pro cache se estiver offline.
+  // Antes era cache-first "pra sempre" - uma vez guardado, o app nunca mais
+  // verificava se tinha deploy novo, nem forçando recarregar a página.
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then((response) => {
-        if (response) {
-          return response;
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
         }
-        return fetch(event.request).then(
-          (response) => {
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-            return response;
-          }
-        );
+        return response;
       })
+      .catch(() => caches.match(event.request))
   );
 });
 
@@ -82,7 +77,10 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    })
+      // Assume o controle das abas já abertas imediatamente, em vez de esperar
+      // elas serem fechadas - junto com skipWaiting(), evita o app ficar preso
+      // na versão anterior enquanto o usuário não fecha e reabre.
+    }).then(() => self.clients.claim())
   );
 });
 
