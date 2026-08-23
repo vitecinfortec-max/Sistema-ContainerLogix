@@ -74,6 +74,83 @@ Sistema completo de entrada, saída e inventário de contêineres para empresas 
 
 ## Histórico de Alterações Recentes
 
+### 23/08/2026 (Sessão Atual)
+- **Auditoria completa e correções de segurança/performance/bugs ✅**
+  - Backend: path traversal no delete de upload, validação de tipo/tamanho de arquivo faltando em 2
+    endpoints, CORS permissivo (`*` com credentials), sem rate limiting em login/forgot-password,
+    numeração sequencial (status/segregação/RPA/OS) com risco de duplicidade sob concorrência, corte
+    silencioso de dados em relatórios/dashboard (`to_list(10000)` fixo), `JWT_SECRET_KEY` gerava
+    chave aleatória se não configurada (invalidava tokens a cada restart), WebSocket não revalidava
+    usuário removido, ~13 buscas com regex sem `re.escape` (quebra com caractere especial/ReDoS)
+  - Frontend: autocomplete que não fechava em 2 telas, filtro de motorista quebrava com `driver_name`
+    nulo, WebSocket duplicado (3 conexões simultâneas → 1 só via `WebSocketProvider` compartilhado),
+    componente `Autocomplete` extraído (estava copiado em 4 páginas), confirmação de exclusão
+    padronizada (`useConfirm` em vez de `window.confirm()`), compressão de imagem no upload de fotos
+  - **`backend/server.py` dividido em `backend/routers/` por domínio** (~8000 linhas → 186 linhas +
+    16 módulos de ~200-1600 linhas cada + `backend/shared.py` com infra comum). Verificado com
+    `pyflakes` + import dinâmico (170 rotas confirmadas, nenhuma perdida).
+
+- **Gestão de Usuários ✅** (`backend/routers/users.py`, `frontend/src/pages/UsersPage.js`)
+  - Admin pode promover/rebaixar (admin↔operador) e ativar/desativar acesso de qualquer usuário,
+    sem apagar o cadastro. Protegido contra remover o último admin ou autodesativar-se.
+  - `User.active: bool` novo campo; `get_current_active_user`/login checam isso.
+
+- **Módulos Contratados ✅** (`backend/routers/module_config.py`, `frontend/src/pages/ModulesPage.js`)
+  - Campo `User.is_superadmin` (só setável direto no banco, nunca via API/UI) controla quem pode
+    liberar/bloquear grupos ou itens do menu para o cliente desta instância — pensado para o modelo
+    de negócio "uma instância por cliente" (ver `provisioning/provision_client.py`).
+  - Travado em 2 camadas: menu esconde (`ModuleConfigContext` + `Layout.js`) e `module_gate_middleware`
+    em `server.py` bloqueia a API mesmo se alguém chamar a rota direto.
+
+- **Deploy em produção pela primeira vez ✅**
+  - Frontend: Vercel (projeto `frontend`, time `vitecinfortec-5654s-projects`), domínio próprio
+    `containerlogix.com.br` (+ `www`), Root Directory = `frontend`, `vercel.json` força `CI=false`
+    (senão o build trava por warning de lint pré-existente). Deploy automático a cada push no GitHub.
+  - Backend: Render (serviço `Sistema-ContainerLogix`, plano Free), `sistema-containerlogix.onrender.com`.
+    Free tier "dorme" após inatividade (~50s de delay no primeiro acesso) — upgrade pra Starter
+    (~$7/mês) remove isso, recomendado se for usar como produto de verdade.
+  - Banco: MongoDB Atlas, cluster `cluster0.xt2husn.mongodb.net`, banco `containerlogix`, usuário
+    `containerlogix`, acesso de rede liberado para `0.0.0.0/0` (Render não tem IP fixo no plano free/starter).
+  - DNS do domínio movido de Cloudflare para o próprio Registro.br ("Configurar zona DNS" / modo avançado).
+  - **Service worker corrigido** (`frontend/public/service-worker.js`): era cache-first "para sempre"
+    em HTML/JS/CSS — depois de um deploy novo, o navegador continuava servindo a versão antiga
+    indefinidamente (só resolvia limpando cache manual). Trocado para network-first com fallback pro
+    cache só quando offline de verdade; também corrigida a lista de pré-cache (referenciava nomes de
+    arquivo sem hash que não existem no build, fazia a instalação do SW falhar silenciosamente).
+  - Instalador Windows também gerado (`desktop/dist/ContainerLogix-Setup-1.0.0.exe`) — canal de
+    distribuição separado do deploy web, para uso offline no pátio.
+
+- **Provisionamento automatizado para vender o sistema ✅** (`provisioning/provision_client.py`)
+  - Decisão de arquitetura: em vez de multi-tenant (schema único + `company_id` em tudo, exigiria
+    auditar ~170 endpoints), optou-se pelo modelo "uma instância isolada por cliente" (mesmo repo,
+    banco/backend/frontend próprios) — mais simples e mais seguro contra vazamento entre clientes,
+    ao custo de precisar administrar cada instância separadamente.
+  - Script automatiza: banco novo no mesmo cluster Atlas, projeto novo na Vercel (via API REST,
+    incluindo desativar proteção SSO que trava o acesso público), serviço novo no Render (via API
+    REST), e conecta as duas pontas (CORS_ORIGINS ↔ REACT_APP_BACKEND_URL).
+  - As chamadas HTTP do script usam `curl` via `subprocess` em vez da lib `requests` — nesta máquina,
+    o Python não fecha o handshake TLS com `api.render.com`/`api.vercel.com` (`SSLEOFError`), mas
+    `curl` (via SChannel do Windows) funciona normalmente para os mesmos hosts.
+  - **Testado ponta a ponta só o lado Vercel** (criou projeto de teste descartável, funcionou, foi
+    apagado depois). O lado Render não foi testado de verdade — a conta exige cartão cadastrado até
+    para o plano Free (bloqueou com 402); vai ser validado no primeiro cliente real (que usaria plano
+    Starter pago mesmo, então não é um bloqueio pra uso real).
+  - **Pendência:** domínio custom por cliente e ativação do primeiro admin de cada instância nova
+    ainda são passos manuais (documentados no output do próprio script).
+
+- **Zoho Mail (e-mail profissional `@containerlogix.com.br`) — em andamento, não concluído**
+  - Plano Standard (pago) contratado. Verificação de domínio parada na etapa de adicionar o registro
+    TXT `zoho-verification=zb75259253.zmverify.zoho.com` no Registro.br — a zona DNS ficou "em
+    transição" (~1h33min de espera) depois da troca de nameservers Cloudflare→Registro.br feita na
+    mesma sessão. Retomar em "Configurar zona DNS" no painel do domínio quando o aviso de transição sumir.
+
+- **Problema não resolvido: layout mobile "modo desktop" mesmo em navegador real**
+  - Investigado a fundo (não era "Site para computador" do navegador, nem bug nas classes Tailwind
+    `hidden md:flex`/`md:hidden` — confirmado que o CSS publicado está correto). Suspeita forte é o
+    cache antigo do Service Worker (corrigido nesta sessão, ver acima) — não foi reconfirmado pelo
+    usuário depois do fix. Se voltar a acontecer, descartar a teoria do Service Worker e investigar
+    de novo (configuração de DPI/zoom do aparelho Android específico, talvez).
+
 ### 26/07/2026 (Sessão Atual)
 - **Checklist de Avarias na Vistoria de Container ✅**
   - Campos `no_damage` (bool) e `damage_items` (lista) no modelo `ContainerInspection`
