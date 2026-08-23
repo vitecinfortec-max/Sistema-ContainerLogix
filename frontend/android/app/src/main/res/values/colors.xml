@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cores da marca ContainerLogix (mesmo teal/laranja usado no CSS do app) -->
+    <color name="colorPrimary">#008577</color>
+    <color name="colorPrimaryDark">#00695C</color>
+    <color name="colorAccent">#F38C25</color>
+</resources>

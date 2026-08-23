@@ -6,7 +6,7 @@ import { api } from '../lib/api';
 import {
   ArrowDownCircle, ArrowUpCircle, Container, Package, Plus, Calendar, ArrowRight,
   FileText, Receipt, Truck, Users, BarChart3, DollarSign, Ship, Building2,
-  ClipboardList, X, Check, Settings2, Trophy, Medal, Award
+  ClipboardList, X, Check, Settings2, Trophy, Medal, Award, AlertTriangle, CheckCircle2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -56,6 +56,7 @@ const DEFAULT_SHORTCUT_IDS = ['new-movement', 'movements', 'report-movements', '
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [alerts, setAlerts] = useState({ over_30: 0, over_60: 0, over_90: 0 });
   const [userShortcuts, setUserShortcuts] = useState(DEFAULT_SHORTCUT_IDS);
   const [showEditor, setShowEditor] = useState(false);
   const [editorSelection, setEditorSelection] = useState([]);
@@ -64,6 +65,7 @@ export default function DashboardPage() {
   const handleWebSocketMessage = useCallback((message) => {
     if (message.type === 'MOVEMENT_CREATED' || message.type === 'MOVEMENT_DELETED') {
       loadStats();
+      loadAlerts();
     }
   }, []);
 
@@ -72,6 +74,7 @@ export default function DashboardPage() {
   useEffect(() => {
     loadStats();
     loadShortcuts();
+    loadAlerts();
   }, []);
 
   const loadStats = async () => {
@@ -82,6 +85,19 @@ export default function DashboardPage() {
       toast.error('Erro ao carregar estatísticas');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAlerts = async () => {
+    try {
+      const response = await api.getAlertsSummary();
+      setAlerts({
+        over_30: response.data.yard_over_30_days || 0,
+        over_60: response.data.yard_over_60_days || 0,
+        over_90: response.data.yard_over_90_days || 0,
+      });
+    } catch (error) {
+      console.error('Erro ao carregar alertas:', error);
     }
   };
 
@@ -366,6 +382,54 @@ export default function DashboardPage() {
               <div className="p-8 text-center text-slate-400 dark:text-slate-500">
                 <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
                 <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Alertas do Sistema */}
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="system-alerts-card">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Alertas do Sistema</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4">
+            {(alerts.over_30 + alerts.over_60 + alerts.over_90) > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {alerts.over_30 > 0 && (
+                  <button
+                    onClick={() => navigate('/yard-control?min_days=31')}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+                    data-testid="alert-over-30"
+                  >
+                    {alerts.over_30} container{alerts.over_30 > 1 ? 's' : ''} há mais de 30 dias no pátio
+                  </button>
+                )}
+                {alerts.over_60 > 0 && (
+                  <button
+                    onClick={() => navigate('/yard-control?min_days=61')}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
+                    data-testid="alert-over-60"
+                  >
+                    {alerts.over_60} container{alerts.over_60 > 1 ? 's' : ''} há mais de 60 dias no pátio
+                  </button>
+                )}
+                {alerts.over_90 > 0 && (
+                  <button
+                    onClick={() => navigate('/yard-control?min_days=91')}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                    data-testid="alert-over-90"
+                  >
+                    {alerts.over_90} container{alerts.over_90 > 1 ? 's' : ''} há mais de 90 dias no pátio
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 text-center text-slate-400 dark:text-slate-500">
+                <CheckCircle2 className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">Nenhum alerta no momento</p>
               </div>
             )}
           </CardContent>
