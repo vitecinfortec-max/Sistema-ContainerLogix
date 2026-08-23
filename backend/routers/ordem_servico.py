@@ -112,8 +112,12 @@ async def list_ordem_servico(
 
 @api_router.get("/ordem-servico/next-number")
 async def get_next_os_number(current_user: dict = Depends(get_current_active_user)):
-    last = await db.ordem_servico.find_one({}, sort=[("os_number", -1)])
-    return {"next_number": (last["os_number"] + 1) if last else 1}
+    """Só uma prévia para exibir na tela; o número real é reservado de forma
+    atômica na criação (ver create_ordem_servico). Lê o mesmo contador em vez de
+    buscar a última OS criada, senão a prévia pode ficar dessincronizada sob
+    concorrência."""
+    counter = await db.counters.find_one({"_id": "os_number"})
+    return {"next_number": (counter["seq"] + 1) if counter else 1}
 
 
 @api_router.get("/ordem-servico/{os_id}", response_model=OrdemServicoResponse)

@@ -401,14 +401,25 @@ Sistema completo de entrada, saída e inventário de contêineres para empresas 
 
 ### P1 - Alta Prioridade
 - [x] Verificar bug da página em branco na impressão do recibo de movimento (CSS corrigido - Verificado 08/03/2026)
-- [ ] Otimizar queries do banco de dados (3 endpoints identificados pelo deployment agent)
+- [x] Otimizar queries do banco de dados (Completo - 23/08/2026: dashboard, controle de pátio e
+      relatórios de estoque não trazem mais a coleção inteira de movimentações para o Python)
 
 ### P2 - Backlog
-- [ ] Refatorar server.py em APIRouters separados (4700+ linhas)
-- [ ] Extrair componente de autocomplete reutilizável
-- [ ] Gerar instalador Windows (.msi)
+- [x] Refatorar server.py em APIRouters separados (Completo - 23/08/2026: 186 linhas + 16 módulos
+      em backend/routers/)
+- [x] Extrair componente de autocomplete reutilizável (Completo - 23/08/2026)
+- [x] Gerar instalador Windows (Completo - 26/07/2026: ContainerLogix-Setup-1.0.0.exe via
+      electron-builder, standalone com Python/MongoDB embutidos - formato .exe, não .msi)
 - [ ] Gerar aplicativo Android (.apk)
-- [ ] Remover motoristas duplicados do banco de dados
+- [x] Remover motoristas duplicados do banco de dados (Verificado - 23/08/2026: checado em produção,
+      não há duplicatas reais - item já não se aplicava)
+- [ ] Ativar rate limiting em endpoints adicionais além de login/forgot-password, se necessário
+- [x] Numeração sequencial (status/segregação/RPA/OS) com risco de duplicidade sob concorrência
+      (Completo - 23/08/2026: movimentações, status de entrega, segregação de unidade e programação
+      de carregamento já usavam contador atômico via `db.counters`; RPA e OS já tinham a criação
+      atômica também, só os endpoints de "prévia do próximo número" (`/rpa-terceiro/next-number` e
+      `/ordem-servico/next-number`) ainda liam "buscar último + 1" - corrigido pra ler do mesmo
+      contador atômico, evitando prévia dessincronizada sob concorrência)
 
 ## Credenciais de Teste
 - Email: joao.victor@jalogisticas.com

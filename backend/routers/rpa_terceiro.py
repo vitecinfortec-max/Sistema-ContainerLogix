@@ -131,13 +131,12 @@ async def get_next_rpa_number(
     rpa_type: Optional[str] = "terceiro",
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Próximo número sequencial do RPA (separado por tipo)."""
-    if rpa_type == "terceiro":
-        type_filter = {"$or": [{"rpa_type": "terceiro"}, {"rpa_type": {"$exists": False}}]}
-    else:
-        type_filter = {"rpa_type": rpa_type}
-    last = await db.rpa_terceiro.find_one(type_filter, sort=[("rpa_number", -1)])
-    next_num = (last["rpa_number"] + 1) if last else 1
+    """Próximo número sequencial do RPA (separado por tipo) - só uma prévia para
+    exibir na tela; o número real é reservado de forma atômica na criação (ver
+    create_rpa_terceiro). Lê o mesmo contador em vez de buscar o último RPA
+    criado, senão a prévia pode ficar dessincronizada sob concorrência."""
+    counter = await db.counters.find_one({"_id": f"rpa_number:{rpa_type or 'terceiro'}"})
+    next_num = (counter["seq"] + 1) if counter else 1
     return {"next_number": next_num}
 
 
