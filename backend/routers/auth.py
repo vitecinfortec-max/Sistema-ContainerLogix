@@ -226,9 +226,10 @@ async def login(credentials: UserLogin, http_request: Request):
         role=user_doc['role'],
         must_change_password=user_doc.get('must_change_password', False),
         active=user_doc.get('active', True),
+        is_superadmin=user_doc.get('is_superadmin', False),
         created_at=datetime.fromisoformat(user_doc['created_at'])
     )
-    
+
     return Token(access_token=access_token, token_type="bearer", user=user_response)
 
 @api_router.get("/auth/me", response_model=UserResponse)
@@ -243,6 +244,8 @@ async def get_me(current_user: dict = Depends(get_current_active_user)):
         email=user_doc['email'],
         role=user_doc['role'],
         must_change_password=user_doc.get('must_change_password', False),
+        active=user_doc.get('active', True),
+        is_superadmin=user_doc.get('is_superadmin', False),
         created_at=datetime.fromisoformat(user_doc['created_at'])
     )
 

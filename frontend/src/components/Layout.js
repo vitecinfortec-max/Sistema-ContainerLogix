@@ -40,13 +40,15 @@ import {
   Calculator,
   Sun,
   Moon,
-  ShieldCheck
+  ShieldCheck,
+  LayoutGrid
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from './ui/button';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useModuleConfig } from '../context/ModuleConfigContext';
 import { api } from '../lib/api';
 import CommandPalette from './CommandPalette';
 
@@ -67,6 +69,7 @@ const PAGE_TITLES = {
   '/companies': 'Transportadoras',
   '/company-settings': 'Dados da Empresa',
   '/users': 'Gestão de Usuários',
+  '/modules': 'Módulos Contratados',
   '/clients': 'Clientes',
   '/suppliers': 'Fornecedores',
   '/shipping-lines': 'Armadores',
@@ -90,6 +93,8 @@ const PAGE_TITLES = {
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isSuperadmin = !!user?.is_superadmin;
+  const { isModuleEnabled } = useModuleConfig();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -291,55 +296,71 @@ export default function Layout({ children }) {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   ];
 
+  // Módulos contratados: itens sem moduleKey (Dados da Empresa, Usuários,
+  // Módulos) nunca são bloqueados por essa trava - são gestão da própria
+  // conta, não um serviço que se contrata à parte.
   const terminalItems = [
-    { path: '/container-inspections', label: 'Vistoria de Container', icon: ClipboardCheck },
-  ];
+    { path: '/container-inspections', label: 'Vistoria de Container', icon: ClipboardCheck, moduleKey: 'terminal.vistoria' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const flexTankItems = [
-    { path: '/flex-tank', label: 'Movimentações', icon: List },
-    { path: '/flex-tank?tab=reports', label: 'Relatórios', icon: BarChart3 },
-  ];
+    { path: '/flex-tank', label: 'Movimentações', icon: List, moduleKey: 'terminal.flex_tank' },
+    { path: '/flex-tank?tab=reports', label: 'Relatórios', icon: BarChart3, moduleKey: 'terminal.flex_tank' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const movimentacoesItems = [
-    { path: '/movements', label: 'Movimentações', icon: List },
-    { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package },
-    { path: '/yard-control', label: 'Controle de Pátio', icon: Clock },
-    { path: '/reports/movements', label: 'Relatório de Movimentação', icon: BarChart3 },
-  ];
+    { path: '/movements', label: 'Movimentações', icon: List, moduleKey: 'terminal.movimentacoes' },
+    { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package, moduleKey: 'terminal.movimentacoes' },
+    { path: '/yard-control', label: 'Controle de Pátio', icon: Clock, moduleKey: 'terminal.movimentacoes' },
+    { path: '/reports/movements', label: 'Relatório de Movimentação', icon: BarChart3, moduleKey: 'terminal.movimentacoes' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const frotaItems = [
-    { path: '/fleet', label: 'Cadastro de Veículos', icon: Car },
-    { path: '/fleet?tab=revisions', label: 'Controle de Revisão', icon: Wrench },
-    { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList },
-    { path: '/fleet/checklist', label: 'Checklist de Veículo', icon: ClipboardCheck },
-  ];
+    { path: '/fleet', label: 'Cadastro de Veículos', icon: Car, moduleKey: 'frota.veiculos' },
+    { path: '/fleet?tab=revisions', label: 'Controle de Revisão', icon: Wrench, moduleKey: 'frota.revisao' },
+    { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList, moduleKey: 'frota.ordem_servico' },
+    { path: '/fleet/checklist', label: 'Checklist de Veículo', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const cadastroItems = [
-    { path: '/drivers', label: 'Pessoas', icon: Truck },
-    { path: '/companies', label: 'Transportadora', icon: Building2 },
-    { path: '/clients', label: 'Cliente', icon: Users },
-    { path: '/suppliers', label: 'Fornecedor', icon: Store },
-    { path: '/shipping-lines', label: 'Armador', icon: Ship },
-    { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList },
+    { path: '/drivers', label: 'Pessoas', icon: Truck, moduleKey: 'cadastro.pessoas' },
+    { path: '/companies', label: 'Transportadora', icon: Building2, moduleKey: 'cadastro.transportadora' },
+    { path: '/clients', label: 'Cliente', icon: Users, moduleKey: 'cadastro.cliente' },
+    { path: '/suppliers', label: 'Fornecedor', icon: Store, moduleKey: 'cadastro.fornecedor' },
+    { path: '/shipping-lines', label: 'Armador', icon: Ship, moduleKey: 'cadastro.armador' },
+    { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList, moduleKey: 'cadastro.tipos_servico' },
     { path: '/company-settings', label: 'Dados da Empresa', icon: Settings },
-    // Só admins veem o link - o backend também bloqueia, mas não faz sentido
-    // mostrar pra quem não pode usar
-    ...(isAdmin ? [{ path: '/users', label: 'Usuários', icon: ShieldCheck }] : []),
-  ];
+  ]
+    .filter((item) => isModuleEnabled(item.moduleKey))
+    .concat(
+      // Só admins veem o link de Usuários - o backend também bloqueia, mas
+      // não faz sentido mostrar pra quem não pode usar. "Módulos" é ainda
+      // mais restrito: só a conta do dono do sistema (superadmin) enxerga.
+      isAdmin ? [{ path: '/users', label: 'Usuários', icon: ShieldCheck }] : [],
+      isSuperadmin ? [{ path: '/modules', label: 'Módulos Contratados', icon: LayoutGrid }] : [],
+    );
 
   const financeiroItems = [
-    { path: '/billing', label: 'Faturas', icon: Receipt },
-    { path: '/international-invoices', label: 'Invoice Internacional', icon: Globe },
-    { path: '/reports/billing', label: 'Relatório de Faturamento', icon: BarChart3 },
-    { path: '/daily-rate-requests', label: 'Solicitação de Diária', icon: Wallet },
-    { path: '/expense-reports', label: 'Prestação de Contas', icon: Calculator },
-    { path: '/fleet/rpa-terceiro', label: 'RPA Terceiro', icon: FileText },
-  ];
+    { path: '/billing', label: 'Faturas', icon: Receipt, moduleKey: 'financeiro.faturas' },
+    { path: '/international-invoices', label: 'Invoice Internacional', icon: Globe, moduleKey: 'financeiro.invoice_internacional' },
+    { path: '/reports/billing', label: 'Relatório de Faturamento', icon: BarChart3, moduleKey: 'financeiro.relatorio_faturamento' },
+    { path: '/daily-rate-requests', label: 'Solicitação de Diária', icon: Wallet, moduleKey: 'financeiro.diaria' },
+    { path: '/expense-reports', label: 'Prestação de Contas', icon: Calculator, moduleKey: 'financeiro.prestacao_contas' },
+    { path: '/fleet/rpa-terceiro', label: 'RPA Terceiro', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const operacionalItems = [
-    { path: '/loading-schedules', label: 'Programação de Carregamento', icon: Calendar },
-    { path: '/delivery-status', label: 'Status de Entrega', icon: ClipboardCheck },
-  ];
+    { path: '/loading-schedules', label: 'Programação de Carregamento', icon: Calendar, moduleKey: 'operacional.programacao_carregamento' },
+    { path: '/delivery-status', label: 'Status de Entrega', icon: ClipboardCheck, moduleKey: 'operacional.status_entrega' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
+  // Esconde o grupo inteiro do menu quando todo módulo dentro dele foi
+  // desativado (senão o grupo aparece vazio ao expandir). Cadastro nunca
+  // some porque "Dados da Empresa" nunca é bloqueado por módulo contratado.
+  const isTerminalGroupVisible = terminalItems.length > 0 || movimentacoesItems.length > 0 || flexTankItems.length > 0;
+  const isFrotaGroupVisible = frotaItems.length > 0;
+  const isFinanceiroGroupVisible = financeiroItems.length > 0;
+  const isOperacionalGroupVisible = operacionalItems.length > 0;
 
   const allSearchableItems = useMemo(() => [
     ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...frotaItems, ...cadastroItems,
@@ -669,24 +690,24 @@ export default function Layout({ children }) {
                 {mainNavItems.map((item) => renderNavItem(item))}
 
                 {/* Terminal */}
-                {renderGroupHeader('Terminal', Anchor, terminalOpen, toggleTerminal, isTerminalActive, 'nav-terminal-toggle')}
-                {terminalOpen && sidebarOpen && (
+                {isTerminalGroupVisible && renderGroupHeader('Terminal', Anchor, terminalOpen, toggleTerminal, isTerminalActive, 'nav-terminal-toggle')}
+                {isTerminalGroupVisible && terminalOpen && sidebarOpen && (
                   <div>
                     {terminalItems.map((item) => renderNavItem(item, true, true))}
-                    {renderGroupHeader('Movimentações', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, 'nav-movimentacoes-toggle', true)}
-                    {movimentacoesOpen && (
+                    {movimentacoesItems.length > 0 && renderGroupHeader('Movimentações', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, 'nav-movimentacoes-toggle', true)}
+                    {movimentacoesItems.length > 0 && movimentacoesOpen && (
                       <div>{movimentacoesItems.map((item) => renderNavItem(item, true, true))}</div>
                     )}
-                    {renderGroupHeader('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, 'nav-flex-tank-toggle', true)}
-                    {flexTankOpen && (
+                    {flexTankItems.length > 0 && renderGroupHeader('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, 'nav-flex-tank-toggle', true)}
+                    {flexTankItems.length > 0 && flexTankOpen && (
                       <div>{flexTankItems.map((item) => renderNavItem(item, true, true))}</div>
                     )}
                   </div>
                 )}
 
                 {/* Frota */}
-                {renderGroupHeader('Frota', Truck, frotaOpen, toggleFrota, isFrotaActive, 'nav-frota-toggle')}
-                {frotaOpen && sidebarOpen && (
+                {isFrotaGroupVisible && renderGroupHeader('Frota', Truck, frotaOpen, toggleFrota, isFrotaActive, 'nav-frota-toggle')}
+                {isFrotaGroupVisible && frotaOpen && sidebarOpen && (
                   <div>{frotaItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
@@ -697,14 +718,14 @@ export default function Layout({ children }) {
                 )}
 
                 {/* Financeiro */}
-                {isAdmin && renderGroupHeader('Financeiro', DollarSign, financeiroOpen, toggleFinanceiro, isFinanceiroActive, 'nav-financeiro-toggle')}
-                {isAdmin && financeiroOpen && sidebarOpen && (
+                {isAdmin && isFinanceiroGroupVisible && renderGroupHeader('Financeiro', DollarSign, financeiroOpen, toggleFinanceiro, isFinanceiroActive, 'nav-financeiro-toggle')}
+                {isAdmin && isFinanceiroGroupVisible && financeiroOpen && sidebarOpen && (
                   <div>{financeiroItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
                 {/* Operacional */}
-                {renderGroupHeader('Operacional', Clipboard, operacionalOpen, toggleOperacional, isOperacionalActive, 'nav-operacional-toggle')}
-                {operacionalOpen && sidebarOpen && (
+                {isOperacionalGroupVisible && renderGroupHeader('Operacional', Clipboard, operacionalOpen, toggleOperacional, isOperacionalActive, 'nav-operacional-toggle')}
+                {isOperacionalGroupVisible && operacionalOpen && sidebarOpen && (
                   <div>{operacionalItems.map((item) => renderNavItem(item, true))}</div>
                 )}
               </div>
@@ -776,32 +797,32 @@ export default function Layout({ children }) {
                 })}
 
                 {/* Terminal Mobile */}
-                {renderMobileGroupToggle('Terminal', Anchor, terminalOpen, toggleTerminal, isTerminalActive)}
-                {terminalOpen && (
+                {isTerminalGroupVisible && renderMobileGroupToggle('Terminal', Anchor, terminalOpen, toggleTerminal, isTerminalActive)}
+                {isTerminalGroupVisible && terminalOpen && (
                   <div>
                     {terminalItems.map((item) => renderMobileNavItem(item, true))}
-                    {renderMobileGroupToggle('Movimentações', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, true)}
-                    {movimentacoesOpen && movimentacoesItems.map((item) => renderMobileNavItem(item, true))}
-                    {renderMobileGroupToggle('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, true)}
-                    {flexTankOpen && flexTankItems.map((item) => renderMobileNavItem(item, true))}
+                    {movimentacoesItems.length > 0 && renderMobileGroupToggle('Movimentações', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, true)}
+                    {movimentacoesItems.length > 0 && movimentacoesOpen && movimentacoesItems.map((item) => renderMobileNavItem(item, true))}
+                    {flexTankItems.length > 0 && renderMobileGroupToggle('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, true)}
+                    {flexTankItems.length > 0 && flexTankOpen && flexTankItems.map((item) => renderMobileNavItem(item, true))}
                   </div>
                 )}
 
                 {/* Frota Mobile */}
-                {renderMobileGroupToggle('Frota', Truck, frotaOpen, toggleFrota, isFrotaActive)}
-                {frotaOpen && frotaItems.map((item) => renderMobileNavItem(item))}
+                {isFrotaGroupVisible && renderMobileGroupToggle('Frota', Truck, frotaOpen, toggleFrota, isFrotaActive)}
+                {isFrotaGroupVisible && frotaOpen && frotaItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Cadastro Mobile */}
                 {renderMobileGroupToggle('Cadastro', FolderOpen, cadastroOpen, toggleCadastro, isCadastroActive)}
                 {cadastroOpen && cadastroItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Financeiro Mobile */}
-                {isAdmin && renderMobileGroupToggle('Financeiro', DollarSign, financeiroOpen, toggleFinanceiro, isFinanceiroActive)}
-                {isAdmin && financeiroOpen && financeiroItems.map((item) => renderMobileNavItem(item))}
+                {isAdmin && isFinanceiroGroupVisible && renderMobileGroupToggle('Financeiro', DollarSign, financeiroOpen, toggleFinanceiro, isFinanceiroActive)}
+                {isAdmin && isFinanceiroGroupVisible && financeiroOpen && financeiroItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Operacional Mobile */}
-                {renderMobileGroupToggle('Operacional', Clipboard, operacionalOpen, toggleOperacional, isOperacionalActive)}
-                {operacionalOpen && operacionalItems.map((item) => renderMobileNavItem(item))}
+                {isOperacionalGroupVisible && renderMobileGroupToggle('Operacional', Clipboard, operacionalOpen, toggleOperacional, isOperacionalActive)}
+                {isOperacionalGroupVisible && operacionalOpen && operacionalItems.map((item) => renderMobileNavItem(item))}
 
                 <button onClick={handleLogout}
                   className="flex items-center gap-3 px-4 py-3 text-sm text-red-600 w-full"

@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 # Carregar variáveis de ambiente ANTES de qualquer outra importação
@@ -10,7 +11,10 @@ import os
 import logging
 from typing import Optional
 
-from shared import db, client, manager, UPLOADS_DIR
+from shared import (
+    db, client, manager, UPLOADS_DIR,
+    get_disabled_modules, match_module_for_path, is_module_disabled,
+)
 from auth import decode_token
 
 from routers.auth import api_router as auth_router
@@ -30,8 +34,23 @@ from routers.rpa_terceiro import api_router as rpa_terceiro_router
 from routers.ordem_servico import api_router as ordem_servico_router
 from routers.expense_reports import api_router as expense_reports_router
 from routers.users import api_router as users_router
+from routers.module_config import api_router as module_config_router
 
 app = FastAPI()
+
+
+@app.middleware("http")
+async def module_gate_middleware(request: Request, call_next):
+    """Bloqueia no backend o acesso a módulos que o cliente ainda não
+    contratou - complementa o menu escondido no frontend, que sozinho não
+    impede alguém de chamar a rota da API direto."""
+    if request.method != "OPTIONS":
+        module_key = match_module_for_path(request.url.path)
+        if module_key:
+            disabled = await get_disabled_modules()
+            if is_module_disabled(module_key, disabled):
+                return JSONResponse(status_code=403, content={"detail": "Este módulo não está disponível no seu plano atual"})
+    return await call_next(request)
 api_router = APIRouter(prefix="/api")
 
 # Montar diretório de uploads para servir arquivos estáticos via /api/uploads
@@ -61,6 +80,7 @@ app.include_router(rpa_terceiro_router)
 app.include_router(ordem_servico_router)
 app.include_router(expense_reports_router)
 app.include_router(users_router)
+app.include_router(module_config_router)
 
 # WebSocket endpoint para sincronização em tempo real
 @app.websocket("/ws")

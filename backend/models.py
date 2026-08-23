@@ -13,6 +13,12 @@ class User(BaseModel):
     role: Literal["admin", "operator"] = "operator"
     must_change_password: bool = False  # True quando usar senha provisória
     active: bool = True  # False = acesso revogado por um admin, sem apagar o usuário
+    # Só verdadeiro para a conta do dono do sistema (J.A Logística/vendedor) -
+    # nunca exposto em nenhum endpoint de criação/edição de usuário, só pode
+    # ser definido direto no banco. Controla quem pode liberar/bloquear
+    # módulos contratados - se o admin comum do cliente pudesse setar isso,
+    # ele conseguiria se autoliberar tudo.
+    is_superadmin: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserResponse(BaseModel):
@@ -22,6 +28,7 @@ class UserResponse(BaseModel):
     role: str
     must_change_password: bool = False
     active: bool = True
+    is_superadmin: bool = False
     created_at: datetime
 
 class UserCreate(BaseModel):
@@ -38,6 +45,9 @@ class UserRoleUpdate(BaseModel):
 
 class UserStatusUpdate(BaseModel):
     active: bool
+
+class ModuleConfigUpdate(BaseModel):
+    disabled_modules: List[str]
 
 class Token(BaseModel):
     access_token: str

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { WebSocketProvider } from './context/WebSocketContext';
+import { ModuleConfigProvider } from './context/ModuleConfigContext';
 import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
@@ -47,12 +48,14 @@ import RPATerceiroPage from './pages/RPATerceiroPage';
 import OrdemServicoPage from './pages/OrdemServicoPage';
 import CompanySettingsPage from './pages/CompanySettingsPage';
 import UsersPage from './pages/UsersPage';
+import ModulesPage from './pages/ModulesPage';
 
 function App() {
   return (
     <ThemeProvider>
     <AuthProvider>
     <WebSocketProvider>
+    <ModuleConfigProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -74,7 +77,7 @@ function App() {
           <Route
             path="/movements"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.movimentacoes">
                 <MovementsPage />
               </ProtectedRoute>
             }
@@ -82,7 +85,7 @@ function App() {
           <Route
             path="/movements/new"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.movimentacoes">
                 <NewMovementPage />
               </ProtectedRoute>
             }
@@ -90,7 +93,7 @@ function App() {
           <Route
             path="/movements/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.movimentacoes">
                 <MovementDetailPage />
               </ProtectedRoute>
             }
@@ -98,7 +101,7 @@ function App() {
           <Route
             path="/movements/:id/edit"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.movimentacoes">
                 <EditMovementPage />
               </ProtectedRoute>
             }
@@ -106,7 +109,7 @@ function App() {
           <Route
             path="/yard-control"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.movimentacoes">
                 <YardControlPage />
               </ProtectedRoute>
             }
@@ -114,7 +117,7 @@ function App() {
           <Route
             path="/fleet"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="frota.veiculos">
                 <FleetPage />
               </ProtectedRoute>
             }
@@ -122,7 +125,7 @@ function App() {
           <Route
             path="/fleet/rpa-terceiro"
             element={
-              <ProtectedRoute adminOnly>
+              <ProtectedRoute adminOnly moduleKey="financeiro.rpa_terceiro">
                 <RPATerceiroPage rpaType="terceiro" />
               </ProtectedRoute>
             }
@@ -130,7 +133,7 @@ function App() {
           <Route
             path="/fleet/ordem-servico"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="frota.ordem_servico">
                 <OrdemServicoPage />
               </ProtectedRoute>
             }
@@ -138,7 +141,7 @@ function App() {
           <Route
             path="/fleet/checklist"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="frota.checklist">
                 <VehicleChecklistPage />
               </ProtectedRoute>
             }
@@ -146,7 +149,7 @@ function App() {
           <Route
             path="/drivers"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="cadastro.pessoas">
                 <DriversPage />
               </ProtectedRoute>
             }
@@ -154,7 +157,7 @@ function App() {
           <Route
             path="/companies"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="cadastro.transportadora">
                 <CompaniesPage />
               </ProtectedRoute>
             }
@@ -176,9 +179,17 @@ function App() {
             }
           />
           <Route
+            path="/modules"
+            element={
+              <ProtectedRoute superadminOnly>
+                <ModulesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/shipping-lines"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="cadastro.armador">
                 <ShippingLinesPage />
               </ProtectedRoute>
             }
@@ -186,7 +197,7 @@ function App() {
           <Route
             path="/clients"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="cadastro.cliente">
                 <ClientsPage />
               </ProtectedRoute>
             }
@@ -194,7 +205,7 @@ function App() {
           <Route
             path="/suppliers"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="cadastro.fornecedor">
                 <SuppliersPage />
               </ProtectedRoute>
             }
@@ -202,7 +213,7 @@ function App() {
           <Route
             path="/service-types"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="cadastro.tipos_servico">
                 <ServiceTypesPage />
               </ProtectedRoute>
             }
@@ -214,7 +225,7 @@ function App() {
           <Route
             path="/reports/movements"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.movimentacoes">
                 <ReportsMovementsPage />
               </ProtectedRoute>
             }
@@ -222,7 +233,7 @@ function App() {
           <Route
             path="/reports/billing"
             element={
-              <ProtectedRoute adminOnly>
+              <ProtectedRoute adminOnly moduleKey="financeiro.relatorio_faturamento">
                 <ReportsBillingPage />
               </ProtectedRoute>
             }
@@ -230,7 +241,7 @@ function App() {
           <Route
             path="/billing"
             element={
-              <ProtectedRoute adminOnly>
+              <ProtectedRoute adminOnly moduleKey="financeiro.faturas">
                 <BillingPage />
               </ProtectedRoute>
             }
@@ -270,7 +281,7 @@ function App() {
           <Route
             path="/container-inspections"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.vistoria">
                 <ContainerInspectionsPage />
               </ProtectedRoute>
             }
@@ -278,7 +289,7 @@ function App() {
           <Route
             path="/container-inspections/new"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.vistoria">
                 <NewContainerInspectionPage />
               </ProtectedRoute>
             }
@@ -286,7 +297,7 @@ function App() {
           <Route
             path="/container-inspections/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.vistoria">
                 <ContainerInspectionDetailPage />
               </ProtectedRoute>
             }
@@ -294,7 +305,7 @@ function App() {
           <Route
             path="/container-inspections/:id/edit"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.vistoria">
                 <EditContainerInspectionPage />
               </ProtectedRoute>
             }
@@ -302,7 +313,7 @@ function App() {
           <Route
             path="/flex-tank"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.flex_tank">
                 <FlexTankPage />
               </ProtectedRoute>
             }
@@ -310,7 +321,7 @@ function App() {
           <Route
             path="/flex-tank/movements/new"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.flex_tank">
                 <NewFlexTankMovementPage />
               </ProtectedRoute>
             }
@@ -318,7 +329,7 @@ function App() {
           <Route
             path="/flex-tank/movements/:id"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.flex_tank">
                 <FlexTankMovementDetailPage />
               </ProtectedRoute>
             }
@@ -326,7 +337,7 @@ function App() {
           <Route
             path="/flex-tank/movements/:id/edit"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.flex_tank">
                 <EditFlexTankMovementPage />
               </ProtectedRoute>
             }
@@ -334,7 +345,7 @@ function App() {
           <Route
             path="/loading-schedules"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="operacional.programacao_carregamento">
                 <LoadingSchedulePage />
               </ProtectedRoute>
             }
@@ -342,7 +353,7 @@ function App() {
           <Route
             path="/daily-rate-requests"
             element={
-              <ProtectedRoute adminOnly>
+              <ProtectedRoute adminOnly moduleKey="financeiro.diaria">
                 <DailyRateRequestPage />
               </ProtectedRoute>
             }
@@ -350,7 +361,7 @@ function App() {
           <Route
             path="/expense-reports"
             element={
-              <ProtectedRoute adminOnly>
+              <ProtectedRoute adminOnly moduleKey="financeiro.prestacao_contas">
                 <ExpenseReportsPage />
               </ProtectedRoute>
             }
@@ -358,7 +369,7 @@ function App() {
           <Route
             path="/delivery-status"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="operacional.status_entrega">
                 <DeliveryStatusPage />
               </ProtectedRoute>
             }
@@ -366,7 +377,7 @@ function App() {
           <Route
             path="/unit-segregation"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute moduleKey="terminal.movimentacoes">
                 <UnitSegregationPage />
               </ProtectedRoute>
             }
@@ -374,7 +385,7 @@ function App() {
           <Route
             path="/international-invoices"
             element={
-              <ProtectedRoute adminOnly>
+              <ProtectedRoute adminOnly moduleKey="financeiro.invoice_internacional">
                 <InternationalInvoicePage />
               </ProtectedRoute>
             }
@@ -382,6 +393,7 @@ function App() {
         </Routes>
         <Toaster position="top-right" richColors />
       </BrowserRouter>
+    </ModuleConfigProvider>
     </WebSocketProvider>
     </AuthProvider>
     </ThemeProvider>

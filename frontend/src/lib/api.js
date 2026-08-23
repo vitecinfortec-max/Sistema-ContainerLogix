@@ -109,6 +109,11 @@ export const api = {
   updateUserRole: (userId, role) => axios.put(`${API}/users/${userId}/role`, { role }),
   updateUserStatus: (userId, active) => axios.put(`${API}/users/${userId}/status`, { active }),
 
+  // Módulos Contratados (superadmin)
+  getModuleConfig: () => axios.get(`${API}/module-config`),
+  getModuleCatalog: () => axios.get(`${API}/module-config/catalog`),
+  updateModuleConfig: (disabledModules) => axios.put(`${API}/module-config`, { disabled_modules: disabledModules }),
+
   // File Upload
   uploadFile: (file) => {
     const formData = new FormData();

@@ -152,6 +152,29 @@ async def get_current_admin_user(current_user: dict = Depends(get_current_user))
     return current_user
 
 
+async def get_current_superadmin_user(current_user: dict = Depends(get_current_user)) -> dict:
+    """Dependência para endpoints restritos ao dono do sistema (ex: liberar/bloquear
+    módulos contratados por um cliente). is_superadmin nunca é exposto em nenhum
+    endpoint de edição de usuário - só pode ser setado direto no banco - então
+    o admin comum de um cliente nunca consegue se autopromover a isso."""
+    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "is_superadmin": 1, "active": 1})
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuário não encontrado ou removido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user_doc.get('active') is False:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Acesso desativado por um administrador",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not user_doc.get('is_superadmin'):
+        raise HTTPException(status_code=403, detail="Acesso restrito ao proprietário do sistema")
+    return current_user
+
+
 # WebSocket connection manager para sincronização em tempo real
 class ConnectionManager:
     def __init__(self):
@@ -223,3 +246,107 @@ async def validate_and_read_upload(file: UploadFile, allowed_extensions: set) ->
             detail=f"Arquivo muito grande. Máximo: {MAX_FILE_SIZE // (1024*1024)}MB"
         )
     return file_ext, content
+
+
+# ==================== MÓDULOS CONTRATADOS ====================
+# Cada instância (um cliente) pode ter grupos ou itens específicos do menu
+# desativados até o cliente contratar aquele serviço. A chave de um item é
+# "<grupo>.<item>" - desativar só o grupo ("terminal") bloqueia tudo dentro
+# dele de uma vez, sem precisar listar item por item.
+MODULE_CATALOG = [
+    {"key": "terminal", "label": "Terminal", "items": [
+        {"key": "terminal.vistoria", "label": "Vistoria de Container"},
+        {"key": "terminal.movimentacoes", "label": "Movimentações"},
+        {"key": "terminal.flex_tank", "label": "Flex Tank"},
+    ]},
+    {"key": "frota", "label": "Frota", "items": [
+        {"key": "frota.veiculos", "label": "Cadastro de Veículos"},
+        {"key": "frota.revisao", "label": "Controle de Revisão"},
+        {"key": "frota.ordem_servico", "label": "Ordem de Serviço"},
+        {"key": "frota.checklist", "label": "Checklist de Veículo"},
+    ]},
+    {"key": "cadastro", "label": "Cadastro", "items": [
+        {"key": "cadastro.pessoas", "label": "Pessoas"},
+        {"key": "cadastro.transportadora", "label": "Transportadora"},
+        {"key": "cadastro.cliente", "label": "Cliente"},
+        {"key": "cadastro.fornecedor", "label": "Fornecedor"},
+        {"key": "cadastro.armador", "label": "Armador"},
+        {"key": "cadastro.tipos_servico", "label": "Tipos de Serviço"},
+    ]},
+    {"key": "financeiro", "label": "Financeiro", "items": [
+        {"key": "financeiro.faturas", "label": "Faturas"},
+        {"key": "financeiro.invoice_internacional", "label": "Invoice Internacional"},
+        {"key": "financeiro.relatorio_faturamento", "label": "Relatório de Faturamento"},
+        {"key": "financeiro.diaria", "label": "Solicitação de Diária"},
+        {"key": "financeiro.prestacao_contas", "label": "Prestação de Contas"},
+        {"key": "financeiro.rpa_terceiro", "label": "RPA Terceiro"},
+    ]},
+    {"key": "operacional", "label": "Operacional", "items": [
+        {"key": "operacional.programacao_carregamento", "label": "Programação de Carregamento"},
+        {"key": "operacional.status_entrega", "label": "Status de Entrega"},
+    ]},
+]
+
+# Prefixo de rota da API -> chave do módulo dono dela. Usado pelo middleware
+# em server.py pra bloquear no backend, não só esconder no menu (esconder no
+# menu sozinho não impede alguém de chamar a rota direto).
+PATH_MODULE_MAP = [
+    ("/api/container-inspections", "terminal.vistoria"),
+    ("/api/reports/movements", "terminal.movimentacoes"),
+    ("/api/movements", "terminal.movimentacoes"),
+    ("/api/yard-control", "terminal.movimentacoes"),
+    ("/api/unit-segregations", "terminal.movimentacoes"),
+    ("/api/check-segregation", "terminal.movimentacoes"),
+    ("/api/flex-tank", "terminal.flex_tank"),
+    ("/api/vehicle-revisions", "frota.revisao"),
+    ("/api/vehicle-checklists", "frota.checklist"),
+    ("/api/vehicles", "frota.veiculos"),
+    ("/api/drivers", "cadastro.pessoas"),
+    ("/api/transport-companies", "cadastro.transportadora"),
+    ("/api/clients", "cadastro.cliente"),
+    ("/api/suppliers", "cadastro.fornecedor"),
+    ("/api/shipping-lines", "cadastro.armador"),
+    ("/api/service-types", "cadastro.tipos_servico"),
+    ("/api/reports/billing", "financeiro.relatorio_faturamento"),
+    ("/api/invoices", "financeiro.faturas"),
+    ("/api/intl-invoices", "financeiro.invoice_internacional"),
+    ("/api/daily-rate-requests", "financeiro.diaria"),
+    ("/api/expense-reports", "financeiro.prestacao_contas"),
+    ("/api/rpa-terceiro", "financeiro.rpa_terceiro"),
+    ("/api/ordem-servico", "frota.ordem_servico"),
+    ("/api/loading-schedules", "operacional.programacao_carregamento"),
+    ("/api/delivery-status", "operacional.status_entrega"),
+]
+
+_module_config_cache = {"value": None, "expires_at": 0}
+_MODULE_CONFIG_CACHE_TTL = 10  # segundos - baixo o bastante pra uma mudança feita pelo superadmin valer quase na hora
+
+
+async def get_disabled_modules() -> list:
+    """Lê a lista de módulos desativados, com um cache curto pra não bater no
+    banco em toda requisição."""
+    now = time.time()
+    if _module_config_cache["value"] is not None and now < _module_config_cache["expires_at"]:
+        return _module_config_cache["value"]
+    doc = await db.module_config.find_one({}, {"_id": 0, "disabled_modules": 1})
+    disabled = (doc or {}).get("disabled_modules", [])
+    _module_config_cache["value"] = disabled
+    _module_config_cache["expires_at"] = now + _MODULE_CONFIG_CACHE_TTL
+    return disabled
+
+
+def invalidate_module_config_cache():
+    _module_config_cache["value"] = None
+    _module_config_cache["expires_at"] = 0
+
+
+def match_module_for_path(path: str):
+    for prefix, module_key in PATH_MODULE_MAP:
+        if path.startswith(prefix):
+            return module_key
+    return None
+
+
+def is_module_disabled(module_key: str, disabled_modules: list) -> bool:
+    group = module_key.split(".")[0]
+    return group in disabled_modules or module_key in disabled_modules
