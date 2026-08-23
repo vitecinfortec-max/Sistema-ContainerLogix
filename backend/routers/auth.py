@@ -140,8 +140,7 @@ async def forgot_password(request: ForgotPasswordRequest, http_request: Request)
         html_content = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #3B9BA8;">J.A Logística</h1>
-                <h2 style="color: #333;">ContainerLogix</h2>
+                <h1 style="color: #3B9BA8;">ContainerLogix</h1>
             </div>
             
             <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">

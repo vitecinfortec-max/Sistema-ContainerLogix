@@ -233,7 +233,7 @@ export default function LoginPage() {
           {/* Rodapé */}
           <div className="mt-12 text-center">
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              J.A Logística - Sistema de Gestão de Contêineres
+              ContainerLogix - Sistema de Gestão de Contêineres
             </p>
           </div>
         </div>

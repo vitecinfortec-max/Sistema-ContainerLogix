@@ -5,7 +5,7 @@ import { api } from './api';
 // enquanto "Dados da Empresa" ainda não foi preenchido, para o cabeçalho impresso
 // no navegador nunca ficar em branco.
 export const DEFAULT_COMPANY = {
-  name: 'J.A LOGÍSTICA E ARMAZENAGEM LTDA',
+  name: 'Sua Empresa',
   logo_filename: null,
 };
 

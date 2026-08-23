@@ -72,26 +72,31 @@ def fmt_datetime(value):
         return value
 
 
-LOGO_URL = os.environ.get('LOGO_URL', "https://customer-assets.emergentagent.com/job_e636a955-bdb3-43db-964e-ca26060412cc/artifacts/026b56rs_J.A%20LOGISTICA%20-%201.png")
+# Sem valor padrão fixo: cada instância/cliente define seu próprio logo em "Dados
+# da Empresa", ou via variável de ambiente se quiser um logo padrão pré-configurado.
+LOGO_URL = os.environ.get('LOGO_URL')
 
-# Cor verde/teal da logo J.A Logística
 PRIMARY_COLOR = "008B7B"
 HEADER_BG_COLOR = "E8F4F5"
 
 ROOT_DIR = Path(__file__).parent
 UPLOADS_DIR = ROOT_DIR.parent / 'uploads'
 
-# Valores usados quando a empresa ainda não configurou seus próprios dados em "Dados da Empresa"
+# Valores usados quando a empresa ainda não configurou seus próprios dados em
+# "Dados da Empresa" - propositalmente genéricos (nunca dados reais de um cliente
+# específico), já que cada instância vendida usa esse mesmo fallback até configurar
+# o seu. CNPJ/telefone/dados bancários/PIX ficam como placeholder óbvio em vez de
+# vazios, pra não sair "Banco: " em branco nem, pior, os dados de outro cliente.
 DEFAULT_COMPANY = {
-    'name': 'J.A LOGÍSTICA E ARMAZENAGEM LTDA',
-    'cnpj': '58.180.321/0001-03',
-    'address': 'Rodovia CE-155, 16226 - Distrito Industrial\nSão Gonçalo do Amarante - CE',
-    'phone': '(85) 9 9175-1472',
-    'email': 'operacional@jalogisticas.com',
-    'bank_name': 'Bradesco S/A',
-    'bank_agency': '699',
-    'bank_account': '64660-1',
-    'pix_key': 'operacional@jalogisticas.com',
+    'name': 'Sua Empresa',
+    'cnpj': '00.000.000/0000-00',
+    'address': 'Configure em "Dados da Empresa"',
+    'phone': '(00) 00000-0000',
+    'email': 'contato@suaempresa.com',
+    'bank_name': 'Configure em "Dados da Empresa"',
+    'bank_agency': '-',
+    'bank_account': '-',
+    'pix_key': 'Configure em "Dados da Empresa"',
 }
 
 
@@ -117,8 +122,10 @@ def merge_company(company: dict = None) -> dict:
 
 def download_logo(company: dict = None):
     """Retorna o logo como file-like object.
-    Prioriza o logo enviado pelo usuário em 'Dados da Empresa' (uploads/);
-    se não houver, cai para a URL remota padrão."""
+    Prioriza o logo enviado pelo usuário em 'Dados da Empresa' (uploads/); se não
+    houver e a variável de ambiente LOGO_URL estiver configurada (opcional, usada
+    quando essa instância quer um logo padrão pré-definido), cai pra ela. Sem
+    nenhum dos dois, o cabeçalho do documento simplesmente sai sem logo."""
     if company and company.get('logo_filename'):
         try:
             logo_path = UPLOADS_DIR / company['logo_filename']
@@ -126,6 +133,8 @@ def download_logo(company: dict = None):
                 return io.BytesIO(logo_path.read_bytes())
         except Exception as e:
             logger.error(f"Error reading uploaded logo: {e}")
+    if not LOGO_URL:
+        return None
     try:
         response = requests.get(LOGO_URL, timeout=5)
         if response.status_code == 200:

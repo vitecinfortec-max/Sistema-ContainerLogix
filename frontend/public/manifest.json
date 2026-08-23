@@ -1,7 +1,7 @@
 {
   "short_name": "ContainerLogix",
   "name": "ContainerLogix - Sistema de Movimentação de Contêineres",
-  "description": "Sistema completo de gestão de entrada e saída de contêineres da J.A Logística",
+  "description": "Sistema completo de gestão de entrada e saída de contêineres",
   "icons": [
     {
       "src": "/logo-containerlogix.png",
