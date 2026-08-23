@@ -37,6 +37,7 @@ from models import (
     VehicleChecklistItem, VehicleChecklistProduct, VehicleChecklistFields,
     VehicleChecklist, VehicleChecklistCreate, VehicleChecklistResponse,
     VEHICLE_CHECKLIST_TEMPLATE, VEHICLE_CHECKLIST_SECTION_LABELS,
+    MAX_VEHICLE_CHECKLIST_PHOTOS,
     VehicleRevision, VehicleRevisionCreate, VehicleRevisionResponse,
     LoadingScheduleItem, LoadingSchedule, LoadingScheduleCreate, LoadingScheduleResponse,
     DailyRateRequestItem, DailyRateRequest, DailyRateRequestCreate, DailyRateRequestResponse,
@@ -251,6 +252,7 @@ async def get_vehicle_checklists(
         search_escaped = re.escape(search)
         query["$or"] = [
             {"cavalo_plate": {"$regex": search_escaped, "$options": "i"}},
+            {"vehicle_plate": {"$regex": search_escaped, "$options": "i"}},
             {"driver_name": {"$regex": search_escaped, "$options": "i"}},
             {"client_name": {"$regex": search_escaped, "$options": "i"}},
         ]
@@ -320,7 +322,79 @@ async def delete_vehicle_checklist(checklist_id: str, current_user: dict = Depen
     result = await db.vehicle_checklists.delete_one({"id": checklist_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Checklist não encontrado")
+
+    try:
+        photo_dir = UPLOADS_DIR / "vehicle_checklists" / checklist_id
+        if photo_dir.exists():
+            shutil.rmtree(photo_dir)
+    except Exception:
+        pass
+
     return {"message": "Checklist excluído com sucesso"}
+
+
+@api_router.post("/vehicle-checklists/{checklist_id}/upload-photo")
+async def upload_vehicle_checklist_photo(
+    checklist_id: str,
+    photo_type: str = Query(..., alias="type", regex="^(front|back|left_side|right_side|speedometer|tires)$"),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Faz upload de uma foto do checklist simplificado (frente/traseira/laterais/velocímetro/pneus)"""
+    checklist = await db.vehicle_checklists.find_one({"id": checklist_id}, {"_id": 0})
+    if not checklist:
+        raise HTTPException(status_code=404, detail="Checklist não encontrado")
+
+    photos = checklist.get("photos") or []
+    if len(photos) >= MAX_VEHICLE_CHECKLIST_PHOTOS:
+        raise HTTPException(status_code=400, detail=f"Limite de {MAX_VEHICLE_CHECKLIST_PHOTOS} fotos por checklist atingido")
+
+    file_ext, content = await validate_and_read_upload(file, ALLOWED_EXTENSIONS)
+
+    photo_dir = UPLOADS_DIR / "vehicle_checklists" / checklist_id
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    photo_id = str(uuid.uuid4())
+    file_path = photo_dir / f"{photo_id}{file_ext}"
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(content)
+
+    photo_url = f"/api/uploads/vehicle_checklists/{checklist_id}/{photo_id}{file_ext}"
+    photo_entry = {"id": photo_id, "type": photo_type, "url": photo_url}
+    await db.vehicle_checklists.update_one(
+        {"id": checklist_id},
+        {"$set": {"photos": photos + [photo_entry], "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    return photo_entry
+
+
+@api_router.delete("/vehicle-checklists/{checklist_id}/photo/{photo_id}")
+async def delete_vehicle_checklist_photo(
+    checklist_id: str,
+    photo_id: str,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Remove uma foto de um checklist de veículo"""
+    checklist = await db.vehicle_checklists.find_one({"id": checklist_id}, {"_id": 0})
+    if not checklist:
+        raise HTTPException(status_code=404, detail="Checklist não encontrado")
+
+    photos = checklist.get("photos") or []
+    remaining_photos = [p for p in photos if p["id"] != photo_id]
+    if len(remaining_photos) == len(photos):
+        raise HTTPException(status_code=404, detail="Foto não encontrada")
+
+    photo_dir = UPLOADS_DIR / "vehicle_checklists" / checklist_id
+    for file_path in photo_dir.glob(f"{photo_id}.*"):
+        file_path.unlink()
+
+    await db.vehicle_checklists.update_one(
+        {"id": checklist_id},
+        {"$set": {"photos": remaining_photos, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    return {"message": "Foto removida com sucesso"}
 
 @api_router.get("/vehicle-checklists/{checklist_id}/pdf")
 async def download_vehicle_checklist_pdf(checklist_id: str, current_user: dict = Depends(get_current_active_user)):

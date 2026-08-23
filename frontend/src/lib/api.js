@@ -179,6 +179,14 @@ export const api = {
   updateVehicleChecklist: (id, data) => axios.put(`${API}/vehicle-checklists/${id}`, data),
   deleteVehicleChecklist: (id) => axios.delete(`${API}/vehicle-checklists/${id}`),
   getVehicleChecklistPDF: (id) => axios.get(`${API}/vehicle-checklists/${id}/pdf`, { responseType: 'blob' }),
+  uploadVehicleChecklistPhoto: (id, type, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/vehicle-checklists/${id}/upload-photo?type=${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteVehicleChecklistPhoto: (id, photoId) => axios.delete(`${API}/vehicle-checklists/${id}/photo/${photoId}`),
   getVehiclePlates: () => axios.get(`${API}/vehicles/plates`),
   
   // Fleet - Vehicles (Frota - Cadastro de Veículos)

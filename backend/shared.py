@@ -259,11 +259,11 @@ MODULE_CATALOG = [
         {"key": "terminal.movimentacoes", "label": "Movimentações"},
         {"key": "terminal.flex_tank", "label": "Flex Tank"},
     ]},
-    {"key": "frota", "label": "Frota", "items": [
+    {"key": "frota", "label": "Manutenção", "items": [
         {"key": "frota.veiculos", "label": "Cadastro de Veículos"},
         {"key": "frota.revisao", "label": "Controle de Revisão"},
         {"key": "frota.ordem_servico", "label": "Ordem de Serviço"},
-        {"key": "frota.checklist", "label": "Checklist de Veículo"},
+        {"key": "frota.checklist", "label": "Checklist"},
     ]},
     {"key": "cadastro", "label": "Cadastro", "items": [
         {"key": "cadastro.pessoas", "label": "Pessoas"},
@@ -279,7 +279,7 @@ MODULE_CATALOG = [
         {"key": "financeiro.relatorio_faturamento", "label": "Relatório de Faturamento"},
         {"key": "financeiro.diaria", "label": "Solicitação de Diária"},
         {"key": "financeiro.prestacao_contas", "label": "Prestação de Contas"},
-        {"key": "financeiro.rpa_terceiro", "label": "RPA Terceiro"},
+        {"key": "financeiro.rpa_terceiro", "label": "Contrato de Frete"},
     ]},
     {"key": "operacional", "label": "Operacional", "items": [
         {"key": "operacional.programacao_carregamento", "label": "Programação de Carregamento"},

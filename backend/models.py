@@ -780,11 +780,31 @@ def default_checklist_items(section: str) -> List["VehicleChecklistItem"]:
     return [VehicleChecklistItem(text=t) for t in VEHICLE_CHECKLIST_TEMPLATE[section]]
 
 
+# Modelo simplificado (substituiu o modelo LVT/Petrobras-Manuport pra novos
+# checklists) - identificação básica do veículo + fotos, sem os itens
+# SIM/NÃO do modelo antigo. Registros antigos (template generic/petrobras_lvt)
+# continuam intactos no banco, só pra consulta/histórico.
+VEHICLE_CHECKLIST_PHOTO_TYPES = ["front", "back", "left_side", "right_side", "speedometer", "tires"]
+MAX_VEHICLE_CHECKLIST_PHOTOS = 24
+
+class VehicleChecklistPhoto(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    type: str  # front, back, left_side, right_side, speedometer ou tires
+    url: str
+
+
 class VehicleChecklistFields(BaseModel):
     """Campos compartilhados entre Create/Update/Response do checklist"""
     # Modelo do documento: "petrobras_lvt" (réplica do LVT Petrobras, usado quando o
-    # cliente contratante é a Manuport) ou "generic" (checklist padrão do sistema)
+    # cliente contratante é a Manuport) ou "generic" (checklist padrão do sistema) -
+    # ambos legados, mantidos só pra registros já existentes. checklist_kind="simple"
+    # é o modelo atual (identificação do veículo + fotos), usado por qualquer
+    # checklist novo criado a partir de agora.
     template: str = "generic"
+    checklist_kind: Optional[str] = None  # None = checklist legado (LVT), "simple" = modelo atual
+    vehicle_type: Optional[str] = None  # CAMINHAO, CARRETA ou CARRO (só no modelo "simple")
+    vehicle_plate: Optional[str] = None  # placa (modelo "simple" - o legado usa cavalo_plate/carreta1_plate/carreta2_plate)
+    photos: List[VehicleChecklistPhoto] = Field(default_factory=list)
 
     # Cabeçalho
     expedidor: Optional[str] = None
