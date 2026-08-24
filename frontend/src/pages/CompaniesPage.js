@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -151,29 +152,27 @@ export default function CompaniesPage() {
   return (
     <Layout>
       <div className="space-y-5" data-testid="companies-page">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Transportadoras
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie o cadastro de empresas de transporte</p>
-          </div>
-          <Dialog open={open} onOpenChange={(isOpen) => {
-            setOpen(isOpen);
-            if (!isOpen) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button 
-                size="default" 
-                className="text-[13px] font-semibold uppercase tracking-wide h-10" 
-                data-testid="add-company-button"
-                onClick={openCreateDialog}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Transportadora
-              </Button>
-            </DialogTrigger>
-            <DialogContent data-testid="company-dialog">
+        <PageHeader
+          title="Transportadoras"
+          subtitle="Gerencie o cadastro de empresas de transporte"
+          icon={Building2}
+          actions={
+            <Dialog open={open} onOpenChange={(isOpen) => {
+              setOpen(isOpen);
+              if (!isOpen) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button
+                  size="default"
+                  className="text-[13px] font-semibold uppercase tracking-wide h-10"
+                  data-testid="add-company-button"
+                  onClick={openCreateDialog}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nova Transportadora
+                </Button>
+              </DialogTrigger>
+              <DialogContent data-testid="company-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editMode ? 'Editar Transportadora' : 'Cadastrar Transportadora'}</DialogTitle>
                 <DialogDescription className="text-[13px]">
@@ -182,7 +181,7 @@ export default function CompaniesPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="name" className="text-[13px]">Nome da Empresa *</Label>
+                  <Label htmlFor="name" className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Nome da Empresa <span className="text-red-500">*</span></Label>
                   <Input
                     id="name"
                     data-testid="company-name-input"
@@ -193,7 +192,7 @@ export default function CompaniesPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="cnpj" className="text-[13px]">CNPJ</Label>
+                  <Label htmlFor="cnpj" className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">CNPJ</Label>
                   <Input
                     id="cnpj"
                     data-testid="company-cnpj-input"
@@ -205,7 +204,7 @@ export default function CompaniesPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="phone" className="text-[13px]">Telefone</Label>
+                  <Label htmlFor="phone" className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Telefone</Label>
                   <Input
                     id="phone"
                     data-testid="company-phone-input"
@@ -226,8 +225,9 @@ export default function CompaniesPage() {
                 </Button>
               </form>
             </DialogContent>
-          </Dialog>
-        </div>
+            </Dialog>
+          }
+        />
 
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />

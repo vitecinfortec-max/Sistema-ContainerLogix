@@ -68,7 +68,7 @@ export default function LoginPage() {
             />
           </div>
           
-          <h1 className="text-4xl md:text-5xl font-black text-white text-center mb-4" style={{ fontFamily: 'Chivo, sans-serif' }}>
+          <h1 className="text-4xl md:text-5xl font-black text-white text-center mb-4">
             ContainerLogix
           </h1>
           
@@ -94,14 +94,14 @@ export default function LoginPage() {
                 className="h-16 mx-auto"
               />
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
               ContainerLogix
             </h1>
           </div>
 
           {/* Cabeçalho do Formulário */}
           <div className="mb-8">
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100" style={{ fontFamily: 'Chivo, sans-serif' }}>
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
               {isLogin ? 'Bem-vindo!' : 'Criar Conta'}
             </h2>
             <p className="text-slate-500 dark:text-slate-400 mt-2">

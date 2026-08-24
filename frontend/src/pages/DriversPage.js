@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -149,29 +150,27 @@ export default function DriversPage() {
   return (
     <Layout>
       <div className="space-y-5" data-testid="drivers-page">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Pessoas
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie o cadastro de pessoas</p>
-          </div>
-          <Dialog open={open} onOpenChange={(isOpen) => {
-            setOpen(isOpen);
-            if (!isOpen) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button 
-                size="default" 
-                className="text-[13px] font-semibold uppercase tracking-wide h-10" 
-                data-testid="add-driver-button"
-                onClick={openCreateDialog}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nova Pessoa
-              </Button>
-            </DialogTrigger>
-            <DialogContent data-testid="driver-dialog">
+        <PageHeader
+          title="Pessoas"
+          subtitle="Gerencie o cadastro de pessoas"
+          icon={Truck}
+          actions={
+            <Dialog open={open} onOpenChange={(isOpen) => {
+              setOpen(isOpen);
+              if (!isOpen) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button
+                  size="default"
+                  className="text-[13px] font-semibold uppercase tracking-wide h-10"
+                  data-testid="add-driver-button"
+                  onClick={openCreateDialog}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nova Pessoa
+                </Button>
+              </DialogTrigger>
+              <DialogContent data-testid="driver-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editMode ? 'Editar Pessoa' : 'Cadastrar Pessoa'}</DialogTitle>
                 <DialogDescription className="text-[13px]">
@@ -180,7 +179,7 @@ export default function DriversPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="name" className="text-[13px]">Nome Completo *</Label>
+                  <Label htmlFor="name" className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Nome Completo <span className="text-red-500">*</span></Label>
                   <Input
                     id="name"
                     data-testid="driver-name-input"
@@ -191,7 +190,7 @@ export default function DriversPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="cpf" className="text-[13px]">CPF *</Label>
+                  <Label htmlFor="cpf" className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">CPF <span className="text-red-500">*</span></Label>
                   <Input
                     id="cpf"
                     data-testid="driver-cpf-input"
@@ -204,7 +203,7 @@ export default function DriversPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="phone" className="text-[13px]">Telefone</Label>
+                  <Label htmlFor="phone" className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Telefone</Label>
                   <Input
                     id="phone"
                     data-testid="driver-phone-input"
@@ -225,8 +224,9 @@ export default function DriversPage() {
                 </Button>
               </form>
             </DialogContent>
-          </Dialog>
-        </div>
+            </Dialog>
+          }
+        />
 
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">

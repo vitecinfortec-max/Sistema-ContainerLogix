@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Chivo:wght@400;700;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,14 +7,14 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 215 25% 15%;
+    --foreground: 215 19% 27%;
     --card: 0 0% 100%;
     --card-foreground: 215 25% 15%;
     --popover: 0 0% 100%;
     --popover-foreground: 215 25% 15%;
     --primary: 174 100% 26%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 30 90% 55%;
+    --secondary: 24 95% 53%;
     --secondary-foreground: 0 0% 100%;
     --muted: 210 20% 96%;
     --muted-foreground: 215 16% 47%;
@@ -22,8 +22,8 @@
     --accent-foreground: 215 25% 15%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --border: 214 15% 84%;
+    --input: 214 15% 84%;
     --ring: 174 100% 26%;
     --radius: 0.375rem;
 
@@ -35,6 +35,11 @@
     --chart-5: 152 60% 40%;  /* Operacional */
     --chart-6: 195 80% 45%;  /* Transporte */
     --chart-7: 220 9% 46%;   /* Opções do Sistema */
+
+    /* Destaque verde de item ativo na sidebar (redesign 2026-08-24) */
+    --sidebar-active: 160 84% 39%;      /* #10B981 */
+    --sidebar-active-bg: 152 68% 90%;   /* #D1FAE5 */
+    --sidebar-bg: 210 20% 98%;          /* #F9FAFB */
   }
 
   .dark {
@@ -46,7 +51,7 @@
     --popover-foreground: 210 20% 90%;
     --primary: 174 70% 45%;
     --primary-foreground: 222 25% 8%;
-    --secondary: 30 80% 55%;
+    --secondary: 24 90% 58%;
     --secondary-foreground: 222 25% 8%;
     --muted: 222 18% 16%;
     --muted-foreground: 215 15% 65%;
@@ -66,6 +71,10 @@
     --chart-5: 152 55% 50%;
     --chart-6: 195 75% 60%;
     --chart-7: 220 10% 65%;
+
+    /* Destaque verde de item ativo na sidebar (redesign 2026-08-24) */
+    --sidebar-active: 160 70% 50%;
+    --sidebar-active-bg: 160 40% 18%;
   }
 }
 
@@ -78,9 +87,6 @@
     font-family: 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-  }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Chivo', sans-serif;
   }
   .font-mono {
     font-family: 'JetBrains Mono', monospace;

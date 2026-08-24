@@ -8,14 +8,12 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
+import { ComboField } from '../components/ui/combo-field';
 import { api } from '../lib/api';
-import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Trash2, Search, Save, ClipboardCheck, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Save, ClipboardCheck } from 'lucide-react';
 
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
@@ -284,7 +282,7 @@ export default function FuelSupplyOrderPage() {
             </div>
 
             <div>
-              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Tipo *</Label>
+              <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Tipo <span className="text-red-500">*</span></Label>
               <div className="flex flex-wrap gap-4">
                 {SUPPLY_MODE_OPTIONS.map(([v, l]) => (
                   <label key={v} className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
@@ -311,45 +309,17 @@ export default function FuelSupplyOrderPage() {
   );
 }
 
-function ComboField({ label, value, onChange, options, placeholder = '-- Selecione --', searchPlaceholder = 'Buscar...', emptyLabel = 'Nenhum resultado encontrado', testid }) {
-  const [open, setOpen] = useState(false);
-  const selected = options.find(([v]) => v === value);
-  return (
-    <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button type="button" variant="outline" role="combobox" aria-expanded={open}
-            className="w-full justify-between font-normal h-9 text-sm" data-testid={testid}>
-            <span className="truncate">{selected ? selected[1] : placeholder}</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-          <Command>
-            <CommandInput placeholder={searchPlaceholder} />
-            <CommandList>
-              <CommandEmpty>{emptyLabel}</CommandEmpty>
-              <CommandGroup>
-                {options.map(([v, l]) => (
-                  <CommandItem key={v} value={l} onSelect={() => { onChange(v); setOpen(false); }}>
-                    <Check className={cn('mr-2 h-4 w-4', value === v ? 'opacity-100' : 'opacity-0')} />
-                    {l}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
+function RequiredLabel({ label }) {
+  if (typeof label === 'string' && label.endsWith(' *')) {
+    return <>{label.slice(0, -2)} <span className="text-red-500">*</span></>;
+  }
+  return label;
 }
 
 function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
       <Input type={type} value={value ?? ''} placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
@@ -359,7 +329,7 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
 function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
       <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
     </div>
   );

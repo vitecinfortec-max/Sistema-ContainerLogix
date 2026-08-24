@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from './ui/breadcrumb';
 import { 
   LayoutDashboard, 
   Truck, 
@@ -118,6 +119,14 @@ const GROUP_COLORS = {
   Operacional: 'chart-5',
   Transporte: 'chart-6',
   'Opções do Sistema': 'chart-7',
+};
+
+// Destaque de item ativo na sidebar (redesign 2026-08-24). Aplicado via inline
+// style (não classe utilitária Tailwind com var() embutido) porque o valor
+// precisa reagir de forma confiável à troca de tema claro/escuro.
+const ACTIVE_SIDEBAR_STYLE = {
+  backgroundColor: 'hsl(var(--sidebar-active-bg))',
+  borderLeftColor: 'hsl(var(--sidebar-active))',
 };
 
 export default function Layout({ children }) {
@@ -453,6 +462,17 @@ export default function Layout({ children }) {
     return 'ContainerLogix';
   }, [location.pathname, location.search]);
 
+  const breadcrumbGroup = useMemo(() => {
+    if (isTerminalActive) return 'Terminal';
+    if (isManutencaoActive) return 'Manutenção';
+    if (isTransporteActive) return 'Transporte';
+    if (isCadastroActive) return 'Cadastro';
+    if (isFinanceiroActive) return 'Financeiro';
+    if (isOperacionalActive) return 'Operacional';
+    if (isOpcoesSistemaActive) return 'Opções do Sistema';
+    return null;
+  }, [isTerminalActive, isManutencaoActive, isTransporteActive, isCadastroActive, isFinanceiroActive, isOperacionalActive, isOpcoesSistemaActive]);
+
   // Expand sidebar when clicking a group while collapsed
   const handleGroupClickCollapsed = (toggleFn) => {
     setSidebarOpen(true);
@@ -472,8 +492,11 @@ export default function Layout({ children }) {
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
           title={item.label}
-          className={`flex items-center justify-center h-11 border-b border-slate-100 dark:border-slate-800 transition-colors ${
-            isActive ? 'text-primary' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
+          style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
+          className={`flex items-center justify-center h-11 border-b border-slate-100 dark:border-slate-800 border-l-[3px] transition-colors ${
+            isActive
+              ? 'text-primary border-l-transparent'
+              : 'text-[#1B4965] dark:text-slate-300 hover:text-primary border-l-transparent'
           }`}
         >
           <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -488,8 +511,11 @@ export default function Layout({ children }) {
           key={item.path}
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-          className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 ${
-            isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
+          style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
+          className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
+            isActive
+              ? 'text-primary font-semibold border-l-transparent'
+              : 'text-[#1B4965] dark:text-slate-300 hover:text-primary border-l-transparent'
           } ${deepIndent ? 'pl-14' : 'pl-10'} pr-5 text-[13px] gap-2`}
         >
           <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -504,8 +530,11 @@ export default function Layout({ children }) {
         key={item.path}
         to={item.path}
         data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-        className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 ${
-          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
+        style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
+        className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
+          isActive
+            ? 'text-primary font-semibold border-l-transparent'
+            : 'text-[#1B4965] dark:text-slate-300 hover:text-primary border-l-transparent'
         } px-5 gap-3 text-[13px]`}
       >
         <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -519,8 +548,11 @@ export default function Layout({ children }) {
     const isActive = isNavItemActive(item, location);
     return (
       <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-        className={`flex items-center gap-2 ${nested ? 'pl-14' : 'pl-10'} pr-4 py-2.5 text-[13px] border-b border-slate-100 dark:border-slate-800 ${
-          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
+        style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
+        className={`flex items-center gap-2 ${nested ? 'pl-14' : 'pl-10'} pr-4 py-2.5 text-[13px] border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
+          isActive
+            ? 'text-primary font-semibold border-l-transparent'
+            : 'text-[#1B4965] dark:text-slate-300 border-l-transparent'
         }`}
       >
         <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -535,8 +567,11 @@ export default function Layout({ children }) {
     const accentVar = GROUP_COLORS[label];
     return (
       <button onClick={toggle}
-        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-4' : 'px-4'} py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
-          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
+        style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
+        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-4' : 'px-4'} py-3 text-sm border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
+          isActive
+            ? 'text-primary font-semibold border-l-transparent'
+            : 'text-[#1B4965] dark:text-slate-300 border-l-transparent'
         }`}
       >
         <div className="flex items-center gap-3">
@@ -563,7 +598,8 @@ export default function Layout({ children }) {
       if (nested) return null;
       return (
         <div
-          className="flex items-center justify-center h-11 cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-colors hover:text-primary"
+          style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
+          className={`flex items-center justify-center h-11 cursor-pointer border-b border-slate-100 dark:border-slate-800 border-l-[3px] transition-colors hover:text-primary border-l-transparent`}
           title={label}
           onClick={() => handleGroupClickCollapsed(toggle)}
           data-testid={testId}
@@ -579,8 +615,11 @@ export default function Layout({ children }) {
     return (
       <button
         onClick={toggle}
-        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors border-b border-slate-100 dark:border-slate-800 text-[13px] ${
-          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
+        style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
+        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors border-b border-slate-100 dark:border-slate-800 border-l-[3px] text-[13px] ${
+          isActive
+            ? 'text-primary font-semibold border-l-transparent'
+            : 'text-[#1B4965] dark:text-slate-300 hover:text-primary border-l-transparent'
         }`}
         data-testid={testId}
       >
@@ -601,12 +640,32 @@ export default function Layout({ children }) {
     <div className="min-h-screen bg-white dark:bg-slate-900 flex flex-col">
       {/* Top Header Bar */}
       <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 right-0 z-30 transition-all duration-300 ${
-        sidebarOpen ? 'left-[260px]' : 'left-16'
+        sidebarOpen ? 'left-[225px]' : 'left-16'
       }`} data-testid="top-header">
         <div className="flex items-center h-full px-6">
-          <h1 className="text-[15px] font-semibold text-slate-800 dark:text-slate-200" style={{ fontFamily: 'Chivo, sans-serif' }} data-testid="page-title">
-            {pageTitle}
-          </h1>
+          <Breadcrumb data-testid="page-title">
+            <BreadcrumbList className="flex-nowrap">
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild className="text-[13px] text-slate-500 dark:text-slate-400">
+                  <Link to="/dashboard">ContainerLogix</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              {breadcrumbGroup && (
+                <>
+                  <BreadcrumbSeparator className="text-slate-400 dark:text-slate-500" />
+                  <BreadcrumbItem>
+                    <span className="text-[13px] text-slate-500 dark:text-slate-400">{breadcrumbGroup}</span>
+                  </BreadcrumbItem>
+                </>
+              )}
+              <BreadcrumbSeparator className="text-slate-400 dark:text-slate-500" />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="text-[15px] font-semibold text-slate-800 dark:text-slate-200">
+                  {pageTitle}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
         <div className="flex items-center gap-1 px-4">
           <button
@@ -707,8 +766,8 @@ export default function Layout({ children }) {
       <div className="flex flex-1">
         {/* Sidebar - Desktop */}
         <aside 
-          className={`no-print hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 transition-all duration-300 ${
-            sidebarOpen ? 'w-[260px]' : 'w-16'
+          className={`no-print hidden md:flex flex-col bg-[#F9FAFB] dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 transition-all duration-300 ${
+            sidebarOpen ? 'w-[225px]' : 'w-16'
           }`}
           data-testid="sidebar"
         >
@@ -721,7 +780,7 @@ export default function Layout({ children }) {
                 className="h-9 w-auto"
               />
               {sidebarOpen && (
-                <span className="font-bold text-[15px] text-primary" style={{ fontFamily: 'Chivo, sans-serif' }}>
+                <span className="font-bold text-[15px] text-primary">
                   ContainerLogix
                 </span>
               )}
@@ -858,7 +917,7 @@ export default function Layout({ children }) {
                   alt="ContainerLogix"
                   className="h-8 w-auto"
                 />
-                <span className="font-bold text-sm text-primary" style={{ fontFamily: 'Chivo, sans-serif' }}>ContainerLogix</span>
+                <span className="font-bold text-sm text-primary">ContainerLogix</span>
               </Link>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">{user?.name?.split(' ')[0]}</span>
@@ -879,8 +938,11 @@ export default function Layout({ children }) {
                   const isActive = location.pathname === item.path;
                   return (
                     <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
-                        isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
+                      style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
+                      className={`flex items-center gap-3 px-4 py-3 text-sm border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
+                        isActive
+                          ? 'text-primary font-semibold border-l-transparent'
+                          : 'text-[#1B4965] dark:text-slate-300 border-l-transparent'
                       }`}
                     >
                       <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={1.8} />
@@ -938,7 +1000,7 @@ export default function Layout({ children }) {
 
         {/* Main Content */}
         <main className={`flex-1 transition-all duration-300 ${
-          sidebarOpen ? 'md:ml-[260px]' : 'md:ml-16'
+          sidebarOpen ? 'md:ml-[225px]' : 'md:ml-16'
         } mt-14 md:mt-12`}>
           <div className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
             {children}

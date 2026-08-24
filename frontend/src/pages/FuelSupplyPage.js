@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -9,14 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
+import { ComboField } from '../components/ui/combo-field';
 import { api } from '../lib/api';
-import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Trash2, Search, Save, Fuel, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Save, Fuel } from 'lucide-react';
 
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
@@ -214,19 +213,17 @@ export default function FuelSupplyPage() {
   return (
     <Layout>
       <div className="space-y-5" data-testid="fuel-supply-page">
-        <div className="flex items-end justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Fuel className="w-4 h-4" />
-              Abastecimento
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de abastecimento de combustível e ARLA da frota</p>
-          </div>
-          <Button onClick={openCreate} className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90" data-testid="fuel-new-btn">
-            <Plus className="w-4 h-4 mr-1.5" />
-            Novo Abastecimento
-          </Button>
-        </div>
+        <PageHeader
+          title="Abastecimento"
+          subtitle="Controle de abastecimento de combustível e ARLA da frota"
+          icon={Fuel}
+          actions={
+            <Button onClick={openCreate} className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90" data-testid="fuel-new-btn">
+              <Plus className="w-4 h-4 mr-1.5" />
+              Novo Abastecimento
+            </Button>
+          }
+        />
 
         <div className="border-t border-slate-200 dark:border-slate-700" />
 
@@ -343,8 +340,8 @@ export default function FuelSupplyPage() {
               <Field type="number" label="Abatimentos" value={form.discounts} onChange={(v) => onChange('discounts', v)} testid="fuel-discounts" />
               <Field type="number" label="Acréscimos" value={form.additions} onChange={(v) => onChange('additions', v)} testid="fuel-additions" />
               <div>
-                <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Valor Líquido</Label>
-                <Input value={fmtMoney(netValue)} readOnly className="h-9 text-sm text-right font-semibold bg-slate-50 dark:bg-slate-800" />
+                <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Valor Líquido</Label>
+                <Input value={fmtMoney(netValue)} readOnly className="h-9 text-sm text-right font-semibold bg-muted" />
               </div>
               <RadioField label="Tanque Cheio *" value={form.full_tank} onChange={(v) => onChange('full_tank', v)} testid="fuel-full-tank" />
             </div>
@@ -364,7 +361,7 @@ export default function FuelSupplyPage() {
 
             <SectionTitle>Informações de Pagamento</SectionTitle>
             <div className="grid grid-cols-1 gap-2">
-              <Label className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Tipo de Pagamento *</Label>
+              <Label className="text-[12px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Tipo de Pagamento <span className="text-red-500">*</span></Label>
               <div className="flex flex-wrap gap-4">
                 {PAYMENT_TYPE_OPTIONS.map(([v, l]) => (
                   <label key={v} className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
@@ -407,47 +404,19 @@ function SectionTitle({ children }) {
   );
 }
 
+function RequiredLabel({ label }) {
+  if (typeof label === 'string' && label.endsWith(' *')) {
+    return <>{label.slice(0, -2)} <span className="text-red-500">*</span></>;
+  }
+  return label;
+}
+
 function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
       <Input type={type} value={value ?? ''} placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
-    </div>
-  );
-}
-
-function ComboField({ label, value, onChange, options, placeholder = '-- Selecione --', searchPlaceholder = 'Buscar...', emptyLabel = 'Nenhum resultado encontrado', testid }) {
-  const [open, setOpen] = useState(false);
-  const selected = options.find(([v]) => v === value);
-  return (
-    <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button type="button" variant="outline" role="combobox" aria-expanded={open}
-            className="w-full justify-between font-normal h-9 text-sm" data-testid={testid}>
-            <span className="truncate">{selected ? selected[1] : placeholder}</span>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-          <Command>
-            <CommandInput placeholder={searchPlaceholder} />
-            <CommandList>
-              <CommandEmpty>{emptyLabel}</CommandEmpty>
-              <CommandGroup>
-                {options.map(([v, l]) => (
-                  <CommandItem key={v} value={l} onSelect={() => { onChange(v); setOpen(false); }}>
-                    <Check className={cn('mr-2 h-4 w-4', value === v ? 'opacity-100' : 'opacity-0')} />
-                    {l}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
     </div>
   );
 }
@@ -455,7 +424,7 @@ function ComboField({ label, value, onChange, options, placeholder = '-- Selecio
 function SelectField({ label, value, onChange, options, testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
       <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
         <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
         <SelectContent>
@@ -471,7 +440,7 @@ function SelectField({ label, value, onChange, options, testid }) {
 function RadioField({ label, value, onChange, testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
       <div className="flex items-center gap-4 h-9">
         <label className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
           <input type="radio" checked={value === true} onChange={() => onChange(true)} className="h-3.5 w-3.5" data-testid={testid ? `${testid}-sim` : undefined} />
@@ -489,7 +458,7 @@ function RadioField({ label, value, onChange, testid }) {
 function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
       <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
     </div>
   );
