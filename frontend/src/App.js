@@ -47,6 +47,7 @@ import UnitSegregationPage from './pages/UnitSegregationPage';
 import RPATerceiroPage from './pages/RPATerceiroPage';
 import OrdemServicoPage from './pages/OrdemServicoPage';
 import FuelSupplyPage from './pages/FuelSupplyPage';
+import FuelSupplyOrderPage from './pages/FuelSupplyOrderPage';
 import CompanySettingsPage from './pages/CompanySettingsPage';
 import UsersPage from './pages/UsersPage';
 import ModulesPage from './pages/ModulesPage';
@@ -144,6 +145,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="frota.checklist">
                 <VehicleChecklistPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/ordem-abastecimento"
+            element={
+              <ProtectedRoute moduleKey="frota.ordem_abastecimento">
+                <FuelSupplyOrderPage />
               </ProtectedRoute>
             }
           />

@@ -65,6 +65,7 @@ const PAGE_TITLES = {
   '/fleet/rpa-terceiro': 'Contrato de Frete',
   '/fleet/rpa-terceiro/new': 'Novo Contrato de Frete',
   '/fleet/ordem-servico': 'Ordem de Serviço',
+  '/fleet/ordem-abastecimento': 'Ordem de Abastecimento',
   '/fleet/abastecimento': 'Abastecimento',
   '/fleet/checklist': 'Checklist',
   '/drivers': 'Pessoas',
@@ -249,7 +250,7 @@ export default function Layout({ children }) {
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
   // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
   const fleetTab = new URLSearchParams(location.search).get('tab');
-  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento';
+  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento';
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro');
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
@@ -374,6 +375,7 @@ export default function Layout({ children }) {
     { path: '/fleet?tab=revisions', label: 'Controle de Revisão', icon: Wrench, moduleKey: 'frota.revisao' },
     { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList, moduleKey: 'frota.ordem_servico' },
     { path: '/fleet/checklist', label: 'Checklist', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
+    { path: '/fleet/ordem-abastecimento', label: 'Ordem de Abastecimento', icon: Clipboard, moduleKey: 'frota.ordem_abastecimento' },
     { path: '/fleet/abastecimento', label: 'Abastecimento', icon: Fuel, moduleKey: 'frota.abastecimento' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 

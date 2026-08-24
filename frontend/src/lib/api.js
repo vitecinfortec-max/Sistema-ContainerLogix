@@ -282,6 +282,14 @@ export const api = {
   createFuelSupply: (data) => axios.post(`${API}/fuel-supplies`, data),
   updateFuelSupply: (id, data) => axios.put(`${API}/fuel-supplies/${id}`, data),
   deleteFuelSupply: (id) => axios.delete(`${API}/fuel-supplies/${id}`),
+
+  // Ordem de Abastecimento (Frota)
+  getFuelSupplyOrders: (params) => axios.get(`${API}/fuel-supply-orders`, { params }),
+  getFuelSupplyOrder: (id) => axios.get(`${API}/fuel-supply-orders/${id}`),
+  getFuelSupplyOrderNextNumber: () => axios.get(`${API}/fuel-supply-orders/next-number`),
+  createFuelSupplyOrder: (data) => axios.post(`${API}/fuel-supply-orders`, data),
+  updateFuelSupplyOrder: (id, data) => axios.put(`${API}/fuel-supply-orders/${id}`, data),
+  deleteFuelSupplyOrder: (id) => axios.delete(`${API}/fuel-supply-orders/${id}`),
 };
 
 export default api;

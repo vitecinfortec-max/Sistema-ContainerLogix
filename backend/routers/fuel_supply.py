@@ -49,6 +49,7 @@ from models import (
     ExpenseReportReceipt, ExpenseReportDeposit, ExpenseReportPurchase,
     ExpenseReport, ExpenseReportCreate, ExpenseReportResponse,
     FuelSupply, FuelSupplyCreate, FuelSupplyUpdate, FuelSupplyResponse,
+    FuelSupplyOrder, FuelSupplyOrderCreate, FuelSupplyOrderUpdate, FuelSupplyOrderResponse,
 )
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, decode_token
 from reports import (
@@ -153,3 +154,81 @@ async def delete_fuel_supply(supply_id: str, current_user: dict = Depends(get_cu
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
     return {"message": "Abastecimento removido"}
+
+
+# ==================== ORDEM DE ABASTECIMENTO ====================
+
+
+@api_router.get("/fuel-supply-orders", response_model=List[FuelSupplyOrderResponse])
+async def list_fuel_supply_orders(
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    query = {}
+    if search:
+        search_escaped = re.escape(search)
+        query["$or"] = [
+            {"equipment_plate": {"$regex": search_escaped, "$options": "i"}},
+            {"requester": {"$regex": search_escaped, "$options": "i"}},
+            {"supplier_name": {"$regex": search_escaped, "$options": "i"}},
+            {"company_name": {"$regex": search_escaped, "$options": "i"}},
+        ]
+    rows = await db.fuel_supply_orders.find(query, {"_id": 0}).sort("order_number", -1).to_list(None)
+    return rows
+
+
+@api_router.get("/fuel-supply-orders/next-number")
+async def get_next_fuel_supply_order_number(current_user: dict = Depends(get_current_active_user)):
+    """Só uma prévia pra tela; o número real é reservado de forma atômica na criação."""
+    counter = await db.counters.find_one({"_id": "fuel_supply_order_number"})
+    return {"next_number": (counter["seq"] + 1) if counter else 1}
+
+
+@api_router.get("/fuel-supply-orders/{order_id}", response_model=FuelSupplyOrderResponse)
+async def get_fuel_supply_order(order_id: str, current_user: dict = Depends(get_current_active_user)):
+    doc = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Ordem de Abastecimento não encontrada")
+    return doc
+
+
+@api_router.post("/fuel-supply-orders", response_model=FuelSupplyOrderResponse)
+async def create_fuel_supply_order(data: FuelSupplyOrderCreate, current_user: dict = Depends(get_current_active_user)):
+    counter = await db.counters.find_one_and_update(
+        {"_id": "fuel_supply_order_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    next_num = counter["seq"]
+
+    obj = FuelSupplyOrder(
+        order_number=next_num,
+        **data.model_dump(),
+        created_by=current_user["sub"],
+        created_by_name=current_user["name"]
+    )
+    doc = obj.model_dump()
+    doc["created_at"] = obj.created_at.isoformat()
+    await db.fuel_supply_orders.insert_one(doc)
+    return doc
+
+
+@api_router.put("/fuel-supply-orders/{order_id}", response_model=FuelSupplyOrderResponse)
+async def update_fuel_supply_order(order_id: str, data: FuelSupplyOrderUpdate, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Ordem de Abastecimento não encontrada")
+    update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.fuel_supply_orders.update_one({"id": order_id}, {"$set": update_data})
+    updated = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0})
+    return updated
+
+
+@api_router.delete("/fuel-supply-orders/{order_id}")
+async def delete_fuel_supply_order(order_id: str, current_user: dict = Depends(get_current_active_user)):
+    result = await db.fuel_supply_orders.delete_one({"id": order_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Ordem de Abastecimento não encontrada")
+    return {"message": "Ordem de Abastecimento removida"}

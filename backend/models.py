@@ -1996,6 +1996,62 @@ class FuelSupplyResponse(FuelSupply):
     total_value: float = 0.0  # calculado
 
 
+# ==================== FROTA - ORDEM DE ABASTECIMENTO ====================
+# Modelo baseado no formulário "Ordens de abastecimentos - Inclusão" do
+# Bsoft TMS (referência fornecida pelo usuário em 2026-08-24). Representa a
+# autorização/pedido de abastecimento que antecede o registro do
+# abastecimento em si (FuelSupply).
+
+FUEL_SUPPLY_ORDER_MODE_OPTIONS = ["LITROS", "VALOR", "LITROS_VALOR", "COMPLETAR_TANQUE"]
+
+class FuelSupplyOrder(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_number: int  # Número sequencial
+
+    company_id: Optional[str] = None
+    company_name: Optional[str] = None
+    requester: Optional[str] = None  # Solicitante (texto livre)
+    order_date: Optional[str] = None
+
+    equipment_id: Optional[str] = None
+    equipment_plate: Optional[str] = None
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    fuel_type: Optional[str] = None  # Produto
+    supply_mode: str = "LITROS"  # Tipo: Litros/Valor/Litros-Valor/Completar tanque
+
+    observations: Optional[str] = None
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+
+class FuelSupplyOrderCreate(BaseModel):
+    company_id: Optional[str] = None
+    company_name: Optional[str] = None
+    requester: Optional[str] = None
+    order_date: Optional[str] = None
+    equipment_id: Optional[str] = None
+    equipment_plate: Optional[str] = None
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    fuel_type: Optional[str] = None
+    supply_mode: str = "LITROS"
+    observations: Optional[str] = None
+
+
+class FuelSupplyOrderUpdate(FuelSupplyOrderCreate):
+    pass
+
+
+class FuelSupplyOrderResponse(FuelSupplyOrder):
+    pass
+
+
 # ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================
 
 class ExpenseReportReceipt(BaseModel):
