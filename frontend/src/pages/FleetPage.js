@@ -435,27 +435,38 @@ export default function FleetPage() {
       <div className="space-y-5" data-testid="fleet-page">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Frota
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              {activeTab === 'revisions' ? <Wrench className="w-4 h-4" /> : <Car className="w-4 h-4" />}
+              {activeTab === 'revisions' ? 'Controle de Revisão' : 'Cadastro de Veículo'}
             </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerenciamento de veículos e manutenção</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+              {activeTab === 'revisions' ? 'Registro de revisões e trocas de óleo dos veículos' : 'Cadastro e gerenciamento da frota de veículos'}
+            </p>
           </div>
+          {activeTab === 'revisions' ? (
+            <Button
+              onClick={() => setNewModalOpen(true)}
+              data-testid="new-revision-btn"
+              className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              Nova Revisão
+            </Button>
+          ) : (
+            <Button
+              onClick={openNewVehicleModal}
+              data-testid="new-vehicle-btn"
+              className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              Novo Veículo
+            </Button>
+          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* ========== ABA CADASTRO DE VEÍCULOS ========== */}
           <TabsContent value="vehicles" className="space-y-5">
-            <div className="flex justify-end">
-              <Button
-                onClick={openNewVehicleModal}
-                data-testid="new-vehicle-btn"
-                className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
-              >
-                <Plus className="w-4 h-4 mr-1.5" />
-                Novo Veículo
-              </Button>
-            </div>
-
             <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
               <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
                 <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
@@ -590,17 +601,6 @@ export default function FleetPage() {
 
           {/* ========== ABA CONTROLE DE REVISÃO ========== */}
           <TabsContent value="revisions" className="space-y-5 mt-4">
-            <div className="flex justify-end">
-              <Button
-                onClick={() => setNewModalOpen(true)}
-                data-testid="new-revision-btn"
-                className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
-              >
-                <Plus className="w-4 h-4 mr-1.5" />
-                Nova Revisão
-              </Button>
-            </div>
-
             <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
               <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
                 <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">

@@ -61,7 +61,6 @@ const PAGE_TITLES = {
   '/movements': 'Movimentações',
   '/movements/new': 'Nova Movimentação',
   '/yard-control': 'Controle de Pátio',
-  '/fleet': 'Frota',
   '/fleet/rpa-terceiro': 'Contrato de Frete',
   '/fleet/rpa-terceiro/new': 'Novo Contrato de Frete',
   '/fleet/ordem-servico': 'Ordem de Serviço',
@@ -431,6 +430,12 @@ export default function Layout({ children }) {
     : null;
 
   const pageTitle = useMemo(() => {
+    // '/fleet' é compartilhado por duas abas com nomes diferentes (Cadastro de
+    // Veículo é a aba padrão, Controle de Revisão só quando ?tab=revisions) -
+    // não dá pra usar um título fixo em PAGE_TITLES pra essa rota.
+    if (location.pathname === '/fleet') {
+      return new URLSearchParams(location.search).get('tab') === 'revisions' ? 'Controle de Revisão' : 'Cadastro de Veículo';
+    }
     const exactMatch = PAGE_TITLES[location.pathname];
     if (exactMatch) return exactMatch;
     if (location.pathname.includes('/movements/') && location.pathname.includes('/edit')) return 'Editar Movimentação';
@@ -441,7 +446,7 @@ export default function Layout({ children }) {
     if (location.pathname.includes('/flex-tank/movements/') && location.pathname.includes('/edit')) return 'Editar Movimentação Flex Tank';
     if (location.pathname.includes('/flex-tank/movements/') && location.pathname !== '/flex-tank/movements/new') return 'Detalhes da Movimentação Flex Tank';
     return 'ContainerLogix';
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   // Expand sidebar when clicking a group while collapsed
   const handleGroupClickCollapsed = (toggleFn) => {
