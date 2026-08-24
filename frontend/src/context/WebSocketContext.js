@@ -12,7 +12,7 @@ const API_URL = BACKEND_URL || '';
 // cabeçalhos customizados no handshake. Lido a cada tentativa de conexão (não
 // numa constante do módulo) porque o token pode mudar entre login/logout.
 const getWsUrl = () => {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   return token ? `${WS_BASE_URL}?token=${encodeURIComponent(token)}` : null;
 };
 
@@ -76,7 +76,7 @@ export function WebSocketProvider({ children }) {
 
     const poll = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = sessionStorage.getItem('token');
         if (!token) return;
 
         const response = await fetch(`${API_URL}/api/movements`, {
@@ -183,7 +183,7 @@ export function WebSocketProvider({ children }) {
 
   const forceRefresh = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token');
       if (!token) return;
 
       const response = await fetch(`${API_URL}/api/movements`, {

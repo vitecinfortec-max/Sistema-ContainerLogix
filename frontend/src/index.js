@@ -10,10 +10,12 @@ const isElectron = navigator.userAgent.toLowerCase().includes('electron');
 const isCapacitorNative = Capacitor.isNativePlatform();
 
 // No app desktop, sempre exige login de novo a cada abertura (por segurança,
-// já que a máquina/sessão do Electron é compartilhada) — não reaproveita o
-// token de uma sessão anterior como acontece no navegador.
+// já que a máquina/sessão do Electron é compartilhada). Redundante com o
+// sessionStorage usado pelo AuthContext (que já limpa sozinho ao fechar a
+// janela), mas mantido como garantia extra caso a partição de sessão do
+// Electron persista entre reinicializações.
 if (isElectron) {
-  localStorage.removeItem('token');
+  sessionStorage.removeItem('token');
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));

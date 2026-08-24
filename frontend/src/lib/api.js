@@ -3,7 +3,7 @@ import axios from 'axios';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BASE_URL = process.env.REACT_APP_BACKEND_URL;
 
-const token = localStorage.getItem('token');
+const token = sessionStorage.getItem('token');
 if (token) {
   axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 }

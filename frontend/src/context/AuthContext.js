@@ -15,7 +15,7 @@ axios.interceptors.response.use(
     const url = error?.config?.url || '';
     const isAuthFlow = ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password'].some((p) => url.includes(p));
     if (status === 401 && !isAuthFlow) {
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login';
@@ -28,7 +28,7 @@ axios.interceptors.response.use(
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [token, setToken] = useState(sessionStorage.getItem('token'));
 
   useEffect(() => {
     if (token) {
@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
     const { access_token, user: userData } = response.data;
-    localStorage.setItem('token', access_token);
+    sessionStorage.setItem('token', access_token);
     setToken(access_token);
     setUser(userData);
     axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password, role = 'operator') => {
     const response = await axios.post(`${API}/auth/register`, { name, email, password, role });
     const { access_token, user: userData } = response.data;
-    localStorage.setItem('token', access_token);
+    sessionStorage.setItem('token', access_token);
     setToken(access_token);
     setUser(userData);
     axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     setToken(null);
     setUser(null);
     delete axios.defaults.headers.common['Authorization'];
