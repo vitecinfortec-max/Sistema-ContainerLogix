@@ -173,6 +173,7 @@ export const api = {
   getVehicleRevisionPDF: (id) => axios.get(`${API}/vehicle-revisions/${id}/pdf`, { responseType: 'blob' }),
 
   getVehicleChecklistTemplate: () => axios.get(`${API}/vehicle-checklists/template`),
+  getSimpleVehicleChecklistTemplate: (vehicleType) => axios.get(`${API}/vehicle-checklists/simple-template`, { params: { vehicle_type: vehicleType } }),
   getVehicleChecklists: (params) => axios.get(`${API}/vehicle-checklists`, { params }),
   getVehicleChecklist: (id) => axios.get(`${API}/vehicle-checklists/${id}`),
   createVehicleChecklist: (data) => axios.post(`${API}/vehicle-checklists`, data),

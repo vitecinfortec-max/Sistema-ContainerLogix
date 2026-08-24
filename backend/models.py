@@ -781,9 +781,10 @@ def default_checklist_items(section: str) -> List["VehicleChecklistItem"]:
 
 
 # Modelo simplificado (substituiu o modelo LVT/Petrobras-Manuport pra novos
-# checklists) - identificação básica do veículo + fotos, sem os itens
-# SIM/NÃO do modelo antigo. Registros antigos (template generic/petrobras_lvt)
-# continuam intactos no banco, só pra consulta/histórico.
+# checklists) - identificação básica do veículo + fotos + itens de verificação
+# específicos por tipo de veículo (não os itens fixos do modelo LVT antigo).
+# Registros antigos (template generic/petrobras_lvt) continuam intactos no
+# banco, só pra consulta/histórico.
 VEHICLE_CHECKLIST_PHOTO_TYPES = ["front", "back", "left_side", "right_side", "speedometer", "tires"]
 MAX_VEHICLE_CHECKLIST_PHOTOS = 24
 
@@ -791,6 +792,95 @@ class VehicleChecklistPhoto(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     type: str  # front, back, left_side, right_side, speedometer ou tires
     url: str
+
+
+# Itens de verificação do checklist simplificado, por tipo de veículo (planilha
+# fornecida pelo usuário em 2026-08-23). Diferente do modelo legado (campos
+# fixos documentos_items/vehicle_condition_items/...), a estrutura varia por
+# tipo de veículo - por isso é guardada como uma lista de seções genérica
+# (VehicleChecklistItemSection), não como campos nomeados fixos.
+SIMPLE_CHECKLIST_TEMPLATES = {
+    "CAMINHAO": [
+        {"label": "Motor e Fluidos", "items": [
+            "Óleo do motor (nível e vazamento)",
+            "Água do radiador",
+            "Nível de combustível",
+            "Correias e mangueiras",
+            "Bateria (terminais e fixação)",
+        ]},
+        {"label": "Freios e Rodagem", "items": [
+            "Freios (pedal / ar do freio pneumático / ABS)",
+            "Pneus (calibragem, desgaste, estepe)",
+            "Nível do óleo de câmbio/diferencial",
+        ]},
+        {"label": "Elétrica e Sinalização", "items": [
+            "Faróis, lanternas, setas",
+            "Luz de freio e luz de ré",
+            "Buzina",
+        ]},
+        {"label": "Segurança e Documentação", "items": [
+            "Retrovisores (estado e ajuste)",
+            "Cinto de segurança",
+            "Extintor de incêndio (validade e carga)",
+            "Triângulo de sinalização",
+            "Macaco e chave de roda",
+            "Documentação (CRLV, ANTT, licenças)",
+            "Tacógrafo funcionando",
+            "Limpador de para-brisa e reservatório de água",
+        ]},
+    ],
+    "CARRETA": [
+        {"label": "Engate e Estrutura", "items": [
+            "Quinta-roda (travamento e lubrificação)",
+            "Pino-rei (desgaste)",
+            "Pontões e sapatas de apoio",
+            "Engate e correntes de segurança",
+            "Assoalho/estrutura da carroceria (trincas, corrosão)",
+        ]},
+        {"label": "Freios e Rodagem", "items": [
+            "Freios da carreta (lonas, câmaras de freio)",
+            "Pneus e rodas (todos os eixos)",
+            "Suspensão (feixe de mola ou pneumática, vazamento de ar)",
+        ]},
+        {"label": "Carga e Sinalização", "items": [
+            "Lonas de cobertura (integridade, amarração)",
+            "Lacres e travas de porta",
+            "Luzes traseiras e laterais",
+            "Placas de identificação e refletivos",
+            "Cabos elétricos e conexão com o cavalo",
+        ]},
+    ],
+    "CARRO": [
+        {"label": "Motor e Fluidos", "items": [
+            "Óleo do motor",
+            "Água do radiador e do limpador de para-brisa",
+            "Nível de combustível",
+        ]},
+        {"label": "Freios e Rodagem", "items": [
+            "Freios",
+            "Pneus (calibragem, estepe, desgaste)",
+        ]},
+        {"label": "Elétrica e Sinalização", "items": [
+            "Faróis, lanternas, setas",
+        ]},
+        {"label": "Segurança e Documentação", "items": [
+            "Cinto de segurança",
+            "Documentação (CRLV, CNH do condutor)",
+            "Ar-condicionado (se aplicável para uso comercial)",
+            "Estado geral da lataria/vidros (avarias)",
+            "Triângulo e macaco",
+        ]},
+    ],
+}
+
+class VehicleChecklistItemAnswer(BaseModel):
+    text: str
+    answer: Optional[str] = None  # "SIM", "NAO" ou None (não respondido)
+
+
+class VehicleChecklistItemSection(BaseModel):
+    label: str
+    items: List[VehicleChecklistItemAnswer] = Field(default_factory=list)
 
 
 class VehicleChecklistFields(BaseModel):
@@ -805,6 +895,10 @@ class VehicleChecklistFields(BaseModel):
     vehicle_type: Optional[str] = None  # CAMINHAO, CARRETA ou CARRO (só no modelo "simple")
     vehicle_plate: Optional[str] = None  # placa (modelo "simple" - o legado usa cavalo_plate/carreta1_plate/carreta2_plate)
     photos: List[VehicleChecklistPhoto] = Field(default_factory=list)
+    vistoriador_id: Optional[str] = None  # digitado/selecionado do cadastro de Pessoas, igual driver_id
+    vistoriador_name: Optional[str] = None
+    current_km: Optional[int] = None
+    checklist_sections: List[VehicleChecklistItemSection] = Field(default_factory=list)  # itens de verificação (modelo "simple", por tipo de veículo)
 
     # Cabeçalho
     expedidor: Optional[str] = None

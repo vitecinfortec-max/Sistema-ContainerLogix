@@ -37,7 +37,7 @@ from models import (
     VehicleChecklistItem, VehicleChecklistProduct, VehicleChecklistFields,
     VehicleChecklist, VehicleChecklistCreate, VehicleChecklistResponse,
     VEHICLE_CHECKLIST_TEMPLATE, VEHICLE_CHECKLIST_SECTION_LABELS,
-    MAX_VEHICLE_CHECKLIST_PHOTOS,
+    MAX_VEHICLE_CHECKLIST_PHOTOS, SIMPLE_CHECKLIST_TEMPLATES,
     VehicleRevision, VehicleRevisionCreate, VehicleRevisionResponse,
     LoadingScheduleItem, LoadingSchedule, LoadingScheduleCreate, LoadingScheduleResponse,
     DailyRateRequestItem, DailyRateRequest, DailyRateRequestCreate, DailyRateRequestResponse,
@@ -238,6 +238,14 @@ async def get_vehicle_checklist_template(current_user: dict = Depends(get_curren
             for key, items in VEHICLE_CHECKLIST_TEMPLATE.items()
         ]
     }
+
+@api_router.get("/vehicle-checklists/simple-template")
+async def get_simple_vehicle_checklist_template(
+    vehicle_type: str = Query(..., regex="^(CAMINHAO|CARRETA|CARRO)$"),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Retorna as seções/itens de verificação do checklist simplificado pro tipo de veículo informado"""
+    return {"sections": SIMPLE_CHECKLIST_TEMPLATES.get(vehicle_type, [])}
 
 @api_router.get("/vehicle-checklists")
 async def get_vehicle_checklists(

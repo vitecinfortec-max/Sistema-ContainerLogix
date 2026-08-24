@@ -144,9 +144,15 @@ const emptySimpleForm = {
   vehicle_plate: '',
   driver_id: '',
   driver_name: '',
+  vistoriador_id: '',
+  vistoriador_name: '',
+  current_km: '',
   inspection_datetime: '',
   observations: '',
 };
+
+const buildSectionsFromTemplate = (sections) =>
+  (sections || []).map((s) => ({ label: s.label, items: (s.items || []).map((text) => ({ text, answer: null })) }));
 
 // Layout de impressão do checklist simplificado (window.print(), igual ao
 // padrão usado em ContainerInspectionDetailPage) - fica fora do fluxo normal
@@ -195,8 +201,16 @@ function SimpleChecklistPrintView({ checklist, company }) {
               <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{checklist.vehicle_plate || '-'}</div>
             </div>
             <div>
+              <div style={{ fontSize: '8px', color: '#666' }}>Km Atual</div>
+              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{checklist.current_km != null ? `${checklist.current_km.toLocaleString('pt-BR')} km` : '-'}</div>
+            </div>
+            <div>
               <div style={{ fontSize: '8px', color: '#666' }}>Motorista</div>
               <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{checklist.driver_name || '-'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '8px', color: '#666' }}>Vistoriador</div>
+              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{checklist.vistoriador_name || '-'}</div>
             </div>
             <div>
               <div style={{ fontSize: '8px', color: '#666' }}>Data/Hora</div>
@@ -206,6 +220,29 @@ function SimpleChecklistPrintView({ checklist, company }) {
             </div>
           </div>
         </div>
+
+        {(checklist.checklist_sections || []).length > 0 && (
+          <div style={{ border: '1px solid #000', borderRadius: '4px', marginBottom: '8px', overflow: 'hidden' }}>
+            <div style={{ backgroundColor: '#f0f0f0', padding: '4px 8px', borderBottom: '1px solid #000', fontWeight: 'bold', fontSize: '10px' }}>
+              Itens de Verificação
+            </div>
+            <div style={{ padding: '8px' }}>
+              {checklist.checklist_sections.map((section, sIdx) => (
+                <div key={sIdx} style={{ marginBottom: sIdx < checklist.checklist_sections.length - 1 ? '6px' : 0, breakInside: 'avoid' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 'bold', marginBottom: '2px' }}>{section.label}</div>
+                  {(section.items || []).map((item, iIdx) => (
+                    <div key={iIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', padding: '2px 0', borderBottom: '1px solid #eee' }}>
+                      <span>{item.text}</span>
+                      <span style={{ fontWeight: 'bold', color: item.answer === 'NAO' ? '#c00' : item.answer === 'SIM' ? '#080' : '#999' }}>
+                        {item.answer === 'SIM' ? 'SIM' : item.answer === 'NAO' ? 'NÃO' : '-'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {checklist.observations && (
           <div style={{ border: '1px solid #000', borderRadius: '4px', marginBottom: '8px', overflow: 'hidden' }}>
@@ -270,6 +307,7 @@ export default function VehicleChecklistPage() {
   const [simpleForm, setSimpleForm] = useState(emptySimpleForm);
   const [simpleEditingId, setSimpleEditingId] = useState(null);
   const [simplePhotos, setSimplePhotos] = useState([]);
+  const [simpleSections, setSimpleSections] = useState([]);
   const [newPhotoType, setNewPhotoType] = useState('front');
   const [savingSimple, setSavingSimple] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -431,6 +469,7 @@ export default function VehicleChecklistPage() {
       ...(checklist.kit_items || []),
       ...(checklist.tank_items || []),
       ...(checklist.post_loading_items || []),
+      ...(checklist.checklist_sections || []).flatMap(s => s.items || []),
     ];
     if (allItems.some(i => i.answer === 'NAO')) return 'REPROVADO';
     if (allItems.length > 0 && allItems.every(i => i.answer === 'SIM')) return 'APROVADO';
@@ -492,12 +531,23 @@ export default function VehicleChecklistPage() {
   const resetSimpleForm = () => {
     setSimpleForm(emptySimpleForm);
     setSimplePhotos([]);
+    setSimpleSections([]);
     setSimpleEditingId(null);
+  };
+
+  const loadSimpleTemplate = async (vehicleType) => {
+    try {
+      const res = await api.getSimpleVehicleChecklistTemplate(vehicleType);
+      setSimpleSections(buildSectionsFromTemplate(res.data.sections));
+    } catch (error) {
+      toast.error('Erro ao carregar itens do checklist');
+    }
   };
 
   const openNewSimpleModal = () => {
     resetSimpleForm();
     setSimpleModalOpen(true);
+    loadSimpleTemplate(emptySimpleForm.vehicle_type);
   };
 
   const openEditSimpleModal = (checklist) => {
@@ -507,11 +557,35 @@ export default function VehicleChecklistPage() {
       vehicle_plate: checklist.vehicle_plate || '',
       driver_id: checklist.driver_id || '',
       driver_name: checklist.driver_name || '',
+      vistoriador_id: checklist.vistoriador_id || '',
+      vistoriador_name: checklist.vistoriador_name || '',
+      current_km: checklist.current_km != null ? String(checklist.current_km) : '',
       inspection_datetime: checklist.inspection_datetime || '',
       observations: checklist.observations || '',
     });
     setSimplePhotos(checklist.photos || []);
+    setSimpleSections(buildSectionsFromTemplate(checklist.checklist_sections));
     setSimpleModalOpen(true);
+  };
+
+  // Troca dos itens de verificação quando o tipo de veículo muda - descarta
+  // as respostas já marcadas (seções diferentes por tipo, não faz sentido
+  // tentar preservar). Handler explícito em vez de useEffect pra não disparar
+  // sozinho ao abrir o modal de edição (que já vem com checklist_sections
+  // carregado do registro salvo).
+  const handleVehicleTypeChange = (newType) => {
+    setSimpleForm(prev => ({ ...prev, vehicle_type: newType }));
+    loadSimpleTemplate(newType);
+  };
+
+  const updateSimpleSectionItem = (sectionIdx, itemIdx, patch) => {
+    setSimpleSections(prev => {
+      const next = [...prev];
+      const items = [...next[sectionIdx].items];
+      items[itemIdx] = { ...items[itemIdx], ...patch };
+      next[sectionIdx] = { ...next[sectionIdx], items };
+      return next;
+    });
   };
 
   // Sempre inclui checklist_kind + listas vazias dos campos do modelo antigo,
@@ -524,6 +598,9 @@ export default function VehicleChecklistPage() {
     vehicle_plate: simpleForm.vehicle_plate,
     driver_id: simpleForm.driver_id,
     driver_name: simpleForm.driver_name,
+    vistoriador_id: simpleForm.vistoriador_id,
+    vistoriador_name: simpleForm.vistoriador_name,
+    current_km: simpleForm.current_km !== '' ? parseInt(simpleForm.current_km, 10) : null,
     inspection_datetime: simpleForm.inspection_datetime,
     observations: simpleForm.observations,
     documentos_items: [],
@@ -533,6 +610,7 @@ export default function VehicleChecklistPage() {
     tank_items: [],
     post_loading_items: [],
     products: [],
+    checklist_sections: simpleSections,
     photos: photos.map((p) => ({ id: p.id, type: p.type, url: p.url })),
   });
 
@@ -694,11 +772,14 @@ export default function VehicleChecklistPage() {
                             {c.created_at ? format(new Date(c.created_at), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                           </td>
                           <td className="px-4 py-2.5">
-                            {isSimple ? (
-                              <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                                <Camera className="w-3 h-3" /> {(c.photos || []).length} foto{(c.photos || []).length !== 1 ? 's' : ''}
-                              </span>
-                            ) : statusBadge(checklistStatus(c))}
+                            <div className="flex items-center gap-2">
+                              {statusBadge(checklistStatus(c))}
+                              {isSimple && (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                  <Camera className="w-3 h-3" /> {(c.photos || []).length}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-0.5">
@@ -750,7 +831,7 @@ export default function VehicleChecklistPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Tipo de Veículo *</Label>
-                <Select value={simpleForm.vehicle_type} onValueChange={(v) => setSimpleForm(prev => ({ ...prev, vehicle_type: v }))}>
+                <Select value={simpleForm.vehicle_type} onValueChange={handleVehicleTypeChange}>
                   <SelectTrigger data-testid="simple-checklist-vehicle-type">
                     <SelectValue />
                   </SelectTrigger>
@@ -784,6 +865,26 @@ export default function VehicleChecklistPage() {
                 />
               </div>
               <div>
+                <Label>Vistoriador</Label>
+                <Autocomplete
+                  value={simpleForm.vistoriador_name}
+                  onChange={(val) => setSimpleForm(prev => ({ ...prev, vistoriador_name: val, vistoriador_id: '' }))}
+                  options={drivers}
+                  placeholder="Digite o nome..."
+                  displayField="name"
+                  onSelect={(d) => setSimpleForm(prev => ({ ...prev, vistoriador_id: d.id, vistoriador_name: d.name }))}
+                />
+              </div>
+              <div>
+                <Label>Km Atual</Label>
+                <Input
+                  type="number"
+                  value={simpleForm.current_km}
+                  onChange={(e) => setSimpleForm(prev => ({ ...prev, current_km: e.target.value }))}
+                  placeholder="Ex: 125430"
+                />
+              </div>
+              <div>
                 <Label>Data e Hora</Label>
                 <Input
                   type="datetime-local"
@@ -792,6 +893,30 @@ export default function VehicleChecklistPage() {
                 />
               </div>
             </div>
+
+            {simpleSections.length > 0 && (
+              <div className="space-y-4">
+                <h3 className="font-semibold text-sm">Itens de Verificação</h3>
+                {simpleSections.map((section, sIdx) => (
+                  <div key={section.label} className="border rounded-lg overflow-hidden">
+                    <div className="bg-primary/10 px-4 py-2">
+                      <h4 className="text-sm font-semibold text-primary">{section.label}</h4>
+                    </div>
+                    <div className="divide-y">
+                      {section.items.map((item, iIdx) => (
+                        <div key={iIdx} className="flex items-center gap-3 px-4 py-2.5">
+                          <span className="text-sm flex-1">{item.text}</span>
+                          <SimNaoToggle
+                            value={item.answer}
+                            onChange={(v) => updateSimpleSectionItem(sIdx, iIdx, { answer: v })}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div>
               <Label>Observações</Label>
@@ -1209,13 +1334,19 @@ export default function VehicleChecklistPage() {
             <DialogTitle className="flex items-center gap-2">
               <ClipboardCheck className="w-5 h-5" />
               Checklist #{selectedChecklist?.checklist_number}
-              {selectedChecklist && selectedChecklist.checklist_kind !== 'simple' && statusBadge(checklistStatus(selectedChecklist))}
+              {selectedChecklist && statusBadge(checklistStatus(selectedChecklist))}
             </DialogTitle>
           </DialogHeader>
 
           {selectedChecklist && (
             selectedChecklist.checklist_kind === 'simple' ? (
               <div className="space-y-4">
+                {checklistStatus(selectedChecklist) === 'REPROVADO' && (
+                  <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    Há item(ns) reprovado(s) nesse checklist.
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-muted/50 p-3 rounded">
                     <p className="text-sm text-muted-foreground">Tipo de Veículo</p>
@@ -1230,12 +1361,42 @@ export default function VehicleChecklistPage() {
                     <p className="font-medium">{selectedChecklist.driver_name || '-'}</p>
                   </div>
                   <div className="bg-muted/50 p-3 rounded">
+                    <p className="text-sm text-muted-foreground">Vistoriador</p>
+                    <p className="font-medium">{selectedChecklist.vistoriador_name || '-'}</p>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded">
+                    <p className="text-sm text-muted-foreground">Km Atual</p>
+                    <p className="font-medium">{selectedChecklist.current_km != null ? `${selectedChecklist.current_km.toLocaleString('pt-BR')} km` : '-'}</p>
+                  </div>
+                  <div className="bg-muted/50 p-3 rounded">
                     <p className="text-sm text-muted-foreground">Data</p>
                     <p className="font-medium">
                       {selectedChecklist.inspection_datetime ? format(new Date(selectedChecklist.inspection_datetime), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '-'}
                     </p>
                   </div>
                 </div>
+
+                {(selectedChecklist.checklist_sections || []).length > 0 && (
+                  <div className="space-y-3">
+                    {selectedChecklist.checklist_sections.map((section, idx) => (
+                      <div key={idx} className="border rounded-lg overflow-hidden">
+                        <div className="bg-primary/10 px-4 py-2">
+                          <h4 className="text-sm font-semibold text-primary">{section.label}</h4>
+                        </div>
+                        <div className="divide-y">
+                          {(section.items || []).map((item, iIdx) => (
+                            <div key={iIdx} className="flex items-center gap-3 px-4 py-2 text-sm">
+                              <span className="flex-1">{item.text}</span>
+                              {item.answer === 'SIM' && <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />}
+                              {item.answer === 'NAO' && <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />}
+                              {!item.answer && <span className="text-xs text-slate-400">-</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <div>
                   <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block mb-2">
