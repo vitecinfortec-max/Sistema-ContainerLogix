@@ -1447,79 +1447,58 @@ class RPAServiceItem(BaseModel):
     value: float = 0.0
 
 
+class RPACargoItem(BaseModel):
+    """Linha de carga do Contrato de Frete (Dados da Carga, no PDF de Contrato de Afretamento)"""
+    nf_number: Optional[str] = None  # Nro NF
+    fiscal_date: Optional[str] = None  # Dt. Fiscal
+    nature: Optional[str] = None  # Natureza (ex: "CT-e - ...")
+    species: Optional[str] = None  # Espécie (ex: BIG BAG)
+    mark: Optional[str] = None  # Marca
+    batch_number: Optional[str] = None  # Talão/Nro
+    quantity: Optional[str] = None  # Quant.
+    weight_kg: Optional[float] = None  # Kg
+    cubage_m3: Optional[float] = None  # M³ Cubagem
+    value: Optional[float] = None  # Valor
+
+
+# RPA - Recibo de Pagamento a Autônomo é o nome técnico legado; a tela e o PDF
+# chamam isso de "Contrato de Frete" desde 2026-08-24, modelado no Contrato de
+# Afretamento do Bsoft TMS fornecido como referência pelo usuário. Coleção do
+# banco (rpa_terceiro) e rotas (/api/rpa-terceiro) mantidas sem mudança pra
+# não perder registros já existentes em produção.
 class RPATerceiro(BaseModel):
-    """RPA - Recibo de Pagamento a Autônomo (motorista terceiro)"""
+    """Contrato de Frete (nome técnico legado: RPA - Recibo de Pagamento a Autônomo)"""
     model_config = ConfigDict(extra="ignore")
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     rpa_number: int  # Número sequencial (Nº 47)
-    rpa_type: str = "terceiro"  # "terceiro" | "agregado"
-
-    # ===== DADOS AUTÔNOMO =====
-    driver_name: Optional[str] = None  # MOTORISTA
-    driver_cpf: Optional[str] = None  # CPF
-    driver_phone: Optional[str] = None  # TELEFONE
-    truck_plate: Optional[str] = None  # PLACA CAVALO
-    truck_renavam: Optional[str] = None  # RENAVAN
-    truck_owner: Optional[str] = None  # PROPRIETÁRIO
-    trailer_plate: Optional[str] = None  # PLACA CAVALO (segundo veículo/carreta)
-    trailer_renavam: Optional[str] = None  # RENAVAN (segundo)
-    trailer_owner: Optional[str] = None  # PROPRIETÁRIO (segundo)
-
-    # ===== DADOS DO SERVIÇO PRESTADO =====
-    service_local: Optional[str] = None  # LOCAL
-    service_date: Optional[str] = None  # DATA (ISO yyyy-mm-dd)
-    service_type: Optional[str] = None  # SERVIÇO (ex: CONTAINER)
-    service_modality: Optional[str] = None  # TIPO (LS/RODO)
-    origin: Optional[str] = None  # ORIGEM
-    destination: Optional[str] = None  # DESTINO
-    cte: Optional[str] = None  # CTE
-    weight: Optional[str] = None  # PESO
-    collection_date: Optional[str] = None  # DATA COLETA
-    delivery_date: Optional[str] = None  # DATA ENTREGA
-    container_number: Optional[str] = None  # Nº CONTAINER
-    client_name: Optional[str] = None  # CLIENTE
-
-    # ===== DEMONSTRATIVO DOS SERVIÇOS PRESTADOS =====
-    services: List[RPAServiceItem] = []
-
-    # ===== ESPECIFICAÇÃO DA REMUNERAÇÃO =====
-    service_value: float = 0.0  # I. VALOR DO SERVIÇO
-    daily_rate: float = 0.0  # II. DIÁRIAS
-    fuel: float = 0.0  # III. ABASTECIMENTO
-    advance: float = 0.0  # IV. ADIANTAMENTO
-    others: float = 0.0  # VI. OUTROS
-    discounts: float = 0.0  # DESCONTOS
-
-    # SALDO A RECEBER calculado: service_value + daily_rate + fuel + others - advance - discounts
-
-    # ===== DADOS BANCÁRIOS DO BENEFICIÁRIO =====
-    bank_agency: Optional[str] = None  # Nº AGÊNCIA
-    bank_account: Optional[str] = None  # Nº CONTA
-    bank_pix: Optional[str] = None  # CHAVE PIX
-    bank_beneficiary: Optional[str] = None  # BENEFICIÁRIO
-
-    # Observação extra
-    observations: Optional[str] = None
-
-    # Controle
-    created_by: str
-    created_by_name: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: Optional[datetime] = None
-
-
-class RPATerceiroCreate(BaseModel):
     rpa_type: str = "terceiro"
+
+    emission_date: Optional[str] = None
+    payment_method: Optional[str] = None
+    operation_type: Optional[str] = None
+    trip_start_date: Optional[str] = None
+    trip_end_date: Optional[str] = None
+    agencia: Optional[str] = None
+    talao: Optional[str] = None
+
+    contratado_id: Optional[str] = None
+    contratado_name: Optional[str] = None
+
     driver_name: Optional[str] = None
     driver_cpf: Optional[str] = None
     driver_phone: Optional[str] = None
     truck_plate: Optional[str] = None
     truck_renavam: Optional[str] = None
     truck_owner: Optional[str] = None
+    vehicle_type: Optional[str] = None
     trailer_plate: Optional[str] = None
     trailer_renavam: Optional[str] = None
     trailer_owner: Optional[str] = None
+    trailer2_plate: Optional[str] = None
+    trailer2_renavam: Optional[str] = None
+    trailer2_owner: Optional[str] = None
+
     service_local: Optional[str] = None
     service_date: Optional[str] = None
     service_type: Optional[str] = None
@@ -1532,17 +1511,154 @@ class RPATerceiroCreate(BaseModel):
     delivery_date: Optional[str] = None
     container_number: Optional[str] = None
     client_name: Optional[str] = None
+
+    vehicle_composition: Optional[str] = None
+    high_performance: bool = False
+    freight_table: Optional[str] = None
+    cargo_type: Optional[str] = None
+    distance_km: Optional[float] = None
+    axle_count: Optional[int] = None
+    return_freight_type: Optional[str] = None
+    return_km: Optional[float] = None
+    minimum_freight: Optional[float] = None
+
     services: List[RPAServiceItem] = []
+    cargo_items: List[RPACargoItem] = []
+    documents_list: Optional[str] = None
+
+    rule: Optional[str] = None
+    tolerance: Optional[float] = None
+    driver_fee: Optional[float] = None
+    collection_weight: Optional[float] = None
     service_value: float = 0.0
     daily_rate: float = 0.0
-    fuel: float = 0.0
+    other_discounts: Optional[float] = None
+    inss_discount_percent: Optional[float] = None
+    sest_senat_discount_percent: Optional[float] = None
+    ir_calculation_base: Optional[float] = None
+    irrf_discount: Optional[float] = None
+    insurance_discount: Optional[float] = None
+    toll_value: Optional[float] = None
+    net_freight: Optional[float] = None
     advance: float = 0.0
+    advance_installments: Optional[int] = None
+    fuel: float = 0.0
+    arrival_weight: Optional[float] = None
+    weight_loss_discount: Optional[float] = None
+    fuel_balance: Optional[float] = None
+    complement: Optional[float] = None
+    result: Optional[float] = None
     others: float = 0.0
     discounts: float = 0.0
+
+    inss_ceiling: Optional[float] = None
+    contratado_monthly_inss_discount: Optional[float] = None
+
+    ciot: Optional[str] = None
+
     bank_agency: Optional[str] = None
     bank_account: Optional[str] = None
     bank_pix: Optional[str] = None
     bank_beneficiary: Optional[str] = None
+
+    observations: Optional[str] = None
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+
+class RPATerceiroCreate(BaseModel):
+    rpa_type: str = "terceiro"
+
+    emission_date: Optional[str] = None
+    payment_method: Optional[str] = None
+    operation_type: Optional[str] = None
+    trip_start_date: Optional[str] = None
+    trip_end_date: Optional[str] = None
+    agencia: Optional[str] = None
+    talao: Optional[str] = None
+
+    contratado_id: Optional[str] = None
+    contratado_name: Optional[str] = None
+
+    driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
+    driver_phone: Optional[str] = None
+    truck_plate: Optional[str] = None
+    truck_renavam: Optional[str] = None
+    truck_owner: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    trailer_plate: Optional[str] = None
+    trailer_renavam: Optional[str] = None
+    trailer_owner: Optional[str] = None
+    trailer2_plate: Optional[str] = None
+    trailer2_renavam: Optional[str] = None
+    trailer2_owner: Optional[str] = None
+
+    service_local: Optional[str] = None
+    service_date: Optional[str] = None
+    service_type: Optional[str] = None
+    service_modality: Optional[str] = None
+    origin: Optional[str] = None
+    destination: Optional[str] = None
+    cte: Optional[str] = None
+    weight: Optional[str] = None
+    collection_date: Optional[str] = None
+    delivery_date: Optional[str] = None
+    container_number: Optional[str] = None
+    client_name: Optional[str] = None
+
+    vehicle_composition: Optional[str] = None
+    high_performance: bool = False
+    freight_table: Optional[str] = None
+    cargo_type: Optional[str] = None
+    distance_km: Optional[float] = None
+    axle_count: Optional[int] = None
+    return_freight_type: Optional[str] = None
+    return_km: Optional[float] = None
+    minimum_freight: Optional[float] = None
+
+    services: List[RPAServiceItem] = []
+    cargo_items: List[RPACargoItem] = []
+    documents_list: Optional[str] = None
+
+    rule: Optional[str] = None
+    tolerance: Optional[float] = None
+    driver_fee: Optional[float] = None
+    collection_weight: Optional[float] = None
+    service_value: float = 0.0
+    daily_rate: float = 0.0
+    other_discounts: Optional[float] = None
+    inss_discount_percent: Optional[float] = None
+    sest_senat_discount_percent: Optional[float] = None
+    ir_calculation_base: Optional[float] = None
+    irrf_discount: Optional[float] = None
+    insurance_discount: Optional[float] = None
+    toll_value: Optional[float] = None
+    net_freight: Optional[float] = None
+    advance: float = 0.0
+    advance_installments: Optional[int] = None
+    fuel: float = 0.0
+    arrival_weight: Optional[float] = None
+    weight_loss_discount: Optional[float] = None
+    fuel_balance: Optional[float] = None
+    complement: Optional[float] = None
+    result: Optional[float] = None
+    others: float = 0.0
+    discounts: float = 0.0
+
+    inss_ceiling: Optional[float] = None
+    contratado_monthly_inss_discount: Optional[float] = None
+
+    ciot: Optional[str] = None
+
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    bank_pix: Optional[str] = None
+    bank_beneficiary: Optional[str] = None
+
     observations: Optional[str] = None
 
 
@@ -1554,15 +1670,32 @@ class RPATerceiroResponse(BaseModel):
     id: str
     rpa_number: int
     rpa_type: str = "terceiro"
+
+    emission_date: Optional[str] = None
+    payment_method: Optional[str] = None
+    operation_type: Optional[str] = None
+    trip_start_date: Optional[str] = None
+    trip_end_date: Optional[str] = None
+    agencia: Optional[str] = None
+    talao: Optional[str] = None
+
+    contratado_id: Optional[str] = None
+    contratado_name: Optional[str] = None
+
     driver_name: Optional[str] = None
     driver_cpf: Optional[str] = None
     driver_phone: Optional[str] = None
     truck_plate: Optional[str] = None
     truck_renavam: Optional[str] = None
     truck_owner: Optional[str] = None
+    vehicle_type: Optional[str] = None
     trailer_plate: Optional[str] = None
     trailer_renavam: Optional[str] = None
     trailer_owner: Optional[str] = None
+    trailer2_plate: Optional[str] = None
+    trailer2_renavam: Optional[str] = None
+    trailer2_owner: Optional[str] = None
+
     service_local: Optional[str] = None
     service_date: Optional[str] = None
     service_type: Optional[str] = None
@@ -1575,19 +1708,59 @@ class RPATerceiroResponse(BaseModel):
     delivery_date: Optional[str] = None
     container_number: Optional[str] = None
     client_name: Optional[str] = None
+
+    vehicle_composition: Optional[str] = None
+    high_performance: bool = False
+    freight_table: Optional[str] = None
+    cargo_type: Optional[str] = None
+    distance_km: Optional[float] = None
+    axle_count: Optional[int] = None
+    return_freight_type: Optional[str] = None
+    return_km: Optional[float] = None
+    minimum_freight: Optional[float] = None
+
     services: List[RPAServiceItem] = []
+    cargo_items: List[RPACargoItem] = []
+    documents_list: Optional[str] = None
+
+    rule: Optional[str] = None
+    tolerance: Optional[float] = None
+    driver_fee: Optional[float] = None
+    collection_weight: Optional[float] = None
     service_value: float = 0.0
     daily_rate: float = 0.0
-    fuel: float = 0.0
+    other_discounts: Optional[float] = None
+    inss_discount_percent: Optional[float] = None
+    sest_senat_discount_percent: Optional[float] = None
+    ir_calculation_base: Optional[float] = None
+    irrf_discount: Optional[float] = None
+    insurance_discount: Optional[float] = None
+    toll_value: Optional[float] = None
+    net_freight: Optional[float] = None
     advance: float = 0.0
+    advance_installments: Optional[int] = None
+    fuel: float = 0.0
+    arrival_weight: Optional[float] = None
+    weight_loss_discount: Optional[float] = None
+    fuel_balance: Optional[float] = None
+    complement: Optional[float] = None
+    result: Optional[float] = None
     others: float = 0.0
     discounts: float = 0.0
     balance: float = 0.0  # calculado
+
+    inss_ceiling: Optional[float] = None
+    contratado_monthly_inss_discount: Optional[float] = None
+
+    ciot: Optional[str] = None
+
     bank_agency: Optional[str] = None
     bank_account: Optional[str] = None
     bank_pix: Optional[str] = None
     bank_beneficiary: Optional[str] = None
+
     observations: Optional[str] = None
+
     created_by: str
     created_by_name: str
     created_at: datetime
