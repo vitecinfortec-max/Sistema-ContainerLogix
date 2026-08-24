@@ -1891,6 +1891,111 @@ class OrdemServicoResponse(OrdemServico):
     grand_total: float = 0.0
 
 
+# ==================== FROTA - CONTROLE DE ABASTECIMENTO ====================
+# Modelo baseado no formulário "Abastecimento - Inclusão" do Bsoft TMS
+# (referência fornecida pelo usuário em 2026-08-24). Campos de tributos
+# ("Detalhamento de impostos", fora da área visível do print de referência)
+# não foram modelados - se precisar depois, é só pedir com mais detalhe do
+# que essa seção contém.
+
+FUEL_TYPE_OPTIONS = ["DIESEL_S10", "DIESEL_S500", "GASOLINA_COMUM", "GASOLINA_ADITIVADA", "ETANOL", "ARLA_32", "GNV", "OUTRO"]
+FUEL_DOCUMENT_TYPE_OPTIONS = ["NF", "CUPOM_FISCAL", "RECIBO", "OUTRO"]
+FUEL_PAYMENT_TYPE_OPTIONS = ["PAGO_MOTORISTA", "PROGRAMAR_PAGAMENTO", "JA_PROGRAMADO", "SEM_PROGRAMACAO"]
+
+
+class FuelSupply(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    supply_number: int  # Número sequencial
+
+    # ===== Cabeçalho =====
+    supply_order: Optional[str] = None  # Ordem de Abastecimento (texto livre - sem cadastro próprio)
+    equipment_id: Optional[str] = None  # Equipamento (Vehicle.id)
+    equipment_plate: Optional[str] = None
+    driver_id: Optional[str] = None  # Operador/Motorista
+    driver_name: Optional[str] = None
+    supply_date: Optional[str] = None  # Data do Abastecimento (ISO yyyy-mm-dd)
+    entry_date: Optional[str] = None  # Data de Entrada
+    reading: Optional[float] = None  # Leitura (KM/horas do equipamento)
+
+    supplier_id: Optional[str] = None  # Fornecedor (Supplier.id)
+    supplier_name: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+
+    # ===== Combustível/ARLA =====
+    fuel_type: Optional[str] = None
+    liters: float = 0.0
+    unit_price: float = 0.0  # Valor Unitário
+    gross_value: float = 0.0  # Valor Bruto
+    discounts: float = 0.0  # Abatimentos
+    additions: float = 0.0  # Acréscimos
+    # Valor Líquido calculado: gross_value - discounts + additions
+    full_tank: bool = True  # Tanque Cheio
+
+    # ===== Outras Despesas =====
+    has_other_expenses: bool = False
+    other_expenses_value: float = 0.0
+    other_expenses_description: Optional[str] = None
+    # Valor Total calculado: líquido + (other_expenses_value se has_other_expenses)
+
+    # ===== Informações de Pagamento =====
+    payment_type: str = "PAGO_MOTORISTA"
+    document_type: Optional[str] = None
+    document_number: Optional[str] = None
+    allocation: Optional[str] = None  # Apropriação
+    observations: Optional[str] = None
+    linked_to_batch: bool = False  # Vinculado ao Lote
+    define_company: bool = False  # Definir Empresa
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+
+class FuelSupplyCreate(BaseModel):
+    supply_order: Optional[str] = None
+    equipment_id: Optional[str] = None
+    equipment_plate: Optional[str] = None
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    supply_date: Optional[str] = None
+    entry_date: Optional[str] = None
+    reading: Optional[float] = None
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    fuel_type: Optional[str] = None
+    liters: float = 0.0
+    unit_price: float = 0.0
+    gross_value: float = 0.0
+    discounts: float = 0.0
+    additions: float = 0.0
+    full_tank: bool = True
+    has_other_expenses: bool = False
+    other_expenses_value: float = 0.0
+    other_expenses_description: Optional[str] = None
+    payment_type: str = "PAGO_MOTORISTA"
+    document_type: Optional[str] = None
+    document_number: Optional[str] = None
+    allocation: Optional[str] = None
+    observations: Optional[str] = None
+    linked_to_batch: bool = False
+    define_company: bool = False
+
+
+class FuelSupplyUpdate(FuelSupplyCreate):
+    pass
+
+
+class FuelSupplyResponse(FuelSupply):
+    net_value: float = 0.0  # calculado
+    total_value: float = 0.0  # calculado
+
+
 # ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================
 
 class ExpenseReportReceipt(BaseModel):

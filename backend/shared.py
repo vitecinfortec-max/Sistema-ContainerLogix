@@ -264,6 +264,7 @@ MODULE_CATALOG = [
         {"key": "frota.revisao", "label": "Controle de Revisão"},
         {"key": "frota.ordem_servico", "label": "Ordem de Serviço"},
         {"key": "frota.checklist", "label": "Checklist"},
+        {"key": "frota.abastecimento", "label": "Abastecimento"},
     ]},
     {"key": "cadastro", "label": "Cadastro", "items": [
         {"key": "cadastro.pessoas", "label": "Pessoas"},
@@ -314,6 +315,7 @@ PATH_MODULE_MAP = [
     ("/api/expense-reports", "financeiro.prestacao_contas"),
     ("/api/rpa-terceiro", "financeiro.rpa_terceiro"),
     ("/api/ordem-servico", "frota.ordem_servico"),
+    ("/api/fuel-supplies", "frota.abastecimento"),
     ("/api/loading-schedules", "operacional.programacao_carregamento"),
     ("/api/delivery-status", "operacional.status_entrega"),
 ]

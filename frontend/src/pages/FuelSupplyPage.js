@@ -1,0 +1,505 @@
+import { useState, useEffect, useRef } from 'react';
+import Layout from '../components/Layout';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { Badge } from '../components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
+import { api } from '../lib/api';
+import { cn } from '../lib/utils';
+import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
+import { format } from 'date-fns';
+import { Plus, Pencil, Trash2, Search, Save, Fuel, Check, ChevronsUpDown } from 'lucide-react';
+
+const FUEL_TYPE_OPTIONS = [
+  ['DIESEL_S10', 'Diesel S10'],
+  ['DIESEL_S500', 'Diesel S500'],
+  ['GASOLINA_COMUM', 'Gasolina Comum'],
+  ['GASOLINA_ADITIVADA', 'Gasolina Aditivada'],
+  ['ETANOL', 'Etanol'],
+  ['ARLA_32', 'Arla 32'],
+  ['GNV', 'GNV'],
+  ['OUTRO', 'Outro'],
+];
+
+const DOCUMENT_TYPE_OPTIONS = [
+  ['NF', 'Nota Fiscal'],
+  ['CUPOM_FISCAL', 'Cupom Fiscal'],
+  ['RECIBO', 'Recibo'],
+  ['OUTRO', 'Outro'],
+];
+
+const PAYMENT_TYPE_OPTIONS = [
+  ['PAGO_MOTORISTA', 'Pago pelo Motorista'],
+  ['PROGRAMAR_PAGAMENTO', 'Programar Pagamento'],
+  ['JA_PROGRAMADO', 'Já Programado'],
+  ['SEM_PROGRAMACAO', 'Sem Programação'],
+];
+
+const FUEL_TYPE_LABELS = FUEL_TYPE_OPTIONS.reduce((acc, [v, l]) => { acc[v] = l; return acc; }, {});
+
+const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+function buildEmpty() {
+  return {
+    supply_order: '',
+    equipment_id: '', equipment_plate: '',
+    driver_id: '', driver_name: '',
+    supply_date: new Date().toISOString().split('T')[0],
+    entry_date: new Date().toISOString().split('T')[0],
+    reading: '',
+    supplier_id: '', supplier_name: '',
+    city: '', state: '',
+    fuel_type: '',
+    liters: '', unit_price: '', gross_value: '', discounts: 0, additions: 0,
+    full_tank: true,
+    has_other_expenses: false, other_expenses_value: '', other_expenses_description: '',
+    payment_type: 'PAGO_MOTORISTA',
+    document_type: '', document_number: '', allocation: '',
+    observations: '',
+    linked_to_batch: false, define_company: false,
+  };
+}
+
+export default function FuelSupplyPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [nextNumber, setNextNumber] = useState(null);
+  const [form, setForm] = useState(buildEmpty());
+  const [saving, setSaving] = useState(false);
+  const [vehicles, setVehicles] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const debounceRef = useRef(null);
+
+  useEffect(() => { loadList(); loadVehicles(); loadDrivers(); loadSuppliers(); }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { loadList(); }, 350);
+    return () => debounceRef.current && clearTimeout(debounceRef.current);
+  }, [search]);
+
+  const loadList = async () => {
+    setLoading(true);
+    try {
+      const params = {};
+      if (search) params.search = search;
+      const r = await api.getFuelSupplies(params);
+      setList(r.data || []);
+    } catch (e) {
+      toast.error('Erro ao carregar abastecimentos');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadVehicles = async () => {
+    try {
+      const r = await api.getVehicles();
+      setVehicles(r.data?.items || r.data || []);
+    } catch (e) { /* ignore */ }
+  };
+  const loadDrivers = async () => {
+    try {
+      const r = await api.getDrivers();
+      setDrivers(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
+  const loadSuppliers = async () => {
+    try {
+      const r = await api.getSuppliers();
+      setSuppliers(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
+
+  const reset = () => setForm(buildEmpty());
+
+  const openCreate = async () => {
+    reset();
+    setEditingId(null);
+    try {
+      const r = await api.getFuelSupplyNextNumber();
+      setNextNumber(r.data?.next_number || 1);
+    } catch (e) { setNextNumber(null); }
+    setDialogOpen(true);
+  };
+
+  const openEdit = async (id) => {
+    try {
+      const r = await api.getFuelSupply(id);
+      const d = r.data;
+      setEditingId(id);
+      setNextNumber(d.supply_number);
+      setForm({ ...buildEmpty(), ...d });
+      setDialogOpen(true);
+    } catch (e) { toast.error('Erro ao carregar abastecimento'); }
+  };
+
+  const onChange = (field, val) => setForm((p) => ({ ...p, [field]: val }));
+
+  // Recalcula Valor Bruto automaticamente quando litros/valor unitário mudam,
+  // mas continua editável manualmente (ex: se o fornecedor já cobra um valor
+  // fechado diferente de litros × unitário).
+  const onLitersOrPriceChange = (field, val) => {
+    setForm((p) => {
+      const next = { ...p, [field]: val };
+      const liters = Number(field === 'liters' ? val : p.liters) || 0;
+      const unitPrice = Number(field === 'unit_price' ? val : p.unit_price) || 0;
+      next.gross_value = liters && unitPrice ? Number((liters * unitPrice).toFixed(2)) : next.gross_value;
+      return next;
+    });
+  };
+
+  const netValue = (() => {
+    const gross = Number(form.gross_value || 0);
+    const discounts = Number(form.discounts || 0);
+    const additions = Number(form.additions || 0);
+    return gross - discounts + additions;
+  })();
+
+  const totalValue = netValue + (form.has_other_expenses ? Number(form.other_expenses_value || 0) : 0);
+
+  const handleSave = async () => {
+    if (!form.equipment_plate || !form.supply_date || !form.entry_date || form.reading === '' || !form.supplier_name || !form.fuel_type || !form.liters || !form.unit_price || !form.gross_value) {
+      toast.error('Preencha os campos obrigatórios (Equipamento, Datas, Leitura, Fornecedor, Combustível, Litros, Valor Unitário e Valor Bruto)');
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        reading: Number(form.reading || 0),
+        liters: Number(form.liters || 0),
+        unit_price: Number(form.unit_price || 0),
+        gross_value: Number(form.gross_value || 0),
+        discounts: Number(form.discounts || 0),
+        additions: Number(form.additions || 0),
+        other_expenses_value: form.has_other_expenses ? Number(form.other_expenses_value || 0) : 0,
+      };
+      if (editingId) {
+        await api.updateFuelSupply(editingId, payload);
+        toast.success('Abastecimento atualizado!');
+      } else {
+        await api.createFuelSupply(payload);
+        toast.success('Abastecimento criado!');
+      }
+      setDialogOpen(false);
+      loadList();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Erro ao salvar abastecimento');
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id, num) => {
+    if (!(await confirm(`Excluir Abastecimento Nº ${num}?`))) return;
+    try {
+      await api.deleteFuelSupply(id);
+      toast.success('Abastecimento excluído');
+      loadList();
+    } catch (e) { toast.error('Erro ao excluir'); }
+  };
+
+  return (
+    <Layout>
+      <div className="space-y-5" data-testid="fuel-supply-page">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+              <Fuel className="w-4 h-4" />
+              Abastecimento
+            </h1>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de abastecimento de combustível e ARLA da frota</p>
+          </div>
+          <Button onClick={openCreate} className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90" data-testid="fuel-new-btn">
+            <Plus className="w-4 h-4 mr-1.5" />
+            Novo Abastecimento
+          </Button>
+        </div>
+
+        <div className="border-t border-slate-200 dark:border-slate-700" />
+
+        <Card className="shadow-sm">
+          <CardContent className="pt-4 pb-4">
+            <div className="relative max-w-md">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+              <Input placeholder="Buscar por placa, motorista ou fornecedor..." value={search}
+                onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-[13px]" data-testid="fuel-search" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[13px] text-slate-700 dark:text-slate-300">
+              {loading ? 'Carregando...' : `Abastecimentos Registrados (${list.length})`}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50 dark:bg-slate-800">
+                    <TableHead className="text-[12px] font-semibold">Nº</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Data</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Equipamento</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Motorista</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Fornecedor</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Combustível</TableHead>
+                    <TableHead className="text-[12px] font-semibold text-right">Litros</TableHead>
+                    <TableHead className="text-[12px] font-semibold text-right">Valor Total</TableHead>
+                    <TableHead className="text-[12px] font-semibold text-center">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {list.length === 0 && !loading && (
+                    <TableRow><TableCell colSpan={9} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhum abastecimento cadastrado.</TableCell></TableRow>
+                  )}
+                  {list.map((f) => (
+                    <TableRow key={f.id} className="hover:bg-slate-50 dark:hover:bg-slate-800" data-testid={`fuel-row-${f.supply_number}`}>
+                      <TableCell className="text-[13px] font-semibold text-primary">Nº {f.supply_number}</TableCell>
+                      <TableCell className="text-[12px]">{f.supply_date ? format(new Date(`${f.supply_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</TableCell>
+                      <TableCell className="text-[12px] font-mono">{f.equipment_plate || '-'}</TableCell>
+                      <TableCell className="text-[13px]">{f.driver_name || '-'}</TableCell>
+                      <TableCell className="text-[13px]">{f.supplier_name || '-'}</TableCell>
+                      <TableCell className="text-[12px]">{FUEL_TYPE_LABELS[f.fuel_type] || f.fuel_type || '-'}</TableCell>
+                      <TableCell className="text-[12px] text-right">{Number(f.liters || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-[13px] font-semibold text-right text-primary">{fmtMoney(f.total_value)}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(f.id)} className="h-8 px-2" data-testid={`fuel-edit-${f.supply_number}`} title="Editar">
+                            <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(f.id, f.supply_number)} className="h-8 px-2" data-testid={`fuel-del-${f.supply_number}`} title="Excluir">
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto" data-testid="fuel-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Fuel className="w-5 h-5 text-primary" />
+              {editingId ? 'Editar Abastecimento' : 'Novo Abastecimento'}
+              {nextNumber !== null && <Badge variant="outline" className="ml-2 text-primary border-primary/30">Nº {nextNumber}</Badge>}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <SectionTitle>Dados Gerais</SectionTitle>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Ordem de Abastecimento" value={form.supply_order} onChange={(v) => onChange('supply_order', v)} testid="fuel-order" />
+              <ComboField label="Equipamento *" value={form.equipment_plate || ''} onChange={(v) => {
+                onChange('equipment_plate', v);
+                const vh = vehicles.find((x) => x.plate === v);
+                onChange('equipment_id', vh?.id || '');
+              }} options={vehicles.map((v) => [v.plate, `${v.plate} ${v.model || ''}`.trim()])}
+                searchPlaceholder="Buscar equipamento..." emptyLabel="Nenhum equipamento encontrado" testid="fuel-equipment" />
+              <ComboField label="Operador / Motorista" value={form.driver_name || ''} onChange={(v) => {
+                onChange('driver_name', v);
+                const dr = drivers.find((x) => x.name === v);
+                onChange('driver_id', dr?.id || '');
+              }} options={drivers.map((d) => [d.name, d.name])}
+                searchPlaceholder="Buscar motorista..." emptyLabel="Nenhum motorista encontrado" testid="fuel-driver" />
+              <Field type="date" label="Data do Abastecimento *" value={form.supply_date} onChange={(v) => onChange('supply_date', v)} testid="fuel-supply-date" />
+              <Field type="date" label="Data de Entrada *" value={form.entry_date} onChange={(v) => onChange('entry_date', v)} testid="fuel-entry-date" />
+              <Field type="number" label="Leitura *" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-reading" placeholder="KM ou horas" />
+              <ComboField label="Fornecedor *" value={form.supplier_name || ''} onChange={(v) => {
+                onChange('supplier_name', v);
+                const sp = suppliers.find((x) => x.name === v);
+                onChange('supplier_id', sp?.id || '');
+              }} options={suppliers.map((s) => [s.name, s.name])}
+                searchPlaceholder="Buscar fornecedor..." emptyLabel="Nenhum fornecedor encontrado" testid="fuel-supplier" />
+              <Field label="Cidade" value={form.city} onChange={(v) => onChange('city', v)} testid="fuel-city" />
+              <Field label="Estado" value={form.state} onChange={(v) => onChange('state', v.toUpperCase().slice(0, 2))} testid="fuel-state" placeholder="UF" />
+            </div>
+
+            <SectionTitle>Combustível / ARLA</SectionTitle>
+            <div className="grid grid-cols-3 gap-3">
+              <SelectField label="Combustível/ARLA *" value={form.fuel_type} onChange={(v) => onChange('fuel_type', v)} options={FUEL_TYPE_OPTIONS} testid="fuel-type" />
+              <Field type="number" label="Litros *" value={form.liters} onChange={(v) => onLitersOrPriceChange('liters', v)} testid="fuel-liters" />
+              <Field type="number" label="Valor Unitário *" value={form.unit_price} onChange={(v) => onLitersOrPriceChange('unit_price', v)} testid="fuel-unit-price" />
+              <Field type="number" label="Valor Bruto *" value={form.gross_value} onChange={(v) => onChange('gross_value', v)} testid="fuel-gross" />
+              <Field type="number" label="Abatimentos" value={form.discounts} onChange={(v) => onChange('discounts', v)} testid="fuel-discounts" />
+              <Field type="number" label="Acréscimos" value={form.additions} onChange={(v) => onChange('additions', v)} testid="fuel-additions" />
+              <div>
+                <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Valor Líquido</Label>
+                <Input value={fmtMoney(netValue)} readOnly className="h-9 text-sm text-right font-semibold bg-slate-50 dark:bg-slate-800" />
+              </div>
+              <RadioField label="Tanque Cheio *" value={form.full_tank} onChange={(v) => onChange('full_tank', v)} testid="fuel-full-tank" />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="has-other-expenses" checked={form.has_other_expenses} onChange={(e) => onChange('has_other_expenses', e.target.checked)} className="h-4 w-4" data-testid="fuel-has-other-expenses" />
+              <Label htmlFor="has-other-expenses" className="text-[12px] text-slate-700 dark:text-slate-300 cursor-pointer">Outras Despesas</Label>
+            </div>
+            {form.has_other_expenses && (
+              <div className="grid grid-cols-2 gap-3 pl-6">
+                <Field type="number" label="Valor de Outras Despesas" value={form.other_expenses_value} onChange={(v) => onChange('other_expenses_value', v)} testid="fuel-other-expenses-value" />
+                <Field label="Descrição" value={form.other_expenses_description} onChange={(v) => onChange('other_expenses_description', v)} testid="fuel-other-expenses-desc" />
+              </div>
+            )}
+
+            <TotalBox label="Valor Total" value={totalValue} />
+
+            <SectionTitle>Informações de Pagamento</SectionTitle>
+            <div className="grid grid-cols-1 gap-2">
+              <Label className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wide">Tipo de Pagamento *</Label>
+              <div className="flex flex-wrap gap-4">
+                {PAYMENT_TYPE_OPTIONS.map(([v, l]) => (
+                  <label key={v} className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
+                    <input type="radio" name="payment_type" checked={form.payment_type === v} onChange={() => onChange('payment_type', v)} className="h-3.5 w-3.5" />
+                    {l}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <SelectField label="Tipo do Documento *" value={form.document_type} onChange={(v) => onChange('document_type', v)} options={DOCUMENT_TYPE_OPTIONS} testid="fuel-doc-type" />
+              <Field label="Número" value={form.document_number} onChange={(v) => onChange('document_number', v)} testid="fuel-doc-number" />
+              <Field label="Apropriação *" value={form.allocation} onChange={(v) => onChange('allocation', v)} testid="fuel-allocation" />
+            </div>
+            <TextAreaField label="Observações" value={form.observations} onChange={(v) => onChange('observations', v)} testid="fuel-observations" />
+            <div className="grid grid-cols-2 gap-3">
+              <RadioField label="Vinculado ao Lote" value={form.linked_to_batch} onChange={(v) => onChange('linked_to_batch', v)} testid="fuel-linked-batch" />
+              <RadioField label="Definir Empresa" value={form.define_company} onChange={(v) => onChange('define_company', v)} testid="fuel-define-company" />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="fuel-cancel">Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90" data-testid="fuel-save">
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar Abastecimento' : 'Salvar Abastecimento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog />
+    </Layout>
+  );
+}
+
+function SectionTitle({ children }) {
+  return (
+    <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary border-b-2 border-primary/20 pb-1">
+      {children}
+    </h3>
+  );
+}
+
+function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
+  return (
+    <div>
+      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Input type={type} value={value ?? ''} placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
+    </div>
+  );
+}
+
+function ComboField({ label, value, onChange, options, placeholder = '-- Selecione --', searchPlaceholder = 'Buscar...', emptyLabel = 'Nenhum resultado encontrado', testid }) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find(([v]) => v === value);
+  return (
+    <div>
+      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline" role="combobox" aria-expanded={open}
+            className="w-full justify-between font-normal h-9 text-sm" data-testid={testid}>
+            <span className="truncate">{selected ? selected[1] : placeholder}</span>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+          <Command>
+            <CommandInput placeholder={searchPlaceholder} />
+            <CommandList>
+              <CommandEmpty>{emptyLabel}</CommandEmpty>
+              <CommandGroup>
+                {options.map(([v, l]) => (
+                  <CommandItem key={v} value={l} onSelect={() => { onChange(v); setOpen(false); }}>
+                    <Check className={cn('mr-2 h-4 w-4', value === v ? 'opacity-100' : 'opacity-0')} />
+                    {l}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+function SelectField({ label, value, onChange, options, testid }) {
+  return (
+    <div>
+      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
+        <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
+        <SelectContent>
+          {options.map(([v, l]) => (
+            <SelectItem key={v || '_empty'} value={v || '_empty'} className="text-sm">{l}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function RadioField({ label, value, onChange, testid }) {
+  return (
+    <div>
+      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <div className="flex items-center gap-4 h-9">
+        <label className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
+          <input type="radio" checked={value === true} onChange={() => onChange(true)} className="h-3.5 w-3.5" data-testid={testid ? `${testid}-sim` : undefined} />
+          Sim
+        </label>
+        <label className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
+          <input type="radio" checked={value === false} onChange={() => onChange(false)} className="h-3.5 w-3.5" data-testid={testid ? `${testid}-nao` : undefined} />
+          Não
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function TextAreaField({ label, value, onChange, testid }) {
+  return (
+    <div>
+      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
+    </div>
+  );
+}
+
+function TotalBox({ label, value }) {
+  return (
+    <div className="p-3 rounded-lg border-2 border-primary/40 bg-primary/5">
+      <div className="text-[10px] uppercase tracking-wider text-primary font-semibold">{label}</div>
+      <div className="text-xl font-bold text-primary">{fmtMoney(value)}</div>
+    </div>
+  );
+}
