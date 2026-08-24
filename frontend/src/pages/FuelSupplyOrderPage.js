@@ -8,7 +8,6 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
 import { api } from '../lib/api';
@@ -280,7 +279,8 @@ export default function FuelSupplyOrderPage() {
                 onChange('supplier_id', sp?.id || '');
               }} options={suppliers.map((s) => [s.name, s.name])}
                 searchPlaceholder="Buscar fornecedor..." emptyLabel="Nenhum fornecedor encontrado" testid="fuel-order-supplier" />
-              <SelectField label="Produto *" value={form.fuel_type} onChange={(v) => onChange('fuel_type', v)} options={FUEL_TYPE_OPTIONS} testid="fuel-order-fuel-type" />
+              <ComboField label="Produto *" value={form.fuel_type} onChange={(v) => onChange('fuel_type', v)} options={FUEL_TYPE_OPTIONS}
+                searchPlaceholder="Buscar produto..." emptyLabel="Nenhum produto encontrado" testid="fuel-order-fuel-type" />
             </div>
 
             <div>
@@ -352,22 +352,6 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
       <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
       <Input type={type} value={value ?? ''} placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
-    </div>
-  );
-}
-
-function SelectField({ label, value, onChange, options, testid }) {
-  return (
-    <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
-      <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
-        <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
-        <SelectContent>
-          {options.map(([v, l]) => (
-            <SelectItem key={v || '_empty'} value={v || '_empty'} className="text-sm">{l}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
     </div>
   );
 }
