@@ -13,7 +13,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
@@ -171,21 +170,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {isLogin && (
-              <div className="flex items-center justify-between">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm text-slate-600 dark:text-slate-400">Lembrar-me</span>
-                </label>
-              </div>
-            )}
-
-            <Button 
+            <Button
               type="submit" 
               className="w-full h-12 font-bold uppercase tracking-wide text-white bg-primary hover:bg-primary/90 transition-all active:scale-[0.98]" 
               disabled={loading}
