@@ -12,6 +12,7 @@ import { Save, ArrowLeft, Check, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useNotifications } from '../hooks/useNotifications';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
+import { Autocomplete } from '../components/Autocomplete';
 
 const AUTO_SAVE_KEY = 'containerlogix_movement_draft';
 
@@ -304,20 +305,15 @@ export default function NewMovementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="driver_name">Nome do Motorista *</Label>
-                  <Input
-                    id="driver_name"
-                    data-testid="driver-name-input"
-                    {...register('driver_name', { required: true })}
-                    onChange={(e) => handleDriverChange(e.target.value)}
+                  <Autocomplete
+                    value={watch('driver_name') || ''}
+                    onChange={handleDriverChange}
+                    onSelect={(d) => handleDriverChange(d.name)}
+                    options={drivers}
+                    displayField="name"
+                    placeholder="Digite para buscar motorista..."
                     className="h-12"
-                    placeholder="Nome completo"
-                    list="drivers-list"
                   />
-                  <datalist id="drivers-list">
-                    {drivers.map(driver => (
-                      <option key={driver.id} value={driver.name} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div className="space-y-2">
@@ -333,56 +329,41 @@ export default function NewMovementPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="truck_plate">Placa do Cavalo *</Label>
-                  <Input
-                    id="truck_plate"
-                    data-testid="truck-plate-input"
-                    {...register('truck_plate', { required: true })}
-                    onChange={(e) => handleTruckPlateChange(e.target.value)}
+                  <Autocomplete
+                    value={watch('truck_plate') || ''}
+                    onChange={handleTruckPlateChange}
+                    onSelect={(v) => handleTruckPlateChange(v.plate)}
+                    options={cavaloVehicles}
+                    displayField="plate"
+                    placeholder="Digite para buscar a placa..."
                     className="h-12 font-mono uppercase"
-                    placeholder="ABC-1234"
-                    list="trucks-list"
                   />
-                  <datalist id="trucks-list">
-                    {cavaloVehicles.map(vehicle => (
-                      <option key={vehicle.id} value={vehicle.plate} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="trailer_plate_1">Placa Carreta *</Label>
-                  <Input
-                    id="trailer_plate_1"
-                    data-testid="trailer-plate-1-input"
-                    {...register('trailer_plate_1', { required: true })}
-                    onChange={(e) => handleTrailerPlateChange(e.target.value)}
+                  <Autocomplete
+                    value={watch('trailer_plate_1') || ''}
+                    onChange={handleTrailerPlateChange}
+                    onSelect={(v) => handleTrailerPlateChange(v.plate)}
+                    options={carretaVehicles}
+                    displayField="plate"
+                    placeholder="Digite para buscar a placa..."
                     className="h-12 font-mono uppercase"
-                    placeholder="ABC-1234"
-                    list="trailers-list"
                   />
-                  <datalist id="trailers-list">
-                    {carretaVehicles.map(vehicle => (
-                      <option key={vehicle.id} value={vehicle.plate} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="transport_company">Transportadora *</Label>
-                  <Input
-                    id="transport_company"
-                    data-testid="transport-company-input"
-                    {...register('transport_company', { required: true })}
-                    onChange={(e) => handleCompanyChange(e.target.value)}
+                  <Autocomplete
+                    value={watch('transport_company') || ''}
+                    onChange={handleCompanyChange}
+                    onSelect={(c) => handleCompanyChange(c.name)}
+                    options={companies}
+                    displayField="name"
+                    placeholder="Digite para buscar a transportadora..."
                     className="h-12"
-                    placeholder="Nome da transportadora"
-                    list="companies-list"
                   />
-                  <datalist id="companies-list">
-                    {companies.map(company => (
-                      <option key={company.id} value={company.name} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div className="space-y-2 relative" ref={clientInputRef}>
