@@ -121,14 +121,6 @@ const GROUP_COLORS = {
   'Opções do Sistema': 'chart-7',
 };
 
-// Destaque de item ativo na sidebar (redesign 2026-08-24). Aplicado via inline
-// style (não classe utilitária Tailwind com var() embutido) porque o valor
-// precisa reagir de forma confiável à troca de tema claro/escuro.
-const ACTIVE_SIDEBAR_STYLE = {
-  backgroundColor: 'hsl(var(--sidebar-active-bg))',
-  borderLeftColor: 'hsl(var(--sidebar-active))',
-};
-
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -492,11 +484,8 @@ export default function Layout({ children }) {
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
           title={item.label}
-          style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
-          className={`flex items-center justify-center h-11 border-b border-slate-100 dark:border-slate-800 border-l-[3px] transition-colors ${
-            isActive
-              ? 'text-primary border-l-transparent'
-              : 'text-[#1B4965] dark:text-slate-300 hover:text-primary border-l-transparent'
+          className={`flex items-center justify-center h-11 border-b border-slate-100 dark:border-slate-800 transition-colors ${
+            isActive ? 'text-primary' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
           }`}
         >
           <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -511,11 +500,8 @@ export default function Layout({ children }) {
           key={item.path}
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-          style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
-          className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
-            isActive
-              ? 'text-primary font-semibold border-l-transparent'
-              : 'text-[#1B4965] dark:text-slate-300 hover:text-primary border-l-transparent'
+          className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 ${
+            isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
           } ${deepIndent ? 'pl-14' : 'pl-10'} pr-5 text-[13px] gap-2`}
         >
           <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -530,11 +516,8 @@ export default function Layout({ children }) {
         key={item.path}
         to={item.path}
         data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-        style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
-        className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
-          isActive
-            ? 'text-primary font-semibold border-l-transparent'
-            : 'text-[#1B4965] dark:text-slate-300 hover:text-primary border-l-transparent'
+        className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 ${
+          isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
         } px-5 gap-3 text-[13px]`}
       >
         <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -548,11 +531,8 @@ export default function Layout({ children }) {
     const isActive = isNavItemActive(item, location);
     return (
       <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-        style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
-        className={`flex items-center gap-2 ${nested ? 'pl-14' : 'pl-10'} pr-4 py-2.5 text-[13px] border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
-          isActive
-            ? 'text-primary font-semibold border-l-transparent'
-            : 'text-[#1B4965] dark:text-slate-300 border-l-transparent'
+        className={`flex items-center gap-2 ${nested ? 'pl-14' : 'pl-10'} pr-4 py-2.5 text-[13px] border-b border-slate-100 dark:border-slate-800 ${
+          isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300'
         }`}
       >
         <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -567,11 +547,8 @@ export default function Layout({ children }) {
     const accentVar = GROUP_COLORS[label];
     return (
       <button onClick={toggle}
-        style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
-        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-4' : 'px-4'} py-3 text-sm border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
-          isActive
-            ? 'text-primary font-semibold border-l-transparent'
-            : 'text-[#1B4965] dark:text-slate-300 border-l-transparent'
+        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-4' : 'px-4'} py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
+          isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300'
         }`}
       >
         <div className="flex items-center gap-3">
@@ -598,8 +575,7 @@ export default function Layout({ children }) {
       if (nested) return null;
       return (
         <div
-          style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
-          className={`flex items-center justify-center h-11 cursor-pointer border-b border-slate-100 dark:border-slate-800 border-l-[3px] transition-colors hover:text-primary border-l-transparent`}
+          className="flex items-center justify-center h-11 cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-colors hover:text-primary"
           title={label}
           onClick={() => handleGroupClickCollapsed(toggle)}
           data-testid={testId}
@@ -615,11 +591,8 @@ export default function Layout({ children }) {
     return (
       <button
         onClick={toggle}
-        style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
-        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors border-b border-slate-100 dark:border-slate-800 border-l-[3px] text-[13px] ${
-          isActive
-            ? 'text-primary font-semibold border-l-transparent'
-            : 'text-[#1B4965] dark:text-slate-300 hover:text-primary border-l-transparent'
+        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors border-b border-slate-100 dark:border-slate-800 text-[13px] ${
+          isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
         }`}
         data-testid={testId}
       >
@@ -938,11 +911,8 @@ export default function Layout({ children }) {
                   const isActive = location.pathname === item.path;
                   return (
                     <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-                      style={isActive ? ACTIVE_SIDEBAR_STYLE : undefined}
-                      className={`flex items-center gap-3 px-4 py-3 text-sm border-b border-slate-100 dark:border-slate-800 border-l-[3px] ${
-                        isActive
-                          ? 'text-primary font-semibold border-l-transparent'
-                          : 'text-[#1B4965] dark:text-slate-300 border-l-transparent'
+                      className={`flex items-center gap-3 px-4 py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
+                        isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300'
                       }`}
                     >
                       <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={1.8} />
