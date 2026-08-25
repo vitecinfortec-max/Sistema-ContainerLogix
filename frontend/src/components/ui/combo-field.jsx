@@ -15,11 +15,12 @@ function RequiredLabel({ label }) {
 
 export function ComboField({ label, value, onChange, options, placeholder = '-- Selecione --', searchPlaceholder = 'Buscar...', emptyLabel = 'Nenhum resultado encontrado', testid }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const selected = options.find(([v]) => v === value);
   return (
     <div>
       {label && <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>}
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next) setSearch(''); }}>
         <PopoverTrigger asChild>
           <Button type="button" variant="outline" role="combobox" aria-expanded={open}
             className="w-full justify-between font-normal h-9 text-sm" data-testid={testid}>
@@ -29,17 +30,23 @@ export function ComboField({ label, value, onChange, options, placeholder = '-- 
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
           <Command>
-            <CommandInput placeholder={searchPlaceholder} />
+            <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />
             <CommandList>
-              <CommandEmpty>{emptyLabel}</CommandEmpty>
-              <CommandGroup>
-                {options.map(([v, l]) => (
-                  <CommandItem key={v} value={l} onSelect={() => { onChange(v); setOpen(false); }}>
-                    <Check className={cn('mr-2 h-4 w-4', value === v ? 'opacity-100' : 'opacity-0')} />
-                    {l}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+              {search.trim().length === 0 ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">Digite para buscar...</div>
+              ) : (
+                <>
+                  <CommandEmpty>{emptyLabel}</CommandEmpty>
+                  <CommandGroup>
+                    {options.map(([v, l]) => (
+                      <CommandItem key={v} value={l} onSelect={() => { onChange(v); setOpen(false); setSearch(''); }}>
+                        <Check className={cn('mr-2 h-4 w-4', value === v ? 'opacity-100' : 'opacity-0')} />
+                        {l}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </>
+              )}
             </CommandList>
           </Command>
         </PopoverContent>
