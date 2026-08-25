@@ -2021,6 +2021,8 @@ class FuelSupplyOrder(BaseModel):
     supplier_name: Optional[str] = None
     fuel_type: Optional[str] = None  # Produto
     supply_mode: str = "LITROS"  # Tipo: Litros/Valor/Litros-Valor/Completar tanque
+    liters: Optional[float] = None  # Usado quando supply_mode = LITROS ou LITROS_VALOR
+    estimated_value: Optional[float] = None  # Usado quando supply_mode = VALOR ou LITROS_VALOR
 
     observations: Optional[str] = None
 
@@ -2041,6 +2043,8 @@ class FuelSupplyOrderCreate(BaseModel):
     supplier_name: Optional[str] = None
     fuel_type: Optional[str] = None
     supply_mode: str = "LITROS"
+    liters: Optional[float] = None
+    estimated_value: Optional[float] = None
     observations: Optional[str] = None
 
 

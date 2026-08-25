@@ -44,9 +44,13 @@ function buildEmpty() {
     supplier_id: '', supplier_name: '',
     fuel_type: '',
     supply_mode: 'LITROS',
+    liters: '',
+    estimated_value: '',
     observations: '',
   };
 }
+
+const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function FuelSupplyOrderPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -129,6 +133,8 @@ export default function FuelSupplyOrderPage() {
 
   const onChange = (field, val) => setForm((p) => ({ ...p, [field]: val }));
 
+  const estimatedTotal = Number(form.liters || 0) * Number(form.estimated_value || 0);
+
   const handleSave = async () => {
     if (!form.order_date || !form.equipment_plate || !form.fuel_type) {
       toast.error('Preencha os campos obrigatórios (Data, Equipamento e Produto)');
@@ -136,11 +142,16 @@ export default function FuelSupplyOrderPage() {
     }
     setSaving(true);
     try {
+      const payload = {
+        ...form,
+        liters: ['LITROS', 'LITROS_VALOR'].includes(form.supply_mode) && form.liters !== '' ? Number(form.liters) : null,
+        estimated_value: ['VALOR', 'LITROS_VALOR'].includes(form.supply_mode) && form.estimated_value !== '' ? Number(form.estimated_value) : null,
+      };
       if (editingId) {
-        await api.updateFuelSupplyOrder(editingId, form);
+        await api.updateFuelSupplyOrder(editingId, payload);
         toast.success('Ordem de Abastecimento atualizada!');
       } else {
-        await api.createFuelSupplyOrder(form);
+        await api.createFuelSupplyOrder(payload);
         toast.success('Ordem de Abastecimento criada!');
       }
       setDialogOpen(false);
@@ -310,10 +321,32 @@ export default function FuelSupplyOrderPage() {
               </div>
             </div>
 
+            {form.supply_mode !== 'COMPLETAR_TANQUE' && (
+              <div className="grid grid-cols-2 gap-3">
+                {(form.supply_mode === 'LITROS' || form.supply_mode === 'LITROS_VALOR') && (
+                  <Field type="number" label="Litros" value={form.liters} onChange={(v) => onChange('liters', v)} testid="fuel-order-liters" />
+                )}
+                {(form.supply_mode === 'VALOR' || form.supply_mode === 'LITROS_VALOR') && (
+                  <Field type="number" label="Valor" value={form.estimated_value} onChange={(v) => onChange('estimated_value', v)} testid="fuel-order-value" />
+                )}
+                {form.supply_mode === 'LITROS_VALOR' && (
+                  <div>
+                    <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Total</Label>
+                    <Input value={fmtMoney(estimatedTotal)} readOnly className="h-9 text-sm bg-muted" data-testid="fuel-order-total" />
+                  </div>
+                )}
+              </div>
+            )}
+
             <TextAreaField label="Observação" value={form.observations} onChange={(v) => onChange('observations', v)} testid="fuel-order-observations" />
           </div>
 
           <DialogFooter>
+            {editingId && (
+              <Button variant="outline" onClick={() => downloadPDF(editingId, nextNumber)} data-testid="fuel-order-print" title="Baixar PDF">
+                <Download className="w-4 h-4 mr-2" />Imprimir
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="fuel-order-cancel">Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90" data-testid="fuel-order-save">
               <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar Ordem' : 'Salvar Ordem'}
