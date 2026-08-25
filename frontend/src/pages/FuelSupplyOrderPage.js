@@ -13,7 +13,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Trash2, Search, Save, ClipboardCheck } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Save, ClipboardCheck, Download } from 'lucide-react';
 
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
@@ -159,6 +159,20 @@ export default function FuelSupplyOrderPage() {
     } catch (e) { toast.error('Erro ao excluir'); }
   };
 
+  const downloadPDF = async (id, num) => {
+    try {
+      const r = await api.getFuelSupplyOrderPDF(id);
+      const url = window.URL.createObjectURL(new Blob([r.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `OrdemAbastecimento_${num}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('PDF gerado!');
+    } catch (e) { toast.error('Erro ao gerar PDF'); }
+  };
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="fuel-order-page">
@@ -224,6 +238,9 @@ export default function FuelSupplyOrderPage() {
                       <TableCell className="text-[13px]">{o.requester || '-'}</TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => downloadPDF(o.id, o.order_number)} className="h-8 px-2" data-testid={`fuel-order-pdf-${o.order_number}`} title="Baixar PDF">
+                            <Download className="w-3.5 h-3.5 text-emerald-600" />
+                          </Button>
                           <Button variant="ghost" size="sm" onClick={() => openEdit(o.id)} className="h-8 px-2" data-testid={`fuel-order-edit-${o.order_number}`} title="Editar">
                             <Pencil className="w-3.5 h-3.5 text-blue-600" />
                           </Button>

@@ -290,6 +290,7 @@ export const api = {
   createFuelSupplyOrder: (data) => axios.post(`${API}/fuel-supply-orders`, data),
   updateFuelSupplyOrder: (id, data) => axios.put(`${API}/fuel-supply-orders/${id}`, data),
   deleteFuelSupplyOrder: (id) => axios.delete(`${API}/fuel-supply-orders/${id}`),
+  getFuelSupplyOrderPDF: (id) => axios.get(`${API}/fuel-supply-orders/${id}/pdf`, { responseType: 'blob' }),
 };
 
 export default api;
