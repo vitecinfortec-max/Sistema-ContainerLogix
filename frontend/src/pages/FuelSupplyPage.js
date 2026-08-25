@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { ComboField } from '../components/ui/combo-field';
+import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -80,9 +81,10 @@ export default function FuelSupplyPage() {
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [fuelOrders, setFuelOrders] = useState([]);
   const debounceRef = useRef(null);
 
-  useEffect(() => { loadList(); loadVehicles(); loadDrivers(); loadSuppliers(); }, []);
+  useEffect(() => { loadList(); loadVehicles(); loadDrivers(); loadSuppliers(); loadFuelOrders(); }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -121,6 +123,27 @@ export default function FuelSupplyPage() {
       const r = await api.getSuppliers();
       setSuppliers(r.data || []);
     } catch (e) { /* ignore */ }
+  };
+  const loadFuelOrders = async () => {
+    try {
+      const r = await api.getFuelSupplyOrders();
+      setFuelOrders(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
+
+  // Ao selecionar uma Ordem de Abastecimento já cadastrada, puxa os dados que
+  // ela já tem (equipamento, fornecedor, combustível) pro Abastecimento atual.
+  const onSelectFuelOrder = (order) => {
+    setForm((p) => ({
+      ...p,
+      supply_order: `Nº ${order.order_number}`,
+      equipment_plate: order.equipment_plate || p.equipment_plate,
+      equipment_id: order.equipment_id || p.equipment_id,
+      supplier_name: order.supplier_name || p.supplier_name,
+      supplier_id: order.supplier_id || p.supplier_id,
+      fuel_type: order.fuel_type || p.fuel_type,
+    }));
+    toast.success('Dados da Ordem de Abastecimento preenchidos automaticamente');
   };
 
   const reset = () => setForm(buildEmpty());
@@ -305,7 +328,18 @@ export default function FuelSupplyPage() {
           <div className="space-y-5">
             <SectionTitle>Dados Gerais</SectionTitle>
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Ordem de Abastecimento" value={form.supply_order} onChange={(v) => onChange('supply_order', v)} testid="fuel-order" />
+              <div>
+                <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Ordem de Abastecimento</Label>
+                <Autocomplete
+                  value={form.supply_order || ''}
+                  onChange={(v) => onChange('supply_order', v)}
+                  onSelect={onSelectFuelOrder}
+                  options={fuelOrders}
+                  displayField={(o) => `Nº ${o.order_number}${o.equipment_plate ? ' - ' + o.equipment_plate : ''}${o.supplier_name ? ' - ' + o.supplier_name : ''}`}
+                  placeholder="Digite ou busque o Nº da ordem..."
+                  className="text-sm"
+                />
+              </div>
               <ComboField label="Equipamento *" value={form.equipment_plate || ''} onChange={(v) => {
                 onChange('equipment_plate', v);
                 const vh = vehicles.find((x) => x.plate === v);
