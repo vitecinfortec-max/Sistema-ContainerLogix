@@ -245,6 +245,18 @@ _SUPPLY_MODE_LABELS = {
 }
 
 
+def _valor_por_extenso(value):
+    """Converte um valor em reais pro texto por extenso (ex: 'Quinhentos e Sessenta e Nove Reais')."""
+    from num2words import num2words
+    try:
+        text = num2words(round(float(value or 0), 2), lang='pt_BR', to='currency')
+    except Exception:
+        return ''
+    conectores = {'e', 'de'}
+    words = text.split(' ')
+    return ' '.join(w if w in conectores else w.capitalize() for w in words)
+
+
 @api_router.get("/fuel-supply-orders/{order_id}/pdf")
 async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Depends(get_current_active_user)):
     """Gera PDF da Ordem de Abastecimento (2 vias), seguindo o modelo Bsoft TMS."""
@@ -262,6 +274,9 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
         raise HTTPException(status_code=404, detail="Ordem de Abastecimento não encontrada")
     company = merge_company(await get_company_settings())
 
+    BLUE = colors.HexColor('#1D4ED8')
+    BLACK = colors.HexColor('#000000')
+
     def fmt_dt(s):
         if not s:
             return ''
@@ -278,113 +293,167 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
         except Exception:
             return str(s)
 
+    def money(v):
+        try:
+            return f"{float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except Exception:
+            return "-"
+
+    liters = order.get('liters')
+    estimated_value = order.get('estimated_value')
+    has_total = liters is not None and estimated_value is not None
+    total_value = (float(liters) * float(estimated_value)) if has_total else None
+
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4,
                             leftMargin=10 * mm, rightMargin=10 * mm,
                             topMargin=8 * mm, bottomMargin=8 * mm)
     styles = getSampleStyleSheet()
-    BLACK = colors.HexColor('#000000')
-    GRAY_BG = colors.HexColor('#E8E8E8')
 
     logo_buffer = download_logo(company)
-    logo_img = RLImage(logo_buffer, width=20 * mm, height=20 * mm) if logo_buffer else Paragraph("", styles['Normal'])
+    logo_img = RLImage(logo_buffer, width=18 * mm, height=18 * mm) if logo_buffer else Paragraph("", styles['Normal'])
 
-    def field(label, val):
-        return Paragraph(f"<font size='7' color='#555'>{label}</font><br/>"
-                         f"<font size='8'><b>{val if val else '_____________'}</b></font>",
-                         ParagraphStyle('F', parent=styles['Normal'], leading=11))
+    COL_W = [32 * mm, 55 * mm, 25 * mm, 43 * mm, 17.5 * mm, 17.5 * mm]  # Equip/Solic/Qtd/Produto/Preço/Total
 
     def build_via():
         elems = []
-        company_style = ParagraphStyle('CompHead', parent=styles['Normal'], fontSize=9, leading=11,
-                                       fontName='Helvetica-Bold')
+        # ===== Cabeçalho: logo + empresa centralizada + data/nº à direita =====
+        company_name_style = ParagraphStyle('CompName', parent=styles['Normal'], fontSize=12, leading=14,
+                                            alignment=TA_CENTER, fontName='Helvetica-Bold')
+        company_contact_style = ParagraphStyle('CompContact', parent=styles['Normal'], fontSize=7, leading=9,
+                                               alignment=TA_CENTER, textColor=BLUE)
         company_address_line = (company['address'] or '').replace('\n', ', ')
-        company_para = Paragraph(
-            f"<b>{company['name']}</b><br/>"
-            f"<font size='8'>{company_address_line}<br/>"
-            f"CNPJ: {company['cnpj']}, Fone: {company['phone']}<br/>"
-            f"E-mail: {company['email']}</font>", company_style)
+        company_block = Table([
+            [Paragraph(f"<b>{company['name']}</b>", company_name_style)],
+            [Paragraph(f"{company_address_line}<br/>"
+                      f"Fone: {company['phone']}, E-mail: {company['email']}", company_contact_style)],
+        ], colWidths=[150 * mm])
+        company_block.setStyle(TableStyle([
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
 
-        title_style = ParagraphStyle('OATit', parent=styles['Normal'], fontSize=13, leading=15,
-                                     alignment=TA_RIGHT, fontName='Helvetica-Bold')
+        info_style = ParagraphStyle('OAInfo', parent=styles['Normal'], fontSize=7, leading=9, alignment=TA_RIGHT)
         right_para = Paragraph(
-            f"Ordem de Abastecimento<br/>"
-            f"<font size='9'>Nº: <b>{order['order_number']}</b></font><br/>"
-            f"<font size='7'>Data/Hora: {fmt_dt(order.get('created_at'))}<br/>"
-            f"Criado por: {order.get('created_by_name') or '-'}</font>", title_style)
+            f"<b>Data/Hora:</b> {fmt_dt(order.get('created_at'))}<br/>"
+            f"<b>Nº:</b> {order['order_number']}<br/>"
+            f"<b>Criado por:</b> {order.get('created_by_name') or '-'}<br/>"
+            f"<b>Impresso por:</b> {current_user.get('name') or '-'}", info_style)
 
-        header = Table([[logo_img, company_para, right_para]], colWidths=[22 * mm, 96 * mm, 72 * mm])
+        header = Table([[logo_img, company_block, right_para]], colWidths=[20 * mm, 145 * mm, 25 * mm])
         header.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('LEFTPADDING', (0, 0), (-1, -1), 0),
             ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('LEFTPADDING', (1, 0), (1, 0), 4),
         ]))
         elems.append(header)
         elems.append(Spacer(1, 4))
 
+        # ===== Título da seção =====
+        title_t = Table([[Paragraph("<b>Ordem de abastecimento</b>",
+                                    ParagraphStyle('OATit', parent=styles['Normal'], fontSize=9, alignment=TA_CENTER))]],
+                        colWidths=[sum(COL_W)])
+        title_t.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.75, BLACK),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        elems.append(title_t)
+
+        # ===== Fornecedor =====
         supplier_t = Table([[Paragraph(
             f"<font size='9'>Fornecedor: <b>{order.get('supplier_name') or '-'}</b></font>", styles['Normal']
-        )]], colWidths=[190 * mm])
+        )]], colWidths=[sum(COL_W)])
         supplier_t.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 0.5, BLACK),
+            ('BOX', (0, 0), (-1, -1), 0.75, BLACK),
+            ('LINEABOVE', (0, 0), (-1, 0), 0, colors.white),
             ('TOPPADDING', (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
         ]))
         elems.append(supplier_t)
 
-        info_rows = [[
-            field("Equipamento", order.get('equipment_plate')),
-            field("Solicitante", order.get('requester')),
-            field("Empresa", order.get('company_name')),
-        ], [
-            field("Produto", _FUEL_TYPE_LABELS.get(order.get('fuel_type'), order.get('fuel_type'))),
-            field("Tipo", _SUPPLY_MODE_LABELS.get(order.get('supply_mode'), order.get('supply_mode'))),
-            field("Data", fmt_date(order.get('order_date'))),
-        ]]
-        info_t = Table(info_rows, colWidths=[63.3 * mm, 63.3 * mm, 63.3 * mm])
-        info_t.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 0.5, BLACK),
-            ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.grey),
+        # ===== Tabela principal: Equipamento/Solicitante/Quantidade/Produto/Preço/Total =====
+        cell_style = ParagraphStyle('Cell', parent=styles['Normal'], fontSize=7.5, alignment=TA_CENTER)
+        header_row = [Paragraph(f"<b>{h}</b>", cell_style) for h in
+                     ['Equipamento', 'Solicitante', 'Quantidade', 'Produto', 'Preço', 'Total']]
+        data_row = [
+            Paragraph(order.get('equipment_plate') or '-', cell_style),
+            Paragraph(order.get('requester') or '-', cell_style),
+            Paragraph(f"{liters:.2f}".replace('.', ',') if liters is not None else '-', cell_style),
+            Paragraph(_FUEL_TYPE_LABELS.get(order.get('fuel_type'), order.get('fuel_type')) or '-', cell_style),
+            Paragraph(money(estimated_value) if estimated_value is not None else '-', cell_style),
+            Paragraph(money(total_value) if has_total else '-', cell_style),
+        ]
+        main_t = Table([header_row, data_row], colWidths=COL_W, rowHeights=[16, 22])
+        main_t.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.75, BLACK),
+            ('INNERGRID', (0, 0), (-1, -1), 0.4, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        elems.append(main_t)
+
+        # ===== Linha de total + valor por extenso =====
+        extenso = _valor_por_extenso(total_value) if has_total and total_value else ''
+        total_row_t = Table([[
+            Paragraph("<font size='7.5'>Valor por extenso:</font>", styles['Normal']),
+            Paragraph("<font size='7.5'><b>TOTAL</b></font>", ParagraphStyle('TotLbl', parent=styles['Normal'], alignment=TA_CENTER)),
+            Paragraph(f"<font size='8'><b>{money(total_value) if has_total else '-'}</b></font>", ParagraphStyle('TotVal', parent=styles['Normal'], alignment=TA_CENTER)),
+        ]], colWidths=[COL_W[0] + COL_W[1] + COL_W[2] + COL_W[3], COL_W[4], COL_W[5]])
+        total_row_t.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.75, BLACK),
+            ('LINEABOVE', (0, 0), (-1, 0), 0, colors.white),
+            ('INNERGRID', (0, 0), (-1, -1), 0.4, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('BACKGROUND', (1, 0), (2, 0), colors.HexColor('#F0F0F0')),
         ]))
-        elems.append(info_t)
+        elems.append(total_row_t)
 
-        blank_block = Table([[
-            Paragraph(
-                "<font size='8'>Data abastecimento: ___________<br/>"
-                "Km de abastecimento: ___________<br/>"
-                "Quantidade em litros: ___________<br/>"
-                "Km último abastecimento: ___________<br/>"
-                "Média: ___________</font>", styles['Normal']),
-            Paragraph(
-                f"<font size='8'>OBS: <b>{(order.get('observations') or '').replace(chr(10), '<br/>')}</b></font>",
-                styles['Normal']),
-        ]], colWidths=[95 * mm, 95 * mm])
-        blank_block.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 0.5, BLACK),
-            ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.grey),
+        if extenso:
+            extenso_t = Table([[Paragraph(f"<b>{extenso}</b>",
+                                          ParagraphStyle('Extenso', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER))]],
+                              colWidths=[sum(COL_W)])
+            extenso_t.setStyle(TableStyle([
+                ('BOX', (0, 0), (-1, -1), 0.75, BLACK),
+                ('LINEABOVE', (0, 0), (-1, 0), 0, colors.white),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            elems.append(extenso_t)
+
+        # ===== Campos manuais (azul) + observação livre =====
+        manual_style = ParagraphStyle('Manual', parent=styles['Normal'], fontSize=8, leading=13, textColor=BLUE)
+        obs_block = Table([[
+            Paragraph("Data abastecimento:<br/>Km de abastecimento:<br/>Quantidade em litros:<br/>"
+                     "Km último abastecimento:<br/>Média:", manual_style),
+            Paragraph(f"<font size='8'>OBS: <b>{(order.get('observations') or '').replace(chr(10), '<br/>')}</b></font>",
+                     styles['Normal']),
+        ]], colWidths=[COL_W[0] + COL_W[1] + COL_W[2], COL_W[3] + COL_W[4] + COL_W[5]])
+        obs_block.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.75, BLACK),
+            ('INNERGRID', (0, 0), (-1, -1), 0.4, colors.grey),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('TOPPADDING', (0, 0), (-1, -1), 4),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
         ]))
-        elems.append(blank_block)
+        elems.append(obs_block)
 
         elems.append(Paragraph(
-            "<font size='7.5'>OBS: Favor anexar esta via junto com a nota fiscal que será enviada para cobrança. Obrigado.</font>",
+            "<font size='7.5'><b><i>OBS: Favor anexar esta via junto com a nota fiscal que será enviada "
+            "para cobrança. Obrigado.</i></b></font>",
             ParagraphStyle('Note', parent=styles['Normal'], spaceBefore=3)
         ))
-        elems.append(Spacer(1, 8))
+        elems.append(Spacer(1, 10))
 
+        # ===== Assinaturas (só o rótulo, espaço em branco acima) =====
         sig_t = Table([
-            [Paragraph("<font size='8'>__________________________<br/>Assinatura do Solicitante</font>", styles['Normal']),
-             Paragraph("<font size='8'>__________________________<br/>Assinatura do Solicitado</font>", styles['Normal'])],
-        ], colWidths=[95 * mm, 95 * mm])
+            [Paragraph("<font size='8'>Assinatura do Solicitante</font>", styles['Normal']),
+             Paragraph("<font size='8'>Assinatura do Solicitado</font>", styles['Normal'])],
+        ], colWidths=[sum(COL_W) / 2, sum(COL_W) / 2], rowHeights=[10])
         sig_t.setStyle(TableStyle([
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
         ]))
         elems.append(sig_t)
