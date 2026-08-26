@@ -137,6 +137,7 @@ export default function Layout({ children }) {
   const [manutencaoOpen, setManutencaoOpen] = useState(false);
   const [operacionalOpen, setOperacionalOpen] = useState(false);
   const [flexTankOpen, setFlexTankOpen] = useState(false);
+  const [terminalCadastroOpen, setTerminalCadastroOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [transporteOpen, setTransporteOpen] = useState(false);
   const [opcoesSistemaOpen, setOpcoesSistemaOpen] = useState(false);
@@ -236,6 +237,8 @@ export default function Layout({ children }) {
     if (savedOperacional !== null) setOperacionalOpen(JSON.parse(savedOperacional));
     const savedFlexTank = localStorage.getItem('flexTankOpen');
     if (savedFlexTank !== null) setFlexTankOpen(JSON.parse(savedFlexTank));
+    const savedTerminalCadastro = localStorage.getItem('terminalCadastroOpen');
+    if (savedTerminalCadastro !== null) setTerminalCadastroOpen(JSON.parse(savedTerminalCadastro));
     const savedTerminal = localStorage.getItem('terminalOpen');
     if (savedTerminal !== null) setTerminalOpen(JSON.parse(savedTerminal));
     const savedTransporte = localStorage.getItem('transporteOpen');
@@ -245,7 +248,7 @@ export default function Layout({ children }) {
   }, []);
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control';
-  const isCadastroActive = ['/drivers', '/companies', '/clients', '/suppliers', '/shipping-lines', '/service-types'].includes(location.pathname);
+  const isCadastroActive = ['/drivers', '/companies', '/clients', '/suppliers'].includes(location.pathname);
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
@@ -257,7 +260,8 @@ export default function Layout({ children }) {
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
-  const isTerminalActive = isFlexTankActive || isContainerInspectionsActive || isMovimentacoesActive;
+  const isTerminalCadastroActive = location.pathname === '/shipping-lines' || location.pathname === '/service-types';
+  const isTerminalActive = isFlexTankActive || isContainerInspectionsActive || isMovimentacoesActive || isTerminalCadastroActive;
 
   useEffect(() => {
     if (isMovimentacoesActive && !movimentacoesOpen) setMovimentacoesOpen(true);
@@ -268,6 +272,7 @@ export default function Layout({ children }) {
     if (isOpcoesSistemaActive && !opcoesSistemaOpen) setOpcoesSistemaOpen(true);
     if (isOperacionalActive && !operacionalOpen) setOperacionalOpen(true);
     if (isFlexTankActive && !flexTankOpen) setFlexTankOpen(true);
+    if (isTerminalCadastroActive && !terminalCadastroOpen) setTerminalCadastroOpen(true);
     if (isTerminalActive && !terminalOpen) setTerminalOpen(true);
   }, [location.pathname]);
 
@@ -326,6 +331,12 @@ export default function Layout({ children }) {
     localStorage.setItem('flexTankOpen', JSON.stringify(newState));
   };
 
+  const toggleTerminalCadastro = () => {
+    const newState = !terminalCadastroOpen;
+    setTerminalCadastroOpen(newState);
+    localStorage.setItem('terminalCadastroOpen', JSON.stringify(newState));
+  };
+
   const toggleTerminal = () => {
     const newState = !terminalOpen;
     setTerminalOpen(newState);
@@ -372,6 +383,14 @@ export default function Layout({ children }) {
     { path: '/reports/movements', label: 'Relatório de Movimentação', icon: BarChart3, moduleKey: 'terminal.movimentacoes' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
+  // Cadastros voltados especificamente pro Terminal (usados em Vistoria/
+  // Movimentação) - separados do grupo geral "Cadastro" pra ficarem à mão
+  // de quem trabalha no Terminal, sem precisar sair do grupo.
+  const terminalCadastroItems = [
+    { path: '/shipping-lines', label: 'Armador', icon: Ship, moduleKey: 'cadastro.armador' },
+    { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList, moduleKey: 'cadastro.tipos_servico' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
   const manutencaoItems = [
     { path: '/fleet?tab=revisions', label: 'Controle de Revisão', icon: Wrench, moduleKey: 'frota.revisao' },
     { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList, moduleKey: 'frota.ordem_servico' },
@@ -390,8 +409,6 @@ export default function Layout({ children }) {
     { path: '/companies', label: 'Transportadora', icon: Building2, moduleKey: 'cadastro.transportadora' },
     { path: '/clients', label: 'Cliente', icon: Users, moduleKey: 'cadastro.cliente' },
     { path: '/suppliers', label: 'Fornecedor', icon: Store, moduleKey: 'cadastro.fornecedor' },
-    { path: '/shipping-lines', label: 'Armador', icon: Ship, moduleKey: 'cadastro.armador' },
-    { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList, moduleKey: 'cadastro.tipos_servico' },
     { path: '/company-settings', label: 'Dados da Empresa', icon: Settings },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
@@ -815,6 +832,10 @@ export default function Layout({ children }) {
                     {flexTankItems.length > 0 && flexTankOpen && (
                       <div>{flexTankItems.map((item) => renderNavItem(item, true, true))}</div>
                     )}
+                    {terminalCadastroItems.length > 0 && renderGroupHeader('Cadastro', FolderOpen, terminalCadastroOpen, toggleTerminalCadastro, isTerminalCadastroActive, 'nav-terminal-cadastro-toggle', true)}
+                    {terminalCadastroItems.length > 0 && terminalCadastroOpen && (
+                      <div>{terminalCadastroItems.map((item) => renderNavItem(item, true, true))}</div>
+                    )}
                   </div>
                 )}
 
@@ -930,6 +951,8 @@ export default function Layout({ children }) {
                     {movimentacoesItems.length > 0 && movimentacoesOpen && movimentacoesItems.map((item) => renderMobileNavItem(item, true))}
                     {flexTankItems.length > 0 && renderMobileGroupToggle('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, true)}
                     {flexTankItems.length > 0 && flexTankOpen && flexTankItems.map((item) => renderMobileNavItem(item, true))}
+                    {terminalCadastroItems.length > 0 && renderMobileGroupToggle('Cadastro', FolderOpen, terminalCadastroOpen, toggleTerminalCadastro, isTerminalCadastroActive, true)}
+                    {terminalCadastroItems.length > 0 && terminalCadastroOpen && terminalCadastroItems.map((item) => renderMobileNavItem(item, true))}
                   </div>
                 )}
 
