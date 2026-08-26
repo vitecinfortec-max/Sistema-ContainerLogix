@@ -286,6 +286,7 @@ MODULE_CATALOG = [
     {"key": "operacional", "label": "Operacional", "items": [
         {"key": "operacional.programacao_carregamento", "label": "Programação de Carregamento"},
         {"key": "operacional.status_entrega", "label": "Status de Entrega"},
+        {"key": "operacional.ordem_carregamento", "label": "Ordem de Carregamento"},
     ]},
 ]
 
@@ -317,6 +318,7 @@ PATH_MODULE_MAP = [
     ("/api/rpa-terceiro", "financeiro.rpa_terceiro"),
     ("/api/ordem-servico", "frota.ordem_servico"),
     ("/api/fuel-supply-orders", "frota.ordem_abastecimento"),
+    ("/api/loading-orders", "operacional.ordem_carregamento"),
     ("/api/fuel-supplies", "frota.abastecimento"),
     ("/api/loading-schedules", "operacional.programacao_carregamento"),
     ("/api/delivery-status", "operacional.status_entrega"),

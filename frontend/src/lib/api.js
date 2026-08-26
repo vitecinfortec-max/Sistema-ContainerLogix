@@ -291,6 +291,15 @@ export const api = {
   updateFuelSupplyOrder: (id, data) => axios.put(`${API}/fuel-supply-orders/${id}`, data),
   deleteFuelSupplyOrder: (id) => axios.delete(`${API}/fuel-supply-orders/${id}`),
   getFuelSupplyOrderPDF: (id) => axios.get(`${API}/fuel-supply-orders/${id}/pdf`, { responseType: 'blob' }),
+
+  // Ordem de Carregamento (Transporte)
+  getLoadingOrders: (params) => axios.get(`${API}/loading-orders`, { params }),
+  getLoadingOrder: (id) => axios.get(`${API}/loading-orders/${id}`),
+  getLoadingOrderNextNumber: () => axios.get(`${API}/loading-orders/next-number`),
+  createLoadingOrder: (data) => axios.post(`${API}/loading-orders`, data),
+  updateLoadingOrder: (id, data) => axios.put(`${API}/loading-orders/${id}`, data),
+  deleteLoadingOrder: (id) => axios.delete(`${API}/loading-orders/${id}`),
+  getLoadingOrderPDF: (id) => axios.get(`${API}/loading-orders/${id}/pdf`, { responseType: 'blob' }),
 };
 
 export default api;

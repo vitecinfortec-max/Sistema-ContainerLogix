@@ -2056,6 +2056,81 @@ class FuelSupplyOrderResponse(FuelSupplyOrder):
     pass
 
 
+# ==================== TRANSPORTE - ORDEM DE CARREGAMENTO ====================
+# Minuta de coleta/entrega de container pro motorista levar até o
+# terminal/porto (referência: modelo real de "Ordem de Serviço - Coleta de
+# Container" fornecido pelo usuário em 2026-08-25). Numeração e data/hora
+# de emissão são geradas automaticamente pelo sistema.
+
+LOADING_ORDER_TYPE_OPTIONS = ["COLETA", "ENTREGA"]
+LOADING_ORDER_STATUS_OPTIONS = ["PENDENTE", "APROVADA", "CANCELADA"]
+
+class LoadingOrder(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    order_number: int  # Número sequencial
+
+    order_type: str = "COLETA"  # COLETA | ENTREGA
+    status: str = "PENDENTE"  # PENDENTE | APROVADA | CANCELADA
+    collection_window: Optional[str] = None  # Janela de coleta/entrega
+
+    origin_terminal: Optional[str] = None
+    port: Optional[str] = None
+
+    container_number: Optional[str] = None
+    size_type: Optional[str] = None
+    gross_weight: Optional[str] = None
+    seal: Optional[str] = None
+    shipping_line: Optional[str] = None  # Armador
+    booking: Optional[str] = None
+    quantity: int = 1
+
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
+    transport_company: Optional[str] = None
+    truck_plate: Optional[str] = None
+    trailer_plate: Optional[str] = None
+
+    observations: Optional[str] = None
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+
+class LoadingOrderCreate(BaseModel):
+    order_type: str = "COLETA"
+    status: str = "PENDENTE"
+    collection_window: Optional[str] = None
+    origin_terminal: Optional[str] = None
+    port: Optional[str] = None
+    container_number: Optional[str] = None
+    size_type: Optional[str] = None
+    gross_weight: Optional[str] = None
+    seal: Optional[str] = None
+    shipping_line: Optional[str] = None
+    booking: Optional[str] = None
+    quantity: int = 1
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
+    transport_company: Optional[str] = None
+    truck_plate: Optional[str] = None
+    trailer_plate: Optional[str] = None
+    observations: Optional[str] = None
+
+
+class LoadingOrderUpdate(LoadingOrderCreate):
+    pass
+
+
+class LoadingOrderResponse(LoadingOrder):
+    pass
+
+
 # ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================
 
 class ExpenseReportReceipt(BaseModel):

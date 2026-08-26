@@ -48,6 +48,7 @@ import RPATerceiroPage from './pages/RPATerceiroPage';
 import OrdemServicoPage from './pages/OrdemServicoPage';
 import FuelSupplyPage from './pages/FuelSupplyPage';
 import FuelSupplyOrderPage from './pages/FuelSupplyOrderPage';
+import LoadingOrderPage from './pages/LoadingOrderPage';
 import CompanySettingsPage from './pages/CompanySettingsPage';
 import UsersPage from './pages/UsersPage';
 import ModulesPage from './pages/ModulesPage';
@@ -161,6 +162,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="frota.abastecimento">
                 <FuelSupplyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/loading-orders"
+            element={
+              <ProtectedRoute moduleKey="operacional.ordem_carregamento">
+                <LoadingOrderPage />
               </ProtectedRoute>
             }
           />

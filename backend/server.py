@@ -33,6 +33,7 @@ from routers.intl_invoices import api_router as intl_invoices_router
 from routers.rpa_terceiro import api_router as rpa_terceiro_router
 from routers.ordem_servico import api_router as ordem_servico_router
 from routers.fuel_supply import api_router as fuel_supply_router
+from routers.loading_orders import api_router as loading_orders_router
 from routers.expense_reports import api_router as expense_reports_router
 from routers.users import api_router as users_router
 from routers.module_config import api_router as module_config_router
@@ -80,6 +81,7 @@ app.include_router(intl_invoices_router)
 app.include_router(rpa_terceiro_router)
 app.include_router(ordem_servico_router)
 app.include_router(fuel_supply_router)
+app.include_router(loading_orders_router)
 app.include_router(expense_reports_router)
 app.include_router(users_router)
 app.include_router(module_config_router)
