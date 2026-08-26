@@ -183,6 +183,35 @@ class SupplierResponse(BaseModel):
     address: Optional[str] = None
     created_at: datetime
 
+# Terminal Model (baseado em Supplier) - Cadastro de Terminal
+class Terminal(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    cnpj: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+class TerminalCreate(BaseModel):
+    name: str
+    cnpj: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+
+class TerminalResponse(BaseModel):
+    id: str
+    name: str
+    cnpj: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    created_at: datetime
+
 class ContainerMovement(BaseModel):
     model_config = ConfigDict(extra="ignore")
     

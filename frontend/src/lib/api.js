@@ -42,6 +42,11 @@ export const api = {
   updateSupplier: (id, data) => axios.put(`${API}/suppliers/${id}`, data),
   deleteSupplier: (id) => axios.delete(`${API}/suppliers/${id}`),
 
+  getTerminals: () => axios.get(`${API}/terminals`),
+  createTerminal: (data) => axios.post(`${API}/terminals`, data),
+  updateTerminal: (id, data) => axios.put(`${API}/terminals/${id}`, data),
+  deleteTerminal: (id) => axios.delete(`${API}/terminals/${id}`),
+
   // Service Types
   getServiceTypes: () => axios.get(`${API}/service-types`),
   createServiceType: (data) => axios.post(`${API}/service-types`, data),

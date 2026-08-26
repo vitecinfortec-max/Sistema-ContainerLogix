@@ -45,7 +45,8 @@ import {
   LayoutGrid,
   Cog,
   Fuel,
-  PackageCheck
+  PackageCheck,
+  Warehouse
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -78,6 +79,7 @@ const PAGE_TITLES = {
   '/modules': 'Módulos Contratados',
   '/clients': 'Clientes',
   '/suppliers': 'Fornecedores',
+  '/terminals': 'Terminais',
   '/shipping-lines': 'Armadores',
   '/service-types': 'Tipos de Serviço',
   '/reports/movements': 'Relatório de Movimentação',
@@ -262,7 +264,7 @@ export default function Layout({ children }) {
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
-  const isTerminalCadastroActive = location.pathname === '/shipping-lines' || location.pathname === '/service-types';
+  const isTerminalCadastroActive = location.pathname === '/terminals' || location.pathname === '/shipping-lines' || location.pathname === '/service-types';
   const isTerminalActive = isFlexTankActive || isContainerInspectionsActive || isMovimentacoesActive || isTerminalCadastroActive;
 
   useEffect(() => {
@@ -389,6 +391,7 @@ export default function Layout({ children }) {
   // Movimentação) - separados do grupo geral "Cadastro" pra ficarem à mão
   // de quem trabalha no Terminal, sem precisar sair do grupo.
   const terminalCadastroItems = [
+    { path: '/terminals', label: 'Terminal', icon: Warehouse, moduleKey: 'cadastro.terminal' },
     { path: '/shipping-lines', label: 'Armador', icon: Ship, moduleKey: 'cadastro.armador' },
     { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList, moduleKey: 'cadastro.tipos_servico' },
   ].filter((item) => isModuleEnabled(item.moduleKey));

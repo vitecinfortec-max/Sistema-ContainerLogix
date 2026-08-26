@@ -19,6 +19,7 @@ import CompaniesPage from './pages/CompaniesPage';
 import ShippingLinesPage from './pages/ShippingLinesPage';
 import ClientsPage from './pages/ClientsPage';
 import SuppliersPage from './pages/SuppliersPage';
+import TerminalsPage from './pages/TerminalsPage';
 import ServiceTypesPage from './pages/ServiceTypesPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
@@ -234,6 +235,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="cadastro.fornecedor">
                 <SuppliersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/terminals"
+            element={
+              <ProtectedRoute moduleKey="cadastro.terminal">
+                <TerminalsPage />
               </ProtectedRoute>
             }
           />

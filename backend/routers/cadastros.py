@@ -21,6 +21,7 @@ from models import (
     TransportCompany, TransportCompanyCreate, TransportCompanyResponse,
     Client, ClientCreate, ClientResponse,
     Supplier, SupplierCreate, SupplierResponse,
+    Terminal, TerminalCreate, TerminalResponse,
     ContainerMovement, ContainerMovementCreate, ContainerMovementResponse,
     DailyMovementPoint, DriverRankingEntry, DashboardStats,
     ShippingLine, ShippingLineCreate, ShippingLineResponse,
@@ -460,6 +461,89 @@ async def delete_supplier(supplier_id: str, current_user: dict = Depends(get_cur
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
     return {"message": "Fornecedor deletado com sucesso"}
+
+# CRUD de Terminal (Cadastro, dentro do grupo Terminal)
+@api_router.post("/terminals", response_model=TerminalResponse)
+async def create_terminal(terminal_input: TerminalCreate, current_user: dict = Depends(get_current_active_user)):
+    terminal = Terminal(
+        name=terminal_input.name,
+        cnpj=terminal_input.cnpj,
+        phone=terminal_input.phone,
+        email=terminal_input.email,
+        address=terminal_input.address,
+        created_by=current_user['sub']
+    )
+
+    doc = terminal.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.terminals.insert_one(doc)
+
+    return TerminalResponse(
+        id=terminal.id,
+        name=terminal.name,
+        cnpj=terminal.cnpj,
+        phone=terminal.phone,
+        email=terminal.email,
+        address=terminal.address,
+        created_at=terminal.created_at
+    )
+
+@api_router.get("/terminals", response_model=List[TerminalResponse])
+async def get_terminals(
+    page: int = 1,
+    per_page: int = 100,
+    current_user: dict = Depends(get_current_active_user)
+):
+    skip = (page - 1) * per_page
+    terminals = await db.terminals.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    return [
+        TerminalResponse(
+            id=t['id'],
+            name=t['name'],
+            cnpj=t.get('cnpj'),
+            phone=t.get('phone'),
+            email=t.get('email'),
+            address=t.get('address'),
+            created_at=datetime.fromisoformat(t['created_at'])
+        )
+        for t in terminals
+    ]
+
+@api_router.put("/terminals/{terminal_id}", response_model=TerminalResponse)
+async def update_terminal(terminal_id: str, terminal_input: TerminalCreate, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.terminals.find_one({"id": terminal_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Terminal não encontrado")
+
+    update_data = {
+        "id": terminal_id,
+        "name": terminal_input.name,
+        "cnpj": terminal_input.cnpj,
+        "phone": terminal_input.phone,
+        "email": terminal_input.email,
+        "address": terminal_input.address,
+        "created_at": existing['created_at'],
+        "created_by": existing['created_by']
+    }
+
+    await db.terminals.replace_one({"id": terminal_id}, update_data)
+
+    return TerminalResponse(
+        id=terminal_id,
+        name=update_data['name'],
+        cnpj=update_data['cnpj'],
+        phone=update_data['phone'],
+        email=update_data['email'],
+        address=update_data['address'],
+        created_at=datetime.fromisoformat(update_data['created_at'])
+    )
+
+@api_router.delete("/terminals/{terminal_id}")
+async def delete_terminal(terminal_id: str, current_user: dict = Depends(get_current_active_user)):
+    result = await db.terminals.delete_one({"id": terminal_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Terminal não encontrado")
+    return {"message": "Terminal deletado com sucesso"}
 
 # CRUD de Tipos de Serviço
 @api_router.post("/service-types", response_model=ServiceTypeResponse)
