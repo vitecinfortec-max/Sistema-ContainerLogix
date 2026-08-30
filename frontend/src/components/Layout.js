@@ -16,7 +16,6 @@ import {
   ChevronRight,
   ChevronDown,
   Receipt,
-  Users,
   ClipboardList,
   FolderOpen,
   BarChart3,
@@ -37,7 +36,6 @@ import {
   Globe,
   Anchor,
   Wallet,
-  Store,
   Calculator,
   Sun,
   Moon,
@@ -45,8 +43,7 @@ import {
   LayoutGrid,
   Cog,
   Fuel,
-  PackageCheck,
-  Warehouse
+  PackageCheck
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -72,14 +69,11 @@ const PAGE_TITLES = {
   '/fleet/abastecimento': 'Abastecimento',
   '/loading-orders': 'Ordem de Carregamento',
   '/fleet/checklist': 'Checklist',
-  '/drivers': 'Pessoas',
+  '/cadastro': 'Cadastro',
   '/companies': 'Transportadoras',
   '/company-settings': 'Dados da Empresa',
   '/users': 'Gestão de Usuários',
   '/modules': 'Módulos Contratados',
-  '/clients': 'Clientes',
-  '/suppliers': 'Fornecedores',
-  '/terminals': 'Terminais',
   '/shipping-lines': 'Armadores',
   '/service-types': 'Tipos de Serviço',
   '/reports/movements': 'Relatório de Movimentação',
@@ -252,7 +246,7 @@ export default function Layout({ children }) {
   }, []);
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control';
-  const isCadastroActive = ['/drivers', '/companies', '/clients', '/suppliers'].includes(location.pathname);
+  const isCadastroActive = ['/cadastro', '/companies'].includes(location.pathname);
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
@@ -264,7 +258,7 @@ export default function Layout({ children }) {
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
-  const isTerminalCadastroActive = location.pathname === '/terminals' || location.pathname === '/shipping-lines' || location.pathname === '/service-types';
+  const isTerminalCadastroActive = location.pathname === '/shipping-lines' || location.pathname === '/service-types';
   const isTerminalActive = isFlexTankActive || isContainerInspectionsActive || isMovimentacoesActive || isTerminalCadastroActive;
 
   useEffect(() => {
@@ -391,7 +385,6 @@ export default function Layout({ children }) {
   // Movimentação) - separados do grupo geral "Cadastro" pra ficarem à mão
   // de quem trabalha no Terminal, sem precisar sair do grupo.
   const terminalCadastroItems = [
-    { path: '/terminals', label: 'Terminal', icon: Warehouse, moduleKey: 'cadastro.terminal' },
     { path: '/shipping-lines', label: 'Armador', icon: Ship, moduleKey: 'cadastro.armador' },
     { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList, moduleKey: 'cadastro.tipos_servico' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
@@ -411,10 +404,8 @@ export default function Layout({ children }) {
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const cadastroItems = [
-    { path: '/drivers', label: 'Pessoas', icon: Truck, moduleKey: 'cadastro.pessoas' },
+    { path: '/cadastro', label: 'Cadastro', icon: FolderOpen },
     { path: '/companies', label: 'Transportadora', icon: Building2, moduleKey: 'cadastro.transportadora' },
-    { path: '/clients', label: 'Cliente', icon: Users, moduleKey: 'cadastro.cliente' },
-    { path: '/suppliers', label: 'Fornecedor', icon: Store, moduleKey: 'cadastro.fornecedor' },
     { path: '/company-settings', label: 'Dados da Empresa', icon: Settings },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 

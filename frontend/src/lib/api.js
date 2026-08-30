@@ -42,10 +42,23 @@ export const api = {
   updateSupplier: (id, data) => axios.put(`${API}/suppliers/${id}`, data),
   deleteSupplier: (id) => axios.delete(`${API}/suppliers/${id}`),
 
+  getStates: () => axios.get(`${API}/locations/states`),
+  getCitiesByUF: (uf) => axios.get(`${API}/locations/cities`, { params: { uf } }),
+
   getTerminals: () => axios.get(`${API}/terminals`),
   createTerminal: (data) => axios.post(`${API}/terminals`, data),
   updateTerminal: (id, data) => axios.put(`${API}/terminals/${id}`, data),
   deleteTerminal: (id) => axios.delete(`${API}/terminals/${id}`),
+
+  getEmployees: () => axios.get(`${API}/employees`),
+  createEmployee: (data) => axios.post(`${API}/employees`, data),
+  updateEmployee: (id, data) => axios.put(`${API}/employees/${id}`, data),
+  deleteEmployee: (id) => axios.delete(`${API}/employees/${id}`),
+
+  getInsuranceCompanies: () => axios.get(`${API}/insurance-companies`),
+  createInsuranceCompany: (data) => axios.post(`${API}/insurance-companies`, data),
+  updateInsuranceCompany: (id, data) => axios.put(`${API}/insurance-companies/${id}`, data),
+  deleteInsuranceCompany: (id) => axios.delete(`${API}/insurance-companies/${id}`),
 
   // Service Types
   getServiceTypes: () => axios.get(`${API}/service-types`),

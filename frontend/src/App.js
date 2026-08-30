@@ -14,12 +14,9 @@ import MovementsPage from './pages/MovementsPage';
 import NewMovementPage from './pages/NewMovementPage';
 import MovementDetailPage from './pages/MovementDetailPage';
 import EditMovementPage from './pages/EditMovementPage';
-import DriversPage from './pages/DriversPage';
 import CompaniesPage from './pages/CompaniesPage';
 import ShippingLinesPage from './pages/ShippingLinesPage';
-import ClientsPage from './pages/ClientsPage';
-import SuppliersPage from './pages/SuppliersPage';
-import TerminalsPage from './pages/TerminalsPage';
+import CadastroUnificadoPage from './pages/CadastroUnificadoPage';
 import ServiceTypesPage from './pages/ServiceTypesPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
@@ -175,13 +172,17 @@ function App() {
             }
           />
           <Route
-            path="/drivers"
+            path="/cadastro"
             element={
-              <ProtectedRoute moduleKey="cadastro.pessoas">
-                <DriversPage />
+              <ProtectedRoute>
+                <CadastroUnificadoPage />
               </ProtectedRoute>
             }
           />
+          <Route path="/drivers" element={<Navigate to="/cadastro?type=motorista" replace />} />
+          <Route path="/clients" element={<Navigate to="/cadastro?type=cliente" replace />} />
+          <Route path="/suppliers" element={<Navigate to="/cadastro?type=fornecedor" replace />} />
+          <Route path="/terminals" element={<Navigate to="/cadastro?type=terminal" replace />} />
           <Route
             path="/companies"
             element={
@@ -219,30 +220,6 @@ function App() {
             element={
               <ProtectedRoute moduleKey="cadastro.armador">
                 <ShippingLinesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/clients"
-            element={
-              <ProtectedRoute moduleKey="cadastro.cliente">
-                <ClientsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/suppliers"
-            element={
-              <ProtectedRoute moduleKey="cadastro.fornecedor">
-                <SuppliersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/terminals"
-            element={
-              <ProtectedRoute moduleKey="cadastro.terminal">
-                <TerminalsPage />
               </ProtectedRoute>
             }
           />

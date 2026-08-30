@@ -22,6 +22,8 @@ from models import (
     Client, ClientCreate, ClientResponse,
     Supplier, SupplierCreate, SupplierResponse,
     Terminal, TerminalCreate, TerminalResponse,
+    Employee, EmployeeCreate, EmployeeResponse,
+    InsuranceCompany, InsuranceCompanyCreate, InsuranceCompanyResponse,
     ContainerMovement, ContainerMovementCreate, ContainerMovementResponse,
     DailyMovementPoint, DriverRankingEntry, DashboardStats,
     ShippingLine, ShippingLineCreate, ShippingLineResponse,
@@ -71,24 +73,13 @@ async def create_driver(driver_input: DriverCreate, current_user: dict = Depends
     if existing_cpf:
         raise HTTPException(status_code=400, detail="Já existe uma pessoa cadastrada com este CPF")
 
-    driver = Driver(
-        name=driver_input.name,
-        cpf=driver_input.cpf,
-        phone=driver_input.phone,
-        created_by=current_user['sub']
-    )
-    
+    driver = Driver(**driver_input.model_dump(), created_by=current_user['sub'])
+
     doc = driver.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.drivers.insert_one(doc)
-    
-    return DriverResponse(
-        id=driver.id,
-        name=driver.name,
-        cpf=driver.cpf,
-        phone=driver.phone,
-        created_at=driver.created_at
-    )
+
+    return DriverResponse(**driver.model_dump())
 
 @api_router.get("/drivers", response_model=List[DriverResponse])
 async def get_drivers(
@@ -103,13 +94,7 @@ async def get_drivers(
         skip = (page - 1) * per_page
         drivers = await db.drivers.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
     return [
-        DriverResponse(
-            id=d['id'],
-            name=d['name'],
-            cpf=d['cpf'],
-            phone=d.get('phone'),
-            created_at=datetime.fromisoformat(d['created_at'])
-        )
+        DriverResponse(**{**d, "created_at": datetime.fromisoformat(d['created_at'])})
         for d in drivers
     ]
 
@@ -126,23 +111,15 @@ async def update_driver(driver_id: str, driver_input: DriverCreate, current_user
         raise HTTPException(status_code=400, detail="Já existe uma pessoa cadastrada com este CPF")
 
     update_data = {
+        **driver_input.model_dump(),
         "id": driver_id,
-        "name": driver_input.name,
-        "cpf": driver_input.cpf,
-        "phone": driver_input.phone,
         "created_at": existing['created_at'],
         "created_by": existing['created_by']
     }
-    
+
     await db.drivers.replace_one({"id": driver_id}, update_data)
-    
-    return DriverResponse(
-        id=driver_id,
-        name=update_data['name'],
-        cpf=update_data['cpf'],
-        phone=update_data['phone'],
-        created_at=datetime.fromisoformat(update_data['created_at'])
-    )
+
+    return DriverResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
 
 @api_router.delete("/drivers/{driver_id}")
 async def delete_driver(driver_id: str, current_user: dict = Depends(get_current_active_user)):
@@ -299,28 +276,13 @@ async def delete_transport_company(company_id: str, current_user: dict = Depends
 # CRUD de Clientes
 @api_router.post("/clients", response_model=ClientResponse)
 async def create_client(client_input: ClientCreate, current_user: dict = Depends(get_current_active_user)):
-    client = Client(
-        name=client_input.name,
-        cnpj=client_input.cnpj,
-        phone=client_input.phone,
-        email=client_input.email,
-        address=client_input.address,
-        created_by=current_user['sub']
-    )
-    
+    client = Client(**client_input.model_dump(), created_by=current_user['sub'])
+
     doc = client.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.clients.insert_one(doc)
-    
-    return ClientResponse(
-        id=client.id,
-        name=client.name,
-        cnpj=client.cnpj,
-        phone=client.phone,
-        email=client.email,
-        address=client.address,
-        created_at=client.created_at
-    )
+
+    return ClientResponse(**client.model_dump())
 
 @api_router.get("/clients", response_model=List[ClientResponse])
 async def get_clients(
@@ -331,15 +293,7 @@ async def get_clients(
     skip = (page - 1) * per_page
     clients = await db.clients.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
     return [
-        ClientResponse(
-            id=c['id'],
-            name=c['name'],
-            cnpj=c.get('cnpj'),
-            phone=c.get('phone'),
-            email=c.get('email'),
-            address=c.get('address'),
-            created_at=datetime.fromisoformat(c['created_at'])
-        )
+        ClientResponse(**{**c, "created_at": datetime.fromisoformat(c['created_at'])})
         for c in clients
     ]
 
@@ -348,29 +302,17 @@ async def update_client(client_id: str, client_input: ClientCreate, current_user
     existing = await db.clients.find_one({"id": client_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
-    
+
     update_data = {
+        **client_input.model_dump(),
         "id": client_id,
-        "name": client_input.name,
-        "cnpj": client_input.cnpj,
-        "phone": client_input.phone,
-        "email": client_input.email,
-        "address": client_input.address,
         "created_at": existing['created_at'],
         "created_by": existing['created_by']
     }
-    
+
     await db.clients.replace_one({"id": client_id}, update_data)
-    
-    return ClientResponse(
-        id=client_id,
-        name=update_data['name'],
-        cnpj=update_data['cnpj'],
-        phone=update_data['phone'],
-        email=update_data['email'],
-        address=update_data['address'],
-        created_at=datetime.fromisoformat(update_data['created_at'])
-    )
+
+    return ClientResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
 
 @api_router.delete("/clients/{client_id}")
 async def delete_client(client_id: str, current_user: dict = Depends(get_current_active_user)):
@@ -382,28 +324,13 @@ async def delete_client(client_id: str, current_user: dict = Depends(get_current
 # CRUD de Fornecedores
 @api_router.post("/suppliers", response_model=SupplierResponse)
 async def create_supplier(supplier_input: SupplierCreate, current_user: dict = Depends(get_current_active_user)):
-    supplier = Supplier(
-        name=supplier_input.name,
-        cnpj=supplier_input.cnpj,
-        phone=supplier_input.phone,
-        email=supplier_input.email,
-        address=supplier_input.address,
-        created_by=current_user['sub']
-    )
+    supplier = Supplier(**supplier_input.model_dump(), created_by=current_user['sub'])
 
     doc = supplier.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.suppliers.insert_one(doc)
 
-    return SupplierResponse(
-        id=supplier.id,
-        name=supplier.name,
-        cnpj=supplier.cnpj,
-        phone=supplier.phone,
-        email=supplier.email,
-        address=supplier.address,
-        created_at=supplier.created_at
-    )
+    return SupplierResponse(**supplier.model_dump())
 
 @api_router.get("/suppliers", response_model=List[SupplierResponse])
 async def get_suppliers(
@@ -414,15 +341,7 @@ async def get_suppliers(
     skip = (page - 1) * per_page
     suppliers = await db.suppliers.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
     return [
-        SupplierResponse(
-            id=s['id'],
-            name=s['name'],
-            cnpj=s.get('cnpj'),
-            phone=s.get('phone'),
-            email=s.get('email'),
-            address=s.get('address'),
-            created_at=datetime.fromisoformat(s['created_at'])
-        )
+        SupplierResponse(**{**s, "created_at": datetime.fromisoformat(s['created_at'])})
         for s in suppliers
     ]
 
@@ -433,27 +352,15 @@ async def update_supplier(supplier_id: str, supplier_input: SupplierCreate, curr
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
 
     update_data = {
+        **supplier_input.model_dump(),
         "id": supplier_id,
-        "name": supplier_input.name,
-        "cnpj": supplier_input.cnpj,
-        "phone": supplier_input.phone,
-        "email": supplier_input.email,
-        "address": supplier_input.address,
         "created_at": existing['created_at'],
         "created_by": existing['created_by']
     }
 
     await db.suppliers.replace_one({"id": supplier_id}, update_data)
 
-    return SupplierResponse(
-        id=supplier_id,
-        name=update_data['name'],
-        cnpj=update_data['cnpj'],
-        phone=update_data['phone'],
-        email=update_data['email'],
-        address=update_data['address'],
-        created_at=datetime.fromisoformat(update_data['created_at'])
-    )
+    return SupplierResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
 
 @api_router.delete("/suppliers/{supplier_id}")
 async def delete_supplier(supplier_id: str, current_user: dict = Depends(get_current_active_user)):
@@ -465,28 +372,13 @@ async def delete_supplier(supplier_id: str, current_user: dict = Depends(get_cur
 # CRUD de Terminal (Cadastro, dentro do grupo Terminal)
 @api_router.post("/terminals", response_model=TerminalResponse)
 async def create_terminal(terminal_input: TerminalCreate, current_user: dict = Depends(get_current_active_user)):
-    terminal = Terminal(
-        name=terminal_input.name,
-        cnpj=terminal_input.cnpj,
-        phone=terminal_input.phone,
-        email=terminal_input.email,
-        address=terminal_input.address,
-        created_by=current_user['sub']
-    )
+    terminal = Terminal(**terminal_input.model_dump(), created_by=current_user['sub'])
 
     doc = terminal.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.terminals.insert_one(doc)
 
-    return TerminalResponse(
-        id=terminal.id,
-        name=terminal.name,
-        cnpj=terminal.cnpj,
-        phone=terminal.phone,
-        email=terminal.email,
-        address=terminal.address,
-        created_at=terminal.created_at
-    )
+    return TerminalResponse(**terminal.model_dump())
 
 @api_router.get("/terminals", response_model=List[TerminalResponse])
 async def get_terminals(
@@ -497,15 +389,7 @@ async def get_terminals(
     skip = (page - 1) * per_page
     terminals = await db.terminals.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
     return [
-        TerminalResponse(
-            id=t['id'],
-            name=t['name'],
-            cnpj=t.get('cnpj'),
-            phone=t.get('phone'),
-            email=t.get('email'),
-            address=t.get('address'),
-            created_at=datetime.fromisoformat(t['created_at'])
-        )
+        TerminalResponse(**{**t, "created_at": datetime.fromisoformat(t['created_at'])})
         for t in terminals
     ]
 
@@ -516,27 +400,15 @@ async def update_terminal(terminal_id: str, terminal_input: TerminalCreate, curr
         raise HTTPException(status_code=404, detail="Terminal não encontrado")
 
     update_data = {
+        **terminal_input.model_dump(),
         "id": terminal_id,
-        "name": terminal_input.name,
-        "cnpj": terminal_input.cnpj,
-        "phone": terminal_input.phone,
-        "email": terminal_input.email,
-        "address": terminal_input.address,
         "created_at": existing['created_at'],
         "created_by": existing['created_by']
     }
 
     await db.terminals.replace_one({"id": terminal_id}, update_data)
 
-    return TerminalResponse(
-        id=terminal_id,
-        name=update_data['name'],
-        cnpj=update_data['cnpj'],
-        phone=update_data['phone'],
-        email=update_data['email'],
-        address=update_data['address'],
-        created_at=datetime.fromisoformat(update_data['created_at'])
-    )
+    return TerminalResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
 
 @api_router.delete("/terminals/{terminal_id}")
 async def delete_terminal(terminal_id: str, current_user: dict = Depends(get_current_active_user)):
@@ -544,6 +416,102 @@ async def delete_terminal(terminal_id: str, current_user: dict = Depends(get_cur
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Terminal não encontrado")
     return {"message": "Terminal deletado com sucesso"}
+
+# CRUD de Funcionário
+@api_router.post("/employees", response_model=EmployeeResponse)
+async def create_employee(employee_input: EmployeeCreate, current_user: dict = Depends(get_current_active_user)):
+    employee = Employee(**employee_input.model_dump(), created_by=current_user['sub'])
+
+    doc = employee.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.employees.insert_one(doc)
+
+    return EmployeeResponse(**employee.model_dump())
+
+@api_router.get("/employees", response_model=List[EmployeeResponse])
+async def get_employees(
+    page: int = 1,
+    per_page: int = 100,
+    current_user: dict = Depends(get_current_active_user)
+):
+    skip = (page - 1) * per_page
+    employees = await db.employees.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    return [
+        EmployeeResponse(**{**e, "created_at": datetime.fromisoformat(e['created_at'])})
+        for e in employees
+    ]
+
+@api_router.put("/employees/{employee_id}", response_model=EmployeeResponse)
+async def update_employee(employee_id: str, employee_input: EmployeeCreate, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.employees.find_one({"id": employee_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+
+    update_data = {
+        **employee_input.model_dump(),
+        "id": employee_id,
+        "created_at": existing['created_at'],
+        "created_by": existing['created_by']
+    }
+
+    await db.employees.replace_one({"id": employee_id}, update_data)
+
+    return EmployeeResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
+
+@api_router.delete("/employees/{employee_id}")
+async def delete_employee(employee_id: str, current_user: dict = Depends(get_current_active_user)):
+    result = await db.employees.delete_one({"id": employee_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+    return {"message": "Funcionário deletado com sucesso"}
+
+# CRUD de Seguradora
+@api_router.post("/insurance-companies", response_model=InsuranceCompanyResponse)
+async def create_insurance_company(insurance_input: InsuranceCompanyCreate, current_user: dict = Depends(get_current_active_user)):
+    insurance = InsuranceCompany(**insurance_input.model_dump(), created_by=current_user['sub'])
+
+    doc = insurance.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.insurance_companies.insert_one(doc)
+
+    return InsuranceCompanyResponse(**insurance.model_dump())
+
+@api_router.get("/insurance-companies", response_model=List[InsuranceCompanyResponse])
+async def get_insurance_companies(
+    page: int = 1,
+    per_page: int = 100,
+    current_user: dict = Depends(get_current_active_user)
+):
+    skip = (page - 1) * per_page
+    items = await db.insurance_companies.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    return [
+        InsuranceCompanyResponse(**{**i, "created_at": datetime.fromisoformat(i['created_at'])})
+        for i in items
+    ]
+
+@api_router.put("/insurance-companies/{insurance_id}", response_model=InsuranceCompanyResponse)
+async def update_insurance_company(insurance_id: str, insurance_input: InsuranceCompanyCreate, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.insurance_companies.find_one({"id": insurance_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Seguradora não encontrada")
+
+    update_data = {
+        **insurance_input.model_dump(),
+        "id": insurance_id,
+        "created_at": existing['created_at'],
+        "created_by": existing['created_by']
+    }
+
+    await db.insurance_companies.replace_one({"id": insurance_id}, update_data)
+
+    return InsuranceCompanyResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
+
+@api_router.delete("/insurance-companies/{insurance_id}")
+async def delete_insurance_company(insurance_id: str, current_user: dict = Depends(get_current_active_user)):
+    result = await db.insurance_companies.delete_one({"id": insurance_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Seguradora não encontrada")
+    return {"message": "Seguradora deletada com sucesso"}
 
 # CRUD de Tipos de Serviço
 @api_router.post("/service-types", response_model=ServiceTypeResponse)

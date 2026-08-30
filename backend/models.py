@@ -81,13 +81,32 @@ class CompanySettingsUpdate(BaseModel):
     pix_key: Optional[str] = None
     logo_filename: Optional[str] = None
 
+DRIVER_STATUS_OPTIONS = ["ATIVO", "INATIVO", "BLOQUEADO"]
+
 class Driver(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     cpf: str
     phone: Optional[str] = None
+    rg: Optional[str] = None
+    rg_issuer: Optional[str] = None
+    rg_uf: Optional[str] = None
+    birth_date: Optional[str] = None
+    cnh_number: Optional[str] = None
+    cnh_category: Optional[str] = None
+    cnh_expiry: Optional[str] = None
+    email: Optional[str] = None
+    address_details: Optional[dict] = None  # {street, number, neighborhood, zip, city, state}
+    transport_company: Optional[str] = None  # autônomo se vazio, ou nome da transportadora vinculada
+    default_truck_plate: Optional[str] = None
+    default_trailer_plate: Optional[str] = None
+    photo_url: Optional[str] = None
+    cnh_photo_front_url: Optional[str] = None
+    cnh_photo_back_url: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
 
@@ -95,12 +114,26 @@ class DriverCreate(BaseModel):
     name: str
     cpf: str
     phone: Optional[str] = None
+    rg: Optional[str] = None
+    rg_issuer: Optional[str] = None
+    rg_uf: Optional[str] = None
+    birth_date: Optional[str] = None
+    cnh_number: Optional[str] = None
+    cnh_category: Optional[str] = None
+    cnh_expiry: Optional[str] = None
+    email: Optional[str] = None
+    address_details: Optional[dict] = None
+    transport_company: Optional[str] = None
+    default_truck_plate: Optional[str] = None
+    default_trailer_plate: Optional[str] = None
+    photo_url: Optional[str] = None
+    cnh_photo_front_url: Optional[str] = None
+    cnh_photo_back_url: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
 
-class DriverResponse(BaseModel):
+class DriverResponse(DriverCreate):
     id: str
-    name: str
-    cpf: str
-    phone: Optional[str] = None
     created_at: datetime
 
 class TransportCompany(BaseModel):
@@ -125,33 +158,46 @@ class TransportCompanyResponse(BaseModel):
     phone: Optional[str] = None
     created_at: datetime
 
+REGISTRO_STATUS_OPTIONS = ["ATIVO", "INATIVO", "BLOQUEADO"]
+
 # Client Model (baseado em TransportCompany)
 class Client(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    trade_name: Optional[str] = None
     cnpj: Optional[str] = None
+    state_registration: Optional[str] = None
+    municipal_registration: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
-    address: Optional[str] = None
+    address: Optional[str] = None  # legado, mantido por compatibilidade com registros antigos
+    address_details: Optional[dict] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
 
 class ClientCreate(BaseModel):
     name: str
+    trade_name: Optional[str] = None
     cnpj: Optional[str] = None
+    state_registration: Optional[str] = None
+    municipal_registration: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
+    address_details: Optional[dict] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
 
-class ClientResponse(BaseModel):
+class ClientResponse(ClientCreate):
     id: str
-    name: str
-    cnpj: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    address: Optional[str] = None
     created_at: datetime
 
 # Supplier Model (baseado em Client) - Fornecedor
@@ -160,27 +206,50 @@ class Supplier(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    trade_name: Optional[str] = None
     cnpj: Optional[str] = None
+    state_registration: Optional[str] = None
+    municipal_registration: Optional[str] = None
+    supply_type: Optional[str] = None  # ex: peças, manutenção, combustível, serviços gerais
     phone: Optional[str] = None
     email: Optional[str] = None
-    address: Optional[str] = None
+    address: Optional[str] = None  # legado, mantido por compatibilidade com registros antigos
+    address_details: Optional[dict] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    pix_key: Optional[str] = None
+    payment_terms: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
 
 class SupplierCreate(BaseModel):
     name: str
+    trade_name: Optional[str] = None
     cnpj: Optional[str] = None
+    state_registration: Optional[str] = None
+    municipal_registration: Optional[str] = None
+    supply_type: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
+    address_details: Optional[dict] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    pix_key: Optional[str] = None
+    payment_terms: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
 
-class SupplierResponse(BaseModel):
+class SupplierResponse(SupplierCreate):
     id: str
-    name: str
-    cnpj: Optional[str] = None
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    address: Optional[str] = None
     created_at: datetime
 
 # Terminal Model (baseado em Supplier) - Cadastro de Terminal
@@ -190,26 +259,117 @@ class Terminal(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     cnpj: Optional[str] = None
+    internal_code: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
-    address: Optional[str] = None
+    address: Optional[str] = None  # legado, mantido por compatibilidade com registros antigos
+    address_details: Optional[dict] = None
+    responsible_name: Optional[str] = None
+    responsible_contact: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
 
 class TerminalCreate(BaseModel):
     name: str
     cnpj: Optional[str] = None
+    internal_code: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
+    address_details: Optional[dict] = None
+    responsible_name: Optional[str] = None
+    responsible_contact: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
 
-class TerminalResponse(BaseModel):
+class TerminalResponse(TerminalCreate):
     id: str
+    created_at: datetime
+
+# Employee Model ("Funcionário") - nível de acesso é só informativo pro RH,
+# não cria nem vincula login real (isso continua exclusivo de User/Gestão de
+# Usuários, ver models.User acima).
+EMPLOYEE_STATUS_OPTIONS = ["ATIVO", "INATIVO", "AFASTADO", "DESLIGADO"]
+
+class Employee(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    cnpj: Optional[str] = None
+    cpf: str
+    rg: Optional[str] = None
+    birth_date: Optional[str] = None
+    position: Optional[str] = None  # cargo/função
+    department: Optional[str] = None  # setor
+    admission_date: Optional[str] = None
+    employee_code: Optional[str] = None  # matrícula/código interno
     phone: Optional[str] = None
     email: Optional[str] = None
-    address: Optional[str] = None
+    address_details: Optional[dict] = None
+    access_level: Optional[str] = None  # informativo (administrador, portaria, pátio, financeiro, etc.)
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+class EmployeeCreate(BaseModel):
+    name: str
+    cpf: str
+    rg: Optional[str] = None
+    birth_date: Optional[str] = None
+    position: Optional[str] = None
+    department: Optional[str] = None
+    admission_date: Optional[str] = None
+    employee_code: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address_details: Optional[dict] = None
+    access_level: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+
+class EmployeeResponse(EmployeeCreate):
+    id: str
+    created_at: datetime
+
+# InsuranceCompany Model ("Seguradora")
+class InsuranceCompany(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    trade_name: Optional[str] = None
+    cnpj: Optional[str] = None
+    susep_registration: Optional[str] = None
+    address_details: Optional[dict] = None
+    phone: Optional[str] = None
+    claims_phone: Optional[str] = None
+    email: Optional[str] = None
+    broker_name: Optional[str] = None
+    broker_phone: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+class InsuranceCompanyCreate(BaseModel):
+    name: str
+    trade_name: Optional[str] = None
+    cnpj: Optional[str] = None
+    susep_registration: Optional[str] = None
+    address_details: Optional[dict] = None
+    phone: Optional[str] = None
+    claims_phone: Optional[str] = None
+    email: Optional[str] = None
+    broker_name: Optional[str] = None
+    broker_phone: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+
+class InsuranceCompanyResponse(InsuranceCompanyCreate):
+    id: str
     created_at: datetime
 
 class ContainerMovement(BaseModel):
