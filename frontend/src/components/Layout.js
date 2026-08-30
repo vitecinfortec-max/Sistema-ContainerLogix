@@ -47,7 +47,8 @@ import {
   Tag,
   Boxes,
   Warehouse,
-  Layers
+  Layers,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -74,6 +75,9 @@ const PAGE_TITLES = {
   '/fleet/os-categories': 'Cadastro de Categoria',
   '/estoque/cadastros': 'Cadastro',
   '/estoque/servicos': 'Cadastro de Serviço',
+  '/estoque/produtos': 'Produto',
+  '/estoque': 'Estoque',
+  '/estoque/relatorio': 'Relatório de Estoque',
   '/loading-orders': 'Ordem de Carregamento',
   '/fleet/checklist': 'Checklist',
   '/cadastro': 'Cadastro',
@@ -278,7 +282,7 @@ export default function Layout({ children }) {
   const fleetTab = new URLSearchParams(location.search).get('tab');
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
-  const isEstoqueActive = isEstoqueCadastroActive || location.pathname === '/estoque/servicos';
+  const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/relatorio'].includes(location.pathname);
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive;
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
@@ -450,7 +454,10 @@ export default function Layout({ children }) {
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const estoqueItems = [
+    { path: '/estoque', label: 'Estoque', icon: Boxes, moduleKey: 'estoque.consulta' },
+    { path: '/estoque/produtos', label: 'Produto', icon: Package, moduleKey: 'estoque.produto' },
     { path: '/estoque/servicos', label: 'Cadastro de Serviço', icon: Wrench, moduleKey: 'estoque.cadastro_servico' },
+    { path: '/estoque/relatorio', label: 'Relatório de Estoque', icon: FileSpreadsheet, moduleKey: 'estoque.relatorio' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const estoqueCadastroItems = [

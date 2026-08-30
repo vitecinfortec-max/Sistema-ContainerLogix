@@ -695,6 +695,60 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
     ws.print_options.horizontalCentered = True
 
 
+def generate_stock_report_excel(products: list, company: dict = None) -> bytes:
+    """Gera Excel do Relatório de Estoque (1 produto por linha)."""
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Relatório de Estoque"
+
+        title = "Relatório de Estoque"
+        total_value = sum((p.get('stock_quantity') or 0) * (p.get('reference_value') or 0) for p in products)
+        stats_text = f"Total de Produtos: {len(products)}  |  Valor Total em Estoque: R$ {total_value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+        headers = ['Cód. Produto', 'Almoxarifado', 'Produto', 'Quantidade', 'Valor do Produto']
+        col_widths = {'B': 14, 'C': 26, 'D': 40, 'E': 14, 'F': 18}
+        center_cols = {0, 3}
+        right_align_cols = {4}
+        number_fmt_cols = {4: 'R$ #,##0.00'}
+
+        data_rows = [
+            [
+                p.get('code', '-'),
+                p.get('warehouse_name') or '-',
+                p.get('description', '-'),
+                p.get('stock_quantity') or 0,
+                p.get('reference_value') or 0,
+            ]
+            for p in products
+        ]
+
+        _bsoft_style_excel(
+            ws, title, stats_text, headers, data_rows, col_widths,
+            center_cols=center_cols,
+            right_align_cols=right_align_cols,
+            number_fmt_cols=number_fmt_cols,
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company)
+        )
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+    except Exception as e:
+        logger.error(f"Error generating stock report Excel: {e}")
+        wb = Workbook()
+        ws = wb.active
+        ws['A1'] = "Erro ao gerar relatório."
+        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+
 def generate_delivery_status_excel(status: dict, company: dict = None) -> bytes:
     """Gera Excel de um Status de Entrega (um motorista/veículo por linha)."""
     try:

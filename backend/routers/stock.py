@@ -1,6 +1,8 @@
+import io
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from typing import List
 
 from models import (
@@ -8,8 +10,10 @@ from models import (
     ProductFamily, ProductFamilyCreate, ProductFamilyResponse,
     ServiceFamily, ServiceFamilyCreate, ServiceFamilyResponse,
     ServiceCatalogItem, ServiceCatalogItemCreate, ServiceCatalogItemResponse,
+    Product, ProductCreate, ProductResponse,
 )
-from shared import db, get_current_active_user
+from shared import db, get_current_active_user, get_company_settings
+from reports import generate_stock_report_excel
 
 api_router = APIRouter(prefix="/api")
 
@@ -153,3 +157,75 @@ async def delete_service_catalog_item(item_id: str, current_user: dict = Depends
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Serviço não encontrado")
     return {"message": "Serviço removido com sucesso"}
+
+
+# ==================== PRODUTO ====================
+
+@api_router.get("/products/next-code")
+async def get_next_product_code(current_user: dict = Depends(get_current_active_user)):
+    counter = await db.counters.find_one({"_id": "product_code"})
+    return {"next_code": (counter["seq"] + 1) if counter else 1}
+
+@api_router.post("/products", response_model=ProductResponse)
+async def create_product(data: ProductCreate, current_user: dict = Depends(get_current_active_user)):
+    counter = await db.counters.find_one_and_update(
+        {"_id": "product_code"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    product = Product(
+        code=counter["seq"], **data.model_dump(),
+        created_by=current_user['sub'], created_by_name=current_user['name']
+    )
+    doc = product.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.products.insert_one(doc)
+    return ProductResponse(**product.model_dump())
+
+@api_router.get("/products", response_model=List[ProductResponse])
+async def get_products(search: str = None, current_user: dict = Depends(get_current_active_user)):
+    query = {}
+    if search:
+        import re
+        search_escaped = re.escape(search)
+        query["$or"] = [
+            {"description": {"$regex": search_escaped, "$options": "i"}},
+            {"barcode": {"$regex": search_escaped, "$options": "i"}},
+        ]
+    items = await db.products.find(query, {"_id": 0}).sort("code", -1).to_list(None)
+    return [ProductResponse(**{**i, "created_at": datetime.fromisoformat(i['created_at'])}) for i in items]
+
+@api_router.put("/products/{item_id}", response_model=ProductResponse)
+async def update_product(item_id: str, data: ProductCreate, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.products.find_one({"id": item_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    update_data = {
+        **data.model_dump(), "id": item_id, "code": existing['code'],
+        "created_at": existing['created_at'], "created_by": existing['created_by'],
+        "created_by_name": existing['created_by_name']
+    }
+    await db.products.replace_one({"id": item_id}, update_data)
+    return ProductResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
+
+@api_router.delete("/products/{item_id}")
+async def delete_product(item_id: str, current_user: dict = Depends(get_current_active_user)):
+    result = await db.products.delete_one({"id": item_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    return {"message": "Produto removido com sucesso"}
+
+
+# ==================== RELATÓRIO DE ESTOQUE ====================
+
+@api_router.get("/stock/report/excel")
+async def download_stock_report_excel(current_user: dict = Depends(get_current_active_user)):
+    products = await db.products.find({}, {"_id": 0}).sort("code", 1).to_list(None)
+    company = await get_company_settings()
+    excel_bytes = generate_stock_report_excel(products, company=company)
+    return StreamingResponse(
+        io.BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=relatorio_estoque.xlsx"}
+    )

@@ -297,6 +297,9 @@ MODULE_CATALOG = [
         {"key": "estoque.familia_produto", "label": "Família de Produto"},
         {"key": "estoque.familia_servico", "label": "Família de Serviço"},
         {"key": "estoque.cadastro_servico", "label": "Cadastro de Serviço"},
+        {"key": "estoque.produto", "label": "Produto"},
+        {"key": "estoque.consulta", "label": "Estoque"},
+        {"key": "estoque.relatorio", "label": "Relatório de Estoque"},
     ]},
 ]
 
@@ -337,6 +340,8 @@ PATH_MODULE_MAP = [
     ("/api/product-families", "estoque.familia_produto"),
     ("/api/service-families", "estoque.familia_servico"),
     ("/api/service-catalog", "estoque.cadastro_servico"),
+    ("/api/stock/report", "estoque.relatorio"),
+    ("/api/products", "estoque.produto"),
     ("/api/fuel-supplies", "frota.abastecimento"),
     ("/api/loading-schedules", "operacional.programacao_carregamento"),
     ("/api/delivery-status", "operacional.status_entrega"),

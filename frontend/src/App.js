@@ -21,6 +21,9 @@ import ServiceTypesPage from './pages/ServiceTypesPage';
 import OSCategoriesPage from './pages/OSCategoriesPage';
 import EstoqueCadastrosPage from './pages/EstoqueCadastrosPage';
 import ServiceCatalogPage from './pages/ServiceCatalogPage';
+import ProductPage from './pages/ProductPage';
+import StockPage from './pages/StockPage';
+import StockReportPage from './pages/StockReportPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
 import BillingPage from './pages/BillingPage';
@@ -255,6 +258,30 @@ function App() {
             element={
               <ProtectedRoute moduleKey="estoque.cadastro_servico">
                 <ServiceCatalogPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/produtos"
+            element={
+              <ProtectedRoute moduleKey="estoque.produto">
+                <ProductPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque"
+            element={
+              <ProtectedRoute moduleKey="estoque.consulta">
+                <StockPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/relatorio"
+            element={
+              <ProtectedRoute moduleKey="estoque.relatorio">
+                <StockReportPage />
               </ProtectedRoute>
             }
           />

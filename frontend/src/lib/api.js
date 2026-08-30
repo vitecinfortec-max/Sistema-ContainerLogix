@@ -63,6 +63,14 @@ export const api = {
   updateServiceCatalogItem: (id, data) => axios.put(`${API}/service-catalog/${id}`, data),
   deleteServiceCatalogItem: (id) => axios.delete(`${API}/service-catalog/${id}`),
 
+  getProducts: (params) => axios.get(`${API}/products`, { params }),
+  getProductNextCode: () => axios.get(`${API}/products/next-code`),
+  createProduct: (data) => axios.post(`${API}/products`, data),
+  updateProduct: (id, data) => axios.put(`${API}/products/${id}`, data),
+  deleteProduct: (id) => axios.delete(`${API}/products/${id}`),
+
+  getStockReportExcel: () => axios.get(`${API}/stock/report/excel`, { responseType: 'blob' }),
+
   getOSCategories: () => axios.get(`${API}/os-categories`),
   createOSCategory: (data) => axios.post(`${API}/os-categories`, data),
   updateOSCategory: (id, data) => axios.put(`${API}/os-categories/${id}`, data),

@@ -2552,6 +2552,64 @@ class ServiceCatalogItemResponse(ServiceCatalogItemCreate):
     created_at: datetime
 
 
+PRODUCT_UNIT_OPTIONS = ["KG", "TON", "M3", "UNIDADE", "CAIXA", "PALLET"]
+PRODUCT_ORIGIN_OPTIONS = ["NACIONAL", "IMPORTADO"]
+
+class Product(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    code: int  # gerado automaticamente via contador
+    description: str
+    photo_url: Optional[str] = None
+    stock_quantity: float = 0.0  # atualizado manualmente - o backlog não pede lançamentos de entrada/saída ainda
+    warehouse_id: Optional[str] = None
+    warehouse_name: Optional[str] = None
+    barcode: Optional[str] = None  # código de barras / SKU
+    ncm: Optional[str] = None
+    cfop: Optional[str] = None
+    unit: Optional[str] = None  # KG, TON, M3, UNIDADE, CAIXA, PALLET
+    family_id: Optional[str] = None
+    family_name: Optional[str] = None  # ProductFamily
+    reference_value: float = 0.0
+    icms_rate: float = 0.0
+    other_taxes_rate: float = 0.0
+    origin: Optional[str] = None  # NACIONAL | IMPORTADO
+    linked_party_name: Optional[str] = None  # Cliente/Fornecedor vinculado (se específico)
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProductCreate(BaseModel):
+    description: str
+    photo_url: Optional[str] = None
+    stock_quantity: float = 0.0
+    warehouse_id: Optional[str] = None
+    warehouse_name: Optional[str] = None
+    barcode: Optional[str] = None
+    ncm: Optional[str] = None
+    cfop: Optional[str] = None
+    unit: Optional[str] = None
+    family_id: Optional[str] = None
+    family_name: Optional[str] = None
+    reference_value: float = 0.0
+    icms_rate: float = 0.0
+    other_taxes_rate: float = 0.0
+    origin: Optional[str] = None
+    linked_party_name: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+
+class ProductResponse(ProductCreate):
+    id: str
+    code: int
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+
+
 # ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================
 
 class ExpenseReportReceipt(BaseModel):
