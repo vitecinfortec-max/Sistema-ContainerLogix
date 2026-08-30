@@ -21,7 +21,16 @@ self.addEventListener('install', (event) => {
 // Fetch event - Network first para APIs e uploads, cache first para assets
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  
+
+  // Deixa passar direto qualquer requisição pra outra origem (ex: dev local,
+  // onde o frontend roda em :3000 e o backend em :8000 - cross-origin). O SW
+  // só existe pra cachear os assets do próprio frontend em produção (mesma
+  // origem, atrás do proxy) - interceptar cross-origin aqui não tem benefício
+  // de cache real e quebra qualquer chamada de API que não seja same-origin.
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // Para requisições de API (incluindo uploads), sempre usar network-first
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
