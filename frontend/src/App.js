@@ -18,6 +18,7 @@ import CompaniesPage from './pages/CompaniesPage';
 import ShippingLinesPage from './pages/ShippingLinesPage';
 import CadastroUnificadoPage from './pages/CadastroUnificadoPage';
 import ServiceTypesPage from './pages/ServiceTypesPage';
+import OSCategoriesPage from './pages/OSCategoriesPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
 import BillingPage from './pages/BillingPage';
@@ -228,6 +229,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="cadastro.tipos_servico">
                 <ServiceTypesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/os-categories"
+            element={
+              <ProtectedRoute moduleKey="frota.cadastro_categoria">
+                <OSCategoriesPage />
               </ProtectedRoute>
             }
           />

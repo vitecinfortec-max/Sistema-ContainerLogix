@@ -2053,6 +2053,28 @@ class RPATerceiroResponse(BaseModel):
 
 
 
+# ============= MANUTENÇÃO - CADASTRO DE CATEGORIA (OS) =============
+
+class OSCategory(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    active: bool = True
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class OSCategoryCreate(BaseModel):
+    name: str
+    active: bool = True
+
+class OSCategoryResponse(BaseModel):
+    id: str
+    name: str
+    active: bool
+    created_at: datetime
+
+
 # ============= ORDEM DE SERVIÇO (FROTA) =============
 
 class OSItem(BaseModel):
@@ -2084,6 +2106,8 @@ class OrdemServico(BaseModel):
     equipment_id: Optional[str] = None  # Referência ao Vehicle.id
     person_doc: Optional[str] = None  # CPF/CNPJ
     person_name: Optional[str] = None  # Pessoa
+    person_id: Optional[str] = None  # Referência ao Driver.id ou Employee.id
+    person_type: Optional[str] = None  # motorista | funcionario
     address: Optional[str] = None  # Endereço
     city_uf: Optional[str] = None  # ex: PARACURU/CE
     is_retorno: bool = False  # Checkbox Retorno
@@ -2116,8 +2140,14 @@ class OrdemServico(BaseModel):
     # ===== Observação / Ajudante =====
     observations: Optional[str] = None
     helper_name: Optional[str] = None  # Ajudante
+    helper_id: Optional[str] = None
+    helper_type: Optional[str] = None  # motorista | funcionario
     technician_name: Optional[str] = None  # Técnico
+    technician_id: Optional[str] = None
+    technician_type: Optional[str] = None  # motorista | funcionario
     supervisor_name: Optional[str] = None  # Supervisor
+    supervisor_id: Optional[str] = None
+    supervisor_type: Optional[str] = None  # motorista | funcionario
 
     # ===== Produtos e Serviços =====
     products: List[OSItem] = []
@@ -2140,6 +2170,8 @@ class OrdemServicoCreate(BaseModel):
     equipment_id: Optional[str] = None
     person_doc: Optional[str] = None
     person_name: Optional[str] = None
+    person_id: Optional[str] = None
+    person_type: Optional[str] = None
     address: Optional[str] = None
     city_uf: Optional[str] = None
     is_retorno: bool = False
@@ -2160,8 +2192,14 @@ class OrdemServicoCreate(BaseModel):
     closure_remark: Optional[str] = None
     observations: Optional[str] = None
     helper_name: Optional[str] = None
+    helper_id: Optional[str] = None
+    helper_type: Optional[str] = None
     technician_name: Optional[str] = None
+    technician_id: Optional[str] = None
+    technician_type: Optional[str] = None
     supervisor_name: Optional[str] = None
+    supervisor_id: Optional[str] = None
+    supervisor_type: Optional[str] = None
     products: List[OSItem] = []
     services: List[OSItem] = []
 

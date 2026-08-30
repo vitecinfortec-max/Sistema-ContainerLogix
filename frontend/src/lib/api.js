@@ -42,6 +42,11 @@ export const api = {
   updateSupplier: (id, data) => axios.put(`${API}/suppliers/${id}`, data),
   deleteSupplier: (id) => axios.delete(`${API}/suppliers/${id}`),
 
+  getOSCategories: () => axios.get(`${API}/os-categories`),
+  createOSCategory: (data) => axios.post(`${API}/os-categories`, data),
+  updateOSCategory: (id, data) => axios.put(`${API}/os-categories/${id}`, data),
+  deleteOSCategory: (id) => axios.delete(`${API}/os-categories/${id}`),
+
   getStates: () => axios.get(`${API}/locations/states`),
   getCitiesByUF: (uf) => axios.get(`${API}/locations/cities`, { params: { uf } }),
 

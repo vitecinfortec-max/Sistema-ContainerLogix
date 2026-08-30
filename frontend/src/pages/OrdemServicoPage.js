@@ -12,6 +12,8 @@ import { Badge } from '../components/ui/badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../components/ui/select';
+import { ComboField } from '../components/ui/combo-field';
+import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -41,9 +43,19 @@ export default function OrdemServicoPage() {
   const [saving, setSaving] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [osCategories, setOsCategories] = useState([]);
   const debounceRef = useRef(null);
 
-  useEffect(() => { loadList(); loadVehicles(); loadDrivers(); }, []);
+  // Pessoa/Supervisor/Técnico/Ajudante buscam nos cadastros de Motorista +
+  // Funcionário combinados (unificados na tela /cadastro) - _type marca de
+  // qual registro veio, pra guardar junto do id selecionado.
+  const people = [
+    ...drivers.map((d) => ({ ...d, _type: 'motorista' })),
+    ...employees.map((e) => ({ ...e, _type: 'funcionario' })),
+  ];
+
+  useEffect(() => { loadList(); loadVehicles(); loadDrivers(); loadEmployees(); loadOsCategories(); }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -76,6 +88,18 @@ export default function OrdemServicoPage() {
     try {
       const r = await api.getDrivers();
       setDrivers(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
+  const loadEmployees = async () => {
+    try {
+      const r = await api.getEmployees();
+      setEmployees(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
+  const loadOsCategories = async () => {
+    try {
+      const r = await api.getOSCategories();
+      setOsCategories((r.data || []).filter((c) => c.active));
     } catch (e) { /* ignore */ }
   };
 
@@ -313,14 +337,43 @@ export default function OrdemServicoPage() {
                 <SelectField label="Prioridade *" value={form.priority} onChange={(v) => onChange('priority', v)} options={[['ALTA', 'Alta'], ['MEDIA', 'Média'], ['BAIXA', 'Baixa']]} testid="os-priority" />
                 <SelectField label="Tipo *" value={form.os_type} onChange={(v) => onChange('os_type', v)} options={[['INTERNO', 'Interno'], ['EXTERNO', 'Externo']]} testid="os-type" />
                 <SelectField label="Status *" value={form.status} onChange={(v) => onChange('status', v)} options={[['ABERTO', 'Aberto'], ['ANDAMENTO', 'Em Andamento'], ['FECHADO', 'Fechado'], ['CANCELADO', 'Cancelado']]} testid="os-status" />
-                <Field label="Categoria *" value={form.category} onChange={(v) => onChange('category', v)} testid="os-category" placeholder="Ex: MANUTENÇÃO CORRETIVA - EXTERNA" />
-                <SelectField label="Equipamento (Placa)" value={form.equipment_plate || ''} onChange={(v) => {
-                  onChange('equipment_plate', v);
-                  const vh = vehicles.find((x) => x.plate === v);
-                  if (vh) onChange('equipment_id', vh.id);
-                }} options={[['', '-- Selecione --'], ...vehicles.map((v) => [v.plate, `${v.plate} ${v.model || ''}`])]} testid="os-equipment" />
+                <div>
+                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Categoria *</Label>
+                  <ComboField
+                    value={form.category}
+                    onChange={(v) => onChange('category', v)}
+                    options={osCategories.map((c) => [c.name, c.name])}
+                    placeholder="-- Selecione --"
+                    searchPlaceholder="Buscar categoria..."
+                    emptyLabel="Nenhuma categoria encontrada"
+                    testid="os-category"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Equipamento (Placa)</Label>
+                  <Autocomplete
+                    value={form.equipment_plate}
+                    onChange={(v) => onChange('equipment_plate', v)}
+                    onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
+                    options={vehicles}
+                    displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                    placeholder="Digite para buscar a placa..."
+                    className="h-9 text-sm font-mono"
+                  />
+                </div>
                 <Field label="Apropriação (Equip. Agregador)" value={form.appropriation_plate} onChange={(v) => onChange('appropriation_plate', v)} testid="os-approp" />
-                <Field label="Pessoa *" value={form.person_name} onChange={(v) => onChange('person_name', v)} testid="os-person-name" />
+                <div>
+                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Pessoa *</Label>
+                  <Autocomplete
+                    value={form.person_name}
+                    onChange={(v) => onChange('person_name', v)}
+                    onSelect={(p) => { onChange('person_name', p.name); onChange('person_id', p.id); onChange('person_type', p._type); }}
+                    options={people}
+                    displayField="name"
+                    placeholder="Digite para buscar..."
+                    className="h-9 text-sm"
+                  />
+                </div>
                 <Field label="CPF/CNPJ" value={form.person_doc} onChange={(v) => onChange('person_doc', v)} testid="os-person-doc" />
                 <Field label="Telefone" value={form.contact_value} onChange={(v) => onChange('contact_value', v)} testid="os-phone" />
                 <Field label="Endereço *" value={form.address} onChange={(v) => onChange('address', v)} testid="os-address" />
@@ -340,9 +393,42 @@ export default function OrdemServicoPage() {
 
               <SectionTitle>Equipe e Supervisão</SectionTitle>
               <div className="grid grid-cols-3 gap-3">
-                <Field label="Supervisor" value={form.supervisor_name} onChange={(v) => onChange('supervisor_name', v)} testid="os-supervisor" />
-                <SelectField label="Técnico" value={form.technician_name || ''} onChange={(v) => onChange('technician_name', v)} options={[['', '-- Selecione --'], ...drivers.map((d) => [d.name, d.name])]} testid="os-technician" />
-                <Field label="Ajudante" value={form.helper_name} onChange={(v) => onChange('helper_name', v)} testid="os-helper" />
+                <div>
+                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Supervisor</Label>
+                  <Autocomplete
+                    value={form.supervisor_name}
+                    onChange={(v) => onChange('supervisor_name', v)}
+                    onSelect={(p) => { onChange('supervisor_name', p.name); onChange('supervisor_id', p.id); onChange('supervisor_type', p._type); }}
+                    options={people}
+                    displayField="name"
+                    placeholder="Digite para buscar..."
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Técnico</Label>
+                  <Autocomplete
+                    value={form.technician_name}
+                    onChange={(v) => onChange('technician_name', v)}
+                    onSelect={(p) => { onChange('technician_name', p.name); onChange('technician_id', p.id); onChange('technician_type', p._type); }}
+                    options={people}
+                    displayField="name"
+                    placeholder="Digite para buscar..."
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Ajudante</Label>
+                  <Autocomplete
+                    value={form.helper_name}
+                    onChange={(v) => onChange('helper_name', v)}
+                    onSelect={(p) => { onChange('helper_name', p.name); onChange('helper_id', p.id); onChange('helper_type', p._type); }}
+                    options={people}
+                    displayField="name"
+                    placeholder="Digite para buscar..."
+                    className="h-9 text-sm"
+                  />
+                </div>
               </div>
 
               <SectionTitle>Controle de Uso</SectionTitle>
@@ -396,13 +482,17 @@ function buildEmpty() {
   return {
     priority: 'MEDIA', requires_pt: false, os_type: 'EXTERNO', status: 'ABERTO',
     category: '', equipment_plate: '', equipment_id: '', person_doc: '', person_name: '',
+    person_id: '', person_type: '',
     address: '', city_uf: '', is_retorno: false, contact_type: 'banco', contact_value: '',
     opened_at: new Date().toISOString().slice(0, 16),
     budget_at: '', approved_at: '', forecast_close_at: '', closed_at: '',
     appropriation_plate: '', supervision_type: 'outros', supervision_value: '',
     reading_initial: 0, reading_final: 0,
     description: '', associated_actions: '', closure_remark: '',
-    observations: '', helper_name: '', technician_name: '', supervisor_name: '',
+    observations: '',
+    helper_name: '', helper_id: '', helper_type: '',
+    technician_name: '', technician_id: '', technician_type: '',
+    supervisor_name: '', supervisor_id: '', supervisor_type: '',
     products: [], services: [],
   };
 }

@@ -46,6 +46,7 @@ from models import (
     UnitSegregationResponse,
     RPAServiceItem, RPATerceiro, RPATerceiroCreate, RPATerceiroUpdate, RPATerceiroResponse,
     OSItem, OrdemServico, OrdemServicoCreate, OrdemServicoUpdate, OrdemServicoResponse,
+    OSCategory, OSCategoryCreate, OSCategoryResponse,
     ExpenseReportReceipt, ExpenseReportDeposit, ExpenseReportPurchase,
     ExpenseReport, ExpenseReportCreate, ExpenseReportResponse,
 )
@@ -63,6 +64,40 @@ from shared import (
 )
 
 api_router = APIRouter(prefix="/api")
+
+# ==================== MANUTENÇÃO - CADASTRO DE CATEGORIA (OS) ====================
+
+@api_router.post("/os-categories", response_model=OSCategoryResponse)
+async def create_os_category(data: OSCategoryCreate, current_user: dict = Depends(get_current_active_user)):
+    category = OSCategory(**data.model_dump(), created_by=current_user['sub'])
+    doc = category.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.os_categories.insert_one(doc)
+    return OSCategoryResponse(**category.model_dump())
+
+@api_router.get("/os-categories", response_model=List[OSCategoryResponse])
+async def get_os_categories(current_user: dict = Depends(get_current_active_user)):
+    categories = await db.os_categories.find({}, {"_id": 0}).sort("name", 1).to_list(None)
+    return [
+        OSCategoryResponse(**{**c, "created_at": datetime.fromisoformat(c['created_at'])})
+        for c in categories
+    ]
+
+@api_router.put("/os-categories/{category_id}", response_model=OSCategoryResponse)
+async def update_os_category(category_id: str, data: OSCategoryCreate, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.os_categories.find_one({"id": category_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+    update_data = {**data.model_dump(), "id": category_id, "created_at": existing['created_at'], "created_by": existing['created_by']}
+    await db.os_categories.replace_one({"id": category_id}, update_data)
+    return OSCategoryResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
+
+@api_router.delete("/os-categories/{category_id}")
+async def delete_os_category(category_id: str, current_user: dict = Depends(get_current_active_user)):
+    result = await db.os_categories.delete_one({"id": category_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Categoria não encontrada")
+    return {"message": "Categoria removida com sucesso"}
 
 # ==================== ORDEM DE SERVIÇO ====================
 from models import OrdemServico, OrdemServicoCreate, OrdemServicoUpdate, OrdemServicoResponse, OSItem
