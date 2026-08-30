@@ -515,11 +515,11 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     # ========== RODAPÉ ==========
     footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
     elements.append(Spacer(1, 15))
-    elements.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
-    
+    elements.append(Paragraph(f"Gerado em {now_brt().strftime('%d/%m/%Y %H:%M')} - ContainerLogix - {company['name']}", footer_style))
+
     doc.build(elements)
     buffer.seek(0)
-    
+
     filename = f"programacao_carregamento_{schedule['schedule_number']}.pdf"
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
 

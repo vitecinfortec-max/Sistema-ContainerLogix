@@ -261,8 +261,9 @@ def _make_pdf_footer(company_name):
         canvas.setFillColor(colors.grey)
         canvas.drawString(doc.leftMargin, 12, f"Página {doc.page}")
 
-        # System info (right)
-        canvas.drawRightString(doc.width + doc.leftMargin, 12, f"ContainerLogix - {company_name}")
+        # System info (right) - inclui data/hora de geração automática do documento
+        gen_stamp = now_brt().strftime('%d/%m/%Y %H:%M')
+        canvas.drawRightString(doc.width + doc.leftMargin, 12, f"Gerado em {gen_stamp} - ContainerLogix - {company_name}")
 
         canvas.restoreState()
     return _footer

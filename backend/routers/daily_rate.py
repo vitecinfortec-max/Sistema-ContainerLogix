@@ -444,7 +444,7 @@ async def generate_daily_rate_request_pdf(request_id: str, current_user: dict = 
 
     footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
     elements.append(Spacer(1, 15))
-    elements.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
+    elements.append(Paragraph(f"Gerado em {now_brt().strftime('%d/%m/%Y %H:%M')} - ContainerLogix - {company['name']}", footer_style))
 
     doc.build(elements)
     buffer.seek(0)
