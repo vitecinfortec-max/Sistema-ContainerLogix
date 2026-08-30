@@ -35,6 +35,7 @@
     --chart-5: 152 60% 40%;  /* Operacional */
     --chart-6: 195 80% 45%;  /* Transporte */
     --chart-7: 220 9% 46%;   /* Opções do Sistema */
+    --chart-8: 320 65% 52%;  /* Estoque */
 
     --sidebar-bg: 210 20% 98%;          /* #F9FAFB */
   }
@@ -68,6 +69,7 @@
     --chart-5: 152 55% 50%;
     --chart-6: 195 75% 60%;
     --chart-7: 220 10% 65%;
+    --chart-8: 320 60% 65%;
   }
 }
 

@@ -2454,6 +2454,104 @@ class LoadingOrderResponse(LoadingOrder):
     pass
 
 
+# ==================== ESTOQUE - CADASTROS DE APOIO ====================
+
+class Warehouse(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    code: Optional[str] = None
+    location: Optional[str] = None
+    responsible_name: Optional[str] = None
+    status: str = "ATIVO"
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class WarehouseCreate(BaseModel):
+    name: str
+    code: Optional[str] = None
+    location: Optional[str] = None
+    responsible_name: Optional[str] = None
+    status: str = "ATIVO"
+
+class WarehouseResponse(WarehouseCreate):
+    id: str
+    created_at: datetime
+
+
+class ProductFamily(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    code: Optional[str] = None
+    status: str = "ATIVO"
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProductFamilyCreate(BaseModel):
+    name: str
+    code: Optional[str] = None
+    status: str = "ATIVO"
+
+class ProductFamilyResponse(ProductFamilyCreate):
+    id: str
+    created_at: datetime
+
+
+class ServiceFamily(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    code: Optional[str] = None
+    status: str = "ATIVO"
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ServiceFamilyCreate(BaseModel):
+    name: str
+    code: Optional[str] = None
+    status: str = "ATIVO"
+
+class ServiceFamilyResponse(ServiceFamilyCreate):
+    id: str
+    created_at: datetime
+
+
+SERVICE_CATALOG_UNIT_OPTIONS = ["HORAS", "QUANTIDADE", "OUTROS"]
+
+class ServiceCatalogItem(BaseModel):
+    """Cadastro de Serviço - item 7º do backlog, usado futuramente pela
+    seção 'Produtos e Serviços' da Ordem de Serviço (Fase 9)."""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    code: int  # gerado automaticamente via contador atômico
+    family_id: Optional[str] = None
+    family_name: Optional[str] = None  # Tipo de Família (ServiceFamily)
+    active: bool = True
+    description: str
+    unit: str = "QUANTIDADE"  # HORAS | QUANTIDADE | OUTROS
+    value: float = 0.0
+    created_by: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ServiceCatalogItemCreate(BaseModel):
+    family_id: Optional[str] = None
+    family_name: Optional[str] = None
+    active: bool = True
+    description: str
+    unit: str = "QUANTIDADE"
+    value: float = 0.0
+
+class ServiceCatalogItemResponse(ServiceCatalogItemCreate):
+    id: str
+    code: int
+    created_at: datetime
+
+
 # ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================
 
 class ExpenseReportReceipt(BaseModel):

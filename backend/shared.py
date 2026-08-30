@@ -292,6 +292,12 @@ MODULE_CATALOG = [
         {"key": "operacional.status_entrega", "label": "Status de Entrega"},
         {"key": "operacional.ordem_carregamento", "label": "Ordem de Carregamento"},
     ]},
+    {"key": "estoque", "label": "Estoque", "items": [
+        {"key": "estoque.almoxarifado", "label": "Almoxarifado"},
+        {"key": "estoque.familia_produto", "label": "Família de Produto"},
+        {"key": "estoque.familia_servico", "label": "Família de Serviço"},
+        {"key": "estoque.cadastro_servico", "label": "Cadastro de Serviço"},
+    ]},
 ]
 
 # Prefixo de rota da API -> chave do módulo dono dela. Usado pelo middleware
@@ -327,6 +333,10 @@ PATH_MODULE_MAP = [
     ("/api/os-categories", "frota.cadastro_categoria"),
     ("/api/fuel-supply-orders", "frota.ordem_abastecimento"),
     ("/api/loading-orders", "operacional.ordem_carregamento"),
+    ("/api/warehouses", "estoque.almoxarifado"),
+    ("/api/product-families", "estoque.familia_produto"),
+    ("/api/service-families", "estoque.familia_servico"),
+    ("/api/service-catalog", "estoque.cadastro_servico"),
     ("/api/fuel-supplies", "frota.abastecimento"),
     ("/api/loading-schedules", "operacional.programacao_carregamento"),
     ("/api/delivery-status", "operacional.status_entrega"),

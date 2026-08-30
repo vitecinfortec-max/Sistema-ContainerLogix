@@ -42,6 +42,27 @@ export const api = {
   updateSupplier: (id, data) => axios.put(`${API}/suppliers/${id}`, data),
   deleteSupplier: (id) => axios.delete(`${API}/suppliers/${id}`),
 
+  getWarehouses: () => axios.get(`${API}/warehouses`),
+  createWarehouse: (data) => axios.post(`${API}/warehouses`, data),
+  updateWarehouse: (id, data) => axios.put(`${API}/warehouses/${id}`, data),
+  deleteWarehouse: (id) => axios.delete(`${API}/warehouses/${id}`),
+
+  getProductFamilies: () => axios.get(`${API}/product-families`),
+  createProductFamily: (data) => axios.post(`${API}/product-families`, data),
+  updateProductFamily: (id, data) => axios.put(`${API}/product-families/${id}`, data),
+  deleteProductFamily: (id) => axios.delete(`${API}/product-families/${id}`),
+
+  getServiceFamilies: () => axios.get(`${API}/service-families`),
+  createServiceFamily: (data) => axios.post(`${API}/service-families`, data),
+  updateServiceFamily: (id, data) => axios.put(`${API}/service-families/${id}`, data),
+  deleteServiceFamily: (id) => axios.delete(`${API}/service-families/${id}`),
+
+  getServiceCatalog: () => axios.get(`${API}/service-catalog`),
+  getServiceCatalogNextCode: () => axios.get(`${API}/service-catalog/next-code`),
+  createServiceCatalogItem: (data) => axios.post(`${API}/service-catalog`, data),
+  updateServiceCatalogItem: (id, data) => axios.put(`${API}/service-catalog/${id}`, data),
+  deleteServiceCatalogItem: (id) => axios.delete(`${API}/service-catalog/${id}`),
+
   getOSCategories: () => axios.get(`${API}/os-categories`),
   createOSCategory: (data) => axios.post(`${API}/os-categories`, data),
   updateOSCategory: (id, data) => axios.put(`${API}/os-categories/${id}`, data),

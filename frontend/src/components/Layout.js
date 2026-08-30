@@ -44,7 +44,10 @@ import {
   Cog,
   Fuel,
   PackageCheck,
-  Tag
+  Tag,
+  Boxes,
+  Warehouse,
+  Layers
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -69,6 +72,8 @@ const PAGE_TITLES = {
   '/fleet/ordem-abastecimento': 'Ordem de Abastecimento',
   '/fleet/abastecimento': 'Abastecimento',
   '/fleet/os-categories': 'Cadastro de Categoria',
+  '/estoque/cadastros': 'Cadastro',
+  '/estoque/servicos': 'Cadastro de Serviço',
   '/loading-orders': 'Ordem de Carregamento',
   '/fleet/checklist': 'Checklist',
   '/cadastro': 'Cadastro',
@@ -106,9 +111,16 @@ const PAGE_TITLES = {
 function isNavItemActive(item, location) {
   const [itemPath, itemQuery] = item.path.split('?');
   if (location.pathname !== itemPath) return false;
-  const itemTab = new URLSearchParams(itemQuery || '').get('tab');
-  const currentTab = new URLSearchParams(location.search).get('tab');
-  return itemTab === currentTab;
+  // Compara todos os parâmetros de query (não só um fixo) pra suportar
+  // várias páginas compartilhadas por query string (?tab=, ?type=, etc.)
+  // sem cada item acender junto quando outro está selecionado.
+  const itemParams = new URLSearchParams(itemQuery || '');
+  const currentParams = new URLSearchParams(location.search);
+  const keys = new Set([...itemParams.keys(), ...currentParams.keys()]);
+  for (const key of keys) {
+    if (itemParams.get(key) !== currentParams.get(key)) return false;
+  }
+  return true;
 }
 
 const GROUP_COLORS = {
@@ -119,6 +131,7 @@ const GROUP_COLORS = {
   Operacional: 'chart-5',
   Transporte: 'chart-6',
   'Opções do Sistema': 'chart-7',
+  Estoque: 'chart-8',
 };
 
 export default function Layout({ children }) {
@@ -139,6 +152,8 @@ export default function Layout({ children }) {
   const [flexTankOpen, setFlexTankOpen] = useState(false);
   const [terminalCadastroOpen, setTerminalCadastroOpen] = useState(false);
   const [manutencaoCadastroOpen, setManutencaoCadastroOpen] = useState(false);
+  const [estoqueOpen, setEstoqueOpen] = useState(false);
+  const [estoqueCadastroOpen, setEstoqueCadastroOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [transporteOpen, setTransporteOpen] = useState(false);
   const [opcoesSistemaOpen, setOpcoesSistemaOpen] = useState(false);
@@ -242,6 +257,10 @@ export default function Layout({ children }) {
     if (savedTerminalCadastro !== null) setTerminalCadastroOpen(JSON.parse(savedTerminalCadastro));
     const savedManutencaoCadastro = localStorage.getItem('manutencaoCadastroOpen');
     if (savedManutencaoCadastro !== null) setManutencaoCadastroOpen(JSON.parse(savedManutencaoCadastro));
+    const savedEstoque = localStorage.getItem('estoqueOpen');
+    if (savedEstoque !== null) setEstoqueOpen(JSON.parse(savedEstoque));
+    const savedEstoqueCadastro = localStorage.getItem('estoqueCadastroOpen');
+    if (savedEstoqueCadastro !== null) setEstoqueCadastroOpen(JSON.parse(savedEstoqueCadastro));
     const savedTerminal = localStorage.getItem('terminalOpen');
     if (savedTerminal !== null) setTerminalOpen(JSON.parse(savedTerminal));
     const savedTransporte = localStorage.getItem('transporteOpen');
@@ -258,6 +277,8 @@ export default function Layout({ children }) {
   // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
   const fleetTab = new URLSearchParams(location.search).get('tab');
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
+  const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
+  const isEstoqueActive = isEstoqueCadastroActive || location.pathname === '/estoque/servicos';
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive;
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
@@ -278,6 +299,8 @@ export default function Layout({ children }) {
     if (isFlexTankActive && !flexTankOpen) setFlexTankOpen(true);
     if (isTerminalCadastroActive && !terminalCadastroOpen) setTerminalCadastroOpen(true);
     if (isManutencaoCadastroActive && !manutencaoCadastroOpen) setManutencaoCadastroOpen(true);
+    if (isEstoqueActive && !estoqueOpen) setEstoqueOpen(true);
+    if (isEstoqueCadastroActive && !estoqueCadastroOpen) setEstoqueCadastroOpen(true);
     if (isTerminalActive && !terminalOpen) setTerminalOpen(true);
   }, [location.pathname]);
 
@@ -348,6 +371,18 @@ export default function Layout({ children }) {
     localStorage.setItem('manutencaoCadastroOpen', JSON.stringify(newState));
   };
 
+  const toggleEstoque = () => {
+    const newState = !estoqueOpen;
+    setEstoqueOpen(newState);
+    localStorage.setItem('estoqueOpen', JSON.stringify(newState));
+  };
+
+  const toggleEstoqueCadastro = () => {
+    const newState = !estoqueCadastroOpen;
+    setEstoqueCadastroOpen(newState);
+    localStorage.setItem('estoqueCadastroOpen', JSON.stringify(newState));
+  };
+
   const toggleTerminal = () => {
     const newState = !terminalOpen;
     setTerminalOpen(newState);
@@ -414,6 +449,16 @@ export default function Layout({ children }) {
     { path: '/fleet/os-categories', label: 'Cadastro de Categoria', icon: Tag, moduleKey: 'frota.cadastro_categoria' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
+  const estoqueItems = [
+    { path: '/estoque/servicos', label: 'Cadastro de Serviço', icon: Wrench, moduleKey: 'estoque.cadastro_servico' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
+  const estoqueCadastroItems = [
+    { path: '/estoque/cadastros?type=almoxarifado', label: 'Almoxarifado', icon: Warehouse, moduleKey: 'estoque.almoxarifado' },
+    { path: '/estoque/cadastros?type=familia-produto', label: 'Família de Produto', icon: Package, moduleKey: 'estoque.familia_produto' },
+    { path: '/estoque/cadastros?type=familia-servico', label: 'Família de Serviço', icon: Layers, moduleKey: 'estoque.familia_servico' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
   const transporteItems = [
     { path: '/fleet', label: 'Cadastro de Veículo', icon: Car, moduleKey: 'frota.veiculos' },
     { path: '/fleet/rpa-terceiro', label: 'Contrato de Frete', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
@@ -455,11 +500,12 @@ export default function Layout({ children }) {
   const isTransporteGroupVisible = transporteItems.length > 0;
   const isFinanceiroGroupVisible = financeiroItems.length > 0;
   const isOperacionalGroupVisible = operacionalItems.length > 0;
+  const isEstoqueGroupVisible = estoqueItems.length > 0 || estoqueCadastroItems.length > 0;
   const isOpcoesSistemaGroupVisible = opcoesSistemaItems.length > 0;
 
   const allSearchableItems = useMemo(() => [
-    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...manutencaoItems, ...transporteItems, ...cadastroItems,
-    ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems,
+    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...manutencaoItems, ...manutencaoCadastroItems, ...transporteItems, ...cadastroItems,
+    ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems, ...estoqueItems, ...estoqueCadastroItems,
   ], [isAdmin]);
 
   const filteredItems = searchQuery
@@ -889,6 +935,18 @@ export default function Layout({ children }) {
                   <div>{operacionalItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
+                {/* Estoque */}
+                {isEstoqueGroupVisible && renderGroupHeader('Estoque', Boxes, estoqueOpen, toggleEstoque, isEstoqueActive, 'nav-estoque-toggle')}
+                {isEstoqueGroupVisible && estoqueOpen && sidebarOpen && (
+                  <div>
+                    {estoqueItems.map((item) => renderNavItem(item, true))}
+                    {estoqueCadastroItems.length > 0 && renderGroupHeader('Cadastro', FolderOpen, estoqueCadastroOpen, toggleEstoqueCadastro, isEstoqueCadastroActive, 'nav-estoque-cadastro-toggle', true)}
+                    {estoqueCadastroItems.length > 0 && estoqueCadastroOpen && (
+                      <div>{estoqueCadastroItems.map((item) => renderNavItem(item, true, true))}</div>
+                    )}
+                  </div>
+                )}
+
                 {/* Opções do Sistema */}
                 {isOpcoesSistemaGroupVisible && renderGroupHeader('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive, 'nav-opcoes-sistema-toggle')}
                 {isOpcoesSistemaGroupVisible && opcoesSistemaOpen && sidebarOpen && (
@@ -1001,6 +1059,16 @@ export default function Layout({ children }) {
                 {/* Operacional Mobile */}
                 {isOperacionalGroupVisible && renderMobileGroupToggle('Operacional', Clipboard, operacionalOpen, toggleOperacional, isOperacionalActive)}
                 {isOperacionalGroupVisible && operacionalOpen && operacionalItems.map((item) => renderMobileNavItem(item))}
+
+                {/* Estoque Mobile */}
+                {isEstoqueGroupVisible && renderMobileGroupToggle('Estoque', Boxes, estoqueOpen, toggleEstoque, isEstoqueActive)}
+                {isEstoqueGroupVisible && estoqueOpen && (
+                  <div>
+                    {estoqueItems.map((item) => renderMobileNavItem(item))}
+                    {estoqueCadastroItems.length > 0 && renderMobileGroupToggle('Cadastro', FolderOpen, estoqueCadastroOpen, toggleEstoqueCadastro, isEstoqueCadastroActive, true)}
+                    {estoqueCadastroItems.length > 0 && estoqueCadastroOpen && estoqueCadastroItems.map((item) => renderMobileNavItem(item, true))}
+                  </div>
+                )}
 
                 {/* Opções do Sistema Mobile */}
                 {isOpcoesSistemaGroupVisible && renderMobileGroupToggle('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive)}
