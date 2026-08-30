@@ -83,16 +83,40 @@ export default function FleetPage() {
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState(null);
   const [vehicleSaving, setVehicleSaving] = useState(false);
-  const [vehicleForm, setVehicleForm] = useState({
+  const buildEmptyVehicleForm = () => ({
     plate: '',
+    renavam: '',
+    chassis: '',
     model: '',
     brand: '',
     year: '',
+    model_year: '',
+    color: '',
+    asset_code: '',
     vehicle_type: '',
+    category: '',
+    load_capacity: '',
+    axle_count: '',
+    body_type: '',
+    fuel_type: '',
+    tank_capacity: '',
+    engine_power: '',
+    tare_weight: '',
+    gross_weight: '',
+    crlv_number: '',
+    crlv_expiry: '',
+    licensing_expiry: '',
+    tachograph_expiry: '',
+    inspection_date: '',
+    inspection_expiry: '',
+    owner_type: '',
+    ownership_status: '',
+    transport_company: '',
     status: 'ATIVO',
     observations: '',
     driver_id: ''
   });
+  const [vehicleForm, setVehicleForm] = useState(buildEmptyVehicleForm());
   const [drivers, setDrivers] = useState([]);
   const [driverPopoverOpen, setDriverPopoverOpen] = useState(false);
 
@@ -103,6 +127,7 @@ export default function FleetPage() {
     { value: 'EMPILHADEIRA', label: 'Empilhadeira' },
     { value: 'GUINDASTE', label: 'Guindaste' },
     { value: 'REACH_STACKER', label: 'Reach Stacker' },
+    { value: 'VAN', label: 'Van' },
     { value: 'EQUIPAMENTO', label: 'Outro Equipamento' },
   ];
 
@@ -110,6 +135,31 @@ export default function FleetPage() {
     { value: 'ATIVO', label: 'Ativo' },
     { value: 'INATIVO', label: 'Inativo' },
     { value: 'MANUTENCAO', label: 'Em Manutenção' },
+  ];
+
+  const categoryOptions = [
+    { value: 'CARGA', label: 'Carga' },
+    { value: 'TRACAO', label: 'Tração' },
+    { value: 'EQUIPAMENTO_PATIO', label: 'Equipamento de Pátio' },
+  ];
+
+  const fuelOptions = [
+    { value: 'DIESEL', label: 'Diesel' },
+    { value: 'GASOLINA', label: 'Gasolina' },
+    { value: 'ELETRICO', label: 'Elétrico' },
+    { value: 'GLP', label: 'GLP' },
+  ];
+
+  const ownerTypeOptions = [
+    { value: 'PROPRIA', label: 'Empresa Própria' },
+    { value: 'TERCEIRIZADO', label: 'Terceirizado' },
+    { value: 'AUTONOMO', label: 'Motorista Autônomo' },
+  ];
+
+  const ownershipStatusOptions = [
+    { value: 'PROPRIO', label: 'Próprio' },
+    { value: 'ALUGADO', label: 'Alugado' },
+    { value: 'AGREGADO', label: 'Agregado' },
   ];
 
   useEffect(() => {
@@ -162,16 +212,7 @@ export default function FleetPage() {
   };
 
   const resetVehicleForm = () => {
-    setVehicleForm({
-      plate: '',
-      model: '',
-      brand: '',
-      year: '',
-      vehicle_type: '',
-      status: 'ATIVO',
-      observations: '',
-      driver_id: ''
-    });
+    setVehicleForm(buildEmptyVehicleForm());
     setEditingVehicle(null);
   };
 
@@ -182,16 +223,16 @@ export default function FleetPage() {
 
   const openEditVehicleModal = (vehicle) => {
     setEditingVehicle(vehicle);
-    setVehicleForm({
-      plate: vehicle.plate || '',
-      model: vehicle.model || '',
-      brand: vehicle.brand || '',
-      year: vehicle.year?.toString() || '',
-      vehicle_type: vehicle.vehicle_type || '',
-      status: vehicle.status || 'ATIVO',
-      observations: vehicle.observations || '',
-      driver_id: vehicle.driver_id || ''
-    });
+    const empty = buildEmptyVehicleForm();
+    const form = { ...empty };
+    for (const key of Object.keys(empty)) {
+      if (vehicle[key] !== undefined && vehicle[key] !== null) {
+        form[key] = typeof empty[key] === 'string' && typeof vehicle[key] !== 'string'
+          ? String(vehicle[key])
+          : vehicle[key];
+      }
+    }
+    setVehicleForm(form);
     setVehicleModalOpen(true);
   };
 
@@ -205,10 +246,33 @@ export default function FleetPage() {
     try {
       const data = {
         plate: vehicleForm.plate.toUpperCase(),
+        renavam: vehicleForm.renavam || null,
+        chassis: vehicleForm.chassis || null,
         model: vehicleForm.model || null,
         brand: vehicleForm.brand || null,
         year: vehicleForm.year ? parseInt(vehicleForm.year) : null,
+        model_year: vehicleForm.model_year ? parseInt(vehicleForm.model_year) : null,
+        color: vehicleForm.color || null,
+        asset_code: vehicleForm.asset_code || null,
         vehicle_type: vehicleForm.vehicle_type,
+        category: vehicleForm.category || null,
+        load_capacity: vehicleForm.load_capacity || null,
+        axle_count: vehicleForm.axle_count ? parseInt(vehicleForm.axle_count) : null,
+        body_type: vehicleForm.body_type || null,
+        fuel_type: vehicleForm.fuel_type || null,
+        tank_capacity: vehicleForm.tank_capacity || null,
+        engine_power: vehicleForm.engine_power || null,
+        tare_weight: vehicleForm.tare_weight || null,
+        gross_weight: vehicleForm.gross_weight || null,
+        crlv_number: vehicleForm.crlv_number || null,
+        crlv_expiry: vehicleForm.crlv_expiry || null,
+        licensing_expiry: vehicleForm.licensing_expiry || null,
+        tachograph_expiry: vehicleForm.tachograph_expiry || null,
+        inspection_date: vehicleForm.inspection_date || null,
+        inspection_expiry: vehicleForm.inspection_expiry || null,
+        owner_type: vehicleForm.owner_type || null,
+        ownership_status: vehicleForm.ownership_status || null,
+        transport_company: vehicleForm.transport_company || null,
         status: vehicleForm.status,
         observations: vehicleForm.observations || null,
         driver_id: vehicleForm.driver_id || null
@@ -1074,15 +1138,16 @@ export default function FleetPage() {
 
       {/* Modal Cadastro/Edição de Veículo */}
       <Dialog open={vehicleModalOpen} onOpenChange={setVehicleModalOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Car className="w-5 h-5" />
               {editingVehicle ? 'Editar Veículo' : 'Novo Veículo'}
             </DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-4">
+
+          <div className="space-y-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Identificação</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Placa *</Label>
@@ -1095,8 +1160,8 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label>Tipo *</Label>
-                <Select 
-                  value={vehicleForm.vehicle_type} 
+                <Select
+                  value={vehicleForm.vehicle_type}
                   onValueChange={(value) => handleVehicleFormChange('vehicle_type', value)}
                 >
                   <SelectTrigger>
@@ -1110,6 +1175,27 @@ export default function FleetPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Categoria</Label>
+                <Select value={vehicleForm.category} onValueChange={(value) => handleVehicleFormChange('category', value)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {categoryOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Cor</Label>
+                <Input value={vehicleForm.color} onChange={(e) => handleVehicleFormChange('color', e.target.value)} placeholder="Ex: Branco" />
+              </div>
+              <div>
+                <Label>Nº Patrimônio/Cód. Interno</Label>
+                <Input value={vehicleForm.asset_code} onChange={(e) => handleVehicleFormChange('asset_code', e.target.value)} />
               </div>
             </div>
 
@@ -1134,7 +1220,7 @@ export default function FleetPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Ano</Label>
+                <Label>Ano de Fabricação</Label>
                 <Input
                   type="number"
                   value={vehicleForm.year}
@@ -1145,23 +1231,153 @@ export default function FleetPage() {
                 />
               </div>
               <div>
-                <Label>Status</Label>
-                <Select 
-                  value={vehicleForm.status} 
-                  onValueChange={(value) => handleVehicleFormChange('status', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o status" />
-                  </SelectTrigger>
+                <Label>Ano Modelo</Label>
+                <Input
+                  type="number"
+                  value={vehicleForm.model_year}
+                  onChange={(e) => handleVehicleFormChange('model_year', e.target.value)}
+                  placeholder="Ex: 2025"
+                  min="1900"
+                  max="2100"
+                />
+              </div>
+            </div>
+
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Especificações</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Capacidade de Carga</Label>
+                <Input value={vehicleForm.load_capacity} onChange={(e) => handleVehicleFormChange('load_capacity', e.target.value)} placeholder="Ex: 30 ton" />
+              </div>
+              <div>
+                <Label>Nº de Eixos</Label>
+                <Input type="number" value={vehicleForm.axle_count} onChange={(e) => handleVehicleFormChange('axle_count', e.target.value)} />
+              </div>
+              <div>
+                <Label>Tipo de Carroceria/Implemento</Label>
+                <Input value={vehicleForm.body_type} onChange={(e) => handleVehicleFormChange('body_type', e.target.value)} placeholder="Ex: prancha, sider, graneleiro" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Combustível</Label>
+                <Select value={vehicleForm.fuel_type} onValueChange={(value) => handleVehicleFormChange('fuel_type', value)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {statusOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
+                    {fuelOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>Capacidade do Tanque</Label>
+                <Input value={vehicleForm.tank_capacity} onChange={(e) => handleVehicleFormChange('tank_capacity', e.target.value)} placeholder="Ex: 400 L" />
+              </div>
+              <div>
+                <Label>Potência do Motor</Label>
+                <Input value={vehicleForm.engine_power} onChange={(e) => handleVehicleFormChange('engine_power', e.target.value)} placeholder="Ex: 460 cv" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tara (peso vazio)</Label>
+                <Input value={vehicleForm.tare_weight} onChange={(e) => handleVehicleFormChange('tare_weight', e.target.value)} placeholder="Ex: 7.500 kg" />
+              </div>
+              <div>
+                <Label>PBT (Peso Bruto Total)</Label>
+                <Input value={vehicleForm.gross_weight} onChange={(e) => handleVehicleFormChange('gross_weight', e.target.value)} placeholder="Ex: 45.000 kg" />
+              </div>
+            </div>
+
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Documentação</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>RENAVAM</Label>
+                <Input value={vehicleForm.renavam} onChange={(e) => handleVehicleFormChange('renavam', e.target.value)} />
+              </div>
+              <div>
+                <Label>Chassi</Label>
+                <Input value={vehicleForm.chassis} onChange={(e) => handleVehicleFormChange('chassis', e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>CRLV - Número</Label>
+                <Input value={vehicleForm.crlv_number} onChange={(e) => handleVehicleFormChange('crlv_number', e.target.value)} />
+              </div>
+              <div>
+                <Label>CRLV - Validade</Label>
+                <Input type="date" value={vehicleForm.crlv_expiry} onChange={(e) => handleVehicleFormChange('crlv_expiry', e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Vencimento do Licenciamento</Label>
+                <Input type="date" value={vehicleForm.licensing_expiry} onChange={(e) => handleVehicleFormChange('licensing_expiry', e.target.value)} />
+              </div>
+              <div>
+                <Label>Vencimento do Tacógrafo</Label>
+                <Input type="date" value={vehicleForm.tachograph_expiry} onChange={(e) => handleVehicleFormChange('tachograph_expiry', e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Data da Vistoria</Label>
+                <Input type="date" value={vehicleForm.inspection_date} onChange={(e) => handleVehicleFormChange('inspection_date', e.target.value)} />
+              </div>
+              <div>
+                <Label>Validade da Vistoria</Label>
+                <Input type="date" value={vehicleForm.inspection_expiry} onChange={(e) => handleVehicleFormChange('inspection_expiry', e.target.value)} />
+              </div>
+            </div>
+
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-1">Vínculo</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Proprietário</Label>
+                <Select value={vehicleForm.owner_type} onValueChange={(value) => handleVehicleFormChange('owner_type', value)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {ownerTypeOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Status de Propriedade</Label>
+                <Select value={vehicleForm.ownership_status} onValueChange={(value) => handleVehicleFormChange('ownership_status', value)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectContent>
+                    {ownershipStatusOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Transportadora Vinculada</Label>
+                <Input value={vehicleForm.transport_company} onChange={(e) => handleVehicleFormChange('transport_company', e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select
+                value={vehicleForm.status}
+                onValueChange={(value) => handleVehicleFormChange('status', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

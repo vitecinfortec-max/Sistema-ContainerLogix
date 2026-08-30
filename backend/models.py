@@ -826,13 +826,37 @@ class FlexTankStockSummary(BaseModel):
 
 class Vehicle(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     plate: str  # Placa do veículo (obrigatório)
+    renavam: Optional[str] = None
+    chassis: Optional[str] = None
     model: Optional[str] = None  # Modelo
     brand: Optional[str] = None  # Marca
-    year: Optional[int] = None  # Ano
+    year: Optional[int] = None  # Ano de fabricação
+    model_year: Optional[int] = None  # Ano modelo
+    color: Optional[str] = None
+    asset_code: Optional[str] = None  # Nº de patrimônio/código interno
     vehicle_type: str  # Tipo: CAMINHÃO, CARRETA, EQUIPAMENTO, etc.
+    category: Optional[str] = None  # CARGA, TRACAO, EQUIPAMENTO_PATIO
+    load_capacity: Optional[str] = None  # kg/toneladas
+    axle_count: Optional[int] = None
+    body_type: Optional[str] = None  # prancha, sider, graneleiro, etc.
+    fuel_type: Optional[str] = None  # diesel, gasolina, elétrico, GLP
+    tank_capacity: Optional[str] = None
+    engine_power: Optional[str] = None
+    tare_weight: Optional[str] = None
+    gross_weight: Optional[str] = None  # PBT
+    crlv_number: Optional[str] = None
+    crlv_expiry: Optional[str] = None
+    licensing_expiry: Optional[str] = None
+    tachograph_expiry: Optional[str] = None
+    inspection_date: Optional[str] = None
+    inspection_expiry: Optional[str] = None
+    document_attachments: Optional[List[str]] = None
+    owner_type: Optional[str] = None  # PROPRIA, TERCEIRIZADO, AUTONOMO
+    ownership_status: Optional[str] = None  # PROPRIO, ALUGADO, AGREGADO
+    transport_company: Optional[str] = None
     status: str = "ATIVO"  # ATIVO, INATIVO, MANUTENÇÃO
     observations: Optional[str] = None
     driver_id: Optional[str] = None  # Motorista responsável (para autopreencher RPA/Movimentação)
@@ -846,20 +870,68 @@ class Vehicle(BaseModel):
 
 class VehicleCreate(BaseModel):
     plate: str
+    renavam: Optional[str] = None
+    chassis: Optional[str] = None
     model: Optional[str] = None
     brand: Optional[str] = None
     year: Optional[int] = None
+    model_year: Optional[int] = None
+    color: Optional[str] = None
+    asset_code: Optional[str] = None
     vehicle_type: str
+    category: Optional[str] = None
+    load_capacity: Optional[str] = None
+    axle_count: Optional[int] = None
+    body_type: Optional[str] = None
+    fuel_type: Optional[str] = None
+    tank_capacity: Optional[str] = None
+    engine_power: Optional[str] = None
+    tare_weight: Optional[str] = None
+    gross_weight: Optional[str] = None
+    crlv_number: Optional[str] = None
+    crlv_expiry: Optional[str] = None
+    licensing_expiry: Optional[str] = None
+    tachograph_expiry: Optional[str] = None
+    inspection_date: Optional[str] = None
+    inspection_expiry: Optional[str] = None
+    document_attachments: Optional[List[str]] = None
+    owner_type: Optional[str] = None
+    ownership_status: Optional[str] = None
+    transport_company: Optional[str] = None
     status: str = "ATIVO"
     observations: Optional[str] = None
     driver_id: Optional[str] = None
 
 class VehicleUpdate(BaseModel):
     plate: Optional[str] = None
+    renavam: Optional[str] = None
+    chassis: Optional[str] = None
     model: Optional[str] = None
     brand: Optional[str] = None
     year: Optional[int] = None
+    model_year: Optional[int] = None
+    color: Optional[str] = None
+    asset_code: Optional[str] = None
     vehicle_type: Optional[str] = None
+    category: Optional[str] = None
+    load_capacity: Optional[str] = None
+    axle_count: Optional[int] = None
+    body_type: Optional[str] = None
+    fuel_type: Optional[str] = None
+    tank_capacity: Optional[str] = None
+    engine_power: Optional[str] = None
+    tare_weight: Optional[str] = None
+    gross_weight: Optional[str] = None
+    crlv_number: Optional[str] = None
+    crlv_expiry: Optional[str] = None
+    licensing_expiry: Optional[str] = None
+    tachograph_expiry: Optional[str] = None
+    inspection_date: Optional[str] = None
+    inspection_expiry: Optional[str] = None
+    document_attachments: Optional[List[str]] = None
+    owner_type: Optional[str] = None
+    ownership_status: Optional[str] = None
+    transport_company: Optional[str] = None
     status: Optional[str] = None
     observations: Optional[str] = None
     driver_id: Optional[str] = None
@@ -868,10 +940,34 @@ class VehicleUpdate(BaseModel):
 class VehicleResponse(BaseModel):
     id: str
     plate: str
+    renavam: Optional[str] = None
+    chassis: Optional[str] = None
     model: Optional[str] = None
     brand: Optional[str] = None
     year: Optional[int] = None
+    model_year: Optional[int] = None
+    color: Optional[str] = None
+    asset_code: Optional[str] = None
     vehicle_type: str
+    category: Optional[str] = None
+    load_capacity: Optional[str] = None
+    axle_count: Optional[int] = None
+    body_type: Optional[str] = None
+    fuel_type: Optional[str] = None
+    tank_capacity: Optional[str] = None
+    engine_power: Optional[str] = None
+    tare_weight: Optional[str] = None
+    gross_weight: Optional[str] = None
+    crlv_number: Optional[str] = None
+    crlv_expiry: Optional[str] = None
+    licensing_expiry: Optional[str] = None
+    tachograph_expiry: Optional[str] = None
+    inspection_date: Optional[str] = None
+    inspection_expiry: Optional[str] = None
+    document_attachments: Optional[List[str]] = None
+    owner_type: Optional[str] = None
+    ownership_status: Optional[str] = None
+    transport_company: Optional[str] = None
     status: str
     observations: Optional[str] = None
     driver_id: Optional[str] = None

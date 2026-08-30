@@ -135,15 +135,11 @@ async def create_vehicle(data: VehicleCreate, current_user: dict = Depends(get_c
         driver_name = driver["name"]
 
     vehicle_data = {
+        **data.model_dump(),
         "id": str(uuid.uuid4()),
         "plate": data.plate.upper(),
-        "model": data.model,
-        "brand": data.brand,
-        "year": data.year,
         "vehicle_type": data.vehicle_type.upper(),
         "status": data.status.upper(),
-        "observations": data.observations,
-        "driver_id": data.driver_id,
         "driver_name": driver_name,
         "created_by": current_user["sub"],
         "created_by_name": current_user.get("name", "Sistema"),
@@ -164,25 +160,19 @@ async def update_vehicle(vehicle_id: str, data: VehicleUpdate, current_user: dic
     if not vehicle:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     
-    update_data = {}
+    update_data = data.model_dump(exclude_unset=True, exclude={"driver_id", "clear_driver"})
+    update_data = {k: v for k, v in update_data.items() if v is not None}
+
     if data.plate is not None:
         # Verificar se placa já existe em outro veículo
         existing = await db.vehicles.find_one({"plate": data.plate.upper(), "id": {"$ne": vehicle_id}})
         if existing:
             raise HTTPException(status_code=400, detail="Placa já cadastrada em outro veículo")
         update_data["plate"] = data.plate.upper()
-    if data.model is not None:
-        update_data["model"] = data.model
-    if data.brand is not None:
-        update_data["brand"] = data.brand
-    if data.year is not None:
-        update_data["year"] = data.year
     if data.vehicle_type is not None:
         update_data["vehicle_type"] = data.vehicle_type.upper()
     if data.status is not None:
         update_data["status"] = data.status.upper()
-    if data.observations is not None:
-        update_data["observations"] = data.observations
 
     if data.clear_driver:
         update_data["driver_id"] = None
