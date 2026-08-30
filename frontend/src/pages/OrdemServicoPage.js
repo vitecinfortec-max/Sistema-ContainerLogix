@@ -45,6 +45,8 @@ export default function OrdemServicoPage() {
   const [drivers, setDrivers] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [osCategories, setOsCategories] = useState([]);
+  const [productCatalog, setProductCatalog] = useState([]);
+  const [serviceCatalog, setServiceCatalog] = useState([]);
   const debounceRef = useRef(null);
 
   // Pessoa/Supervisor/Técnico/Ajudante buscam nos cadastros de Motorista +
@@ -55,7 +57,19 @@ export default function OrdemServicoPage() {
     ...employees.map((e) => ({ ...e, _type: 'funcionario' })),
   ];
 
-  useEffect(() => { loadList(); loadVehicles(); loadDrivers(); loadEmployees(); loadOsCategories(); }, []);
+  // Normaliza Produto/Cadastro de Serviço (Fases 6-7) pro mesmo formato
+  // usado pelas linhas de Produtos e Serviços da OS.
+  const productCatalogOptions = productCatalog.map((p) => ({
+    code: String(p.code), description: p.description, unit: p.unit, price: p.reference_value,
+  }));
+  const serviceCatalogOptions = serviceCatalog.map((s) => ({
+    code: String(s.code), description: s.description, unit: s.unit, price: s.value,
+  }));
+
+  useEffect(() => {
+    loadList(); loadVehicles(); loadDrivers(); loadEmployees(); loadOsCategories();
+    loadProductCatalog(); loadServiceCatalog();
+  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -100,6 +114,18 @@ export default function OrdemServicoPage() {
     try {
       const r = await api.getOSCategories();
       setOsCategories((r.data || []).filter((c) => c.active));
+    } catch (e) { /* ignore */ }
+  };
+  const loadProductCatalog = async () => {
+    try {
+      const r = await api.getProducts();
+      setProductCatalog((r.data || []).filter((p) => p.status === 'ATIVO'));
+    } catch (e) { /* ignore */ }
+  };
+  const loadServiceCatalog = async () => {
+    try {
+      const r = await api.getServiceCatalog();
+      setServiceCatalog((r.data || []).filter((s) => s.active));
     } catch (e) { /* ignore */ }
   };
 
@@ -450,11 +476,13 @@ export default function OrdemServicoPage() {
               <ItemsSection title="Produtos" items={form.products || []} kind="products"
                 onAdd={() => addItem('products')} onRemove={(i) => removeItem('products', i)}
                 onChange={(i, f, v) => setItem('products', i, f, v)}
+                catalogOptions={productCatalogOptions}
                 showUnit={true} />
 
               <ItemsSection title="Serviços" items={form.services || []} kind="services"
                 onAdd={() => addItem('services')} onRemove={(i) => removeItem('services', i)}
                 onChange={(i, f, v) => setItem('services', i, f, v)}
+                catalogOptions={serviceCatalogOptions}
                 showUnit={true} />
 
               <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
@@ -549,7 +577,7 @@ function TextAreaField({ label, value, onChange, testid }) {
   );
 }
 
-function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit }) {
+function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit, catalogOptions = [] }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -572,7 +600,20 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit 
             </div>
             <div className="col-span-4">
               <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Descrição</Label>
-              <Input value={it.description || ''} onChange={(e) => onChange(idx, 'description', e.target.value)} className="h-8 text-sm" data-testid={`${kind}-desc-${idx}`} />
+              <Autocomplete
+                value={it.description || ''}
+                onChange={(v) => onChange(idx, 'description', v)}
+                onSelect={(cat) => {
+                  onChange(idx, 'description', cat.description);
+                  onChange(idx, 'code', cat.code);
+                  if (cat.unit) onChange(idx, 'unit', cat.unit);
+                  onChange(idx, 'unit_price', cat.price ?? 0);
+                }}
+                options={catalogOptions}
+                displayField="description"
+                placeholder="Digite para buscar no catálogo..."
+                className="h-8 text-sm"
+              />
             </div>
             <div className="col-span-1">
               <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Qtd</Label>
