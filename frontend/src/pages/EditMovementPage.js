@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Save, ArrowLeft, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
+import { Autocomplete } from '../components/Autocomplete';
 
 export default function EditMovementPage() {
   const { id } = useParams();
@@ -22,8 +23,10 @@ export default function EditMovementPage() {
   const [shippingLines, setShippingLines] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [terminals, setTerminals] = useState([]);
   const [containerPhotos, setContainerPhotos] = useState(null);
   const [containerDamages, setContainerDamages] = useState([]);
+  const [inspectionNotes, setInspectionNotes] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const clientInputRef = useRef(null);
@@ -70,14 +73,18 @@ export default function EditMovementPage() {
       if (movement.container_damages) {
         setContainerDamages(movement.container_damages);
       }
-      
+
+      if (movement.inspection_notes) {
+        setInspectionNotes(movement.inspection_notes);
+      }
+
       // Atualizar o campo de busca do cliente
       if (movement.client_name) {
         setClientSearch(movement.client_name);
       }
     } catch (error) {
-      console.error('[EditMovementPage] Erro ao carregar movimentação:', error);
-      toast.error('Erro ao carregar movimentação');
+      console.error('[EditMovementPage] Erro ao carregar registro:', error);
+      toast.error('Erro ao carregar registro');
       navigate('/movements');
     } finally {
       setLoadingData(false);
@@ -87,22 +94,25 @@ export default function EditMovementPage() {
   const loadAuxData = async () => {
     setLoadingAux(true);
     try {
-      const [clientsRes, shippingLinesRes, serviceTypesRes, vehiclesRes] = await Promise.all([
+      const [clientsRes, shippingLinesRes, serviceTypesRes, vehiclesRes, terminalsRes] = await Promise.all([
         api.getClients(),
         api.getShippingLines(),
         api.getServiceTypes(),
-        api.getVehicles({ per_page: 1000 })
+        api.getVehicles({ per_page: 1000 }),
+        api.getTerminals()
       ]);
 
       const clientsData = Array.isArray(clientsRes.data) ? clientsRes.data : [];
       const shippingLinesData = Array.isArray(shippingLinesRes.data) ? shippingLinesRes.data : [];
       const serviceTypesData = Array.isArray(serviceTypesRes.data) ? serviceTypesRes.data : [];
       const vehiclesData = Array.isArray(vehiclesRes.data?.items) ? vehiclesRes.data.items : [];
+      const terminalsData = Array.isArray(terminalsRes.data) ? terminalsRes.data : [];
 
       setClients(clientsData);
       setShippingLines(shippingLinesData);
       setServiceTypes(serviceTypesData);
       setVehicles(vehiclesData);
+      setTerminals(terminalsData);
     } catch (error) {
       console.error('[EditMovementPage] Erro ao carregar dados auxiliares:', error);
       toast.error('Erro ao carregar dados auxiliares');
@@ -122,13 +132,14 @@ export default function EditMovementPage() {
         ...data,
         currency,
         container_photos: containerPhotos,
-        container_damages: containerDamages
+        container_damages: containerDamages,
+        inspection_notes: inspectionNotes
       };
       await api.updateMovement(id, payload);
-      toast.success('Movimentação atualizada com sucesso!');
+      toast.success('Registro atualizado com sucesso!');
       navigate(`/movements/${id}`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar movimentação');
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar registro');
     } finally {
       setLoading(false);
     }
@@ -171,9 +182,9 @@ export default function EditMovementPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Editar Movimentação
+              Editar Registro de Gate
             </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Atualize as informações da movimentação</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Atualize as informações do registro</p>
           </div>
           <Button variant="outline" onClick={() => navigate(`/movements/${id}`)} data-testid="back-button">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -407,9 +418,21 @@ export default function EditMovementPage() {
                   <Label htmlFor="genset">Genset</Label>
                   <Input id="genset" {...register('genset')} className="h-12 font-mono" />
                 </div>
-                <div className="space-y-2 md:col-span-2">
+                <div className="space-y-2">
                   <Label htmlFor="booking">Booking</Label>
                   <Input id="booking" {...register('booking')} className="h-12 font-mono" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="origin_terminal">Terminal de Origem</Label>
+                  <Autocomplete
+                    value={watch('origin_terminal') || ''}
+                    onChange={(v) => setValue('origin_terminal', v)}
+                    onSelect={(t) => setValue('origin_terminal', t.name)}
+                    options={terminals}
+                    displayField="name"
+                    placeholder="Digite para buscar o terminal..."
+                    className="h-12"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="service_value">
@@ -464,7 +487,7 @@ export default function EditMovementPage() {
                     data-testid="observations-input"
                     {...register('observations')}
                     className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                    placeholder="Observações adicionais sobre a movimentação (opcional)"
+                    placeholder="Observações adicionais sobre o registro (opcional)"
                     rows={3}
                   />
                 </div>
@@ -473,10 +496,10 @@ export default function EditMovementPage() {
           </Card>
 
           <ContainerPhotoUpload
-            photos={containerPhotos}
-            onChange={setContainerPhotos}
             damages={containerDamages}
             onDamagesChange={setContainerDamages}
+            notes={inspectionNotes}
+            onNotesChange={setInspectionNotes}
             disabled={loading}
           />
 

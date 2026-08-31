@@ -39,8 +39,8 @@ function ChartTooltip({ active, payload, label }) {
 }
 
 const ALL_SHORTCUTS = [
-  { id: 'new-movement', label: 'Nova Movimentação', icon: Plus, path: '/movements/new', color: 'text-primary', bg: 'bg-primary/10' },
-  { id: 'movements', label: 'Movimentações', icon: Container, path: '/movements', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700' },
+  { id: 'new-movement', label: 'Novo Registro', icon: Plus, path: '/movements/new', color: 'text-primary', bg: 'bg-primary/10' },
+  { id: 'movements', label: 'Registro de Gate', icon: Container, path: '/movements', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700' },
   { id: 'report-movements', label: 'Rel. Movimentações', icon: BarChart3, path: '/reports/movements', color: 'text-blue-600', bg: 'bg-blue-50' },
   { id: 'report-billing', label: 'Rel. Faturamento', icon: DollarSign, path: '/reports/billing', color: 'text-amber-600', bg: 'bg-amber-50' },
   { id: 'invoices', label: 'Faturas', icon: Receipt, path: '/billing', color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -483,7 +483,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="p-8 text-center text-slate-400 dark:text-slate-500" data-testid="no-driver-ranking">
                   <Trophy className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm">Nenhuma movimentação registrada neste mês</p>
+                  <p className="text-sm">Nenhum registro cadastrado neste mês</p>
                 </div>
               )}
             </CardContent>
@@ -557,7 +557,7 @@ export default function DashboardPage() {
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="recent-movements-card">
           <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Movimentações Recentes</CardTitle>
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Registros de Gate Recentes</CardTitle>
               <Button 
                 variant="ghost" 
                 size="sm"
@@ -621,7 +621,7 @@ export default function DashboardPage() {
             ) : (
               <div className="p-8 text-center text-slate-400 dark:text-slate-500" data-testid="no-movements">
                 <Container className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Nenhuma movimentação registrada ainda</p>
+                <p className="text-sm">Nenhum registro cadastrado ainda</p>
               </div>
             )}
           </CardContent>

@@ -54,7 +54,7 @@ export default function MovementsPage() {
         const updated = [newMovement, ...prev];
         return updated.sort((a, b) => b.transaction_id - a.transaction_id);
       });
-      toast.info(`Nova movimentação: ${newMovement.container_number}`, {
+      toast.info(`Novo registro: ${newMovement.container_number}`, {
         description: `${newMovement.operation_type} - ${newMovement.driver_name}`
       });
     } else if (message.type === 'MOVEMENT_DELETED') {
@@ -79,7 +79,7 @@ export default function MovementsPage() {
       const sortedMovements = response.data.sort((a, b) => b.transaction_id - a.transaction_id);
       setMovements(sortedMovements);
     } catch (error) {
-      toast.error('Erro ao carregar movimentações');
+      toast.error('Erro ao carregar registros');
     } finally {
       setLoading(false);
     }
@@ -192,7 +192,7 @@ export default function MovementsPage() {
   const handleClone = async () => {
     if (!cloneId || isCloning) return;
     const movementToClone = movements.find(m => m.id === cloneId);
-    if (!movementToClone) { toast.error('Movimentação não encontrada'); setCloneId(null); return; }
+    if (!movementToClone) { toast.error('Registro não encontrado'); setCloneId(null); return; }
     setIsCloning(true);
     try {
       const cloneData = {
@@ -213,13 +213,13 @@ export default function MovementsPage() {
         booking: movementToClone.booking || ''
       };
       const response = await api.createMovement(cloneData);
-      toast.success(`Movimentação clonada! Nova ID: #${response.data.transaction_id}`);
+      toast.success(`Registro clonado! Nova ID: #${response.data.transaction_id}`);
       setMovements(prev => {
         const updated = [response.data, ...prev];
         return updated.sort((a, b) => b.transaction_id - a.transaction_id);
       });
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao clonar movimentação');
+      toast.error(error.response?.data?.detail || 'Erro ao clonar registro');
     } finally {
       setCloneId(null);
       setIsCloning(false);
@@ -229,20 +229,20 @@ export default function MovementsPage() {
   const handleDelete = async () => {
     if (!deleteId || isDeleting) return;
     const movementExists = movements.some(m => m.id === deleteId);
-    if (!movementExists) { toast.error('Movimentação já foi removida'); setDeleteId(null); return; }
+    if (!movementExists) { toast.error('Registro já foi removido'); setDeleteId(null); return; }
     setIsDeleting(true);
     markPendingDelete(deleteId);
     const idToDelete = deleteId;
     setMovements(prev => prev.filter(m => m.id !== idToDelete));
     try {
       await api.deleteMovement(idToDelete);
-      toast.success('Movimentação deletada com sucesso');
+      toast.success('Registro deletado com sucesso');
       setTimeout(() => forceRefresh(), 500);
     } catch (error) {
       if (error.response?.status === 404) {
-        toast.info('Movimentação já foi removida');
+        toast.info('Registro já foi removido');
       } else {
-        toast.error(error.response?.data?.detail || 'Erro ao deletar movimentação');
+        toast.error(error.response?.data?.detail || 'Erro ao deletar registro');
         forceRefresh();
       }
     } finally {
@@ -268,7 +268,7 @@ export default function MovementsPage() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Movimentações
+              Registro de Gate
             </h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
               Histórico completo de entradas e saídas
@@ -284,7 +284,7 @@ export default function MovementsPage() {
             data-testid="add-movement-button"
           >
             <Plus className="w-4 h-4 mr-1.5" />
-            Nova Movimentação
+            Novo Registro
           </Button>
         </div>
 
@@ -372,7 +372,7 @@ export default function MovementsPage() {
                 </div>
               </div>
               <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Movimentação</Label>
+                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Registro</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                   <Input
@@ -426,7 +426,7 @@ export default function MovementsPage() {
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <span>Lista de Movimentações ({filteredMovements.length})</span>
+              <span>Lista de Registros ({filteredMovements.length})</span>
               {totalPages > 1 && (
                 <span className="text-xs font-normal text-slate-400 dark:text-slate-500">Página {currentPage} de {totalPages}</span>
               )}
@@ -506,8 +506,8 @@ export default function MovementsPage() {
             ) : (
               <div className="p-12 text-center text-muted-foreground" data-testid="no-movements">
                 <ContainerIcon className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                <p className="text-sm font-medium">Nenhuma movimentação encontrada</p>
-                <p className="text-xs mt-1 text-slate-400 dark:text-slate-500">Tente ajustar os filtros ou adicione uma nova movimentação</p>
+                <p className="text-sm font-medium">Nenhum registro encontrado</p>
+                <p className="text-xs mt-1 text-slate-400 dark:text-slate-500">Tente ajustar os filtros ou adicione um novo registro</p>
               </div>
             )}
 
@@ -557,7 +557,7 @@ export default function MovementsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja deletar esta movimentação? Esta ação não pode ser desfeita.
+              Tem certeza que deseja deletar este registro? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -573,9 +573,9 @@ export default function MovementsPage() {
       <AlertDialog open={!!cloneId} onOpenChange={(open) => !isCloning && setCloneId(open ? cloneId : null)}>
         <AlertDialogContent data-testid="clone-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>Clonar Movimentação</AlertDialogTitle>
+            <AlertDialogTitle>Clonar Registro</AlertDialogTitle>
             <AlertDialogDescription>
-              Deseja criar uma cópia desta movimentação? Uma nova ID será gerada automaticamente.
+              Deseja criar uma cópia deste registro? Uma nova ID será gerada automaticamente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

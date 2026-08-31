@@ -27,8 +27,10 @@ export default function NewMovementPage() {
   const [shippingLines, setShippingLines] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
   const [autoSaved, setAutoSaved] = useState(false);
+  const [terminals, setTerminals] = useState([]);
   const [containerPhotos, setContainerPhotos] = useState(null);
   const [containerDamages, setContainerDamages] = useState([]);
+  const [inspectionNotes, setInspectionNotes] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const clientInputRef = useRef(null);
@@ -89,13 +91,14 @@ export default function NewMovementPage() {
     setLoadingData(true);
     try {
       // Carregar todos os dados em paralelo
-      const [driversRes, companiesRes, clientsRes, shippingLinesRes, serviceTypesRes, vehiclesRes] = await Promise.all([
+      const [driversRes, companiesRes, clientsRes, shippingLinesRes, serviceTypesRes, vehiclesRes, terminalsRes] = await Promise.all([
         api.getDrivers(),
         api.getTransportCompanies(),
         api.getClients(),
         api.getShippingLines(),
         api.getServiceTypes(),
-        api.getVehicles({ per_page: 1000 })
+        api.getVehicles({ per_page: 1000 }),
+        api.getTerminals()
       ]);
 
       // Definir os dados com validação
@@ -105,6 +108,7 @@ export default function NewMovementPage() {
       const shippingLinesData = Array.isArray(shippingLinesRes.data) ? shippingLinesRes.data : [];
       const serviceTypesData = Array.isArray(serviceTypesRes.data) ? serviceTypesRes.data : [];
       const vehiclesData = Array.isArray(vehiclesRes.data?.items) ? vehiclesRes.data.items : [];
+      const terminalsData = Array.isArray(terminalsRes.data) ? terminalsRes.data : [];
 
       setDrivers(driversData);
       setCompanies(companiesData);
@@ -112,6 +116,7 @@ export default function NewMovementPage() {
       setShippingLines(shippingLinesData);
       setServiceTypes(serviceTypesData);
       setVehicles(vehiclesData);
+      setTerminals(terminalsData);
       
       if (shippingLinesData.length === 0) {
         console.warn('[NewMovementPage] Nenhum armador encontrado!');
@@ -136,11 +141,12 @@ export default function NewMovementPage() {
         ...data,
         currency,
         container_photos: containerPhotos,
-        container_damages: containerDamages
+        container_damages: containerDamages,
+        inspection_notes: inspectionNotes
       };
       const response = await api.createMovement(payload);
       localStorage.removeItem(AUTO_SAVE_KEY);
-      toast.success('Movimentação cadastrada com sucesso!');
+      toast.success('Registro cadastrado com sucesso!');
       
       // Enviar notificação push
       notifyNewMovement(response.data);
@@ -148,7 +154,7 @@ export default function NewMovementPage() {
       // Redireciona para a página de detalhes com parâmetro para abrir impressão automaticamente
       navigate(`/movements/${response.data.id}?autoprint=true`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao cadastrar movimentação');
+      toast.error(error.response?.data?.detail || 'Erro ao cadastrar registro');
     } finally {
       setLoading(false);
     }
@@ -243,7 +249,7 @@ export default function NewMovementPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Nova Movimentação
+              Novo Registro
             </h1>
             <div className="flex items-center gap-2 mt-0.5">
               <p className="text-[13px] text-slate-500 dark:text-slate-400">Registre uma nova entrada ou saída de contêiner</p>
@@ -537,7 +543,7 @@ export default function NewMovementPage() {
                   />
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
+                <div className="space-y-2">
                   <Label htmlFor="booking">Booking</Label>
                   <Input
                     id="booking"
@@ -545,6 +551,19 @@ export default function NewMovementPage() {
                     {...register('booking')}
                     className="h-12 font-mono"
                     placeholder="Número de booking (opcional)"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="origin_terminal">Terminal de Origem</Label>
+                  <Autocomplete
+                    value={watch('origin_terminal') || ''}
+                    onChange={(v) => setValue('origin_terminal', v)}
+                    onSelect={(t) => setValue('origin_terminal', t.name)}
+                    options={terminals}
+                    displayField="name"
+                    placeholder="Digite para buscar o terminal..."
+                    className="h-12"
                   />
                 </div>
 
@@ -605,7 +624,7 @@ export default function NewMovementPage() {
                     data-testid="observations-input"
                     {...register('observations')}
                     className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                    placeholder="Observações adicionais sobre a movimentação (opcional)"
+                    placeholder="Observações adicionais sobre o registro (opcional)"
                     rows={3}
                   />
                 </div>
@@ -614,10 +633,10 @@ export default function NewMovementPage() {
           </Card>
 
           <ContainerPhotoUpload
-            photos={containerPhotos}
-            onChange={setContainerPhotos}
             damages={containerDamages}
             onDamagesChange={setContainerDamages}
+            notes={inspectionNotes}
+            onNotesChange={setInspectionNotes}
             disabled={loading}
           />
 
@@ -629,7 +648,7 @@ export default function NewMovementPage() {
               {loading ? 'Salvando...' : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Salvar Movimentação
+                  Salvar Registro
                 </>
               )}
             </Button>

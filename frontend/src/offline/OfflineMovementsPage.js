@@ -91,9 +91,9 @@ export default function OfflineMovementsPage() {
       }
       setShowForm(false);
       load();
-      toast.success('Movimentação salva!');
+      toast.success('Registro salvo!');
     } catch (e) {
-      toast.error('Erro ao salvar movimentação');
+      toast.error('Erro ao salvar registro');
     }
   };
 
@@ -110,18 +110,18 @@ export default function OfflineMovementsPage() {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Movimentação de Containers</h1>
+        <h1 className="text-2xl font-bold">Registro de Gate</h1>
       </div>
 
       <Button onClick={openNew} className="w-full" data-testid="movement-add-btn">
         <Plus className="w-4 h-4 mr-2" />
-        Nova Movimentação
+        Novo Registro
       </Button>
 
       {loading ? (
         <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
       ) : movements.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">Nenhuma movimentação registrada ainda.</p>
+        <p className="text-sm text-muted-foreground text-center py-4">Nenhum registro cadastrado ainda.</p>
       ) : (
         <div className="space-y-2">
           {movements.map((mv) => (
@@ -155,7 +155,7 @@ export default function OfflineMovementsPage() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Movimentação' : 'Nova Movimentação'}</DialogTitle>
+            <DialogTitle>{editing ? 'Editar Registro' : 'Novo Registro'}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3">

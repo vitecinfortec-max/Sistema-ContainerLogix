@@ -64,8 +64,8 @@ const YARD_ALERT_POLL_MS = 5 * 60 * 1000;
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
-  '/movements': 'Movimentações',
-  '/movements/new': 'Nova Movimentação',
+  '/movements': 'Registro de Gate',
+  '/movements/new': 'Novo Registro',
   '/yard-control': 'Controle de Pátio',
   '/fleet/rpa-terceiro': 'Contrato de Frete',
   '/fleet/rpa-terceiro/new': 'Novo Contrato de Frete',
@@ -192,11 +192,11 @@ export default function Layout({ children }) {
   const handleWsNotification = useCallback((message) => {
     if (message.type === 'MOVEMENT_CREATED') {
       const d = message.data || {};
-      const opLabel = d.operation_type === 'ENTRADA' ? 'Entrada' : d.operation_type === 'SAIDA' ? 'Saída' : (d.operation_type || 'Movimentação');
+      const opLabel = d.operation_type === 'ENTRADA' ? 'Entrada' : d.operation_type === 'SAIDA' ? 'Saída' : (d.operation_type || 'Registro');
       setNotifications((prev) => [
         {
           id: `created-${d.id}-${Date.now()}`,
-          title: 'Nova movimentação',
+          title: 'Novo registro de gate',
           description: `${opLabel} · Container ${d.container_number || '-'}`,
           path: d.id ? `/movements/${d.id}` : '/movements',
           timestamp: new Date(),
@@ -208,8 +208,8 @@ export default function Layout({ children }) {
       setNotifications((prev) => [
         {
           id: `deleted-${message.data?.id}-${Date.now()}`,
-          title: 'Movimentação removida',
-          description: 'Uma movimentação foi excluída',
+          title: 'Registro removido',
+          description: 'Um registro de gate foi excluído',
           path: '/movements',
           timestamp: new Date(),
           read: false,
@@ -427,7 +427,7 @@ export default function Layout({ children }) {
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const movimentacoesItems = [
-    { path: '/movements', label: 'Movimentações', icon: List, moduleKey: 'terminal.movimentacoes' },
+    { path: '/movements', label: 'Registro de Gate', icon: List, moduleKey: 'terminal.movimentacoes' },
     { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package, moduleKey: 'terminal.movimentacoes' },
     { path: '/yard-control', label: 'Controle de Pátio', icon: Clock, moduleKey: 'terminal.movimentacoes' },
     { path: '/reports/movements', label: 'Relatório de Movimentação', icon: BarChart3, moduleKey: 'terminal.movimentacoes' },
@@ -528,13 +528,13 @@ export default function Layout({ children }) {
     }
     const exactMatch = PAGE_TITLES[location.pathname];
     if (exactMatch) return exactMatch;
-    if (location.pathname.includes('/movements/') && location.pathname.includes('/edit')) return 'Editar Movimentação';
-    if (location.pathname.includes('/movements/')) return 'Detalhes da Movimentação';
+    if (location.pathname.includes('/flex-tank/movements/') && location.pathname.includes('/edit')) return 'Editar Movimentação Flex Tank';
+    if (location.pathname.includes('/flex-tank/movements/') && location.pathname !== '/flex-tank/movements/new') return 'Detalhes da Movimentação Flex Tank';
+    if (location.pathname.includes('/movements/') && location.pathname.includes('/edit')) return 'Editar Registro de Gate';
+    if (location.pathname.includes('/movements/')) return 'Detalhes do Registro de Gate';
     if (location.pathname.includes('/photo-registries/') && location.pathname !== '/photo-registries/new') return 'Detalhes do Registro Fotográfico';
     if (location.pathname.includes('/container-inspections/') && location.pathname.includes('/edit')) return 'Editar Vistoria de Container';
     if (location.pathname.includes('/container-inspections/') && location.pathname !== '/container-inspections/new') return 'Detalhes da Vistoria de Container';
-    if (location.pathname.includes('/flex-tank/movements/') && location.pathname.includes('/edit')) return 'Editar Movimentação Flex Tank';
-    if (location.pathname.includes('/flex-tank/movements/') && location.pathname !== '/flex-tank/movements/new') return 'Detalhes da Movimentação Flex Tank';
     return 'ContainerLogix';
   }, [location.pathname, location.search]);
 
@@ -891,7 +891,7 @@ export default function Layout({ children }) {
                 {isTerminalGroupVisible && terminalOpen && sidebarOpen && (
                   <div>
                     {terminalItems.map((item) => renderNavItem(item, true, true))}
-                    {movimentacoesItems.length > 0 && renderGroupHeader('Movimentações', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, 'nav-movimentacoes-toggle', true)}
+                    {movimentacoesItems.length > 0 && renderGroupHeader('Registro de Gate', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, 'nav-movimentacoes-toggle', true)}
                     {movimentacoesItems.length > 0 && movimentacoesOpen && (
                       <div>{movimentacoesItems.map((item) => renderNavItem(item, true, true))}</div>
                     )}
@@ -1032,7 +1032,7 @@ export default function Layout({ children }) {
                 {isTerminalGroupVisible && terminalOpen && (
                   <div>
                     {terminalItems.map((item) => renderMobileNavItem(item, true))}
-                    {movimentacoesItems.length > 0 && renderMobileGroupToggle('Movimentações', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, true)}
+                    {movimentacoesItems.length > 0 && renderMobileGroupToggle('Registro de Gate', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, true)}
                     {movimentacoesItems.length > 0 && movimentacoesOpen && movimentacoesItems.map((item) => renderMobileNavItem(item, true))}
                     {flexTankItems.length > 0 && renderMobileGroupToggle('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, true)}
                     {flexTankItems.length > 0 && flexTankOpen && flexTankItems.map((item) => renderMobileNavItem(item, true))}

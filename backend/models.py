@@ -393,13 +393,15 @@ class ContainerMovement(BaseModel):
     seal: Optional[str] = None
     genset: Optional[str] = None
     booking: Optional[str] = None
+    origin_terminal: Optional[str] = None  # Terminal de Origem
     service_type: Optional[str] = None  # Tipo de Serviço (aparece no faturamento)
     invoice_number: Optional[str] = None  # Nota Fiscal (opcional, aparece no faturamento)
     service_value: Optional[float] = None  # Valor do serviço (não aparece na impressão)
     currency: str = "BRL"  # Moeda: BRL (Real) ou USD (Dólar)
     observations: Optional[str] = None  # Observações da movimentação
-    container_photos: Optional[dict] = None  # Fotos do container (frente, traseira, esquerda, direita)
+    container_photos: Optional[dict] = None  # Fotos do container (frente, traseira, esquerda, direita) - upload removido da UI, mantido só por compatibilidade com registros antigos
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
+    inspection_notes: Optional[str] = None  # Vistoria: observações livres não cobertas pelas opções de avaria
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -423,6 +425,7 @@ class ContainerMovementCreate(BaseModel):
     seal: Optional[str] = None
     genset: Optional[str] = None
     booking: Optional[str] = None
+    origin_terminal: Optional[str] = None  # Terminal de Origem
     service_type: Optional[str] = None  # Tipo de Serviço
     invoice_number: Optional[str] = None  # Nota Fiscal
     service_value: Optional[float] = None  # Valor do serviço
@@ -430,6 +433,7 @@ class ContainerMovementCreate(BaseModel):
     observations: Optional[str] = None  # Observações da movimentação
     container_photos: Optional[dict] = None  # Fotos do container
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
+    inspection_notes: Optional[str] = None  # Vistoria: observações livres
 
 class ContainerMovementResponse(BaseModel):
     id: str
@@ -450,6 +454,7 @@ class ContainerMovementResponse(BaseModel):
     seal: Optional[str] = None
     genset: Optional[str] = None
     booking: Optional[str] = None
+    origin_terminal: Optional[str] = None  # Terminal de Origem
     service_type: Optional[str] = None  # Tipo de Serviço
     invoice_number: Optional[str] = None  # Nota Fiscal
     service_value: Optional[float] = None  # Valor do serviço
@@ -457,6 +462,7 @@ class ContainerMovementResponse(BaseModel):
     observations: Optional[str] = None  # Observações da movimentação
     container_photos: Optional[dict] = None  # Fotos do container
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
+    inspection_notes: Optional[str] = None  # Vistoria: observações livres
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
     created_at: datetime

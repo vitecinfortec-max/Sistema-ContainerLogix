@@ -89,7 +89,7 @@ export default function MovementDetailPage() {
       const barcodeImg = generateBarcodeImage(barcodeValue);
       setBarcodeImage(barcodeImg);
     } catch (error) {
-      toast.error('Erro ao carregar movimentação');
+      toast.error('Erro ao carregar registro');
       navigate('/movements');
     } finally {
       setLoading(false);
@@ -335,8 +335,8 @@ export default function MovementDetailPage() {
               <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.service_type || '-'}</div>
             </div>
           </div>
-          {/* Linha 3: Nota Fiscal | Cliente */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          {/* Linha 3: Nota Fiscal | Cliente | Terminal de Origem */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
             <div>
               <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Nota Fiscal</div>
               <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.invoice_number || '-'}</div>
@@ -344,6 +344,10 @@ export default function MovementDetailPage() {
             <div>
               <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Cliente</div>
               <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.client_name || '-'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Terminal de Origem</div>
+              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.origin_terminal || '-'}</div>
             </div>
           </div>
         </div>
@@ -374,8 +378,8 @@ export default function MovementDetailPage() {
         </div>
       )}
 
-      {/* BOX 5: Vistoria de Container - Exibir se houver avarias marcadas ou fotos anexadas */}
-      {((movement.container_damages && movement.container_damages.length > 0) || movement.container_photos) && (
+      {/* BOX 5: Vistoria de Container - Exibir se houver avarias marcadas, fotos anexadas ou observações de vistoria */}
+      {((movement.container_damages && movement.container_damages.length > 0) || movement.container_photos || movement.inspection_notes) && (
         <div style={{
           border: '1px solid #000',
           borderRadius: '4px',
@@ -399,8 +403,14 @@ export default function MovementDetailPage() {
                 : '-'}
             </div>
             {movement.container_photos && (
-              <div style={{ fontSize: '10px', color: '#000' }}>
+              <div style={{ fontSize: '10px', color: '#000', marginBottom: '4px' }}>
                 {Object.keys(movement.container_photos).length} foto(s) do container anexada(s) ao registro digital.
+              </div>
+            )}
+            {movement.inspection_notes && (
+              <div>
+                <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Observações da Vistoria</div>
+                <div style={{ fontSize: '10px', color: '#000', whiteSpace: 'pre-wrap' }}>{movement.inspection_notes}</div>
               </div>
             )}
           </div>
@@ -510,7 +520,7 @@ export default function MovementDetailPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-                Detalhes da Movimentação
+                Detalhes do Registro de Gate
               </h1>
               <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Visualização</p>
             </div>
@@ -646,9 +656,13 @@ export default function MovementDetailPage() {
                   <p className="text-[10px] text-muted-foreground">Nota Fiscal</p>
                   <p className="font-bold font-mono text-xs">{movement.invoice_number || '-'}</p>
                 </div>
-                <div className="col-span-3">
+                <div className="col-span-2">
                   <p className="text-[10px] text-muted-foreground">Cliente</p>
                   <p className="font-bold text-xs">{movement.client_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground">Terminal de Origem</p>
+                  <p className="font-bold text-xs">{movement.origin_terminal || '-'}</p>
                 </div>
               </div>
             </div>
