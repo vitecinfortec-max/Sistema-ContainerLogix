@@ -2675,3 +2675,246 @@ def generate_petrobras_lvt_pdf(checklist: dict, company: dict = None) -> bytes:
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
+
+
+# ==================== REGISTRO DE GATE — COMPROVANTE EM PDF (para download) ====================
+# Réplica do comprovante hoje só disponível via impressão do navegador
+# (frontend/src/pages/MovementDetailPage.js, componente ViaSection) - mesmas caixas
+# e campos, mas gerado no servidor pra virar um arquivo baixável, uma via por vez
+# (Terminal ou Motorista, nunca as duas juntas nesse fluxo) e uma página por
+# movimentação selecionada.
+
+_MOVEMENT_DAMAGE_LABELS = {
+    'SEM_AVARIA': 'Sem Avaria',
+    'AMASSADO': 'Amassado',
+    'FURADO': 'Furado/Perfurado',
+    'VAZAMENTO': 'Vazamento',
+    'ESTRUTURA_COMPROMETIDA': 'Estrutura Comprometida',
+    'PISO_DANIFICADO': 'Piso Danificado',
+    'PORTAS_DANIFICADAS': 'Portas Danificadas',
+    'SUJEIRA_RESIDUOS': 'Sujeira/Resíduos',
+    'LACRE_VIOLADO': 'Lacre Violado',
+}
+
+
+def generate_movement_voucher_pdf(movements: list, via: str, company: dict = None) -> bytes:
+    """Gera o comprovante de Registro de Gate em PDF - uma página por movimentação
+    selecionada, todas na mesma via escolhida (TERMINAL ou MOTORISTA)."""
+    from reportlab.platypus import PageBreak
+    from reportlab.graphics.barcode import code128
+
+    c = merge_company(company)
+    via_label = 'VIA TERMINAL' if via == 'TERMINAL' else 'VIA MOTORISTA'
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=12 * mm, leftMargin=12 * mm, topMargin=10 * mm, bottomMargin=10 * mm
+    )
+    width = doc.width
+    styles = getSampleStyleSheet()
+    logo_buffer = download_logo(c)
+
+    label_value_style = styles['Normal']
+    box_title_style = ParagraphStyle('VoucherBoxTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
+    title_style = ParagraphStyle('VoucherTitle', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER)
+    subtitle_style = ParagraphStyle('VoucherSubtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)
+    company_name_style = ParagraphStyle('VoucherCompanyName', parent=styles['Normal'], fontSize=18, fontName='Helvetica-Bold')
+    footer_style = ParagraphStyle('VoucherFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=colors.HexColor('#555555'))
+
+    def field(label, value):
+        v = value if value not in (None, '') else '-'
+        return Paragraph(f'<font size=7 color="#333333">{label}</font><br/><font size=10><b>{v}</b></font>', label_value_style)
+
+    def field_row(pairs, n_cols=4):
+        cells = [field(l, v) for l, v in pairs]
+        while len(cells) < n_cols:
+            cells.append('')
+        col_w = width / n_cols
+        t = Table([cells], colWidths=[col_w] * n_cols)
+        t.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        return t
+
+    def boxed_section(title, row_tables, extra=None):
+        inner = [Paragraph(f'<b>{title}</b>', box_title_style)]
+        for i, rt in enumerate(row_tables):
+            inner.append(Spacer(1, 6 if i == 0 else 8))
+            inner.append(rt)
+        if extra:
+            inner.append(Spacer(1, 6 if row_tables else 2))
+            inner.extend(extra)
+        wrapper = Table([[inner]], colWidths=[width])
+        wrapper.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        return wrapper
+
+    elements = []
+    for idx, m in enumerate(movements):
+        if idx > 0:
+            elements.append(PageBreak())
+
+        # Header: logo + nome da empresa
+        logo_cell = ''
+        if logo_buffer:
+            try:
+                logo_buffer.seek(0)
+                logo_cell = Image(logo_buffer, width=45, height=45)
+            except Exception as e:
+                logger.error(f"Error adding logo to movement voucher PDF: {e}")
+        header_tbl = Table([[logo_cell, Paragraph(c['name'], company_name_style)]], colWidths=[55, width - 55])
+        header_tbl.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ]))
+        elements.append(header_tbl)
+        elements.append(Spacer(1, 8))
+
+        # Título
+        title_tbl = Table([
+            [Paragraph('COMPROVANTE DE MOVIMENTAÇÃO DE CONTÊINER', title_style)],
+            [Paragraph(f"ID Transação: #{m.get('transaction_id')} - {via_label}", subtitle_style)],
+        ], colWidths=[width])
+        title_tbl.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(title_tbl)
+        elements.append(Spacer(1, 8))
+
+        created_brt = to_brt(m.get('created_at'))
+        created_str = created_brt.strftime('%d/%m/%Y %H:%M') if created_brt else '-'
+
+        elements.append(boxed_section('Informações da Operação', [
+            field_row([
+                ('ID Transação', f"#{m.get('transaction_id')}"),
+                ('Tipo de Operação', m.get('operation_type')),
+                ('Status', m.get('status')),
+                ('Data/Hora', created_str),
+            ]),
+        ]))
+        elements.append(Spacer(1, 6))
+
+        elements.append(boxed_section('Informações do Veículo e Motorista', [
+            field_row([
+                ('Motorista', m.get('driver_name')),
+                ('CPF', m.get('driver_cpf')),
+                ('Transportadora', m.get('transport_company')),
+            ], n_cols=3),
+            field_row([
+                ('Placa Cavalo', m.get('truck_plate')),
+                ('Placa Carreta', m.get('trailer_plate_1')),
+            ], n_cols=2),
+        ]))
+        elements.append(Spacer(1, 6))
+
+        elements.append(boxed_section('Informações do Contêiner', [
+            field_row([
+                ('Nº Container', m.get('container_number')),
+                ('Tamanho/Tipo', m.get('size_type')),
+                ('Armador', m.get('shipping_line')),
+                ('Tara', m.get('tare')),
+            ]),
+            field_row([
+                ('Lacre', m.get('seal')),
+                ('Genset', m.get('genset')),
+                ('Booking', m.get('booking')),
+                ('Tipo de Serviço', m.get('service_type')),
+            ]),
+            field_row([
+                ('Nota Fiscal', m.get('invoice_number')),
+                ('Cliente', m.get('client_name')),
+                ('Terminal de Origem', m.get('origin_terminal')),
+            ], n_cols=3),
+        ]))
+        elements.append(Spacer(1, 6))
+
+        if m.get('observations'):
+            elements.append(boxed_section('Observações', [], extra=[
+                Paragraph(str(m['observations']).replace('\n', '<br/>'), styles['Normal']),
+            ]))
+            elements.append(Spacer(1, 6))
+
+        damages = m.get('container_damages') or []
+        photos = m.get('container_photos')
+        notes = m.get('inspection_notes')
+        if damages or photos or notes:
+            extra = [field('Estado do Container', ', '.join(_MOVEMENT_DAMAGE_LABELS.get(d, d) for d in damages) if damages else '-')]
+            if photos:
+                extra.append(Spacer(1, 4))
+                extra.append(Paragraph(f"{len(photos)} foto(s) do container anexada(s) ao registro digital.", ParagraphStyle('VoucherPhotoNote', parent=styles['Normal'], fontSize=8)))
+            if notes:
+                extra.append(Spacer(1, 4))
+                extra.append(field('Observações da Vistoria', notes))
+            elements.append(boxed_section('Vistoria de Container', [], extra=extra))
+            elements.append(Spacer(1, 6))
+
+        # Área de assinaturas
+        sig_title_style = ParagraphStyle('VoucherSigTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', alignment=TA_CENTER)
+        sig_info_style = ParagraphStyle('VoucherSigInfo', parent=styles['Normal'], fontSize=8)
+        sig_data = [[
+            [
+                Paragraph('Assinatura do Motorista', sig_title_style),
+                Spacer(1, 24),
+                HRFlowable(width='100%', thickness=0.8, color=colors.black),
+                Paragraph(f"Nome: {m.get('driver_name') or '-'}", sig_info_style),
+                Paragraph(f"CPF: {m.get('driver_cpf') or '-'}", sig_info_style),
+            ],
+            [
+                Paragraph('Assinatura do Responsável', sig_title_style),
+                Spacer(1, 24),
+                HRFlowable(width='100%', thickness=0.8, color=colors.black),
+                Paragraph(f"Nome: {m.get('user_name') or '-'}", sig_info_style),
+                Paragraph(f"Data: {now_brt().strftime('%d/%m/%Y')}", sig_info_style),
+            ],
+        ]]
+        sig_tbl = Table(sig_data, colWidths=[width / 2] * 2)
+        sig_tbl.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 15),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 15),
+        ]))
+        elements.append(sig_tbl)
+        elements.append(Spacer(1, 8))
+
+        # Código de barras + usuário + data/hora
+        barcode_value = str(m.get('transaction_id') or 0).zfill(6)
+        try:
+            bc = code128.Code128(barcode_value, barWidth=1.0, barHeight=28)
+        except Exception:
+            bc = None
+        bc_num = Paragraph(f"<b>{m.get('transaction_id')}</b>", ParagraphStyle('VoucherBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER))
+        left_cell = [bc, bc_num] if bc else [bc_num]
+        right_info = [
+            Paragraph(f"<b>Usuário: {m.get('user_name') or '-'}</b>", styles['Normal']),
+            Paragraph(f"<b>Data e hora da impressão: {now_brt().strftime('%d/%m/%Y %H:%M')}</b>", styles['Normal']),
+        ]
+        info_tbl = Table([[left_cell, right_info]], colWidths=[100, width - 100])
+        info_tbl.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LINEBELOW', (0, 0), (-1, -1), 1, colors.black),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        elements.append(info_tbl)
+        elements.append(Spacer(1, 6))
+
+        elements.append(Paragraph(
+            f"{c['name']} | Este documento é válido como comprovante de movimentação",
+            footer_style
+        ))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()

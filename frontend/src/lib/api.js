@@ -107,6 +107,7 @@ export const api = {
   updateMovement: (id, data) => axios.put(`${API}/movements/${id}`, data),
   deleteMovement: (id) => axios.delete(`${API}/movements/${id}`),
   getOpenEntryForContainer: (containerNumber) => axios.get(`${API}/movements/open-entry/${containerNumber}`),
+  downloadMovementsPdf: (movementIds, via) => axios.post(`${API}/movements/pdf`, { movement_ids: movementIds, via }, { responseType: 'blob' }),
   
   // Reports
   downloadPDFReport: (params) => axios.get(`${API}/reports/pdf`, { params, responseType: 'blob' }),

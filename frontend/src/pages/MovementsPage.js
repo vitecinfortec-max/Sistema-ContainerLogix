@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Plus, Search, Trash2, Container as ContainerIcon, Eye, Edit, Wifi, WifiOff, Copy, Calendar, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Search, Trash2, Container as ContainerIcon, Eye, Edit, Wifi, WifiOff, Copy, Calendar, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Download, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -42,7 +42,9 @@ export default function MovementsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [cloneId, setCloneId] = useState(null);
   const [isCloning, setIsCloning] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [showViaDialog, setShowViaDialog] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState('transaction_id');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -191,6 +193,30 @@ export default function MovementsPage() {
     return parts[0];
   };
 
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = paginatedMovements.map(m => m.id);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        pageIds.forEach(id => next.delete(id));
+      } else {
+        pageIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const singleSelectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
+
   const handleClone = async () => {
     if (!cloneId || isCloning) return;
     const movementToClone = movements.find(m => m.id === cloneId);
@@ -250,7 +276,37 @@ export default function MovementsPage() {
     } finally {
       setDeleteId(null);
       setIsDeleting(false);
-      setSelectedId(prev => (prev === idToDelete ? null : prev));
+      setSelectedIds(prev => {
+        if (!prev.has(idToDelete)) return prev;
+        const next = new Set(prev);
+        next.delete(idToDelete);
+        return next;
+      });
+    }
+  };
+
+  const handleDownloadPdf = async (via) => {
+    if (selectedIds.size === 0 || isDownloadingPdf) return;
+    setIsDownloadingPdf(true);
+    try {
+      const response = await api.downloadMovementsPdf([...selectedIds], via);
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      const filename = selectedIds.size === 1
+        ? `registro-gate-${movements.find(m => m.id === [...selectedIds][0])?.transaction_id || [...selectedIds][0]}.pdf`
+        : `registros-gate-${selectedIds.size}-documentos.pdf`;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('PDF gerado com sucesso!');
+      setShowViaDialog(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao gerar PDF');
+    } finally {
+      setIsDownloadingPdf(false);
     }
   };
 
@@ -281,7 +337,136 @@ export default function MovementsPage() {
           </p>
         </div>
 
-        {/* Barra de ações - marque um registro na tabela pra habilitar Ver/Editar/Clonar/Excluir */}
+        {/* Filtros */}
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" />
+                Filtrar
+              </span>
+              {hasFilters && (
+                <button onClick={clearAllFilters} className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="clear-all-filters">
+                  <X className="w-3 h-3" />
+                  Limpar
+                </button>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
+                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs" data-testid="date-from-input" />
+              </div>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
+                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-xs" data-testid="date-to-input" />
+              </div>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Tipo</Label>
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="h-8 text-xs" data-testid="filter-type-select">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="ENTRADA">Entrada</SelectItem>
+                    <SelectItem value="SAIDA">Saída</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="h-8 text-xs" data-testid="filter-status-select">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="CHEIO">Cheio</SelectItem>
+                    <SelectItem value="VAZIO">Vazio</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
+                  <Input
+                    placeholder="Buscar..."
+                    value={searchClient}
+                    onChange={e => setSearchClient(e.target.value)}
+                    className="h-8 text-xs pl-6"
+                    data-testid="search-client-input"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Nº Container</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
+                  <Input
+                    placeholder="Buscar..."
+                    value={searchContainer}
+                    onChange={e => setSearchContainer(e.target.value)}
+                    className="h-8 text-xs pl-6"
+                    data-testid="search-container-input"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Nº Registro</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
+                  <Input
+                    placeholder="Buscar..."
+                    value={searchMovement}
+                    onChange={e => setSearchMovement(e.target.value)}
+                    className="h-8 text-xs pl-6"
+                    data-testid="search-movement-input"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Motorista</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
+                  <Input
+                    placeholder="Buscar..."
+                    value={searchDriver}
+                    onChange={e => setSearchDriver(e.target.value)}
+                    className="h-8 text-xs pl-6"
+                    data-testid="search-driver-input"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Filter + Clear buttons */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearAllFilters}
+                className="h-7 text-xs font-medium"
+                data-testid="filter-clear-button"
+              >
+                Limpar
+              </Button>
+              <Button
+                size="sm"
+                onClick={filterData}
+                className="h-7 text-xs font-medium bg-primary hover:bg-primary/90"
+                data-testid="filter-apply-button"
+              >
+                Filtrar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Barra de ações - marque um ou mais registros na tabela abaixo pra habilitar as ações */}
         <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
           <Button
             variant="ghost"
@@ -297,8 +482,8 @@ export default function MovementsPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => selectedId && navigate(`/movements/${selectedId}`)}
-            disabled={!selectedId}
+            onClick={() => singleSelectedId && navigate(`/movements/${singleSelectedId}`)}
+            disabled={!singleSelectedId}
             title="Ver/Imprimir"
             data-testid="view-movement-button"
             className="h-9 w-9 p-0 disabled:opacity-30"
@@ -308,8 +493,8 @@ export default function MovementsPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => selectedId && navigate(`/movements/${selectedId}/edit`)}
-            disabled={!selectedId}
+            onClick={() => singleSelectedId && navigate(`/movements/${singleSelectedId}/edit`)}
+            disabled={!singleSelectedId}
             title="Editar"
             data-testid="edit-movement-button"
             className="h-9 w-9 p-0 disabled:opacity-30"
@@ -319,8 +504,8 @@ export default function MovementsPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => selectedId && setCloneId(selectedId)}
-            disabled={!selectedId}
+            onClick={() => singleSelectedId && setCloneId(singleSelectedId)}
+            disabled={!singleSelectedId}
             title="Clonar"
             data-testid="clone-movement-button"
             className="h-9 w-9 p-0 disabled:opacity-30"
@@ -330,149 +515,32 @@ export default function MovementsPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => selectedId && setDeleteId(selectedId)}
-            disabled={!selectedId}
+            onClick={() => singleSelectedId && setDeleteId(singleSelectedId)}
+            disabled={!singleSelectedId}
             title="Excluir"
             data-testid="delete-movement-button"
             className="h-9 w-9 p-0 disabled:opacity-30"
           >
             <Trash2 className="w-4 h-4 text-destructive" />
           </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowViaDialog(true)}
+            disabled={selectedIds.size === 0}
+            title="Baixar PDF"
+            data-testid="download-pdf-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Download className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
-
-        {/* Filtros */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300">
-              <span className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Filtrar
-              </span>
-              {hasFilters && (
-                <button onClick={clearAllFilters} className="text-[11px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="clear-all-filters">
-                  <X className="w-3.5 h-3.5" />
-                  Limpar
-                </button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 space-y-3">
-            {/* Row 1: Dates + Type + Status */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Início</Label>
-                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 text-[13px]" data-testid="date-from-input" />
-              </div>
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Fim</Label>
-                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-[13px]" data-testid="date-to-input" />
-              </div>
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="h-9 text-sm" data-testid="filter-type-select">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="ENTRADA">Entrada</SelectItem>
-                    <SelectItem value="SAIDA">Saída</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Status</Label>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="h-9 text-sm" data-testid="filter-status-select">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="CHEIO">Cheio</SelectItem>
-                    <SelectItem value="VAZIO">Vazio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Row 2: Specific search fields */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    placeholder="Buscar cliente..."
-                    value={searchClient}
-                    onChange={e => setSearchClient(e.target.value)}
-                    className="h-9 text-sm pl-8"
-                    data-testid="search-client-input"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Container</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    placeholder="Buscar container..."
-                    value={searchContainer}
-                    onChange={e => setSearchContainer(e.target.value)}
-                    className="h-9 text-sm pl-8"
-                    data-testid="search-container-input"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Registro</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    placeholder="Buscar nº..."
-                    value={searchMovement}
-                    onChange={e => setSearchMovement(e.target.value)}
-                    className="h-9 text-sm pl-8"
-                    data-testid="search-movement-input"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Motorista</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    placeholder="Buscar motorista..."
-                    value={searchDriver}
-                    onChange={e => setSearchDriver(e.target.value)}
-                    className="h-9 text-sm pl-8"
-                    data-testid="search-driver-input"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Filter + Clear buttons */}
-            <div className="flex items-center gap-2 pt-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearAllFilters}
-                className="h-8 text-xs font-medium"
-                data-testid="filter-clear-button"
-              >
-                Limpar
-              </Button>
-              <Button
-                size="sm"
-                onClick={filterData}
-                className="h-8 text-xs font-medium bg-primary hover:bg-primary/90"
-                data-testid="filter-apply-button"
-              >
-                Filtrar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Table */}
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
@@ -490,7 +558,13 @@ export default function MovementsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="w-9 px-4 py-2.5"></th>
+                      <th className="w-9 px-4 py-2.5">
+                        <Checkbox
+                          checked={paginatedMovements.length > 0 && paginatedMovements.every(m => selectedIds.has(m.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="select-all-checkbox"
+                        />
+                      </th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('transaction_id')}>Nº<SortIcon field="transaction_id" /></th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('operation_type')}>Tipo<SortIcon field="operation_type" /></th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('client_name')}>Cliente<SortIcon field="client_name" /></th>
@@ -505,14 +579,14 @@ export default function MovementsPage() {
                     {paginatedMovements.map((movement, idx) => (
                       <tr
                         key={movement.id}
-                        onClick={() => setSelectedId(prev => (prev === movement.id ? null : movement.id))}
-                        className={`cursor-pointer transition-colors ${selectedId === movement.id ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
+                        onClick={() => toggleSelect(movement.id)}
+                        className={`cursor-pointer transition-colors ${selectedIds.has(movement.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
                         data-testid="movement-row"
                       >
                         <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
                           <Checkbox
-                            checked={selectedId === movement.id}
-                            onCheckedChange={() => setSelectedId(prev => (prev === movement.id ? null : movement.id))}
+                            checked={selectedIds.has(movement.id)}
+                            onCheckedChange={() => toggleSelect(movement.id)}
                             data-testid="movement-row-checkbox"
                           />
                         </td>
@@ -627,6 +701,42 @@ export default function MovementsPage() {
             <AlertDialogAction onClick={handleClone} disabled={isCloning} className="bg-green-600 hover:bg-green-700" data-testid="confirm-clone">
               {isCloning ? 'Clonando...' : 'Clonar'}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Via Dialog - qual via do comprovante baixar em PDF */}
+      <AlertDialog open={showViaDialog} onOpenChange={(open) => !isDownloadingPdf && setShowViaDialog(open)}>
+        <AlertDialogContent data-testid="via-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Qual via deseja baixar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedIds.size === 1
+                ? 'Será gerado um PDF com o comprovante do registro selecionado.'
+                : `Será gerado um único PDF com ${selectedIds.size} páginas, uma para cada registro selecionado.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDownloadingPdf} data-testid="cancel-via">Cancelar</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleDownloadPdf('TERMINAL')}
+              disabled={isDownloadingPdf}
+              data-testid="via-terminal-button"
+            >
+              {isDownloadingPdf && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Via Terminal
+            </Button>
+            <Button
+              type="button"
+              onClick={() => handleDownloadPdf('MOTORISTA')}
+              disabled={isDownloadingPdf}
+              data-testid="via-motorista-button"
+            >
+              {isDownloadingPdf && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Via Motorista
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

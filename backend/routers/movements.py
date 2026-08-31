@@ -1,7 +1,7 @@
 import asyncio
 import os
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from typing import Optional, List, Literal
 import io
 import re
 import json
@@ -53,6 +53,7 @@ from models import (
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, decode_token
 from reports import (
     generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel,
+    generate_movement_voucher_pdf,
     now_brt, to_brt, merge_company, DEFAULT_COMPANY
 )
 
@@ -166,6 +167,32 @@ async def create_movement(movement_input: ContainerMovementCreate, current_user:
     })
     
     return response
+
+class MovementPDFRequest(PydanticBaseModel):
+    movement_ids: List[str]
+    via: Literal["TERMINAL", "MOTORISTA"]
+
+@api_router.post("/movements/pdf")
+async def download_movements_pdf(request: MovementPDFRequest, current_user: dict = Depends(get_current_active_user)):
+    if not request.movement_ids:
+        raise HTTPException(status_code=400, detail="Selecione pelo menos um registro")
+
+    docs = await db.movements.find({"id": {"$in": request.movement_ids}}, {"_id": 0}).to_list(None)
+    if not docs:
+        raise HTTPException(status_code=404, detail="Nenhum registro encontrado")
+
+    order = {mid: i for i, mid in enumerate(request.movement_ids)}
+    docs.sort(key=lambda d: order.get(d['id'], 0))
+
+    company = await get_company_settings()
+    pdf_bytes = generate_movement_voucher_pdf(docs, request.via, company)
+
+    filename = f"registro-gate-{docs[0].get('transaction_id')}.pdf" if len(docs) == 1 else f"registros-gate-{len(docs)}-documentos.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 @api_router.get("/movements")
 async def get_movements(
