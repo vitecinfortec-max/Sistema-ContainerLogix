@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -25,9 +25,72 @@ const FieldLabel = ({ children }) => (
   <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{children}</Label>
 );
 
-// Bloco de endereço reutilizável (rua/número/bairro/CEP + cidade/UF em
-// cascata, cidade filtrada pela UF via /api/locations). Value shape:
-// { street, number, neighborhood, zip, city, state }.
+// Cidade/UF em cascata sozinho (sem rua/número/bairro/CEP) - pra telas que
+// já têm seu próprio campo de endereço/logradouro e só precisam estruturar
+// cidade+UF (ex: Ordem de Serviço, Abastecimento). Value shape: { city, state }.
+// `flat` renderiza sem wrapper de grid (2 <div> soltas) pra encaixar como
+// duas células dentro de um grid externo já existente, no lugar dos dois
+// campos de texto livre que ela substitui.
+export function CityStateFields({ value, onChange, cityLabel = 'Cidade', stateLabel = 'UF', flat = false }) {
+  const v = value || {};
+  const [cities, setCities] = useState([]);
+
+  useEffect(() => {
+    if (!v.state) { setCities([]); return; }
+    api.getCitiesByUF(v.state)
+      .then((r) => setCities(r.data || []))
+      .catch(() => setCities([]));
+  }, [v.state]);
+
+  const setState = (val) => {
+    const uf = val === '_empty' ? '' : val;
+    onChange({ ...v, state: uf, city: '' });
+  };
+
+  const stateField = (
+    <div>
+      <FieldLabel>{stateLabel}</FieldLabel>
+      <Select value={v.state || '_empty'} onValueChange={setState}>
+        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="-- UF --" /></SelectTrigger>
+        <SelectContent>
+          {UF_OPTIONS.map(([uf, nome]) => (
+            <SelectItem key={uf} value={uf} className="text-sm">{uf} - {nome}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const cityField = (
+    <div className={flat ? '' : 'col-span-2'}>
+      <FieldLabel>{cityLabel}</FieldLabel>
+      <Autocomplete
+        value={v.city || ''}
+        onChange={(val) => onChange({ ...v, city: val })}
+        options={cities}
+        displayField={(c) => c}
+        placeholder={v.state ? 'Digite para buscar a cidade...' : 'Selecione a UF primeiro'}
+        className="h-9 text-sm"
+      />
+    </div>
+  );
+
+  if (flat) {
+    return <Fragment>{cityField}{stateField}</Fragment>;
+  }
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {stateField}
+      {cityField}
+    </div>
+  );
+}
+
+// Bloco de endereço completo reutilizável (rua/número/bairro/CEP + cidade/UF
+// em cascata, cidade filtrada pela UF via /api/locations). Value shape:
+// { street, number, neighborhood, zip, city, state }. Mantido self-contained
+// (não reaproveita CityStateFields) pra não alterar o layout já testado na
+// Fase 2 - a duplicação da lógica de busca de cidades é pequena e aceitável.
 export function AddressFields({ value, onChange }) {
   const v = value || {};
   const [cities, setCities] = useState([]);

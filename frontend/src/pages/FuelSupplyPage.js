@@ -12,6 +12,7 @@ import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { ComboField } from '../components/ui/combo-field';
 import { Autocomplete } from '../components/Autocomplete';
+import { CityStateFields } from '../components/AddressFields';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -361,8 +362,11 @@ export default function FuelSupplyPage() {
                 onChange('supplier_id', sp?.id || '');
               }} options={suppliers.map((s) => [s.name, s.name])}
                 searchPlaceholder="Buscar fornecedor..." emptyLabel="Nenhum fornecedor encontrado" testid="fuel-supplier" />
-              <Field label="Cidade" value={form.city} onChange={(v) => onChange('city', v)} testid="fuel-city" />
-              <Field label="Estado" value={form.state} onChange={(v) => onChange('state', v.toUpperCase().slice(0, 2))} testid="fuel-state" placeholder="UF" />
+              <CityStateFields
+                flat
+                value={{ city: form.city, state: form.state }}
+                onChange={({ city, state }) => { onChange('city', city); onChange('state', state); }}
+              />
             </div>
 
             <SectionTitle>Combustível / ARLA</SectionTitle>

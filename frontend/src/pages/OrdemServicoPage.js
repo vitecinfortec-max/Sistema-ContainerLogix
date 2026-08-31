@@ -14,6 +14,7 @@ import {
 } from '../components/ui/select';
 import { ComboField } from '../components/ui/combo-field';
 import { Autocomplete } from '../components/Autocomplete';
+import { CityStateFields } from '../components/AddressFields';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -403,7 +404,20 @@ export default function OrdemServicoPage() {
                 <Field label="CPF/CNPJ" value={form.person_doc} onChange={(v) => onChange('person_doc', v)} testid="os-person-doc" />
                 <Field label="Telefone" value={form.contact_value} onChange={(v) => onChange('contact_value', v)} testid="os-phone" />
                 <Field label="Endereço *" value={form.address} onChange={(v) => onChange('address', v)} testid="os-address" />
-                <Field label="Cidade/UF" value={form.city_uf} onChange={(v) => onChange('city_uf', v)} testid="os-city" />
+                <CityStateFields
+                  flat
+                  value={{ city: form.city, state: form.state }}
+                  onChange={({ city, state }) => {
+                    onChange('city', city);
+                    onChange('state', state);
+                    onChange('city_uf', city && state ? `${city}/${state}` : (city || state || ''));
+                  }}
+                />
+                {!form.city && !form.state && form.city_uf && (
+                  <p className="col-span-3 text-[11px] text-slate-400 dark:text-slate-500 -mt-2">
+                    Cidade/UF cadastrada anteriormente (texto livre): {form.city_uf}
+                  </p>
+                )}
                 <CheckboxField label="Retorno" value={form.is_retorno} onChange={(v) => onChange('is_retorno', v)} />
               </div>
 
@@ -511,7 +525,7 @@ function buildEmpty() {
     priority: 'MEDIA', requires_pt: false, os_type: 'EXTERNO', status: 'ABERTO',
     category: '', equipment_plate: '', equipment_id: '', person_doc: '', person_name: '',
     person_id: '', person_type: '',
-    address: '', city_uf: '', is_retorno: false, contact_type: 'banco', contact_value: '',
+    address: '', city_uf: '', city: '', state: '', is_retorno: false, contact_type: 'banco', contact_value: '',
     opened_at: new Date().toISOString().slice(0, 16),
     budget_at: '', approved_at: '', forecast_close_at: '', closed_at: '',
     appropriation_plate: '', supervision_type: 'outros', supervision_value: '',

@@ -2109,7 +2109,9 @@ class OrdemServico(BaseModel):
     person_id: Optional[str] = None  # Referência ao Driver.id ou Employee.id
     person_type: Optional[str] = None  # motorista | funcionario
     address: Optional[str] = None  # Endereço
-    city_uf: Optional[str] = None  # ex: PARACURU/CE
+    city_uf: Optional[str] = None  # legado (texto livre "CIDADE/UF") - mantido só pra registros antigos, ver city/state
+    city: Optional[str] = None
+    state: Optional[str] = None
     is_retorno: bool = False  # Checkbox Retorno
     contact_type: str = 'banco'  # banco | outros
     contact_value: Optional[str] = None
@@ -2174,6 +2176,8 @@ class OrdemServicoCreate(BaseModel):
     person_type: Optional[str] = None
     address: Optional[str] = None
     city_uf: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
     is_retorno: bool = False
     contact_type: str = 'banco'
     contact_value: Optional[str] = None
