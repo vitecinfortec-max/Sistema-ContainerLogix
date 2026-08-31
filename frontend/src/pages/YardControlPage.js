@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { Checkbox } from '../components/ui/checkbox';
 import { Package, Clock, AlertTriangle, FileSpreadsheet, Search, Filter, X, Eye, LogOut, Users, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -37,7 +38,8 @@ export default function YardControlPage() {
   const [drivers, setDrivers] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
   // Modal de Saída Rápida
   const [exitModalOpen, setExitModalOpen] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState(null);
@@ -166,6 +168,27 @@ export default function YardControlPage() {
     }
   };
 
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = paginatedContainers.map(c => c.id);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach(id => next.delete(id));
+      else pageIds.forEach(id => next.add(id));
+      return next;
+    });
+  };
+
+  const singleSelectedContainer = selectedIds.size === 1 ? containers.find(c => c.id === [...selectedIds][0]) : null;
+
   const downloadExcel = async () => {
     try {
       const params = { ...filters };
@@ -236,6 +259,12 @@ export default function YardControlPage() {
       });
       toast.success(`Saída do container ${selectedContainer.container_number} registrada com sucesso!`);
       setExitModalOpen(false);
+      setSelectedIds(prev => {
+        if (!prev.has(selectedContainer.id)) return prev;
+        const next = new Set(prev);
+        next.delete(selectedContainer.id);
+        return next;
+      });
       loadData(filters);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao registrar saída');
@@ -247,17 +276,11 @@ export default function YardControlPage() {
   return (
     <Layout>
       <div className="space-y-6" data-testid="yard-control-page">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Controle de Pátio
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Containers em estoque e tempo de permanência</p>
-          </div>
-          <Button onClick={downloadExcel} data-testid="download-excel-btn" className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90">
-            <FileSpreadsheet className="w-4 h-4 mr-2" />
-            Exportar Excel
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            Controle de Pátio
+          </h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Containers em estoque e tempo de permanência</p>
         </div>
 
         {/* Cards de Estatísticas */}
@@ -326,24 +349,22 @@ export default function YardControlPage() {
         )}
 
         {/* Filtros */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300">
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4" />
-                Filtros
-              </div>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5" />
+              Filtrar
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          <CardContent className="p-3 space-y-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
               <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Status</Label>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
                 <Select
                   value={filters.status_filter || 'all'}
                   onValueChange={(value) => setFilters(prev => ({ ...prev, status_filter: value === 'all' ? '' : value }))}
                 >
-                  <SelectTrigger data-testid="filter-status" className="h-9 text-sm">
+                  <SelectTrigger data-testid="filter-status" className="h-8 text-xs">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -353,14 +374,14 @@ export default function YardControlPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Tipo</Label>
                 <Select
                   value={filters.movement_type || 'all'}
                   onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
                 >
-                  <SelectTrigger data-testid="filter-movement-type" className="h-9 text-sm">
+                  <SelectTrigger data-testid="filter-movement-type" className="h-8 text-xs">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -371,54 +392,52 @@ export default function YardControlPage() {
                   </SelectContent>
                 </Select>
               </div>
-              
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
-                <div className="relative">
-                  <Input
-                    value={filters.client_name}
-                    onChange={(e) => setFilters(prev => ({ ...prev, client_name: e.target.value }))}
-                    onFocus={() => setClientInputFocused(true)}
-                    onBlur={() => setTimeout(() => setClientInputFocused(false), 200)}
-                    placeholder="Digite para buscar..."
-                    data-testid="filter-client"
-                    className="h-9 text-sm"
-                  />
-                  {clientInputFocused && filters.client_name && filters.client_name.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                      {clients
-                        .filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase()))
-                        .slice(0, 10)
-                        .map(client => (
-                          <div
-                            key={client.id}
-                            className="px-3 py-2 cursor-pointer hover:bg-muted text-[13px]"
-                            onClick={() => {
-                              setFilters(prev => ({ ...prev, client_name: client.name }));
-                              setClientInputFocused(false);
-                            }}
-                          >
-                            {client.name}
-                          </div>
-                        ))
-                      }
-                      {clients.filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase())).length === 0 && (
-                        <div className="px-3 py-2 text-[13px] text-muted-foreground">
-                          Nenhum cliente encontrado
+
+              <div className="relative">
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
+                <Input
+                  value={filters.client_name}
+                  onChange={(e) => setFilters(prev => ({ ...prev, client_name: e.target.value }))}
+                  onFocus={() => setClientInputFocused(true)}
+                  onBlur={() => setTimeout(() => setClientInputFocused(false), 200)}
+                  placeholder="Buscar..."
+                  data-testid="filter-client"
+                  className="h-8 text-xs"
+                />
+                {clientInputFocused && filters.client_name && filters.client_name.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {clients
+                      .filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase()))
+                      .slice(0, 10)
+                      .map(client => (
+                        <div
+                          key={client.id}
+                          className="px-3 py-2 cursor-pointer hover:bg-muted text-[13px]"
+                          onClick={() => {
+                            setFilters(prev => ({ ...prev, client_name: client.name }));
+                            setClientInputFocused(false);
+                          }}
+                        >
+                          {client.name}
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                      ))
+                    }
+                    {clients.filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase())).length === 0 && (
+                      <div className="px-3 py-2 text-[13px] text-muted-foreground">
+                        Nenhum cliente encontrado
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              
+
               <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Armador</Label>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Armador</Label>
                 <Select
                   value={filters.shipping_line || 'all'}
                   onValueChange={(value) => setFilters(prev => ({ ...prev, shipping_line: value === 'all' ? '' : value }))}
                 >
-                  <SelectTrigger data-testid="filter-shipping" className="h-9 text-sm">
+                  <SelectTrigger data-testid="filter-shipping" className="h-8 text-xs">
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
@@ -431,11 +450,9 @@ export default function YardControlPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+
               <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Dias mínimos</Label>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Dias mínimos</Label>
                 <Input
                   type="number"
                   min="0"
@@ -443,44 +460,85 @@ export default function YardControlPage() {
                   onChange={(e) => setFilters(prev => ({ ...prev, min_days: e.target.value }))}
                   placeholder="Ex: 30"
                   data-testid="filter-min-days"
-                  className="h-9 text-sm"
+                  className="h-8 text-xs"
                 />
               </div>
-              
+
               <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Inicial</Label>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Inicial</Label>
                 <Input
                   type="date"
                   value={filters.date_from}
                   onChange={(e) => setFilters(prev => ({ ...prev, date_from: e.target.value }))}
                   data-testid="filter-date-from"
-                  className="h-9 text-[13px]"
+                  className="h-8 text-xs"
                 />
               </div>
-              
+
               <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Final</Label>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Final</Label>
                 <Input
                   type="date"
                   value={filters.date_to}
                   onChange={(e) => setFilters(prev => ({ ...prev, date_to: e.target.value }))}
                   data-testid="filter-date-to"
-                  className="h-9 text-[13px]"
+                  className="h-8 text-xs"
                 />
               </div>
-              
-              <div className="flex items-end gap-2 md:col-span-2">
-                <Button onClick={applyFilters} className="flex-1 h-8 text-xs font-medium bg-primary hover:bg-primary/90" data-testid="apply-filters-btn">
-                  <Search className="w-4 h-4 mr-2" />
-                  Filtrar
-                </Button>
-                <Button variant="outline" onClick={clearFilters} className="h-8 text-xs font-medium" data-testid="clear-filters-btn">
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-0.5">
+              <Button variant="outline" onClick={clearFilters} className="h-7 text-xs font-medium" data-testid="clear-filters-btn">
+                Limpar
+              </Button>
+              <Button onClick={applyFilters} className="h-7 text-xs font-medium bg-primary hover:bg-primary/90" data-testid="apply-filters-btn">
+                Filtrar
+              </Button>
             </div>
           </CardContent>
         </Card>
+
+        {/* Barra de ações - marque um container na tabela abaixo pra habilitar as ações */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedContainer && navigate(`/movements/${singleSelectedContainer.id}`)}
+            disabled={!singleSelectedContainer}
+            title="Ver Detalhes"
+            data-testid="view-container-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedContainer && openExitModal(singleSelectedContainer)}
+            disabled={!singleSelectedContainer || singleSelectedContainer.in_stock === false}
+            title="Registrar Saída"
+            data-testid="exit-container-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <LogOut className="w-4 h-4 text-destructive" />
+          </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={downloadExcel}
+            title="Exportar Excel"
+            data-testid="download-excel-btn"
+            className="h-9 w-9 p-0"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-green-600" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
 
         {/* Tabela de Containers */}
         <Card>
@@ -507,6 +565,13 @@ export default function YardControlPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-muted/50">
+                      <th className="w-9 py-2.5 px-4">
+                        <Checkbox
+                          checked={paginatedContainers.length > 0 && paginatedContainers.every(c => selectedIds.has(c.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="select-all-checkbox"
+                        />
+                      </th>
                       <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
                       <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
                       <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
@@ -516,16 +581,23 @@ export default function YardControlPage() {
                       <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data Entrada</th>
                       <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data Saída</th>
                       <th className="text-center py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Dias no Pátio</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedContainers.map(container => (
-                      <tr 
-                        key={container.id} 
-                        className="border-b hover:bg-muted/50"
+                      <tr
+                        key={container.id}
+                        onClick={() => toggleSelect(container.id)}
+                        className={`border-b cursor-pointer transition-colors ${selectedIds.has(container.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-muted/50'}`}
                         data-testid={`container-row-${container.container_number}`}
                       >
+                        <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(container.id)}
+                            onCheckedChange={() => toggleSelect(container.id)}
+                            data-testid="container-row-checkbox"
+                          />
+                        </td>
                         <td className="py-2.5 px-4">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-mono font-bold text-slate-700 dark:text-slate-300">{container.container_number}</span>
@@ -563,32 +635,6 @@ export default function YardControlPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${getDaysColor(container.days_in_yard)}`}>
                             {container.days_in_yard} dias
                           </span>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <div className="flex items-center gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => navigate(`/movements/${container.id}`)}
-                              title="Ver Detalhes"
-                              data-testid={`view-container-${container.container_number}`}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            {container.in_stock !== false && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                className="h-7 w-7 text-red-600 hover:text-red-700"
-                                onClick={() => openExitModal(container)}
-                                title="Registrar Saída"
-                                data-testid={`exit-container-${container.container_number}`}
-                              >
-                                <LogOut className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
                         </td>
                       </tr>
                     ))}

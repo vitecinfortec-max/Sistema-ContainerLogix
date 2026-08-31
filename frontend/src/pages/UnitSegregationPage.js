@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
+import { Checkbox } from '../components/ui/checkbox';
 import { Package, Plus, Eye, Trash2, Search, Printer, Pencil, Unlock, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -20,6 +21,7 @@ export default function UnitSegregationPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   // Modal de novo/editar
   const [modalOpen, setModalOpen] = useState(false);
@@ -225,6 +227,12 @@ export default function UnitSegregationPage() {
     try {
       await api.deleteUnitSegregation(id);
       toast.success('Segregação excluída!');
+      setSelectedIds(prev => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadSegregations();
     } catch (error) {
       toast.error('Erro ao excluir');
@@ -273,49 +281,60 @@ export default function UnitSegregationPage() {
     return styles[status] || 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200';
   };
 
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = segregations.map(s => s.id);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach(id => next.delete(id));
+      else pageIds.forEach(id => next.add(id));
+      return next;
+    });
+  };
+
+  const singleSelectedItem = selectedIds.size === 1 ? segregations.find(s => s.id === [...selectedIds][0]) : null;
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="unit-segregation-page">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Segregação de Unidade</h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Reserva de containers para clientes específicos</p>
-          </div>
-          <Button
-            onClick={() => { resetForm(); setModalOpen(true); }}
-            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
-            data-testid="new-segregation-btn"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Nova Segregação
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Segregação de Unidade</h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Reserva de containers para clientes específicos</p>
         </div>
 
         {/* Filtros */}
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-[13px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
-              <Search className="w-4 h-4" />
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
               Filtrar
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4">
-            <div className="flex gap-3 items-end flex-wrap">
-              <div className="flex-1 min-w-[180px] max-w-xs">
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Container</Label>
+          <CardContent className="p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Container</Label>
                 <Input
                   placeholder="Nº do Container"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-9 text-sm"
+                  className="h-8 text-xs"
                   data-testid="search-container"
                 />
               </div>
-              <div className="w-40">
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Status</Label>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
                 <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-8 text-xs">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
@@ -326,16 +345,91 @@ export default function UnitSegregationPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button size="sm" className="h-9 text-xs font-medium" onClick={() => {
+              <Button size="sm" className="h-8 text-xs font-medium" onClick={() => {
                 setPagination(prev => ({ ...prev, page: 1 }));
                 loadSegregations();
               }}>
-                <Search className="w-4 h-4 mr-1" />
+                <Search className="w-3.5 h-3.5 mr-1" />
                 Buscar
               </Button>
             </div>
           </CardContent>
         </Card>
+
+        {/* Barra de ações - marque uma segregação na tabela abaixo pra habilitar as ações */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { resetForm(); setModalOpen(true); }}
+            title="Adicionar"
+            data-testid="new-segregation-btn"
+            className="h-9 w-9 p-0"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedItem && viewDetails(singleSelectedItem)}
+            disabled={!singleSelectedItem}
+            title="Ver Detalhes"
+            data-testid="view-segregation-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedItem && openEditModal(singleSelectedItem)}
+            disabled={!singleSelectedItem || singleSelectedItem.status !== 'ATIVO'}
+            title="Editar"
+            data-testid="edit-segregation-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedItem && handleRelease(singleSelectedItem.id)}
+            disabled={!singleSelectedItem || singleSelectedItem.status !== 'ATIVO'}
+            title="Liberar"
+            data-testid="release-segregation-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Unlock className="w-4 h-4 text-amber-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedItem && handlePrint(singleSelectedItem.id)}
+            disabled={!singleSelectedItem}
+            title="Imprimir PDF"
+            data-testid="print-segregation-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Printer className="w-4 h-4 text-green-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)}
+            disabled={!singleSelectedItem}
+            title="Excluir"
+            data-testid="delete-segregation-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
 
         {/* Lista */}
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
@@ -357,17 +451,34 @@ export default function UnitSegregationPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="w-9 px-4 py-2.5">
+                        <Checkbox
+                          checked={segregations.length > 0 && segregations.every(s => selectedIds.has(s.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="select-all-checkbox"
+                        />
+                      </th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Reservado</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Containers</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {segregations.map((item, idx) => (
-                      <tr key={item.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}>
+                      <tr
+                        key={item.id}
+                        onClick={() => toggleSelect(item.id)}
+                        className={`cursor-pointer transition-colors ${selectedIds.has(item.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
+                      >
+                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(item.id)}
+                            onCheckedChange={() => toggleSelect(item.id)}
+                            data-testid="segregation-row-checkbox"
+                          />
+                        </td>
                         <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{item.segregation_number}</td>
                         <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{item.client_name}</td>
                         <td className="px-4 py-2.5">
@@ -394,29 +505,6 @@ export default function UnitSegregationPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${getStatusBadge(item.status)}`}>
                             {item.status}
                           </span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-0.5">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => viewDetails(item)} title="Ver detalhes">
-                              <Eye className="w-3.5 h-3.5 text-primary" />
-                            </Button>
-                            {item.status === 'ATIVO' && (
-                              <>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditModal(item)} title="Editar">
-                                  <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                                </Button>
-                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleRelease(item.id)} title="Liberar">
-                                  <Unlock className="w-3.5 h-3.5 text-amber-600" />
-                                </Button>
-                              </>
-                            )}
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handlePrint(item.id)} title="Imprimir PDF">
-                              <Printer className="w-3.5 h-3.5 text-green-600" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(item.id)} title="Excluir">
-                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                            </Button>
-                          </div>
                         </td>
                       </tr>
                     ))}

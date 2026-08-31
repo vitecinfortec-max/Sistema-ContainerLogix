@@ -154,80 +154,80 @@ export default function ReportsMovementsPage() {
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gere e exporte relatórios das movimentações de containers</p>
         </div>
 
-        <div className="border-t border-slate-200 dark:border-slate-700"></div>
-
         {/* Filters */}
-        <Card className="shadow-sm">
-          <CardHeader className="bg-slate-50 dark:bg-slate-800/50 pb-3 pt-4">
-            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
-              <Calendar className="w-4 h-4" />
-              Filtros
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" />
+                Filtrar
+              </span>
+              {hasFilters && (
+                <button onClick={clearFilters} className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="report-clear-filters">
+                  <X className="w-3 h-3" />
+                  Limpar
+                </button>
+              )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4 space-y-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="w-36">
-                <Label className="text-[11px] text-slate-500 dark:text-slate-400 mb-1 block">Data Início</Label>
+          <CardContent className="p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
                 <Input
                   type="date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
-                  className="h-10 text-[13px]"
+                  className="h-8 text-xs"
                   data-testid="report-date-from"
                 />
               </div>
-              <div className="w-36">
-                <Label className="text-[11px] text-slate-500 dark:text-slate-400 mb-1 block">Data Fim</Label>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
                 <Input
                   type="date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
-                  className="h-10 text-[13px]"
+                  className="h-8 text-xs"
                   data-testid="report-date-to"
                 />
               </div>
-              {hasFilters && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={clearFilters}
-                  className="h-10 text-[13px] text-slate-600 dark:text-slate-400"
-                  data-testid="report-clear-filters"
-                >
-                  <X className="w-3.5 h-3.5 mr-1" />
-                  Limpar
-                </Button>
-              )}
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger className="h-10 text-[13px]" data-testid="report-filter-type">
-                  <SelectValue placeholder="Todas as Operações" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todas as Operações</SelectItem>
-                  <SelectItem value="ENTRADA" className="text-[13px]">Apenas Entradas</SelectItem>
-                  <SelectItem value="SAIDA" className="text-[13px]">Apenas Saídas</SelectItem>
-                  <SelectItem value="ESTOQUE" className="text-[13px]">Estoque Atual</SelectItem>
-                </SelectContent>
-              </Select>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Operação</Label>
+                <Select value={filterType} onValueChange={setFilterType}>
+                  <SelectTrigger className="h-8 text-xs" data-testid="report-filter-type">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-[13px]">Todas as Operações</SelectItem>
+                    <SelectItem value="ENTRADA" className="text-[13px]">Apenas Entradas</SelectItem>
+                    <SelectItem value="SAIDA" className="text-[13px]">Apenas Saídas</SelectItem>
+                    <SelectItem value="ESTOQUE" className="text-[13px]">Estoque Atual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="h-10 text-[13px]" data-testid="report-filter-status">
-                  <SelectValue placeholder="Todos os Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todos os Status</SelectItem>
-                  <SelectItem value="CHEIO" className="text-[13px]">Cheio</SelectItem>
-                  <SelectItem value="VAZIO" className="text-[13px]">Vazio</SelectItem>
-                </SelectContent>
-              </Select>
+              <div>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="h-8 text-xs" data-testid="report-filter-status">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-[13px]">Todos os Status</SelectItem>
+                    <SelectItem value="CHEIO" className="text-[13px]">Cheio</SelectItem>
+                    <SelectItem value="VAZIO" className="text-[13px]">Vazio</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Cliente - Autocomplete (digite para buscar) */}
-              <div className="relative" ref={clientBoxRef}>
+              <div ref={clientBoxRef}>
+                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
+                <div className="relative">
                 <Input
-                  placeholder="Digite para buscar cliente..."
+                  placeholder="Buscar..."
                   value={clientSearch}
                   onChange={(e) => handleClientSearch(e.target.value)}
                   onFocus={() => {
@@ -235,7 +235,7 @@ export default function ReportsMovementsPage() {
                       setShowClientSuggestions(true);
                     }
                   }}
-                  className={`h-10 text-[13px] pr-8 ${filterClient !== 'all' ? 'border-emerald-500 bg-emerald-50' : ''}`}
+                  className={`h-8 text-xs pr-8 ${filterClient !== 'all' ? 'border-emerald-500 bg-emerald-50' : ''}`}
                   data-testid="report-filter-client"
                 />
                 {filterClient !== 'all' && (
@@ -272,6 +272,7 @@ export default function ReportsMovementsPage() {
                     Nenhum cliente encontrado
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </CardContent>
