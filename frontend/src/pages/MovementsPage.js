@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Plus, Search, Trash2, Container as ContainerIcon, Eye, Edit, Wifi, WifiOff, Copy, Calendar, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
@@ -41,6 +42,7 @@ export default function MovementsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [cloneId, setCloneId] = useState(null);
   const [isCloning, setIsCloning] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState('transaction_id');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -248,6 +250,7 @@ export default function MovementsPage() {
     } finally {
       setDeleteId(null);
       setIsDeleting(false);
+      setSelectedId(prev => (prev === idToDelete ? null : prev));
     }
   };
 
@@ -265,26 +268,75 @@ export default function MovementsPage() {
     <Layout>
       <div className="space-y-5" data-testid="movements-page">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Registro de Gate
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
-              Histórico completo de entradas e saídas
-              <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                {isConnected ? 'Sincronizado' : 'Offline'}
-              </span>
-            </p>
-          </div>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            Registro de Gate
+          </h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
+            Histórico completo de entradas e saídas
+            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+              {isConnected ? 'Sincronizado' : 'Offline'}
+            </span>
+          </p>
+        </div>
+
+        {/* Barra de ações - marque um registro na tabela pra habilitar Ver/Editar/Clonar/Excluir */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
           <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate('/movements/new')}
-            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
+            title="Adicionar"
             data-testid="add-movement-button"
+            className="h-9 w-9 p-0"
           >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Novo Registro
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => selectedId && navigate(`/movements/${selectedId}`)}
+            disabled={!selectedId}
+            title="Ver/Imprimir"
+            data-testid="view-movement-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => selectedId && navigate(`/movements/${selectedId}/edit`)}
+            disabled={!selectedId}
+            title="Editar"
+            data-testid="edit-movement-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Edit className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => selectedId && setCloneId(selectedId)}
+            disabled={!selectedId}
+            title="Clonar"
+            data-testid="clone-movement-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Copy className="w-4 h-4 text-green-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => selectedId && setDeleteId(selectedId)}
+            disabled={!selectedId}
+            title="Excluir"
+            data-testid="delete-movement-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
           </Button>
         </div>
 
@@ -438,6 +490,7 @@ export default function MovementsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="w-9 px-4 py-2.5"></th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('transaction_id')}>Nº<SortIcon field="transaction_id" /></th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('operation_type')}>Tipo<SortIcon field="operation_type" /></th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('client_name')}>Cliente<SortIcon field="client_name" /></th>
@@ -446,16 +499,23 @@ export default function MovementsPage() {
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('status')}>Status<SortIcon field="status" /></th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('created_at')}>Emissão<SortIcon field="created_at" /></th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('user_name')}>Usuário<SortIcon field="user_name" /></th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedMovements.map((movement, idx) => (
                       <tr
                         key={movement.id}
-                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                        onClick={() => setSelectedId(prev => (prev === movement.id ? null : movement.id))}
+                        className={`cursor-pointer transition-colors ${selectedId === movement.id ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
                         data-testid="movement-row"
                       >
+                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedId === movement.id}
+                            onCheckedChange={() => setSelectedId(prev => (prev === movement.id ? null : movement.id))}
+                            data-testid="movement-row-checkbox"
+                          />
+                        </td>
                         <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{movement.transaction_id}</td>
                         <td className="px-4 py-2.5">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
@@ -482,22 +542,6 @@ export default function MovementsPage() {
                           {format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                         </td>
                         <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">{getShortName(movement.user_name)}</td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-0.5">
-                            <Button variant="ghost" size="sm" onClick={() => navigate(`/movements/${movement.id}`)} title="Ver/Imprimir" data-testid="view-movement-button" className="h-7 w-7 p-0">
-                              <Eye className="w-3.5 h-3.5 text-primary" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => navigate(`/movements/${movement.id}/edit`)} title="Editar" data-testid="edit-movement-button" className="h-7 w-7 p-0">
-                              <Edit className="w-3.5 h-3.5 text-blue-600" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setCloneId(movement.id)} title="Clonar" data-testid="clone-movement-button" className="h-7 w-7 p-0">
-                              <Copy className="w-3.5 h-3.5 text-green-600" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setDeleteId(movement.id)} title="Deletar" data-testid="delete-movement-button" className="h-7 w-7 p-0">
-                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                            </Button>
-                          </div>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
