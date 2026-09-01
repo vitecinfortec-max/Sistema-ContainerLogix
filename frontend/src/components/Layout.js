@@ -2,9 +2,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from './ui/breadcrumb';
-import { 
-  LayoutDashboard, 
-  Truck, 
+import {
+  Truck,
   Building2, 
   FileText, 
   LogOut, 
@@ -410,9 +409,10 @@ export default function Layout({ children }) {
     navigate('/login');
   };
 
-  const mainNavItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  ];
+  // Dashboard não tem mais item próprio no menu - a página continua sendo a
+  // tela inicial (redirect de "/" em App.js), só se volta a ela clicando no
+  // nome "ContainerLogix" (logo/breadcrumb, já linkam pra /dashboard).
+  const mainNavItems = [];
 
   // Módulos contratados: itens sem moduleKey (Dados da Empresa, Usuários,
   // Módulos) nunca são bloqueados por essa trava - são gestão da própria
