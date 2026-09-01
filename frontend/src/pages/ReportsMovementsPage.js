@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Download, FileText, FileSpreadsheet, Calendar, X, BarChart3 } from 'lucide-react';
+import { FileText, FileSpreadsheet, Calendar, X, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -307,6 +307,32 @@ export default function ReportsMovementsPage() {
           </CardContent>
         </Card>
 
+        {/* Barra de ações */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={downloadPDF}
+            disabled={loading}
+            title="Baixar PDF"
+            data-testid="download-pdf-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <FileText className="w-4 h-4 text-red-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={downloadExcel}
+            disabled={loading}
+            title="Baixar Excel"
+            data-testid="download-excel-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-green-600" />
+          </Button>
+        </div>
+
         {/* Entradas e Saídas por Dia */}
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-chart-card">
           <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
@@ -343,26 +369,6 @@ export default function ReportsMovementsPage() {
           </CardContent>
         </Card>
 
-        {/* Download Card - Only Excel */}
-        <Card className="border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow max-w-md">
-          <CardHeader className="pb-2 pt-4">
-            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
-              Relatório Excel
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-4">
-            <Button
-              onClick={downloadExcel}
-              disabled={loading}
-              className="w-full h-10 text-[13px] font-semibold uppercase tracking-wide bg-emerald-600 hover:bg-emerald-700"
-              data-testid="download-excel-button"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              {loading ? 'Gerando...' : 'Baixar Excel'}
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     </Layout>
   );
