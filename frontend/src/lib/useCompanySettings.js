@@ -6,6 +6,10 @@ import { api } from './api';
 // no navegador nunca ficar em branco.
 export const DEFAULT_COMPANY = {
   name: 'Sua Empresa',
+  cnpj: '00.000.000/0000-00',
+  address: 'Configure em "Dados da Empresa"',
+  phone: '(00) 00000-0000',
+  email: 'contato@suaempresa.com',
   logo_filename: null,
 };
 

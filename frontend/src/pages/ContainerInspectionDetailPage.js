@@ -173,17 +173,17 @@ export default function ContainerInspectionDetailPage() {
         boxSizing: 'border-box'
       }}>
         {/* Header */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
           justifyContent: 'center',
           marginBottom: '10px',
-          gap: '12px'
+          gap: '16px'
         }}>
           <img
             src={getCompanyLogoUrl(company)}
             alt={company.name}
-            style={{ height: '40px', width: 'auto' }}
+            style={{ height: '65px', width: 'auto' }}
           />
           <div style={{ textAlign: 'center' }}>
             <div style={{
@@ -194,6 +194,11 @@ export default function ContainerInspectionDetailPage() {
             }}>
               {company.name}
             </div>
+            <div style={{ fontSize: '9px', color: '#333' }}>CNPJ: {company.cnpj}</div>
+            {(company.address || '').split('\n').filter(line => line.trim()).map((line, i) => (
+              <div key={i} style={{ fontSize: '9px', color: '#333' }}>{line.trim()}</div>
+            ))}
+            <div style={{ fontSize: '9px', color: '#333' }}>{company.email} | {company.phone}</div>
           </div>
         </div>
 
