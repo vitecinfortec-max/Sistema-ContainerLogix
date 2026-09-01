@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { formatContainerNumber } from '../lib/containerNumber';
 
 export default function EditFlexTankMovementPage() {
   const { id } = useParams();
@@ -275,6 +276,7 @@ export default function EditFlexTankMovementPage() {
                     id="container_number"
                     value={formData.container_number}
                     onChange={(e) => handleInputChange('container_number', e.target.value.toUpperCase())}
+                    onBlur={(e) => handleInputChange('container_number', formatContainerNumber(e.target.value))}
                     data-testid="container-number-input"
                   />
                 </div>

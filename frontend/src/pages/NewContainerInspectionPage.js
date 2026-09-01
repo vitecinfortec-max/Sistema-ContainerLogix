@@ -13,6 +13,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Camera, Upload, X, Loader2, Plus } from 'lucide-react';
 import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
+import { formatContainerNumber } from '../lib/containerNumber';
 
 export const CONTAINER_INSPECTION_PHOTO_TYPES = [
   { value: 'front', label: 'Frente' },
@@ -226,6 +227,7 @@ export default function NewContainerInspectionPage() {
                     id="container_number"
                     value={formData.container_number}
                     onChange={(e) => handleInputChange('container_number', e.target.value.toUpperCase())}
+                    onBlur={(e) => handleInputChange('container_number', formatContainerNumber(e.target.value))}
                     required
                     data-testid="container-number-input"
                   />

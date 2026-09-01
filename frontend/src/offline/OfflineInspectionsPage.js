@@ -10,6 +10,7 @@ import { Plus, Pencil, Trash2, Camera, Upload, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { offlineInspections, offlineClients, offlineShippingLines, newId } from '../lib/offlineDb';
 import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
+import { formatContainerNumber } from '../lib/containerNumber';
 import { CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS } from '../pages/NewContainerInspectionPage';
 import { capturePhoto, savePhotoBase64, deletePhoto, getPhotoDisplayUri } from '../lib/offlinePhotos';
 
@@ -197,6 +198,7 @@ export default function OfflineInspectionsPage() {
               <Input
                 value={formData.container_number}
                 onChange={(e) => handleChange('container_number', e.target.value.toUpperCase())}
+                onBlur={(e) => handleChange('container_number', formatContainerNumber(e.target.value))}
               />
             </div>
 

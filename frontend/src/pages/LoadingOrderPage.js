@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Search, Save, PackageCheck, Download } from 'lucide-react';
+import { formatContainerNumber } from '../lib/containerNumber';
 
 const ORDER_TYPE_OPTIONS = [
   ['COLETA', 'Coleta de Container'],
@@ -314,7 +315,7 @@ export default function LoadingOrderPage() {
 
             <SectionTitle>Especificações do Container e Carga</SectionTitle>
             <div className="grid grid-cols-4 gap-3">
-              <Field label="ID do Container *" value={form.container_number} onChange={(v) => onChange('container_number', v.toUpperCase())} testid="loading-order-container" />
+              <Field label="ID do Container *" value={form.container_number} onChange={(v) => onChange('container_number', v.toUpperCase())} onBlur={(e) => onChange('container_number', formatContainerNumber(e.target.value))} testid="loading-order-container" />
               <SelectField label="Tipo/Tamanho" value={form.size_type} onChange={(v) => onChange('size_type', v)} options={SIZE_TYPE_OPTIONS} testid="loading-order-size" />
               <Field label="Peso Bruto" value={form.gross_weight} onChange={(v) => onChange('gross_weight', v)} testid="loading-order-weight" />
               <Field label="Lacre (Seal)" value={form.seal} onChange={(v) => onChange('seal', v)} testid="loading-order-seal" />
@@ -412,12 +413,12 @@ function RequiredLabel({ label }) {
   return label;
 }
 
-function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
+function Field({ label, value, onChange, onBlur, type = 'text', testid }) {
   return (
     <div>
       <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
       <Input type={type} value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
+        onChange={(e) => onChange(e.target.value)} onBlur={onBlur} className="h-9 text-sm" data-testid={testid} />
     </div>
   );
 }

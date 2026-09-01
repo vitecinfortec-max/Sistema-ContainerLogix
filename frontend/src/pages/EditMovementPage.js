@@ -12,6 +12,7 @@ import { Save, ArrowLeft, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
 import { Autocomplete } from '../components/Autocomplete';
+import { formatContainerNumber } from '../lib/containerNumber';
 
 export default function EditMovementPage() {
   const { id } = useParams();
@@ -351,7 +352,14 @@ export default function EditMovementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="container_number">Nº Container *</Label>
-                  <Input id="container_number" {...register('container_number', { required: true })} className="h-12 font-mono uppercase" />
+                  <Input
+                    id="container_number"
+                    {...register('container_number', {
+                      required: true,
+                      onBlur: (e) => setValue('container_number', formatContainerNumber(e.target.value)),
+                    })}
+                    className="h-12 font-mono uppercase"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="size_type">Tamanho/Tipo *</Label>

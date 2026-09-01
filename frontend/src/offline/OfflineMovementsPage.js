@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Badge } from '../components/ui/badge';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatContainerNumber } from '../lib/containerNumber';
 import {
   offlineMovements, offlineDrivers, offlineTransportCompanies, offlineClients, offlineShippingLines,
 } from '../lib/offlineDb';
@@ -175,6 +176,7 @@ export default function OfflineMovementsPage() {
               <Input
                 value={formData.container_number}
                 onChange={(e) => handleChange('container_number', e.target.value.toUpperCase())}
+                onBlur={(e) => handleChange('container_number', formatContainerNumber(e.target.value))}
               />
             </div>
 

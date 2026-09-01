@@ -13,6 +13,7 @@ import { useForm } from 'react-hook-form';
 import { useNotifications } from '../hooks/useNotifications';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
 import { Autocomplete } from '../components/Autocomplete';
+import { formatContainerNumber } from '../lib/containerNumber';
 
 const AUTO_SAVE_KEY = 'containerlogix_movement_draft';
 
@@ -182,8 +183,9 @@ export default function NewMovementPage() {
   };
 
   const handleContainerNumberBlur = async (e) => {
+    const containerNumber = formatContainerNumber(e.target.value);
+    setValue('container_number', containerNumber);
     if (operationType !== 'SAIDA') return;
-    const containerNumber = e.target.value.trim().toUpperCase();
     if (!containerNumber) return;
     try {
       const response = await api.getOpenEntryForContainer(containerNumber);

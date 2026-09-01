@@ -13,6 +13,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Package, Plus, Eye, Trash2, Search, Printer, Pencil, Unlock, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatContainerNumber } from '../lib/containerNumber';
 
 export default function UnitSegregationPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -613,6 +614,7 @@ export default function UnitSegregationPage() {
                         <Input
                           value={item.container_number}
                           onChange={(e) => updateItem(index, 'container_number', e.target.value)}
+                          onBlur={(e) => updateItem(index, 'container_number', formatContainerNumber(e.target.value))}
                           className="h-8 text-sm font-mono"
                           data-testid={`container-${index}`}
                         />

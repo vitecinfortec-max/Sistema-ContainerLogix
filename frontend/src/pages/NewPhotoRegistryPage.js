@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { ArrowLeft, Camera, Upload, X, Save, Loader2 } from 'lucide-react';
+import { formatContainerNumber } from '../lib/containerNumber';
 
 export default function NewPhotoRegistryPage() {
   const navigate = useNavigate();
@@ -248,6 +249,7 @@ export default function NewPhotoRegistryPage() {
                     id="container_number"
                     value={formData.container_number}
                     onChange={(e) => handleInputChange('container_number', e.target.value.toUpperCase())}
+                    onBlur={(e) => handleInputChange('container_number', formatContainerNumber(e.target.value))}
                     required
                     data-testid="container-number-input"
                   />
