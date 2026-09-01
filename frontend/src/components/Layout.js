@@ -272,7 +272,7 @@ export default function Layout({ children }) {
     if (savedOpcoesSistema !== null) setOpcoesSistemaOpen(JSON.parse(savedOpcoesSistema));
   }, []);
 
-  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control';
+  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
   const isCadastroActive = ['/cadastro', '/companies'].includes(location.pathname);
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
@@ -414,12 +414,10 @@ export default function Layout({ children }) {
   // nome "ContainerLogix" (logo/breadcrumb, já linkam pra /dashboard).
   const mainNavItems = [];
 
-  // Módulos contratados: itens sem moduleKey (Dados da Empresa, Usuários,
-  // Módulos) nunca são bloqueados por essa trava - são gestão da própria
-  // conta, não um serviço que se contrata à parte.
-  const terminalItems = [
-    { path: '/container-inspections', label: 'Vistoria de Container', icon: ClipboardCheck, moduleKey: 'terminal.vistoria' },
-  ].filter((item) => isModuleEnabled(item.moduleKey));
+  // Vistoria de Container passou a viver dentro do grupo "Registro de Gate"
+  // (movimentacoesItems) - array mantido vazio pra não precisar remover todo
+  // o encaixe de renderização (mesmo padrão do mainNavItems acima).
+  const terminalItems = [];
 
   const flexTankItems = [
     { path: '/flex-tank', label: 'Movimentações', icon: List, moduleKey: 'terminal.flex_tank' },
@@ -428,6 +426,7 @@ export default function Layout({ children }) {
 
   const movimentacoesItems = [
     { path: '/movements', label: 'Registro de Gate', icon: List, moduleKey: 'terminal.movimentacoes' },
+    { path: '/container-inspections', label: 'Vistoria de Container', icon: ClipboardCheck, moduleKey: 'terminal.vistoria' },
     { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package, moduleKey: 'terminal.movimentacoes' },
     { path: '/yard-control', label: 'Controle de Pátio', icon: Clock, moduleKey: 'terminal.movimentacoes' },
     { path: '/reports/movements', label: 'Relatório de Movimentação', icon: BarChart3, moduleKey: 'terminal.movimentacoes' },
