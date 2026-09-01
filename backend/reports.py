@@ -908,19 +908,23 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
             total_fill = XLFill(start_color='E8F4F5', end_color='E8F4F5', fill_type='solid')
 
             start_row = ws.max_row + 3  # deixa espaço da tabela principal
+            # Alinhado embaixo das duas últimas colunas da tabela principal
+            # (Armador/Booking), não das duas primeiras.
+            col_a = 2 + len(headers) - 2
+            col_b = col_a + 1
 
             # Título do bloco
             total_exits_summary = sum(booking_counts.values())
-            ws.cell(row=start_row, column=2,
+            ws.cell(row=start_row, column=col_a,
                     value=f"Saídas por Booking ({total_exits_summary} container{'s' if total_exits_summary != 1 else ''})")
-            ws.cell(row=start_row, column=2).font = XLFont(name='Calibri', size=11, bold=True, color='008B7B')
-            ws.merge_cells(start_row=start_row, start_column=2, end_row=start_row, end_column=3)
+            ws.cell(row=start_row, column=col_a).font = XLFont(name='Calibri', size=11, bold=True, color='008B7B')
+            ws.merge_cells(start_row=start_row, start_column=col_a, end_row=start_row, end_column=col_b)
 
             # Cabeçalho da tabela
             header_row = start_row + 1
-            ws.cell(row=header_row, column=2, value='Booking')
-            ws.cell(row=header_row, column=3, value='Qtd. Containers (Saída)')
-            for col_idx in (2, 3):
+            ws.cell(row=header_row, column=col_a, value='Booking')
+            ws.cell(row=header_row, column=col_b, value='Quantidade (Saída)')
+            for col_idx in (col_a, col_b):
                 cell = ws.cell(row=header_row, column=col_idx)
                 cell.font = XLFont(name='Calibri', size=10, bold=True, color='FFFFFF')
                 cell.alignment = XLAlign(horizontal='center', vertical='center')
@@ -931,24 +935,24 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
             sorted_bookings = sorted(booking_counts.items(), key=lambda x: (-x[1], x[0]))
             current_row = header_row + 1
             for booking_name, qty in sorted_bookings:
-                ws.cell(row=current_row, column=2, value=booking_name)
-                ws.cell(row=current_row, column=3, value=qty)
-                ws.cell(row=current_row, column=2).alignment = XLAlign(horizontal='left', vertical='center')
-                ws.cell(row=current_row, column=3).alignment = XLAlign(horizontal='center', vertical='center')
-                ws.cell(row=current_row, column=2).border = thin_border
-                ws.cell(row=current_row, column=3).border = thin_border
-                ws.cell(row=current_row, column=2).font = XLFont(name='Calibri', size=10)
-                ws.cell(row=current_row, column=3).font = XLFont(name='Calibri', size=10)
+                ws.cell(row=current_row, column=col_a, value=booking_name)
+                ws.cell(row=current_row, column=col_b, value=qty)
+                ws.cell(row=current_row, column=col_a).alignment = XLAlign(horizontal='left', vertical='center')
+                ws.cell(row=current_row, column=col_b).alignment = XLAlign(horizontal='center', vertical='center')
+                ws.cell(row=current_row, column=col_a).border = thin_border
+                ws.cell(row=current_row, column=col_b).border = thin_border
+                ws.cell(row=current_row, column=col_a).font = XLFont(name='Calibri', size=10)
+                ws.cell(row=current_row, column=col_b).font = XLFont(name='Calibri', size=10)
                 current_row += 1
 
             # Linha de total
-            ws.cell(row=current_row, column=2, value='TOTAL')
-            ws.cell(row=current_row, column=3, value=total_exits_summary)
-            for col_idx in (2, 3):
+            ws.cell(row=current_row, column=col_a, value='TOTAL')
+            ws.cell(row=current_row, column=col_b, value=total_exits_summary)
+            for col_idx in (col_a, col_b):
                 cell = ws.cell(row=current_row, column=col_idx)
                 cell.font = XLFont(name='Calibri', size=10, bold=True)
                 cell.alignment = XLAlign(
-                    horizontal='left' if col_idx == 2 else 'center', vertical='center'
+                    horizontal='left' if col_idx == col_a else 'center', vertical='center'
                 )
                 cell.fill = total_fill
                 cell.border = thin_border
