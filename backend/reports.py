@@ -206,9 +206,12 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
     # logo) - a 3ª coluna existe só pra contrabalançar a logo, senão o texto
     # (centralizado dentro da 2ª coluna) fica visivelmente puxado pra direita
     # do bloco inteiro sempre que não há logo configurada (coluna 1 vazia mas
-    # ainda ocupando espaço).
+    # ainda ocupando espaço). Largura das colunas calculada a partir de
+    # content_width (em vez de fixa) pra nunca ultrapassar relatórios retrato
+    # com margens mais estreitas.
+    flank_width = min(110, content_width / 3)
     header_data = [[logo_cell, company_info_elements, '']]
-    header_table = Table(header_data, colWidths=[110, 320, 110])
+    header_table = Table(header_data, colWidths=[flank_width, content_width - 2 * flank_width, flank_width])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (0, 0), (0, 0), 'CENTER'),
@@ -2716,7 +2719,6 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
     box_title_style = ParagraphStyle('VoucherBoxTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
     title_style = ParagraphStyle('VoucherTitle', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER)
     subtitle_style = ParagraphStyle('VoucherSubtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)
-    company_name_style = ParagraphStyle('VoucherCompanyName', parent=styles['Normal'], fontSize=18, fontName='Helvetica-Bold')
     footer_style = ParagraphStyle('VoucherFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=colors.HexColor('#555555'))
 
     def field(label, value):
@@ -2761,21 +2763,10 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
         if idx > 0:
             elements.append(PageBreak())
 
-        # Header: logo + nome da empresa
-        logo_cell = ''
-        if logo_buffer:
-            try:
-                logo_buffer.seek(0)
-                logo_cell = Image(logo_buffer, width=45, height=45)
-            except Exception as e:
-                logger.error(f"Error adding logo to movement voucher PDF: {e}")
-        header_tbl = Table([[logo_cell, Paragraph(c['name'], company_name_style)]], colWidths=[55, width - 55])
-        header_tbl.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-        ]))
-        elements.append(header_tbl)
-        elements.append(Spacer(1, 8))
+        # Header: logo + dados completos da empresa (centralizado), mesmo bloco
+        # compartilhado com os demais relatórios (_build_pdf_header) - já traz
+        # endereço/CNPJ/e-mail/telefone e a logo no tamanho padrão do sistema.
+        elements.extend(_build_pdf_header(styles, logo_buffer, '', company=company, content_width=width)[:2])
 
         # Título
         title_tbl = Table([
