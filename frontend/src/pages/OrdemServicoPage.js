@@ -267,7 +267,7 @@ export default function OrdemServicoPage() {
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative max-w-md flex-1 min-w-[280px]">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-                <Input placeholder="Buscar por cliente, placa, descrição..." value={search}
+                <Input value={search}
                   onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-[13px]" data-testid="os-search" />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -370,7 +370,6 @@ export default function OrdemServicoPage() {
                     value={form.category}
                     onChange={(v) => onChange('category', v)}
                     options={osCategories.map((c) => [c.name, c.name])}
-                    placeholder="-- Selecione --"
                     searchPlaceholder="Buscar categoria..."
                     emptyLabel="Nenhuma categoria encontrada"
                     testid="os-category"
@@ -384,7 +383,6 @@ export default function OrdemServicoPage() {
                     onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
                     options={vehicles}
                     displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                    placeholder="Digite para buscar a placa..."
                     className="h-9 text-sm font-mono"
                   />
                 </div>
@@ -397,7 +395,6 @@ export default function OrdemServicoPage() {
                     onSelect={(p) => { onChange('person_name', p.name); onChange('person_id', p.id); onChange('person_type', p._type); }}
                     options={people}
                     displayField="name"
-                    placeholder="Digite para buscar..."
                     className="h-9 text-sm"
                   />
                 </div>
@@ -441,7 +438,6 @@ export default function OrdemServicoPage() {
                     onSelect={(p) => { onChange('supervisor_name', p.name); onChange('supervisor_id', p.id); onChange('supervisor_type', p._type); }}
                     options={people}
                     displayField="name"
-                    placeholder="Digite para buscar..."
                     className="h-9 text-sm"
                   />
                 </div>
@@ -453,7 +449,6 @@ export default function OrdemServicoPage() {
                     onSelect={(p) => { onChange('technician_name', p.name); onChange('technician_id', p.id); onChange('technician_type', p._type); }}
                     options={people}
                     displayField="name"
-                    placeholder="Digite para buscar..."
                     className="h-9 text-sm"
                   />
                 </div>
@@ -465,7 +460,6 @@ export default function OrdemServicoPage() {
                     onSelect={(p) => { onChange('helper_name', p.name); onChange('helper_id', p.id); onChange('helper_type', p._type); }}
                     options={people}
                     displayField="name"
-                    placeholder="Digite para buscar..."
                     className="h-9 text-sm"
                   />
                 </div>
@@ -547,11 +541,11 @@ function SectionTitle({ children }) {
   );
 }
 
-function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
+function Field({ label, value, onChange, type = 'text', testid }) {
   return (
     <div>
       <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
-      <Input type={type} value={value ?? ''} placeholder={placeholder}
+      <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
   );
@@ -562,7 +556,7 @@ function SelectField({ label, value, onChange, options, testid }) {
     <div>
       <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
       <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
-        <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
+        <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue /></SelectTrigger>
         <SelectContent>
           {options.map(([v, l]) => (
             <SelectItem key={v || '_empty'} value={v || '_empty'} className="text-sm">{l}</SelectItem>
@@ -625,7 +619,6 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
                 }}
                 options={catalogOptions}
                 displayField="description"
-                placeholder="Digite para buscar no catálogo..."
                 className="h-8 text-sm"
               />
             </div>

@@ -317,7 +317,6 @@ export default function LoadingSchedulePage() {
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                   <Input
-                    placeholder="Buscar..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -438,7 +437,6 @@ export default function LoadingSchedulePage() {
                     value={formData.contracting_client_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, contracting_client_name: val, contracting_client_id: '' }))}
                     options={clients}
-                    placeholder="Digite o nome do cliente contratante..."
                     displayField="name"
                     valueField="id"
                     onSelect={(client) => handleClientChange('contracting', client)}
@@ -450,7 +448,6 @@ export default function LoadingSchedulePage() {
                     value={formData.destination_client_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, destination_client_name: val, destination_client_id: '' }))}
                     options={clients}
-                    placeholder="Digite o nome do cliente destino..."
                     displayField="name"
                     valueField="id"
                     onSelect={(client) => handleClientChange('destination', client)}
@@ -461,7 +458,6 @@ export default function LoadingSchedulePage() {
                   <Input 
                     value={formData.booking} 
                     onChange={(e) => setFormData(prev => ({ ...prev, booking: e.target.value.toUpperCase() }))} 
-                    placeholder="Número do Booking"
                   />
                 </div>
                 <div>
@@ -469,7 +465,6 @@ export default function LoadingSchedulePage() {
                   <Input
                     value={formData.voyage}
                     onChange={(e) => setFormData(prev => ({ ...prev, voyage: e.target.value.toUpperCase() }))}
-                    placeholder="Número da Viagem"
                   />
                 </div>
               </div>
@@ -499,7 +494,7 @@ export default function LoadingSchedulePage() {
                         <Label className="text-xs">Tipo *</Label>
                         <Select value={item.operation_type} onValueChange={(v) => handleItemChange(index, 'operation_type', v)}>
                           <SelectTrigger className="h-9">
-                            <SelectValue placeholder="Coleta ou Entrega" />
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="COLETA">Coleta</SelectItem>
@@ -513,7 +508,6 @@ export default function LoadingSchedulePage() {
                           value={item.driver_name}
                           onChange={(val) => handleItemChange(index, 'driver_name', val)}
                           options={drivers}
-                          placeholder="Digite o nome..."
                           displayField="name"
                           valueField="id"
                           onSelect={(driver) => {
@@ -525,7 +519,7 @@ export default function LoadingSchedulePage() {
                       </div>
                       <div>
                         <Label className="text-xs">CPF</Label>
-                        <Input className="h-9" value={item.driver_cpf} onChange={(e) => handleItemChange(index, 'driver_cpf', e.target.value)} placeholder="CPF" />
+                        <Input className="h-9" value={item.driver_cpf} onChange={(e) => handleItemChange(index, 'driver_cpf', e.target.value)} />
                       </div>
                       <div>
                         <Label className="text-xs">Cavalo *</Label>
@@ -533,7 +527,6 @@ export default function LoadingSchedulePage() {
                           value={item.cavalo_plate}
                           onChange={(val) => handleItemChange(index, 'cavalo_plate', val.toUpperCase())}
                           options={cavalos}
-                          placeholder="Digite a placa..."
                           displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                           valueField="id"
                           onSelect={(vehicle) => {
@@ -547,7 +540,6 @@ export default function LoadingSchedulePage() {
                           value={item.carreta_plate}
                           onChange={(val) => handleItemChange(index, 'carreta_plate', val.toUpperCase())}
                           options={carretas}
-                          placeholder="Digite a placa..."
                           displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                           valueField="id"
                           onSelect={(vehicle) => {
@@ -557,7 +549,7 @@ export default function LoadingSchedulePage() {
                       </div>
                       <div className="md:col-span-2">
                         <Label className="text-xs">Local de Carregamento *</Label>
-                        <Input className="h-9" value={item.loading_location} onChange={(e) => handleItemChange(index, 'loading_location', e.target.value)} placeholder="Local de carregamento" />
+                        <Input className="h-9" value={item.loading_location} onChange={(e) => handleItemChange(index, 'loading_location', e.target.value)} />
                       </div>
                       <div>
                         <Label className="text-xs">Data *</Label>
@@ -565,11 +557,11 @@ export default function LoadingSchedulePage() {
                       </div>
                       <div>
                         <Label className="text-xs">Nº Container</Label>
-                        <Input className="h-9" value={item.container_number} onChange={(e) => handleItemChange(index, 'container_number', e.target.value.toUpperCase())} placeholder="XXXX1234567" />
+                        <Input className="h-9" value={item.container_number} onChange={(e) => handleItemChange(index, 'container_number', e.target.value.toUpperCase())} />
                       </div>
                       <div>
                         <Label className="text-xs">Lacre</Label>
-                        <Input className="h-9" value={item.seal_number} onChange={(e) => handleItemChange(index, 'seal_number', e.target.value.toUpperCase())} placeholder="Nº do Lacre" />
+                        <Input className="h-9" value={item.seal_number} onChange={(e) => handleItemChange(index, 'seal_number', e.target.value.toUpperCase())} />
                       </div>
                       {(formData.contracting_client_name === BAG_NUMBER_CLIENT_NAME || formData.destination_client_name === BAG_NUMBER_CLIENT_NAME) && (
                         <div>
@@ -578,7 +570,6 @@ export default function LoadingSchedulePage() {
                             className="h-9"
                             value={item.bag_number}
                             onChange={(e) => handleItemChange(index, 'bag_number', e.target.value)}
-                            placeholder="Ex: 245250701171065"
                             maxLength={30}
                             data-testid={`loading-schedule-bag-number-${index}`}
                           />
@@ -593,7 +584,7 @@ export default function LoadingSchedulePage() {
             {/* Observações */}
             <div>
               <Label>Observações</Label>
-              <Input value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} placeholder="Observações adicionais" />
+              <Input value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} />
             </div>
           </div>
 

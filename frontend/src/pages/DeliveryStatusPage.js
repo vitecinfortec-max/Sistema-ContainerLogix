@@ -266,7 +266,6 @@ export default function DeliveryStatusPage() {
                 <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Programação</Label>
                 <Input
                   type="number"
-                  placeholder="Ex: 1"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="h-9 text-sm"
@@ -399,7 +398,6 @@ export default function DeliveryStatusPage() {
                     <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Programação</Label>
                     <Input
                       type="number"
-                      placeholder="Digite o número da programação"
                       value={scheduleSearchNumber}
                       onChange={(e) => setScheduleSearchNumber(e.target.value)}
                       className="h-9"
@@ -482,7 +480,6 @@ export default function DeliveryStatusPage() {
                         <Input
                           value={item.bag_number || ''}
                           onChange={(e) => updateItemTime(index, 'bag_number', e.target.value)}
-                          placeholder="Ex: 245250701171065"
                           maxLength={30}
                           className="h-8 text-sm"
                           data-testid={`delivery-status-bag-number-${index}`}
@@ -582,7 +579,6 @@ export default function DeliveryStatusPage() {
                 className="w-full h-20 p-3 border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                 value={formData.observations}
                 onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))}
-                placeholder="Observações adicionais..."
                 data-testid="observations-input"
               />
             </div>

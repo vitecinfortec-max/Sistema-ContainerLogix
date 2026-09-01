@@ -188,7 +188,6 @@ export default function EditFlexTankMovementPage() {
                     id="bag_number"
                     value={formData.bag_number}
                     onChange={(e) => handleInputChange('bag_number', e.target.value.toUpperCase())}
-                    placeholder="Ex: FT-001"
                     required
                     data-testid="bag-number-input"
                   />
@@ -201,7 +200,7 @@ export default function EditFlexTankMovementPage() {
                     onValueChange={(value) => handleInputChange('bag_size', value)}
                   >
                     <SelectTrigger data-testid="bag-size-select">
-                      <SelectValue placeholder="Selecione o tamanho" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {bagSizes.map(size => (
@@ -253,7 +252,6 @@ export default function EditFlexTankMovementPage() {
                     }}
                     onFocus={() => setShowClientDropdown(true)}
                     onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
-                    placeholder="Buscar cliente..."
                     data-testid="client-input"
                   />
                   {showClientDropdown && filteredClients.length > 0 && (
@@ -277,7 +275,6 @@ export default function EditFlexTankMovementPage() {
                     id="container_number"
                     value={formData.container_number}
                     onChange={(e) => handleInputChange('container_number', e.target.value.toUpperCase())}
-                    placeholder="Ex: MSKU1234567"
                     data-testid="container-number-input"
                   />
                 </div>
@@ -296,7 +293,6 @@ export default function EditFlexTankMovementPage() {
                     }}
                     onFocus={() => setShowDestinationClientDropdown(true)}
                     onBlur={() => setTimeout(() => setShowDestinationClientDropdown(false), 200)}
-                    placeholder="Buscar cliente destino..."
                     data-testid="destination-client-input"
                   />
                   {showDestinationClientDropdown && filteredDestinationClients.length > 0 && (
@@ -321,7 +317,6 @@ export default function EditFlexTankMovementPage() {
                   id="observations"
                   value={formData.observations}
                   onChange={(e) => handleInputChange('observations', e.target.value)}
-                  placeholder="Observações adicionais..."
                   rows={3}
                   data-testid="observations-input"
                 />

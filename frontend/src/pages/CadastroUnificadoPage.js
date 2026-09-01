@@ -406,7 +406,6 @@ export default function CadastroUnificadoPage() {
                         value={formData[f.name] || ''}
                         onChange={(e) => setField(f.name, f.mask ? MASKS[f.mask](e.target.value) : e.target.value)}
                         required={f.required}
-                        placeholder={f.placeholder}
                         className="h-10 text-[13px]"
                       />
                     )}
@@ -423,7 +422,6 @@ export default function CadastroUnificadoPage() {
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
           <Input
-            placeholder="Buscar..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-10 text-[13px] pl-9"

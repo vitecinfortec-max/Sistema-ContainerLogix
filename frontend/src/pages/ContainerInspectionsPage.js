@@ -119,7 +119,6 @@ export default function ContainerInspectionsPage() {
               <div className="sm:col-span-2">
                 <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Container, Booking ou Cliente</Label>
                 <Input
-                  placeholder="Buscar..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="h-8 text-xs"

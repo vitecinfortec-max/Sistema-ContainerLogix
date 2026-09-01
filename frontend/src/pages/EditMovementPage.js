@@ -282,7 +282,6 @@ export default function EditMovementPage() {
                       id="client_name" 
                       data-testid="client-name-input"
                       className="h-12 pr-10"
-                      placeholder="Digite para buscar cliente..."
                       value={clientSearch}
                       onChange={(e) => {
                         setClientSearch(e.target.value);
@@ -386,7 +385,7 @@ export default function EditMovementPage() {
                   </div>
                   <Select value={shippingLine || ''} onValueChange={(value) => setValue('shipping_line', value)}>
                     <SelectTrigger id="shipping_line" data-testid="shipping-line-select" className="h-12">
-                      <SelectValue placeholder={loadingAux ? "Carregando armadores..." : (shippingLines.length === 0 ? "Nenhum armador cadastrado" : "Selecione o armador")} />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-80 overflow-y-auto">
                       {loadingAux ? (
@@ -430,7 +429,6 @@ export default function EditMovementPage() {
                     onSelect={(t) => setValue('origin_terminal', t.name)}
                     options={terminals}
                     displayField="name"
-                    placeholder="Digite para buscar o terminal..."
                     className="h-12"
                   />
                 </div>
@@ -445,7 +443,6 @@ export default function EditMovementPage() {
                     min="0"
                     {...register('service_value', { valueAsNumber: true })}
                     className="h-12 font-mono"
-                    placeholder="0,00"
                   />
                   <p className="text-xs text-muted-foreground">Este valor aparecerá apenas no relatório de faturamento</p>
                 </div>
@@ -458,7 +455,7 @@ export default function EditMovementPage() {
                   </div>
                   <Select value={serviceType || 'none'} onValueChange={(value) => setValue('service_type', value === 'none' ? '' : value)}>
                     <SelectTrigger id="service_type" data-testid="service-type-select" className="h-12">
-                      <SelectValue placeholder={serviceTypes.length === 0 ? "Nenhum tipo cadastrado" : "Selecione o tipo de serviço"} />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-80 overflow-y-auto">
                       <SelectItem value="none">Nenhum</SelectItem>
@@ -475,7 +472,6 @@ export default function EditMovementPage() {
                     id="invoice_number"
                     {...register('invoice_number')}
                     className="h-12 font-mono"
-                    placeholder="Número da NF (opcional)"
                   />
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
                 </div>
@@ -487,7 +483,6 @@ export default function EditMovementPage() {
                     data-testid="observations-input"
                     {...register('observations')}
                     className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                    placeholder="Observações adicionais sobre o registro (opcional)"
                     rows={3}
                   />
                 </div>

@@ -309,7 +309,7 @@ export default function FlexTankPage() {
                       onValueChange={(value) => setFilters(prev => ({ ...prev, client_id: value === 'all' ? '' : value }))}
                     >
                       <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Todos" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
@@ -325,7 +325,6 @@ export default function FlexTankPage() {
                       type="number"
                       value={filters.movement_number}
                       onChange={(e) => setFilters(prev => ({ ...prev, movement_number: e.target.value }))}
-                      placeholder="Ex: 1"
                       className="h-8 text-xs"
                     />
                   </div>
@@ -336,7 +335,7 @@ export default function FlexTankPage() {
                       onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
                     >
                       <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Todos" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos</SelectItem>
@@ -561,7 +560,7 @@ export default function FlexTankPage() {
                       onValueChange={(value) => setReportFilters(prev => ({ ...prev, client_id: value === 'all' ? '' : value }))}
                     >
                       <SelectTrigger className="h-8 text-xs" data-testid="report-filter-client">
-                        <SelectValue placeholder="Todos" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos os clientes</SelectItem>
@@ -580,7 +579,7 @@ export default function FlexTankPage() {
                       onValueChange={(value) => setReportFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
                     >
                       <SelectTrigger className="h-8 text-xs" data-testid="report-filter-type">
-                        <SelectValue placeholder="Todos" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos os tipos</SelectItem>

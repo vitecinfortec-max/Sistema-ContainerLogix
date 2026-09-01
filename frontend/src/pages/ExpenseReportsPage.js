@@ -400,7 +400,6 @@ export default function ExpenseReportsPage() {
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                   <Input
-                    placeholder="Buscar..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -573,7 +572,7 @@ export default function ExpenseReportsPage() {
                       </div>
                       <div>
                         <Label className="text-xs">Enviado Por *</Label>
-                        <Input className="h-9" value={deposit.sent_by} onChange={(e) => handleDepositChange(index, 'sent_by', e.target.value)} placeholder="Nome/setor" />
+                        <Input className="h-9" value={deposit.sent_by} onChange={(e) => handleDepositChange(index, 'sent_by', e.target.value)} />
                       </div>
                     </div>
                   </div>
@@ -609,7 +608,6 @@ export default function ExpenseReportsPage() {
                           value={purchase.supplier_name}
                           onChange={(val) => handlePurchaseChange(index, 'supplier_name', val)}
                           options={suppliers}
-                          placeholder="Digite o fornecedor..."
                           displayField="name"
                           valueField="id"
                           onSelect={(supplier) => {
@@ -628,7 +626,7 @@ export default function ExpenseReportsPage() {
                       </div>
                       <div>
                         <Label className="text-xs">Observação</Label>
-                        <Input className="h-9" value={purchase.observation} onChange={(e) => handlePurchaseChange(index, 'observation', e.target.value)} placeholder="Opcional" />
+                        <Input className="h-9" value={purchase.observation} onChange={(e) => handlePurchaseChange(index, 'observation', e.target.value)} />
                       </div>
                     </div>
 

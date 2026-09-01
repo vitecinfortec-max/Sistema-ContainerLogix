@@ -248,7 +248,6 @@ export default function NewPhotoRegistryPage() {
                     id="container_number"
                     value={formData.container_number}
                     onChange={(e) => handleInputChange('container_number', e.target.value.toUpperCase())}
-                    placeholder="Ex: MSKU1234567"
                     required
                     data-testid="container-number-input"
                   />
@@ -260,7 +259,6 @@ export default function NewPhotoRegistryPage() {
                     id="container_seal"
                     value={formData.container_seal}
                     onChange={(e) => handleInputChange('container_seal', e.target.value.toUpperCase())}
-                    placeholder="Lacre / Numeração"
                     data-testid="container-seal-input"
                   />
                 </div>
@@ -271,7 +269,6 @@ export default function NewPhotoRegistryPage() {
                     id="collection_terminal"
                     value={formData.collection_terminal}
                     onChange={(e) => handleInputChange('collection_terminal', e.target.value)}
-                    placeholder="Ex: Terminal Santos"
                     data-testid="collection-terminal-input"
                   />
                 </div>
@@ -282,7 +279,6 @@ export default function NewPhotoRegistryPage() {
                     id="booking"
                     value={formData.booking}
                     onChange={(e) => handleInputChange('booking', e.target.value)}
-                    placeholder="Número do booking"
                     data-testid="booking-input"
                   />
                 </div>
@@ -301,7 +297,6 @@ export default function NewPhotoRegistryPage() {
                     }}
                     onFocus={() => setShowClientDropdown(true)}
                     onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
-                    placeholder="Buscar cliente..."
                     data-testid="client-input"
                   />
                   {showClientDropdown && filteredClients.length > 0 && (
@@ -333,7 +328,6 @@ export default function NewPhotoRegistryPage() {
                     }}
                     onFocus={() => setShowShippingLineDropdown(true)}
                     onBlur={() => setTimeout(() => setShowShippingLineDropdown(false), 200)}
-                    placeholder="Buscar armador..."
                     data-testid="shipping-line-input"
                   />
                   {showShippingLineDropdown && filteredShippingLines.length > 0 && (

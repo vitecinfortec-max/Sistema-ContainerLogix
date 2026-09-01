@@ -79,7 +79,6 @@ export default function ContainerPhotoUpload({ damages = [], onDamagesChange, no
             data-testid="inspection-notes-input"
             value={notes}
             onChange={(e) => onNotesChange?.(e.target.value)}
-            placeholder="Outras observações sobre o estado do container não cobertas pelas opções acima (opcional)"
             disabled={disabled}
             rows={3}
           />

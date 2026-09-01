@@ -317,7 +317,6 @@ export default function NewMovementPage() {
                     onSelect={(d) => handleDriverChange(d.name)}
                     options={drivers}
                     displayField="name"
-                    placeholder="Digite para buscar motorista..."
                     className="h-12"
                   />
                 </div>
@@ -329,7 +328,6 @@ export default function NewMovementPage() {
                     data-testid="driver-cpf-input"
                     {...register('driver_cpf', { required: true })}
                     className="h-12 font-mono"
-                    placeholder="000.000.000-00"
                   />
                 </div>
 
@@ -341,7 +339,6 @@ export default function NewMovementPage() {
                     onSelect={(v) => handleTruckPlateChange(v.plate)}
                     options={cavaloVehicles}
                     displayField="plate"
-                    placeholder="Digite para buscar a placa..."
                     className="h-12 font-mono uppercase"
                   />
                 </div>
@@ -354,7 +351,6 @@ export default function NewMovementPage() {
                     onSelect={(v) => handleTrailerPlateChange(v.plate)}
                     options={carretaVehicles}
                     displayField="plate"
-                    placeholder="Digite para buscar a placa..."
                     className="h-12 font-mono uppercase"
                   />
                 </div>
@@ -367,7 +363,6 @@ export default function NewMovementPage() {
                     onSelect={(c) => handleCompanyChange(c.name)}
                     options={companies}
                     displayField="name"
-                    placeholder="Digite para buscar a transportadora..."
                     className="h-12"
                   />
                 </div>
@@ -379,7 +374,6 @@ export default function NewMovementPage() {
                       id="client_name" 
                       data-testid="client-name-input"
                       className="h-12 pr-10"
-                      placeholder="Digite para buscar cliente..."
                       value={clientSearch}
                       onChange={(e) => {
                         setClientSearch(e.target.value);
@@ -454,7 +448,6 @@ export default function NewMovementPage() {
                     data-testid="container-number-input"
                     {...register('container_number', { required: true, onBlur: handleContainerNumberBlur })}
                     className="h-12 font-mono uppercase"
-                    placeholder="ABCD1234567"
                   />
                 </div>
 
@@ -485,7 +478,6 @@ export default function NewMovementPage() {
                     data-testid="tare-input"
                     {...register('tare')}
                     className="h-12 font-mono"
-                    placeholder="Peso (opcional)"
                   />
                 </div>
 
@@ -498,7 +490,7 @@ export default function NewMovementPage() {
                   </div>
                   <Select value={shippingLine || ''} onValueChange={(value) => setValue('shipping_line', value)}>
                     <SelectTrigger id="shipping_line" data-testid="shipping-line-select" className="h-12">
-                      <SelectValue placeholder={shippingLines.length === 0 ? "Nenhum armador cadastrado" : "Selecione o armador"} />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-80 overflow-y-auto">
                       {shippingLines.length === 0 ? (
@@ -528,7 +520,6 @@ export default function NewMovementPage() {
                     data-testid="seal-input"
                     {...register('seal')}
                     className="h-12 font-mono"
-                    placeholder="Número do lacre (opcional)"
                   />
                 </div>
 
@@ -539,7 +530,6 @@ export default function NewMovementPage() {
                     data-testid="genset-input"
                     {...register('genset')}
                     className="h-12 font-mono"
-                    placeholder="Genset (opcional)"
                   />
                 </div>
 
@@ -550,7 +540,6 @@ export default function NewMovementPage() {
                     data-testid="booking-input"
                     {...register('booking')}
                     className="h-12 font-mono"
-                    placeholder="Número de booking (opcional)"
                   />
                 </div>
 
@@ -562,7 +551,6 @@ export default function NewMovementPage() {
                     onSelect={(t) => setValue('origin_terminal', t.name)}
                     options={terminals}
                     displayField="name"
-                    placeholder="Digite para buscar o terminal..."
                     className="h-12"
                   />
                 </div>
@@ -579,7 +567,6 @@ export default function NewMovementPage() {
                     min="0"
                     {...register('service_value', { valueAsNumber: true })}
                     className="h-12 font-mono"
-                    placeholder="0,00 (opcional)"
                   />
                   <p className="text-xs text-muted-foreground">Este valor aparecerá apenas no relatório de faturamento</p>
                 </div>
@@ -593,7 +580,7 @@ export default function NewMovementPage() {
                   </div>
                   <Select value={serviceType || 'none'} onValueChange={(value) => setValue('service_type', value === 'none' ? '' : value)}>
                     <SelectTrigger id="service_type" data-testid="service-type-select" className="h-12">
-                      <SelectValue placeholder={serviceTypes.length === 0 ? "Nenhum tipo cadastrado" : "Selecione o tipo de serviço"} />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-80 overflow-y-auto">
                       <SelectItem value="none">Nenhum</SelectItem>
@@ -612,7 +599,6 @@ export default function NewMovementPage() {
                     data-testid="invoice-number-input"
                     {...register('invoice_number')}
                     className="h-12 font-mono"
-                    placeholder="Número da NF (opcional)"
                   />
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
                 </div>
@@ -624,7 +610,6 @@ export default function NewMovementPage() {
                     data-testid="observations-input"
                     {...register('observations')}
                     className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                    placeholder="Observações adicionais sobre o registro (opcional)"
                     rows={3}
                   />
                 </div>

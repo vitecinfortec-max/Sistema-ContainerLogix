@@ -782,7 +782,6 @@ export default function BillingPage() {
                 <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Buscar por ID ou Container</Label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Ex: 123 ou CONT1234567 (escaneie o código de barras)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearchById()}
@@ -801,7 +800,6 @@ export default function BillingPage() {
                 <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Cliente (Nome ou CNPJ)</Label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Ex: Empresa LTDA ou 12.345.678/0001-90"
                     value={clientSearchQuery}
                     onChange={(e) => setClientSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearchByClient()}
@@ -985,7 +983,6 @@ export default function BillingPage() {
                 <div className="mt-4">
                   <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Observações (opcional)</Label>
                   <Textarea
-                    placeholder="Adicione observações para esta fatura..."
                     value={invoiceNotes}
                     onChange={(e) => setInvoiceNotes(e.target.value)}
                     className="h-20"
@@ -1258,7 +1255,6 @@ export default function BillingPage() {
                     value={editFormData.client_cnpj}
                     onChange={handleCNPJChange}
                     className="h-10 text-[13px] font-mono"
-                    placeholder="00.000.000/0000-00"
                     maxLength={18}
                   />
                 </div>
@@ -1272,7 +1268,6 @@ export default function BillingPage() {
                   value={editFormData.notes}
                   onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
                   className="min-h-[60px] text-[13px]"
-                  placeholder="Observações da fatura (opcional)"
                 />
               </div>
 
@@ -1349,7 +1344,6 @@ export default function BillingPage() {
                 <div className="p-3 border-b bg-slate-50 dark:bg-slate-800/50">
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Buscar por Nº da movimentação..."
                       value={editSearchId}
                       onChange={(e) => setEditSearchId(e.target.value)}
                       className="h-9 text-[13px] flex-1"

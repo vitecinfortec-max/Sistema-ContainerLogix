@@ -572,7 +572,7 @@ export default function InternationalInvoicePage() {
                 <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Status</Label>
                 <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val === "ALL" ? "" : val)}>
                   <SelectTrigger data-testid="filter-status">
-                    <SelectValue placeholder="Todos" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">Todos</SelectItem>
@@ -586,7 +586,7 @@ export default function InternationalInvoicePage() {
                 <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Moeda</Label>
                 <Select value={filterCurrency} onValueChange={(val) => setFilterCurrency(val === "ALL" ? "" : val)}>
                   <SelectTrigger data-testid="filter-currency">
-                    <SelectValue placeholder="Todas" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">Todas</SelectItem>
@@ -779,7 +779,6 @@ export default function InternationalInvoicePage() {
                       setShowClientDropdown(true);
                     }}
                     onFocus={() => setShowClientDropdown(true)}
-                    placeholder="Buscar cliente cadastrado..."
                     data-testid="client-search"
                   />
                   {showClientDropdown && clientSearch && filteredClients.length > 0 && (
@@ -809,7 +808,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={formData.payer_company}
                       onChange={(e) => setFormData({ ...formData, payer_company: e.target.value })}
-                      placeholder="Nome da empresa pagadora"
                       data-testid="payer-company"
                     />
                   </div>
@@ -818,7 +816,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={formData.payer_cnpj}
                       onChange={(e) => setFormData({ ...formData, payer_cnpj: e.target.value })}
-                      placeholder="CNPJ do cliente"
                       data-testid="payer-cnpj"
                     />
                   </div>
@@ -830,7 +827,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={formData.payer_contact}
                       onChange={(e) => setFormData({ ...formData, payer_contact: e.target.value })}
-                      placeholder="Telefone de contato"
                       data-testid="payer-contact"
                     />
                   </div>
@@ -839,7 +835,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={formData.payer_email}
                       onChange={(e) => setFormData({ ...formData, payer_email: e.target.value })}
-                      placeholder="E-mail do cliente"
                       data-testid="payer-email"
                     />
                   </div>
@@ -850,7 +845,6 @@ export default function InternationalInvoicePage() {
                   <Input
                     value={formData.payer_address}
                     onChange={(e) => setFormData({ ...formData, payer_address: e.target.value })}
-                    placeholder="Endereço completo"
                     data-testid="payer-address"
                   />
                 </div>
@@ -914,7 +908,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={movementSearch}
                       onChange={(e) => setMovementSearch(e.target.value)}
-                      placeholder="Ex: 001, 002..."
                       onKeyPress={(e) => e.key === 'Enter' && searchMovement()}
                       data-testid="movement-search"
                     />
@@ -944,7 +937,6 @@ export default function InternationalInvoicePage() {
                       <Input
                         value={item.description}
                         onChange={(e) => updateInvoiceItem(index, 'description', e.target.value)}
-                        placeholder="Descrição do serviço"
                         data-testid={`item-description-${index}`}
                       />
                     </div>
@@ -1010,7 +1002,6 @@ export default function InternationalInvoicePage() {
                 <Textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Observações adicionais (opcional)"
                   rows={3}
                   data-testid="notes-input"
                 />
@@ -1063,7 +1054,7 @@ export default function InternationalInvoicePage() {
                     onValueChange={(val) => handleUpdateStatus(selectedInvoice.id, val)}
                   >
                     <SelectTrigger className="w-40" data-testid="status-select">
-                      <SelectValue placeholder="Alterar status" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {STATUS_OPTIONS.map(opt => (
@@ -1240,7 +1231,6 @@ export default function InternationalInvoicePage() {
                       setShowEditClientDropdown(true);
                     }}
                     onFocus={() => setShowEditClientDropdown(true)}
-                    placeholder="Buscar cliente cadastrado..."
                     data-testid="edit-client-search"
                   />
                   {showEditClientDropdown && editClientSearch && clients.filter(c => 
@@ -1274,7 +1264,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={editFormData.payer_company}
                       onChange={(e) => setEditFormData({ ...editFormData, payer_company: e.target.value })}
-                      placeholder="Nome da empresa pagadora"
                       data-testid="edit-payer-company"
                     />
                   </div>
@@ -1283,7 +1272,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={editFormData.payer_cnpj}
                       onChange={(e) => setEditFormData({ ...editFormData, payer_cnpj: e.target.value })}
-                      placeholder="CNPJ do cliente"
                       data-testid="edit-payer-cnpj"
                     />
                   </div>
@@ -1295,7 +1283,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={editFormData.payer_contact}
                       onChange={(e) => setEditFormData({ ...editFormData, payer_contact: e.target.value })}
-                      placeholder="Telefone de contato"
                       data-testid="edit-payer-contact"
                     />
                   </div>
@@ -1304,7 +1291,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={editFormData.payer_email}
                       onChange={(e) => setEditFormData({ ...editFormData, payer_email: e.target.value })}
-                      placeholder="E-mail do cliente"
                       data-testid="edit-payer-email"
                     />
                   </div>
@@ -1315,7 +1301,6 @@ export default function InternationalInvoicePage() {
                   <Input
                     value={editFormData.payer_address}
                     onChange={(e) => setEditFormData({ ...editFormData, payer_address: e.target.value })}
-                    placeholder="Endereço completo"
                     data-testid="edit-payer-address"
                   />
                 </div>
@@ -1379,7 +1364,6 @@ export default function InternationalInvoicePage() {
                     <Input
                       value={editMovementSearch}
                       onChange={(e) => setEditMovementSearch(e.target.value)}
-                      placeholder="Ex: 001, 002..."
                       onKeyPress={(e) => e.key === 'Enter' && searchEditMovement()}
                       data-testid="edit-movement-search"
                     />
@@ -1409,7 +1393,6 @@ export default function InternationalInvoicePage() {
                       <Input
                         value={item.description}
                         onChange={(e) => updateEditInvoiceItem(index, 'description', e.target.value)}
-                        placeholder="Descrição do serviço"
                         data-testid={`edit-item-description-${index}`}
                       />
                     </div>
@@ -1475,7 +1458,6 @@ export default function InternationalInvoicePage() {
                 <Textarea
                   value={editFormData.notes}
                   onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                  placeholder="Observações adicionais (opcional)"
                   rows={3}
                   data-testid="edit-notes-input"
                 />

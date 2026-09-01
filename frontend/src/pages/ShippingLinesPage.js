@@ -155,7 +155,6 @@ export default function ShippingLinesPage() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                     className="h-10 text-[13px]"
-                    placeholder="Ex: CMA CGM"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -166,7 +165,6 @@ export default function ShippingLinesPage() {
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                     className="h-10 text-[13px] font-mono"
-                    placeholder="Ex: CMA (opcional)"
                     maxLength={10}
                   />
                 </div>
@@ -186,7 +184,6 @@ export default function ShippingLinesPage() {
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
           <Input
-            placeholder="Buscar por nome ou código..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-10 text-[13px] pl-9"

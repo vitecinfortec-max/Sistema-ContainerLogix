@@ -156,7 +156,6 @@ export default function ServiceTypesPage() {
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                     className="h-10 text-[13px]"
-                    placeholder="Ex: Armazenagem, Movimentação, Transporte"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -167,7 +166,6 @@ export default function ServiceTypesPage() {
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="min-h-[70px] text-[13px]"
-                    placeholder="Descrição opcional do tipo de serviço"
                   />
                 </div>
                 <Button 
@@ -186,7 +184,6 @@ export default function ServiceTypesPage() {
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
           <Input
-            placeholder="Buscar por nome ou descrição..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-10 text-[13px] pl-9"

@@ -210,7 +210,7 @@ export default function OfflineMovementsPage() {
                   handleChange('driver_cpf', d ? d.cpf : '');
                 }}
               >
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {drivers.map((d) => <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>)}
                 </SelectContent>
@@ -231,7 +231,7 @@ export default function OfflineMovementsPage() {
             <div>
               <Label>Transportadora</Label>
               <Select value={formData.transport_company || ''} onValueChange={(v) => handleChange('transport_company', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {companies.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                 </SelectContent>
@@ -241,7 +241,7 @@ export default function OfflineMovementsPage() {
             <div>
               <Label>Cliente</Label>
               <Select value={formData.client_name || ''} onValueChange={(v) => handleChange('client_name', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {clients.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                 </SelectContent>
@@ -251,7 +251,7 @@ export default function OfflineMovementsPage() {
             <div>
               <Label>Armador</Label>
               <Select value={formData.shipping_line || ''} onValueChange={(v) => handleChange('shipping_line', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {shippingLines.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                 </SelectContent>

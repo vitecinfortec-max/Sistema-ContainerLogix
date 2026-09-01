@@ -256,7 +256,6 @@ export default function DailyRateRequestPage() {
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1 max-w-md">
             <Input
-              placeholder="Buscar por motorista, placa ou cliente..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -385,7 +384,6 @@ export default function DailyRateRequestPage() {
                           value={item.driver_name}
                           onChange={(val) => handleItemChange(index, 'driver_name', val)}
                           options={drivers}
-                          placeholder="Digite o nome..."
                           displayField="name"
                           valueField="id"
                           onSelect={(driver) => {
@@ -400,7 +398,6 @@ export default function DailyRateRequestPage() {
                           value={item.vehicle_plate}
                           onChange={(val) => handleItemChange(index, 'vehicle_plate', val.toUpperCase())}
                           options={vehicles}
-                          placeholder="Digite a placa..."
                           displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                           valueField="id"
                           onSelect={(vehicle) => handleItemChange(index, 'vehicle_plate', vehicle.plate)}
@@ -412,7 +409,6 @@ export default function DailyRateRequestPage() {
                           value={item.client_name}
                           onChange={(val) => handleItemChange(index, 'client_name', val)}
                           options={clients}
-                          placeholder="Digite o cliente..."
                           displayField="name"
                           valueField="id"
                           onSelect={(client) => handleItemChange(index, 'client_name', client.name)}
@@ -458,7 +454,7 @@ export default function DailyRateRequestPage() {
 
             <div>
               <Label>Observações</Label>
-              <Input value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} placeholder="Observações adicionais" />
+              <Input value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} />
             </div>
           </div>
 

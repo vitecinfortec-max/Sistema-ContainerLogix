@@ -520,7 +520,6 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <div className="relative max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <Input
-                placeholder="Buscar por motorista, cliente, container, placa..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 h-9 text-[13px]"
@@ -647,7 +646,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <SectionHeader title="Dados do Contrato" noMargin />
             <div className="grid grid-cols-2 gap-3">
               <Field label="Data de Emissão" type="date" value={form.emission_date} onChange={(v) => onChange('emission_date', v)} testid="rpa-emission-date" />
-              <Field label="Forma de Pagamento" value={form.payment_method} onChange={(v) => onChange('payment_method', v)} placeholder="Ex: Carta frete" testid="rpa-payment-method" />
+              <Field label="Forma de Pagamento" value={form.payment_method} onChange={(v) => onChange('payment_method', v)} testid="rpa-payment-method" />
               <Field label="Data Inicial da Viagem" type="date" value={form.trip_start_date} onChange={(v) => onChange('trip_start_date', v)} testid="rpa-trip-start" />
               <Field label="Data Final da Viagem" type="date" value={form.trip_end_date} onChange={(v) => onChange('trip_end_date', v)} testid="rpa-trip-end" />
               <Field label="Tipo de Operação" value={form.operation_type} onChange={(v) => onChange('operation_type', v)} testid="rpa-operation-type" />
@@ -665,7 +664,6 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 <div className="relative">
                   <Input
                     type="text"
-                    placeholder="Digite o nome da transportadora contratada..."
                     value={contratadoSearch}
                     onChange={(e) => handleContratadoSearch(e.target.value)}
                     onFocus={() => {
@@ -720,7 +718,6 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 <div className="relative">
                   <Input
                     type="text"
-                    placeholder="Digite o nome ou CPF do motorista..."
                     value={driverSearch}
                     onChange={(e) => handleDriverSearch(e.target.value)}
                     onFocus={() => {
@@ -804,7 +801,6 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 <div className="relative">
                   <Input
                     type="text"
-                    placeholder="Digite o nome do cliente..."
                     value={clientSearch}
                     onChange={(e) => handleClientSearch(e.target.value)}
                     onFocus={() => {
@@ -885,7 +881,6 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     <Input
                       value={s.description}
                       onChange={(e) => updateService(idx, 'description', e.target.value)}
-                      placeholder="Ex: 01 - COLETA E ENTREGA DE CNTR LS"
                       className="h-8 text-sm"
                       data-testid={`rpa-service-desc-${idx}`}
                     />
@@ -973,7 +968,6 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Input
                 value={form.documents_list}
                 onChange={(e) => onChange('documents_list', e.target.value)}
-                placeholder="Ex: CT-e - Empresa / 2, CT-e - Empresa / 3"
                 className="h-9 text-sm"
                 data-testid="rpa-documents-list"
               />
@@ -1049,7 +1043,6 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Textarea
                 value={form.observations}
                 onChange={(e) => onChange('observations', e.target.value)}
-                placeholder="* Somente efetuar pagamento mediante comprovante de exportação e pesagem"
                 className="text-sm min-h-[60px]"
                 data-testid="rpa-observations"
               />
@@ -1097,7 +1090,6 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
         onChange={(e) => onChange(e.target.value)}
         className="h-9 text-sm"
         data-testid={testid}
-        placeholder={placeholder}
       />
     </div>
   );

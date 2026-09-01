@@ -221,7 +221,7 @@ export default function OfflineInspectionsPage() {
             <div>
               <Label>Cliente</Label>
               <Select value={formData.client_name || ''} onValueChange={(v) => handleChange('client_name', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {clients.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
                 </SelectContent>
@@ -231,7 +231,7 @@ export default function OfflineInspectionsPage() {
             <div>
               <Label>Armador</Label>
               <Select value={formData.shipping_line_name || ''} onValueChange={(v) => handleChange('shipping_line_name', v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {shippingLines.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
                 </SelectContent>

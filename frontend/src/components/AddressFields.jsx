@@ -51,7 +51,7 @@ export function CityStateFields({ value, onChange, cityLabel = 'Cidade', stateLa
     <div>
       <FieldLabel>{stateLabel}</FieldLabel>
       <Select value={v.state || '_empty'} onValueChange={setState}>
-        <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="-- UF --" /></SelectTrigger>
+        <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
         <SelectContent>
           {UF_OPTIONS.map(([uf, nome]) => (
             <SelectItem key={uf} value={uf} className="text-sm">{uf} - {nome}</SelectItem>
@@ -69,7 +69,6 @@ export function CityStateFields({ value, onChange, cityLabel = 'Cidade', stateLa
         onChange={(val) => onChange({ ...v, city: val })}
         options={cities}
         displayField={(c) => c}
-        placeholder={v.state ? 'Digite para buscar a cidade...' : 'Selecione a UF primeiro'}
         className="h-9 text-sm"
       />
     </div>
@@ -128,12 +127,12 @@ export function AddressFields({ value, onChange }) {
         </div>
         <div>
           <FieldLabel>CEP</FieldLabel>
-          <Input value={v.zip || ''} onChange={(e) => set('zip', formatCEP(e.target.value))} className="h-9 text-sm font-mono" placeholder="00000-000" maxLength={9} />
+          <Input value={v.zip || ''} onChange={(e) => set('zip', formatCEP(e.target.value))} className="h-9 text-sm font-mono" maxLength={9} />
         </div>
         <div>
           <FieldLabel>UF</FieldLabel>
           <Select value={v.state || '_empty'} onValueChange={setState}>
-            <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="-- UF --" /></SelectTrigger>
+            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               {UF_OPTIONS.map(([uf, nome]) => (
                 <SelectItem key={uf} value={uf} className="text-sm">{uf} - {nome}</SelectItem>
@@ -149,7 +148,6 @@ export function AddressFields({ value, onChange }) {
           onChange={(val) => set('city', val)}
           options={cities}
           displayField={(c) => c}
-          placeholder={v.state ? 'Digite para buscar a cidade...' : 'Selecione a UF primeiro'}
           className="h-9 text-sm"
         />
       </div>

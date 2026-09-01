@@ -226,7 +226,6 @@ export default function NewContainerInspectionPage() {
                     id="container_number"
                     value={formData.container_number}
                     onChange={(e) => handleInputChange('container_number', e.target.value.toUpperCase())}
-                    placeholder="Ex: MSKU1234567"
                     required
                     data-testid="container-number-input"
                   />
@@ -238,7 +237,6 @@ export default function NewContainerInspectionPage() {
                     id="container_seal"
                     value={formData.container_seal}
                     onChange={(e) => handleInputChange('container_seal', e.target.value.toUpperCase())}
-                    placeholder="Lacre"
                     data-testid="container-seal-input"
                   />
                 </div>
@@ -269,7 +267,6 @@ export default function NewContainerInspectionPage() {
                     id="collection_terminal"
                     value={formData.collection_terminal}
                     onChange={(e) => handleInputChange('collection_terminal', e.target.value)}
-                    placeholder="Ex: Terminal Santos"
                     data-testid="collection-terminal-input"
                   />
                 </div>
@@ -282,7 +279,6 @@ export default function NewContainerInspectionPage() {
                     onSelect={(t) => handleInputChange('origin_terminal', t.name)}
                     options={terminals}
                     displayField="name"
-                    placeholder="Digite para buscar o terminal..."
                   />
                 </div>
 
@@ -292,7 +288,6 @@ export default function NewContainerInspectionPage() {
                     id="booking"
                     value={formData.booking}
                     onChange={(e) => handleInputChange('booking', e.target.value)}
-                    placeholder="Número do booking"
                     data-testid="booking-input"
                   />
                 </div>
@@ -311,7 +306,6 @@ export default function NewContainerInspectionPage() {
                     }}
                     onFocus={() => setShowClientDropdown(true)}
                     onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
-                    placeholder="Buscar cliente..."
                     data-testid="client-input"
                   />
                   {showClientDropdown && filteredClients.length > 0 && (
@@ -343,7 +337,6 @@ export default function NewContainerInspectionPage() {
                     }}
                     onFocus={() => setShowShippingLineDropdown(true)}
                     onBlur={() => setTimeout(() => setShowShippingLineDropdown(false), 200)}
-                    placeholder="Buscar armador..."
                     data-testid="shipping-line-input"
                   />
                   {showShippingLineDropdown && filteredShippingLines.length > 0 && (
@@ -368,7 +361,6 @@ export default function NewContainerInspectionPage() {
                   id="observations"
                   value={formData.observations}
                   onChange={(e) => handleInputChange('observations', e.target.value)}
-                  placeholder="Observações sobre a vistoria..."
                   rows={4}
                   data-testid="observations-input"
                 />
@@ -430,7 +422,6 @@ export default function NewContainerInspectionPage() {
                             handleAddCustomItem();
                           }
                         }}
-                        placeholder="Ex: Vazamento, Ferrugem localizada..."
                       />
                     </div>
                     <Button type="button" variant="outline" onClick={handleAddCustomItem}>

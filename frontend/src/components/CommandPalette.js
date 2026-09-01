@@ -132,7 +132,6 @@ export default function CommandPalette({ open, onOpenChange, items }) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar contêiner, motorista, cliente, página..."
             className="w-full h-12 text-sm bg-transparent focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
             data-testid="command-palette-input"
           />

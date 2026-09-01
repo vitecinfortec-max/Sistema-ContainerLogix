@@ -207,7 +207,7 @@ export default function FuelSupplyOrderPage() {
           <CardContent className="pt-4 pb-4">
             <div className="relative max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-              <Input placeholder="Buscar por placa, solicitante, fornecedor ou empresa..." value={search}
+              <Input value={search}
                 onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-[13px]" data-testid="fuel-order-search" />
             </div>
           </CardContent>
@@ -370,7 +370,7 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   return (
     <div>
       <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
-      <Input type={type} value={value ?? ''} placeholder={placeholder}
+      <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
   );

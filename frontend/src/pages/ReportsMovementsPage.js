@@ -226,7 +226,7 @@ export default function ReportsMovementsPage() {
                 <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Operação</Label>
                 <Select value={filterType} onValueChange={setFilterType}>
                   <SelectTrigger className="h-8 text-xs" data-testid="report-filter-type">
-                    <SelectValue placeholder="Todas" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all" className="text-[13px]">Todas as Operações</SelectItem>
@@ -241,7 +241,7 @@ export default function ReportsMovementsPage() {
                 <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
                   <SelectTrigger className="h-8 text-xs" data-testid="report-filter-status">
-                    <SelectValue placeholder="Todos" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all" className="text-[13px]">Todos os Status</SelectItem>
@@ -256,7 +256,6 @@ export default function ReportsMovementsPage() {
                 <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
                 <div className="relative">
                 <Input
-                  placeholder="Buscar..."
                   value={clientSearch}
                   onChange={(e) => handleClientSearch(e.target.value)}
                   onFocus={() => {

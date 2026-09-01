@@ -545,7 +545,6 @@ export default function FleetPage() {
                     <div className="relative">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                       <Input
-                        placeholder="Buscar..."
                         value={vehicleSearch}
                         onChange={(e) => setVehicleSearch(e.target.value.toUpperCase())}
                         onKeyPress={(e) => e.key === 'Enter' && handleVehicleSearch()}
@@ -679,7 +678,6 @@ export default function FleetPage() {
                     <div className="relative">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                       <Input
-                        placeholder="Buscar por placa..."
                         value={searchPlate}
                         onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
                         onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -831,7 +829,7 @@ export default function FleetPage() {
                 onValueChange={(value) => handleInputChange('vehicle_type_revision', value)}
               >
                 <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Selecione o tipo" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="CAVALO">Cavalo Mecânico</SelectItem>
@@ -849,7 +847,6 @@ export default function FleetPage() {
                     <Input
                       value={formData.vehicle_plate}
                       onChange={(e) => handleInputChange('vehicle_plate', e.target.value.toUpperCase())}
-                      placeholder="ABC1D23"
                     />
                   </div>
                   <div>
@@ -857,7 +854,6 @@ export default function FleetPage() {
                     <Input
                       value={formData.vehicle_model}
                       onChange={(e) => handleInputChange('vehicle_model', e.target.value)}
-                      placeholder="Ex: Volvo FH 540"
                     />
                   </div>
                   <div>
@@ -876,7 +872,6 @@ export default function FleetPage() {
                     <Input
                       value={formData.oil_used}
                       onChange={(e) => handleInputChange('oil_used', e.target.value)}
-                      placeholder="Ex: 15W40"
                     />
                   </div>
                   <div>
@@ -885,7 +880,6 @@ export default function FleetPage() {
                       type="number"
                       value={formData.current_km}
                       onChange={(e) => handleInputChange('current_km', e.target.value)}
-                      placeholder="Ex: 150000"
                     />
                   </div>
                 </div>
@@ -895,51 +889,51 @@ export default function FleetPage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                       <Label>Óleo Motor</Label>
-                      <Input type="number" value={formData.next_oil_motor_km} onChange={(e) => handleInputChange('next_oil_motor_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_oil_motor_km} onChange={(e) => handleInputChange('next_oil_motor_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Filtro Óleo</Label>
-                      <Input type="number" value={formData.next_oil_filter_km} onChange={(e) => handleInputChange('next_oil_filter_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_oil_filter_km} onChange={(e) => handleInputChange('next_oil_filter_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Filtro Ar</Label>
-                      <Input type="number" value={formData.next_air_filter_km} onChange={(e) => handleInputChange('next_air_filter_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_air_filter_km} onChange={(e) => handleInputChange('next_air_filter_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Filtro Ar Condicionado</Label>
-                      <Input type="number" value={formData.next_ac_filter_km} onChange={(e) => handleInputChange('next_ac_filter_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_ac_filter_km} onChange={(e) => handleInputChange('next_ac_filter_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Filtro Combustível</Label>
-                      <Input type="number" value={formData.next_fuel_filter_km} onChange={(e) => handleInputChange('next_fuel_filter_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_fuel_filter_km} onChange={(e) => handleInputChange('next_fuel_filter_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Filtro Racor</Label>
-                      <Input type="number" value={formData.next_racor_filter_km} onChange={(e) => handleInputChange('next_racor_filter_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_racor_filter_km} onChange={(e) => handleInputChange('next_racor_filter_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Filtro APU</Label>
-                      <Input type="number" value={formData.next_apu_filter_km} onChange={(e) => handleInputChange('next_apu_filter_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_apu_filter_km} onChange={(e) => handleInputChange('next_apu_filter_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Filtro Hidráulico</Label>
-                      <Input type="number" value={formData.next_hydraulic_filter_km} onChange={(e) => handleInputChange('next_hydraulic_filter_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_hydraulic_filter_km} onChange={(e) => handleInputChange('next_hydraulic_filter_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Óleo Caixa de Marcha</Label>
-                      <Input type="number" value={formData.next_gearbox_oil_km} onChange={(e) => handleInputChange('next_gearbox_oil_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_gearbox_oil_km} onChange={(e) => handleInputChange('next_gearbox_oil_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Óleo Diferencial</Label>
-                      <Input type="number" value={formData.next_differential_oil_km} onChange={(e) => handleInputChange('next_differential_oil_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_differential_oil_km} onChange={(e) => handleInputChange('next_differential_oil_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Lubrificação</Label>
-                      <Input type="number" value={formData.next_lubrication_km} onChange={(e) => handleInputChange('next_lubrication_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_lubrication_km} onChange={(e) => handleInputChange('next_lubrication_km', e.target.value)} />
                     </div>
                     <div>
                       <Label>Lavagem</Label>
-                      <Input type="number" value={formData.next_washing_km} onChange={(e) => handleInputChange('next_washing_km', e.target.value)} placeholder="KM" />
+                      <Input type="number" value={formData.next_washing_km} onChange={(e) => handleInputChange('next_washing_km', e.target.value)} />
                     </div>
                   </div>
                 </div>
@@ -949,16 +943,16 @@ export default function FleetPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Nome do Mecânico *</Label>
-                      <Input value={formData.mechanic_name} onChange={(e) => handleInputChange('mechanic_name', e.target.value)} placeholder="Nome do mecânico" />
+                      <Input value={formData.mechanic_name} onChange={(e) => handleInputChange('mechanic_name', e.target.value)} />
                     </div>
                     <div>
                       <Label>Realizado por</Label>
-                      <Input value={formData.performed_by} onChange={(e) => handleInputChange('performed_by', e.target.value)} placeholder="Quem realizou" />
+                      <Input value={formData.performed_by} onChange={(e) => handleInputChange('performed_by', e.target.value)} />
                     </div>
                   </div>
                   <div className="mt-4">
                     <Label>Observações</Label>
-                    <Input value={formData.observations} onChange={(e) => handleInputChange('observations', e.target.value)} placeholder="Observações" />
+                    <Input value={formData.observations} onChange={(e) => handleInputChange('observations', e.target.value)} />
                   </div>
                 </div>
               </>
@@ -973,7 +967,6 @@ export default function FleetPage() {
                     <Input
                       value={formData.vehicle_plate}
                       onChange={(e) => handleInputChange('vehicle_plate', e.target.value.toUpperCase())}
-                      placeholder="ABC1D23"
                     />
                   </div>
                   <div>
@@ -981,7 +974,6 @@ export default function FleetPage() {
                     <Input
                       value={formData.vehicle_model}
                       onChange={(e) => handleInputChange('vehicle_model', e.target.value)}
-                      placeholder="Ex: Randon SR"
                     />
                   </div>
                 </div>
@@ -994,7 +986,7 @@ export default function FleetPage() {
                       onValueChange={(value) => handleInputChange('carreta_revision_type', value)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione o tipo de revisão" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="FREIOS">Freios</SelectItem>
@@ -1023,7 +1015,6 @@ export default function FleetPage() {
                   <Input
                     value={formData.observations}
                     onChange={(e) => handleInputChange('observations', e.target.value)}
-                    placeholder="Descreva os serviços realizados"
                   />
                 </div>
 
@@ -1033,7 +1024,6 @@ export default function FleetPage() {
                     <Input
                       value={formData.mechanic_name}
                       onChange={(e) => handleInputChange('mechanic_name', e.target.value)}
-                      placeholder="Nome do mecânico"
                     />
                   </div>
                   <div>
@@ -1041,7 +1031,6 @@ export default function FleetPage() {
                     <Input
                       value={formData.performed_by}
                       onChange={(e) => handleInputChange('performed_by', e.target.value)}
-                      placeholder="Quem realizou a revisão"
                     />
                   </div>
                 </div>
@@ -1154,7 +1143,6 @@ export default function FleetPage() {
                 <Input
                   value={vehicleForm.plate}
                   onChange={(e) => handleVehicleFormChange('plate', e.target.value.toUpperCase())}
-                  placeholder="ABC1D23"
                   data-testid="input-vehicle-plate-form"
                 />
               </div>
@@ -1165,7 +1153,7 @@ export default function FleetPage() {
                   onValueChange={(value) => handleVehicleFormChange('vehicle_type', value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {vehicleTypes.map(type => (
@@ -1181,7 +1169,7 @@ export default function FleetPage() {
               <div>
                 <Label>Categoria</Label>
                 <Select value={vehicleForm.category} onValueChange={(value) => handleVehicleFormChange('category', value)}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {categoryOptions.map(option => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -1191,7 +1179,7 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label>Cor</Label>
-                <Input value={vehicleForm.color} onChange={(e) => handleVehicleFormChange('color', e.target.value)} placeholder="Ex: Branco" />
+                <Input value={vehicleForm.color} onChange={(e) => handleVehicleFormChange('color', e.target.value)} />
               </div>
               <div>
                 <Label>Nº Patrimônio/Cód. Interno</Label>
@@ -1205,7 +1193,6 @@ export default function FleetPage() {
                 <Input
                   value={vehicleForm.brand}
                   onChange={(e) => handleVehicleFormChange('brand', e.target.value)}
-                  placeholder="Ex: Volvo, Scania..."
                 />
               </div>
               <div>
@@ -1213,7 +1200,6 @@ export default function FleetPage() {
                 <Input
                   value={vehicleForm.model}
                   onChange={(e) => handleVehicleFormChange('model', e.target.value)}
-                  placeholder="Ex: FH 540"
                 />
               </div>
             </div>
@@ -1225,7 +1211,6 @@ export default function FleetPage() {
                   type="number"
                   value={vehicleForm.year}
                   onChange={(e) => handleVehicleFormChange('year', e.target.value)}
-                  placeholder="Ex: 2024"
                   min="1900"
                   max="2100"
                 />
@@ -1236,7 +1221,6 @@ export default function FleetPage() {
                   type="number"
                   value={vehicleForm.model_year}
                   onChange={(e) => handleVehicleFormChange('model_year', e.target.value)}
-                  placeholder="Ex: 2025"
                   min="1900"
                   max="2100"
                 />
@@ -1247,7 +1231,7 @@ export default function FleetPage() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Capacidade de Carga</Label>
-                <Input value={vehicleForm.load_capacity} onChange={(e) => handleVehicleFormChange('load_capacity', e.target.value)} placeholder="Ex: 30 ton" />
+                <Input value={vehicleForm.load_capacity} onChange={(e) => handleVehicleFormChange('load_capacity', e.target.value)} />
               </div>
               <div>
                 <Label>Nº de Eixos</Label>
@@ -1255,14 +1239,14 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label>Tipo de Carroceria/Implemento</Label>
-                <Input value={vehicleForm.body_type} onChange={(e) => handleVehicleFormChange('body_type', e.target.value)} placeholder="Ex: prancha, sider, graneleiro" />
+                <Input value={vehicleForm.body_type} onChange={(e) => handleVehicleFormChange('body_type', e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Combustível</Label>
                 <Select value={vehicleForm.fuel_type} onValueChange={(value) => handleVehicleFormChange('fuel_type', value)}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {fuelOptions.map(option => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -1272,21 +1256,21 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label>Capacidade do Tanque</Label>
-                <Input value={vehicleForm.tank_capacity} onChange={(e) => handleVehicleFormChange('tank_capacity', e.target.value)} placeholder="Ex: 400 L" />
+                <Input value={vehicleForm.tank_capacity} onChange={(e) => handleVehicleFormChange('tank_capacity', e.target.value)} />
               </div>
               <div>
                 <Label>Potência do Motor</Label>
-                <Input value={vehicleForm.engine_power} onChange={(e) => handleVehicleFormChange('engine_power', e.target.value)} placeholder="Ex: 460 cv" />
+                <Input value={vehicleForm.engine_power} onChange={(e) => handleVehicleFormChange('engine_power', e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Tara (peso vazio)</Label>
-                <Input value={vehicleForm.tare_weight} onChange={(e) => handleVehicleFormChange('tare_weight', e.target.value)} placeholder="Ex: 7.500 kg" />
+                <Input value={vehicleForm.tare_weight} onChange={(e) => handleVehicleFormChange('tare_weight', e.target.value)} />
               </div>
               <div>
                 <Label>PBT (Peso Bruto Total)</Label>
-                <Input value={vehicleForm.gross_weight} onChange={(e) => handleVehicleFormChange('gross_weight', e.target.value)} placeholder="Ex: 45.000 kg" />
+                <Input value={vehicleForm.gross_weight} onChange={(e) => handleVehicleFormChange('gross_weight', e.target.value)} />
               </div>
             </div>
 
@@ -1337,7 +1321,7 @@ export default function FleetPage() {
               <div>
                 <Label>Proprietário</Label>
                 <Select value={vehicleForm.owner_type} onValueChange={(value) => handleVehicleFormChange('owner_type', value)}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ownerTypeOptions.map(option => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -1348,7 +1332,7 @@ export default function FleetPage() {
               <div>
                 <Label>Status de Propriedade</Label>
                 <Select value={vehicleForm.ownership_status} onValueChange={(value) => handleVehicleFormChange('ownership_status', value)}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ownershipStatusOptions.map(option => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -1368,7 +1352,7 @@ export default function FleetPage() {
                 onValueChange={(value) => handleVehicleFormChange('status', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o status" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {statusOptions.map(option => (
@@ -1399,7 +1383,7 @@ export default function FleetPage() {
                 </PopoverTrigger>
                 <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Buscar motorista..." />
+                    <CommandInput />
                     <CommandList>
                       <CommandEmpty>Nenhum motorista encontrado</CommandEmpty>
                       <CommandGroup>
@@ -1441,7 +1425,6 @@ export default function FleetPage() {
               <Input
                 value={vehicleForm.observations}
                 onChange={(e) => handleVehicleFormChange('observations', e.target.value)}
-                placeholder="Observações adicionais"
               />
             </div>
           </div>

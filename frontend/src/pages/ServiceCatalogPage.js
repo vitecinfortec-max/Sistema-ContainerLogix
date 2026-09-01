@@ -154,7 +154,7 @@ export default function ServiceCatalogPage() {
                 <div className="space-y-1.5">
                   <Label className="text-[13px]">Tipo de Família</Label>
                   <Select value={formData.family_id || '_empty'} onValueChange={(v) => handleFamilyChange(v === '_empty' ? '' : v)}>
-                    <SelectTrigger className="h-10 text-[13px]"><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
+                    <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_empty">-- Selecione --</SelectItem>
                       {families.map((f) => <SelectItem key={f.id} value={f.id} className="text-sm">{f.name}</SelectItem>)}
@@ -199,7 +199,7 @@ export default function ServiceCatalogPage() {
 
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-          <Input placeholder="Buscar por descrição, família ou código..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 text-[13px] pl-9" data-testid="search-service-catalog-input" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 text-[13px] pl-9" data-testid="search-service-catalog-input" />
         </div>
 
         <Card>

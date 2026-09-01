@@ -255,7 +255,7 @@ export default function FuelSupplyPage() {
           <CardContent className="pt-4 pb-4">
             <div className="relative max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-              <Input placeholder="Buscar por placa, motorista ou fornecedor..." value={search}
+              <Input value={search}
                 onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-[13px]" data-testid="fuel-search" />
             </div>
           </CardContent>
@@ -337,7 +337,6 @@ export default function FuelSupplyPage() {
                   onSelect={onSelectFuelOrder}
                   options={fuelOrders}
                   displayField={(o) => `Nº ${o.order_number}${o.equipment_plate ? ' - ' + o.equipment_plate : ''}${o.supplier_name ? ' - ' + o.supplier_name : ''}`}
-                  placeholder="Digite ou busque o Nº da ordem..."
                   className="text-sm"
                 />
               </div>
@@ -355,7 +354,7 @@ export default function FuelSupplyPage() {
                 searchPlaceholder="Buscar motorista..." emptyLabel="Nenhum motorista encontrado" testid="fuel-driver" />
               <Field type="date" label="Data do Abastecimento *" value={form.supply_date} onChange={(v) => onChange('supply_date', v)} testid="fuel-supply-date" />
               <Field type="date" label="Data de Entrada *" value={form.entry_date} onChange={(v) => onChange('entry_date', v)} testid="fuel-entry-date" />
-              <Field type="number" label="Leitura *" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-reading" placeholder="KM ou horas" />
+              <Field type="number" label="Leitura *" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-reading" />
               <ComboField label="Fornecedor *" value={form.supplier_name || ''} onChange={(v) => {
                 onChange('supplier_name', v);
                 const sp = suppliers.find((x) => x.name === v);
@@ -453,7 +452,7 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   return (
     <div>
       <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
-      <Input type={type} value={value ?? ''} placeholder={placeholder}
+      <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
   );
@@ -464,7 +463,7 @@ function SelectField({ label, value, onChange, options, testid }) {
     <div>
       <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
       <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
-        <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
+        <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue /></SelectTrigger>
         <SelectContent>
           {options.map(([v, l]) => (
             <SelectItem key={v || '_empty'} value={v || '_empty'} className="text-sm">{l}</SelectItem>

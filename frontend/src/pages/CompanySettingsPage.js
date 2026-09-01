@@ -239,7 +239,6 @@ export default function CompanySettingsPage() {
                       onChange={handleCNPJChange}
                       disabled={!isAdmin}
                       className="h-10 text-[13px] font-mono"
-                      placeholder="00.000.000/0000-00"
                       maxLength={18}
                     />
                   </div>
@@ -252,7 +251,6 @@ export default function CompanySettingsPage() {
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       disabled={!isAdmin}
                       className="text-[13px] min-h-[70px]"
-                      placeholder={'Rua/Rodovia, número - Bairro\nCidade - UF'}
                     />
                   </div>
                 </div>
@@ -275,7 +273,6 @@ export default function CompanySettingsPage() {
                     onChange={handlePhoneChange}
                     disabled={!isAdmin}
                     className="h-10 text-[13px] font-mono"
-                    placeholder="(00) 00000-0000"
                     maxLength={15}
                   />
                 </div>

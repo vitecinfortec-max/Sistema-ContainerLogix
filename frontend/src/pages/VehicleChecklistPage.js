@@ -720,7 +720,6 @@ export default function VehicleChecklistPage() {
           <CardHeader className="pb-3">
             <div className="flex gap-2">
               <Input
-                placeholder="Buscar por placa, motorista ou cliente..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -848,7 +847,6 @@ export default function VehicleChecklistPage() {
                   value={simpleForm.vehicle_plate}
                   onChange={(val) => setSimpleForm(prev => ({ ...prev, vehicle_plate: val.toUpperCase() }))}
                   options={vehicles}
-                  placeholder="Digite a placa..."
                   displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                   onSelect={(v) => setSimpleForm(prev => ({ ...prev, vehicle_plate: v.plate }))}
                 />
@@ -859,7 +857,6 @@ export default function VehicleChecklistPage() {
                   value={simpleForm.driver_name}
                   onChange={(val) => setSimpleForm(prev => ({ ...prev, driver_name: val, driver_id: '' }))}
                   options={drivers}
-                  placeholder="Digite o nome..."
                   displayField="name"
                   onSelect={(d) => setSimpleForm(prev => ({ ...prev, driver_id: d.id, driver_name: d.name }))}
                 />
@@ -870,7 +867,6 @@ export default function VehicleChecklistPage() {
                   value={simpleForm.vistoriador_name}
                   onChange={(val) => setSimpleForm(prev => ({ ...prev, vistoriador_name: val, vistoriador_id: '' }))}
                   options={drivers}
-                  placeholder="Digite o nome..."
                   displayField="name"
                   onSelect={(d) => setSimpleForm(prev => ({ ...prev, vistoriador_id: d.id, vistoriador_name: d.name }))}
                 />
@@ -881,7 +877,6 @@ export default function VehicleChecklistPage() {
                   type="number"
                   value={simpleForm.current_km}
                   onChange={(e) => setSimpleForm(prev => ({ ...prev, current_km: e.target.value }))}
-                  placeholder="Ex: 125430"
                 />
               </div>
               <div>
@@ -923,7 +918,6 @@ export default function VehicleChecklistPage() {
               <Textarea
                 value={simpleForm.observations}
                 onChange={(e) => setSimpleForm(prev => ({ ...prev, observations: e.target.value }))}
-                placeholder="Observações gerais"
               />
             </div>
 
@@ -1039,7 +1033,6 @@ export default function VehicleChecklistPage() {
                   <Input
                     value={formData.expedidor}
                     onChange={(e) => setFormData(prev => ({ ...prev, expedidor: e.target.value }))}
-                    placeholder="Ex: Petróleo Brasileiro S.A."
                     disabled={formData.template === 'petrobras_lvt'}
                   />
                 </div>
@@ -1073,7 +1066,6 @@ export default function VehicleChecklistPage() {
                     value={formData.client_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, client_name: val, client_id: '' }))}
                     options={clients}
-                    placeholder="Digite o nome do cliente..."
                     displayField="name"
                     onSelect={(c) => setFormData(prev => ({ ...prev, client_id: c.id, client_name: c.name }))}
                   />
@@ -1084,7 +1076,6 @@ export default function VehicleChecklistPage() {
                     value={formData.transport_company_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, transport_company_name: val, transport_company_id: '' }))}
                     options={companies}
-                    placeholder="Digite o nome da transportadora..."
                     displayField="name"
                     onSelect={(c) => setFormData(prev => ({ ...prev, transport_company_id: c.id, transport_company_name: c.name }))}
                   />
@@ -1118,7 +1109,6 @@ export default function VehicleChecklistPage() {
                     value={formData.driver_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, driver_name: val, driver_id: '' }))}
                     options={drivers}
-                    placeholder="Digite o nome..."
                     displayField="name"
                     onSelect={(d) => setFormData(prev => ({ ...prev, driver_id: d.id, driver_name: d.name, driver_cpf: d.cpf || '' }))}
                   />
@@ -1130,8 +1120,8 @@ export default function VehicleChecklistPage() {
                 <div>
                   <Label>Nº CNH / Categoria</Label>
                   <div className="flex gap-2">
-                    <Input value={formData.cnh_number} onChange={(e) => setFormData(prev => ({ ...prev, cnh_number: e.target.value }))} placeholder="Número" />
-                    <Input value={formData.cnh_category} onChange={(e) => setFormData(prev => ({ ...prev, cnh_category: e.target.value.toUpperCase() }))} placeholder="Cat." className="w-20" />
+                    <Input value={formData.cnh_number} onChange={(e) => setFormData(prev => ({ ...prev, cnh_number: e.target.value }))} />
+                    <Input value={formData.cnh_category} onChange={(e) => setFormData(prev => ({ ...prev, cnh_category: e.target.value.toUpperCase() }))} className="w-20" />
                   </div>
                 </div>
                 <div>
@@ -1144,7 +1134,6 @@ export default function VehicleChecklistPage() {
                     value={formData.cavalo_plate}
                     onChange={(val) => setFormData(prev => ({ ...prev, cavalo_plate: val.toUpperCase() }))}
                     options={cavalos}
-                    placeholder="Digite a placa..."
                     displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                     onSelect={(v) => setFormData(prev => ({ ...prev, cavalo_plate: v.plate, cavalo_year: v.year ? String(v.year) : prev.cavalo_year }))}
                   />
@@ -1159,7 +1148,6 @@ export default function VehicleChecklistPage() {
                     value={formData.carreta1_plate}
                     onChange={(val) => setFormData(prev => ({ ...prev, carreta1_plate: val.toUpperCase() }))}
                     options={carretas}
-                    placeholder="Digite a placa..."
                     displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                     onSelect={(v) => setFormData(prev => ({ ...prev, carreta1_plate: v.plate, carreta1_year: v.year ? String(v.year) : prev.carreta1_year }))}
                   />
@@ -1170,7 +1158,7 @@ export default function VehicleChecklistPage() {
                 </div>
                 <div>
                   <Label>Capacidade Carreta 1</Label>
-                  <Input value={formData.carreta1_capacity} onChange={(e) => setFormData(prev => ({ ...prev, carreta1_capacity: e.target.value }))} placeholder="Volume e/ou Peso" />
+                  <Input value={formData.carreta1_capacity} onChange={(e) => setFormData(prev => ({ ...prev, carreta1_capacity: e.target.value }))} />
                 </div>
                 <div>
                   <Label>Placa Carreta 2</Label>
@@ -1178,7 +1166,6 @@ export default function VehicleChecklistPage() {
                     value={formData.carreta2_plate}
                     onChange={(val) => setFormData(prev => ({ ...prev, carreta2_plate: val.toUpperCase() }))}
                     options={carretas}
-                    placeholder="Digite a placa..."
                     displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                     onSelect={(v) => setFormData(prev => ({ ...prev, carreta2_plate: v.plate, carreta2_year: v.year ? String(v.year) : prev.carreta2_year }))}
                   />
@@ -1189,7 +1176,7 @@ export default function VehicleChecklistPage() {
                 </div>
                 <div>
                   <Label>Capacidade Carreta 2</Label>
-                  <Input value={formData.carreta2_capacity} onChange={(e) => setFormData(prev => ({ ...prev, carreta2_capacity: e.target.value }))} placeholder="Volume e/ou Peso" />
+                  <Input value={formData.carreta2_capacity} onChange={(e) => setFormData(prev => ({ ...prev, carreta2_capacity: e.target.value }))} />
                 </div>
               </div>
             </div>
@@ -1220,10 +1207,10 @@ export default function VehicleChecklistPage() {
                 <div className="space-y-2">
                   {formData.products.map((p, idx) => (
                     <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                      <Input className="col-span-5 h-9" placeholder="Produto" value={p.product} onChange={(e) => updateProduct(idx, 'product', e.target.value)} />
-                      <Input className="col-span-2 h-9" placeholder="ONU" value={p.un_number} onChange={(e) => updateProduct(idx, 'un_number', e.target.value)} />
-                      <Input className="col-span-2 h-9" placeholder="Nº Risco" value={p.risk_number} onChange={(e) => updateProduct(idx, 'risk_number', e.target.value)} />
-                      <Input className="col-span-2 h-9" placeholder="Subclasse" value={p.subclass} onChange={(e) => updateProduct(idx, 'subclass', e.target.value)} />
+                      <Input className="col-span-5 h-9" value={p.product} onChange={(e) => updateProduct(idx, 'product', e.target.value)} />
+                      <Input className="col-span-2 h-9" value={p.un_number} onChange={(e) => updateProduct(idx, 'un_number', e.target.value)} />
+                      <Input className="col-span-2 h-9" value={p.risk_number} onChange={(e) => updateProduct(idx, 'risk_number', e.target.value)} />
+                      <Input className="col-span-2 h-9" value={p.subclass} onChange={(e) => updateProduct(idx, 'subclass', e.target.value)} />
                       <Button type="button" variant="ghost" size="sm" className="col-span-1 h-9 w-9 p-0" onClick={() => removeProduct(idx)}>
                         <X className="w-4 h-4 text-destructive" />
                       </Button>
@@ -1267,7 +1254,7 @@ export default function VehicleChecklistPage() {
             {/* Observações */}
             <div>
               <Label>Observações</Label>
-              <Textarea value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} placeholder="Registro de observações" />
+              <Textarea value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} />
             </div>
 
             {/* Responsáveis */}
@@ -1276,7 +1263,7 @@ export default function VehicleChecklistPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Responsável da Transportadora</Label>
-                  <Input value={formData.transport_responsible_name} onChange={(e) => setFormData(prev => ({ ...prev, transport_responsible_name: e.target.value }))} placeholder="Nome" />
+                  <Input value={formData.transport_responsible_name} onChange={(e) => setFormData(prev => ({ ...prev, transport_responsible_name: e.target.value }))} />
                 </div>
                 <div>
                   <Label>RG</Label>
@@ -1284,7 +1271,7 @@ export default function VehicleChecklistPage() {
                 </div>
                 <div>
                   <Label>Recebedor da LVT</Label>
-                  <Input value={formData.lvt_receiver_name} onChange={(e) => setFormData(prev => ({ ...prev, lvt_receiver_name: e.target.value }))} placeholder="Nome" />
+                  <Input value={formData.lvt_receiver_name} onChange={(e) => setFormData(prev => ({ ...prev, lvt_receiver_name: e.target.value }))} />
                 </div>
                 <div>
                   <Label>Matrícula</Label>
@@ -1292,7 +1279,7 @@ export default function VehicleChecklistPage() {
                 </div>
                 <div>
                   <Label>Responsável pela Vistoria</Label>
-                  <Input value={formData.inspection_responsible_name} onChange={(e) => setFormData(prev => ({ ...prev, inspection_responsible_name: e.target.value }))} placeholder="Nome" />
+                  <Input value={formData.inspection_responsible_name} onChange={(e) => setFormData(prev => ({ ...prev, inspection_responsible_name: e.target.value }))} />
                 </div>
                 <div>
                   <Label>Matrícula</Label>

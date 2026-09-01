@@ -199,7 +199,6 @@ export default function CompaniesPage() {
                     value={formData.cnpj}
                     onChange={handleCNPJChange}
                     className="h-10 text-[13px] font-mono"
-                    placeholder="00.000.000/0000-00"
                     maxLength={18}
                   />
                 </div>
@@ -211,7 +210,6 @@ export default function CompaniesPage() {
                     value={formData.phone}
                     onChange={handlePhoneChange}
                     className="h-10 text-[13px] font-mono"
-                    placeholder="(00) 0000-0000"
                     maxLength={15}
                   />
                 </div>
@@ -232,7 +230,6 @@ export default function CompaniesPage() {
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
           <Input
-            placeholder="Buscar por nome, CNPJ ou telefone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-10 text-[13px] pl-9"

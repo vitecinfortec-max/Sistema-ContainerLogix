@@ -145,7 +145,6 @@ export default function OSCategoriesPage() {
                     data-testid="os-category-name-input"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: MANUTENÇÃO CORRETIVA - EXTERNA"
                     required
                     className="h-10 text-[13px]"
                   />
@@ -176,7 +175,6 @@ export default function OSCategoriesPage() {
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
           <Input
-            placeholder="Buscar por nome..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-10 text-[13px] pl-9"

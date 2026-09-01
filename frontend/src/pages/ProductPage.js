@@ -197,7 +197,6 @@ export default function ProductPage() {
                       onSelect={(w) => { setField('warehouse_name', w.name); setField('warehouse_id', w.id); }}
                       options={warehouses}
                       displayField="name"
-                      placeholder="Digite para buscar..."
                       className="h-10 text-sm"
                     />
                   </div>
@@ -209,7 +208,6 @@ export default function ProductPage() {
                       onSelect={(f) => { setField('family_name', f.name); setField('family_id', f.id); }}
                       options={families}
                       displayField="name"
-                      placeholder="Digite para buscar..."
                       className="h-10 text-sm"
                     />
                   </div>
@@ -270,7 +268,6 @@ export default function ProductPage() {
                       onChange={(v) => setField('linked_party_name', v)}
                       options={parties}
                       displayField="name"
-                      placeholder="Digite para buscar (se específico)..."
                       className="h-10 text-sm"
                     />
                   </div>
@@ -301,7 +298,7 @@ export default function ProductPage() {
 
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-          <Input placeholder="Buscar por descrição, código de barras ou código..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 text-[13px] pl-9" data-testid="search-product-input" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 text-[13px] pl-9" data-testid="search-product-input" />
         </div>
 
         <Card>

@@ -324,7 +324,6 @@ export default function UnitSegregationPage() {
               <div>
                 <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Container</Label>
                 <Input
-                  placeholder="Nº do Container"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="h-8 text-xs"
@@ -335,7 +334,7 @@ export default function UnitSegregationPage() {
                 <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
                 <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
                   <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Todos" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
@@ -549,7 +548,6 @@ export default function UnitSegregationPage() {
               </Label>
               <div className="relative">
                 <Input
-                  placeholder="Digite para buscar cliente..."
                   value={clientSearch}
                   onChange={(e) => handleClientSearch(e.target.value)}
                   onFocus={() => {
@@ -613,7 +611,6 @@ export default function UnitSegregationPage() {
                       <div>
                         <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase">Container *</Label>
                         <Input
-                          placeholder="ABCD1234567"
                           value={item.container_number}
                           onChange={(e) => updateItem(index, 'container_number', e.target.value)}
                           className="h-8 text-sm font-mono"
@@ -623,7 +620,6 @@ export default function UnitSegregationPage() {
                       <div>
                         <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase">Tara</Label>
                         <Input
-                          placeholder="3800"
                           value={item.tare}
                           onChange={(e) => updateItem(index, 'tare', e.target.value)}
                           className="h-8 text-sm"
@@ -634,7 +630,7 @@ export default function UnitSegregationPage() {
                         <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase">Armador *</Label>
                         <Select value={item.shipping_line} onValueChange={(v) => updateItem(index, 'shipping_line', v)}>
                           <SelectTrigger className="h-8 text-sm" data-testid={`shipping-${index}`}>
-                            <SelectValue placeholder="Selecione" />
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {shippingLines.map(sl => (
@@ -667,7 +663,6 @@ export default function UnitSegregationPage() {
                 className="w-full h-20 p-3 border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                 value={formData.observations}
                 onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))}
-                placeholder="Observações adicionais..."
                 data-testid="observations-input"
               />
             </div>

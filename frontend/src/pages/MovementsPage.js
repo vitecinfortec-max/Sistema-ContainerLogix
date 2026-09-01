@@ -367,7 +367,7 @@ export default function MovementsPage() {
                 <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Tipo</Label>
                 <Select value={filterType} onValueChange={setFilterType}>
                   <SelectTrigger className="h-8 text-xs" data-testid="filter-type-select">
-                    <SelectValue placeholder="Todos" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
@@ -380,7 +380,7 @@ export default function MovementsPage() {
                 <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
                   <SelectTrigger className="h-8 text-xs" data-testid="filter-status-select">
-                    <SelectValue placeholder="Todos" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
@@ -394,7 +394,6 @@ export default function MovementsPage() {
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
                   <Input
-                    placeholder="Buscar..."
                     value={searchClient}
                     onChange={e => setSearchClient(e.target.value)}
                     className="h-8 text-xs pl-6"
@@ -407,7 +406,6 @@ export default function MovementsPage() {
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
                   <Input
-                    placeholder="Buscar..."
                     value={searchContainer}
                     onChange={e => setSearchContainer(e.target.value)}
                     className="h-8 text-xs pl-6"
@@ -420,7 +418,6 @@ export default function MovementsPage() {
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
                   <Input
-                    placeholder="Buscar..."
                     value={searchMovement}
                     onChange={e => setSearchMovement(e.target.value)}
                     className="h-8 text-xs pl-6"
@@ -433,7 +430,6 @@ export default function MovementsPage() {
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
                   <Input
-                    placeholder="Buscar..."
                     value={searchDriver}
                     onChange={e => setSearchDriver(e.target.value)}
                     className="h-8 text-xs pl-6"

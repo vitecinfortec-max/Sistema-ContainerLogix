@@ -207,7 +207,7 @@ export default function ReportsBillingPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="h-10 text-[13px]" data-testid="report-billing-filter-type">
-                  <SelectValue placeholder="Todas as Operações" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all" className="text-[13px]">Todas as Operações</SelectItem>
@@ -218,7 +218,7 @@ export default function ReportsBillingPage() {
 
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="h-10 text-[13px]" data-testid="report-billing-filter-status">
-                  <SelectValue placeholder="Todos os Status" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all" className="text-[13px]">Todos os Status</SelectItem>
@@ -230,7 +230,6 @@ export default function ReportsBillingPage() {
               {/* Cliente - Autocomplete (digite para buscar) */}
               <div className="relative" ref={clientBoxRef}>
                 <Input
-                  placeholder="Digite para buscar cliente..."
                   value={clientSearch}
                   onChange={(e) => handleClientSearch(e.target.value)}
                   onFocus={() => {
@@ -279,7 +278,7 @@ export default function ReportsBillingPage() {
 
               <Select value={billedFilter} onValueChange={setBilledFilter}>
                 <SelectTrigger className="h-10 text-[13px]" data-testid="report-billing-filter-billed">
-                  <SelectValue placeholder="Faturamento" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all" className="text-[13px]">Todas</SelectItem>

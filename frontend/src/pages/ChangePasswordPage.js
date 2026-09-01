@@ -98,7 +98,6 @@ export default function ChangePasswordPage() {
                   onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
                   required
                   className="pl-10 pr-10 h-12"
-                  placeholder="Digite a senha provisória recebida"
                   data-testid="current-password-input"
                 />
                 <button
@@ -122,7 +121,6 @@ export default function ChangePasswordPage() {
                   onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
                   required
                   className="pl-10 pr-10 h-12"
-                  placeholder="Crie sua nova senha"
                   data-testid="new-password-input"
                 />
                 <button
@@ -146,7 +144,6 @@ export default function ChangePasswordPage() {
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
                   className="pl-10 h-12"
-                  placeholder="Confirme sua nova senha"
                   data-testid="confirm-password-input"
                 />
               </div>

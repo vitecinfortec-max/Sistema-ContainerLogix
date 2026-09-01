@@ -365,7 +365,7 @@ export default function YardControlPage() {
                   onValueChange={(value) => setFilters(prev => ({ ...prev, status_filter: value === 'all' ? '' : value }))}
                 >
                   <SelectTrigger data-testid="filter-status" className="h-8 text-xs">
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
@@ -382,7 +382,7 @@ export default function YardControlPage() {
                   onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
                 >
                   <SelectTrigger data-testid="filter-movement-type" className="h-8 text-xs">
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
@@ -400,7 +400,6 @@ export default function YardControlPage() {
                   onChange={(e) => setFilters(prev => ({ ...prev, client_name: e.target.value }))}
                   onFocus={() => setClientInputFocused(true)}
                   onBlur={() => setTimeout(() => setClientInputFocused(false), 200)}
-                  placeholder="Buscar..."
                   data-testid="filter-client"
                   className="h-8 text-xs"
                 />
@@ -438,7 +437,7 @@ export default function YardControlPage() {
                   onValueChange={(value) => setFilters(prev => ({ ...prev, shipping_line: value === 'all' ? '' : value }))}
                 >
                   <SelectTrigger data-testid="filter-shipping" className="h-8 text-xs">
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
@@ -458,7 +457,6 @@ export default function YardControlPage() {
                   min="0"
                   value={filters.min_days}
                   onChange={(e) => setFilters(prev => ({ ...prev, min_days: e.target.value }))}
-                  placeholder="Ex: 30"
                   data-testid="filter-min-days"
                   className="h-8 text-xs"
                 />
@@ -765,7 +763,7 @@ export default function YardControlPage() {
                 <Label>Motorista</Label>
                 <Select value={exitData.driver_id} onValueChange={handleDriverChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o motorista" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {drivers.map(driver => (
@@ -781,7 +779,7 @@ export default function YardControlPage() {
                 <Label>Transportadora</Label>
                 <Select value={exitData.transport_company_id} onValueChange={handleCompanyChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione a transportadora" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map(company => (
@@ -798,7 +796,6 @@ export default function YardControlPage() {
                 <Input
                   value={exitData.vehicle_plate}
                   onChange={(e) => setExitData(prev => ({ ...prev, vehicle_plate: e.target.value.toUpperCase() }))}
-                  placeholder="Ex: ABC1D23"
                 />
               </div>
 
@@ -807,7 +804,6 @@ export default function YardControlPage() {
                 <Input
                   value={exitData.observations}
                   onChange={(e) => setExitData(prev => ({ ...prev, observations: e.target.value }))}
-                  placeholder="Observações (opcional)"
                 />
               </div>
             </div>

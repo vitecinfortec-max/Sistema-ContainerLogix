@@ -222,7 +222,7 @@ export default function LoadingOrderPage() {
           <CardContent className="pt-4 pb-4">
             <div className="relative max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-              <Input placeholder="Buscar por container, motorista ou transportadora..." value={search}
+              <Input value={search}
                 onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-[13px]" data-testid="loading-order-search" />
             </div>
           </CardContent>
@@ -303,7 +303,7 @@ export default function LoadingOrderPage() {
             <div className="grid grid-cols-3 gap-3">
               <SelectField label="Tipo *" value={form.order_type} onChange={(v) => onChange('order_type', v)} options={ORDER_TYPE_OPTIONS} testid="loading-order-type" />
               <SelectField label="Status" value={form.status} onChange={(v) => onChange('status', v)} options={STATUS_OPTIONS} testid="loading-order-status" />
-              <Field label="Janela" value={form.collection_window} onChange={(v) => onChange('collection_window', v)} placeholder="Ex: 08:00 - 12:00" testid="loading-order-window" />
+              <Field label="Janela" value={form.collection_window} onChange={(v) => onChange('collection_window', v)} testid="loading-order-window" />
             </div>
 
             <SectionTitle>Origem e Destino</SectionTitle>
@@ -336,7 +336,6 @@ export default function LoadingOrderPage() {
                   onSelect={onSelectDriver}
                   options={drivers}
                   displayField="name"
-                  placeholder="Digite para buscar motorista..."
                   className="h-9 text-sm"
                 />
               </div>
@@ -350,7 +349,6 @@ export default function LoadingOrderPage() {
                   onChange={(v) => onChange('transport_company', v)}
                   options={companies}
                   displayField="name"
-                  placeholder="Digite para buscar transportadora..."
                   className="h-9 text-sm"
                 />
               </div>
@@ -362,7 +360,6 @@ export default function LoadingOrderPage() {
                   onSelect={(v) => onChange('truck_plate', v.plate)}
                   options={vehicles}
                   displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                  placeholder="Digite para buscar a placa..."
                   className="h-9 text-sm font-mono"
                 />
               </div>
@@ -374,7 +371,6 @@ export default function LoadingOrderPage() {
                   onSelect={(v) => onChange('trailer_plate', v.plate)}
                   options={vehicles}
                   displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                  placeholder="Digite para buscar a placa..."
                   className="h-9 text-sm font-mono"
                 />
               </div>
@@ -420,7 +416,7 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   return (
     <div>
       <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
-      <Input type={type} value={value ?? ''} placeholder={placeholder}
+      <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
   );
@@ -431,7 +427,7 @@ function SelectField({ label, value, onChange, options, testid }) {
     <div>
       <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
       <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
-        <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue placeholder="-- Selecione --" /></SelectTrigger>
+        <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue /></SelectTrigger>
         <SelectContent>
           {options.map(([v, l]) => (
             <SelectItem key={v || '_empty'} value={v || '_empty'} className="text-sm">{l}</SelectItem>

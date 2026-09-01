@@ -850,7 +850,6 @@ export default function Layout({ children }) {
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Pesquisar"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full h-9 pl-3 pr-8 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40 placeholder:text-slate-400 dark:placeholder:text-slate-500"

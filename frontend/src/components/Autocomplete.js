@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 // LoadingSchedulePage, DailyRateRequestPage, ExpenseReportsPage e
 // VehicleChecklistPage (4 cópias, ~75 linhas cada). Consolidado aqui para que
 // uma correção futura valha para todas as telas de uma vez.
-export function Autocomplete({ value, onChange, options, placeholder, displayField = 'name', valueField = 'id', onSelect, className = '' }) {
+export function Autocomplete({ value, onChange, options, displayField = 'name', valueField = 'id', onSelect, className = '' }) {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value || '');
   const [filteredOptions, setFilteredOptions] = useState([]);
@@ -59,7 +59,6 @@ export function Autocomplete({ value, onChange, options, placeholder, displayFie
         value={inputValue}
         onChange={handleInputChange}
         onFocus={() => setIsOpen(true)}
-        placeholder={placeholder}
       />
       {isOpen && filteredOptions.length > 0 && (
         <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">

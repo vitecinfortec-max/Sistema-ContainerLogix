@@ -103,7 +103,6 @@ export default function PhotoRegistriesPage() {
                   <div className="relative">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                     <Input
-                      placeholder="Buscar..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       className="h-9 text-sm pl-8"

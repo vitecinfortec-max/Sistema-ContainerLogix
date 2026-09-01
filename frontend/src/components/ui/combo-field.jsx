@@ -13,7 +13,7 @@ function RequiredLabel({ label }) {
   return label;
 }
 
-export function ComboField({ label, value, onChange, options, placeholder = '-- Selecione --', searchPlaceholder = 'Buscar...', emptyLabel = 'Nenhum resultado encontrado', testid }) {
+export function ComboField({ label, value, onChange, options, emptyLabel = 'Nenhum resultado encontrado', testid }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const selected = options.find(([v]) => v === value);
@@ -24,13 +24,13 @@ export function ComboField({ label, value, onChange, options, placeholder = '-- 
         <PopoverTrigger asChild>
           <Button type="button" variant="outline" role="combobox" aria-expanded={open}
             className="w-full justify-between font-normal h-9 text-sm" data-testid={testid}>
-            <span className="truncate">{selected ? selected[1] : placeholder}</span>
+            <span className="truncate">{selected ? selected[1] : ''}</span>
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
           <Command>
-            <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />
+            <CommandInput value={search} onValueChange={setSearch} />
             <CommandList>
               {search.trim().length === 0 ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">Digite para buscar...</div>
