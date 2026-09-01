@@ -155,11 +155,11 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
 
     # ========== LOGO ==========
     # Redimensiona mantendo a proporção original (evita esticar/achatar a logo),
-    # limitando à mesma caixa 70x70 usada antes.
+    # limitando à caixa 100x100 (logo maior, a pedido do usuário).
     logo_cell = ""
     if logo_buffer:
         try:
-            max_box = 70
+            max_box = 100
             logo_buffer.seek(0)
             with PILImage.open(logo_buffer) as pil_img:
                 orig_w, orig_h = pil_img.size
@@ -208,7 +208,7 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
     # do bloco inteiro sempre que não há logo configurada (coluna 1 vazia mas
     # ainda ocupando espaço).
     header_data = [[logo_cell, company_info_elements, '']]
-    header_table = Table(header_data, colWidths=[80, 350, 80])
+    header_table = Table(header_data, colWidths=[110, 320, 110])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (0, 0), (0, 0), 'CENTER'),
@@ -326,28 +326,13 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
     elements.append(Paragraph(stats_text, stats_style))
     
     # ========== GENERATION INFO ==========
-    # Distribuída nas duas laterais (largura total = doc.width, igual à linha
-    # verde do cabeçalho) em vez de um texto único centralizado - evita a
-    # aparência de "sobrando" espaço vazio nas bordas.
-    gen_left_style = ParagraphStyle(
-        'GenInfoLeft', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_LEFT
-    )
-    gen_right_style = ParagraphStyle(
-        'GenInfoRight', parent=gen_left_style, alignment=TA_RIGHT
+    gen_info_style = ParagraphStyle(
+        'GenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER,
+        spaceAfter=12
     )
     gen_date = now_brt().strftime('%d/%m/%Y %H:%M')
-    gen_table = Table([[
-        Paragraph(f"Gerado em: {gen_date}", gen_left_style),
-        Paragraph("Fuso: UTC-3 (Brasília)", gen_right_style),
-    ]], colWidths=[doc.width / 2, doc.width / 2])
-    gen_table.setStyle(TableStyle([
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-    ]))
-    elements.append(gen_table)
+    elements.append(Paragraph(f"Gerado em: {gen_date}", gen_info_style))
     
     # ========== TABLE SECTION ==========
     # Células de texto usam Paragraph (não string pura) pra quebrar linha
