@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useWebSocket } from '../hooks/useWebSocket';
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, Tooltip,
   PieChart, Pie, Cell
 } from 'recharts';
 
@@ -350,42 +350,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
-
-        {/* Daily Entries/Exits Chart */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-chart-card">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-primary" />
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Entradas e Saídas por Dia</CardTitle>
-              <span className="text-xs text-slate-400 dark:text-slate-500">(últimos 14 dias)</span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            {stats?.daily_chart && stats.daily_chart.length > 0 ? (
-              <div className="h-72 w-full" data-testid="daily-chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.daily_chart.map(d => ({
-                    ...d,
-                    label: format(new Date(d.date + 'T00:00:00'), 'dd/MM', { locale: ptBR })
-                  }))} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100 dark:stroke-slate-800" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="entries" name="Entradas" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={28} />
-                    <Bar dataKey="exits" name="Saídas" fill="#f59e0b" radius={[3, 3, 0, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Alertas do Sistema */}
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="system-alerts-card">
