@@ -202,9 +202,13 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
         Paragraph(f"{c['email']} | {c['phone']}", address_style),
     ]
     
-    # Inner header table: Logo | Company Info
-    header_data = [[logo_cell, company_info_elements]]
-    header_table = Table(header_data, colWidths=[80, 350])
+    # Inner header table: Logo | Company Info | espaçador (mesma largura da
+    # logo) - a 3ª coluna existe só pra contrabalançar a logo, senão o texto
+    # (centralizado dentro da 2ª coluna) fica visivelmente puxado pra direita
+    # do bloco inteiro sempre que não há logo configurada (coluna 1 vazia mas
+    # ainda ocupando espaço).
+    header_data = [[logo_cell, company_info_elements, '']]
+    header_table = Table(header_data, colWidths=[80, 350, 80])
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN', (0, 0), (0, 0), 'CENTER'),
@@ -322,20 +326,41 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
     elements.append(Paragraph(stats_text, stats_style))
     
     # ========== GENERATION INFO ==========
-    gen_style = ParagraphStyle(
-        'GenInfo',
-        parent=styles['Normal'],
-        fontSize=9,
-        textColor=colors.HexColor('#808080'),
-        alignment=TA_CENTER,
-        spaceBefore=0,
-        spaceAfter=12
+    # Distribuída nas duas laterais (largura total = doc.width, igual à linha
+    # verde do cabeçalho) em vez de um texto único centralizado - evita a
+    # aparência de "sobrando" espaço vazio nas bordas.
+    gen_left_style = ParagraphStyle(
+        'GenInfoLeft', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_LEFT
+    )
+    gen_right_style = ParagraphStyle(
+        'GenInfoRight', parent=gen_left_style, alignment=TA_RIGHT
     )
     gen_date = now_brt().strftime('%d/%m/%Y %H:%M')
-    elements.append(Paragraph(f"Gerado em: {gen_date} | Fuso: UTC-3 (Brasília)", gen_style))
+    gen_table = Table([[
+        Paragraph(f"Gerado em: {gen_date}", gen_left_style),
+        Paragraph("Fuso: UTC-3 (Brasília)", gen_right_style),
+    ]], colWidths=[doc.width / 2, doc.width / 2])
+    gen_table.setStyle(TableStyle([
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+    ]))
+    elements.append(gen_table)
     
     # ========== TABLE SECTION ==========
-    # 15 columns matching template
+    # Células de texto usam Paragraph (não string pura) pra quebrar linha
+    # dentro da própria célula em vez de vazar visualmente pra célula vizinha
+    # quando o conteúdo é mais largo que a coluna (nome de motorista grande,
+    # CPF, transportadora) - era a causa da sobreposição de texto no relatório.
+    cell_style_l = ParagraphStyle('ReportCellL', parent=styles['Normal'], fontSize=7, leading=8.5, alignment=TA_LEFT)
+    cell_style_c = ParagraphStyle('ReportCellC', parent=cell_style_l, alignment=TA_CENTER)
+
+    def cell(text, centered=False):
+        return Paragraph(str(text) if text not in (None, '') else '-', cell_style_c if centered else cell_style_l)
+
+    # 14 colunas
     data = [[
         'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista', 'CPF',
         'Placa Cavalo', 'Placa Carreta', 'Transportadora',
@@ -347,24 +372,27 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
         created_at = dt_brt.strftime('%d/%m/%Y %H:%M') if dt_brt else str(m.get('created_at', '-'))
 
         data.append([
-            str(m.get('transaction_id', '-')),
-            created_at,
-            "ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA",
-            m.get('container_number', '-'),
-            m.get('driver_name', '-'),
-            m.get('driver_cpf', '-'),
-            m.get('truck_plate', '-'),
-            m.get('trailer_plate_1', '') or '-',
-            m.get('transport_company', '-'),
-            m.get('status', 'VAZIO'),
-            m.get('size_type', '-'),
-            str(m.get('tare', '')) if m.get('tare') else '-',
-            m.get('shipping_line', '-'),
-            m.get('booking', '') or '-'
+            cell(m.get('transaction_id', '-'), centered=True),
+            cell(created_at),
+            cell("ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA", centered=True),
+            cell(m.get('container_number', '-')),
+            cell(m.get('driver_name', '-')),
+            cell(m.get('driver_cpf', '-')),
+            cell(m.get('truck_plate', '-')),
+            cell(m.get('trailer_plate_1', '') or '-'),
+            cell(m.get('transport_company', '-')),
+            cell(m.get('status', 'VAZIO'), centered=True),
+            cell(m.get('size_type', '-'), centered=True),
+            cell(str(m.get('tare', '')) if m.get('tare') else '-', centered=True),
+            cell(m.get('shipping_line', '-')),
+            cell(m.get('booking', '') or '-')
         ])
 
-    # Column widths for 14 columns in landscape A4 (~780 points available)
-    col_widths = [30, 56, 42, 58, 75, 48, 46, 52, 72, 38, 38, 32, 52, 42]
+    # Larguras redistribuídas pra usar a área útil real da página (doc.width em
+    # A4 paisagem, ~785pt) em vez de somar ~680pt e deixar sobra sem uso -
+    # colunas de texto mais longo (Motorista, Transportadora, CPF) ganharam
+    # mais espaço pra reduzir a quantidade de quebra de linha necessária.
+    col_widths = [32, 62, 42, 62, 100, 62, 50, 50, 90, 40, 38, 34, 68, 55]
 
     table = Table(data, colWidths=col_widths, repeatRows=1)
 
@@ -381,32 +409,13 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
         ('FONTSIZE', (0, 0), (-1, 0), 7),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
         ('TOPPADDING', (0, 0), (-1, 0), 5),
-        
-        # Body styling
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 7),
+
+        # Body styling - alinhamento e fonte já vêm do Paragraph de cada célula
         ('TOPPADDING', (0, 1), (-1, -1), 3),
         ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
         ('LEFTPADDING', (0, 0), (-1, -1), 3),
         ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-        
-        # Alignments
-        ('ALIGN', (0, 1), (0, -1), 'CENTER'),   # ID Trans.
-        ('ALIGN', (2, 1), (2, -1), 'CENTER'),   # Tipo
-        ('ALIGN', (9, 1), (9, -1), 'CENTER'),   # Status
-        ('ALIGN', (10, 1), (10, -1), 'CENTER'), # Tamanho
-        ('ALIGN', (11, 1), (11, -1), 'CENTER'), # Tara
-        ('ALIGN', (1, 1), (1, -1), 'LEFT'),     # Data/Hora
-        ('ALIGN', (3, 1), (3, -1), 'LEFT'),     # Nº Container
-        ('ALIGN', (4, 1), (4, -1), 'LEFT'),     # Motorista
-        ('ALIGN', (5, 1), (5, -1), 'LEFT'),     # CPF
-        ('ALIGN', (6, 1), (6, -1), 'LEFT'),     # Placa Cavalo
-        ('ALIGN', (7, 1), (7, -1), 'LEFT'),     # Placa Carreta
-        ('ALIGN', (8, 1), (8, -1), 'LEFT'),     # Transportadora
-        ('ALIGN', (12, 1), (12, -1), 'LEFT'),   # Armador
-        ('ALIGN', (13, 1), (13, -1), 'LEFT'),   # Booking
-        
+
         # Bordas finas cinza, mesmo peso usado nos demais relatórios
         ('GRID', (0, 0), (-1, -1), 0.5, border_gray),
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
