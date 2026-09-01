@@ -19,15 +19,17 @@ const PHOTO_LABELS = CONTAINER_INSPECTION_PHOTO_TYPES.reduce((acc, { value, labe
   return acc;
 }, {});
 
-// Função para gerar código de barras como imagem base64
+// Função para gerar código de barras como imagem base64 - só as barras, sem o
+// valor embutido (a fonte do JsBarcode fica fina/pequena demais); o valor é
+// escrito à parte, em negrito, no mesmo estilo do comprovante de Registro de Gate.
 function generateBarcodeImage(value) {
   const canvas = document.createElement('canvas');
   JsBarcode(canvas, value, {
     format: 'CODE128',
-    width: 2,
-    height: 50,
-    displayValue: true,
-    fontSize: 14,
+    width: 2.2,
+    height: 55,
+    displayValue: false,
+    lineColor: '#000000',
     margin: 5
   });
   return canvas.toDataURL('image/png');
@@ -183,7 +185,7 @@ export default function ContainerInspectionDetailPage() {
           <img
             src={getCompanyLogoUrl(company)}
             alt={company.name}
-            style={{ height: '65px', width: 'auto' }}
+            style={{ height: '95px', width: 'auto' }}
           />
           <div style={{ textAlign: 'center' }}>
             <div style={{
@@ -212,7 +214,7 @@ export default function ContainerInspectionDetailPage() {
           marginBottom: '10px'
         }}>
           <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#000' }}>
-            VISTORIA DE CONTÊINER
+            VISTORIA DE CONTAINER
           </div>
           <div style={{ fontSize: '11px', color: '#000', marginTop: '2px' }}>
             Vistoria Nº {inspection.inspection_number}
@@ -369,26 +371,30 @@ export default function ContainerInspectionDetailPage() {
         )}
 
         {/* Rodapé */}
-        <div style={{ 
+        <div style={{
           borderTop: '1px solid #000',
           paddingTop: '6px',
-          fontSize: '9px'
+          fontSize: '11px',
+          color: '#000'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', flex: 1 }}>
               <div>
-                <strong>Vistoriado por:</strong> {inspection.created_by_name}
+                <strong>Vistoriado por: {inspection.created_by_name}</strong>
               </div>
               <div>
-                <strong>Data de criação:</strong> {format(new Date(inspection.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                <strong>Data de criação: {format(new Date(inspection.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
               </div>
               <div>
-                <strong>Data da vistoria:</strong> {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                <strong>Data da vistoria: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
               </div>
             </div>
             {barcodeImage && (
-              <div style={{ textAlign: 'right' }}>
-                <img src={barcodeImage} alt="Código de Barras" style={{ height: '45px', width: 'auto' }} />
+              <div style={{ textAlign: 'center' }}>
+                <img src={barcodeImage} alt="Código de Barras" style={{ height: '50px', width: 'auto' }} />
+                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000', marginTop: '2px' }}>
+                  {`VC${String(inspection.inspection_number).padStart(6, '0')}`}
+                </div>
               </div>
             )}
           </div>
