@@ -6,10 +6,11 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Eye, Pencil, Trash2, Search, Package, TrendingUp, TrendingDown, FileSpreadsheet, Filter, X } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Package, TrendingUp, TrendingDown, FileSpreadsheet, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -68,6 +69,7 @@ export default function FlexTankPage() {
     total: 0,
     totalPages: 0
   });
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {
     loadClients();
@@ -126,19 +128,45 @@ export default function FlexTankPage() {
     }
   };
 
-  const handleDelete = async (id, e) => {
-    e.stopPropagation();
+  const handleDelete = async (id) => {
     if (!(await confirm('Tem certeza que deseja excluir esta movimentação?'))) return;
-    
+
     try {
       await api.deleteFlexTankMovement(id);
       toast.success('Movimentação excluída com sucesso!');
+      setSelectedIds(prev => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadMovements();
       loadStock();
     } catch (error) {
       toast.error('Erro ao excluir movimentação');
     }
   };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = movements.map(m => m.id);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach(id => next.delete(id));
+      else pageIds.forEach(id => next.add(id));
+      return next;
+    });
+  };
+
+  const singleSelectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
 
   const applyFilters = () => {
     setAppliedFilters({ ...filters });
@@ -198,17 +226,11 @@ export default function FlexTankPage() {
   return (
     <Layout>
       <div className="space-y-5" data-testid="flex-tank-page">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Flex Tank
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de estoque de bolsas</p>
-          </div>
-          <Button onClick={() => navigate('/flex-tank/movements/new')} className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90" data-testid="new-movement-btn">
-            <Plus className="w-4 h-4 mr-1.5" />
-            Nova Movimentação
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            Flex Tank
+          </h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de estoque de bolsas</p>
         </div>
 
         {/* Dashboard de Estoque */}
@@ -254,41 +276,39 @@ export default function FlexTankPage() {
           <div className="space-y-4">
             {/* Filtros */}
             <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                  <span className="flex items-center gap-2">
-                    <Filter className="w-4 h-4" />
-                    Filtros
-                  </span>
+              <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5" />
+                  Filtrar
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <CardContent className="p-3 space-y-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   <div>
-                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Inicial</Label>
+                    <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Inicial</Label>
                     <Input
                       type="date"
                       value={filters.start_date}
                       onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
-                      className="h-9 text-[13px]"
+                      className="h-8 text-xs"
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Final</Label>
+                    <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Final</Label>
                     <Input
                       type="date"
                       value={filters.end_date}
                       onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
-                      className="h-9 text-[13px]"
+                      className="h-8 text-xs"
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
+                    <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
                     <Select
                       value={filters.client_id}
                       onValueChange={(value) => setFilters(prev => ({ ...prev, client_id: value === 'all' ? '' : value }))}
                     >
-                      <SelectTrigger className="h-9 text-sm">
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="Todos" />
                       </SelectTrigger>
                       <SelectContent>
@@ -300,22 +320,22 @@ export default function FlexTankPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Registro</Label>
+                    <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Nº Registro</Label>
                     <Input
                       type="number"
                       value={filters.movement_number}
                       onChange={(e) => setFilters(prev => ({ ...prev, movement_number: e.target.value }))}
                       placeholder="Ex: 1"
-                      className="h-9 text-sm"
+                      className="h-8 text-xs"
                     />
                   </div>
                   <div>
-                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
+                    <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Tipo</Label>
                     <Select
                       value={filters.movement_type}
                       onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
                     >
-                      <SelectTrigger className="h-9 text-sm">
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="Todos" />
                       </SelectTrigger>
                       <SelectContent>
@@ -326,18 +346,69 @@ export default function FlexTankPage() {
                     </Select>
                   </div>
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <Button onClick={applyFilters} size="sm" className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
-                    <Search className="w-4 h-4 mr-2" />
-                    Filtrar
-                  </Button>
-                  <Button variant="outline" onClick={clearFilters} size="sm" className="h-8 text-xs font-medium">
-                    <X className="w-4 h-4 mr-2" />
+                <div className="flex items-center gap-2 pt-0.5">
+                  <Button variant="outline" onClick={clearFilters} className="h-7 text-xs font-medium">
                     Limpar
+                  </Button>
+                  <Button onClick={applyFilters} className="h-7 text-xs font-medium bg-primary hover:bg-primary/90">
+                    Filtrar
                   </Button>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Barra de ações - marque uma movimentação na tabela abaixo pra habilitar as ações */}
+            <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/flex-tank/movements/new')}
+                title="Adicionar"
+                data-testid="new-movement-btn"
+                className="h-9 w-9 p-0"
+              >
+                <Plus className="w-4 h-4 text-primary" />
+              </Button>
+              <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => singleSelectedId && navigate(`/flex-tank/movements/${singleSelectedId}`)}
+                disabled={!singleSelectedId}
+                title="Visualizar"
+                data-testid="view-movement-button"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <Eye className="w-4 h-4 text-primary" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => singleSelectedId && navigate(`/flex-tank/movements/${singleSelectedId}/edit`)}
+                disabled={!singleSelectedId}
+                title="Editar"
+                data-testid="edit-movement-button"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <Pencil className="w-4 h-4 text-blue-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => singleSelectedId && handleDelete(singleSelectedId)}
+                disabled={!singleSelectedId}
+                title="Excluir"
+                data-testid="delete-movement-button"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <Trash2 className="w-4 h-4 text-destructive" />
+              </Button>
+              {selectedIds.size > 0 && (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+                  {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
 
             {/* Lista de Movimentações */}
             <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
@@ -364,6 +435,13 @@ export default function FlexTankPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-slate-100 dark:border-slate-800">
+                          <th className="w-9 px-4 py-2.5">
+                            <Checkbox
+                              checked={movements.length > 0 && movements.every(m => selectedIds.has(m.id))}
+                              onCheckedChange={toggleSelectAllOnPage}
+                              data-testid="select-all-checkbox"
+                            />
+                          </th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº Bolsa</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tamanho</th>
@@ -371,17 +449,23 @@ export default function FlexTankPage() {
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
                         {movements.map((movement, idx) => (
-                          <tr 
-                            key={movement.id} 
-                            className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors cursor-pointer ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
-                            onClick={() => navigate(`/flex-tank/movements/${movement.id}`)}
+                          <tr
+                            key={movement.id}
+                            className={`cursor-pointer transition-colors ${selectedIds.has(movement.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
+                            onClick={() => toggleSelect(movement.id)}
                             data-testid={`movement-row-${movement.id}`}
                           >
+                            <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedIds.has(movement.id)}
+                                onCheckedChange={() => toggleSelect(movement.id)}
+                                data-testid="movement-row-checkbox"
+                              />
+                            </td>
                             <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{movement.movement_number}</td>
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.bag_number}</td>
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.bag_size}</td>
@@ -399,40 +483,6 @@ export default function FlexTankPage() {
                             </td>
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.client_name || '-'}</td>
                             <td className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300">{movement.container_number || '-'}</td>
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center gap-0.5">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={(e) => { e.stopPropagation(); navigate(`/flex-tank/movements/${movement.id}`); }}
-                                  title="Visualizar"
-                                  data-testid={`view-movement-${movement.id}`}
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-primary" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={(e) => { e.stopPropagation(); navigate(`/flex-tank/movements/${movement.id}/edit`); }}
-                                  title="Editar"
-                                  data-testid={`edit-movement-${movement.id}`}
-                                >
-                                  <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={(e) => handleDelete(movement.id, e)}
-                                  title="Excluir"
-                                  data-testid={`delete-movement-${movement.id}`}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                                </Button>
-                              </div>
-                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -476,118 +526,113 @@ export default function FlexTankPage() {
         {activeTab === 'reports' && (
           <div className="space-y-4">
             <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  <FileSpreadsheet className="w-4 h-4" />
-                  Relatórios
+              <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                  <Filter className="w-3.5 h-3.5" />
+                  Filtrar
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-4 space-y-6">
-                {/* Filtros do Relatório */}
-                <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-800/50">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Filter className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                    <h3 className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">Filtros do Relatório</h3>
+              <CardContent className="p-3 space-y-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div>
+                    <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
+                    <Input
+                      type="date"
+                      value={reportFilters.start_date}
+                      onChange={(e) => setReportFilters(prev => ({ ...prev, start_date: e.target.value }))}
+                      className="h-8 text-xs"
+                      data-testid="report-filter-start-date"
+                    />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div>
-                      <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Início</Label>
-                      <Input
-                        type="date"
-                        value={reportFilters.start_date}
-                        onChange={(e) => setReportFilters(prev => ({ ...prev, start_date: e.target.value }))}
-                        className="h-9 text-[13px]"
-                        data-testid="report-filter-start-date"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data Fim</Label>
-                      <Input
-                        type="date"
-                        value={reportFilters.end_date}
-                        onChange={(e) => setReportFilters(prev => ({ ...prev, end_date: e.target.value }))}
-                        className="h-9 text-[13px]"
-                        data-testid="report-filter-end-date"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente</Label>
-                      <Select
-                        value={reportFilters.client_id}
-                        onValueChange={(value) => setReportFilters(prev => ({ ...prev, client_id: value === 'all' ? '' : value }))}
-                      >
-                        <SelectTrigger className="h-9 text-sm" data-testid="report-filter-client">
-                          <SelectValue placeholder="Todos os clientes" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos os clientes</SelectItem>
-                          {clients.map(client => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Tipo</Label>
-                      <Select
-                        value={reportFilters.movement_type}
-                        onValueChange={(value) => setReportFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
-                      >
-                        <SelectTrigger className="h-9 text-sm" data-testid="report-filter-type">
-                          <SelectValue placeholder="Todos os tipos" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todos os tipos</SelectItem>
-                          <SelectItem value="ENTRADA">Entrada</SelectItem>
-                          <SelectItem value="SAIDA">Saída</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
+                    <Input
+                      type="date"
+                      value={reportFilters.end_date}
+                      onChange={(e) => setReportFilters(prev => ({ ...prev, end_date: e.target.value }))}
+                      className="h-8 text-xs"
+                      data-testid="report-filter-end-date"
+                    />
                   </div>
-                  <div className="flex gap-2 mt-4">
-                    <Button onClick={downloadReport} size="sm" className="h-8 text-xs font-medium bg-primary hover:bg-primary/90" data-testid="download-report-btn">
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      Baixar Excel
-                    </Button>
-                    <Button variant="outline" onClick={clearReportFilters} size="sm" className="h-8 text-xs font-medium" data-testid="clear-report-filters-btn">
-                      <X className="w-4 h-4 mr-2" />
-                      Limpar Filtros
-                    </Button>
+                  <div>
+                    <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
+                    <Select
+                      value={reportFilters.client_id}
+                      onValueChange={(value) => setReportFilters(prev => ({ ...prev, client_id: value === 'all' ? '' : value }))}
+                    >
+                      <SelectTrigger className="h-8 text-xs" data-testid="report-filter-client">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os clientes</SelectItem>
+                        {clients.map(client => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  {(reportFilters.start_date || reportFilters.end_date || reportFilters.client_id || reportFilters.movement_type) && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="text-[11px] text-slate-400 dark:text-slate-500">Filtros ativos:</span>
-                      {reportFilters.start_date && (
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px]">
-                          De: {format(new Date(reportFilters.start_date + 'T00:00:00'), 'dd/MM/yyyy')}
-                        </span>
-                      )}
-                      {reportFilters.end_date && (
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px]">
-                          Até: {format(new Date(reportFilters.end_date + 'T00:00:00'), 'dd/MM/yyyy')}
-                        </span>
-                      )}
-                      {reportFilters.client_id && (
-                        <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-[10px]">
-                          Cliente: {clients.find(c => c.id === reportFilters.client_id)?.name || 'Selecionado'}
-                        </span>
-                      )}
-                      {reportFilters.movement_type && (
-                        <span className={`px-2 py-0.5 rounded text-[10px] ${
-                          reportFilters.movement_type === 'ENTRADA' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          Tipo: {reportFilters.movement_type === 'ENTRADA' ? 'Entrada' : 'Saída'}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <div>
+                    <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Tipo</Label>
+                    <Select
+                      value={reportFilters.movement_type}
+                      onValueChange={(value) => setReportFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
+                    >
+                      <SelectTrigger className="h-8 text-xs" data-testid="report-filter-type">
+                        <SelectValue placeholder="Todos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os tipos</SelectItem>
+                        <SelectItem value="ENTRADA">Entrada</SelectItem>
+                        <SelectItem value="SAIDA">Saída</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+                <div className="flex items-center gap-2 pt-0.5">
+                  <Button variant="outline" onClick={clearReportFilters} className="h-7 text-xs font-medium" data-testid="clear-report-filters-btn">
+                    Limpar
+                  </Button>
+                  <Button onClick={downloadReport} className="h-7 text-xs font-medium bg-primary hover:bg-primary/90" data-testid="download-report-btn">
+                    <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
+                    Baixar Excel
+                  </Button>
+                </div>
+                {(reportFilters.start_date || reportFilters.end_date || reportFilters.client_id || reportFilters.movement_type) && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500">Filtros ativos:</span>
+                    {reportFilters.start_date && (
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px]">
+                        De: {format(new Date(reportFilters.start_date + 'T00:00:00'), 'dd/MM/yyyy')}
+                      </span>
+                    )}
+                    {reportFilters.end_date && (
+                      <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px]">
+                        Até: {format(new Date(reportFilters.end_date + 'T00:00:00'), 'dd/MM/yyyy')}
+                      </span>
+                    )}
+                    {reportFilters.client_id && (
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-[10px]">
+                        Cliente: {clients.find(c => c.id === reportFilters.client_id)?.name || 'Selecionado'}
+                      </span>
+                    )}
+                    {reportFilters.movement_type && (
+                      <span className={`px-2 py-0.5 rounded text-[10px] ${
+                        reportFilters.movement_type === 'ENTRADA'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        Tipo: {reportFilters.movement_type === 'ENTRADA' ? 'Entrada' : 'Saída'}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-                {/* Estoque por Cliente */}
+            {/* Estoque por Cliente */}
+            <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 space-y-6">
                 <div>
                   <h3 className="text-[13px] font-semibold text-slate-700 dark:text-slate-300 mb-3">Estoque por Cliente</h3>
                   {stock.by_client.length === 0 ? (
@@ -648,8 +693,7 @@ export default function FlexTankPage() {
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
           </div>
         )}
       </div>
