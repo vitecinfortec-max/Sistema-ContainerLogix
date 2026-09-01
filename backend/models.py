@@ -692,6 +692,7 @@ class ContainerInspection(BaseModel):
     container_seal: Optional[str] = None  # Numeração do Container (lacre)
     size_type: Optional[str] = None  # Tamanho/Tipo do container (ex: 20DC, 40HC)
     collection_terminal: Optional[str] = None  # Terminal de Coleta
+    origin_terminal: Optional[str] = None  # Terminal de Origem
     booking: Optional[str] = None
     client_id: Optional[str] = None
     client_name: Optional[str] = None
@@ -717,6 +718,7 @@ class ContainerInspectionCreate(BaseModel):
     container_seal: Optional[str] = None
     size_type: Optional[str] = None
     collection_terminal: Optional[str] = None
+    origin_terminal: Optional[str] = None
     booking: Optional[str] = None
     client_id: Optional[str] = None
     shipping_line_id: Optional[str] = None
@@ -729,6 +731,7 @@ class ContainerInspectionUpdate(BaseModel):
     container_seal: Optional[str] = None
     size_type: Optional[str] = None
     collection_terminal: Optional[str] = None
+    origin_terminal: Optional[str] = None
     booking: Optional[str] = None
     client_id: Optional[str] = None
     shipping_line_id: Optional[str] = None
@@ -743,6 +746,7 @@ class ContainerInspectionResponse(BaseModel):
     container_seal: Optional[str] = None
     size_type: Optional[str] = None
     collection_terminal: Optional[str] = None
+    origin_terminal: Optional[str] = None
     booking: Optional[str] = None
     client_id: Optional[str] = None
     client_name: Optional[str] = None

@@ -253,6 +253,10 @@ export default function ContainerInspectionDetailPage() {
               <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.collection_terminal || '-'}</div>
             </div>
             <div>
+              <div style={{ fontSize: '8px', color: '#666' }}>Terminal de Origem</div>
+              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.origin_terminal || '-'}</div>
+            </div>
+            <div>
               <div style={{ fontSize: '8px', color: '#666' }}>Booking</div>
               <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.booking || '-'}</div>
             </div>
@@ -454,6 +458,10 @@ export default function ContainerInspectionDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Terminal de Coleta</p>
                 <p className="font-semibold">{inspection.collection_terminal || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Terminal de Origem</p>
+                <p className="font-semibold">{inspection.origin_terminal || '-'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Booking</p>

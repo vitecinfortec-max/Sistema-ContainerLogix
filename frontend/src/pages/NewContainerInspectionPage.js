@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Camera, Upload, X, Loader2, Plus } from 'lucide-react';
@@ -28,6 +29,7 @@ export default function NewContainerInspectionPage() {
   const [saving, setSaving] = useState(false);
   const [clients, setClients] = useState([]);
   const [shippingLines, setShippingLines] = useState([]);
+  const [terminals, setTerminals] = useState([]);
   const [clientSearch, setClientSearch] = useState('');
   const [shippingLineSearch, setShippingLineSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -38,6 +40,7 @@ export default function NewContainerInspectionPage() {
     container_seal: '',
     size_type: '20DC',
     collection_terminal: '',
+    origin_terminal: '',
     booking: '',
     client_id: '',
     client_name: '',
@@ -60,12 +63,14 @@ export default function NewContainerInspectionPage() {
 
   const loadData = async () => {
     try {
-      const [clientsRes, shippingLinesRes] = await Promise.all([
+      const [clientsRes, shippingLinesRes, terminalsRes] = await Promise.all([
         api.getClients(),
-        api.getShippingLines()
+        api.getShippingLines(),
+        api.getTerminals()
       ]);
       setClients(clientsRes.data);
       setShippingLines(shippingLinesRes.data);
+      setTerminals(Array.isArray(terminalsRes.data) ? terminalsRes.data : []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados');
@@ -152,6 +157,7 @@ export default function NewContainerInspectionPage() {
         container_seal: formData.container_seal || null,
         size_type: formData.size_type || null,
         collection_terminal: formData.collection_terminal || null,
+        origin_terminal: formData.origin_terminal || null,
         booking: formData.booking || null,
         client_id: formData.client_id || null,
         shipping_line_id: formData.shipping_line_id || null,
@@ -267,7 +273,19 @@ export default function NewContainerInspectionPage() {
                     data-testid="collection-terminal-input"
                   />
                 </div>
-                
+
+                <div>
+                  <Label htmlFor="origin_terminal">Terminal de Origem</Label>
+                  <Autocomplete
+                    value={formData.origin_terminal}
+                    onChange={(v) => handleInputChange('origin_terminal', v)}
+                    onSelect={(t) => handleInputChange('origin_terminal', t.name)}
+                    options={terminals}
+                    displayField="name"
+                    placeholder="Digite para buscar o terminal..."
+                  />
+                </div>
+
                 <div>
                   <Label htmlFor="booking">Booking</Label>
                   <Input

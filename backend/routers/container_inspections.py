@@ -128,6 +128,7 @@ async def create_container_inspection(
         container_seal=data.container_seal,
         size_type=data.size_type,
         collection_terminal=data.collection_terminal,
+        origin_terminal=data.origin_terminal,
         booking=data.booking,
         client_id=data.client_id,
         client_name=client_name,
@@ -171,6 +172,9 @@ async def update_container_inspection(
 
     if data.collection_terminal is not None:
         update_data["collection_terminal"] = data.collection_terminal
+
+    if data.origin_terminal is not None:
+        update_data["origin_terminal"] = data.origin_terminal
 
     if data.booking is not None:
         update_data["booking"] = data.booking
