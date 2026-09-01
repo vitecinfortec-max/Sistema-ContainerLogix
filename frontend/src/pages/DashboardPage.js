@@ -268,49 +268,49 @@ export default function DashboardPage() {
         {/* Stats Grid - 4 cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-primary/30 transition-colors" data-testid="stat-entries-today">
-            <CardContent className="p-4">
+            <CardContent className="p-5 md:p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <ArrowDownCircle className="w-5 h-5 text-primary" />
+                <div className="w-11 h-11 md:w-9 md:h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <ArrowDownCircle className="w-6 h-6 md:w-5 md:h-5 text-primary" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.entries_today || 0}</div>
+              <div className="text-3xl md:text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.entries_today || 0}</div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Entradas Hoje</p>
             </CardContent>
           </Card>
 
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-amber-300 transition-colors" data-testid="stat-exits-today">
-            <CardContent className="p-4">
+            <CardContent className="p-5 md:p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
-                  <ArrowUpCircle className="w-5 h-5 text-amber-500" />
+                <div className="w-11 h-11 md:w-9 md:h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <ArrowUpCircle className="w-6 h-6 md:w-5 md:h-5 text-amber-500" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.exits_today || 0}</div>
+              <div className="text-3xl md:text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.exits_today || 0}</div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Saídas Hoje</p>
             </CardContent>
           </Card>
 
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-emerald-300 transition-colors" data-testid="stat-stock-full">
-            <CardContent className="p-4">
+            <CardContent className="p-5 md:p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
-                  <Package className="w-5 h-5 text-emerald-500" />
+                <div className="w-11 h-11 md:w-9 md:h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <Package className="w-6 h-6 md:w-5 md:h-5 text-emerald-500" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.stock_full || 0}</div>
+              <div className="text-3xl md:text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.stock_full || 0}</div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque Cheios</p>
             </CardContent>
           </Card>
 
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-slate-300 dark:hover:border-slate-600 transition-colors" data-testid="stat-stock-empty">
-            <CardContent className="p-4">
+            <CardContent className="p-5 md:p-4">
               <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                  <Container className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                <div className="w-11 h-11 md:w-9 md:h-9 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                  <Container className="w-6 h-6 md:w-5 md:h-5 text-slate-500 dark:text-slate-400" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.stock_empty || 0}</div>
+              <div className="text-3xl md:text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.stock_empty || 0}</div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque Vazios</p>
             </CardContent>
           </Card>
@@ -319,14 +319,14 @@ export default function DashboardPage() {
         {/* Monthly Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card className="border border-primary/20 shadow-none" data-testid="stat-entries-month">
-            <CardContent className="p-4">
+            <CardContent className="p-5 md:p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Calendar className="w-4 h-4 text-primary" />
                 <span className="text-sm font-medium text-primary">Entradas no Mês</span>
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-slate-800 dark:text-slate-200">{stats?.entries_month || 0}</div>
+                  <div className="text-4xl md:text-3xl font-bold text-slate-800 dark:text-slate-200">{stats?.entries_month || 0}</div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
                 </div>
                 <ArrowDownCircle className="w-10 h-10 text-primary/20" />
@@ -335,14 +335,14 @@ export default function DashboardPage() {
           </Card>
 
           <Card className="border border-amber-200 shadow-none" data-testid="stat-exits-month">
-            <CardContent className="p-4">
+            <CardContent className="p-5 md:p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Calendar className="w-4 h-4 text-amber-600" />
                 <span className="text-sm font-medium text-amber-600">Saídas no Mês</span>
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-slate-800 dark:text-slate-200">{stats?.exits_month || 0}</div>
+                  <div className="text-4xl md:text-3xl font-bold text-slate-800 dark:text-slate-200">{stats?.exits_month || 0}</div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
                 </div>
                 <ArrowUpCircle className="w-10 h-10 text-amber-500/20" />
@@ -359,7 +359,7 @@ export default function DashboardPage() {
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Alertas do Sistema</CardTitle>
             </div>
           </CardHeader>
-          <CardContent className="p-4">
+          <CardContent className="p-5 md:p-4">
             {(alerts.over_30 + alerts.over_60 + alerts.over_90) > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {alerts.over_30 > 0 && (
@@ -460,7 +460,7 @@ export default function DashboardPage() {
                 <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Estoque Atual no Pátio</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="p-4">
+            <CardContent className="p-5 md:p-4">
               {(stats?.stock_full || 0) + (stats?.stock_empty || 0) > 0 ? (
                 <div className="flex items-center gap-4">
                   <div className="h-52 w-1/2" data-testid="stock-distribution-chart">

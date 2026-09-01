@@ -4,11 +4,10 @@ import { useTheme } from '../context/ThemeContext';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from './ui/breadcrumb';
 import {
   Truck,
-  Building2, 
-  FileText, 
-  LogOut, 
-  Menu, 
-  X, 
+  Building2,
+  FileText,
+  LogOut,
+  X,
   Container, 
   Ship,
   ChevronLeft,
@@ -47,7 +46,9 @@ import {
   Boxes,
   Warehouse,
   Layers,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Home,
+  MoreHorizontal
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -997,19 +998,12 @@ export default function Layout({ children }) {
                 <span className="font-bold text-sm text-primary">ContainerLogix</span>
               </Link>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">{user?.name?.split(' ')[0]}</span>
-                <button
-                  className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400"
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  data-testid="mobile-menu-toggle"
-                >
-                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{user?.name?.split(' ')[0]}</span>
               </div>
             </div>
 
             {mobileMenuOpen && (
-              <div className="py-1 border-t border-slate-200 dark:border-slate-700 max-h-[calc(100vh-56px)] overflow-y-auto -mx-4 px-2 pb-4 bg-white dark:bg-slate-900" data-testid="mobile-menu">
+              <div className="py-1 border-t border-slate-200 dark:border-slate-700 max-h-[calc(100vh-56px-64px)] overflow-y-auto -mx-4 px-2 pb-4 bg-white dark:bg-slate-900" data-testid="mobile-menu">
                 {mainNavItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.path;
@@ -1090,10 +1084,61 @@ export default function Layout({ children }) {
           </div>
         </nav>
 
+        {/* Mobile Bottom Navigation */}
+        <nav
+          className="no-print md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 fixed bottom-0 left-0 right-0 z-50 shadow-[0_-1px_4px_rgba(0,0,0,0.06)] flex items-stretch"
+          data-testid="mobile-bottom-navigation"
+        >
+          <Link
+            to="/dashboard"
+            onClick={() => setMobileMenuOpen(false)}
+            data-testid="mobile-bottom-nav-home"
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 ${
+              location.pathname === '/dashboard' ? 'text-primary' : 'text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            <Home className="w-6 h-6" strokeWidth={1.8} />
+            <span className="text-[11px] font-medium">Início</span>
+          </Link>
+          <Link
+            to="/movements"
+            onClick={() => setMobileMenuOpen(false)}
+            data-testid="mobile-bottom-nav-gate"
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 ${
+              isMovimentacoesActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            <Container className="w-6 h-6" strokeWidth={1.8} />
+            <span className="text-[11px] font-medium">Registro de Gate</span>
+          </Link>
+          <Link
+            to="/container-inspections"
+            onClick={() => setMobileMenuOpen(false)}
+            data-testid="mobile-bottom-nav-inspection"
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 ${
+              isContainerInspectionsActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            <ClipboardCheck className="w-6 h-6" strokeWidth={1.8} />
+            <span className="text-[11px] font-medium">Vistoria</span>
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            data-testid="mobile-bottom-nav-more"
+            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 ${
+              mobileMenuOpen ? 'text-primary' : 'text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            <MoreHorizontal className="w-6 h-6" strokeWidth={1.8} />
+            <span className="text-[11px] font-medium">Mais</span>
+          </button>
+        </nav>
+
         {/* Main Content */}
-        <main className={`flex-1 transition-all duration-300 ${
+        <main className={`flex-1 min-w-0 transition-all duration-300 ${
           sidebarOpen ? 'md:ml-[225px]' : 'md:ml-16'
-        } mt-14 md:mt-12`}>
+        } mt-14 md:mt-12 pb-20 md:pb-0`}>
           <div className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
             {children}
           </div>

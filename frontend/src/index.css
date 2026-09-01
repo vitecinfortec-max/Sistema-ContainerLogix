@@ -99,9 +99,15 @@
   display: none !important;
 }
 
-.no-print {
-  display: block;
-}
+/* .no-print não define display na tela - cada elemento usa seu próprio
+   display (inclusive as classes responsivas hidden/md:flex/md:hidden do
+   Tailwind). Um "display: block" incondicional aqui, sem @media print,
+   vencia essas classes responsivas fora do breakpoint md (min-width:768px)
+   e forçava sidebar/header de desktop a aparecer no celular - só não
+   quebrava a visão desktop porque a media query do Tailwind entra depois
+   dessa regra no CSS final e ganha de volta a partir de 768px. O
+   .no-print continua escondido só na impressão, via a regra @media print
+   abaixo. */
 
 @media print {
   @page {
