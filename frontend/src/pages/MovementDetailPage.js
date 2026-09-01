@@ -517,7 +517,7 @@ export default function MovementDetailPage() {
 
         {/* ===== CONTEÚDO PARA VISUALIZAÇÃO NA TELA (OCULTO NA IMPRESSÃO) ===== */}
         <div className="no-print">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
             <div>
               <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
                 Detalhes do Registro de Gate
@@ -526,16 +526,16 @@ export default function MovementDetailPage() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => navigate('/movements')} data-testid="back-button">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Voltar
+                <ArrowLeft className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Voltar</span>
               </Button>
               <Button variant="outline" onClick={() => navigate(`/movements/${id}/edit`)} data-testid="edit-button">
-                <Edit className="w-4 h-4 mr-2" />
-                Editar
+                <Edit className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Editar</span>
               </Button>
               <Button onClick={() => window.print()} data-testid="print-button">
-                <Printer className="w-4 h-4 mr-2" />
-                Imprimir
+                <Printer className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Imprimir</span>
               </Button>
             </div>
           </div>
@@ -547,7 +547,7 @@ export default function MovementDetailPage() {
               <p className="text-xs font-bold">Informações da Operação</p>
             </div>
             <div className="px-3 py-2">
-              <div className="grid grid-cols-4 gap-2 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div>
                   <p className="text-[10px] text-muted-foreground">ID Transação</p>
                   <p className="font-bold text-sm font-mono text-primary">#{movement.transaction_id}</p>
@@ -582,7 +582,7 @@ export default function MovementDetailPage() {
               <p className="text-xs font-bold">Informações do Veículo e Motorista</p>
             </div>
             <div className="px-3 py-2">
-              <div className="grid grid-cols-3 gap-2 text-xs mb-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-1">
                 <div>
                   <p className="text-[10px] text-muted-foreground">Motorista</p>
                   <p className="font-bold text-xs">{movement.driver_name}</p>
@@ -615,7 +615,7 @@ export default function MovementDetailPage() {
               <p className="text-xs font-bold">Informações do Contêiner</p>
             </div>
             <div className="px-3 py-2">
-              <div className="grid grid-cols-4 gap-2 text-xs mb-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-1">
                 <div>
                   <p className="text-[10px] text-muted-foreground">Nº Container</p>
                   <p className="font-bold font-mono text-xs">{movement.container_number}</p>
@@ -633,7 +633,7 @@ export default function MovementDetailPage() {
                   <p className="font-bold font-mono text-xs">{movement.tare || '-'}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-2 text-xs mb-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-1">
                 <div>
                   <p className="text-[10px] text-muted-foreground">Lacre</p>
                   <p className="font-bold font-mono text-xs">{movement.seal || '-'}</p>
@@ -651,7 +651,7 @@ export default function MovementDetailPage() {
                   <p className="font-bold text-xs">{movement.service_type || '-'}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-2 text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div>
                   <p className="text-[10px] text-muted-foreground">Nota Fiscal</p>
                   <p className="font-bold font-mono text-xs">{movement.invoice_number || '-'}</p>

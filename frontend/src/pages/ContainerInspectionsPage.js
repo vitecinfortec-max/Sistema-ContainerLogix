@@ -212,9 +212,9 @@ export default function ContainerInspectionsPage() {
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Fotos</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado em</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado por</th>
+                      <th className="hidden sm:table-cell px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Fotos</th>
+                      <th className="hidden sm:table-cell px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado em</th>
+                      <th className="hidden sm:table-cell px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado por</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -235,7 +235,7 @@ export default function ContainerInspectionsPage() {
                         <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{inspection.inspection_number}</td>
                         <td className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300 whitespace-nowrap">{inspection.container_number}</td>
                         <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{inspection.client_name || '-'}</td>
-                        <td className="px-4 py-2.5">
+                        <td className="hidden sm:table-cell px-4 py-2.5">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                             getPhotoCount(inspection) > 0 ? 'bg-emerald-50 text-emerald-700' :
                             'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
@@ -243,10 +243,10 @@ export default function ContainerInspectionsPage() {
                             {getPhotoCount(inspection)}/8
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
+                        <td className="hidden sm:table-cell px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
                           {format(new Date(inspection.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
+                        <td className="hidden sm:table-cell px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
                           {inspection.created_by_name?.split(' ').slice(0, 2).join(' ') || '-'}
                         </td>
                       </tr>
