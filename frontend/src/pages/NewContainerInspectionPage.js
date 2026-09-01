@@ -227,12 +227,12 @@ export default function NewContainerInspectionPage() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="container_seal">Numeração de Container</Label>
+                  <Label htmlFor="container_seal">Lacre</Label>
                   <Input
                     id="container_seal"
                     value={formData.container_seal}
                     onChange={(e) => handleInputChange('container_seal', e.target.value.toUpperCase())}
-                    placeholder="Lacre / Numeração"
+                    placeholder="Lacre"
                     data-testid="container-seal-input"
                   />
                 </div>

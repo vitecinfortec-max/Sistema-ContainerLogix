@@ -236,7 +236,7 @@ export default function ContainerInspectionDetailPage() {
               <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.container_number}</div>
             </div>
             <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Numeração de Container</div>
+              <div style={{ fontSize: '8px', color: '#666' }}>Lacre</div>
               <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.container_seal || '-'}</div>
             </div>
             <div>
@@ -439,7 +439,7 @@ export default function ContainerInspectionDetailPage() {
                 <p className="font-semibold">{inspection.container_number}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Numeração de Container</p>
+                <p className="text-sm text-muted-foreground">Lacre</p>
                 <p className="font-semibold">{inspection.container_seal || '-'}</p>
               </div>
               <div>
