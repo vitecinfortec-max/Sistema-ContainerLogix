@@ -6,8 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import { FileText, FileSpreadsheet, Calendar, X, BarChart3 } from 'lucide-react';
+import { FileText, FileSpreadsheet, Calendar, X, BarChart3, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -28,7 +29,20 @@ function ChartTooltip({ active, payload, label }) {
   );
 }
 
+function yesterdayISO() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function ReportsMovementsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
+  const [emailDate, setEmailDate] = useState(yesterdayISO());
+  const [sendingEmails, setSendingEmails] = useState(false);
+  const [emailResult, setEmailResult] = useState(null);
+
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterClient, setFilterClient] = useState('all');
@@ -172,6 +186,25 @@ export default function ReportsMovementsPage() {
     }
   };
 
+  const sendDailyEmails = async () => {
+    setSendingEmails(true);
+    setEmailResult(null);
+    try {
+      const response = await api.sendDailyMovementReports(emailDate);
+      setEmailResult(response.data);
+      const { sent, errors } = response.data;
+      if (errors.length > 0) {
+        toast.error(`Enviado para ${sent.length} cliente(s), ${errors.length} erro(s)`);
+      } else {
+        toast.success(`Relatório enviado para ${sent.length} cliente(s)`);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao enviar relatórios por e-mail');
+    } finally {
+      setSendingEmails(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="reports-movements-page">
@@ -182,6 +215,60 @@ export default function ReportsMovementsPage() {
           </h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gere e exporte relatórios das movimentações de containers</p>
         </div>
+
+        {isAdmin && (
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-email-report-card">
+            <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+                <Mail className="w-3.5 h-3.5" />
+                Envio Automático por E-mail
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 space-y-3">
+              <p className="text-[13px] text-slate-500 dark:text-slate-400">
+                Todo dia às 07:00 o sistema envia automaticamente, por e-mail, o relatório de movimentações do dia anterior pra cada Cliente ativo com e-mail cadastrado.
+                Use os campos abaixo pra disparar o envio manualmente (útil pra testar ou reenviar um dia específico).
+              </p>
+              <div className="flex items-end gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-slate-500 dark:text-slate-400">Data das movimentações</Label>
+                  <Input
+                    type="date"
+                    value={emailDate}
+                    onChange={(e) => setEmailDate(e.target.value)}
+                    className="h-9 text-[13px]"
+                    data-testid="daily-email-report-date"
+                  />
+                </div>
+                <Button
+                  onClick={sendDailyEmails}
+                  disabled={sendingEmails || !emailDate}
+                  data-testid="daily-email-report-send-btn"
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  {sendingEmails ? 'Enviando...' : 'Enviar Agora'}
+                </Button>
+              </div>
+              {emailResult && (
+                <div className="text-[12px] space-y-1 pt-1">
+                  <p className="text-green-700 dark:text-green-400">
+                    Enviado para {emailResult.sent.length} cliente(s){emailResult.sent.length > 0 ? `: ${emailResult.sent.join(', ')}` : ''}
+                  </p>
+                  {emailResult.skipped.length > 0 && (
+                    <p className="text-slate-500 dark:text-slate-400">
+                      Sem movimentação no dia ({emailResult.skipped.length}): {emailResult.skipped.join(', ')}
+                    </p>
+                  )}
+                  {emailResult.errors.length > 0 && (
+                    <p className="text-red-600 dark:text-red-400">
+                      Erro ao enviar para: {emailResult.errors.map((e) => `${e.client} (${e.error})`).join('; ')}
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Filters */}
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">

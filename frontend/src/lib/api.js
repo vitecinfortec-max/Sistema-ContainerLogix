@@ -112,6 +112,7 @@ export const api = {
   // Reports
   downloadPDFReport: (params) => axios.get(`${API}/reports/pdf`, { params, responseType: 'blob' }),
   downloadExcelReport: (params) => axios.get(`${API}/reports/excel`, { params, responseType: 'blob' }),
+  sendDailyMovementReports: (targetDate) => axios.post(`${API}/reports/send-daily-movements`, null, { params: targetDate ? { target_date: targetDate } : {} }),
   downloadBillingPDFReport: (params) => axios.get(`${API}/reports/billing/pdf`, { params, responseType: 'blob' }),
   downloadBillingExcelReport: (params) => axios.get(`${API}/reports/billing/excel`, { params, responseType: 'blob' }),
   
