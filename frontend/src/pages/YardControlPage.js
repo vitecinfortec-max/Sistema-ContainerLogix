@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Checkbox } from '../components/ui/checkbox';
-import { Package, Clock, AlertTriangle, FileSpreadsheet, Search, Filter, X, Eye, LogOut, Users, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Package, Clock, AlertTriangle, FileText, FileSpreadsheet, Search, Filter, X, Eye, LogOut, Users, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -195,12 +195,33 @@ export default function YardControlPage() {
       Object.keys(params).forEach(key => {
         if (!params[key]) delete params[key];
       });
-      
+
       const response = await api.downloadYardControlExcel(params);
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `controle_patio_${format(new Date(), 'dd-MM-yyyy_HH-mm')}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Relatório baixado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao baixar relatório');
+    }
+  };
+
+  const downloadPdf = async () => {
+    try {
+      const params = { ...filters };
+      Object.keys(params).forEach(key => {
+        if (!params[key]) delete params[key];
+      });
+
+      const response = await api.downloadYardControlPdf(params);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `controle_patio_${format(new Date(), 'dd-MM-yyyy_HH-mm')}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -521,6 +542,16 @@ export default function YardControlPage() {
             <LogOut className="w-4 h-4 text-destructive" />
           </Button>
           <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={downloadPdf}
+            title="Exportar PDF"
+            data-testid="download-pdf-btn"
+            className="h-9 w-9 p-0"
+          >
+            <FileText className="w-4 h-4 text-red-600" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"

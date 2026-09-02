@@ -120,6 +120,7 @@ export const api = {
   getAlertsSummary: () => axios.get(`${API}/alerts/summary`),
   globalSearch: (q) => axios.get(`${API}/search`, { params: { q } }),
   downloadYardControlExcel: (params) => axios.get(`${API}/yard-control/excel`, { params, responseType: 'blob' }),
+  downloadYardControlPdf: (params) => axios.get(`${API}/yard-control/pdf`, { params, responseType: 'blob' }),
   registerQuickExit: (data) => axios.post(`${API}/yard-control/quick-exit`, data),
   
   // Billing

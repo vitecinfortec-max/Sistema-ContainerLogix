@@ -53,7 +53,7 @@ from models import (
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, decode_token
 from reports import (
     generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel,
-    generate_movement_voucher_pdf,
+    generate_movement_voucher_pdf, generate_yard_control_pdf,
     now_brt, to_brt, merge_company, DEFAULT_COMPANY
 )
 
@@ -1386,6 +1386,30 @@ async def download_yard_control_excel(
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@api_router.get("/yard-control/pdf")
+async def download_yard_control_pdf(
+    status_filter: Optional[str] = None,
+    client_name: Optional[str] = None,
+    shipping_line: Optional[str] = None,
+    min_days: Optional[int] = None,
+    movement_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Gera relatório PDF de containers no pátio"""
+    yard_data = await get_yard_control(status_filter, client_name, shipping_line, min_days, movement_type, date_from, date_to, current_user)
+    company = await get_company_settings()
+    pdf_bytes = generate_yard_control_pdf(yard_data['containers'], yard_data['stats'], company)
+
+    filename = f"controle_patio_{now_brt().strftime('%d-%m-%Y_%H-%M')}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 

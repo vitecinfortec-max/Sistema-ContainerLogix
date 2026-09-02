@@ -486,6 +486,140 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
     return pdf_bytes
 
 
+def generate_yard_control_pdf(containers: list, stats: dict, company: dict = None) -> bytes:
+    """
+    Gera o PDF do Controle de Pátio - mesmo padrão visual de generate_pdf_report
+    (header + estatísticas + tabela + rodapé), mas com as colunas específicas do
+    Controle de Pátio (entrada/saída/dias no pátio) em vez das colunas de uma
+    movimentação bruta.
+    """
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=10*mm,
+        leftMargin=10*mm,
+        topMargin=15*mm,
+        bottomMargin=15*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = download_logo(company)
+    elements.extend(_build_pdf_header(styles, logo_buffer, "Controle de Pátio", company=company, content_width=doc.width))
+
+    # ========== STATISTICS LINE ==========
+    stats_style = ParagraphStyle(
+        'YardStatsLine',
+        parent=styles['Normal'],
+        fontSize=11,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold',
+        spaceBefore=6,
+        spaceAfter=4
+    )
+    elements.append(Paragraph(
+        f"Total: {stats['total']}  |  Vazios: {stats['empty']}  |  Cheios: {stats['full']}  |  "
+        f"Média de Dias: {stats['avg_days']}  |  Máximo de Dias: {stats['max_days']}",
+        stats_style
+    ))
+    elements.append(Paragraph(
+        f"&gt;30 dias: {stats['over_30_days']}  |  &gt;60 dias: {stats['over_60_days']}  |  &gt;90 dias: {stats['over_90_days']}",
+        stats_style
+    ))
+
+    gen_info_style = ParagraphStyle(
+        'GenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER,
+        spaceAfter=12
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    # ========== TABLE SECTION ==========
+    cell_style_l = ParagraphStyle('YardCellL', parent=styles['Normal'], fontSize=7, leading=8.5, alignment=TA_LEFT)
+    cell_style_c = ParagraphStyle('YardCellC', parent=cell_style_l, alignment=TA_CENTER)
+
+    def cell(text, centered=False):
+        return Paragraph(str(text) if text not in (None, '') else '-', cell_style_c if centered else cell_style_l)
+
+    headers = ["Nº Container", "Tipo", "Status", "Tamanho", "Armador", "Cliente", "Data Entrada", "Data Saída", "Dias no Pátio", "Booking"]
+    data = [headers]
+
+    def fmt_date_iso(value):
+        if not value:
+            return '-'
+        try:
+            return datetime.fromisoformat(value.replace('Z', '+00:00')).strftime('%d/%m/%Y')
+        except Exception:
+            return '-'
+
+    for item in containers:
+        data.append([
+            cell(item['container_number']),
+            cell('ENTRADA' if item.get('in_stock', True) else 'SAÍDA', centered=True),
+            cell(item.get('status', '-'), centered=True),
+            cell(item.get('size_type', '-'), centered=True),
+            cell(item.get('shipping_line', '-')),
+            cell(item.get('client_name') or '-'),
+            cell(fmt_date_iso(item.get('entry_date')), centered=True),
+            cell(fmt_date_iso(item.get('exit_date')), centered=True),
+            cell(item.get('days_in_yard', 0), centered=True),
+            cell(item.get('booking') or '-'),
+        ])
+
+    col_widths = [95, 55, 55, 60, 90, 150, 65, 65, 65, 75]
+    table = Table(data, colWidths=col_widths, repeatRows=1)
+
+    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
+    border_gray = colors.HexColor('#CCCCCC')
+    zebra_gray = colors.HexColor('#F8F8F8')
+    entrada_fill = colors.HexColor('#C6EFCE')
+    saida_fill = colors.HexColor('#BDD7EE')
+    warning_fill = colors.HexColor('#FFEB9C')
+    danger_fill = colors.HexColor('#FF6B6B')
+
+    style_commands = [
+        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 7),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+        ('TOPPADDING', (0, 0), (-1, 0), 5),
+
+        ('TOPPADDING', (0, 1), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+
+        ('GRID', (0, 0), (-1, -1), 0.5, border_gray),
+        ('BOX', (0, 0), (-1, -1), 1, header_bg),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, zebra_gray]),
+    ]
+    for row, item in enumerate(containers, 1):
+        style_commands.append(('BACKGROUND', (1, row), (1, row), entrada_fill if item.get('in_stock', True) else saida_fill))
+        days = item.get('days_in_yard', 0)
+        if days > 90:
+            style_commands.append(('BACKGROUND', (8, row), (8, row), danger_fill))
+        elif days > 30:
+            style_commands.append(('BACKGROUND', (8, row), (8, row), warning_fill))
+
+    table.setStyle(TableStyle(style_commands))
+    elements.append(table)
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    return pdf_bytes
+
+
 def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, center_cols=None, right_align_cols=None, number_fmt_cols=None, total_col=None, stats_text=None, company_name=None, logo_buffer=None, total_number_format='R$ #,##0.00'):
     """
     Shared Bsoft-style Excel formatting matching the J.A LOGÍSTICA template.
