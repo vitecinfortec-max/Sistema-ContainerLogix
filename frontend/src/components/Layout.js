@@ -1109,7 +1109,7 @@ export default function Layout({ children }) {
             }`}
           >
             <Container className="w-6 h-6" strokeWidth={1.8} />
-            <span className="text-[11px] font-medium">Registro de Gate</span>
+            <span className="text-[11px] font-medium">Gate</span>
           </Link>
           <Link
             to="/container-inspections"
