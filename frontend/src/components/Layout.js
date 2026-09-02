@@ -64,7 +64,7 @@ const YARD_ALERT_POLL_MS = 5 * 60 * 1000;
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
-  '/movements': 'Registro de Gate',
+  '/movements': 'Gate',
   '/movements/new': 'Novo Registro',
   '/yard-control': 'Controle de Pátio',
   '/fleet/rpa-terceiro': 'Contrato de Frete',
@@ -426,7 +426,7 @@ export default function Layout({ children }) {
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const movimentacoesItems = [
-    { path: '/movements', label: 'Registro de Gate', icon: List, moduleKey: 'terminal.movimentacoes' },
+    { path: '/movements', label: 'Gate', icon: List, moduleKey: 'terminal.movimentacoes' },
     { path: '/container-inspections', label: 'Vistoria de Container', icon: ClipboardCheck, moduleKey: 'terminal.vistoria' },
     { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package, moduleKey: 'terminal.movimentacoes' },
     { path: '/yard-control', label: 'Controle de Pátio', icon: Clock, moduleKey: 'terminal.movimentacoes' },
@@ -530,8 +530,8 @@ export default function Layout({ children }) {
     if (exactMatch) return exactMatch;
     if (location.pathname.includes('/flex-tank/movements/') && location.pathname.includes('/edit')) return 'Editar Movimentação Flex Tank';
     if (location.pathname.includes('/flex-tank/movements/') && location.pathname !== '/flex-tank/movements/new') return 'Detalhes da Movimentação Flex Tank';
-    if (location.pathname.includes('/movements/') && location.pathname.includes('/edit')) return 'Editar Registro de Gate';
-    if (location.pathname.includes('/movements/')) return 'Detalhes do Registro de Gate';
+    if (location.pathname.includes('/movements/') && location.pathname.includes('/edit')) return 'Editar Gate';
+    if (location.pathname.includes('/movements/')) return 'Detalhes do Gate';
     if (location.pathname.includes('/photo-registries/') && location.pathname !== '/photo-registries/new') return 'Detalhes do Registro Fotográfico';
     if (location.pathname.includes('/container-inspections/') && location.pathname.includes('/edit')) return 'Editar Vistoria de Container';
     if (location.pathname.includes('/container-inspections/') && location.pathname !== '/container-inspections/new') return 'Detalhes da Vistoria de Container';
@@ -890,7 +890,7 @@ export default function Layout({ children }) {
                 {isTerminalGroupVisible && terminalOpen && sidebarOpen && (
                   <div>
                     {terminalItems.map((item) => renderNavItem(item, true, true))}
-                    {movimentacoesItems.length > 0 && renderGroupHeader('Registro de Gate', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, 'nav-movimentacoes-toggle', true)}
+                    {movimentacoesItems.length > 0 && renderGroupHeader('Gate', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, 'nav-movimentacoes-toggle', true)}
                     {movimentacoesItems.length > 0 && movimentacoesOpen && (
                       <div>{movimentacoesItems.map((item) => renderNavItem(item, true, true))}</div>
                     )}
@@ -1024,7 +1024,7 @@ export default function Layout({ children }) {
                 {isTerminalGroupVisible && terminalOpen && (
                   <div>
                     {terminalItems.map((item) => renderMobileNavItem(item, true))}
-                    {movimentacoesItems.length > 0 && renderMobileGroupToggle('Registro de Gate', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, true)}
+                    {movimentacoesItems.length > 0 && renderMobileGroupToggle('Gate', Container, movimentacoesOpen, toggleMovimentacoes, isMovimentacoesActive, true)}
                     {movimentacoesItems.length > 0 && movimentacoesOpen && movimentacoesItems.map((item) => renderMobileNavItem(item, true))}
                     {flexTankItems.length > 0 && renderMobileGroupToggle('Flex Tank', Package, flexTankOpen, toggleFlexTank, isFlexTankActive, true)}
                     {flexTankItems.length > 0 && flexTankOpen && flexTankItems.map((item) => renderMobileNavItem(item, true))}

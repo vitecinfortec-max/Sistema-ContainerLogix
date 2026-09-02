@@ -40,7 +40,7 @@ function ChartTooltip({ active, payload, label }) {
 
 const ALL_SHORTCUTS = [
   { id: 'new-movement', label: 'Novo Registro', icon: Plus, path: '/movements/new', color: 'text-primary', bg: 'bg-primary/10' },
-  { id: 'movements', label: 'Registro de Gate', icon: Container, path: '/movements', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700' },
+  { id: 'movements', label: 'Gate', icon: Container, path: '/movements', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700' },
   { id: 'report-movements', label: 'Rel. Movimentações', icon: BarChart3, path: '/reports/movements', color: 'text-blue-600', bg: 'bg-blue-50' },
   { id: 'report-billing', label: 'Rel. Faturamento', icon: DollarSign, path: '/reports/billing', color: 'text-amber-600', bg: 'bg-amber-50' },
   { id: 'invoices', label: 'Faturas', icon: Receipt, path: '/billing', color: 'text-emerald-600', bg: 'bg-emerald-50' },

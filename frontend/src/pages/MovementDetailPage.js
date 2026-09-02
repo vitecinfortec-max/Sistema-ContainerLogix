@@ -520,7 +520,7 @@ export default function MovementDetailPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
             <div>
               <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-                Detalhes do Registro de Gate
+                Detalhes do Gate
               </h1>
               <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Visualização</p>
             </div>

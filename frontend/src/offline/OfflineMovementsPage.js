@@ -111,7 +111,7 @@ export default function OfflineMovementsPage() {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Registro de Gate</h1>
+        <h1 className="text-2xl font-bold">Gate</h1>
       </div>
 
       <Button onClick={openNew} className="w-full" data-testid="movement-add-btn">

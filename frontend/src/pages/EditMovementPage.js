@@ -183,7 +183,7 @@ export default function EditMovementPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Editar Registro de Gate
+              Editar Gate
             </h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Atualize as informações do registro</p>
           </div>
