@@ -8,6 +8,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
+import { compressImage } from '../lib/imageCompression';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
@@ -632,7 +633,8 @@ export default function VehicleChecklistPage() {
       // Checklist já existe (edição) - envia a foto direto pro servidor
       setUploadingPhoto(true);
       try {
-        const res = await api.uploadVehicleChecklistPhoto(simpleEditingId, newPhotoType, file);
+        const compressed = await compressImage(file);
+        const res = await api.uploadVehicleChecklistPhoto(simpleEditingId, newPhotoType, compressed);
         setSimplePhotos(prev => [...prev, res.data]);
       } catch (error) {
         toast.error('Erro ao enviar foto');
@@ -641,7 +643,8 @@ export default function VehicleChecklistPage() {
       }
     } else {
       // Checklist novo (ainda sem id) - guarda localmente, envia após criar
-      setSimplePhotos(prev => [...prev, { id: `local-${Date.now()}-${Math.random()}`, type: newPhotoType, file }]);
+      const compressed = await compressImage(file);
+      setSimplePhotos(prev => [...prev, { id: `local-${Date.now()}-${Math.random()}`, type: newPhotoType, file: compressed }]);
     }
   };
 
@@ -673,9 +676,11 @@ export default function VehicleChecklistPage() {
         const res = await api.createVehicleChecklist(buildSimplePayload([]));
         const newId = res.data.id;
         const staged = simplePhotos.filter(p => p.file);
-        for (const photo of staged) {
-          await api.uploadVehicleChecklistPhoto(newId, photo.type, photo.file);
-        }
+        // Upload em paralelo (fotos já comprimidas) - bem mais rápido que
+        // subir uma de cada vez, principalmente em rede móvel.
+        await Promise.all(
+          staged.map((photo) => api.uploadVehicleChecklistPhoto(newId, photo.type, photo.file))
+        );
         toast.success('Checklist criado com sucesso!');
       }
       setSimpleModalOpen(false);
