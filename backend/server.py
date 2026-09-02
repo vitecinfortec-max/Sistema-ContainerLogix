@@ -39,6 +39,7 @@ from routers.stock import api_router as stock_router
 from routers.expense_reports import api_router as expense_reports_router
 from routers.users import api_router as users_router
 from routers.module_config import api_router as module_config_router
+from scheduled_reports import api_router as scheduled_reports_router, start_scheduler, stop_scheduler
 
 app = FastAPI()
 
@@ -89,6 +90,7 @@ app.include_router(stock_router)
 app.include_router(expense_reports_router)
 app.include_router(users_router)
 app.include_router(module_config_router)
+app.include_router(scheduled_reports_router)
 
 # WebSocket endpoint para sincronização em tempo real
 @app.websocket("/ws")
@@ -211,6 +213,9 @@ async def startup_event():
     await db.clients.create_index("cnpj")
     await db.transport_companies.create_index("cnpj")
 
+    start_scheduler()
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    stop_scheduler()
     client.close()

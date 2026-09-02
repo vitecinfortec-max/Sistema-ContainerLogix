@@ -3,6 +3,7 @@ aiohttp==3.13.3
 aiosignal==1.4.0
 annotated-types==0.7.0
 anyio==4.12.1
+apscheduler==3.11.3
 attrs==25.4.0
 bcrypt==4.0.1
 black==26.1.0
@@ -121,6 +122,7 @@ typer-slim==0.21.1
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2025.3
+tzlocal==5.4.4
 uritemplate==4.2.0
 urllib3==2.6.3
 uvicorn==0.25.0
