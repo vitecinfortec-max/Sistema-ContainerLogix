@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Save, Loader2, Plus, Camera, Upload, X } from 'lucide-react';
 import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
 import { formatContainerNumber } from '../lib/containerNumber';
+import { compressImage } from '../lib/imageCompression';
 import { CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS } from './NewContainerInspectionPage';
 
 const PHOTO_LABELS = CONTAINER_INSPECTION_PHOTO_TYPES.reduce((acc, { value, label }) => {
@@ -112,7 +113,8 @@ export default function EditContainerInspectionPage() {
 
     setUploadingPhoto(true);
     try {
-      const response = await api.uploadContainerInspectionPhoto(id, newPhotoType, file);
+      const compressed = await compressImage(file);
+      const response = await api.uploadContainerInspectionPhoto(id, newPhotoType, compressed);
       setPhotos(prev => [...prev, response.data]);
       toast.success('Foto adicionada!');
     } catch (error) {

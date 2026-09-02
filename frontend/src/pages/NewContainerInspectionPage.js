@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Save, Camera, Upload, X, Loader2, Plus } from 'lucide-react';
 import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
 import { formatContainerNumber } from '../lib/containerNumber';
+import { compressImage } from '../lib/imageCompression';
 
 export const CONTAINER_INSPECTION_PHOTO_TYPES = [
   { value: 'front', label: 'Frente' },
@@ -117,13 +118,14 @@ export default function NewContainerInspectionPage() {
     setCustomItem('');
   };
 
-  const handleAddPhoto = (file) => {
+  const handleAddPhoto = async (file) => {
     if (!file) return;
     if (photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS) {
       toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria`);
       return;
     }
-    setPhotos(prev => [...prev, { id: `local-${Date.now()}-${Math.random()}`, type: newPhotoType, file }]);
+    const compressed = await compressImage(file);
+    setPhotos(prev => [...prev, { id: `local-${Date.now()}-${Math.random()}`, type: newPhotoType, file: compressed }]);
   };
 
   const handlePhotoRemove = (id) => {
@@ -169,10 +171,11 @@ export default function NewContainerInspectionPage() {
 
       const inspectionId = response.data.id;
 
-      // Upload das fotos, cada uma com o tipo informado
-      for (const photo of photos) {
-        await api.uploadContainerInspectionPhoto(inspectionId, photo.type, photo.file);
-      }
+      // Upload das fotos em paralelo (já comprimidas) - bem mais rápido que
+      // subir uma de cada vez, principalmente em rede móvel.
+      await Promise.all(
+        photos.map((photo) => api.uploadContainerInspectionPhoto(inspectionId, photo.type, photo.file))
+      );
 
       toast.success('Vistoria criada com sucesso!');
       navigate(`/container-inspections/${inspectionId}`);

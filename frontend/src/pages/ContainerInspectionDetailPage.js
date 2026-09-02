@@ -621,8 +621,8 @@ export default function ContainerInspectionDetailPage() {
             <CardTitle>Informações da Vistoria</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex justify-between items-start">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 flex-1">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 flex-1">
                 <div>
                   <p className="text-sm text-muted-foreground">Criado por</p>
                   <p className="font-semibold">{inspection.created_by_name}</p>
@@ -643,7 +643,7 @@ export default function ContainerInspectionDetailPage() {
                 )}
               </div>
               {barcodeImage && (
-                <div className="text-center ml-4">
+                <div className="text-center sm:ml-4">
                   <p className="text-sm text-muted-foreground mb-1">Código de Barras</p>
                   <img src={barcodeImage} alt="Código de Barras" className="h-12" />
                 </div>
