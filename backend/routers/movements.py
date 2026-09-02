@@ -1021,22 +1021,26 @@ async def get_yard_control(
     
     # Ordenar por dias no pátio (maior primeiro)
     yard_containers.sort(key=lambda x: x['days_in_yard'], reverse=True)
-    
-    # Estatísticas
-    total_containers = len(yard_containers)
-    total_empty = sum(1 for c in yard_containers if c['status'] == 'VAZIO')
-    total_full = sum(1 for c in yard_containers if c['status'] == 'CHEIO')
-    avg_days = sum(c['days_in_yard'] for c in yard_containers) / total_containers if total_containers > 0 else 0
-    max_days = max((c['days_in_yard'] for c in yard_containers), default=0)
-    
+
+    # Estatísticas (cards do topo, breakdown por cliente/armador) - sempre calculadas
+    # só a partir do estoque atual (in_stock), independente do filtro "Tipo" da
+    # tabela abaixo. Sem isso, escolher "Todos" ou "Saída" em Tipo inflava "Total
+    # no Pátio" somando containers que já saíram junto com os que ainda estão lá.
+    stock_only = [c for c in yard_containers if c['in_stock']]
+    total_containers = len(stock_only)
+    total_empty = sum(1 for c in stock_only if c['status'] == 'VAZIO')
+    total_full = sum(1 for c in stock_only if c['status'] == 'CHEIO')
+    avg_days = sum(c['days_in_yard'] for c in stock_only) / total_containers if total_containers > 0 else 0
+    max_days = max((c['days_in_yard'] for c in stock_only), default=0)
+
     # Containers com mais de 30 dias (alerta)
-    over_30_days = sum(1 for c in yard_containers if c['days_in_yard'] > 30)
-    over_60_days = sum(1 for c in yard_containers if c['days_in_yard'] > 60)
-    over_90_days = sum(1 for c in yard_containers if c['days_in_yard'] > 90)
-    
+    over_30_days = sum(1 for c in stock_only if c['days_in_yard'] > 30)
+    over_60_days = sum(1 for c in stock_only if c['days_in_yard'] > 60)
+    over_90_days = sum(1 for c in stock_only if c['days_in_yard'] > 90)
+
     # Estoque por Cliente
     stock_by_client = {}
-    for c in yard_containers:
+    for c in stock_only:
         client = c.get('client_name') or 'Sem Cliente'
         if client not in stock_by_client:
             stock_by_client[client] = {'total': 0, 'empty': 0, 'full': 0}
@@ -1045,12 +1049,12 @@ async def get_yard_control(
             stock_by_client[client]['empty'] += 1
         else:
             stock_by_client[client]['full'] += 1
-    
+
     by_client = [{'client': k, **v} for k, v in sorted(stock_by_client.items(), key=lambda x: x[1]['total'], reverse=True)]
-    
+
     # Estoque por Armador
     stock_by_shipping = {}
-    for c in yard_containers:
+    for c in stock_only:
         shipping = c.get('shipping_line') or 'Sem Armador'
         if shipping not in stock_by_shipping:
             stock_by_shipping[shipping] = {'total': 0, 'empty': 0, 'full': 0}
@@ -1059,7 +1063,7 @@ async def get_yard_control(
             stock_by_shipping[shipping]['empty'] += 1
         else:
             stock_by_shipping[shipping]['full'] += 1
-    
+
     by_shipping = [{'shipping_line': k, **v} for k, v in sorted(stock_by_shipping.items(), key=lambda x: x[1]['total'], reverse=True)]
     
     return {
