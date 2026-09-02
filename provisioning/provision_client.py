@@ -33,6 +33,7 @@ import urllib.error
 
 GITHUB_REPO = "vitecinfortec-max/Sistema-ContainerLogix"
 GITHUB_BRANCH = "main"
+GITHUB_REPO_ID = 1299291792  # confirmado via GET /v9/projects (link.repoId do projeto "frontend" já existente)
 
 RENDER_API = "https://api.render.com/v1"
 VERCEL_API = "https://api.vercel.com"
@@ -123,10 +124,14 @@ class Provisioner:
         print(f"[Render] workspace: {data[0]['owner']['name']} ({self.render_owner_id})")
 
     def fetch_vercel_team(self):
-        status, data = curl_json("GET", f"{VERCEL_API}/v2/user", self.vercel_headers)
-        if status >= 300:
-            raise RuntimeError(f"Falha ao buscar conta da Vercel: {status} {data}")
-        self.vercel_team_id = data["user"].get("defaultTeamId")
+        # /v2/user só funciona com token de conta pessoal - tokens escopados a um
+        # team (o caso mais comum ao criar o token pelo dashboard) dão 404 "User
+        # not found" nesse endpoint. /v9/projects funciona com os dois tipos de
+        # token e o accountId de qualquer projeto já é o id do team.
+        status, data = curl_json("GET", f"{VERCEL_API}/v9/projects", self.vercel_headers, params={"limit": 1})
+        if status >= 300 or not data.get("projects"):
+            raise RuntimeError(f"Falha ao buscar conta/team da Vercel: {status} {data}")
+        self.vercel_team_id = data["projects"][0]["accountId"]
         print(f"[Vercel] team: {self.vercel_team_id}")
 
     # ---------- Render ----------
@@ -217,7 +222,7 @@ class Provisioner:
             "name": name,
             "project": self.vercel_project_id,
             "target": "production",
-            "gitSource": {"type": "github", "repo": GITHUB_REPO, "ref": GITHUB_BRANCH},
+            "gitSource": {"type": "github", "repo": GITHUB_REPO, "repoId": GITHUB_REPO_ID, "ref": GITHUB_BRANCH},
         }
         status, data = curl_json(
             "POST", f"{VERCEL_API}/v13/deployments", self.vercel_headers,
