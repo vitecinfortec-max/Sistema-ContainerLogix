@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Capacitor } from "@capacitor/core";
+import { StatusBar, Style } from "@capacitor/status-bar";
 import "@/index.css";
 import App from "@/App";
 import OfflineApp from "@/offline/OfflineApp";
@@ -8,6 +9,16 @@ import OfflineApp from "@/offline/OfflineApp";
 const isOfflineMode = process.env.REACT_APP_OFFLINE_MODE === 'true';
 const isElectron = navigator.userAgent.toLowerCase().includes('electron');
 const isCapacitorNative = Capacitor.isNativePlatform();
+
+// No Android (targetSdk 35), o sistema força layout edge-to-edge e a WebView
+// desenha por baixo da status bar por padrão, sobrepondo o cabeçalho do app
+// (logo/nome do usuário) com o relógio/ícones do sistema. Isso reserva o
+// espaço da status bar fora da WebView.
+if (isCapacitorNative) {
+  StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+  StatusBar.setBackgroundColor({ color: '#FFFFFF' }).catch(() => {});
+  StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+}
 
 // No app desktop, sempre exige login de novo a cada abertura (por segurança,
 // já que a máquina/sessão do Electron é compartilhada). Redundante com o
