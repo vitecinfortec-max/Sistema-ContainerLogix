@@ -426,7 +426,7 @@ export default function Layout({ children }) {
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const movimentacoesItems = [
-    { path: '/movements', label: 'Gate', icon: List, moduleKey: 'terminal.movimentacoes' },
+    { path: '/movements', label: 'Emitir EIR', icon: List, moduleKey: 'terminal.movimentacoes' },
     { path: '/container-inspections', label: 'Vistoria de Container', icon: ClipboardCheck, moduleKey: 'terminal.vistoria' },
     { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package, moduleKey: 'terminal.movimentacoes' },
     { path: '/yard-control', label: 'Controle de Pátio', icon: Clock, moduleKey: 'terminal.movimentacoes' },
