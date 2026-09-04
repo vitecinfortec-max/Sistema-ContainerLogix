@@ -535,143 +535,149 @@ export default function MovementDetailPage() {
           </div>
 
           {/* ===== CONTEÚDO PARA VISUALIZAÇÃO NA TELA ===== */}
+          {/* Mesmo padrão visual (Card + badges) já usado na lista/Emitir EIR,
+              em vez das caixas antigas de borda preta grossa. */}
           {/* Informações da Operação */}
-          <div className="mb-2 border-2 border-black rounded-lg bg-white dark:bg-slate-900 overflow-hidden">
-            <div className="px-3 py-1 border-b border-black bg-slate-100 dark:bg-slate-700">
-              <p className="text-xs font-bold">Informações da Operação</p>
-            </div>
-            <div className="px-3 py-2">
+          <Card className="mb-2 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300">Informações da Operação</CardTitle>
+            </CardHeader>
+            <CardContent className="p-3">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div>
-                  <p className="text-[10px] text-muted-foreground">ID Transação</p>
-                  <p className="font-bold text-sm font-mono text-primary">#{movement.transaction_id}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">ID Transação</p>
+                  <p className="font-semibold text-sm font-mono text-primary">#{movement.transaction_id}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Tipo de Operação</p>
-                  <p className="font-bold">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                      movement.operation_type === 'ENTRADA' 
-                        ? 'bg-primary/20 text-primary' 
-                        : 'bg-amber-100 text-amber-800'
-                    }`}>
-                      {movement.operation_type}
-                    </span>
-                  </p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">Tipo de Operação</p>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                    movement.operation_type === 'ENTRADA'
+                      ? 'bg-primary/10 text-primary'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {movement.operation_type}
+                  </span>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Status</p>
-                  <p className="font-bold text-xs">{movement.status}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-0.5">Status</p>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                    movement.status === 'CHEIO'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}>
+                    {movement.status}
+                  </span>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Data/Hora</p>
-                  <p className="font-bold font-mono text-xs">{format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Data/Hora</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</p>
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Informações do Veículo e Motorista */}
-          <div className="mb-2 border-2 border-black rounded-lg bg-white dark:bg-slate-900 overflow-hidden">
-            <div className="px-3 py-1 border-b border-black bg-slate-100 dark:bg-slate-700">
-              <p className="text-xs font-bold">Informações do Veículo e Motorista</p>
-            </div>
-            <div className="px-3 py-2">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-1">
+          <Card className="mb-2 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300">Informações do Veículo e Motorista</CardTitle>
+            </CardHeader>
+            <CardContent className="p-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-2">
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Motorista</p>
-                  <p className="font-bold text-xs">{movement.driver_name}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Motorista</p>
+                  <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.driver_name}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">CPF</p>
-                  <p className="font-bold font-mono text-xs">{movement.driver_cpf}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">CPF</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.driver_cpf}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Transportadora</p>
-                  <p className="font-bold text-xs">{movement.transport_company}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Transportadora</p>
+                  <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.transport_company}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Placa Cavalo</p>
-                  <p className="font-bold font-mono text-xs">{movement.truck_plate}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Placa Cavalo</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.truck_plate}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Placa Carreta</p>
-                  <p className="font-bold font-mono text-xs">{movement.trailer_plate_1}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Placa Carreta</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.trailer_plate_1}</p>
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Informações do Contêiner */}
-          <div className="mb-2 border-2 border-black rounded-lg bg-white dark:bg-slate-900 overflow-hidden">
-            <div className="px-3 py-1 border-b border-black bg-slate-100 dark:bg-slate-700">
-              <p className="text-xs font-bold">Informações do Contêiner</p>
-            </div>
-            <div className="px-3 py-2">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-1">
+          <Card className="mb-2 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300">Informações do Contêiner</CardTitle>
+            </CardHeader>
+            <CardContent className="p-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-2">
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Nº Container</p>
-                  <p className="font-bold font-mono text-xs">{movement.container_number}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Nº Container</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.container_number}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Tamanho/Tipo</p>
-                  <p className="font-bold font-mono text-xs">{movement.size_type}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Tamanho/Tipo</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.size_type}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Armador</p>
-                  <p className="font-bold text-xs">{movement.shipping_line}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Armador</p>
+                  <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.shipping_line}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Tara</p>
-                  <p className="font-bold font-mono text-xs">{movement.tare || '-'}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Tara</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.tare || '-'}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-2">
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Lacre</p>
-                  <p className="font-bold font-mono text-xs">{movement.seal || '-'}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Lacre</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.seal || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Genset</p>
-                  <p className="font-bold font-mono text-xs">{movement.genset || '-'}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Genset</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.genset || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Booking</p>
-                  <p className="font-bold font-mono text-xs">{movement.booking || '-'}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Booking</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.booking || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Tipo de Serviço</p>
-                  <p className="font-bold text-xs">{movement.service_type || '-'}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Tipo de Serviço</p>
+                  <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.service_type || '-'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Nota Fiscal</p>
-                  <p className="font-bold font-mono text-xs">{movement.invoice_number || '-'}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Nota Fiscal</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.invoice_number || '-'}</p>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-[10px] text-muted-foreground">Cliente</p>
-                  <p className="font-bold text-xs">{movement.client_name || '-'}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Cliente</p>
+                  <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.client_name || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Terminal de Origem</p>
-                  <p className="font-bold text-xs">{movement.origin_terminal || '-'}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Terminal de Origem</p>
+                  <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.origin_terminal || '-'}</p>
                 </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Observações - Exibir apenas se houver */}
           {movement.observations && (
-            <div className="mb-2 border-2 border-black rounded-lg bg-white dark:bg-slate-900 overflow-hidden">
-              <div className="px-3 py-1 border-b border-black bg-slate-100 dark:bg-slate-700">
-                <p className="text-xs font-bold">Observações</p>
-              </div>
-              <div className="px-3 py-2">
-                <p className="text-xs whitespace-pre-wrap">{movement.observations}</p>
-              </div>
-            </div>
+            <Card className="mb-2 border border-slate-200 dark:border-slate-700 shadow-none">
+              <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300">Observações</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3">
+                <p className="text-xs whitespace-pre-wrap text-slate-800 dark:text-slate-200">{movement.observations}</p>
+              </CardContent>
+            </Card>
           )}
 
           {/* Fotos do Container */}
