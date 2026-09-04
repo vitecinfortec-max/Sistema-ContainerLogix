@@ -534,9 +534,9 @@ export default function UnitSegregationPage() {
       {/* Modal Criar/Editar */}
       <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) resetForm(); setModalOpen(open); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="w-5 h-5" />
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Package className="w-5 h-5 text-primary" />
               {editingItem ? 'Editar Segregação' : 'Nova Segregação de Unidade'}
             </DialogTitle>
           </DialogHeader>
@@ -544,7 +544,7 @@ export default function UnitSegregationPage() {
           <div className="space-y-5 py-4">
             {/* Cliente - Autocomplete */}
             <div className="relative" ref={clientAutocompleteRef}>
-              <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">
+              <Label className="mb-1.5 block">
                 Cliente Reservado <span className="text-red-500">*</span>
               </Label>
               <div className="relative">
@@ -556,7 +556,7 @@ export default function UnitSegregationPage() {
                       setShowClientSuggestions(true);
                     }
                   }}
-                  className={`h-9 pr-8 ${formData.client_id ? 'border-green-500 bg-green-50' : ''}`}
+                  className={`h-11 pr-8 ${formData.client_id ? 'border-green-500 bg-green-50' : ''}`}
                   data-testid="client-search-input"
                 />
                 {formData.client_id && (
@@ -596,11 +596,11 @@ export default function UnitSegregationPage() {
             {/* Lista de Containers */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">
+                <Label>
                   Unidades a Segregar <span className="text-red-500">*</span>
                 </Label>
-                <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-7 text-xs">
-                  <Plus className="w-3 h-3 mr-1" />
+                <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 text-xs">
+                  <Plus className="w-3.5 h-3.5 mr-1" />
                   Adicionar Container
                 </Button>
               </div>
@@ -608,30 +608,30 @@ export default function UnitSegregationPage() {
               <div className="space-y-2">
                 {formData.items.map((item, index) => (
                   <div key={index} className="flex gap-2 items-start p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <div className="flex-1 grid grid-cols-3 gap-2">
+                    <div className="flex-1 grid grid-cols-3 gap-3">
                       <div>
-                        <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase">Container *</Label>
+                        <Label className="text-xs mb-1 block">Container *</Label>
                         <Input
                           value={item.container_number}
                           onChange={(e) => updateItem(index, 'container_number', e.target.value)}
                           onBlur={(e) => updateItem(index, 'container_number', formatContainerNumber(e.target.value))}
-                          className="h-8 text-sm font-mono"
+                          className="h-10 text-sm font-mono"
                           data-testid={`container-${index}`}
                         />
                       </div>
                       <div>
-                        <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase">Tara</Label>
+                        <Label className="text-xs mb-1 block">Tara</Label>
                         <Input
                           value={item.tare}
                           onChange={(e) => updateItem(index, 'tare', e.target.value)}
-                          className="h-8 text-sm"
+                          className="h-10 text-sm"
                           data-testid={`tare-${index}`}
                         />
                       </div>
                       <div>
-                        <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase">Armador *</Label>
+                        <Label className="text-xs mb-1 block">Armador *</Label>
                         <Select value={item.shipping_line} onValueChange={(v) => updateItem(index, 'shipping_line', v)}>
-                          <SelectTrigger className="h-8 text-sm" data-testid={`shipping-${index}`}>
+                          <SelectTrigger className="h-10 text-sm" data-testid={`shipping-${index}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -648,7 +648,7 @@ export default function UnitSegregationPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeItem(index)}
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 mt-5"
+                        className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 mt-5"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -660,9 +660,9 @@ export default function UnitSegregationPage() {
 
             {/* Observações */}
             <div>
-              <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Observações</Label>
+              <Label className="mb-1.5 block">Observações</Label>
               <textarea
-                className="w-full h-20 p-3 border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full h-20 p-3 border border-input rounded-md text-sm bg-transparent resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                 value={formData.observations}
                 onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))}
                 data-testid="observations-input"
