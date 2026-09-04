@@ -74,7 +74,11 @@ export default function MovementDetailPage() {
     const autoprint = searchParams.get('autoprint');
     if (autoprint === 'true' && movement && !loading && !autoPrintExecuted.current) {
       autoPrintExecuted.current = true;
-      toast.info('Abrindo impressão...');
+      // Sem toast aqui - qualquer notificação ainda visível (inclusive a de
+      // sucesso da página anterior) fica capturada no PDF/impressão junto
+      // com o conteúdo da página. toast.dismiss() garante que nenhuma fique
+      // sobreposta ao comprovante no momento do print.
+      toast.dismiss();
       setTimeout(() => window.print(), 500);
     }
   }, [movement, loading, searchParams]);
