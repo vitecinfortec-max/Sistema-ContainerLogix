@@ -110,29 +110,30 @@ export default function MovementDetailPage() {
       pageBreakAfter: 'always',
       pageBreakInside: 'avoid'
     }}>
-      {/* HEADER: Logo + Nome da Empresa */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      {/* HEADER: Logo + dados completos da empresa - mesmo padrão do PDF gerado
+          pelo backend (_build_pdf_header em reports.py), pra ficar igual
+          independente de vir do "Baixar PDF" ou da impressão direto da tela. */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
         marginBottom: '10px',
-        gap: '12px'
+        gap: '14px'
       }}>
         <img
           src={getCompanyLogoUrl(company)}
           alt={company.name}
-          style={{ height: '50px', width: 'auto' }}
+          style={{ maxHeight: '46px', maxWidth: '46px', width: 'auto', height: 'auto', objectFit: 'contain' }}
         />
         <div style={{ textAlign: 'center' }}>
-          <div style={{
-            fontSize: '24px',
-            fontWeight: 'bold',
-            color: '#000',
-            fontFamily: 'Arial Black, sans-serif',
-            letterSpacing: '1px'
-          }}>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#000' }}>
             {company.name}
           </div>
+          <div style={{ fontSize: '9px', color: '#000' }}>CNPJ: {company.cnpj}</div>
+          {(company.address || '').split('\n').filter(Boolean).map((line, i) => (
+            <div key={i} style={{ fontSize: '9px', color: '#000' }}>{line.trim()}</div>
+          ))}
+          <div style={{ fontSize: '9px', color: '#000' }}>{company.email} | {company.phone}</div>
         </div>
       </div>
 
@@ -186,18 +187,7 @@ export default function MovementDetailPage() {
             </div>
             <div>
               <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Tipo de Operação</div>
-              <div style={{ 
-                display: 'inline-block',
-                backgroundColor: '#fff', 
-                color: '#000', 
-                padding: '2px 8px', 
-                border: '1px solid #000',
-                borderRadius: '3px',
-                fontSize: '10px',
-                fontWeight: 'bold'
-              }}>
-                {movement.operation_type}
-              </div>
+              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.operation_type}</div>
             </div>
             <div>
               <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Status</div>
