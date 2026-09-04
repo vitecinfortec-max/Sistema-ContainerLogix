@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Badge } from '../components/ui/badge';
+import { Checkbox } from '../components/ui/checkbox';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../components/ui/select';
@@ -42,6 +43,7 @@ export default function OrdemServicoPage() {
   const [nextNumber, setNextNumber] = useState(null);
   const [form, setForm] = useState(buildEmpty());
   const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -227,8 +229,33 @@ export default function OrdemServicoPage() {
     try {
       await api.deleteOrdemServico(id);
       toast.success('OS excluída');
+      setSelectedIds(prev => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadList();
     } catch (e) { toast.error('Erro ao excluir'); }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = list.map((o) => o.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
   };
 
   const downloadPDF = async (id, num) => {
@@ -246,24 +273,24 @@ export default function OrdemServicoPage() {
   };
 
   const t = totals();
+  const singleSelectedOS = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;
 
   return (
     <Layout>
       <div className="space-y-5" data-testid="ordem-servico-page">
-        <div className="flex items-end justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Ordem de Serviço</h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gestão de OS para manutenção da frota</p>
-          </div>
-          <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="os-new-btn">
-            <Plus className="w-4 h-4 mr-2" />Nova OS
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Ordem de Serviço</h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gestão de OS para manutenção da frota</p>
         </div>
 
-        <div className="border-t border-slate-200 dark:border-slate-700" />
-
-        <Card className="shadow-sm">
-          <CardContent className="pt-4 pb-4">
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative max-w-md flex-1 min-w-[280px]">
                 <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
@@ -286,17 +313,75 @@ export default function OrdemServicoPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[13px] text-slate-700 dark:text-slate-300">
+        {/* Barra de ações - marque uma OS na tabela abaixo pra habilitar as ações */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openCreate}
+            title="Adicionar"
+            data-testid="os-new-btn"
+            className="h-9 w-9 p-0"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedOS && openEdit(singleSelectedOS.id)}
+            disabled={!singleSelectedOS}
+            title="Editar"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedOS && downloadPDF(singleSelectedOS.id, singleSelectedOS.os_number)}
+            disabled={!singleSelectedOS}
+            title="Baixar PDF"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedOS && handleDelete(singleSelectedOS.id, singleSelectedOS.os_number)}
+            disabled={!singleSelectedOS}
+            title="Excluir"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <FileText className="w-4 h-4" />
               {loading ? 'Carregando...' : `${list.length} Ordem(s) de Serviço`}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50 dark:bg-slate-800">
+                    <TableHead className="w-9">
+                      <Checkbox
+                        checked={list.length > 0 && list.every((o) => selectedIds.has(o.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </TableHead>
                     <TableHead className="text-[12px] font-semibold">Nº</TableHead>
                     <TableHead className="text-[12px] font-semibold">Abertura</TableHead>
                     <TableHead className="text-[12px] font-semibold">Pessoa</TableHead>
@@ -304,7 +389,6 @@ export default function OrdemServicoPage() {
                     <TableHead className="text-[12px] font-semibold">Categoria</TableHead>
                     <TableHead className="text-[12px] font-semibold">Status</TableHead>
                     <TableHead className="text-[12px] font-semibold text-right">Total</TableHead>
-                    <TableHead className="text-[12px] font-semibold text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -312,7 +396,19 @@ export default function OrdemServicoPage() {
                     <TableRow><TableCell colSpan={8} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma OS cadastrada.</TableCell></TableRow>
                   )}
                   {list.map((o) => (
-                    <TableRow key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800" data-testid={`os-row-${o.os_number}`}>
+                    <TableRow
+                      key={o.id}
+                      onClick={() => toggleSelect(o.id)}
+                      className={`cursor-pointer transition-colors ${selectedIds.has(o.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                      data-testid={`os-row-${o.os_number}`}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(o.id)}
+                          onCheckedChange={() => toggleSelect(o.id)}
+                          data-testid={`os-row-checkbox-${o.os_number}`}
+                        />
+                      </TableCell>
                       <TableCell className="text-[13px] font-semibold text-emerald-700">Nº {o.os_number}</TableCell>
                       <TableCell className="text-[12px]">{o.opened_at ? format(new Date(o.opened_at), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
                       <TableCell className="text-[13px]">{o.person_name || '-'}</TableCell>
@@ -320,19 +416,6 @@ export default function OrdemServicoPage() {
                       <TableCell className="text-[12px]">{o.category || '-'}</TableCell>
                       <TableCell><Badge variant="secondary" className={`text-[10px] ${STATUS_COLORS[o.status] || ''}`}>{o.status}</Badge></TableCell>
                       <TableCell className="text-[13px] font-semibold text-right text-emerald-700">{fmtMoney(o.grand_total)}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => downloadPDF(o.id, o.os_number)} className="h-8 px-2" data-testid={`os-pdf-${o.os_number}`} title="Baixar PDF">
-                            <Download className="w-3.5 h-3.5 text-emerald-600" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(o.id)} className="h-8 px-2" data-testid={`os-edit-${o.os_number}`} title="Editar">
-                            <Pencil className="w-3.5 h-3.5 text-slate-600 dark:text-slate-400" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(o.id, o.os_number)} className="h-8 px-2" data-testid={`os-del-${o.os_number}`} title="Excluir">
-                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -344,8 +427,8 @@ export default function OrdemServicoPage() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto" data-testid="os-dialog">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex items-center gap-2 text-base">
               <FileText className="w-5 h-5 text-emerald-600" />
               {editingId ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}
               {nextNumber !== null && <Badge variant="outline" className="ml-2 text-emerald-700 border-emerald-300">Nº {nextNumber}</Badge>}
@@ -365,7 +448,7 @@ export default function OrdemServicoPage() {
                 <SelectField label="Tipo *" value={form.os_type} onChange={(v) => onChange('os_type', v)} options={[['INTERNO', 'Interno'], ['EXTERNO', 'Externo']]} testid="os-type" />
                 <SelectField label="Status *" value={form.status} onChange={(v) => onChange('status', v)} options={[['ABERTO', 'Aberto'], ['ANDAMENTO', 'Em Andamento'], ['FECHADO', 'Fechado'], ['CANCELADO', 'Cancelado']]} testid="os-status" />
                 <div>
-                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Categoria *</Label>
+                  <Label className="mb-1 block">Categoria *</Label>
                   <ComboField
                     value={form.category}
                     onChange={(v) => onChange('category', v)}
@@ -376,7 +459,7 @@ export default function OrdemServicoPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Equipamento (Placa)</Label>
+                  <Label className="mb-1 block">Equipamento (Placa)</Label>
                   <Autocomplete
                     value={form.equipment_plate}
                     onChange={(v) => onChange('equipment_plate', v)}
@@ -388,7 +471,7 @@ export default function OrdemServicoPage() {
                 </div>
                 <Field label="Apropriação (Equip. Agregador)" value={form.appropriation_plate} onChange={(v) => onChange('appropriation_plate', v)} testid="os-approp" />
                 <div>
-                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Pessoa *</Label>
+                  <Label className="mb-1 block">Pessoa *</Label>
                   <Autocomplete
                     value={form.person_name}
                     onChange={(v) => onChange('person_name', v)}
@@ -431,7 +514,7 @@ export default function OrdemServicoPage() {
               <SectionTitle>Equipe e Supervisão</SectionTitle>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Supervisor</Label>
+                  <Label className="mb-1 block">Supervisor</Label>
                   <Autocomplete
                     value={form.supervisor_name}
                     onChange={(v) => onChange('supervisor_name', v)}
@@ -442,7 +525,7 @@ export default function OrdemServicoPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Técnico</Label>
+                  <Label className="mb-1 block">Técnico</Label>
                   <Autocomplete
                     value={form.technician_name}
                     onChange={(v) => onChange('technician_name', v)}
@@ -453,7 +536,7 @@ export default function OrdemServicoPage() {
                   />
                 </div>
                 <div>
-                  <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Ajudante</Label>
+                  <Label className="mb-1 block">Ajudante</Label>
                   <Autocomplete
                     value={form.helper_name}
                     onChange={(v) => onChange('helper_name', v)}
@@ -544,7 +627,7 @@ function SectionTitle({ children }) {
 function Field({ label, value, onChange, type = 'text', testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="mb-1 block">{label}</Label>
       <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
@@ -554,7 +637,7 @@ function Field({ label, value, onChange, type = 'text', testid }) {
 function SelectField({ label, value, onChange, options, testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="mb-1 block">{label}</Label>
       <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
         <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue /></SelectTrigger>
         <SelectContent>
@@ -579,7 +662,7 @@ function CheckboxField({ label, value, onChange }) {
 function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
-      <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="mb-1 block">{label}</Label>
       <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
     </div>
   );
@@ -603,11 +686,11 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
         {items.map((it, idx) => (
           <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
             <div className="col-span-2">
-              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Código</Label>
+              <Label className="text-xs mb-1 block">Código</Label>
               <Input value={it.code || ''} onChange={(e) => onChange(idx, 'code', e.target.value)} className="h-8 text-sm" data-testid={`${kind}-code-${idx}`} />
             </div>
             <div className="col-span-4">
-              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Descrição</Label>
+              <Label className="text-xs mb-1 block">Descrição</Label>
               <Autocomplete
                 value={it.description || ''}
                 onChange={(v) => onChange(idx, 'description', v)}
@@ -623,25 +706,25 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
               />
             </div>
             <div className="col-span-1">
-              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Qtd</Label>
+              <Label className="text-xs mb-1 block">Qtd</Label>
               <Input type="number" step="0.01" value={it.quantity ?? ''} onChange={(e) => onChange(idx, 'quantity', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-qty-${idx}`} />
             </div>
             {showUnit && (
               <div className="col-span-1">
-                <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Un.</Label>
+                <Label className="text-xs mb-1 block">Un.</Label>
                 <Input value={it.unit || ''} onChange={(e) => onChange(idx, 'unit', e.target.value)} className="h-8 text-sm" data-testid={`${kind}-unit-${idx}`} />
               </div>
             )}
             <div className="col-span-1">
-              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">V. Unit.</Label>
+              <Label className="text-xs mb-1 block">V. Unit.</Label>
               <Input type="number" step="0.01" value={it.unit_price ?? ''} onChange={(e) => onChange(idx, 'unit_price', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-unitprice-${idx}`} />
             </div>
             <div className="col-span-1">
-              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Desc.</Label>
+              <Label className="text-xs mb-1 block">Desc.</Label>
               <Input type="number" step="0.01" value={it.discount ?? ''} onChange={(e) => onChange(idx, 'discount', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-disc-${idx}`} />
             </div>
             <div className="col-span-1">
-              <Label className="text-[10px] text-slate-500 dark:text-slate-400 mb-1 block">Total</Label>
+              <Label className="text-xs mb-1 block">Total</Label>
               <Input value={fmtMoney(it.total)} readOnly className="h-8 text-sm text-right font-semibold bg-white dark:bg-slate-900" />
             </div>
             <div className="col-span-1">
