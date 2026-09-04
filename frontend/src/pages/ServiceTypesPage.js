@@ -181,19 +181,32 @@ export default function ServiceTypesPage() {
           </Dialog>
         </div>
 
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-10 text-[13px] pl-9"
-            data-testid="search-service-type-input"
-          />
-        </div>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 text-[13px] pl-9"
+                data-testid="search-service-type-input"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
-        <Card>
-          <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
-            <CardTitle className="text-[13px] font-medium">Lista de Tipos de Serviço ({filteredServiceTypes.length})</CardTitle>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <ClipboardList className="w-4 h-4" />
+              Lista de Tipos de Serviço ({filteredServiceTypes.length})
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {filteredServiceTypes.length > 0 ? (
