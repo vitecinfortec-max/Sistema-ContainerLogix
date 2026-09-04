@@ -5,7 +5,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -23,6 +24,7 @@ export default function ServiceTypesPage() {
   const [formData, setFormData] = useState({ name: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {
     loadServiceTypes();
@@ -88,11 +90,36 @@ export default function ServiceTypesPage() {
       try {
         await api.deleteServiceType(id);
         toast.success('Tipo de serviço deletado com sucesso');
+        setSelectedIds(prev => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
         loadServiceTypes();
       } catch (error) {
         toast.error('Erro ao deletar tipo de serviço');
       }
     }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = filteredServiceTypes.map(s => s.id);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach(id => next.delete(id));
+      else pageIds.forEach(id => next.add(id));
+      return next;
+    });
   };
 
   const filteredServiceTypes = serviceTypes.filter((serviceType) => {
@@ -103,6 +130,8 @@ export default function ServiceTypesPage() {
       serviceType.description?.toLowerCase().includes(term)
     );
   });
+
+  const singleSelectedServiceType = selectedIds.size === 1 ? filteredServiceTypes.find(s => s.id === [...selectedIds][0]) : null;
 
   if (loading) {
     return (
@@ -117,28 +146,17 @@ export default function ServiceTypesPage() {
   return (
     <Layout>
       <div className="space-y-5" data-testid="service-types-page">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Tipos de Serviço
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie os tipos de serviço para movimentações</p>
-          </div>
-          <Dialog open={open} onOpenChange={(isOpen) => {
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            Tipos de Serviço
+          </h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie os tipos de serviço para movimentações</p>
+        </div>
+
+        <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
             if (!isOpen) resetForm();
           }}>
-            <DialogTrigger asChild>
-              <Button 
-                size="default" 
-                className="text-[13px] font-semibold uppercase tracking-wide h-10" 
-                data-testid="add-service-type-button"
-                onClick={openCreateDialog}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Tipo de Serviço
-              </Button>
-            </DialogTrigger>
             <DialogContent data-testid="service-type-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editMode ? 'Editar Tipo de Serviço' : 'Cadastrar Tipo de Serviço'}</DialogTitle>
@@ -179,7 +197,6 @@ export default function ServiceTypesPage() {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
 
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
@@ -201,6 +218,48 @@ export default function ServiceTypesPage() {
           </CardContent>
         </Card>
 
+        {/* Barra de ações - marque um tipo de serviço na tabela abaixo pra habilitar as ações */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openCreateDialog}
+            title="Adicionar"
+            data-testid="add-service-type-button"
+            className="h-9 w-9 p-0"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedServiceType && openEditDialog(singleSelectedServiceType)}
+            disabled={!singleSelectedServiceType}
+            title="Editar"
+            data-testid="edit-service-type-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Edit className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedServiceType && handleDelete(singleSelectedServiceType.id)}
+            disabled={!singleSelectedServiceType}
+            title="Excluir"
+            data-testid="delete-service-type-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -214,43 +273,37 @@ export default function ServiceTypesPage() {
                 <table className="w-full">
                   <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
+                      <th className="w-9 px-4 py-2.5">
+                        <Checkbox
+                          checked={filteredServiceTypes.length > 0 && filteredServiceTypes.every(s => selectedIds.has(s.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="select-all-checkbox"
+                        />
+                      </th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nome</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Descrição</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {filteredServiceTypes.map((serviceType) => (
-                      <tr key={serviceType.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" data-testid="service-type-row">
+                      <tr
+                        key={serviceType.id}
+                        onClick={() => toggleSelect(serviceType.id)}
+                        className={`cursor-pointer transition-colors ${selectedIds.has(serviceType.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        data-testid="service-type-row"
+                      >
+                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(serviceType.id)}
+                            onCheckedChange={() => toggleSelect(serviceType.id)}
+                            data-testid="service-type-row-checkbox"
+                          />
+                        </td>
                         <td className="px-4 py-2.5 text-[13px] font-medium">{serviceType.name}</td>
                         <td className="px-4 py-2.5 text-[13px] text-slate-500 dark:text-slate-400">{serviceType.description || '-'}</td>
                         <td className="px-4 py-2.5 text-[13px]">
                           {format(new Date(serviceType.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditDialog(serviceType)}
-                              data-testid="edit-service-type-button"
-                              title="Editar"
-                              className="h-8 w-8 p-0"
-                            >
-                              <Edit className="w-3.5 h-3.5 text-blue-600" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(serviceType.id)}
-                              data-testid="delete-service-type-button"
-                              title="Deletar"
-                              className="h-8 w-8 p-0"
-                            >
-                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                            </Button>
-                          </div>
                         </td>
                       </tr>
                     ))}
