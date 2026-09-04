@@ -41,10 +41,10 @@ export default function ContainerPhotoUpload({ damages = [], onDamagesChange, no
   }, [damages, onDamagesChange]);
 
   return (
-    <Card>
-      <CardHeader className="bg-slate-50 dark:bg-slate-800">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <ClipboardCheck className="w-5 h-5" />
+    <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+      <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+        <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+          <ClipboardCheck className="w-4 h-4" />
           Vistoria de Container
         </CardTitle>
       </CardHeader>
