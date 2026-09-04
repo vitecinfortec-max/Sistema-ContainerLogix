@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { compressImage } from '../lib/imageCompression';
 import { toast } from 'sonner';
@@ -285,6 +286,7 @@ export default function VehicleChecklistPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const [clients, setClients] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -440,10 +442,35 @@ export default function VehicleChecklistPage() {
     try {
       await api.deleteVehicleChecklist(id);
       toast.success('Checklist excluído!');
+      setSelectedIds(prev => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadChecklists();
     } catch (error) {
       toast.error('Erro ao excluir');
     }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = checklists.map((c) => c.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
   };
 
   const handlePrint = async (id) => {
@@ -702,27 +729,29 @@ export default function VehicleChecklistPage() {
     setTimeout(() => window.print(), 350);
   };
 
+  const singleSelectedChecklist = selectedIds.size === 1 ? checklists.find((c) => c.id === [...selectedIds][0]) : null;
+
   return (
     <Layout>
       {printChecklist && <SimpleChecklistPrintView checklist={printChecklist} company={company} />}
 
-      <div className="space-y-6 no-print">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <ClipboardCheck className="w-4 h-4" />
-              Checklist de Veículo
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Identificação do veículo e registro fotográfico antes da viagem</p>
-          </div>
-          <Button onClick={openNewSimpleModal} data-testid="new-checklist-button">
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Checklist
-          </Button>
+      <div className="space-y-5 no-print">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4" />
+            Checklist de Veículo
+          </h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Identificação do veículo e registro fotográfico antes da viagem</p>
         </div>
 
-        <Card>
-          <CardHeader className="pb-3">
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
             <div className="flex gap-2">
               <Input
                 value={searchQuery}
@@ -734,6 +763,75 @@ export default function VehicleChecklistPage() {
                 <Search className="w-4 h-4" />
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Barra de ações - marque um checklist na tabela abaixo pra habilitar as ações */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openNewSimpleModal}
+            title="Adicionar"
+            data-testid="new-checklist-button"
+            className="h-9 w-9 p-0"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedChecklist && viewDetails(singleSelectedChecklist)}
+            disabled={!singleSelectedChecklist}
+            title="Ver Detalhes"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedChecklist && (singleSelectedChecklist.checklist_kind === 'simple' ? openEditSimpleModal(singleSelectedChecklist) : openEditModal(singleSelectedChecklist))}
+            disabled={!singleSelectedChecklist}
+            title="Editar"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedChecklist && (singleSelectedChecklist.checklist_kind === 'simple' ? handleSimplePrint(singleSelectedChecklist) : handlePrint(singleSelectedChecklist.id))}
+            disabled={!singleSelectedChecklist}
+            title="Imprimir"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Printer className="w-4 h-4 text-emerald-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedChecklist && handleDelete(singleSelectedChecklist.id)}
+            disabled={!singleSelectedChecklist}
+            title="Excluir"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <ClipboardCheck className="w-4 h-4" />
+              {loading ? 'Carregando...' : `${pagination.total} Checklist(s)`}
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
@@ -745,20 +843,37 @@ export default function VehicleChecklistPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="w-9 px-4 py-2.5">
+                        <Checkbox
+                          checked={checklists.length > 0 && checklists.every((c) => selectedIds.has(c.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="select-all-checkbox"
+                        />
+                      </th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motorista</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente / Tipo</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {checklists.map((c, idx) => {
                       const isSimple = c.checklist_kind === 'simple';
                       return (
-                        <tr key={c.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}>
+                        <tr
+                          key={c.id}
+                          onClick={() => toggleSelect(c.id)}
+                          className={`cursor-pointer transition-colors ${selectedIds.has(c.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
+                        >
+                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedIds.has(c.id)}
+                              onCheckedChange={() => toggleSelect(c.id)}
+                              data-testid="checklist-row-checkbox"
+                            />
+                          </td>
                           <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{c.checklist_number}</td>
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{c.driver_name || '-'}</td>
                           <td className="px-4 py-2.5 text-sm font-mono text-slate-600 dark:text-slate-400">{(isSimple ? c.vehicle_plate : c.cavalo_plate) || '-'}</td>
@@ -783,22 +898,6 @@ export default function VehicleChecklistPage() {
                                   <Camera className="w-3 h-3" /> {(c.photos || []).length}
                                 </span>
                               )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-0.5">
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => viewDetails(c)} title="Ver detalhes">
-                                <Eye className="w-3.5 h-3.5 text-primary" />
-                              </Button>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => (isSimple ? openEditSimpleModal(c) : openEditModal(c))} title="Editar">
-                                <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                              </Button>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => (isSimple ? handleSimplePrint(c) : handlePrint(c.id))} title="Imprimir">
-                                <Printer className="w-3.5 h-3.5 text-green-600" />
-                              </Button>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(c.id)} title="Excluir">
-                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                              </Button>
                             </div>
                           </td>
                         </tr>
