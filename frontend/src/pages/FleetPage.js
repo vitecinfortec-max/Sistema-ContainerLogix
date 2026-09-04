@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
@@ -39,6 +40,7 @@ export default function FleetPage() {
   const [loading, setLoading] = useState(true);
   const [searchPlate, setSearchPlate] = useState('');
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [selectedRevisionIds, setSelectedRevisionIds] = useState(() => new Set());
   
   // Modal de nova revisão
   const [newModalOpen, setNewModalOpen] = useState(false);
@@ -457,10 +459,16 @@ export default function FleetPage() {
 
   const handleDelete = async (id) => {
     if (!(await confirm('Deseja realmente excluir esta revisão?'))) return;
-    
+
     try {
       await api.deleteVehicleRevision(id);
       toast.success('Revisão excluída');
+      setSelectedRevisionIds(prev => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadRevisions();
     } catch (error) {
       toast.error('Erro ao excluir revisão');
@@ -470,6 +478,25 @@ export default function FleetPage() {
   const handleViewDetails = async (revision) => {
     setSelectedRevision(revision);
     setDetailModalOpen(true);
+  };
+
+  const toggleSelectRevision = (id) => {
+    setSelectedRevisionIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllRevisionsOnPage = () => {
+    const pageIds = revisions.map(r => r.id);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedRevisionIds.has(id));
+    setSelectedRevisionIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach(id => next.delete(id));
+      else pageIds.forEach(id => next.add(id));
+      return next;
+    });
   };
 
   const handlePrintPDF = async (revisionId) => {
@@ -494,6 +521,8 @@ export default function FleetPage() {
     return `${value.toLocaleString('pt-BR')} KM`;
   };
 
+  const singleSelectedRevision = selectedRevisionIds.size === 1 ? revisions.find(r => r.id === [...selectedRevisionIds][0]) : null;
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="fleet-page">
@@ -507,16 +536,7 @@ export default function FleetPage() {
               {activeTab === 'revisions' ? 'Registro de revisões e trocas de óleo dos veículos' : 'Cadastro e gerenciamento da frota de veículos'}
             </p>
           </div>
-          {activeTab === 'revisions' ? (
-            <Button
-              onClick={() => setNewModalOpen(true)}
-              data-testid="new-revision-btn"
-              className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
-            >
-              <Plus className="w-4 h-4 mr-1.5" />
-              Nova Revisão
-            </Button>
-          ) : (
+          {activeTab === 'vehicles' && (
             <Button
               onClick={openNewVehicleModal}
               data-testid="new-vehicle-btn"
@@ -695,6 +715,56 @@ export default function FleetPage() {
               </CardContent>
             </Card>
 
+            {/* Barra de ações - marque uma revisão na tabela abaixo pra habilitar as ações */}
+            <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setNewModalOpen(true)}
+                title="Adicionar"
+                data-testid="new-revision-btn"
+                className="h-9 w-9 p-0"
+              >
+                <Plus className="w-4 h-4 text-primary" />
+              </Button>
+              <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => singleSelectedRevision && handleViewDetails(singleSelectedRevision)}
+                disabled={!singleSelectedRevision}
+                title="Ver Detalhes"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <Eye className="w-4 h-4 text-primary" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => singleSelectedRevision && handlePrintPDF(singleSelectedRevision.id)}
+                disabled={!singleSelectedRevision}
+                title="Imprimir PDF"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <Printer className="w-4 h-4 text-blue-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => singleSelectedRevision && handleDelete(singleSelectedRevision.id)}
+                disabled={!singleSelectedRevision}
+                title="Excluir"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <Trash2 className="w-4 h-4 text-destructive" />
+              </Button>
+              {selectedRevisionIds.size > 0 && (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+                  {selectedRevisionIds.size} selecionado{selectedRevisionIds.size > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+
             {/* Tabela de revisões */}
             <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
               <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
@@ -717,6 +787,13 @@ export default function FleetPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-slate-100 dark:border-slate-800">
+                          <th className="w-9 px-4 py-2.5">
+                            <Checkbox
+                              checked={revisions.length > 0 && revisions.every(r => selectedRevisionIds.has(r.id))}
+                              onCheckedChange={toggleSelectAllRevisionsOnPage}
+                              data-testid="select-all-checkbox"
+                            />
+                          </th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modelo</th>
@@ -724,15 +801,22 @@ export default function FleetPage() {
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM Atual</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Óleo</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Mecânico</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
                         {revisions.map((revision, idx) => (
                           <tr
                             key={revision.id}
-                            className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                            onClick={() => toggleSelectRevision(revision.id)}
+                            className={`cursor-pointer transition-colors ${selectedRevisionIds.has(revision.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
                           >
+                            <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedRevisionIds.has(revision.id)}
+                                onCheckedChange={() => toggleSelectRevision(revision.id)}
+                                data-testid="revision-row-checkbox"
+                              />
+                            </td>
                             <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{revision.revision_number}</td>
                             <td className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300">{revision.vehicle_plate}</td>
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{revision.vehicle_model || '-'}</td>
@@ -742,37 +826,6 @@ export default function FleetPage() {
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{formatKM(revision.current_km)}</td>
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{revision.oil_used}</td>
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{revision.mechanic_name}</td>
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center gap-0.5">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleViewDetails(revision)}
-                                  title="Ver Detalhes"
-                                  className="h-7 w-7 p-0"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-primary" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handlePrintPDF(revision.id)}
-                                  title="Imprimir PDF"
-                                  className="h-7 w-7 p-0"
-                                >
-                                  <Printer className="w-3.5 h-3.5 text-blue-600" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(revision.id)}
-                                  title="Excluir"
-                                  className="h-7 w-7 p-0"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                                </Button>
-                              </div>
-                            </td>
                           </tr>
                         ))}
                       </tbody>
