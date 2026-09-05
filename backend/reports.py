@@ -350,8 +350,8 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
 
     # 14 colunas
     data = [[
-        'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista', 'CPF',
-        'Placa Cavalo', 'Placa Carreta', 'Transportadora',
+        'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista',
+        'Placa Cavalo', 'Placa Carreta', 'Transportadora', 'Terminal de Origem',
         'Status', 'Tamanho', 'Tara', 'Armador', 'Booking'
     ]]
 
@@ -365,10 +365,10 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
             cell("ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA", centered=True),
             cell(m.get('container_number', '-')),
             cell(m.get('driver_name', '-')),
-            cell(m.get('driver_cpf', '-')),
             cell(m.get('truck_plate', '-')),
             cell(m.get('trailer_plate_1', '') or '-'),
             cell(m.get('transport_company', '-')),
+            cell(m.get('origin_terminal', '') or '-'),
             cell(m.get('status', 'VAZIO'), centered=True),
             cell(m.get('size_type', '-'), centered=True),
             cell(str(m.get('tare', '')) if m.get('tare') else '-', centered=True),
@@ -378,9 +378,10 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
 
     # Larguras redistribuídas pra usar a área útil real da página (doc.width em
     # A4 paisagem, ~785pt) em vez de somar ~680pt e deixar sobra sem uso -
-    # colunas de texto mais longo (Motorista, Transportadora, CPF) ganharam
-    # mais espaço pra reduzir a quantidade de quebra de linha necessária.
-    col_widths = [32, 62, 42, 62, 100, 62, 50, 50, 90, 40, 38, 34, 68, 55]
+    # colunas de texto mais longo (Motorista, Transportadora, Terminal de
+    # Origem) ganharam mais espaço pra reduzir a quantidade de quebra de linha
+    # necessária.
+    col_widths = [32, 62, 42, 62, 100, 50, 50, 90, 62, 40, 38, 34, 68, 55]
 
     table = Table(data, colWidths=col_widths, repeatRows=1)
 
@@ -984,8 +985,8 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
 
         # Headers matching template (14 columns)
         headers = [
-            'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista', 'CPF',
-            'Placa Cavalo', 'Placa Carreta', 'Transportadora',
+            'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista',
+            'Placa Cavalo', 'Placa Carreta', 'Transportadora', 'Terminal de Origem',
             'Status', 'Tamanho', 'Tara', 'Armador', 'Booking'
         ]
 
@@ -999,10 +1000,10 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
                 "ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA",
                 m.get('container_number', '-'),
                 m.get('driver_name', '-'),
-                m.get('driver_cpf', '-'),
                 m.get('truck_plate', '-'),
                 m.get('trailer_plate_1', '-') or '-',
                 m.get('transport_company', '-'),
+                m.get('origin_terminal', '') or '-',
                 m.get('status', 'VAZIO'),
                 m.get('size_type', '-'),
                 m.get('tare', '') or '-',
@@ -1012,8 +1013,8 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
 
         # Column widths matching template (14 columns: B to O)
         col_widths = {
-            'B': 7.3, 'C': 13.7, 'D': 8, 'E': 14, 'F': 30, 'G': 14,
-            'H': 12, 'I': 14, 'J': 27.3, 'K': 5.6, 'L': 7.6,
+            'B': 7.3, 'C': 13.7, 'D': 8, 'E': 14, 'F': 30, 'G': 12,
+            'H': 14, 'I': 27.3, 'J': 20, 'K': 5.6, 'L': 7.6,
             'M': 4.5, 'N': 13.2, 'O': 12
         }
 
