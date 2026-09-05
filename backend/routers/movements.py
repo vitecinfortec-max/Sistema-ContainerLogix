@@ -415,20 +415,20 @@ async def get_unbilled_movements(
             query['client_name'] = client_by_cnpj['name']
     
     if search:
-        # Buscar por transaction_id, container_number ou ID
-        search_escaped = re.escape(search)
-        search_conditions = [
-            {"container_number": {"$regex": search_escaped, "$options": "i"}},
-            {"id": {"$regex": search_escaped, "$options": "i"}},
-        ]
-        # Tentar buscar por transaction_id se for número
+        # Busca exata por transaction_id (ID digitado ou lido via código de
+        # barras, que codifica o transaction_id) ou por container_number
+        # (correspondência exata, não parcial) - antes usava regex parcial
+        # contra container_number e até contra o campo interno "id" (um UUID),
+        # o que fazia dígitos digitados baterem por coincidência em outras
+        # movimentações não relacionadas.
+        search_stripped = search.strip()
         try:
-            transaction_id = int(search)
-            search_conditions.append({"transaction_id": transaction_id})
+            transaction_id = int(search_stripped)
+            query['transaction_id'] = transaction_id
         except ValueError:
-            pass
-        
-        query['$or'] = search_conditions
+            query['container_number'] = {
+                "$regex": f"^{re.escape(search_stripped)}$", "$options": "i"
+            }
     
     movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
     
