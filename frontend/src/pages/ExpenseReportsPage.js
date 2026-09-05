@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -67,9 +68,13 @@ export default function ExpenseReportsPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
 
+  // Estado de Seleção (toolbar)
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
   useEffect(() => {
     loadReports();
     loadSuppliers();
+    setSelectedIds(new Set());
   }, [pagination.page]);
 
   const loadSuppliers = async () => {
@@ -292,11 +297,41 @@ export default function ExpenseReportsPage() {
     try {
       await api.deleteExpenseReport(id);
       toast.success('Prestação de contas excluída');
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadReports();
     } catch (error) {
       toast.error('Erro ao excluir prestação de contas');
     }
   };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds(prev => {
+      const pageIds = reports.map(r => r.id);
+      const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...pageIds]);
+    });
+  };
+
+  const singleSelectedReport = selectedIds.size === 1
+    ? reports.find(r => r.id === [...selectedIds][0])
+    : null;
 
   const handleComplete = async (id) => {
     if (!(await confirm('Concluir esta prestação de contas? A edição ficará bloqueada até reabrir.'))) return;
@@ -369,31 +404,21 @@ export default function ExpenseReportsPage() {
   return (
     <Layout>
       <div className="space-y-5" data-testid="expense-reports-page">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Prestação de Contas
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de depósitos recebidos e compras realizadas por período</p>
-          </div>
-          <Button
-            onClick={openNewModal}
-            data-testid="new-expense-report-btn"
-            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Nova Prestação de Contas
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            Prestação de Contas
+          </h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de depósitos recebidos e compras realizadas por período</p>
         </div>
 
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
-              <Search className="w-4 h-4" />
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
               Filtrar
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4 space-y-3">
+          <CardContent className="p-3 space-y-3">
             <div className="grid grid-cols-1 sm:max-w-sm gap-3">
               <div>
                 <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Número ou fornecedor</Label>
@@ -417,6 +442,87 @@ export default function ExpenseReportsPage() {
           </CardContent>
         </Card>
 
+        {/* Toolbar */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openNewModal}
+            className="h-9 w-9 p-0"
+            title="Nova Prestação de Contas"
+            data-testid="new-expense-report-btn"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedReport && openDetails(singleSelectedReport)}
+            disabled={!singleSelectedReport}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Ver Detalhes"
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedReport && openEditModal(singleSelectedReport)}
+            disabled={!singleSelectedReport || singleSelectedReport.status !== 'EM_ANDAMENTO'}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Editar"
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          {singleSelectedReport?.status === 'CONCLUIDA' ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleReopen(singleSelectedReport.id)}
+              className="h-9 w-9 p-0"
+              title="Reabrir"
+            >
+              <RotateCcw className="w-4 h-4 text-blue-600" />
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => singleSelectedReport && handleComplete(singleSelectedReport.id)}
+              disabled={!singleSelectedReport}
+              className="h-9 w-9 p-0 disabled:opacity-30"
+              title="Concluir"
+            >
+              <CheckCircle2 className="w-4 h-4 text-green-600" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedReport && handlePrintPDF(singleSelectedReport.id)}
+            disabled={!singleSelectedReport || singleSelectedReport.status !== 'CONCLUIDA'}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Baixar PDF"
+          >
+            <Printer className="w-4 h-4 text-emerald-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedReport && handleDelete(singleSelectedReport.id)}
+            disabled={!singleSelectedReport}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Excluir"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
+              {selectedIds.size} selecionado(s)
+            </span>
+          )}
+        </div>
+
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -438,67 +544,40 @@ export default function ExpenseReportsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-4 py-2.5 text-left w-10">
+                        <Checkbox
+                          checked={reports.length > 0 && reports.every(r => selectedIds.has(r.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Período</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Total Compras</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Saldo</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reports.map((report, idx) => {
                       const bi = balanceInfo(report.balance || 0);
+                      const isSelected = selectedIds.has(report.id);
                       return (
                         <tr
                           key={report.id}
-                          className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
+                          onClick={() => toggleSelect(report.id)}
                         >
+                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelect(report.id)}
+                            />
+                          </td>
                           <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{report.report_number_formatted}</td>
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{formatPeriodDate(report.period_start)} a {formatPeriodDate(report.period_end)}</td>
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{formatMoney(report.total_purchases)}</td>
                           <td className={`px-4 py-2.5 text-sm font-semibold ${bi.className}`}>{formatMoney(bi.value)}</td>
                           <td className="px-4 py-2.5">{getStatusBadge(report.status)}</td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-0.5">
-                              <Button variant="ghost" size="sm" onClick={() => openDetails(report)} title="Ver detalhes" className="h-7 w-7 p-0">
-                                <Eye className="w-3.5 h-3.5 text-primary" />
-                              </Button>
-                              {report.status === 'EM_ANDAMENTO' ? (
-                                <>
-                                  <Button variant="ghost" size="sm" onClick={() => openEditModal(report)} title="Editar" className="h-7 w-7 p-0">
-                                    <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => handleComplete(report.id)} title="Concluir" className="h-7 w-7 p-0">
-                                    <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <Button variant="ghost" size="sm" onClick={() => handleReopen(report.id)} title="Reabrir" className="h-7 w-7 p-0">
-                                  <RotateCcw className="w-3.5 h-3.5 text-blue-600" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handlePrintPDF(report.id)}
-                                title={report.status === 'CONCLUIDA' ? 'Gerar PDF' : 'Conclua a prestação de contas para gerar o PDF'}
-                                disabled={report.status !== 'CONCLUIDA'}
-                                className="h-7 w-7 p-0"
-                              >
-                                <Printer className="w-3.5 h-3.5 text-green-600" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(report.id)}
-                                title="Excluir"
-                                className="h-7 w-7 p-0"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                              </Button>
-                            </div>
-                          </td>
                         </tr>
                       );
                     })}
@@ -525,9 +604,9 @@ export default function ExpenseReportsPage() {
       {/* Modal Nova/Editar Prestação de Contas */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calculator className="w-5 h-5" />
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Calculator className="w-4 h-4 text-primary" />
               {editingReport ? `Editar Prestação de Contas #${editingReport.report_number_formatted}` : 'Nova Prestação de Contas'}
             </DialogTitle>
           </DialogHeader>
@@ -536,11 +615,11 @@ export default function ExpenseReportsPage() {
             {/* Período */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Período - Início *</Label>
+                <Label className="text-xs mb-1 block">Período - Início *</Label>
                 <Input type="date" className="h-9" value={formData.period_start} onChange={(e) => setFormData(prev => ({ ...prev, period_start: e.target.value }))} />
               </div>
               <div>
-                <Label className="text-xs">Período - Fim *</Label>
+                <Label className="text-xs mb-1 block">Período - Fim *</Label>
                 <Input type="date" className="h-9" value={formData.period_end} onChange={(e) => setFormData(prev => ({ ...prev, period_end: e.target.value }))} />
               </div>
             </div>
@@ -563,15 +642,15 @@ export default function ExpenseReportsPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pr-8">
                       <div>
-                        <Label className="text-xs">Valor Enviado (R$) *</Label>
+                        <Label className="text-xs mb-1 block">Valor Enviado (R$) *</Label>
                         <Input className="h-9" type="number" step="0.01" value={deposit.amount} onChange={(e) => handleDepositChange(index, 'amount', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Data *</Label>
+                        <Label className="text-xs mb-1 block">Data *</Label>
                         <Input className="h-9" type="date" value={deposit.date} onChange={(e) => handleDepositChange(index, 'date', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Enviado Por *</Label>
+                        <Label className="text-xs mb-1 block">Enviado Por *</Label>
                         <Input className="h-9" value={deposit.sent_by} onChange={(e) => handleDepositChange(index, 'sent_by', e.target.value)} />
                       </div>
                     </div>
@@ -603,7 +682,7 @@ export default function ExpenseReportsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                       <div>
-                        <Label className="text-xs">Local de Compra (Fornecedor) *</Label>
+                        <Label className="text-xs mb-1 block">Local de Compra (Fornecedor) *</Label>
                         <Autocomplete
                           value={purchase.supplier_name}
                           onChange={(val) => handlePurchaseChange(index, 'supplier_name', val)}
@@ -617,22 +696,22 @@ export default function ExpenseReportsPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs">Data da Compra *</Label>
+                        <Label className="text-xs mb-1 block">Data da Compra *</Label>
                         <Input className="h-9" type="date" value={purchase.purchase_date} onChange={(e) => handlePurchaseChange(index, 'purchase_date', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Valor da Compra (R$) *</Label>
+                        <Label className="text-xs mb-1 block">Valor da Compra (R$) *</Label>
                         <Input className="h-9" type="number" step="0.01" value={purchase.amount} onChange={(e) => handlePurchaseChange(index, 'amount', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Observação</Label>
+                        <Label className="text-xs mb-1 block">Observação</Label>
                         <Input className="h-9" value={purchase.observation} onChange={(e) => handlePurchaseChange(index, 'observation', e.target.value)} />
                       </div>
                     </div>
 
                     {/* Recibos */}
                     <div className="mt-3">
-                      <Label className="text-xs">Recibos / Comprovantes</Label>
+                      <Label className="text-xs mb-1 block">Recibos / Comprovantes</Label>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {(purchase.receipts || []).map((receipt) => (
                           <div key={receipt.id} className="relative">
