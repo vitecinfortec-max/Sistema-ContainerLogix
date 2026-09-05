@@ -80,6 +80,7 @@ export default function FleetPage() {
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
   const [vehicleSearch, setVehicleSearch] = useState('');
   const [vehiclePagination, setVehiclePagination] = useState({ page: 1, pages: 1, total: 0 });
+  const [selectedVehicleIds, setSelectedVehicleIds] = useState(() => new Set());
   
   // Modal de veículo
   const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
@@ -301,14 +302,39 @@ export default function FleetPage() {
 
   const handleDeleteVehicle = async (id) => {
     if (!(await confirm('Deseja realmente excluir este veículo?'))) return;
-    
+
     try {
       await api.deleteVehicle(id);
       toast.success('Veículo excluído');
+      setSelectedVehicleIds(prev => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadVehicles();
     } catch (error) {
       toast.error('Erro ao excluir veículo');
     }
+  };
+
+  const toggleSelectVehicle = (id) => {
+    setSelectedVehicleIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllVehiclesOnPage = () => {
+    const pageIds = vehicles.map(v => v.id);
+    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedVehicleIds.has(id));
+    setSelectedVehicleIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach(id => next.delete(id));
+      else pageIds.forEach(id => next.add(id));
+      return next;
+    });
   };
 
   const getStatusBadge = (status) => {
@@ -522,6 +548,7 @@ export default function FleetPage() {
   };
 
   const singleSelectedRevision = selectedRevisionIds.size === 1 ? revisions.find(r => r.id === [...selectedRevisionIds][0]) : null;
+  const singleSelectedVehicle = selectedVehicleIds.size === 1 ? vehicles.find(v => v.id === [...selectedVehicleIds][0]) : null;
 
   return (
     <Layout>
@@ -536,16 +563,6 @@ export default function FleetPage() {
               {activeTab === 'revisions' ? 'Registro de revisões e trocas de óleo dos veículos' : 'Cadastro e gerenciamento da frota de veículos'}
             </p>
           </div>
-          {activeTab === 'vehicles' && (
-            <Button
-              onClick={openNewVehicleModal}
-              data-testid="new-vehicle-btn"
-              className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
-            >
-              <Plus className="w-4 h-4 mr-1.5" />
-              Novo Veículo
-            </Button>
-          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -561,7 +578,7 @@ export default function FleetPage() {
               <CardContent className="p-4 space-y-3">
                 <div className="grid grid-cols-1 sm:max-w-sm gap-3">
                   <div>
-                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Placa, modelo ou marca</Label>
+                    <Label className="mb-1 block">Placa, modelo ou marca</Label>
                     <div className="relative">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                       <Input
@@ -581,6 +598,46 @@ export default function FleetPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Barra de ações - marque um veículo na tabela abaixo pra habilitar as ações */}
+            <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={openNewVehicleModal}
+                title="Adicionar"
+                data-testid="new-vehicle-btn"
+                className="h-9 w-9 p-0"
+              >
+                <Plus className="w-4 h-4 text-primary" />
+              </Button>
+              <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => singleSelectedVehicle && openEditVehicleModal(singleSelectedVehicle)}
+                disabled={!singleSelectedVehicle}
+                title="Editar"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <Pencil className="w-4 h-4 text-blue-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => singleSelectedVehicle && handleDeleteVehicle(singleSelectedVehicle.id)}
+                disabled={!singleSelectedVehicle}
+                title="Excluir"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <Trash2 className="w-4 h-4 text-destructive" />
+              </Button>
+              {selectedVehicleIds.size > 0 && (
+                <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+                  {selectedVehicleIds.size} selecionado{selectedVehicleIds.size > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
 
             <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
               <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
@@ -603,6 +660,13 @@ export default function FleetPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-slate-100 dark:border-slate-800">
+                          <th className="w-9 px-4 py-2.5">
+                            <Checkbox
+                              checked={vehicles.length > 0 && vehicles.every(v => selectedVehicleIds.has(v.id))}
+                              onCheckedChange={toggleSelectAllVehiclesOnPage}
+                              data-testid="select-all-vehicles-checkbox"
+                            />
+                          </th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Marca</th>
@@ -610,15 +674,22 @@ export default function FleetPage() {
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ano</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motorista</th>
                           <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
                         {vehicles.map((vehicle, idx) => (
                           <tr
                             key={vehicle.id}
-                            className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                            onClick={() => toggleSelectVehicle(vehicle.id)}
+                            className={`cursor-pointer transition-colors ${selectedVehicleIds.has(vehicle.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
                           >
+                            <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedVehicleIds.has(vehicle.id)}
+                                onCheckedChange={() => toggleSelectVehicle(vehicle.id)}
+                                data-testid="vehicle-row-checkbox"
+                              />
+                            </td>
                             <td className="px-4 py-2.5 text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{vehicle.plate}</td>
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicleTypes.find(t => t.value === vehicle.vehicle_type)?.label || vehicle.vehicle_type}</td>
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.brand || '-'}</td>
@@ -626,28 +697,6 @@ export default function FleetPage() {
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.year || '-'}</td>
                             <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.driver_name || '-'}</td>
                             <td className="px-4 py-2.5">{getStatusBadge(vehicle.status)}</td>
-                            <td className="px-4 py-2.5">
-                              <div className="flex items-center gap-0.5">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openEditVehicleModal(vehicle)}
-                                  title="Editar"
-                                  className="h-7 w-7 p-0"
-                                >
-                                  <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteVehicle(vehicle.id)}
-                                  title="Excluir"
-                                  className="h-7 w-7 p-0"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                                </Button>
-                              </div>
-                            </td>
                           </tr>
                         ))}
                       </tbody>
