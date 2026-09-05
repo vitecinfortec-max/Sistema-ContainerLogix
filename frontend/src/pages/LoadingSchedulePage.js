@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -51,6 +52,9 @@ export default function LoadingSchedulePage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
 
+  // Estado de Seleção (toolbar)
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
   function createEmptyItem() {
     return {
       operation_type: 'COLETA',
@@ -70,6 +74,7 @@ export default function LoadingSchedulePage() {
   useEffect(() => {
     loadSchedules();
     loadSelectData();
+    setSelectedIds(new Set());
   }, [pagination.page]);
 
   const loadSelectData = async () => {
@@ -237,11 +242,41 @@ export default function LoadingSchedulePage() {
     try {
       await api.deleteLoadingSchedule(id);
       toast.success('Programação excluída');
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadSchedules();
     } catch (error) {
       toast.error('Erro ao excluir programação');
     }
   };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds(prev => {
+      const pageIds = schedules.map(s => s.id);
+      const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...pageIds]);
+    });
+  };
+
+  const singleSelectedSchedule = selectedIds.size === 1
+    ? schedules.find(s => s.id === [...selectedIds][0])
+    : null;
 
   const handlePrintPDF = async (id) => {
     try {
@@ -288,29 +323,19 @@ export default function LoadingSchedulePage() {
   return (
     <Layout>
       <div className="space-y-5" data-testid="loading-schedule-page">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Programação de Carregamento</h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie as programações de carregamento</p>
-          </div>
-          <Button
-            onClick={openNewModal}
-            data-testid="new-schedule-btn"
-            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Nova Programação
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Programação de Carregamento</h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie as programações de carregamento</p>
         </div>
 
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
-              <Search className="w-4 h-4" />
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
               Filtrar
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4 space-y-3">
+          <CardContent className="p-3 space-y-3">
             <div className="grid grid-cols-1 sm:max-w-sm gap-3">
               <div>
                 <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente, motorista ou container</Label>
@@ -334,6 +359,65 @@ export default function LoadingSchedulePage() {
           </CardContent>
         </Card>
 
+        {/* Toolbar */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openNewModal}
+            className="h-9 w-9 p-0"
+            title="Nova Programação"
+            data-testid="new-schedule-btn"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedSchedule && openDetails(singleSelectedSchedule)}
+            disabled={!singleSelectedSchedule}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Ver Detalhes"
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedSchedule && openEditModal(singleSelectedSchedule)}
+            disabled={!singleSelectedSchedule}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Editar"
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedSchedule && handlePrintPDF(singleSelectedSchedule.id)}
+            disabled={!singleSelectedSchedule}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Baixar PDF"
+          >
+            <Printer className="w-4 h-4 text-emerald-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedSchedule && handleDelete(singleSelectedSchedule.id)}
+            disabled={!singleSelectedSchedule}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Excluir"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
+              {selectedIds.size} selecionado(s)
+            </span>
+          )}
+        </div>
+
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
@@ -355,47 +439,46 @@ export default function LoadingSchedulePage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-4 py-2.5 text-left w-10">
+                        <Checkbox
+                          checked={schedules.length > 0 && schedules.every(s => selectedIds.has(s.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Contratante</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Destino</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Itens</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado em</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {schedules.map((schedule, idx) => (
-                      <tr
-                        key={schedule.id}
-                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
-                      >
-                        <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{schedule.schedule_number}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.contracting_client_name}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.destination_client_name}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.items?.length || 0}</td>
-                        <td className="px-4 py-2.5">{getStatusBadge(schedule.status)}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                          {schedule.created_at && format(new Date(schedule.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-0.5">
-                            <Button variant="ghost" size="sm" onClick={() => openDetails(schedule)} title="Ver detalhes" className="h-7 w-7 p-0">
-                              <Eye className="w-3.5 h-3.5 text-primary" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => openEditModal(schedule)} title="Editar" className="h-7 w-7 p-0">
-                              <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handlePrintPDF(schedule.id)} title="Gerar PDF" className="h-7 w-7 p-0">
-                              <Printer className="w-3.5 h-3.5 text-green-600" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(schedule.id)} title="Excluir" className="h-7 w-7 p-0">
-                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {schedules.map((schedule, idx) => {
+                      const isSelected = selectedIds.has(schedule.id);
+                      return (
+                        <tr
+                          key={schedule.id}
+                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
+                          onClick={() => toggleSelect(schedule.id)}
+                        >
+                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelect(schedule.id)}
+                            />
+                          </td>
+                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{schedule.schedule_number}</td>
+                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.contracting_client_name}</td>
+                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.destination_client_name}</td>
+                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.items?.length || 0}</td>
+                          <td className="px-4 py-2.5">{getStatusBadge(schedule.status)}</td>
+                          <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
+                            {schedule.created_at && format(new Date(schedule.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -419,9 +502,9 @@ export default function LoadingSchedulePage() {
       {/* Modal Nova/Editar Programação */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Calendar className="w-4 h-4 text-primary" />
               {editingSchedule ? 'Editar Programação' : 'Nova Programação de Carregamento'}
             </DialogTitle>
           </DialogHeader>
@@ -491,7 +574,7 @@ export default function LoadingSchedulePage() {
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
-                        <Label className="text-xs">Tipo *</Label>
+                        <Label className="text-xs mb-1 block">Tipo *</Label>
                         <Select value={item.operation_type} onValueChange={(v) => handleItemChange(index, 'operation_type', v)}>
                           <SelectTrigger className="h-9">
                             <SelectValue />
@@ -503,7 +586,7 @@ export default function LoadingSchedulePage() {
                         </Select>
                       </div>
                       <div>
-                        <Label className="text-xs">Motorista *</Label>
+                        <Label className="text-xs mb-1 block">Motorista *</Label>
                         <Autocomplete
                           value={item.driver_name}
                           onChange={(val) => handleItemChange(index, 'driver_name', val)}
@@ -518,11 +601,11 @@ export default function LoadingSchedulePage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs">CPF</Label>
+                        <Label className="text-xs mb-1 block">CPF</Label>
                         <Input className="h-9" value={item.driver_cpf} onChange={(e) => handleItemChange(index, 'driver_cpf', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Cavalo *</Label>
+                        <Label className="text-xs mb-1 block">Cavalo *</Label>
                         <Autocomplete
                           value={item.cavalo_plate}
                           onChange={(val) => handleItemChange(index, 'cavalo_plate', val.toUpperCase())}
@@ -535,7 +618,7 @@ export default function LoadingSchedulePage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs">Carreta</Label>
+                        <Label className="text-xs mb-1 block">Carreta</Label>
                         <Autocomplete
                           value={item.carreta_plate}
                           onChange={(val) => handleItemChange(index, 'carreta_plate', val.toUpperCase())}
@@ -548,24 +631,24 @@ export default function LoadingSchedulePage() {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <Label className="text-xs">Local de Carregamento *</Label>
+                        <Label className="text-xs mb-1 block">Local de Carregamento *</Label>
                         <Input className="h-9" value={item.loading_location} onChange={(e) => handleItemChange(index, 'loading_location', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Data *</Label>
+                        <Label className="text-xs mb-1 block">Data *</Label>
                         <Input className="h-9" type="date" value={item.loading_date} onChange={(e) => handleItemChange(index, 'loading_date', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Nº Container</Label>
+                        <Label className="text-xs mb-1 block">Nº Container</Label>
                         <Input className="h-9" value={item.container_number} onChange={(e) => handleItemChange(index, 'container_number', e.target.value.toUpperCase())} />
                       </div>
                       <div>
-                        <Label className="text-xs">Lacre</Label>
+                        <Label className="text-xs mb-1 block">Lacre</Label>
                         <Input className="h-9" value={item.seal_number} onChange={(e) => handleItemChange(index, 'seal_number', e.target.value.toUpperCase())} />
                       </div>
                       {(formData.contracting_client_name === BAG_NUMBER_CLIENT_NAME || formData.destination_client_name === BAG_NUMBER_CLIENT_NAME) && (
                         <div>
-                          <Label className="text-xs">Nº da Bolsa</Label>
+                          <Label className="text-xs mb-1 block">Nº da Bolsa</Label>
                           <Input
                             className="h-9"
                             value={item.bag_number}
