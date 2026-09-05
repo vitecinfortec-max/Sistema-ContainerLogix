@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { AddressFields } from '../components/AddressFields';
@@ -284,9 +285,11 @@ export default function CadastroUnificadoPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState(() => buildEmptyForm(activeType));
   const [submitting, setSubmitting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {
     setSearchParams(activeTypeKey === TYPES[0].key ? {} : { type: activeTypeKey }, { replace: true });
+    setSelectedIds(new Set());
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTypeKey]);
@@ -363,6 +366,12 @@ export default function CadastroUnificadoPage() {
       try {
         await activeType.api.remove(id);
         toast.success(`${activeType.label} ${g.deletado} com sucesso`);
+        setSelectedIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
         loadItems();
       } catch (error) {
         toast.error(`Erro ao deletar ${g.este} ${activeType.label.toLowerCase()}`);
@@ -370,11 +379,32 @@ export default function CadastroUnificadoPage() {
     }
   };
 
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = filteredItems.map((item) => item.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
+  };
+
   const filteredItems = items.filter((item) => {
     const term = search.trim().toLowerCase();
     if (!term) return true;
     return activeType.listColumns.some(([field]) => (item[field] || '').toString().toLowerCase().includes(term));
   });
+
+  const singleSelectedItem = selectedIds.size === 1 ? filteredItems.find((item) => item.id === [...selectedIds][0]) : null;
 
   return (
     <Layout>
@@ -406,40 +436,11 @@ export default function CadastroUnificadoPage() {
           })}
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200">Cadastro de {activeType.label}</h2>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="default"
-                className="text-[13px] font-semibold uppercase tracking-wide h-10"
-                data-testid="add-cadastro-button"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar
-                <ChevronDown className="w-4 h-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {availableTypes.map((t) => {
-                const Icon = t.icon;
-                return (
-                  <DropdownMenuItem
-                    key={t.key}
-                    onClick={() => openCreateDialogFor(t.key)}
-                    data-testid={`add-cadastro-option-${t.key}`}
-                  >
-                    <Icon className="w-4 h-4 mr-2" />
-                    {genderWords(t).novo} {t.label}
-                  </DropdownMenuItem>
-                );
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div>
+          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200">Cadastro de {activeType.label}</h2>
+        </div>
 
-          <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
+        <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="cadastro-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editId ? `Editar ${activeType.label}` : `Cadastrar ${activeType.label}`}</DialogTitle>
@@ -481,7 +482,6 @@ export default function CadastroUnificadoPage() {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
 
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
@@ -493,9 +493,67 @@ export default function CadastroUnificadoPage() {
           />
         </div>
 
-        <Card>
-          <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
-            <CardTitle className="text-[13px] font-medium">
+        {/* Barra de ações - marque um registro na tabela abaixo pra habilitar as ações */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Adicionar"
+                data-testid="add-cadastro-button"
+                className="h-9 w-9 p-0"
+              >
+                <Plus className="w-4 h-4 text-primary" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {availableTypes.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <DropdownMenuItem
+                    key={t.key}
+                    onClick={() => openCreateDialogFor(t.key)}
+                    data-testid={`add-cadastro-option-${t.key}`}
+                  >
+                    <Icon className="w-4 h-4 mr-2" />
+                    {genderWords(t).novo} {t.label}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedItem && openEditDialog(singleSelectedItem)}
+            disabled={!singleSelectedItem}
+            title="Editar"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Edit className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)}
+            disabled={!singleSelectedItem}
+            title="Excluir"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">
               {loading ? 'Carregando...' : `Lista de ${activeType.plural} (${filteredItems.length})`}
             </CardTitle>
           </CardHeader>
@@ -505,28 +563,36 @@ export default function CadastroUnificadoPage() {
                 <table className="w-full">
                   <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
+                      <th className="w-9 px-4 py-2.5">
+                        <Checkbox
+                          checked={filteredItems.length > 0 && filteredItems.every((item) => selectedIds.has(item.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="select-all-checkbox"
+                        />
+                      </th>
                       {activeType.listColumns.map(([field, label]) => (
                         <th key={field} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</th>
                       ))}
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {filteredItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" data-testid="cadastro-row">
+                      <tr
+                        key={item.id}
+                        onClick={() => toggleSelect(item.id)}
+                        className={`cursor-pointer transition-colors ${selectedIds.has(item.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        data-testid="cadastro-row"
+                      >
+                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(item.id)}
+                            onCheckedChange={() => toggleSelect(item.id)}
+                            data-testid="cadastro-row-checkbox"
+                          />
+                        </td>
                         {activeType.listColumns.map(([field]) => (
                           <td key={field} className="px-4 py-2.5 text-[13px]">{item[field] || '-'}</td>
                         ))}
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => openEditDialog(item)} title="Editar" className="h-8 w-8 p-0">
-                              <Edit className="w-3.5 h-3.5 text-blue-600" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(item.id)} title="Deletar" className="h-8 w-8 p-0">
-                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                            </Button>
-                          </div>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
