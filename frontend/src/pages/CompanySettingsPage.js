@@ -151,9 +151,9 @@ export default function CompanySettingsPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <Card>
-            <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
-              <CardTitle className="text-[13px] font-medium flex items-center gap-2">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                 <Building2 className="w-4 h-4" />
                 Identificação
               </CardTitle>
@@ -258,9 +258,9 @@ export default function CompanySettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
-              <CardTitle className="text-[13px] font-medium">Contato</CardTitle>
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Contato</CardTitle>
             </CardHeader>
             <CardContent className="pt-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -292,9 +292,9 @@ export default function CompanySettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
-              <CardTitle className="text-[13px] font-medium">Dados Bancários</CardTitle>
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dados Bancários</CardTitle>
               <CardDescription className="text-[12px]">Exibidos nos relatórios e faturas de faturamento</CardDescription>
             </CardHeader>
             <CardContent className="pt-5">
