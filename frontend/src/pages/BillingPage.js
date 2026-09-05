@@ -90,9 +90,13 @@ export default function BillingPage() {
   const [downloadingPdf, setDownloadingPdf] = useState(null);
   const [downloadingExcel, setDownloadingExcel] = useState(null);
 
+  // Estado de Seleção (toolbar)
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
   useEffect(() => {
     loadInvoices();
     loadClients();
+    setSelectedIds(new Set());
   }, [currentPage]);
 
   const loadInvoices = async () => {
@@ -538,12 +542,17 @@ export default function BillingPage() {
 
   const deleteInvoice = async () => {
     if (!invoiceToDelete) return;
-    
+
     setDeleting(true);
     try {
       await api.deleteInvoice(invoiceToDelete.id);
       toast.success('Fatura excluída com sucesso');
       setShowDeleteConfirm(false);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(invoiceToDelete.id);
+        return next;
+      });
       setInvoiceToDelete(null);
       loadInvoices();
     } catch (error) {
@@ -552,6 +561,31 @@ export default function BillingPage() {
       setDeleting(false);
     }
   };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds(prev => {
+      const pageIds = invoices.map(i => i.id);
+      const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...pageIds]);
+    });
+  };
+
+  const singleSelectedInvoice = selectedIds.size === 1
+    ? invoices.find(i => i.id === [...selectedIds][0])
+    : null;
 
   const formatCurrency = (value) => {
     if (!value && value !== 0) return 'R$ 0,00';
@@ -583,39 +617,106 @@ export default function BillingPage() {
     <Layout>
       <div className="space-y-5" data-testid="billing-page">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Faturamento
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Gerencie as faturas do sistema
-            </p>
-          </div>
-          <Button
-            onClick={openNewInvoiceModal}
-            size="default"
-            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90 shadow-sm"
-            data-testid="new-invoice-button"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Gerar Faturamento
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            Faturamento
+          </h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+            Gerencie as faturas do sistema
+          </p>
         </div>
 
-        {/* Separador */}
-        <div className="border-t border-slate-200 dark:border-slate-700"></div>
+        {/* Toolbar */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openNewInvoiceModal}
+            className="h-9 w-9 p-0"
+            title="Gerar Faturamento"
+            data-testid="new-invoice-button"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedInvoice && viewInvoiceDetails(singleSelectedInvoice)}
+            disabled={!singleSelectedInvoice}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Ver Detalhes"
+            data-testid={singleSelectedInvoice ? `view-invoice-${singleSelectedInvoice.id}` : undefined}
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedInvoice && downloadPdf(singleSelectedInvoice)}
+            disabled={!singleSelectedInvoice || downloadingPdf === singleSelectedInvoice?.id}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Baixar PDF"
+          >
+            {singleSelectedInvoice && downloadingPdf === singleSelectedInvoice.id ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+            ) : (
+              <Download className="w-4 h-4 text-emerald-600" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedInvoice && downloadExcel(singleSelectedInvoice)}
+            disabled={!singleSelectedInvoice || downloadingExcel === singleSelectedInvoice?.id}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Baixar Excel"
+            data-testid={singleSelectedInvoice ? `download-invoice-${singleSelectedInvoice.id}` : undefined}
+          >
+            {singleSelectedInvoice && downloadingExcel === singleSelectedInvoice.id ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+            ) : (
+              <FileSpreadsheet className="w-4 h-4 text-green-600" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedInvoice && openEditModal(singleSelectedInvoice)}
+            disabled={!singleSelectedInvoice}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Editar"
+            data-testid={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
+          >
+            <Edit className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedInvoice && confirmDelete(singleSelectedInvoice)}
+            disabled={!singleSelectedInvoice}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Excluir"
+            data-testid={singleSelectedInvoice ? `delete-invoice-${singleSelectedInvoice.id}` : undefined}
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
+              {selectedIds.size} selecionado(s)
+            </span>
+          )}
+        </div>
 
         {/* Lista de Faturas */}
-        <Card className="shadow-sm">
-          <CardHeader className="bg-slate-50 dark:bg-slate-800/50 py-3">
-            <CardTitle className="flex items-center justify-between text-[13px] font-medium text-slate-700 dark:text-slate-300">
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
               <span className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 Faturas Geradas ({totalInvoices})
               </span>
               {totalPages > 1 && (
-                <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400">
+                <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
                   Página {currentPage} de {totalPages}
                 </span>
               )}
@@ -627,6 +728,12 @@ export default function BillingPage() {
                 <table className="w-full">
                   <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
+                      <th className="px-4 py-2.5 text-left w-10">
+                        <Checkbox
+                          checked={invoices.length > 0 && invoices.every(i => selectedIds.has(i.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nº Fatura</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Data</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cliente</th>
@@ -634,16 +741,22 @@ export default function BillingPage() {
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Qtd. Movim.</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Valor Total</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Usuário</th>
-                      <th className="px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {invoices.map((invoice) => (
-                      <tr 
-                        key={invoice.id} 
-                        className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                      <tr
+                        key={invoice.id}
+                        className={`cursor-pointer transition-colors ${selectedIds.has(invoice.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        onClick={() => toggleSelect(invoice.id)}
                         data-testid="invoice-row"
                       >
+                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(invoice.id)}
+                            onCheckedChange={() => toggleSelect(invoice.id)}
+                          />
+                        </td>
                         <td className="px-4 py-2.5 text-[13px] font-bold text-primary">
                           #{invoice.invoice_number}
                         </td>
@@ -661,55 +774,6 @@ export default function BillingPage() {
                           {formatCurrency(invoice.total_value)}
                         </td>
                         <td className="px-4 py-2.5 text-[13px] text-slate-600 dark:text-slate-400">{shortenName(invoice.user_name)}</td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center justify-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => viewInvoiceDetails(invoice)}
-                              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:text-primary"
-                              title="Ver detalhes"
-                              data-testid={`view-invoice-${invoice.id}`}
-                            >
-                              <Eye className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:text-green-600"
-                              title="Baixar Excel"
-                              data-testid={`download-invoice-${invoice.id}`}
-                              disabled={downloadingExcel === invoice.id}
-                              onClick={() => downloadExcel(invoice)}
-                            >
-                              {downloadingExcel === invoice.id ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-                              ) : (
-                                <FileSpreadsheet className="w-4 h-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditModal(invoice)}
-                              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:text-blue-600"
-                              title="Editar fatura"
-                              data-testid={`edit-invoice-${invoice.id}`}
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => confirmDelete(invoice)}
-                              className="h-8 w-8 p-0 text-slate-600 dark:text-slate-400 hover:text-red-600"
-                              title="Excluir fatura"
-                              data-testid={`delete-invoice-${invoice.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -764,7 +828,7 @@ export default function BillingPage() {
       {/* Modal - Nova Fatura */}
       <Dialog open={showNewInvoice} onOpenChange={setShowNewInvoice}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="flex items-center gap-2 text-base">
               <Receipt className="w-4 h-4 text-primary" />
               Gerar Nova Fatura
@@ -779,7 +843,7 @@ export default function BillingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
               {/* Busca por ID/Container (Código de Barras) */}
               <div>
-                <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Buscar por ID ou Container</Label>
+                <Label className="mb-1 block">Buscar por ID ou Container</Label>
                 <div className="flex gap-2">
                   <Input
                     value={searchQuery}
@@ -797,7 +861,7 @@ export default function BillingPage() {
 
               {/* Busca por Cliente (Nome ou CNPJ) */}
               <div>
-                <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Cliente (Nome ou CNPJ)</Label>
+                <Label className="mb-1 block">Cliente (Nome ou CNPJ)</Label>
                 <div className="flex gap-2">
                   <Input
                     value={clientSearchQuery}
@@ -963,25 +1027,25 @@ export default function BillingPage() {
                 <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3">Resumo da Fatura</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <Label className="text-xs text-slate-500 dark:text-slate-400">Cliente</Label>
+                    <Label className="text-xs mb-1 block">Cliente</Label>
                     <p className="font-medium">{getSelectedClient() || '-'}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 dark:text-slate-400">CNPJ</Label>
+                    <Label className="text-xs mb-1 block">CNPJ</Label>
                     <p className="font-mono">{getSelectedClientCnpj() || '-'}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 dark:text-slate-400">Qtd. Movimentações</Label>
+                    <Label className="text-xs mb-1 block">Qtd. Movimentações</Label>
                     <p className="font-bold text-primary">{selectedMovements.size}</p>
                   </div>
                   <div>
-                    <Label className="text-xs text-slate-500 dark:text-slate-400">Valor Total</Label>
+                    <Label className="text-xs mb-1 block">Valor Total</Label>
                     <p className="font-bold text-green-700 text-lg">{formatCurrency(getTotalValue())}</p>
                   </div>
                 </div>
-                
+
                 <div className="mt-4">
-                  <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Observações (opcional)</Label>
+                  <Label className="mb-1 block">Observações (opcional)</Label>
                   <Textarea
                     value={invoiceNotes}
                     onChange={(e) => setInvoiceNotes(e.target.value)}
