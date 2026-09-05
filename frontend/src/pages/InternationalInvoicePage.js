@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
 import { api } from '../lib/api';
@@ -100,10 +101,14 @@ export default function InternationalInvoicePage() {
   const [deleting, setDeleting] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(null);
 
+  // Estado de Seleção (toolbar)
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
   useEffect(() => {
     loadInvoices();
     loadClients();
     loadReceiverData();
+    setSelectedIds(new Set());
   }, [currentPage, filterStatus, filterCurrency]);
 
   // Fecha os dropdowns de autocomplete de cliente ao clicar fora - sem isso eles
@@ -513,12 +518,17 @@ export default function InternationalInvoicePage() {
 
   const handleDelete = async () => {
     if (!invoiceToDelete) return;
-    
+
     try {
       setDeleting(true);
       await api.deleteIntlInvoice(invoiceToDelete.id);
       toast.success('Invoice excluída com sucesso!');
       setShowDeleteConfirm(false);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(invoiceToDelete.id);
+        return next;
+      });
       setInvoiceToDelete(null);
       loadInvoices();
     } catch (error) {
@@ -527,6 +537,31 @@ export default function InternationalInvoicePage() {
       setDeleting(false);
     }
   };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds(prev => {
+      const pageIds = invoices.map(i => i.id);
+      const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...pageIds]);
+    });
+  };
+
+  const singleSelectedInvoice = selectedIds.size === 1
+    ? invoices.find(i => i.id === [...selectedIds][0])
+    : null;
 
   const getCurrencySymbol = (currency) => {
     const found = CURRENCIES.find(c => c.value === currency);
@@ -544,32 +579,28 @@ export default function InternationalInvoicePage() {
     <Layout>
       <div className="space-y-6" data-testid="international-invoice-page">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <Globe className="h-4 w-4 text-primary" />
-              Invoices Internacionais
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Gerencie suas faturas para clientes internacionais
-            </p>
-          </div>
-          <Button 
-            onClick={openNewInvoiceModal}
-            className="bg-primary hover:bg-primary/90"
-            data-testid="new-invoice-btn"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Invoice
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <Globe className="h-4 w-4 text-primary" />
+            Invoices Internacionais
+          </h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+            Gerencie suas faturas para clientes internacionais
+          </p>
         </div>
 
         {/* Filtros */}
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
             <div className="flex flex-wrap gap-4">
               <div className="w-48">
-                <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Status</Label>
+                <Label className="mb-1 block">Status</Label>
                 <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val === "ALL" ? "" : val)}>
                   <SelectTrigger data-testid="filter-status">
                     <SelectValue />
@@ -583,7 +614,7 @@ export default function InternationalInvoicePage() {
                 </Select>
               </div>
               <div className="w-48">
-                <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block">Moeda</Label>
+                <Label className="mb-1 block">Moeda</Label>
                 <Select value={filterCurrency} onValueChange={(val) => setFilterCurrency(val === "ALL" ? "" : val)}>
                   <SelectTrigger data-testid="filter-currency">
                     <SelectValue />
@@ -600,11 +631,82 @@ export default function InternationalInvoicePage() {
           </CardContent>
         </Card>
 
+        {/* Toolbar */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openNewInvoiceModal}
+            className="h-9 w-9 p-0"
+            title="Nova Invoice"
+            data-testid="new-invoice-btn"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedInvoice && handleViewDetails(singleSelectedInvoice)}
+            disabled={!singleSelectedInvoice}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Ver Detalhes"
+            data-testid={singleSelectedInvoice ? `view-invoice-${singleSelectedInvoice.id}` : undefined}
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedInvoice && handleOpenEdit(singleSelectedInvoice)}
+            disabled={!singleSelectedInvoice}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Editar"
+            data-testid={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedInvoice && handleDownloadPdf(singleSelectedInvoice)}
+            disabled={!singleSelectedInvoice || downloadingPdf === singleSelectedInvoice?.id}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Baixar PDF"
+            data-testid={singleSelectedInvoice ? `download-pdf-${singleSelectedInvoice.id}` : undefined}
+          >
+            {singleSelectedInvoice && downloadingPdf === singleSelectedInvoice.id ? (
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-600" />
+            ) : (
+              <FileDown className="w-4 h-4 text-emerald-600" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (!singleSelectedInvoice) return;
+              setInvoiceToDelete(singleSelectedInvoice);
+              setShowDeleteConfirm(true);
+            }}
+            disabled={!singleSelectedInvoice}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Excluir"
+            data-testid={singleSelectedInvoice ? `delete-invoice-${singleSelectedInvoice.id}` : undefined}
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
+              {selectedIds.size} selecionado(s)
+            </span>
+          )}
+        </div>
+
         {/* Lista de Invoices */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Receipt className="h-5 w-5" />
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <Receipt className="w-4 h-4" />
               Invoices ({totalInvoices})
             </CardTitle>
           </CardHeader>
@@ -623,6 +725,12 @@ export default function InternationalInvoicePage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-slate-50 dark:bg-slate-800">
+                      <th className="text-left p-3 w-10">
+                        <Checkbox
+                          checked={invoices.length > 0 && invoices.every(i => selectedIds.has(i.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
                       <th className="text-left p-3 font-semibold">Nº</th>
                       <th className="text-left p-3 font-semibold">Pagador</th>
                       <th className="text-left p-3 font-semibold">Emissão</th>
@@ -630,14 +738,23 @@ export default function InternationalInvoicePage() {
                       <th className="text-left p-3 font-semibold">Moeda</th>
                       <th className="text-right p-3 font-semibold">Total</th>
                       <th className="text-center p-3 font-semibold">Status</th>
-                      <th className="text-center p-3 font-semibold">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {invoices.map((invoice) => {
                       const statusBadge = getStatusBadge(invoice.status);
                       return (
-                        <tr key={invoice.id} className="border-b hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <tr
+                          key={invoice.id}
+                          className={`border-b cursor-pointer transition-colors ${selectedIds.has(invoice.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                          onClick={() => toggleSelect(invoice.id)}
+                        >
+                          <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedIds.has(invoice.id)}
+                              onCheckedChange={() => toggleSelect(invoice.id)}
+                            />
+                          </td>
                           <td className="p-3 font-medium">#{invoice.invoice_number}</td>
                           <td className="p-3">{invoice.payer_company}</td>
                           <td className="p-3">
@@ -654,55 +771,6 @@ export default function InternationalInvoicePage() {
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
                               {statusBadge.label}
                             </span>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex justify-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewDetails(invoice)}
-                                title="Ver detalhes"
-                                data-testid={`view-invoice-${invoice.id}`}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenEdit(invoice)}
-                                title="Editar"
-                                data-testid={`edit-invoice-${invoice.id}`}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDownloadPdf(invoice)}
-                                disabled={downloadingPdf === invoice.id}
-                                title="Baixar PDF"
-                                data-testid={`download-pdf-${invoice.id}`}
-                              >
-                                {downloadingPdf === invoice.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <FileDown className="h-4 w-4" />
-                                )}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  setInvoiceToDelete(invoice);
-                                  setShowDeleteConfirm(true);
-                                }}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                title="Excluir"
-                                data-testid={`delete-invoice-${invoice.id}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
                           </td>
                         </tr>
                       );
@@ -744,12 +812,12 @@ export default function InternationalInvoicePage() {
         {/* Modal Nova Invoice */}
         <Dialog open={showNewInvoice} onOpenChange={setShowNewInvoice}>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-primary" />
+            <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Globe className="h-4 w-4 text-primary" />
                 Nova Invoice Internacional
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-[13px]">
                 Preencha os dados para criar uma nova invoice
               </DialogDescription>
             </DialogHeader>
