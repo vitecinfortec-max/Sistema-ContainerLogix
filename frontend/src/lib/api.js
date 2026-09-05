@@ -115,6 +115,7 @@ export const api = {
   sendDailyMovementReports: (targetDate) => axios.post(`${API}/reports/send-daily-movements`, null, { params: targetDate ? { target_date: targetDate } : {} }),
   downloadBillingPDFReport: (params) => axios.get(`${API}/reports/billing/pdf`, { params, responseType: 'blob' }),
   downloadBillingExcelReport: (params) => axios.get(`${API}/reports/billing/excel`, { params, responseType: 'blob' }),
+  getBillingDailyChart: () => axios.get(`${API}/reports/billing/daily-chart`),
   
   // Yard Control (Controle de Pátio)
   getYardControl: (params) => axios.get(`${API}/yard-control`, { params }),

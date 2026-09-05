@@ -502,6 +502,11 @@ class DailyMovementPoint(BaseModel):
     entries: int
     exits: int
 
+class DailyBillingPoint(BaseModel):
+    date: str  # YYYY-MM-DD
+    billed: float
+    unbilled: float
+
 class DriverRankingEntry(BaseModel):
     driver_name: str
     entries: int

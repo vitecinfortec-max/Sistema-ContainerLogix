@@ -23,7 +23,7 @@ from models import (
     Client, ClientCreate, ClientResponse,
     Supplier, SupplierCreate, SupplierResponse,
     ContainerMovement, ContainerMovementCreate, ContainerMovementResponse,
-    DailyMovementPoint, DriverRankingEntry, DashboardStats,
+    DailyMovementPoint, DailyBillingPoint, DriverRankingEntry, DashboardStats,
     ShippingLine, ShippingLineCreate, ShippingLineResponse,
     ServiceType, ServiceTypeCreate, ServiceTypeResponse,
     Invoice, InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceMovementDetail,
@@ -679,6 +679,38 @@ async def _compute_daily_chart(today: datetime) -> list[DailyMovementPoint]:
             date=day_key,
             entries=counts.get('ENTRADA', 0),
             exits=counts.get('SAIDA', 0)
+        ))
+    return daily_chart
+
+
+async def _compute_daily_billing_chart(today: datetime) -> list[DailyBillingPoint]:
+    """Valor faturado/não faturado por dia dos últimos 14 dias - mesma estratégia de
+    agregação restrita à janela de datas usada em _compute_daily_chart."""
+    day0 = today - timedelta(days=13)
+    pipeline = [
+        {"$match": {**_created_at_gte(day0), "service_value": {"$ne": None}}},
+        {"$addFields": {"_day": {"$dateToString": {
+            "format": "%Y-%m-%d", "date": {"$toDate": "$created_at"}, "timezone": "UTC"
+        }}}},
+        {"$group": {
+            "_id": {"day": "$_day", "billed": {"$eq": ["$billed", True]}},
+            "total": {"$sum": "$service_value"}
+        }},
+    ]
+    by_day: dict = {}
+    async for r in db.movements.aggregate(pipeline):
+        key = 'billed' if r["_id"]["billed"] else 'unbilled'
+        by_day.setdefault(r["_id"]["day"], {})[key] = r["total"]
+
+    daily_chart = []
+    for i in range(13, -1, -1):
+        day_start = today - timedelta(days=i)
+        day_key = day_start.strftime('%Y-%m-%d')
+        totals = by_day.get(day_key, {})
+        daily_chart.append(DailyBillingPoint(
+            date=day_key,
+            billed=totals.get('billed', 0),
+            unbilled=totals.get('unbilled', 0)
         ))
     return daily_chart
 
@@ -1585,6 +1617,12 @@ async def download_excel_report(
     )
 
 # ==================== RELATÓRIO DE FATURAMENTO ====================
+
+@api_router.get("/reports/billing/daily-chart", response_model=list[DailyBillingPoint])
+async def get_billing_daily_chart(current_user: dict = Depends(get_current_admin_user)):
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    return await _compute_daily_billing_chart(today)
+
 
 @api_router.get("/reports/billing/pdf")
 async def download_billing_pdf_report(
