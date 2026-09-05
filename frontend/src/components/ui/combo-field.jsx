@@ -19,7 +19,7 @@ export function ComboField({ label, value, onChange, options, emptyLabel = 'Nenh
   const selected = options.find(([v]) => v === value);
   return (
     <div>
-      {label && <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>}
+      {label && <Label className="mb-1 block"><RequiredLabel label={label} /></Label>}
       <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next) setSearch(''); }}>
         <PopoverTrigger asChild>
           <Button type="button" variant="outline" role="combobox" aria-expanded={open}

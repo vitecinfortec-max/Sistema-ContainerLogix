@@ -8,6 +8,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
+import { Checkbox } from '../components/ui/checkbox';
 import { ComboField } from '../components/ui/combo-field';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
@@ -62,6 +63,7 @@ export default function FuelSupplyOrderPage() {
   const [nextNumber, setNextNumber] = useState(null);
   const [form, setForm] = useState(buildEmpty());
   const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [vehicles, setVehicles] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -166,8 +168,33 @@ export default function FuelSupplyOrderPage() {
     try {
       await api.deleteFuelSupplyOrder(id);
       toast.success('Ordem de Abastecimento excluída');
+      setSelectedIds(prev => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadList();
     } catch (e) { toast.error('Erro ao excluir'); }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = list.map((o) => o.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
   };
 
   const downloadPDF = async (id, num) => {
@@ -184,27 +211,27 @@ export default function FuelSupplyOrderPage() {
     } catch (e) { toast.error('Erro ao gerar PDF'); }
   };
 
+  const singleSelectedOrder = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="fuel-order-page">
-        <div className="flex items-end justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-              <ClipboardCheck className="w-4 h-4" />
-              Ordem de Abastecimento
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Autorização de abastecimento anterior ao registro do abastecimento em si</p>
-          </div>
-          <Button onClick={openCreate} className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90" data-testid="fuel-order-new-btn">
-            <Plus className="w-4 h-4 mr-1.5" />
-            Nova Ordem de Abastecimento
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4" />
+            Ordem de Abastecimento
+          </h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Autorização de abastecimento anterior ao registro do abastecimento em si</p>
         </div>
 
-        <div className="border-t border-slate-200 dark:border-slate-700" />
-
-        <Card className="shadow-sm">
-          <CardContent className="pt-4 pb-4">
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
             <div className="relative max-w-md">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
               <Input value={search}
@@ -213,17 +240,75 @@ export default function FuelSupplyOrderPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[13px] text-slate-700 dark:text-slate-300">
+        {/* Barra de ações - marque uma ordem na tabela abaixo pra habilitar as ações */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openCreate}
+            title="Adicionar"
+            data-testid="fuel-order-new-btn"
+            className="h-9 w-9 p-0"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedOrder && openEdit(singleSelectedOrder.id)}
+            disabled={!singleSelectedOrder}
+            title="Editar"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedOrder && downloadPDF(singleSelectedOrder.id, singleSelectedOrder.order_number)}
+            disabled={!singleSelectedOrder}
+            title="Baixar PDF"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number)}
+            disabled={!singleSelectedOrder}
+            title="Excluir"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <ClipboardCheck className="w-4 h-4" />
               {loading ? 'Carregando...' : `Ordens de Abastecimento Registradas (${list.length})`}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-50 dark:bg-slate-800">
+                    <TableHead className="w-9">
+                      <Checkbox
+                        checked={list.length > 0 && list.every((o) => selectedIds.has(o.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </TableHead>
                     <TableHead className="text-[12px] font-semibold">Nº</TableHead>
                     <TableHead className="text-[12px] font-semibold">Data</TableHead>
                     <TableHead className="text-[12px] font-semibold">Equipamento</TableHead>
@@ -231,7 +316,6 @@ export default function FuelSupplyOrderPage() {
                     <TableHead className="text-[12px] font-semibold">Produto</TableHead>
                     <TableHead className="text-[12px] font-semibold">Tipo</TableHead>
                     <TableHead className="text-[12px] font-semibold">Solicitante</TableHead>
-                    <TableHead className="text-[12px] font-semibold text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -239,7 +323,19 @@ export default function FuelSupplyOrderPage() {
                     <TableRow><TableCell colSpan={8} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma ordem de abastecimento cadastrada.</TableCell></TableRow>
                   )}
                   {list.map((o) => (
-                    <TableRow key={o.id} className="hover:bg-slate-50 dark:hover:bg-slate-800" data-testid={`fuel-order-row-${o.order_number}`}>
+                    <TableRow
+                      key={o.id}
+                      onClick={() => toggleSelect(o.id)}
+                      className={`cursor-pointer transition-colors ${selectedIds.has(o.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                      data-testid={`fuel-order-row-${o.order_number}`}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(o.id)}
+                          onCheckedChange={() => toggleSelect(o.id)}
+                          data-testid={`fuel-order-row-checkbox-${o.order_number}`}
+                        />
+                      </TableCell>
                       <TableCell className="text-[13px] font-semibold text-primary">Nº {o.order_number}</TableCell>
                       <TableCell className="text-[12px]">{o.order_date ? format(new Date(`${o.order_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</TableCell>
                       <TableCell className="text-[12px] font-mono">{o.equipment_plate || '-'}</TableCell>
@@ -247,19 +343,6 @@ export default function FuelSupplyOrderPage() {
                       <TableCell className="text-[12px]">{FUEL_TYPE_LABELS[o.fuel_type] || o.fuel_type || '-'}</TableCell>
                       <TableCell className="text-[12px]">{SUPPLY_MODE_LABELS[o.supply_mode] || o.supply_mode || '-'}</TableCell>
                       <TableCell className="text-[13px]">{o.requester || '-'}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => downloadPDF(o.id, o.order_number)} className="h-8 px-2" data-testid={`fuel-order-pdf-${o.order_number}`} title="Baixar PDF">
-                            <Download className="w-3.5 h-3.5 text-emerald-600" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(o.id)} className="h-8 px-2" data-testid={`fuel-order-edit-${o.order_number}`} title="Editar">
-                            <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(o.id, o.order_number)} className="h-8 px-2" data-testid={`fuel-order-del-${o.order_number}`} title="Excluir">
-                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -271,8 +354,8 @@ export default function FuelSupplyOrderPage() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="fuel-order-dialog">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex items-center gap-2 text-base">
               <ClipboardCheck className="w-5 h-5 text-primary" />
               {editingId ? 'Editar Ordem de Abastecimento' : 'Nova Ordem de Abastecimento'}
               {nextNumber !== null && <Badge variant="outline" className="ml-2 text-primary border-primary/30">Nº {nextNumber}</Badge>}
@@ -310,7 +393,7 @@ export default function FuelSupplyOrderPage() {
             </div>
 
             <div>
-              <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Tipo <span className="text-red-500">*</span></Label>
+              <Label className="mb-1 block">Tipo <span className="text-red-500">*</span></Label>
               <div className="flex flex-wrap gap-4">
                 {SUPPLY_MODE_OPTIONS.map(([v, l]) => (
                   <label key={v} className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
@@ -331,7 +414,7 @@ export default function FuelSupplyOrderPage() {
                 )}
                 {form.supply_mode === 'LITROS_VALOR' && (
                   <div>
-                    <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">Total</Label>
+                    <Label className="mb-1 block">Total</Label>
                     <Input value={fmtMoney(estimatedTotal)} readOnly className="h-9 text-sm bg-muted" data-testid="fuel-order-total" />
                   </div>
                 )}
@@ -369,7 +452,7 @@ function RequiredLabel({ label }) {
 function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   return (
     <div>
-      <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide"><RequiredLabel label={label} /></Label>
+      <Label className="mb-1 block"><RequiredLabel label={label} /></Label>
       <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
@@ -379,7 +462,7 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
 function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
-      <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{label}</Label>
+      <Label className="mb-1 block">{label}</Label>
       <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
     </div>
   );
