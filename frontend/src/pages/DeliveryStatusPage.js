@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -45,8 +46,12 @@ export default function DeliveryStatusPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(null);
 
+  // Estado de Seleção (toolbar)
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
   useEffect(() => {
     loadStatuses();
+    setSelectedIds(new Set());
   }, [pagination.page]);
 
   const loadStatuses = async () => {
@@ -171,11 +176,41 @@ export default function DeliveryStatusPage() {
     try {
       await api.deleteDeliveryStatus(id);
       toast.success('Status de entrega excluído!');
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadStatuses();
     } catch (error) {
       toast.error('Erro ao excluir');
     }
   };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds(prev => {
+      const pageIds = statuses.map(s => s.id);
+      const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...pageIds]);
+    });
+  };
+
+  const singleSelectedStatus = selectedIds.size === 1
+    ? statuses.find(s => s.id === [...selectedIds][0])
+    : null;
 
   const handlePrint = async (id) => {
     try {
@@ -237,30 +272,20 @@ export default function DeliveryStatusPage() {
     <Layout>
       <div className="space-y-5" data-testid="delivery-status-page">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Status de Entrega</h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de horários de entrega por programação</p>
-          </div>
-          <Button
-            onClick={() => { resetForm(); setModalOpen(true); }}
-            className="text-[13px] font-semibold uppercase tracking-wide h-10 px-5 bg-primary hover:bg-primary/90"
-            data-testid="new-delivery-status-btn"
-          >
-            <Plus className="w-4 h-4 mr-1.5" />
-            Novo Status
-          </Button>
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Status de Entrega</h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de horários de entrega por programação</p>
         </div>
 
         {/* Filtros */}
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-[13px] font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2">
-              <Search className="w-4 h-4" />
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
               Filtrar
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex gap-3 items-end">
               <div className="flex-1 max-w-xs">
                 <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Programação</Label>
@@ -282,6 +307,75 @@ export default function DeliveryStatusPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Toolbar */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { resetForm(); setModalOpen(true); }}
+            className="h-9 w-9 p-0"
+            title="Novo Status"
+            data-testid="new-delivery-status-btn"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedStatus && viewDetails(singleSelectedStatus)}
+            disabled={!singleSelectedStatus}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Ver Detalhes"
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedStatus && openEditModal(singleSelectedStatus)}
+            disabled={!singleSelectedStatus}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Editar"
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedStatus && handlePrint(singleSelectedStatus.id)}
+            disabled={!singleSelectedStatus}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Imprimir PDF"
+          >
+            <Printer className="w-4 h-4 text-emerald-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedStatus && handleExcel(singleSelectedStatus.id)}
+            disabled={!singleSelectedStatus}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Baixar Excel"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-green-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedStatus && handleDelete(singleSelectedStatus.id)}
+            disabled={!singleSelectedStatus}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Excluir"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
+              {selectedIds.size} selecionado(s)
+            </span>
+          )}
+        </div>
 
         {/* Lista */}
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
@@ -306,55 +400,54 @@ export default function DeliveryStatusPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-4 py-2.5 text-left w-10">
+                        <Checkbox
+                          checked={statuses.length > 0 && statuses.every(s => selectedIds.has(s.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Prog. Ref.</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Destino</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motoristas</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {statuses.map((status, idx) => (
-                      <tr key={status.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}>
-                        <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{status.status_number}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">Prog. #{status.schedule_number}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                          {status.status_date ? format(new Date(status.status_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                        </td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{status.destination_client_name}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{status.items?.length || 0}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
-                            status.status === 'CONCLUIDO' ? 'bg-green-100 text-green-800' :
-                            status.status === 'CANCELADO' ? 'bg-red-100 text-red-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
-                            {status.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <div className="flex items-center gap-0.5">
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => viewDetails(status)} title="Ver detalhes">
-                              <Eye className="w-3.5 h-3.5 text-primary" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditModal(status)} title="Editar">
-                              <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handlePrint(status.id)} title="Imprimir PDF">
-                              <Printer className="w-3.5 h-3.5 text-green-600" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleExcel(status.id)} title="Baixar Excel">
-                              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleDelete(status.id)} title="Excluir">
-                              <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {statuses.map((status, idx) => {
+                      const isSelected = selectedIds.has(status.id);
+                      return (
+                        <tr
+                          key={status.id}
+                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
+                          onClick={() => toggleSelect(status.id)}
+                        >
+                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelect(status.id)}
+                            />
+                          </td>
+                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{status.status_number}</td>
+                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">Prog. #{status.schedule_number}</td>
+                          <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
+                            {status.status_date ? format(new Date(status.status_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                          </td>
+                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{status.destination_client_name}</td>
+                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{status.items?.length || 0}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
+                              status.status === 'CONCLUIDO' ? 'bg-green-100 text-green-800' :
+                              status.status === 'CANCELADO' ? 'bg-red-100 text-red-800' :
+                              'bg-blue-100 text-blue-800'
+                            }`}>
+                              {status.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -381,9 +474,9 @@ export default function DeliveryStatusPage() {
       {/* Modal Criar/Editar */}
       <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) resetForm(); setModalOpen(open); }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ClipboardCheck className="w-5 h-5" />
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <ClipboardCheck className="w-4 h-4 text-primary" />
               {editingStatus ? 'Editar Status de Entrega' : 'Novo Status de Entrega'}
             </DialogTitle>
           </DialogHeader>
