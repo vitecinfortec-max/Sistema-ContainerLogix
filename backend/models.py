@@ -138,24 +138,53 @@ class DriverResponse(DriverCreate):
 
 class TransportCompany(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    trade_name: Optional[str] = None
     cnpj: Optional[str] = None
+    antt: Optional[str] = None  # Registro ANTT (RNTRC)
+    state_registration: Optional[str] = None
+    municipal_registration: Optional[str] = None
     phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None  # legado, mantido por compatibilidade com registros antigos
+    address_details: Optional[dict] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    pix_key: Optional[str] = None
+    payment_terms: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
 
 class TransportCompanyCreate(BaseModel):
     name: str
+    trade_name: Optional[str] = None
     cnpj: Optional[str] = None
+    antt: Optional[str] = None
+    state_registration: Optional[str] = None
+    municipal_registration: Optional[str] = None
     phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
+    address_details: Optional[dict] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    pix_key: Optional[str] = None
+    payment_terms: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
 
-class TransportCompanyResponse(BaseModel):
+class TransportCompanyResponse(TransportCompanyCreate):
     id: str
-    name: str
-    cnpj: Optional[str] = None
-    phone: Optional[str] = None
     created_at: datetime
 
 REGISTRO_STATUS_OPTIONS = ["ATIVO", "INATIVO", "BLOQUEADO"]

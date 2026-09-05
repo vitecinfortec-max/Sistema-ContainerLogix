@@ -7,7 +7,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { AddressFields } from '../components/AddressFields';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Plus, Trash2, Edit, Search, Truck, IdCard, Store, ShieldCheck, Users, Warehouse,
+  Building2, ChevronDown,
 } from 'lucide-react';
 
 const formatCPF = (value) => {
@@ -75,6 +77,39 @@ const TYPES = [
       { name: 'default_truck_plate', label: 'Placa do Cavalo (padrão)' },
       { name: 'default_trailer_plate', label: 'Placa da Carreta (padrão)' },
       { name: 'status', label: 'Status', type: 'select', options: STATUS_COM_BLOQUEADO },
+      { name: 'observations', label: 'Observações', type: 'textarea' },
+    ],
+  },
+  {
+    key: 'transportadora',
+    label: 'Transportadora',
+    plural: 'Transportadoras',
+    feminine: true,
+    icon: Building2,
+    moduleKey: 'cadastro.transportadora',
+    api: {
+      list: api.getTransportCompanies, create: api.createTransportCompany,
+      update: api.updateTransportCompany, remove: api.deleteTransportCompany,
+    },
+    listColumns: [['name', 'Razão Social'], ['cnpj', 'CNPJ'], ['antt', 'ANTT'], ['status', 'Status']],
+    fields: [
+      { name: 'name', label: 'Razão Social', required: true },
+      { name: 'trade_name', label: 'Nome Fantasia' },
+      { name: 'cnpj', label: 'CNPJ (ou CPF)', mask: 'cnpj' },
+      { name: 'antt', label: 'ANTT (RNTRC)' },
+      { name: 'state_registration', label: 'Inscrição Estadual' },
+      { name: 'municipal_registration', label: 'Inscrição Municipal' },
+      { name: 'phone', label: 'Telefone', mask: 'tel' },
+      { name: 'email', label: 'Email' },
+      { name: 'address_details', label: 'Endereço', type: 'address' },
+      { name: 'contact_name', label: 'Nome do Contato' },
+      { name: 'contact_phone', label: 'Telefone do Contato', mask: 'tel' },
+      { name: 'bank_name', label: 'Banco' },
+      { name: 'bank_agency', label: 'Agência' },
+      { name: 'bank_account', label: 'Conta' },
+      { name: 'pix_key', label: 'Chave PIX' },
+      { name: 'payment_terms', label: 'Condições de Pagamento' },
+      { name: 'status', label: 'Status', type: 'select', options: STATUS_ATIVO_INATIVO },
       { name: 'observations', label: 'Observações', type: 'textarea' },
     ],
   },
@@ -278,6 +313,17 @@ export default function CadastroUnificadoPage() {
     setOpen(true);
   };
 
+  // Chamado a partir do menu do botão "Adicionar" - troca o tipo ativo e já
+  // abre o formulário de criação para ele, sem depender de `activeType` (que
+  // só reflete o novo valor no próximo render).
+  const openCreateDialogFor = (typeKey) => {
+    const type = TYPES.find((t) => t.key === typeKey) || TYPES[0];
+    setActiveTypeKey(typeKey);
+    setFormData(buildEmptyForm(type));
+    setEditId(null);
+    setOpen(true);
+  };
+
   const openEditDialog = (item) => {
     const form = buildEmptyForm(activeType);
     for (const f of activeType.fields) {
@@ -338,7 +384,7 @@ export default function CadastroUnificadoPage() {
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Selecione o tipo de cadastro</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           {availableTypes.map((t) => {
             const Icon = t.icon;
             const active = t.key === activeTypeKey;
@@ -364,18 +410,36 @@ export default function CadastroUnificadoPage() {
           <div>
             <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200">Cadastro de {activeType.label}</h2>
           </div>
-          <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
-            <DialogTrigger asChild>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button
                 size="default"
                 className="text-[13px] font-semibold uppercase tracking-wide h-10"
                 data-testid="add-cadastro-button"
-                onClick={openCreateDialog}
               >
                 <Plus className="w-4 h-4 mr-2" />
-                {g.novo} {activeType.label}
+                Adicionar
+                <ChevronDown className="w-4 h-4 ml-2" />
               </Button>
-            </DialogTrigger>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {availableTypes.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <DropdownMenuItem
+                    key={t.key}
+                    onClick={() => openCreateDialogFor(t.key)}
+                    data-testid={`add-cadastro-option-${t.key}`}
+                  >
+                    <Icon className="w-4 h-4 mr-2" />
+                    {genderWords(t).novo} {t.label}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="cadastro-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editId ? `Editar ${activeType.label}` : `Cadastrar ${activeType.label}`}</DialogTitle>

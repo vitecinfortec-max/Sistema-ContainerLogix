@@ -4,7 +4,6 @@ import { useTheme } from '../context/ThemeContext';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from './ui/breadcrumb';
 import {
   Truck,
-  Building2,
   FileText,
   LogOut,
   X,
@@ -81,7 +80,6 @@ const PAGE_TITLES = {
   '/loading-orders': 'Ordem de Carregamento',
   '/fleet/checklist': 'Checklist',
   '/cadastro': 'Cadastro',
-  '/companies': 'Transportadoras',
   '/company-settings': 'Dados da Empresa',
   '/users': 'Gestão de Usuários',
   '/modules': 'Módulos Contratados',
@@ -274,7 +272,7 @@ export default function Layout({ children }) {
   }, []);
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
-  const isCadastroActive = ['/cadastro', '/companies'].includes(location.pathname);
+  const isCadastroActive = location.pathname === '/cadastro';
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
@@ -474,7 +472,6 @@ export default function Layout({ children }) {
 
   const cadastroItems = [
     { path: '/cadastro', label: 'Cadastro', icon: FolderOpen },
-    { path: '/companies', label: 'Transportadora', icon: Building2, moduleKey: 'cadastro.transportadora' },
     { path: '/company-settings', label: 'Dados da Empresa', icon: Settings },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 

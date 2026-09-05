@@ -14,7 +14,6 @@ import MovementsPage from './pages/MovementsPage';
 import NewMovementPage from './pages/NewMovementPage';
 import MovementDetailPage from './pages/MovementDetailPage';
 import EditMovementPage from './pages/EditMovementPage';
-import CompaniesPage from './pages/CompaniesPage';
 import ShippingLinesPage from './pages/ShippingLinesPage';
 import CadastroUnificadoPage from './pages/CadastroUnificadoPage';
 import ServiceTypesPage from './pages/ServiceTypesPage';
@@ -189,14 +188,7 @@ function App() {
           <Route path="/clients" element={<Navigate to="/cadastro?type=cliente" replace />} />
           <Route path="/suppliers" element={<Navigate to="/cadastro?type=fornecedor" replace />} />
           <Route path="/terminals" element={<Navigate to="/cadastro?type=terminal" replace />} />
-          <Route
-            path="/companies"
-            element={
-              <ProtectedRoute moduleKey="cadastro.transportadora">
-                <CompaniesPage />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/companies" element={<Navigate to="/cadastro?type=transportadora" replace />} />
           <Route
             path="/company-settings"
             element={

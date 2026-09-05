@@ -130,24 +130,13 @@ async def delete_driver(driver_id: str, current_user: dict = Depends(get_current
 
 @api_router.post("/transport-companies", response_model=TransportCompanyResponse)
 async def create_transport_company(company_input: TransportCompanyCreate, current_user: dict = Depends(get_current_active_user)):
-    company = TransportCompany(
-        name=company_input.name,
-        cnpj=company_input.cnpj,
-        phone=company_input.phone,
-        created_by=current_user['sub']
-    )
-    
+    company = TransportCompany(**company_input.model_dump(), created_by=current_user['sub'])
+
     doc = company.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.transport_companies.insert_one(doc)
-    
-    return TransportCompanyResponse(
-        id=company.id,
-        name=company.name,
-        cnpj=company.cnpj,
-        phone=company.phone,
-        created_at=company.created_at
-    )
+
+    return TransportCompanyResponse(**company.model_dump())
 
 @api_router.get("/transport-companies", response_model=List[TransportCompanyResponse])
 async def get_transport_companies(
@@ -161,13 +150,7 @@ async def get_transport_companies(
         skip = (page - 1) * per_page
         companies = await db.transport_companies.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
     return [
-        TransportCompanyResponse(
-            id=c['id'],
-            name=c['name'],
-            cnpj=c.get('cnpj'),
-            phone=c.get('phone'),
-            created_at=datetime.fromisoformat(c['created_at'])
-        )
+        TransportCompanyResponse(**{**c, "created_at": datetime.fromisoformat(c['created_at'])})
         for c in companies
     ]
 
@@ -246,25 +229,17 @@ async def update_transport_company(company_id: str, company_input: TransportComp
     existing = await db.transport_companies.find_one({"id": company_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Transportadora não encontrada")
-    
+
     update_data = {
+        **company_input.model_dump(),
         "id": company_id,
-        "name": company_input.name,
-        "cnpj": company_input.cnpj,
-        "phone": company_input.phone,
         "created_at": existing['created_at'],
         "created_by": existing['created_by']
     }
-    
+
     await db.transport_companies.replace_one({"id": company_id}, update_data)
-    
-    return TransportCompanyResponse(
-        id=company_id,
-        name=update_data['name'],
-        cnpj=update_data['cnpj'],
-        phone=update_data['phone'],
-        created_at=datetime.fromisoformat(update_data['created_at'])
-    )
+
+    return TransportCompanyResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
 
 @api_router.delete("/transport-companies/{company_id}")
 async def delete_transport_company(company_id: str, current_user: dict = Depends(get_current_active_user)):
