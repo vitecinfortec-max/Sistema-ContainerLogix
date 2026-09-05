@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -45,6 +46,9 @@ export default function DailyRateRequestPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
 
+  // Estado de Seleção (toolbar)
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
   function createEmptyItem() {
     return {
       driver_id: '',
@@ -63,6 +67,7 @@ export default function DailyRateRequestPage() {
   useEffect(() => {
     loadRequests();
     loadSelectData();
+    setSelectedIds(new Set());
   }, [pagination.page]);
 
   const loadSelectData = async () => {
@@ -196,11 +201,41 @@ export default function DailyRateRequestPage() {
     try {
       await api.deleteDailyRateRequest(id);
       toast.success('Solicitação excluída');
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       loadRequests();
     } catch (error) {
       toast.error('Erro ao excluir solicitação');
     }
   };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    setSelectedIds(prev => {
+      const pageIds = requests.map(r => r.id);
+      const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        pageIds.forEach(id => next.delete(id));
+        return next;
+      }
+      return new Set([...prev, ...pageIds]);
+    });
+  };
+
+  const singleSelectedRequest = selectedIds.size === 1
+    ? requests.find(r => r.id === [...selectedIds][0])
+    : null;
 
   const handlePrintPDF = async (id) => {
     try {
@@ -245,36 +280,99 @@ export default function DailyRateRequestPage() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Solicitação de Diária</h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie as solicitações de diária, comissão e almoço dos motoristas</p>
-          </div>
+      <div className="space-y-5">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Solicitação de Diária</h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie as solicitações de diária, comissão e almoço dos motoristas</p>
         </div>
 
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 flex-1 max-w-md">
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              data-testid="search-daily-rate-input"
-            />
-            <Button variant="outline" onClick={handleSearch}>
-              <Search className="w-4 h-4" />
-            </Button>
-          </div>
-          <Button onClick={openNewModal} data-testid="new-daily-rate-btn">
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Solicitação
+        {/* Filtrar */}
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5" />
+              Filtrar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 max-w-md">
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                className="h-9"
+                data-testid="search-daily-rate-input"
+              />
+              <Button variant="outline" size="sm" onClick={handleSearch} className="h-9">
+                <Search className="w-4 h-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Toolbar */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={openNewModal}
+            className="h-9 w-9 p-0"
+            title="Nova Solicitação"
+            data-testid="new-daily-rate-btn"
+          >
+            <Plus className="w-4 h-4 text-primary" />
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedRequest && openDetails(singleSelectedRequest)}
+            disabled={!singleSelectedRequest}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Ver Detalhes"
+          >
+            <Eye className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedRequest && openEditModal(singleSelectedRequest)}
+            disabled={!singleSelectedRequest}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Editar"
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedRequest && handlePrintPDF(singleSelectedRequest.id)}
+            disabled={!singleSelectedRequest}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Baixar PDF"
+          >
+            <Printer className="w-4 h-4 text-emerald-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedRequest && handleDelete(singleSelectedRequest.id)}
+            disabled={!singleSelectedRequest}
+            className="h-9 w-9 p-0 disabled:opacity-30"
+            title="Excluir"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
+              {selectedIds.size} selecionado(s)
+            </span>
+          )}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="w-5 h-5" />
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <Wallet className="w-4 h-4" />
               Solicitações ({pagination.total})
             </CardTitle>
           </CardHeader>
@@ -292,39 +390,38 @@ export default function DailyRateRequestPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b bg-muted/50">
+                      <th className="text-left py-3 px-4 w-10">
+                        <Checkbox
+                          checked={requests.length > 0 && requests.every(r => selectedIds.has(r.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
                       <th className="text-left py-3 px-4 font-medium">Nº</th>
                       <th className="text-left py-3 px-4 font-medium">Itens</th>
                       <th className="text-left py-3 px-4 font-medium">Total</th>
                       <th className="text-left py-3 px-4 font-medium">Status</th>
                       <th className="text-left py-3 px-4 font-medium">Criado em</th>
-                      <th className="text-left py-3 px-4 font-medium">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {requests.map(request => (
-                      <tr key={request.id} className="border-b hover:bg-muted/50">
+                      <tr
+                        key={request.id}
+                        className={`border-b cursor-pointer transition-colors ${selectedIds.has(request.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-muted/50'}`}
+                        onClick={() => toggleSelect(request.id)}
+                      >
+                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(request.id)}
+                            onCheckedChange={() => toggleSelect(request.id)}
+                          />
+                        </td>
                         <td className="py-3 px-4 font-mono font-bold">#{request.request_number}</td>
                         <td className="py-3 px-4">{request.items?.length || 0}</td>
                         <td className="py-3 px-4">{formatMoney(request.total_value)}</td>
                         <td className="py-3 px-4">{getStatusBadge(request.status)}</td>
                         <td className="py-3 px-4">
                           {request.created_at && format(new Date(request.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openDetails(request)} title="Ver detalhes">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openEditModal(request)} title="Editar">
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handlePrintPDF(request.id)} title="Gerar PDF">
-                              <Printer className="w-4 h-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(request.id)} title="Excluir" className="text-red-600 hover:text-red-700">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
                         </td>
                       </tr>
                     ))}
@@ -351,9 +448,9 @@ export default function DailyRateRequestPage() {
       {/* Modal Nova/Editar Solicitação */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wallet className="w-5 h-5" />
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Wallet className="w-4 h-4 text-primary" />
               {editingRequest ? 'Editar Solicitação' : 'Nova Solicitação de Diária'}
             </DialogTitle>
           </DialogHeader>
@@ -379,7 +476,7 @@ export default function DailyRateRequestPage() {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
-                        <Label className="text-xs">Motorista *</Label>
+                        <Label className="text-xs mb-1 block">Motorista *</Label>
                         <Autocomplete
                           value={item.driver_name}
                           onChange={(val) => handleItemChange(index, 'driver_name', val)}
@@ -393,7 +490,7 @@ export default function DailyRateRequestPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs">Placa *</Label>
+                        <Label className="text-xs mb-1 block">Placa *</Label>
                         <Autocomplete
                           value={item.vehicle_plate}
                           onChange={(val) => handleItemChange(index, 'vehicle_plate', val.toUpperCase())}
@@ -404,7 +501,7 @@ export default function DailyRateRequestPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs">Cliente *</Label>
+                        <Label className="text-xs mb-1 block">Cliente *</Label>
                         <Autocomplete
                           value={item.client_name}
                           onChange={(val) => handleItemChange(index, 'client_name', val)}
@@ -415,27 +512,27 @@ export default function DailyRateRequestPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs">Data de Saída *</Label>
+                        <Label className="text-xs mb-1 block">Data de Saída *</Label>
                         <Input className="h-9" type="date" value={item.departure_date} onChange={(e) => handleItemChange(index, 'departure_date', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Outros (R$)</Label>
+                        <Label className="text-xs mb-1 block">Outros (R$)</Label>
                         <Input className="h-9" type="number" step="0.01" value={item.others_value} onChange={(e) => handleItemChange(index, 'others_value', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Comissão (R$)</Label>
+                        <Label className="text-xs mb-1 block">Comissão (R$)</Label>
                         <Input className="h-9" type="number" step="0.01" value={item.commission_value} onChange={(e) => handleItemChange(index, 'commission_value', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Almoço (R$)</Label>
+                        <Label className="text-xs mb-1 block">Almoço (R$)</Label>
                         <Input className="h-9" type="number" step="0.01" value={item.lunch_value} onChange={(e) => handleItemChange(index, 'lunch_value', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Qtd. Diária</Label>
+                        <Label className="text-xs mb-1 block">Qtd. Diária</Label>
                         <Input className="h-9" type="number" step="1" value={item.daily_rate_quantity} onChange={(e) => handleItemChange(index, 'daily_rate_quantity', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs">Valor da Diária (R$)</Label>
+                        <Label className="text-xs mb-1 block">Valor da Diária (R$)</Label>
                         <Input className="h-9" type="number" step="0.01" value={item.daily_rate_value} onChange={(e) => handleItemChange(index, 'daily_rate_value', e.target.value)} />
                       </div>
                     </div>
