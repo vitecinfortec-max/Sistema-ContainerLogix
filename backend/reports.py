@@ -1421,7 +1421,7 @@ def generate_invoice_pdf(invoice: dict, movements: list, company: dict = None) -
     )
     
     client_data = [[Paragraph(client_info_text, client_style)]]
-    client_table = Table(client_data, colWidths=[760])
+    client_table = Table(client_data, colWidths=[doc.width])
     client_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -1431,77 +1431,98 @@ def generate_invoice_pdf(invoice: dict, movements: list, company: dict = None) -
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
     ]))
     elements.append(client_table)
-    elements.append(Spacer(1, 10))
-    
+
+    # ========== GENERATION INFO ==========
+    # Mesmo padrão do Relatório de Movimentações (_build_pdf_header + linha
+    # "Gerado em") pra manter os dois PDFs com layout consistente.
+    gen_info_style = ParagraphStyle(
+        'InvoiceGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER,
+        spaceBefore=8, spaceAfter=10
+    )
+    gen_date = now_brt().strftime('%d/%m/%Y %H:%M')
+    elements.append(Paragraph(f"Gerado em: {gen_date}", gen_info_style))
+
     # ========== MOVEMENTS TABLE ==========
+    # Células de texto usam Paragraph (não string pura) pra quebrar linha
+    # dentro da própria célula em vez de vazar visualmente pra célula vizinha
+    # quando o conteúdo é mais largo que a coluna (Cliente, Transportadora) -
+    # mesma técnica usada no Relatório de Movimentações.
+    cell_style_l = ParagraphStyle('InvoiceCellL', parent=styles['Normal'], fontSize=7, leading=8.5, alignment=TA_LEFT)
+    cell_style_c = ParagraphStyle('InvoiceCellC', parent=cell_style_l, alignment=TA_CENTER)
+    cell_style_r = ParagraphStyle('InvoiceCellR', parent=cell_style_l, alignment=TA_RIGHT)
+
+    def cell(text, align='left'):
+        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
+        return Paragraph(str(text) if text not in (None, '') else '-', style)
+
     table_data = [[
-        'ID', 'Data/Hora', 'Tipo', 'Nº Container', 'Cliente', 'Placa', 
-        'Transportadora', 'Armador', 'Status', 'Tamanho', 
+        'ID', 'Data/Hora', 'Tipo', 'Nº Container', 'Cliente', 'Placa',
+        'Transportadora', 'Armador', 'Status', 'Tamanho',
         'Tipo de Serviço', 'Nota Fiscal', 'Valor da Operação'
     ]]
-    
+
     for m in movements:
         _m_dt = to_brt(m.get('created_at'))
         mov_date = _m_dt.strftime('%d/%m/%Y %H:%M') if _m_dt else '-'
-        
+
         service_value = m.get('service_value')
         value_str = f"R$ {service_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if service_value else '-'
-        
+
         table_data.append([
-            str(m.get('transaction_id', '-')),
-            mov_date,
-            "ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA",
-            m.get('container_number', '-'),
-            m.get('client_name', '-') or '-',
-            m.get('truck_plate', '-') or '-',
-            m.get('transport_company', '-') or '-',
-            m.get('shipping_line', '-') or '-',
-            m.get('status', '-') or '-',
-            m.get('size_type', '-') or '-',
-            m.get('service_type', '-') or '-',
-            m.get('invoice_number', '-') or '-',
-            value_str
+            cell(m.get('transaction_id', '-'), align='center'),
+            cell(mov_date),
+            cell("ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA", align='center'),
+            cell(m.get('container_number', '-')),
+            cell(m.get('client_name', '-') or '-'),
+            cell(m.get('truck_plate', '-') or '-'),
+            cell(m.get('transport_company', '-') or '-'),
+            cell(m.get('shipping_line', '-') or '-'),
+            cell(m.get('status', '-') or '-', align='center'),
+            cell(m.get('size_type', '-') or '-', align='center'),
+            cell(m.get('service_type', '-') or '-'),
+            cell(m.get('invoice_number', '-') or '-'),
+            cell(value_str, align='right')
         ])
-    
-    # Total row
+
+    # Total row (não usa Paragraph - fica em negrito/tamanho maior, fora do
+    # padrão de célula normal)
     table_data.append(['', '', '', '', '', '', '', '', '', '', '', 'TOTAL:', total_str])
-    
-    col_widths = [28, 55, 42, 62, 75, 42, 70, 52, 40, 42, 65, 50, 62]
-    
+
+    # Larguras redistribuídas pra usar a área útil real da página (doc.width),
+    # mesma estratégia do Relatório de Movimentações.
+    col_widths = [28, 60, 40, 62, 100, 50, 90, 60, 40, 38, 80, 52, 65]
+
     table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
+    border_gray = colors.HexColor('#CCCCCC')
+    zebra_gray = colors.HexColor('#F8F8F8')
+
     table.setStyle(TableStyle([
-        # Header
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+        # Header styling - mesmo teal + texto branco usado nos demais relatórios
+        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 7),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
         ('TOPPADDING', (0, 0), (-1, 0), 5),
-        
-        # Body
-        ('BACKGROUND', (0, 1), (-1, -2), colors.white),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 7),
-        ('TOPPADDING', (0, 1), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 2),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-        
-        # Alignments
-        ('ALIGN', (0, 1), (0, -1), 'CENTER'),   # ID
-        ('ALIGN', (2, 1), (2, -1), 'CENTER'),   # Tipo
-        ('ALIGN', (8, 1), (8, -1), 'CENTER'),   # Status
-        ('ALIGN', (9, 1), (9, -1), 'CENTER'),   # Tamanho
-        ('ALIGN', (12, 1), (12, -1), 'RIGHT'),  # Valor
-        
-        # Borders
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
+
+        # Body styling - alinhamento e fonte já vêm do Paragraph de cada célula
+        ('TOPPADDING', (0, 1), (-1, -2), 3),
+        ('BOTTOMPADDING', (0, 1), (-1, -2), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+
+        # Bordas finas cinza, mesmo peso usado nos demais relatórios
+        ('GRID', (0, 0), (-1, -2), 0.5, border_gray),
         ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-        
+        # Zebra striping
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, zebra_gray]),
+
         # Total row
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
         ('FONTNAME', (11, -1), (12, -1), 'Helvetica-Bold'),
@@ -1512,7 +1533,7 @@ def generate_invoice_pdf(invoice: dict, movements: list, company: dict = None) -
         ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
         ('BOX', (11, -1), (12, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
     ]))
-    
+
     elements.append(table)
     
     # ========== NOTES SECTION ==========
