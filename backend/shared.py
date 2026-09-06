@@ -258,6 +258,7 @@ MODULE_CATALOG = [
         {"key": "terminal.vistoria", "label": "Vistoria de Container"},
         {"key": "terminal.movimentacoes", "label": "Movimentações"},
         {"key": "terminal.flex_tank", "label": "Flex Tank"},
+        {"key": "terminal.auditoria", "label": "Auditoria"},
     ]},
     {"key": "frota", "label": "Manutenção", "items": [
         {"key": "frota.veiculos", "label": "Cadastro de Veículos"},
@@ -314,6 +315,7 @@ PATH_MODULE_MAP = [
     ("/api/unit-segregations", "terminal.movimentacoes"),
     ("/api/check-segregation", "terminal.movimentacoes"),
     ("/api/flex-tank", "terminal.flex_tank"),
+    ("/api/container-audits", "terminal.auditoria"),
     ("/api/vehicle-revisions", "frota.revisao"),
     ("/api/vehicle-checklists", "frota.checklist"),
     ("/api/vehicles", "frota.veiculos"),

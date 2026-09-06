@@ -214,7 +214,23 @@ export const api = {
     });
   },
   deleteContainerInspectionPhoto: (id, photoId) => axios.delete(`${API}/container-inspections/${id}/photo/${photoId}`),
-  
+
+  // Auditoria de Estoque (Terminal)
+  getContainerAudits: (params) => axios.get(`${API}/container-audits`, { params }),
+  getContainerAudit: (id) => axios.get(`${API}/container-audits/${id}`),
+  createContainerAudit: (data) => axios.post(`${API}/container-audits`, data),
+  updateContainerAuditItem: (id, data) => axios.put(`${API}/container-audits/${id}/items`, data),
+  uploadContainerAuditPhoto: (id, containerNumber, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/container-audits/${id}/items/${encodeURIComponent(containerNumber)}/photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  completeContainerAudit: (id) => axios.post(`${API}/container-audits/${id}/complete`),
+  deleteContainerAudit: (id) => axios.delete(`${API}/container-audits/${id}`),
+  downloadContainerAuditPdf: (id) => axios.get(`${API}/container-audits/${id}/pdf`, { responseType: 'blob' }),
+
   // Flex Tank (Controle de Estoque de Bolsas)
   getFlexTankMovements: (params) => axios.get(`${API}/flex-tank/movements`, { params }),
   getFlexTankMovement: (id) => axios.get(`${API}/flex-tank/movements/${id}`),

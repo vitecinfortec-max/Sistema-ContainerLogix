@@ -47,7 +47,8 @@ import {
   Layers,
   FileSpreadsheet,
   Home,
-  MoreHorizontal
+  MoreHorizontal,
+  ListChecks
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -93,6 +94,8 @@ const PAGE_TITLES = {
   '/photo-registries/new': 'Novo Registro Fotográfico',
   '/container-inspections': 'Vistoria de Container',
   '/container-inspections/new': 'Nova Vistoria de Container',
+  '/container-audits': 'Auditoria',
+  '/container-audits/new': 'Nova Auditoria',
   '/flex-tank': 'Flex Tank',
   '/flex-tank/movements/new': 'Nova Movimentação Flex Tank',
   '/loading-schedules': 'Programação de Carregamento',
@@ -271,7 +274,7 @@ export default function Layout({ children }) {
     if (savedOpcoesSistema !== null) setOpcoesSistemaOpen(JSON.parse(savedOpcoesSistema));
   }, []);
 
-  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
+  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/');
   const isCadastroActive = location.pathname === '/cadastro';
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
@@ -429,6 +432,7 @@ export default function Layout({ children }) {
     { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package, moduleKey: 'terminal.movimentacoes' },
     { path: '/yard-control', label: 'Controle de Pátio', icon: Clock, moduleKey: 'terminal.movimentacoes' },
     { path: '/reports/movements', label: 'Relatório de Movimentação', icon: BarChart3, moduleKey: 'terminal.movimentacoes' },
+    { path: '/container-audits', label: 'Auditoria', icon: ListChecks, moduleKey: 'terminal.auditoria' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   // Cadastros voltados especificamente pro Terminal (usados em Vistoria/
@@ -532,6 +536,7 @@ export default function Layout({ children }) {
     if (location.pathname.includes('/photo-registries/') && location.pathname !== '/photo-registries/new') return 'Detalhes do Registro Fotográfico';
     if (location.pathname.includes('/container-inspections/') && location.pathname.includes('/edit')) return 'Editar Vistoria de Container';
     if (location.pathname.includes('/container-inspections/') && location.pathname !== '/container-inspections/new') return 'Detalhes da Vistoria de Container';
+    if (location.pathname.includes('/container-audits/') && location.pathname !== '/container-audits/new') return 'Detalhe da Auditoria';
     return 'ContainerLogix';
   }, [location.pathname, location.search]);
 

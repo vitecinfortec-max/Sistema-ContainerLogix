@@ -34,6 +34,9 @@ import ContainerInspectionsPage from './pages/ContainerInspectionsPage';
 import NewContainerInspectionPage from './pages/NewContainerInspectionPage';
 import ContainerInspectionDetailPage from './pages/ContainerInspectionDetailPage';
 import EditContainerInspectionPage from './pages/EditContainerInspectionPage';
+import ContainerAuditsPage from './pages/ContainerAuditsPage';
+import NewContainerAuditPage from './pages/NewContainerAuditPage';
+import ContainerAuditDetailPage from './pages/ContainerAuditDetailPage';
 import FlexTankPage from './pages/FlexTankPage';
 import NewFlexTankMovementPage from './pages/NewFlexTankMovementPage';
 import FlexTankMovementDetailPage from './pages/FlexTankMovementDetailPage';
@@ -366,6 +369,30 @@ function App() {
             element={
               <ProtectedRoute moduleKey="terminal.vistoria">
                 <EditContainerInspectionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-audits"
+            element={
+              <ProtectedRoute moduleKey="terminal.auditoria">
+                <ContainerAuditsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-audits/new"
+            element={
+              <ProtectedRoute moduleKey="terminal.auditoria">
+                <NewContainerAuditPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-audits/:id"
+            element={
+              <ProtectedRoute moduleKey="terminal.auditoria">
+                <ContainerAuditDetailPage />
               </ProtectedRoute>
             }
           />

@@ -2395,6 +2395,236 @@ def generate_expense_report_pdf(report: dict, company: dict = None) -> bytes:
     return buffer.getvalue()
 
 
+def generate_container_audit_pdf(audit: dict, company: dict = None) -> bytes:
+    """Gera o PDF da Auditoria de Estoque: confronto entre o que o sistema
+    esperava em estoque para o cliente e o que foi encontrado fisicamente,
+    com código de barras do audit_code e fotos anexadas por container."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=15*mm,
+        bottomMargin=20*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    # ========== HEADER SECTION ==========
+    logo_buffer = download_logo(company)
+    report_title = f"AUDITORIA DE ESTOQUE Nº {audit.get('audit_code', '-')}"
+    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
+    elements.extend(header_elements)
+
+    # ========== INFO BAR ==========
+    status_label = 'Concluída' if audit.get('status') == 'CONCLUIDA' else 'Em Andamento'
+    completed_str = fmt_datetime(audit.get('completed_at')) if audit.get('completed_at') else '-'
+    info_text = (
+        f"Cliente: {audit.get('client_name', '-')}"
+        f"  |  Responsável: {audit.get('created_by_name', '-')}"
+        f"  |  Status: {status_label}"
+        f"  |  Concluída em: {completed_str}"
+    )
+    info_style = ParagraphStyle(
+        'AuditInfoBar', parent=styles['Normal'], fontSize=10,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
+    )
+    info_data = [[Paragraph(info_text, info_style)]]
+    info_table = Table(info_data, colWidths=[doc.width])
+    info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 12))
+
+    gen_info_style = ParagraphStyle(
+        'AuditGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=10
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    # ========== RESUMO ==========
+    items = audit.get('items', []) or []
+    total_confirmado = sum(1 for i in items if i.get('status') == 'CONFIRMADO')
+    total_faltante = sum(1 for i in items if i.get('status') == 'FALTANTE')
+    total_nao_esperado = sum(1 for i in items if i.get('status') == 'NAO_ESPERADO')
+    total_esperado = sum(1 for i in items if i.get('expected'))
+
+    summary_style = ParagraphStyle(
+        'AuditSummary', parent=styles['Normal'], fontSize=10,
+        textColor=colors.black, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceAfter=12
+    )
+    summary_text = (
+        f"Esperados: {total_esperado}  |  Confirmados: {total_confirmado}  |  "
+        f"Faltantes: {total_faltante}  |  Não Esperados: {total_nao_esperado}"
+    )
+    elements.append(Paragraph(summary_text, summary_style))
+
+    # ========== TABELA DE ITENS ==========
+    cell_style_l = ParagraphStyle('AuditCellL', parent=styles['Normal'], fontSize=8, leading=9.5, alignment=TA_LEFT)
+    cell_style_c = ParagraphStyle('AuditCellC', parent=cell_style_l, alignment=TA_CENTER)
+
+    def cell(text, align='left'):
+        style = cell_style_c if align == 'center' else cell_style_l
+        return Paragraph(str(text) if text not in (None, '') else '-', style)
+
+    STATUS_LABELS = {
+        'CONFIRMADO': 'Confirmado',
+        'FALTANTE': 'Faltante',
+        'NAO_ESPERADO': 'Não Esperado',
+        'PENDENTE': 'Pendente',
+    }
+    STATUS_COLORS = {
+        'CONFIRMADO': colors.HexColor('#D4EDDA'),
+        'FALTANTE': colors.HexColor('#F8D7DA'),
+        'NAO_ESPERADO': colors.HexColor('#FFF3CD'),
+        'PENDENTE': colors.white,
+    }
+
+    data = [['Container', 'Situação', 'Nº Transação', 'Tamanho/Tipo', 'Observações']]
+    for item in items:
+        data.append([
+            cell(item.get('container_number'), align='center'),
+            cell(STATUS_LABELS.get(item.get('status'), item.get('status')), align='center'),
+            cell(item.get('transaction_id'), align='center'),
+            cell(item.get('size_type'), align='center'),
+            cell(item.get('observations')),
+        ])
+
+    col_widths = [doc.width*0.18, doc.width*0.16, doc.width*0.14, doc.width*0.14, doc.width*0.38]
+    table = Table(data, colWidths=col_widths, repeatRows=1)
+
+    table_style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+    ]
+    for idx, item in enumerate(items, start=1):
+        bg = STATUS_COLORS.get(item.get('status'), colors.white)
+        table_style.append(('BACKGROUND', (0, idx), (-1, idx), bg))
+    table.setStyle(TableStyle(table_style))
+
+    elements.append(table)
+
+    # ========== CÓDIGO DE BARRAS ==========
+    elements.append(Spacer(1, 20))
+
+    import barcode
+    from barcode.writer import ImageWriter
+
+    barcode_buffer = io.BytesIO()
+    try:
+        barcode_str = str(audit.get('audit_code', '0'))
+        code128 = barcode.get_barcode_class('code128')
+        barcode_obj = code128(barcode_str, writer=ImageWriter())
+        barcode_obj.write(barcode_buffer, options={
+            'module_width': 0.3,
+            'module_height': 12,
+            'font_size': 10,
+            'text_distance': 5,
+            'quiet_zone': 2
+        })
+        barcode_buffer.seek(0)
+        barcode_image = Image(barcode_buffer, width=160, height=55)
+    except Exception as e:
+        logger.error(f"Error generating barcode: {e}")
+        barcode_image = Paragraph(f"[{audit.get('audit_code', '-')}]", styles['Normal'])
+
+    created_by = audit.get('created_by_name', 'Sistema')
+    print_date = now_brt().strftime('%d/%m/%Y %H:%M')
+
+    user_info_style = ParagraphStyle(
+        'AuditUserInfo', parent=styles['Normal'], fontSize=10,
+        textColor=colors.black, fontName='Helvetica-Bold', leading=14
+    )
+    user_info = [
+        Paragraph(f"Usuário: {created_by}", user_info_style),
+        Spacer(1, 6),
+        Paragraph(f"Data da impressão: {print_date}", user_info_style),
+    ]
+
+    barcode_section_data = [[barcode_image, user_info]]
+    barcode_section_table = Table(barcode_section_data, colWidths=[doc.width*0.35, doc.width*0.65])
+    barcode_section_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (1, 0), (1, 0), 20),
+    ]))
+    elements.append(barcode_section_table)
+
+    # ========== FOTOS ANEXADAS ==========
+    items_with_photo = [i for i in items if i.get('photo')]
+    if items_with_photo:
+        elements.append(Spacer(1, 20))
+        photos_title_style = ParagraphStyle(
+            'AuditPhotosTitle', parent=styles['Normal'], fontSize=11,
+            textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceAfter=8
+        )
+        elements.append(Paragraph("FOTOS ANEXADAS", photos_title_style))
+
+        caption_style = ParagraphStyle('AuditPhotoCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER)
+        unavailable_style = ParagraphStyle('AuditPhotoUnavailable', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
+
+        images_per_row = 3
+        cells = []
+        for item in items_with_photo:
+            img_flowable = None
+            try:
+                url = item['photo'].get('url', '') or ''
+                marker = '/container_audits/'
+                if marker in url:
+                    relative = url.split(marker, 1)[1]
+                    file_path = UPLOADS_DIR / 'container_audits' / relative
+                    if file_path.exists():
+                        img_flowable = Image(str(file_path), width=150, height=110, kind='proportional')
+            except Exception as e:
+                logger.error(f"Error loading audit photo: {e}")
+            if img_flowable is None:
+                img_flowable = Paragraph("[Foto indisponível]", unavailable_style)
+            cells.append([img_flowable, Paragraph(item.get('container_number', '-'), caption_style)])
+
+        rows = []
+        current_row = []
+        for cell_content in cells:
+            current_row.append(cell_content)
+            if len(current_row) == images_per_row:
+                rows.append(current_row)
+                current_row = []
+        if current_row:
+            while len(current_row) < images_per_row:
+                current_row.append('')
+            rows.append(current_row)
+
+        photos_table = Table(rows, colWidths=[doc.width/images_per_row]*images_per_row)
+        photos_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ]))
+        elements.append(photos_table)
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
 VEHICLE_CHECKLIST_TEMPLATE_SECTIONS = list(VEHICLE_CHECKLIST_TEMPLATE.keys())
 
 

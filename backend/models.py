@@ -797,6 +797,62 @@ class ContainerInspectionResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
+# ===== AUDITORIA DE ESTOQUE (TERMINAL) =====
+class AuditedContainerPhoto(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    url: str
+
+class AuditedContainerItem(BaseModel):
+    container_number: str
+    expected: bool  # True = veio do snapshot de estoque calculado na criação da auditoria
+    status: str = "PENDENTE"  # PENDENTE | CONFIRMADO | FALTANTE | NAO_ESPERADO
+    # Metadados herdados do snapshot de estoque (quando expected=True), usados no PDF
+    transaction_id: Optional[int] = None
+    size_type: Optional[str] = None
+    shipping_line: Optional[str] = None
+    booking: Optional[str] = None
+    entry_date: Optional[datetime] = None
+    observations: Optional[str] = None
+    photo: Optional[AuditedContainerPhoto] = None
+
+class ContainerAudit(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    audit_seq: int  # valor numérico puro do contador do mês
+    audit_code: str  # formatado "202609-0001", valor impresso no código de barras
+    client_id: str
+    client_name: str
+    status: str = "EM_ANDAMENTO"  # EM_ANDAMENTO | CONCLUIDA
+    items: List[AuditedContainerItem] = Field(default_factory=list)
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class ContainerAuditCreate(BaseModel):
+    client_id: str
+
+class ContainerAuditItemUpdate(BaseModel):
+    container_number: str
+    status: str  # CONFIRMADO | FALTANTE | NAO_ESPERADO
+    observations: Optional[str] = None
+
+class ContainerAuditResponse(BaseModel):
+    id: str
+    audit_seq: int
+    audit_code: str
+    client_id: str
+    client_name: str
+    status: str
+    items: List[AuditedContainerItem] = Field(default_factory=list)
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
 
 # ===== FLEX TANK (CONTROLE DE ESTOQUE DE BOLSAS) =====
 class FlexTankMovement(BaseModel):
