@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { FileSpreadsheet } from 'lucide-react';
+import { FileText, FileSpreadsheet } from 'lucide-react';
 
 export default function StockReportPage() {
   const [downloading, setDownloading] = useState(false);
@@ -27,6 +27,25 @@ export default function StockReportPage() {
     }
   };
 
+  const downloadPDF = async () => {
+    setDownloading(true);
+    try {
+      const r = await api.getStockReportPDF();
+      const url = window.URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'relatorio_estoque.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Relatório gerado!');
+    } catch (e) {
+      toast.error('Erro ao gerar relatório');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="stock-report-page">
@@ -37,6 +56,17 @@ export default function StockReportPage() {
 
         {/* Barra de ações */}
         <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={downloadPDF}
+            disabled={downloading}
+            title="Baixar PDF"
+            data-testid="download-stock-report-pdf-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <FileText className="w-4 h-4 text-red-600" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"

@@ -827,6 +827,105 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
     ws.print_options.horizontalCentered = True
 
 
+def generate_stock_report_pdf(products: list, company: dict = None) -> bytes:
+    """Gera PDF do Relatório de Estoque, mesmo padrão visual do Relatório de
+    Movimentações (_build_pdf_header + linha de estatísticas + linha "Gerado
+    em" + tabela com células em Paragraph pra evitar sobreposição de texto)."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=10*mm,
+        leftMargin=10*mm,
+        topMargin=15*mm,
+        bottomMargin=15*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = download_logo(company)
+    elements.extend(_build_pdf_header(styles, logo_buffer, "Relatório de Estoque", company=company, content_width=doc.width))
+
+    # ========== STATISTICS LINE ==========
+    total_value = sum((p.get('stock_quantity') or 0) * (p.get('reference_value') or 0) for p in products)
+    total_str = f"R$ {total_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    stats_text = f"Total de Produtos: {len(products)}  |  Valor Total em Estoque: {total_str}"
+
+    stats_style = ParagraphStyle(
+        'StockStatsLine', parent=styles['Normal'], fontSize=11,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER,
+        fontName='Helvetica-Bold', spaceBefore=6, spaceAfter=8
+    )
+    elements.append(Paragraph(stats_text, stats_style))
+
+    # ========== GENERATION INFO ==========
+    gen_info_style = ParagraphStyle(
+        'StockGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    # ========== TABLE SECTION ==========
+    cell_style_l = ParagraphStyle('StockCellL', parent=styles['Normal'], fontSize=8, leading=9.5, alignment=TA_LEFT)
+    cell_style_c = ParagraphStyle('StockCellC', parent=cell_style_l, alignment=TA_CENTER)
+    cell_style_r = ParagraphStyle('StockCellR', parent=cell_style_l, alignment=TA_RIGHT)
+
+    def cell(text, align='left'):
+        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
+        return Paragraph(str(text) if text not in (None, '') else '-', style)
+
+    data = [['Cód. Produto', 'Almoxarifado', 'Produto', 'Quantidade', 'Valor do Produto']]
+    for p in products:
+        value_str = f"R$ {(p.get('reference_value') or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        data.append([
+            cell(p.get('code', '-'), align='center'),
+            cell(p.get('warehouse_name') or '-'),
+            cell(p.get('description', '-')),
+            cell(p.get('stock_quantity') or 0, align='center'),
+            cell(value_str, align='right'),
+        ])
+
+    col_widths = [70, 150, 350, 80, 100]
+    table = Table(data, colWidths=col_widths, repeatRows=1)
+
+    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
+    border_gray = colors.HexColor('#CCCCCC')
+    zebra_gray = colors.HexColor('#F8F8F8')
+
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+        ('TOPPADDING', (0, 0), (-1, 0), 5),
+
+        ('TOPPADDING', (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+
+        ('GRID', (0, 0), (-1, -1), 0.5, border_gray),
+        ('BOX', (0, 0), (-1, -1), 1, header_bg),
+
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, zebra_gray]),
+    ]))
+
+    elements.append(table)
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    return pdf_bytes
+
+
 def generate_stock_report_excel(products: list, company: dict = None) -> bytes:
     """Gera Excel do Relatório de Estoque (1 produto por linha)."""
     try:

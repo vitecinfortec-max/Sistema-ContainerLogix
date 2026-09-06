@@ -13,7 +13,7 @@ from models import (
     Product, ProductCreate, ProductResponse,
 )
 from shared import db, get_current_active_user, get_company_settings
-from reports import generate_stock_report_excel
+from reports import generate_stock_report_excel, generate_stock_report_pdf
 
 api_router = APIRouter(prefix="/api")
 
@@ -228,4 +228,15 @@ async def download_stock_report_excel(current_user: dict = Depends(get_current_a
         io.BytesIO(excel_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=relatorio_estoque.xlsx"}
+    )
+
+@api_router.get("/stock/report/pdf")
+async def download_stock_report_pdf(current_user: dict = Depends(get_current_active_user)):
+    products = await db.products.find({}, {"_id": 0}).sort("code", 1).to_list(None)
+    company = await get_company_settings()
+    pdf_bytes = generate_stock_report_pdf(products, company=company)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=relatorio_estoque.pdf"}
     )

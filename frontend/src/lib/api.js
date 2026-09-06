@@ -70,6 +70,7 @@ export const api = {
   deleteProduct: (id) => axios.delete(`${API}/products/${id}`),
 
   getStockReportExcel: () => axios.get(`${API}/stock/report/excel`, { responseType: 'blob' }),
+  getStockReportPDF: () => axios.get(`${API}/stock/report/pdf`, { responseType: 'blob' }),
 
   getOSCategories: () => axios.get(`${API}/os-categories`),
   createOSCategory: (data) => axios.post(`${API}/os-categories`, data),
