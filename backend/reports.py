@@ -1375,7 +1375,7 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
     )
 
     stats_data = [[Paragraph(stats_text, stats_style)]]
-    stats_table = Table(stats_data, colWidths=[760])
+    stats_table = Table(stats_data, colWidths=[doc.width])
     stats_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -1385,9 +1385,27 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
     ]))
     elements.append(stats_table)
-    elements.append(Spacer(1, 10))
+
+    # ========== GENERATION INFO ==========
+    gen_info_style = ParagraphStyle(
+        'BillingGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER,
+        spaceBefore=8, spaceAfter=10
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
 
     # ========== TABLE ==========
+    # Células usam Paragraph (não string pura) pra quebrar linha dentro da
+    # própria célula em vez de vazar pra célula vizinha quando o conteúdo é
+    # mais largo que a coluna (Cliente, Transportadora) - mesma técnica da Fatura.
+    cell_style_l = ParagraphStyle('BillingCellL', parent=styles['Normal'], fontSize=7, leading=8.5, alignment=TA_LEFT)
+    cell_style_c = ParagraphStyle('BillingCellC', parent=cell_style_l, alignment=TA_CENTER)
+    cell_style_r = ParagraphStyle('BillingCellR', parent=cell_style_l, alignment=TA_RIGHT)
+
+    def cell(text, align='left'):
+        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
+        return Paragraph(str(text) if text not in (None, '') else '-', style)
+
     data = [[
         'ID', 'Data/Hora', 'Tipo', 'Nº Container', 'Cliente', 'Placa',
         'Transportadora', 'Armador', 'Status', 'Tamanho',
@@ -1402,25 +1420,27 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
         val_str = f"R$ {service_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if service_value else '-'
 
         data.append([
-            str(m.get('transaction_id', '-')),
-            created_at,
-            "ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA",
-            m.get('container_number', '-'),
-            m.get('client_name', '-') or '-',
-            m.get('truck_plate', '-') or '-',
-            m.get('transport_company', '-') or '-',
-            m.get('shipping_line', '-') or '-',
-            m.get('status', '-') or '-',
-            m.get('size_type', '-') or '-',
-            m.get('service_type', '-') or '-',
-            m.get('invoice_number', '-') or '-',
-            val_str
+            cell(m.get('transaction_id', '-'), align='center'),
+            cell(created_at),
+            cell("ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA", align='center'),
+            cell(m.get('container_number', '-')),
+            cell(m.get('client_name', '-') or '-'),
+            cell(m.get('truck_plate', '-') or '-'),
+            cell(m.get('transport_company', '-') or '-'),
+            cell(m.get('shipping_line', '-') or '-'),
+            cell(m.get('status', '-') or '-', align='center'),
+            cell(m.get('size_type', '-') or '-', align='center'),
+            cell(m.get('service_type', '-') or '-'),
+            cell(m.get('invoice_number', '-') or '-'),
+            cell(val_str, align='right')
         ])
 
-    # Total row
+    # Total row (fora do padrão de célula normal - fica em negrito/tamanho maior)
     data.append(['', '', '', '', '', '', '', '', '', '', '', 'TOTAL:', value_str])
 
-    col_widths = [30, 58, 42, 62, 75, 45, 70, 55, 40, 42, 62, 52, 58]
+    # Larguras redistribuídas pra usar a área útil real da página (doc.width),
+    # mesmas colunas/proporções da Fatura já que o conjunto de campos é idêntico.
+    col_widths = [28, 60, 40, 62, 100, 50, 90, 60, 40, 38, 80, 52, 65]
 
     table = Table(data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle([
@@ -1433,23 +1453,12 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
         ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
         ('TOPPADDING', (0, 0), (-1, 0), 5),
 
-        # Body styling
-        ('BACKGROUND', (0, 1), (-1, -2), colors.white),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 7),
-        ('TOPPADDING', (0, 1), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 2),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-        
-        # Alignments
-        ('ALIGN', (0, 1), (0, -1), 'CENTER'),   # ID
-        ('ALIGN', (2, 1), (2, -1), 'CENTER'),   # Tipo
-        ('ALIGN', (8, 1), (8, -1), 'CENTER'),   # Status
-        ('ALIGN', (9, 1), (9, -1), 'CENTER'),   # Tamanho
-        ('ALIGN', (12, 1), (12, -1), 'RIGHT'),  # Valor
-        
+        # Body styling - alinhamento e fonte já vêm do Paragraph de cada célula
+        ('TOPPADDING', (0, 1), (-1, -2), 3),
+        ('BOTTOMPADDING', (0, 1), (-1, -2), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+
         # Borders
         ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
         ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
