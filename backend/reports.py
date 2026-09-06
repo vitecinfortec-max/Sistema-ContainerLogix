@@ -1516,8 +1516,12 @@ def generate_invoice_pdf(invoice: dict, movements: list, company: dict = None) -
     # ========== CLIENT INFO BAR ==========
     total_value = sum(m.get('service_value', 0) or 0 for m in movements)
     total_str = f"R$ {total_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    
-    client_info_text = f"Cliente: {invoice.get('client_name', '-')}  |  CNPJ: {invoice.get('client_cnpj', '-') or '-'}  |  Movimentações: {len(movements)}  |  Valor Total: {total_str}"
+
+    # Movimentações com Valor da Operação zerado/vazio não aparecem na fatura
+    # impressa - não somam nada ao total, então ocultá-las não afeta o valor.
+    visible_movements = [m for m in movements if (m.get('service_value') or 0) != 0]
+
+    client_info_text = f"Cliente: {invoice.get('client_name', '-')}  |  CNPJ: {invoice.get('client_cnpj', '-') or '-'}  |  Movimentações: {len(visible_movements)}  |  Valor Total: {total_str}"
     
     client_style = ParagraphStyle(
         'ClientInfo',
@@ -1570,7 +1574,7 @@ def generate_invoice_pdf(invoice: dict, movements: list, company: dict = None) -
         'Tipo de Serviço', 'Nota Fiscal', 'Valor da Operação'
     ]]
 
-    for m in movements:
+    for m in visible_movements:
         _m_dt = to_brt(m.get('created_at'))
         mov_date = _m_dt.strftime('%d/%m/%Y %H:%M') if _m_dt else '-'
 
@@ -1733,9 +1737,14 @@ def generate_invoice_excel(invoice: dict, movements: list, company: dict = None)
         # Calculate total value
         total_value = sum(m.get('service_value', 0) or 0 for m in movements)
         val_str = f"R$ {total_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        
+
+        # Movimentações com Valor da Operação zerado/vazio não aparecem na
+        # fatura exportada - não somam nada ao total, então ocultá-las não
+        # afeta o valor (mesmo critério do PDF).
+        visible_movements = [m for m in movements if (m.get('service_value') or 0) != 0]
+
         title = f"FATURA Nº {invoice.get('invoice_number', '-')} - Cliente: {invoice.get('client_name', '-')}"
-        stats_text = f"Total: {len(movements)} movimentações  |  Valor: {val_str}  |  Data: {created_at}"
+        stats_text = f"Total: {len(visible_movements)} movimentações  |  Valor: {val_str}  |  Data: {created_at}"
 
         headers = [
             'ID', 'Data/Hora', 'Tipo', 'Nº Container', 'Cliente', 'Placa',
@@ -1744,7 +1753,7 @@ def generate_invoice_excel(invoice: dict, movements: list, company: dict = None)
         ]
 
         data_rows = []
-        for m in movements:
+        for m in visible_movements:
             _m_dt = to_brt(m.get('created_at'))
             mov_date = _m_dt.strftime('%d/%m/%Y %H:%M') if _m_dt else '-'
             data_rows.append([
