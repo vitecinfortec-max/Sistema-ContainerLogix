@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Download, FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet } from 'lucide-react';
 
 export default function StockReportPage() {
   const [downloading, setDownloading] = useState(false);
@@ -36,23 +35,20 @@ export default function StockReportPage() {
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Exporte o relatório completo do estoque atual</p>
         </div>
 
-        <Card className="max-w-md">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-[13px] font-medium flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              Relatório Excel
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mb-4">
-              Gera uma planilha com todos os produtos cadastrados: código, almoxarifado, descrição, quantidade e valor.
-            </p>
-            <Button onClick={downloadExcel} disabled={downloading} className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="download-stock-report-button">
-              <Download className="w-4 h-4 mr-2" />
-              {downloading ? 'Gerando...' : 'Baixar Excel'}
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Barra de ações */}
+        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={downloadExcel}
+            disabled={downloading}
+            title="Baixar Excel"
+            data-testid="download-stock-report-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-green-600" />
+          </Button>
+        </div>
       </div>
     </Layout>
   );
