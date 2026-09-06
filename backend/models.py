@@ -574,13 +574,14 @@ class ServiceTypeResponse(BaseModel):
 # Invoice (Fatura) Model
 class Invoice(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     invoice_number: int  # Número sequencial da fatura
     client_name: str
     client_cnpj: Optional[str] = None
     movement_ids: List[str]  # IDs das movimentações incluídas
     total_value: float
+    status: str = "PENDENTE"  # PENDENTE, PAGO, CANCELADO
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
@@ -606,6 +607,7 @@ class InvoiceResponse(BaseModel):
     client_cnpj: Optional[str] = None
     movement_ids: List[str]
     total_value: float
+    status: str = "PENDENTE"
     notes: Optional[str] = None
     created_at: datetime
     user_name: str

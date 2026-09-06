@@ -173,6 +173,7 @@ async def create_invoice(
         client_cnpj=invoice.client_cnpj,
         movement_ids=invoice.movement_ids,
         total_value=invoice.total_value,
+        status=invoice.status,
         notes=invoice.notes,
         created_at=invoice.created_at,
         user_name=invoice.user_name
@@ -202,6 +203,7 @@ async def get_invoices(
             client_cnpj=inv.get('client_cnpj'),
             movement_ids=inv['movement_ids'],
             total_value=inv['total_value'],
+            status=inv.get('status', 'PENDENTE'),
             notes=inv.get('notes'),
             created_at=datetime.fromisoformat(inv['created_at']),
             user_name=inv['user_name']
@@ -236,10 +238,40 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
         client_cnpj=invoice.get('client_cnpj'),
         movement_ids=invoice['movement_ids'],
         total_value=invoice['total_value'],
+        status=invoice.get('status', 'PENDENTE'),
         notes=invoice.get('notes'),
         created_at=datetime.fromisoformat(invoice['created_at']),
         user_name=invoice['user_name']
     )
+
+@api_router.put("/invoices/{invoice_id}/status")
+async def update_invoice_status(
+    invoice_id: str,
+    status: str,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Atualiza o status de pagamento de uma fatura (Pendente/Pago/Cancelado)"""
+    if status not in ["PENDENTE", "PAGO", "CANCELADO"]:
+        raise HTTPException(status_code=400, detail="Status inválido")
+
+    invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Fatura não encontrada")
+
+    old_status = invoice.get('status', 'PENDENTE')
+    await db.invoices.update_one({"id": invoice_id}, {"$set": {"status": status}})
+
+    if old_status != status:
+        await log_invoice_history(
+            invoice_id=invoice_id,
+            invoice_number=invoice['invoice_number'],
+            action="UPDATED",
+            changes={"status": {"from": old_status, "to": status}},
+            user_id=current_user['sub'],
+            user_name=current_user['name']
+        )
+
+    return {"message": "Status atualizado com sucesso"}
 
 @api_router.put("/invoices/{invoice_id}", response_model=InvoiceResponse)
 async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current_user: dict = Depends(get_current_admin_user)):
@@ -344,6 +376,7 @@ async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current
         client_cnpj=updated_invoice.get('client_cnpj'),
         movement_ids=updated_invoice['movement_ids'],
         total_value=updated_invoice['total_value'],
+        status=updated_invoice.get('status', 'PENDENTE'),
         notes=updated_invoice.get('notes'),
         created_at=datetime.fromisoformat(updated_invoice['created_at']),
         user_name=updated_invoice['user_name']

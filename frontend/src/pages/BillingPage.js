@@ -22,6 +22,16 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 const ITEMS_PER_PAGE = 15;
 
+const INVOICE_STATUS_OPTIONS = [
+  { value: 'PENDENTE', label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'PAGO', label: 'Pago', color: 'bg-green-100 text-green-800' },
+  { value: 'CANCELADO', label: 'Cancelado', color: 'bg-red-100 text-red-800' },
+];
+
+const getInvoiceStatusBadge = (status) => {
+  return INVOICE_STATUS_OPTIONS.find(s => s.value === status) || INVOICE_STATUS_OPTIONS[0];
+};
+
 // Função para abreviar nome (primeiro e segundo nome, ignorando preposições)
 const shortenName = (fullName) => {
   if (!fullName) return '-';
@@ -431,6 +441,17 @@ export default function BillingPage() {
     }
   };
 
+  const handleUpdateInvoiceStatus = async (invoiceId, newStatus) => {
+    try {
+      await api.updateInvoiceStatus(invoiceId, newStatus);
+      toast.success('Status atualizado com sucesso!');
+      setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: newStatus } : inv));
+      setSelectedInvoice(prev => prev && prev.id === invoiceId ? { ...prev, status: newStatus } : prev);
+    } catch (error) {
+      toast.error('Erro ao atualizar status');
+    }
+  };
+
   const loadInvoiceHistory = async (invoiceId) => {
     setLoadingHistory(true);
     try {
@@ -740,6 +761,7 @@ export default function BillingPage() {
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">CNPJ</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Qtd. Movim.</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Valor Total</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Status</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Usuário</th>
                     </tr>
                   </thead>
@@ -772,6 +794,11 @@ export default function BillingPage() {
                         </td>
                         <td className="px-4 py-2.5 text-[13px] font-mono font-bold text-green-700">
                           {formatCurrency(invoice.total_value)}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${getInvoiceStatusBadge(invoice.status).color}`}>
+                            {getInvoiceStatusBadge(invoice.status).label}
+                          </span>
                         </td>
                         <td className="px-4 py-2.5 text-[13px] text-slate-600 dark:text-slate-400">{shortenName(invoice.user_name)}</td>
                       </tr>
@@ -1095,6 +1122,29 @@ export default function BillingPage() {
 
           {selectedInvoice && (
             <div className="flex-1 overflow-y-auto space-y-4 py-4">
+              {/* Status */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] text-slate-500 dark:text-slate-400">Status:</span>
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getInvoiceStatusBadge(selectedInvoice.status).color}`}>
+                    {getInvoiceStatusBadge(selectedInvoice.status).label}
+                  </span>
+                </div>
+                <Select
+                  value={selectedInvoice.status || 'PENDENTE'}
+                  onValueChange={(val) => handleUpdateInvoiceStatus(selectedInvoice.id, val)}
+                >
+                  <SelectTrigger className="w-40 h-9 text-[13px]" data-testid="invoice-status-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INVOICE_STATUS_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Informações da Fatura */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                 <div>

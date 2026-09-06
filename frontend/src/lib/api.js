@@ -134,6 +134,7 @@ export const api = {
   getInvoice: (id) => axios.get(`${API}/invoices/${id}`),
   createInvoice: (data) => axios.post(`${API}/invoices`, data),
   updateInvoice: (id, data) => axios.put(`${API}/invoices/${id}`, data),
+  updateInvoiceStatus: (id, status) => axios.put(`${API}/invoices/${id}/status?status=${status}`),
   deleteInvoice: (id) => axios.delete(`${API}/invoices/${id}`),
   getInvoiceMovements: (id) => axios.get(`${API}/invoices/${id}/movements`),
   getInvoiceHistory: (id) => axios.get(`${API}/invoices/${id}/history`),
