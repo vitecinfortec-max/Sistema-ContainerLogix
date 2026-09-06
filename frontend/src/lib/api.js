@@ -140,6 +140,7 @@ export const api = {
   getInvoiceMovements: (id) => axios.get(`${API}/invoices/${id}/movements`),
   getInvoiceHistory: (id) => axios.get(`${API}/invoices/${id}/history`),
   getUnbilledMovements: (params) => axios.get(`${API}/movements/unbilled`, { params }),
+  findMovementForInvoice: (search) => axios.get(`${API}/movements/find-for-invoice`, { params: { search } }),
   downloadInvoicePdf: (id) => axios.get(`${API}/invoices/${id}/pdf`, { responseType: 'blob' }),
   downloadInvoiceExcel: (id) => axios.get(`${API}/invoices/${id}/excel`, { responseType: 'blob' }),
   

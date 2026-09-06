@@ -431,7 +431,7 @@ async def get_unbilled_movements(
             }
     
     movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
-    
+
     return [
         ContainerMovementResponse(
             id=m['id'],
@@ -466,6 +466,48 @@ async def get_unbilled_movements(
         )
         for m in movements
     ]
+
+
+@api_router.get("/movements/find-for-invoice")
+async def find_movement_for_invoice(
+    search: str,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Busca uma movimentação por ID (transaction_id) ou Nº de Container para
+    adicionar a uma fatura manualmente. Ao contrário de /movements/unbilled,
+    inclui movimentações já faturadas de propósito - assim o front consegue
+    avisar em qual fatura ela já está, em vez de dizer "não encontrada"."""
+    search_stripped = search.strip()
+    query = {}
+    try:
+        query['transaction_id'] = int(search_stripped)
+    except ValueError:
+        query['container_number'] = {
+            "$regex": f"^{re.escape(search_stripped)}$", "$options": "i"
+        }
+
+    movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
+
+    results = []
+    for m in movements:
+        billed_invoice_number = None
+        if m.get('billed') and m.get('invoice_id'):
+            invoice = await db.invoices.find_one({"id": m['invoice_id']}, {"_id": 0, "invoice_number": 1})
+            if invoice:
+                billed_invoice_number = invoice['invoice_number']
+
+        results.append({
+            "id": m['id'],
+            "transaction_id": m.get('transaction_id', 0),
+            "container_number": m['container_number'],
+            "client_name": m.get('client_name'),
+            "service_type": m.get('service_type'),
+            "service_value": m.get('service_value'),
+            "created_at": m['created_at'],
+            "billed": m.get('billed', False),
+            "billed_invoice_number": billed_invoice_number,
+        })
+    return results
 
 @api_router.get("/movements/open-entry/{container_number}")
 async def get_open_entry_for_container(container_number: str, current_user: dict = Depends(get_current_active_user)):

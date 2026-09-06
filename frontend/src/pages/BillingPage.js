@@ -67,6 +67,8 @@ export default function BillingPage() {
   const [creating, setCreating] = useState(false);
   const [loadingMovements, setLoadingMovements] = useState(false);
   const [addedMovements, setAddedMovements] = useState([]); // Movimentações adicionadas via busca por ID
+  const [targetClientName, setTargetClientName] = useState(''); // Cliente definido para esta fatura (trava a busca por ID)
+  const [idSearchError, setIdSearchError] = useState(''); // Mensagem em vermelho da busca por ID/Container
   
   // Estado de Detalhes
   const [showDetails, setShowDetails] = useState(false);
@@ -158,34 +160,68 @@ export default function BillingPage() {
     setInvoiceNotes('');
     setAddedMovements([]);
     setUnbilledMovements([]);
+    setTargetClientName('');
+    setIdSearchError('');
   };
 
-  // Buscar movimentação por ID/Container (código de barras)
+  // Compara nomes de cliente ignorando maiúsculas/minúsculas e espaços nas pontas
+  const isSameClient = (a, b) => {
+    if (!a || !b) return false;
+    return a.trim().toLowerCase() === b.trim().toLowerCase();
+  };
+
+  // Buscar movimentação por ID/Container (código de barras) - inclui já
+  // faturadas de propósito, pra poder avisar em qual fatura já está em vez
+  // de simplesmente dizer "não encontrada".
   const handleSearchById = async () => {
     if (!searchQuery.trim()) return;
-    
+    setIdSearchError('');
+
     try {
-      const res = await api.getUnbilledMovements({ search: searchQuery.trim() });
-      if (res.data && res.data.length > 0) {
-        // Adicionar movimentações encontradas que ainda não estão na lista
-        const newMovements = res.data.filter(
-          m => !addedMovements.some(am => am.id === m.id)
+      const res = await api.findMovementForInvoice(searchQuery.trim());
+      const matches = res.data || [];
+
+      if (matches.length === 0) {
+        setIdSearchError('Nenhuma movimentação encontrada com este ID/Container.');
+        setSearchQuery('');
+        return;
+      }
+
+      const alreadyBilled = matches.find(m => m.billed);
+      if (alreadyBilled) {
+        setIdSearchError(
+          `A movimentação #${alreadyBilled.transaction_id} (${alreadyBilled.container_number}) já está na Fatura Nº ${alreadyBilled.billed_invoice_number}.`
         );
-        
-        if (newMovements.length > 0) {
-          setAddedMovements(prev => [...prev, ...newMovements]);
-          // Selecionar automaticamente as novas movimentações
-          setSelectedMovements(prev => {
-            const newSet = new Set(prev);
-            newMovements.forEach(m => newSet.add(m.id));
-            return newSet;
-          });
-          toast.success(`${newMovements.length} movimentação(ões) adicionada(s)`);
-        } else {
-          toast.info('Movimentação já foi adicionada');
+        return;
+      }
+
+      const wrongClient = targetClientName
+        ? matches.find(m => !isSameClient(m.client_name, targetClientName))
+        : null;
+      if (wrongClient) {
+        setIdSearchError(
+          `A movimentação #${wrongClient.transaction_id} (${wrongClient.container_number}) pertence ao cliente "${wrongClient.client_name || 'não definido'}", não a "${targetClientName}".`
+        );
+        return;
+      }
+
+      const newMovements = matches.filter(
+        m => !addedMovements.some(am => am.id === m.id)
+      );
+
+      if (newMovements.length > 0) {
+        setAddedMovements(prev => [...prev, ...newMovements]);
+        setSelectedMovements(prev => {
+          const newSet = new Set(prev);
+          newMovements.forEach(m => newSet.add(m.id));
+          return newSet;
+        });
+        if (!targetClientName && newMovements[0].client_name) {
+          setTargetClientName(newMovements[0].client_name);
         }
+        toast.success(`${newMovements.length} movimentação(ões) adicionada(s)`);
       } else {
-        toast.warning('Nenhuma movimentação encontrada com este ID/Container');
+        toast.info('Movimentação já foi adicionada');
       }
       setSearchQuery('');
     } catch (error) {
@@ -193,13 +229,21 @@ export default function BillingPage() {
     }
   };
 
-  // Buscar movimentações por cliente (nome ou CNPJ)
+  // Buscar movimentações por cliente (nome ou CNPJ) - também define o
+  // cliente desta fatura, travando a busca por ID contra outros clientes.
   const handleSearchByClient = async () => {
     if (!clientSearchQuery.trim()) {
       setUnbilledMovements([]);
+      if (addedMovements.length === 0) setTargetClientName('');
       return;
     }
-    
+
+    const matchedClient = clients.find(
+      c => isSameClient(c.name, clientSearchQuery.trim()) || c.cnpj === clientSearchQuery.trim()
+    );
+    setTargetClientName(matchedClient?.name || clientSearchQuery.trim());
+    setIdSearchError('');
+
     await loadUnbilledMovements(clientSearchQuery.trim());
   };
 
@@ -278,6 +322,10 @@ export default function BillingPage() {
     const clientName = getSelectedClient();
     if (!clientName) {
       toast.warning('As movimentações selecionadas não possuem cliente definido');
+      return;
+    }
+    if (clientName === 'Diversos') {
+      toast.error('As movimentações selecionadas pertencem a clientes diferentes. Remova as que não são do cliente desta fatura.');
       return;
     }
 
@@ -884,25 +932,44 @@ export default function BillingPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Pressione Enter ou clique + para adicionar</p>
+                {idSearchError && (
+                  <p className="text-xs text-red-600 dark:text-red-400 font-medium mt-1.5" data-testid="id-search-error">
+                    {idSearchError}
+                  </p>
+                )}
               </div>
 
-              {/* Busca por Cliente (Nome ou CNPJ) */}
+              {/* Cliente a Faturar (Nome ou CNPJ) */}
               <div>
-                <Label className="mb-1 block">Cliente (Nome ou CNPJ)</Label>
+                <Label className="mb-1 block">Cliente a Faturar (Nome ou CNPJ)</Label>
                 <div className="flex gap-2">
                   <Input
                     value={clientSearchQuery}
                     onChange={(e) => setClientSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearchByClient()}
+                    disabled={!!targetClientName && (addedMovements.length > 0 || selectedMovements.size > 0)}
                     className="h-10 flex-1"
                     data-testid="search-client-input"
                   />
-                  <Button onClick={handleSearchByClient} className="h-10" data-testid="search-by-client-button">
+                  <Button
+                    onClick={handleSearchByClient}
+                    disabled={!!targetClientName && (addedMovements.length > 0 || selectedMovements.size > 0)}
+                    className="h-10"
+                    data-testid="search-by-client-button"
+                  >
                     <Search className="w-4 h-4 mr-2" />
                     Buscar
                   </Button>
                 </div>
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Buscar movimentações pendentes do cliente</p>
+                {targetClientName ? (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">
+                    Faturando para: {targetClientName}
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                    Define o cliente desta fatura — movimentações de outro cliente são bloqueadas
+                  </p>
+                )}
               </div>
             </div>
 
