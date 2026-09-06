@@ -410,17 +410,25 @@ export default function BillingPage() {
         // Verificar se já está na fatura ou já foi selecionada
         const alreadyInInvoice = editMovements.some(m => m.id === movement.id);
         const alreadySelected = movementsToAdd.has(movement.id);
-        const alreadyInAvailable = editAvailableMovements.some(m => m.id === movement.id);
-        
+
         if (alreadyInInvoice) {
           toast.info('Esta movimentação já está na fatura');
         } else if (alreadySelected) {
           toast.info('Esta movimentação já foi selecionada para adicionar');
         } else if (movement.billed) {
           toast.warning('Esta movimentação já está faturada em outra fatura');
-        } else if (!alreadyInAvailable) {
-          setEditAvailableMovements(prev => [movement, ...prev]);
-          toast.success('Movimentação encontrada e adicionada à lista');
+        } else {
+          // Garante que a movimentação apareça na lista "Adicionar Movimentações"
+          // (pode já estar lá, já que a lista vem pré-carregada com as
+          // pendentes do cliente) e já marca pra adicionar direto - antes,
+          // quando o item já estava na lista pré-carregada, essa condição
+          // não caía em nenhum dos ramos acima e a busca não fazia nada
+          // visível, dando a impressão de que "não adicionava".
+          setEditAvailableMovements(prev =>
+            prev.some(m => m.id === movement.id) ? prev : [movement, ...prev]
+          );
+          setMovementsToAdd(prev => new Set(prev).add(movement.id));
+          toast.success(`Movimentação #${movement.transaction_id} adicionada`);
         }
       } else {
         toast.warning('Movimentação não encontrada');
