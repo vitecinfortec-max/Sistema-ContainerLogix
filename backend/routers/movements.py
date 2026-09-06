@@ -66,8 +66,49 @@ from shared import (
 
 api_router = APIRouter(prefix="/api")
 
+
+async def _find_last_movement(container_number: str):
+    """Movimentação mais recente (qualquer tipo) registrada pra esse container."""
+    return await db.movements.find_one(
+        {"container_number": container_number.strip().upper()},
+        {"_id": 0, "transaction_id": 1, "operation_type": 1, "created_at": 1},
+        sort=[("created_at", -1)]
+    )
+
+
+@api_router.get("/movements/last-for-container/{container_number}")
+async def get_last_movement_for_container(container_number: str, current_user: dict = Depends(get_current_active_user)):
+    """Usado pelo formulário de Emissão de EIR pra avisar, assim que o
+    container é digitado, se uma Entrada/Saída em duplicidade vai ser
+    bloqueada no envio - antes que o usuário preencha o formulário inteiro."""
+    last = await _find_last_movement(container_number)
+    if not last:
+        return {"movement": None}
+    return {"movement": last}
+
+
 @api_router.post("/movements", response_model=ContainerMovementResponse)
 async def create_movement(movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_active_user)):
+    # Trava de duplicidade: não permite registrar uma Entrada quando a
+    # movimentação mais recente desse container já é uma Entrada (ainda não
+    # saiu), nem uma Saída quando a mais recente já é uma Saída (já saiu e
+    # não voltou a entrar) - mesmo critério "mesmo tipo duas vezes seguidas"
+    # já usado na auditoria de duplicidades da produção.
+    last_movement = await _find_last_movement(movement_input.container_number)
+    if last_movement and last_movement.get('operation_type') == movement_input.operation_type:
+        tipo_label = 'ENTRADA' if movement_input.operation_type == 'ENTRADA' else 'SAÍDA'
+        last_dt = parse_datetime_value(last_movement['created_at'])
+        last_dt_brt = to_brt(last_dt) if last_dt else None
+        date_str = last_dt_brt.strftime('%d/%m/%Y %H:%M') if last_dt_brt else '-'
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Este container já teve uma {tipo_label} registrada (Transação #{last_movement.get('transaction_id')}, "
+                f"em {date_str}) sem uma movimentação do tipo oposto depois. "
+                f"Não é possível registrar outra {tipo_label} em duplicidade."
+            )
+        )
+
     # Usar contador atômico para garantir sequência única
     next_transaction_id = await get_next_transaction_id()
     

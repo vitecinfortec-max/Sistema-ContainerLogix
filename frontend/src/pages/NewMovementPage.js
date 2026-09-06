@@ -14,6 +14,8 @@ import { useNotifications } from '../hooks/useNotifications';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
 import { Autocomplete } from '../components/Autocomplete';
 import { formatContainerNumber } from '../lib/containerNumber';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const AUTO_SAVE_KEY = 'containerlogix_movement_draft';
 
@@ -34,6 +36,7 @@ export default function NewMovementPage() {
   const [inspectionNotes, setInspectionNotes] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [containerDuplicateError, setContainerDuplicateError] = useState('');
   const clientInputRef = useRef(null);
   const { notifyNewMovement, requestPermission, permission } = useNotifications();
   
@@ -132,6 +135,10 @@ export default function NewMovementPage() {
   };
 
   const onSubmit = async (data) => {
+    if (containerDuplicateError) {
+      toast.error(containerDuplicateError);
+      return;
+    }
     setLoading(true);
     try {
       // Determinar moeda baseada no cliente
@@ -182,9 +189,38 @@ export default function NewMovementPage() {
     }
   };
 
+  // Verifica se a última movimentação registrada desse container já é do
+  // mesmo tipo que está sendo digitado agora - trava de duplicidade (mesmo
+  // container não pode dar Entrada/Entrada ou Saída/Saída em sequência sem
+  // uma movimentação do tipo oposto no meio).
+  const checkContainerDuplicate = useCallback(async (containerNumber, opType) => {
+    if (!containerNumber) {
+      setContainerDuplicateError('');
+      return;
+    }
+    try {
+      const response = await api.getLastMovementForContainer(containerNumber);
+      const last = response.data?.movement;
+      if (last && last.operation_type === opType) {
+        const tipoLabel = opType === 'ENTRADA' ? 'ENTRADA' : 'SAÍDA';
+        const dataStr = last.created_at
+          ? format(new Date(last.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })
+          : '';
+        setContainerDuplicateError(
+          `Este container já teve uma ${tipoLabel} registrada (Transação #${last.transaction_id}${dataStr ? `, em ${dataStr}` : ''}) sem uma movimentação do tipo oposto depois. Não é possível registrar outra ${tipoLabel} em duplicidade.`
+        );
+      } else {
+        setContainerDuplicateError('');
+      }
+    } catch (error) {
+      setContainerDuplicateError('');
+    }
+  }, []);
+
   const handleContainerNumberBlur = async (e) => {
     const containerNumber = formatContainerNumber(e.target.value);
     setValue('container_number', containerNumber);
+    checkContainerDuplicate(containerNumber, operationType);
     if (operationType !== 'SAIDA') return;
     if (!containerNumber) return;
     try {
@@ -207,6 +243,16 @@ export default function NewMovementPage() {
       // Sem entrada em aberto para esse container — segue com preenchimento manual
     }
   };
+
+  // Reconfere a trava de duplicidade quando o Tipo de Operação muda (o
+  // container pode já ter sido digitado antes de o usuário trocar o tipo).
+  useEffect(() => {
+    const containerNumber = formData.container_number;
+    if (containerNumber) {
+      checkContainerDuplicate(containerNumber, operationType);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operationType]);
 
   const handleCompanyChange = (companyName) => {
     setValue('transport_company', companyName);
@@ -451,6 +497,11 @@ export default function NewMovementPage() {
                     {...register('container_number', { required: true, onBlur: handleContainerNumberBlur })}
                     className="h-12 font-mono uppercase"
                   />
+                  {containerDuplicateError && (
+                    <p className="text-xs text-red-600 dark:text-red-400 font-medium" data-testid="container-duplicate-error">
+                      {containerDuplicateError}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
