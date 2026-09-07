@@ -46,7 +46,15 @@ const formatPhone = (value) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
-const MASKS = { cpf: formatCPF, cnpj: formatCNPJ, tel: formatPhone };
+// Campo único "CNPJ ou CPF": aplica a máscara de CPF enquanto tiver até 11
+// dígitos (senão um CPF saía formatado como CNPJ, ex. "026.496.043/28"
+// em vez de "026.496.043-28"), e passa a formatar como CNPJ a partir do 12º.
+const formatCnpjCpf = (value) => {
+  const digits = value.replace(/\D/g, '');
+  return digits.length > 11 ? formatCNPJ(value) : formatCPF(value);
+};
+
+const MASKS = { cpf: formatCPF, cnpj: formatCNPJ, doc: formatCnpjCpf, tel: formatPhone };
 
 const STATUS_ATIVO_INATIVO = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 const STATUS_COM_BLOQUEADO = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo'], ['BLOQUEADO', 'Bloqueado']];
@@ -96,7 +104,7 @@ const TYPES = [
     fields: [
       { name: 'name', label: 'Razão Social', required: true },
       { name: 'trade_name', label: 'Nome Fantasia' },
-      { name: 'cnpj', label: 'CNPJ (ou CPF)', mask: 'cnpj' },
+      { name: 'cnpj', label: 'CNPJ (ou CPF)', mask: 'doc' },
       { name: 'antt', label: 'ANTT (RNTRC)' },
       { name: 'state_registration', label: 'Inscrição Estadual' },
       { name: 'municipal_registration', label: 'Inscrição Municipal' },
@@ -150,7 +158,7 @@ const TYPES = [
     fields: [
       { name: 'name', label: 'Razão Social', required: true },
       { name: 'trade_name', label: 'Nome Fantasia' },
-      { name: 'cnpj', label: 'CNPJ (ou CPF)', mask: 'cnpj' },
+      { name: 'cnpj', label: 'CNPJ (ou CPF)', mask: 'doc' },
       { name: 'state_registration', label: 'Inscrição Estadual' },
       { name: 'municipal_registration', label: 'Inscrição Municipal' },
       { name: 'supply_type', label: 'Tipo de Fornecimento', placeholder: 'Ex: peças, manutenção, combustível...' },
@@ -206,7 +214,7 @@ const TYPES = [
     fields: [
       { name: 'name', label: 'Razão Social / Nome', required: true },
       { name: 'trade_name', label: 'Nome Fantasia' },
-      { name: 'cnpj', label: 'CNPJ ou CPF', mask: 'cnpj' },
+      { name: 'cnpj', label: 'CNPJ ou CPF', mask: 'doc' },
       { name: 'state_registration', label: 'Inscrição Estadual' },
       { name: 'municipal_registration', label: 'Inscrição Municipal' },
       { name: 'phone', label: 'Telefone', mask: 'tel' },

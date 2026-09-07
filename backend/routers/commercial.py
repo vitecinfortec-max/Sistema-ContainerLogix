@@ -11,7 +11,7 @@ from models import (
     ClientRepresentativeLink, ClientRepresentativeLinkCreate, ClientRepresentativeLinkResponse,
 )
 from shared import db, get_current_active_user, get_company_settings, round_money
-from reports import generate_commission_report_pdf
+from reports import generate_commission_report_pdf, generate_service_price_table_pdf
 
 api_router = APIRouter(prefix="/api")
 
@@ -104,6 +104,29 @@ async def get_service_price_entries(
         query['client_name'] = {"$regex": f"^{client_name.strip()}$", "$options": "i"}
     items = await db.service_price_entries.find(query, {"_id": 0}).sort("service_type_name", 1).to_list(None)
     return [ServicePriceEntryResponse(**{**i, "created_at": datetime.fromisoformat(i['created_at'])}) for i in items]
+
+@api_router.get("/service-price-entries/pdf")
+async def download_service_price_table_pdf(
+    client_id: str,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Gera o PDF da tabela de serviços (serviço + valor) de um cliente"""
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0, "name": 1})
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+
+    entries = await db.service_price_entries.find(
+        {"client_id": client_id}, {"_id": 0}
+    ).sort("service_type_name", 1).to_list(None)
+
+    company = await get_company_settings()
+    pdf_bytes = generate_service_price_table_pdf(client['name'], entries, company=company)
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=Tabela_Servicos.pdf"}
+    )
 
 @api_router.put("/service-price-entries/{item_id}", response_model=ServicePriceEntryResponse)
 async def update_service_price_entry(item_id: str, data: ServicePriceEntryCreate, current_user: dict = Depends(get_current_active_user)):

@@ -2730,6 +2730,82 @@ def generate_commission_report_pdf(data: dict, company: dict = None) -> bytes:
     return buffer.getvalue()
 
 
+def generate_service_price_table_pdf(client_name: str, entries: list, company: dict = None) -> bytes:
+    """Gera o PDF da Tabela de Serviços de um cliente (Comercial > Tabela de
+    Serviços): lista simples de serviço + valor cadastrados para ele."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=15*mm,
+        bottomMargin=20*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = download_logo(company)
+    header_elements = _build_pdf_header(styles, logo_buffer, "Tabela de Serviços", company=company, content_width=doc.width)
+    elements.extend(header_elements)
+
+    info_style = ParagraphStyle(
+        'ServicePriceInfoBar', parent=styles['Normal'], fontSize=10,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
+    )
+    info_data = [[Paragraph(f"Cliente: {client_name}", info_style)]]
+    info_table = Table(info_data, colWidths=[doc.width])
+    info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 12))
+
+    gen_info_style = ParagraphStyle(
+        'ServicePriceGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    cell_style = ParagraphStyle('ServicePriceCell', parent=styles['Normal'], fontSize=9, leading=11)
+
+    data = [['Serviço', 'Valor']]
+    for e in entries:
+        data.append([Paragraph(e.get('service_type_name', '-'), cell_style), format_currency(e.get('value', 0))])
+
+    table = Table(data, colWidths=[doc.width*0.7, doc.width*0.3], repeatRows=1)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F8F8')]),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(table)
+
+    if not entries:
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph("Nenhum serviço cadastrado para este cliente.", cell_style))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
 VEHICLE_CHECKLIST_TEMPLATE_SECTIONS = list(VEHICLE_CHECKLIST_TEMPLATE.keys())
 
 

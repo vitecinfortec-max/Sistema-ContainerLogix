@@ -242,6 +242,7 @@ export const api = {
   createServicePriceEntry: (data) => axios.post(`${API}/service-price-entries`, data),
   updateServicePriceEntry: (id, data) => axios.put(`${API}/service-price-entries/${id}`, data),
   deleteServicePriceEntry: (id) => axios.delete(`${API}/service-price-entries/${id}`),
+  downloadServicePriceTablePdf: (clientId) => axios.get(`${API}/service-price-entries/pdf`, { params: { client_id: clientId }, responseType: 'blob' }),
 
   // Comercial: Vínculo de Clientes
   getClientRepresentativeLinks: () => axios.get(`${API}/client-representative-links`),

@@ -8,11 +8,12 @@ import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Trash2, Edit, Tags } from 'lucide-react';
+import { Plus, Trash2, Edit, Tags, FileDown } from 'lucide-react';
 
 export default function ServicePriceTablePage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [clients, setClients] = useState([]);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [serviceTypes, setServiceTypes] = useState([]);
   const [clientNameInput, setClientNameInput] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
@@ -116,6 +117,25 @@ export default function ServicePriceTablePage() {
     }
   };
 
+  const handleDownloadPdf = async () => {
+    setDownloadingPdf(true);
+    try {
+      const response = await api.downloadServicePriceTablePdf(selectedClient.id);
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Tabela_Servicos_${selectedClient.name}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error('Erro ao gerar PDF');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="service-price-table-page">
@@ -143,11 +163,21 @@ export default function ServicePriceTablePage() {
 
         {selectedClient && (
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
                 <Tags className="w-4 h-4" />
                 Serviços de {selectedClient.name}
               </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf || entries.length === 0}
+                data-testid="download-service-price-table-pdf-btn"
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                Baixar PDF
+              </Button>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               <form onSubmit={handleSubmitEntry} className="flex items-end gap-2 flex-wrap">
