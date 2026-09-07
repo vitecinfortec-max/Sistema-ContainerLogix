@@ -39,6 +39,7 @@ import NewContainerAuditPage from './pages/NewContainerAuditPage';
 import ContainerAuditDetailPage from './pages/ContainerAuditDetailPage';
 import ComercialCadastrosPage from './pages/ComercialCadastrosPage';
 import ServicePriceTablePage from './pages/ServicePriceTablePage';
+import ServicePriceTableClientPage from './pages/ServicePriceTableClientPage';
 import ClientRepresentativeLinksPage from './pages/ClientRepresentativeLinksPage';
 import ComercialProposalsPage from './pages/ComercialProposalsPage';
 import NewCommercialProposalPage from './pages/NewCommercialProposalPage';
@@ -415,6 +416,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="comercial.tabela_servicos">
                 <ServicePriceTablePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comercial/tabela-servicos/:clientId"
+            element={
+              <ProtectedRoute moduleKey="comercial.tabela_servicos">
+                <ServicePriceTableClientPage />
               </ProtectedRoute>
             }
           />

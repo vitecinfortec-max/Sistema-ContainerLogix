@@ -297,7 +297,7 @@ export default function Layout({ children }) {
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/relatorio'].includes(location.pathname);
-  const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
+  const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive;
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
@@ -567,6 +567,7 @@ export default function Layout({ children }) {
     if (location.pathname.includes('/container-inspections/') && location.pathname !== '/container-inspections/new') return 'Detalhes da Vistoria de Container';
     if (location.pathname.includes('/container-audits/') && location.pathname !== '/container-audits/new') return 'Detalhe da Auditoria';
     if (location.pathname.includes('/comercial/proposta/') && location.pathname !== '/comercial/proposta/new') return 'Editar Proposta Comercial';
+    if (location.pathname.startsWith('/comercial/tabela-servicos/')) return 'Tabela de Serviços';
     return 'ContainerLogix';
   }, [location.pathname, location.search]);
 
