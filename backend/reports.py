@@ -1215,7 +1215,7 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
         return buffer.getvalue()
 
 
-def generate_billing_excel(movements: list, company: dict = None) -> bytes:
+def generate_billing_excel(movements: list, company: dict = None, storage_charges: list = None) -> bytes:
     """Generate billing Excel report with Bsoft template style."""
     try:
         c = merge_company(company)
@@ -1273,9 +1273,55 @@ def generate_billing_excel(movements: list, company: dict = None) -> bytes:
             logo_buffer=download_logo(company)
         )
 
-        # ========== DADOS BANCÁRIOS ==========
-        # Encontrar a última linha com dados
+        # ========== DIÁRIAS DE ARMAZENAGEM EM ABERTO ==========
+        # Seção adicional, calculada na hora (nada é persistido) - containers
+        # em estoque que já passaram do free time acordado na Tabela de
+        # Serviços. Cada moeda presente ganha seu próprio subtotal, nunca um
+        # total único misturando moedas.
         last_row = ws.max_row + 3  # Pular 3 linhas após a tabela
+
+        if storage_charges:
+            storage_title_font = Font(size=12, bold=True, color=PRIMARY_COLOR)
+            storage_header_font = Font(size=9, bold=True, color="FFFFFF")
+            storage_header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
+            storage_subtotal_font = Font(size=9, bold=True)
+            storage_subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+
+            ws.cell(row=last_row, column=2, value="COBRANÇA DE DIÁRIA DE ARMAZENAGEM — CONTAINERS ACIMA DO FREE TIME")
+            ws.cell(row=last_row, column=2).font = storage_title_font
+            ws.merge_cells(start_row=last_row, start_column=2, end_row=last_row, end_column=8)
+            last_row += 2
+
+            by_currency = {}
+            for charge in storage_charges:
+                by_currency.setdefault(charge.get('currency') or 'BRL', []).append(charge)
+
+            storage_headers = ['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor']
+            for currency, group in by_currency.items():
+                for col, header in enumerate(storage_headers, start=2):
+                    header_cell = ws.cell(row=last_row, column=col, value=header)
+                    header_cell.font = storage_header_font
+                    header_cell.fill = storage_header_fill
+                last_row += 1
+                for charge in group:
+                    ws.cell(row=last_row, column=2, value=charge['container_number'])
+                    ws.cell(row=last_row, column=3, value=charge['client_name'])
+                    ws.cell(row=last_row, column=4, value=charge['entry_date'].strftime('%d/%m/%Y'))
+                    ws.cell(row=last_row, column=5, value=charge['days_in_yard'])
+                    ws.cell(row=last_row, column=6, value=charge['free_time_days'])
+                    ws.cell(row=last_row, column=7, value=charge['extra_days'])
+                    ws.cell(row=last_row, column=8, value=format_currency(charge['service_value'], currency))
+                    last_row += 1
+                subtotal = round(sum(charge['service_value'] for charge in group), 2)
+                ws.cell(row=last_row, column=6, value='SUBTOTAL:').font = storage_subtotal_font
+                ws.cell(row=last_row, column=7, value=format_currency(subtotal, currency)).font = storage_subtotal_font
+                for col in range(2, 9):
+                    ws.cell(row=last_row, column=col).fill = storage_subtotal_fill
+                last_row += 2
+
+            last_row += 1
+
+        # ========== DADOS BANCÁRIOS ==========
 
         # Estilo para o título dos dados bancários
         bank_title_font = Font(size=12, bold=True, color=PRIMARY_COLOR)
@@ -1331,7 +1377,7 @@ def generate_billing_excel(movements: list, company: dict = None) -> bytes:
         return buffer.getvalue()
 
 
-def generate_billing_pdf_report(movements: list, report_title: str = "Relatório de Faturamento", company: dict = None) -> bytes:
+def generate_billing_pdf_report(movements: list, report_title: str = "Relatório de Faturamento", company: dict = None, storage_charges: list = None) -> bytes:
     """
     Generate PDF billing report following Bsoft layout style.
     Header: Logo left, company name + address center, generation info right
@@ -1478,6 +1524,59 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
     ]))
 
     elements.append(table)
+
+    # ========== DIÁRIAS DE ARMAZENAGEM EM ABERTO ==========
+    # Seção adicional, calculada na hora (nada é persistido) - containers em
+    # estoque que já passaram do free time acordado na Tabela de Serviços.
+    # Não soma com o total de movimentações acima: cada moeda presente ganha
+    # sua própria subtabela/subtotal, nunca um total único misturando moedas.
+    if storage_charges:
+        section_title_style = ParagraphStyle(
+            'StorageSectionTitle', parent=styles['Normal'], fontSize=11,
+            textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceBefore=14, spaceAfter=6
+        )
+        elements.append(Paragraph("COBRANÇA DE DIÁRIA DE ARMAZENAGEM — CONTAINERS ACIMA DO FREE TIME", section_title_style))
+
+        storage_cell_style = ParagraphStyle('StorageCell', parent=styles['Normal'], fontSize=8, leading=10)
+
+        by_currency = {}
+        for charge in storage_charges:
+            by_currency.setdefault(charge.get('currency') or 'BRL', []).append(charge)
+
+        for currency, group in by_currency.items():
+            rows = [['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor']]
+            for charge in group:
+                rows.append([
+                    Paragraph(charge['container_number'], storage_cell_style),
+                    Paragraph(charge['client_name'], storage_cell_style),
+                    charge['entry_date'].strftime('%d/%m/%Y'),
+                    str(charge['days_in_yard']),
+                    str(charge['free_time_days']),
+                    str(charge['extra_days']),
+                    format_currency(charge['service_value'], currency),
+                ])
+            subtotal = round(sum(charge['service_value'] for charge in group), 2)
+            rows.append(['', '', '', '', '', 'SUBTOTAL:', format_currency(subtotal, currency)])
+
+            storage_table = Table(rows, colWidths=[doc.width*0.14, doc.width*0.26, doc.width*0.12, doc.width*0.14, doc.width*0.1, doc.width*0.12, doc.width*0.12], repeatRows=1)
+            storage_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
+                ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
+                ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
+                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+                ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ]))
+            elements.append(storage_table)
+            elements.append(Spacer(1, 10))
 
     # Build with footer
     footer = _make_pdf_footer(c['name'])
@@ -2780,7 +2879,18 @@ def generate_service_price_table_pdf(client_name: str, entries: list, company: d
 
     data = [['Serviço', 'Valor']]
     for e in entries:
-        data.append([Paragraph(e.get('service_type_name', '-'), cell_style), format_currency(e.get('value', 0), e.get('currency') or 'BRL')])
+        if e.get('billing_type') == 'DIARIA':
+            size_label = f"{e['container_size_group']} pés" if e.get('container_size_group') else 'qualquer tamanho'
+            caption = f"Diária após {e.get('free_time_days', 0)} dias de free time · Contêiner {size_label}"
+            service_cell = Paragraph(
+                f"{e.get('service_type_name', '-')}<br/><font size=7 color='#808080'>{caption}</font>",
+                cell_style
+            )
+            value_str = f"{format_currency(e.get('value', 0), e.get('currency') or 'BRL')}/dia"
+        else:
+            service_cell = Paragraph(e.get('service_type_name', '-'), cell_style)
+            value_str = format_currency(e.get('value', 0), e.get('currency') or 'BRL')
+        data.append([service_cell, value_str])
 
     table = Table(data, colWidths=[doc.width*0.7, doc.width*0.3], repeatRows=1)
     table.setStyle(TableStyle([

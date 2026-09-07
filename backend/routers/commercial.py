@@ -111,6 +111,25 @@ async def create_service_price_entry(data: ServicePriceEntryCreate, current_user
     if not service_type:
         raise HTTPException(status_code=404, detail="Tipo de Serviço não encontrado")
 
+    if data.billing_type == "DIARIA":
+        if data.free_time_days is None:
+            raise HTTPException(status_code=400, detail="Free time (dias) é obrigatório para cobrança de Diária de Armazenagem")
+        if data.status == "ATIVO":
+            conflicting = await db.service_price_entries.find_one(
+                {
+                    "client_id": data.client_id,
+                    "billing_type": "DIARIA",
+                    "status": "ATIVO",
+                    "container_size_group": data.container_size_group,
+                },
+                {"_id": 0, "service_type_name": 1}
+            )
+            if conflicting:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Este cliente já tem uma Diária de Armazenagem ativa para esse tamanho de container ({conflicting['service_type_name']}). Edite ou inative a existente antes de criar uma nova."
+                )
+
     entry = ServicePriceEntry(
         client_id=data.client_id,
         client_name=client['name'],
@@ -118,6 +137,9 @@ async def create_service_price_entry(data: ServicePriceEntryCreate, current_user
         service_type_name=service_type['name'],
         value=round_money(data.value),
         currency=data.currency,
+        billing_type=data.billing_type,
+        free_time_days=data.free_time_days,
+        container_size_group=data.container_size_group,
         status=data.status,
         created_by=current_user['sub'],
     )
@@ -178,6 +200,26 @@ async def update_service_price_entry(item_id: str, data: ServicePriceEntryCreate
     if not service_type:
         raise HTTPException(status_code=404, detail="Tipo de Serviço não encontrado")
 
+    if data.billing_type == "DIARIA":
+        if data.free_time_days is None:
+            raise HTTPException(status_code=400, detail="Free time (dias) é obrigatório para cobrança de Diária de Armazenagem")
+        if data.status == "ATIVO":
+            conflicting = await db.service_price_entries.find_one(
+                {
+                    "client_id": data.client_id,
+                    "billing_type": "DIARIA",
+                    "status": "ATIVO",
+                    "container_size_group": data.container_size_group,
+                    "id": {"$ne": item_id},
+                },
+                {"_id": 0, "service_type_name": 1}
+            )
+            if conflicting:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Este cliente já tem uma Diária de Armazenagem ativa para esse tamanho de container ({conflicting['service_type_name']}). Edite ou inative a existente antes de criar uma nova."
+                )
+
     update_data = {
         "id": item_id,
         "client_id": data.client_id,
@@ -186,6 +228,9 @@ async def update_service_price_entry(item_id: str, data: ServicePriceEntryCreate
         "service_type_name": service_type['name'],
         "value": round_money(data.value),
         "currency": data.currency,
+        "billing_type": data.billing_type,
+        "free_time_days": data.free_time_days,
+        "container_size_group": data.container_size_group,
         "status": data.status,
         "created_at": existing['created_at'],
         "created_by": existing['created_by'],

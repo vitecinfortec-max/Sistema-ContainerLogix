@@ -612,6 +612,9 @@ class ServicePriceEntry(BaseModel):
     service_type_name: str
     value: float
     currency: str = "BRL"  # Moeda do valor: BRL (R$) ou USD ($) - clientes do exterior
+    billing_type: Literal["UNICO", "DIARIA"] = "UNICO"  # UNICO = preço fechado; DIARIA = cobrança de diária após free time
+    free_time_days: Optional[int] = None  # dias de free time acordado - só usado quando billing_type == DIARIA
+    container_size_group: Optional[Literal["20", "40"]] = None  # restringe a diária a containers de 20 ou 40 pés; None = qualquer tamanho
     status: str = "ATIVO"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
@@ -621,6 +624,9 @@ class ServicePriceEntryCreate(BaseModel):
     service_type_id: str
     value: float
     currency: str = "BRL"
+    billing_type: Literal["UNICO", "DIARIA"] = "UNICO"
+    free_time_days: Optional[int] = None
+    container_size_group: Optional[Literal["20", "40"]] = None
     status: str = "ATIVO"
 
 class ServicePriceEntryResponse(BaseModel):
@@ -631,6 +637,9 @@ class ServicePriceEntryResponse(BaseModel):
     service_type_name: str
     value: float
     currency: str = "BRL"
+    billing_type: str = "UNICO"
+    free_time_days: Optional[int] = None
+    container_size_group: Optional[str] = None
     status: str
     created_at: datetime
 

@@ -1701,6 +1701,73 @@ async def download_excel_report(
 
 # ==================== RELATÓRIO DE FATURAMENTO ====================
 
+async def _compute_storage_overage_charges(client_name: Optional[str] = None, status_filter: Optional[str] = None) -> list:
+    """Calcula, na hora (nada é salvo), o valor de Diária de Armazenagem devido
+    por cada container atualmente em estoque que já passou do free time
+    acordado na Tabela de Serviços (Comercial > Tabela de Serviços,
+    billing_type == "DIARIA"). Reaproveita o mesmo algoritmo de última-
+    movimentação-por-container de _get_expected_stock_for_client
+    (container_audits.py) - evita o bug de contagem entradas>saídas do
+    _get_current_stock_movements, sem depender dele."""
+    entry_query = {"billing_type": "DIARIA", "status": "ATIVO"}
+    diaria_entries = await db.service_price_entries.find(entry_query, {"_id": 0}).to_list(None)
+    if client_name:
+        target = client_name.strip().lower()
+        diaria_entries = [e for e in diaria_entries if (e.get('client_name') or '').strip().lower() == target]
+    if not diaria_entries:
+        return []
+
+    lean = await db.movements.find(
+        {}, {"_id": 0, "container_number": 1, "operation_type": 1, "created_at": 1,
+             "client_name": 1, "size_type": 1, "status": 1}
+    ).to_list(None)
+    last_by_container = {}
+    for m in sorted(lean, key=lambda x: parse_datetime_value(x['created_at'])):
+        last_by_container[m['container_number']] = m
+    in_stock = [m for m in last_by_container.values() if m['operation_type'] == 'ENTRADA']
+    if status_filter:
+        in_stock = [m for m in in_stock if m.get('status') == status_filter]
+
+    # Se um container bater com mais de uma entrada DIARIA do mesmo cliente
+    # (não deveria acontecer - bloqueado na criação/edição - mas por segurança
+    # aqui também), prefere a mais específica (com container_size_group).
+    today = now_brt().date()
+    charges = []
+    for container in in_stock:
+        container_client = (container.get('client_name') or '').strip().lower()
+        matches = [
+            e for e in diaria_entries
+            if (e.get('client_name') or '').strip().lower() == container_client
+            and (not e.get('container_size_group') or (container.get('size_type') or '').startswith(e['container_size_group']))
+        ]
+        if not matches:
+            continue
+        matches.sort(key=lambda e: e.get('container_size_group') is None)
+        entry = matches[0]
+
+        free_time_days = entry.get('free_time_days')
+        if free_time_days is None:
+            continue
+        entry_date = parse_datetime_value(container['created_at'])
+        days_in_yard = (today - entry_date.date()).days
+        extra_days = days_in_yard - free_time_days
+        if extra_days <= 0:
+            continue
+        charges.append({
+            "container_number": container['container_number'],
+            "client_name": entry['client_name'],
+            "service_type_name": entry['service_type_name'],
+            "entry_date": entry_date,
+            "days_in_yard": days_in_yard,
+            "free_time_days": free_time_days,
+            "extra_days": extra_days,
+            "daily_rate": entry['value'],
+            "currency": entry.get('currency') or 'BRL',
+            "service_value": round_money(extra_days * entry['value']),
+        })
+    return charges
+
+
 @api_router.get("/reports/billing/daily-chart", response_model=list[DailyBillingPoint])
 async def get_billing_daily_chart(current_user: dict = Depends(get_current_admin_user)):
     today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -1749,8 +1816,15 @@ async def download_billing_pdf_report(
     if client_name and client_name != 'all':
         report_title += f" - Cliente: {client_name}"
 
+    storage_charges = []
+    if billed_filter != 'billed':
+        storage_charges = await _compute_storage_overage_charges(
+            client_name if client_name and client_name != 'all' else None,
+            status_filter if status_filter and status_filter != 'all' else None,
+        )
+
     company = await get_company_settings()
-    pdf_buffer = generate_billing_pdf_report(movements, report_title, company=company)
+    pdf_buffer = generate_billing_pdf_report(movements, report_title, company=company, storage_charges=storage_charges)
 
     return StreamingResponse(
         io.BytesIO(pdf_buffer),
@@ -1801,8 +1875,15 @@ async def download_billing_excel_report(
     if client_name and client_name != 'all':
         report_title += f" - Cliente: {client_name}"
 
+    storage_charges = []
+    if billed_filter != 'billed':
+        storage_charges = await _compute_storage_overage_charges(
+            client_name if client_name and client_name != 'all' else None,
+            status_filter if status_filter and status_filter != 'all' else None,
+        )
+
     company = await get_company_settings()
-    excel_buffer = generate_billing_excel(movements, company=company)
+    excel_buffer = generate_billing_excel(movements, company=company, storage_charges=storage_charges)
 
     return StreamingResponse(
         io.BytesIO(excel_buffer),

@@ -16,6 +16,9 @@ const CURRENCY_OPTIONS = [['BRL', 'R$ - Real'], ['USD', '$ - Dólar']];
 const CURRENCY_SYMBOL = { BRL: 'R$', USD: '$' };
 const formatMoney = (value, currency) => `${CURRENCY_SYMBOL[currency] || currency} ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const BILLING_TYPE_OPTIONS = [['UNICO', 'Único'], ['DIARIA', 'Diária de Armazenagem']];
+const SIZE_GROUP_OPTIONS = [['_any', 'Qualquer tamanho'], ['20', '20 pés'], ['40', '40 pés']];
+
 export default function ServicePriceTableClientPage() {
   const { clientId } = useParams();
   const navigate = useNavigate();
@@ -31,6 +34,9 @@ export default function ServicePriceTableClientPage() {
   const [selectedServiceType, setSelectedServiceType] = useState(null);
   const [valueInput, setValueInput] = useState('');
   const [currency, setCurrency] = useState('BRL');
+  const [billingType, setBillingType] = useState('UNICO');
+  const [freeTimeDays, setFreeTimeDays] = useState('');
+  const [sizeGroup, setSizeGroup] = useState('_any');
   const [editId, setEditId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -70,6 +76,9 @@ export default function ServicePriceTableClientPage() {
     setSelectedServiceType(null);
     setValueInput('');
     setCurrency('BRL');
+    setBillingType('UNICO');
+    setFreeTimeDays('');
+    setSizeGroup('_any');
     setEditId(null);
   };
 
@@ -79,6 +88,9 @@ export default function ServicePriceTableClientPage() {
     setSelectedServiceType({ id: entry.service_type_id, name: entry.service_type_name });
     setValueInput(String(entry.value));
     setCurrency(entry.currency || 'BRL');
+    setBillingType(entry.billing_type || 'UNICO');
+    setFreeTimeDays(entry.free_time_days != null ? String(entry.free_time_days) : '');
+    setSizeGroup(entry.container_size_group || '_any');
   };
 
   const handleSubmitEntry = async (e) => {
@@ -91,9 +103,21 @@ export default function ServicePriceTableClientPage() {
       toast.error('Informe um valor válido');
       return;
     }
+    if (billingType === 'DIARIA' && (freeTimeDays === '' || Number(freeTimeDays) < 0)) {
+      toast.error('Informe o Free Time (dias) para a Diária de Armazenagem');
+      return;
+    }
     setSubmitting(true);
     try {
-      const payload = { client_id: clientId, service_type_id: selectedServiceType.id, value: Number(valueInput), currency };
+      const payload = {
+        client_id: clientId,
+        service_type_id: selectedServiceType.id,
+        value: Number(valueInput),
+        currency,
+        billing_type: billingType,
+        free_time_days: billingType === 'DIARIA' ? Number(freeTimeDays) : null,
+        container_size_group: billingType === 'DIARIA' && sizeGroup !== '_any' ? sizeGroup : null,
+      };
       if (editId) {
         await api.updateServicePriceEntry(editId, payload);
         toast.success('Preço atualizado com sucesso');
@@ -192,7 +216,7 @@ export default function ServicePriceTableClientPage() {
                 />
               </div>
               <div className="w-32">
-                <Label>Valor ({CURRENCY_SYMBOL[currency]})</Label>
+                <Label>{billingType === 'DIARIA' ? 'Valor da Diária' : 'Valor'} ({CURRENCY_SYMBOL[currency]})</Label>
                 <Input type="number" step="0.01" min="0" value={valueInput} onChange={(e) => setValueInput(e.target.value)} className="h-9" />
               </div>
               <div className="w-36">
@@ -206,6 +230,36 @@ export default function ServicePriceTableClientPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="w-48">
+                <Label>Tipo de Cobrança</Label>
+                <Select value={billingType} onValueChange={setBillingType}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {BILLING_TYPE_OPTIONS.map(([value, label]) => (
+                      <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {billingType === 'DIARIA' && (
+                <>
+                  <div className="w-32">
+                    <Label>Free Time (dias)</Label>
+                    <Input type="number" step="1" min="0" value={freeTimeDays} onChange={(e) => setFreeTimeDays(e.target.value)} className="h-9" />
+                  </div>
+                  <div className="w-40">
+                    <Label>Tamanho do Container</Label>
+                    <Select value={sizeGroup} onValueChange={setSizeGroup}>
+                      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SIZE_GROUP_OPTIONS.map(([value, label]) => (
+                          <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              )}
               <Button type="submit" disabled={submitting} data-testid="submit-service-price-entry">
                 <Plus className="w-4 h-4 mr-2" />
                 {editId ? 'Atualizar' : 'Adicionar'}
@@ -231,7 +285,16 @@ export default function ServicePriceTableClientPage() {
                     <tr key={entry.id} className={idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}>
                       <td className="px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200">{entry.service_type_name}</td>
                       <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">
-                        {formatMoney(entry.value, entry.currency || 'BRL')}
+                        {entry.billing_type === 'DIARIA' ? (
+                          <div>
+                            <div>{formatMoney(entry.value, entry.currency || 'BRL')}/dia</div>
+                            <div className="text-xs text-slate-400 dark:text-slate-500">
+                              Free time {entry.free_time_days} dias · {entry.container_size_group ? `${entry.container_size_group} pés` : 'qualquer tamanho'}
+                            </div>
+                          </div>
+                        ) : (
+                          formatMoney(entry.value, entry.currency || 'BRL')
+                        )}
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-1">
