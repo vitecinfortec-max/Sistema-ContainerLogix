@@ -469,20 +469,6 @@ export default function EditMovementPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="service_value">
-                    Valor do Serviço ({clientName === 'CARU Containers Brasil Locação' ? 'US$' : 'R$'})
-                  </Label>
-                  <Input
-                    id="service_value"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    {...register('service_value', { valueAsNumber: true })}
-                    className="h-12 font-mono"
-                  />
-                  <p className="text-xs text-muted-foreground">Este valor aparecerá apenas no relatório de faturamento</p>
-                </div>
-                <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="service_type">Tipo de Serviço</Label>
                     <span className="text-xs text-muted-foreground">
@@ -501,6 +487,20 @@ export default function EditMovementPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="service_value">
+                    Valor do Serviço ({clientName === 'CARU Containers Brasil Locação' ? 'US$' : 'R$'})
+                  </Label>
+                  <Input
+                    id="service_value"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register('service_value', { valueAsNumber: true })}
+                    className="h-12 font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">Este valor aparecerá apenas no relatório de faturamento</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="invoice_number">Nota Fiscal</Label>
