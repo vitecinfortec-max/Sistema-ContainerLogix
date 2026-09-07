@@ -91,6 +91,13 @@ async def send_daily_client_movement_reports(day: date = None) -> dict:
 
     for c in clients:
         try:
+            # Um cliente pode ter mais de um e-mail cadastrado, separados por
+            # ";" (ex: "financeiro@x.com; operacional@x.com").
+            recipient_emails = [e.strip() for e in c["email"].split(';') if e.strip()]
+            if not recipient_emails:
+                skipped.append(c["name"])
+                continue
+
             movements = await _movements_for_client(c["name"], day)
             if not movements:
                 skipped.append(c["name"])
@@ -104,7 +111,7 @@ async def send_daily_client_movement_reports(day: date = None) -> dict:
 
             params = {
                 "from": SENDER_EMAIL,
-                "to": [c["email"]],
+                "to": recipient_emails,
                 "subject": f"ContainerLogix - Relatório de Movimentações - {day.strftime('%d/%m/%Y')}",
                 "html": _build_email_html(c["name"], day, len(movements)),
                 "attachments": [{

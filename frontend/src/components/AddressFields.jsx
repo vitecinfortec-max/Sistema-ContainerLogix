@@ -87,19 +87,24 @@ export function CityStateFields({ value, onChange, cityLabel = 'Cidade', stateLa
 
 // Bloco de endereço completo reutilizável (rua/número/bairro/CEP + cidade/UF
 // em cascata, cidade filtrada pela UF via /api/locations). Value shape:
-// { street, number, neighborhood, zip, city, state }. Mantido self-contained
-// (não reaproveita CityStateFields) pra não alterar o layout já testado na
-// Fase 2 - a duplicação da lógica de busca de cidades é pequena e aceitável.
-export function AddressFields({ value, onChange }) {
+// { street, number, neighborhood, zip, city, state, country }. Mantido
+// self-contained (não reaproveita CityStateFields) pra não alterar o layout
+// já testado na Fase 2 - a duplicação da lógica de busca de cidades é
+// pequena e aceitável.
+// `international=true` troca UF/Cidade (que só cobrem o Brasil, via a base
+// de municípios do IBGE) por campos de texto livre, e acrescenta um campo
+// "País" - pra clientes/fornecedores etc. de fora do Brasil, onde a
+// cascata de estado/cidade brasileira não se aplica.
+export function AddressFields({ value, onChange, international = false }) {
   const v = value || {};
   const [cities, setCities] = useState([]);
 
   useEffect(() => {
-    if (!v.state) { setCities([]); return; }
+    if (international || !v.state) { setCities([]); return; }
     api.getCitiesByUF(v.state)
       .then((r) => setCities(r.data || []))
       .catch(() => setCities([]));
-  }, [v.state]);
+  }, [v.state, international]);
 
   const set = (field, val) => onChange({ ...v, [field]: val });
 
@@ -131,25 +136,41 @@ export function AddressFields({ value, onChange }) {
         </div>
         <div>
           <FieldLabel>UF</FieldLabel>
-          <Select value={v.state || '_empty'} onValueChange={setState}>
-            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {UF_OPTIONS.map(([uf, nome]) => (
-                <SelectItem key={uf} value={uf} className="text-sm">{uf} - {nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {international ? (
+            <Input value={v.state || ''} onChange={(e) => set('state', e.target.value)} className="h-9 text-sm" />
+          ) : (
+            <Select value={v.state || '_empty'} onValueChange={setState}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {UF_OPTIONS.map(([uf, nome]) => (
+                  <SelectItem key={uf} value={uf} className="text-sm">{uf} - {nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </div>
-      <div>
-        <FieldLabel>Cidade</FieldLabel>
-        <Autocomplete
-          value={v.city || ''}
-          onChange={(val) => set('city', val)}
-          options={cities}
-          displayField={(c) => c}
-          className="h-9 text-sm"
-        />
+      <div className={international ? 'grid grid-cols-2 gap-3' : ''}>
+        <div>
+          <FieldLabel>Cidade</FieldLabel>
+          {international ? (
+            <Input value={v.city || ''} onChange={(e) => set('city', e.target.value)} className="h-9 text-sm" />
+          ) : (
+            <Autocomplete
+              value={v.city || ''}
+              onChange={(val) => set('city', val)}
+              options={cities}
+              displayField={(c) => c}
+              className="h-9 text-sm"
+            />
+          )}
+        </div>
+        {international && (
+          <div>
+            <FieldLabel>País</FieldLabel>
+            <Input value={v.country || ''} onChange={(e) => set('country', e.target.value)} className="h-9 text-sm" />
+          </div>
+        )}
       </div>
     </div>
   );

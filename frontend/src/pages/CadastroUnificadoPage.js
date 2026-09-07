@@ -59,6 +59,7 @@ const MASKS = { cpf: formatCPF, cnpj: formatCNPJ, doc: formatCnpjCpf, tel: forma
 const STATUS_ATIVO_INATIVO = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 const STATUS_COM_BLOQUEADO = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo'], ['BLOQUEADO', 'Bloqueado']];
 const STATUS_FUNCIONARIO = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo'], ['AFASTADO', 'Afastado'], ['DESLIGADO', 'Desligado']];
+const LOCATION_TYPE_OPTIONS = [['BRASIL', 'Brasil'], ['EXTERIOR', 'Exterior']];
 
 const TYPES = [
   {
@@ -214,12 +215,13 @@ const TYPES = [
     fields: [
       { name: 'name', label: 'Razão Social / Nome', required: true },
       { name: 'trade_name', label: 'Nome Fantasia' },
-      { name: 'cnpj', label: 'CNPJ ou CPF', mask: 'doc' },
-      { name: 'state_registration', label: 'Inscrição Estadual' },
-      { name: 'municipal_registration', label: 'Inscrição Municipal' },
+      { name: 'location_type', label: 'Brasil ou Exterior', type: 'select', options: LOCATION_TYPE_OPTIONS },
+      { name: 'cnpj', label: 'CNPJ ou CPF', mask: 'doc', showIf: (f) => f.location_type !== 'EXTERIOR' },
+      { name: 'state_registration', label: 'Inscrição Estadual', showIf: (f) => f.location_type !== 'EXTERIOR' },
+      { name: 'municipal_registration', label: 'Inscrição Municipal', showIf: (f) => f.location_type !== 'EXTERIOR' },
       { name: 'phone', label: 'Telefone', mask: 'tel' },
-      { name: 'email', label: 'Email' },
-      { name: 'address_details', label: 'Endereço', type: 'address' },
+      { name: 'email', label: "Email (um ou mais, separados por ';')" },
+      { name: 'address_details', label: 'Endereço', type: 'address', internationalToggle: 'location_type' },
       { name: 'contact_name', label: 'Nome do Contato' },
       { name: 'contact_phone', label: 'Telefone do Contato', mask: 'tel' },
       { name: 'status', label: 'Status', type: 'select', options: STATUS_COM_BLOQUEADO },
@@ -271,6 +273,10 @@ function buildEmptyForm(type) {
   if (form.status === '') {
     const statusField = type.fields.find((f) => f.name === 'status');
     if (statusField) form.status = statusField.options[0][0];
+  }
+  if (form.location_type === '') {
+    const locationTypeField = type.fields.find((f) => f.name === 'location_type');
+    if (locationTypeField) form.location_type = locationTypeField.options[0][0];
   }
   return form;
 }
@@ -457,13 +463,19 @@ export default function CadastroUnificadoPage() {
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {activeType.fields.map((f) => (
+                {activeType.fields.map((f) => {
+                  if (f.showIf && !f.showIf(formData)) return null;
+                  return (
                   <div key={f.name} className="space-y-1.5">
                     {f.type !== 'address' && (
                       <Label className="text-[13px]">{f.label}{f.required ? ' *' : ''}</Label>
                     )}
                     {f.type === 'address' ? (
-                      <AddressFields value={formData[f.name]} onChange={(val) => setField(f.name, val)} />
+                      <AddressFields
+                        value={formData[f.name]}
+                        onChange={(val) => setField(f.name, val)}
+                        international={!!f.internationalToggle && formData[f.internationalToggle] === 'EXTERIOR'}
+                      />
                     ) : f.type === 'select' ? (
                       <Select value={formData[f.name] || f.options[0][0]} onValueChange={(v) => setField(f.name, v)}>
                         <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
@@ -483,7 +495,8 @@ export default function CadastroUnificadoPage() {
                       />
                     )}
                   </div>
-                ))}
+                  );
+                })}
                 <Button type="submit" className="w-full h-10 text-[13px] font-semibold" data-testid="submit-cadastro-button" disabled={submitting}>
                   {submitting ? 'Salvando...' : (editId ? 'Atualizar' : 'Cadastrar')}
                 </Button>

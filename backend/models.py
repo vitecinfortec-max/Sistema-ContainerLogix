@@ -198,11 +198,12 @@ class Client(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     trade_name: Optional[str] = None
+    location_type: str = "BRASIL"  # BRASIL | EXTERIOR - cliente de fora do país não tem CNPJ/CPF nem IE/IM
     cnpj: Optional[str] = None
     state_registration: Optional[str] = None
     municipal_registration: Optional[str] = None
     phone: Optional[str] = None
-    email: Optional[str] = None
+    email: Optional[str] = None  # um ou mais e-mails separados por ";" (usado no envio automático diário)
     address: Optional[str] = None  # legado, mantido por compatibilidade com registros antigos
     address_details: Optional[dict] = None
     contact_name: Optional[str] = None
@@ -215,6 +216,7 @@ class Client(BaseModel):
 class ClientCreate(BaseModel):
     name: str
     trade_name: Optional[str] = None
+    location_type: str = "BRASIL"
     cnpj: Optional[str] = None
     state_registration: Optional[str] = None
     municipal_registration: Optional[str] = None
