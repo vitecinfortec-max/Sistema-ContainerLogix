@@ -2780,7 +2780,7 @@ def generate_service_price_table_pdf(client_name: str, entries: list, company: d
 
     data = [['Serviço', 'Valor']]
     for e in entries:
-        data.append([Paragraph(e.get('service_type_name', '-'), cell_style), format_currency(e.get('value', 0))])
+        data.append([Paragraph(e.get('service_type_name', '-'), cell_style), format_currency(e.get('value', 0), e.get('currency') or 'BRL')])
 
     table = Table(data, colWidths=[doc.width*0.7, doc.width*0.3], repeatRows=1)
     table.setStyle(TableStyle([

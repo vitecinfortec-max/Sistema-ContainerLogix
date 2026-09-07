@@ -117,6 +117,7 @@ async def create_service_price_entry(data: ServicePriceEntryCreate, current_user
         service_type_id=data.service_type_id,
         service_type_name=service_type['name'],
         value=round_money(data.value),
+        currency=data.currency,
         status=data.status,
         created_by=current_user['sub'],
     )
@@ -184,6 +185,7 @@ async def update_service_price_entry(item_id: str, data: ServicePriceEntryCreate
         "service_type_id": data.service_type_id,
         "service_type_name": service_type['name'],
         "value": round_money(data.value),
+        "currency": data.currency,
         "status": data.status,
         "created_at": existing['created_at'],
         "created_by": existing['created_by'],

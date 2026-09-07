@@ -611,6 +611,7 @@ class ServicePriceEntry(BaseModel):
     service_type_id: str
     service_type_name: str
     value: float
+    currency: str = "BRL"  # Moeda do valor: BRL (R$) ou USD ($) - clientes do exterior
     status: str = "ATIVO"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
@@ -619,6 +620,7 @@ class ServicePriceEntryCreate(BaseModel):
     client_id: str
     service_type_id: str
     value: float
+    currency: str = "BRL"
     status: str = "ATIVO"
 
 class ServicePriceEntryResponse(BaseModel):
@@ -628,6 +630,7 @@ class ServicePriceEntryResponse(BaseModel):
     service_type_id: str
     service_type_name: str
     value: float
+    currency: str = "BRL"
     status: str
     created_at: datetime
 

@@ -5,11 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { ArrowLeft, Plus, Trash2, Edit, Tags, FileDown } from 'lucide-react';
+
+const CURRENCY_OPTIONS = [['BRL', 'R$ - Real'], ['USD', '$ - Dólar']];
+const CURRENCY_SYMBOL = { BRL: 'R$', USD: '$' };
+const formatMoney = (value, currency) => `${CURRENCY_SYMBOL[currency] || currency} ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function ServicePriceTableClientPage() {
   const { clientId } = useParams();
@@ -25,6 +30,7 @@ export default function ServicePriceTableClientPage() {
   const [serviceNameInput, setServiceNameInput] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState(null);
   const [valueInput, setValueInput] = useState('');
+  const [currency, setCurrency] = useState('BRL');
   const [editId, setEditId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -63,6 +69,7 @@ export default function ServicePriceTableClientPage() {
     setServiceNameInput('');
     setSelectedServiceType(null);
     setValueInput('');
+    setCurrency('BRL');
     setEditId(null);
   };
 
@@ -71,6 +78,7 @@ export default function ServicePriceTableClientPage() {
     setServiceNameInput(entry.service_type_name);
     setSelectedServiceType({ id: entry.service_type_id, name: entry.service_type_name });
     setValueInput(String(entry.value));
+    setCurrency(entry.currency || 'BRL');
   };
 
   const handleSubmitEntry = async (e) => {
@@ -85,7 +93,7 @@ export default function ServicePriceTableClientPage() {
     }
     setSubmitting(true);
     try {
-      const payload = { client_id: clientId, service_type_id: selectedServiceType.id, value: Number(valueInput) };
+      const payload = { client_id: clientId, service_type_id: selectedServiceType.id, value: Number(valueInput), currency };
       if (editId) {
         await api.updateServicePriceEntry(editId, payload);
         toast.success('Preço atualizado com sucesso');
@@ -183,9 +191,20 @@ export default function ServicePriceTableClientPage() {
                   className="w-full"
                 />
               </div>
-              <div className="w-40">
-                <Label>Valor (R$)</Label>
+              <div className="w-32">
+                <Label>Valor ({CURRENCY_SYMBOL[currency]})</Label>
                 <Input type="number" step="0.01" min="0" value={valueInput} onChange={(e) => setValueInput(e.target.value)} className="h-9" />
+              </div>
+              <div className="w-36">
+                <Label>Moeda</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CURRENCY_OPTIONS.map(([value, label]) => (
+                      <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <Button type="submit" disabled={submitting} data-testid="submit-service-price-entry">
                 <Plus className="w-4 h-4 mr-2" />
@@ -212,7 +231,7 @@ export default function ServicePriceTableClientPage() {
                     <tr key={entry.id} className={idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}>
                       <td className="px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200">{entry.service_type_name}</td>
                       <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">
-                        {entry.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        {formatMoney(entry.value, entry.currency || 'BRL')}
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-1">
