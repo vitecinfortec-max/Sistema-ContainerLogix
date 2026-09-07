@@ -8,7 +8,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Trash2, Edit, Tags, FileDown } from 'lucide-react';
+import { Plus, Trash2, Edit, Tags, FileDown, ListTree } from 'lucide-react';
 
 export default function ServicePriceTablePage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -21,6 +21,9 @@ export default function ServicePriceTablePage() {
   const [entries, setEntries] = useState([]);
   const [loadingEntries, setLoadingEntries] = useState(false);
 
+  const [allEntries, setAllEntries] = useState([]);
+  const [loadingSummary, setLoadingSummary] = useState(true);
+
   const [serviceNameInput, setServiceNameInput] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState(null);
   const [valueInput, setValueInput] = useState('');
@@ -29,6 +32,7 @@ export default function ServicePriceTablePage() {
 
   useEffect(() => {
     loadBaseData();
+    loadSummary();
   }, []);
 
   useEffect(() => {
@@ -46,6 +50,29 @@ export default function ServicePriceTablePage() {
     }
   };
 
+  // Todas as entradas de todos os clientes, só pra montar a lista "Clientes
+  // com Tabela Cadastrada" abaixo - dá visibilidade de quem já tem preço
+  // configurado sem precisar buscar cliente por cliente.
+  const loadSummary = async () => {
+    setLoadingSummary(true);
+    try {
+      const response = await api.getServicePriceEntries();
+      setAllEntries(response.data);
+    } catch (error) {
+      toast.error('Erro ao carregar resumo das tabelas cadastradas');
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  const clientSummaries = Object.values(
+    allEntries.reduce((acc, e) => {
+      if (!acc[e.client_id]) acc[e.client_id] = { client_id: e.client_id, client_name: e.client_name, count: 0 };
+      acc[e.client_id].count += 1;
+      return acc;
+    }, {})
+  ).sort((a, b) => a.client_name.localeCompare(b.client_name));
+
   const loadEntries = async () => {
     setLoadingEntries(true);
     try {
@@ -60,6 +87,7 @@ export default function ServicePriceTablePage() {
 
   const handleSelectClient = (client) => {
     setSelectedClient(client);
+    setClientNameInput(client.name);
     resetEntryForm();
   };
 
@@ -99,6 +127,7 @@ export default function ServicePriceTablePage() {
       }
       resetEntryForm();
       loadEntries();
+      loadSummary();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao salvar preço de serviço');
     } finally {
@@ -112,6 +141,7 @@ export default function ServicePriceTablePage() {
       await api.deleteServicePriceEntry(id);
       toast.success('Removido com sucesso');
       loadEntries();
+      loadSummary();
     } catch (error) {
       toast.error('Erro ao remover');
     }
@@ -158,6 +188,52 @@ export default function ServicePriceTablePage() {
               onSelect={handleSelectClient}
               className="w-full"
             />
+          </CardContent>
+        </Card>
+
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <ListTree className="w-4 h-4" />
+              Clientes com Tabela Cadastrada ({clientSummaries.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {loadingSummary ? (
+              <div className="text-center py-6 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
+            ) : clientSummaries.length === 0 ? (
+              <div className="text-center py-6 text-sm text-slate-500 dark:text-slate-400">Nenhum cliente com tabela de serviços cadastrada ainda</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Serviços Cadastrados</th>
+                      <th className="px-4 py-2.5"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientSummaries.map((cs, idx) => (
+                      <tr
+                        key={cs.client_id}
+                        onClick={() => handleSelectClient({ id: cs.client_id, name: cs.client_name })}
+                        className={`cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/80 ${selectedClient?.id === cs.client_id ? 'bg-primary/10 hover:bg-primary/15' : idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                        data-testid={`service-price-summary-row-${cs.client_id}`}
+                      >
+                        <td className="px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200">{cs.client_name}</td>
+                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{cs.count}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Editar">
+                            <Edit className="w-3.5 h-3.5 text-blue-600" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
