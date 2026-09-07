@@ -50,6 +50,20 @@ def _exact_client_name_filter(client_name: str) -> dict:
     return {"$regex": f"^{re.escape(client_name.strip())}$", "$options": "i"}
 
 
+def _service_type_in_filter(service_type_names: list) -> dict:
+    """Filtro 'o service_type da movimentação é um destes', sem diferenciar
+    maiúsculas/minúsculas - o texto de service_type na movimentação é uma
+    string livre copiada do catálogo de Tipo de Serviço no momento da
+    seleção, e pode ter sido digitada/salva com uma variação de caixa
+    diferente da que está no catálogo hoje (mesmo problema já visto em
+    client_name - ex. "(VAZIO)" nas movimentações reais vs "(Vazio)" no
+    catálogo/Tabela de Serviços)."""
+    return {"$or": [
+        {"service_type": {"$regex": f"^{re.escape(name.strip())}$", "$options": "i"}}
+        for name in service_type_names
+    ]}
+
+
 # ==================== REPRESENTANTE ====================
 
 @api_router.post("/representatives", response_model=RepresentativeResponse)
@@ -286,9 +300,26 @@ async def _compute_commission_report(representative_id: Optional[str], start_dat
         clients_data = []
         rep_total = 0.0
         for link in links:
-            match_query = {**date_filter, "client_name": _exact_client_name_filter(link['client_name']), "billed": True}
-            movements = await db.movements.find(match_query, {"_id": 0, "service_value": 1}).to_list(None)
-            total_billed = round_money(sum((m.get('service_value') or 0) for m in movements))
+            # Só conta pra comissão os serviços que o cliente tem cadastrados
+            # na Tabela de Serviços (Comercial > Tabela de Serviços) - não
+            # todo valor faturado do cliente, que pode incluir serviços fora
+            # do acordo de comissão com o representante.
+            price_entries = await db.service_price_entries.find(
+                {"client_id": link['client_id']}, {"_id": 0, "service_type_name": 1}
+            ).to_list(None)
+            registered_service_types = [e['service_type_name'] for e in price_entries]
+
+            if registered_service_types:
+                match_query = {
+                    **date_filter,
+                    **_service_type_in_filter(registered_service_types),
+                    "client_name": _exact_client_name_filter(link['client_name']),
+                    "billed": True,
+                }
+                movements = await db.movements.find(match_query, {"_id": 0, "service_value": 1}).to_list(None)
+                total_billed = round_money(sum((m.get('service_value') or 0) for m in movements))
+            else:
+                total_billed = 0.0
             commission_value = round_money(total_billed * (link['commission_percentage'] / 100))
             clients_data.append({
                 "client_name": link['client_name'],
