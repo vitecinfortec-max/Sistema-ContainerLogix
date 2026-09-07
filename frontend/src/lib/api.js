@@ -231,6 +231,25 @@ export const api = {
   deleteContainerAudit: (id) => axios.delete(`${API}/container-audits/${id}`),
   downloadContainerAuditPdf: (id) => axios.get(`${API}/container-audits/${id}/pdf`, { responseType: 'blob' }),
 
+  // Comercial: Representante
+  getRepresentatives: () => axios.get(`${API}/representatives`),
+  createRepresentative: (data) => axios.post(`${API}/representatives`, data),
+  updateRepresentative: (id, data) => axios.put(`${API}/representatives/${id}`, data),
+  deleteRepresentative: (id) => axios.delete(`${API}/representatives/${id}`),
+
+  // Comercial: Tabela de Serviços
+  getServicePriceEntries: (params) => axios.get(`${API}/service-price-entries`, { params }),
+  createServicePriceEntry: (data) => axios.post(`${API}/service-price-entries`, data),
+  updateServicePriceEntry: (id, data) => axios.put(`${API}/service-price-entries/${id}`, data),
+  deleteServicePriceEntry: (id) => axios.delete(`${API}/service-price-entries/${id}`),
+
+  // Comercial: Vínculo de Clientes
+  getClientRepresentativeLinks: () => axios.get(`${API}/client-representative-links`),
+  createClientRepresentativeLink: (data) => axios.post(`${API}/client-representative-links`, data),
+  updateClientRepresentativeLink: (id, data) => axios.put(`${API}/client-representative-links/${id}`, data),
+  deleteClientRepresentativeLink: (id) => axios.delete(`${API}/client-representative-links/${id}`),
+  downloadCommissionReportPdf: (params) => axios.get(`${API}/reports/commission/pdf`, { params, responseType: 'blob' }),
+
   // Flex Tank (Controle de Estoque de Bolsas)
   getFlexTankMovements: (params) => axios.get(`${API}/flex-tank/movements`, { params }),
   getFlexTankMovement: (id) => axios.get(`${API}/flex-tank/movements/${id}`),

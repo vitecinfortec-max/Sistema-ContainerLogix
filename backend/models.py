@@ -571,6 +571,93 @@ class ServiceTypeResponse(BaseModel):
     created_at: datetime
 
 
+# ===== COMERCIAL: Representante, Tabela de Serviços, Vínculo de Clientes =====
+class Representative(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    cnpj: Optional[str] = None  # CNPJ ou CPF, mesmo campo/máscara usado em Cliente/Fornecedor
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+class RepresentativeCreate(BaseModel):
+    name: str
+    cnpj: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+
+class RepresentativeResponse(RepresentativeCreate):
+    id: str
+    created_at: datetime
+
+
+class ServicePriceEntry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_id: str
+    client_name: str
+    service_type_id: str
+    service_type_name: str
+    value: float
+    status: str = "ATIVO"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+class ServicePriceEntryCreate(BaseModel):
+    client_id: str
+    service_type_id: str
+    value: float
+    status: str = "ATIVO"
+
+class ServicePriceEntryResponse(BaseModel):
+    id: str
+    client_id: str
+    client_name: str
+    service_type_id: str
+    service_type_name: str
+    value: float
+    status: str
+    created_at: datetime
+
+
+class ClientRepresentativeLink(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    client_id: str
+    client_name: str
+    representative_id: str
+    representative_name: str
+    commission_percentage: float
+    status: str = "ATIVO"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+class ClientRepresentativeLinkCreate(BaseModel):
+    client_id: str
+    representative_id: str
+    commission_percentage: float
+    status: str = "ATIVO"
+
+class ClientRepresentativeLinkResponse(BaseModel):
+    id: str
+    client_id: str
+    client_name: str
+    representative_id: str
+    representative_name: str
+    commission_percentage: float
+    status: str
+    created_at: datetime
+
+
 # Invoice (Fatura) Model
 class Invoice(BaseModel):
     model_config = ConfigDict(extra="ignore")

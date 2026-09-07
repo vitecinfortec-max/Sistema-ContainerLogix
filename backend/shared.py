@@ -302,6 +302,11 @@ MODULE_CATALOG = [
         {"key": "estoque.consulta", "label": "Estoque"},
         {"key": "estoque.relatorio", "label": "Relatório de Estoque"},
     ]},
+    {"key": "comercial", "label": "Comercial", "items": [
+        {"key": "comercial.representante", "label": "Representante"},
+        {"key": "comercial.tabela_servicos", "label": "Tabela de Serviços"},
+        {"key": "comercial.vinculo_clientes", "label": "Vínculo de Clientes"},
+    ]},
 ]
 
 # Prefixo de rota da API -> chave do módulo dono dela. Usado pelo middleware
@@ -316,6 +321,10 @@ PATH_MODULE_MAP = [
     ("/api/check-segregation", "terminal.movimentacoes"),
     ("/api/flex-tank", "terminal.flex_tank"),
     ("/api/container-audits", "terminal.auditoria"),
+    ("/api/representatives", "comercial.representante"),
+    ("/api/service-price-entries", "comercial.tabela_servicos"),
+    ("/api/client-representative-links", "comercial.vinculo_clientes"),
+    ("/api/reports/commission", "comercial.vinculo_clientes"),
     ("/api/vehicle-revisions", "frota.revisao"),
     ("/api/vehicle-checklists", "frota.checklist"),
     ("/api/vehicles", "frota.veiculos"),

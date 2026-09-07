@@ -37,6 +37,7 @@ export default function NewMovementPage() {
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [containerDuplicateError, setContainerDuplicateError] = useState('');
+  const [servicePriceEntries, setServicePriceEntries] = useState([]);
   const clientInputRef = useRef(null);
   const { notifyNewMovement, requestPermission, permission } = useNotifications();
   
@@ -90,6 +91,27 @@ export default function NewMovementPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Carrega a tabela de preços do cliente selecionado (Comercial > Tabela de
+  // Serviços), usada abaixo para preencher o Valor do Serviço automaticamente.
+  useEffect(() => {
+    if (!clientName) {
+      setServicePriceEntries([]);
+      return;
+    }
+    api.getServicePriceEntries({ client_name: clientName })
+      .then((res) => setServicePriceEntries(res.data))
+      .catch(() => setServicePriceEntries([]));
+  }, [clientName]);
+
+  // Preenche o Valor do Serviço automaticamente quando cliente + serviço
+  // selecionados batem com uma entrada da Tabela de Serviços - não impede
+  // edição manual depois, só sugere um valor de partida.
+  useEffect(() => {
+    if (!serviceType || servicePriceEntries.length === 0) return;
+    const match = servicePriceEntries.find((e) => e.service_type_name === serviceType);
+    if (match) setValue('service_value', match.value);
+  }, [serviceType, servicePriceEntries, setValue]);
 
   const loadData = async () => {
     setLoadingData(true);

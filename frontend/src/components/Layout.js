@@ -48,7 +48,11 @@ import {
   FileSpreadsheet,
   Home,
   MoreHorizontal,
-  ListChecks
+  ListChecks,
+  UserCog,
+  Tags,
+  Link2,
+  Briefcase
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -96,6 +100,9 @@ const PAGE_TITLES = {
   '/container-inspections/new': 'Nova Vistoria de Container',
   '/container-audits': 'Auditoria',
   '/container-audits/new': 'Nova Auditoria',
+  '/comercial/cadastros': 'Representante',
+  '/comercial/tabela-servicos': 'Tabela de Serviços',
+  '/comercial/vinculo-clientes': 'Vínculo de Clientes',
   '/flex-tank': 'Flex Tank',
   '/flex-tank/movements/new': 'Nova Movimentação Flex Tank',
   '/loading-schedules': 'Programação de Carregamento',
@@ -137,6 +144,7 @@ const GROUP_COLORS = {
   Transporte: 'chart-6',
   'Opções do Sistema': 'chart-7',
   Estoque: 'chart-8',
+  Comercial: 'chart-9',
 };
 
 export default function Layout({ children }) {
@@ -159,6 +167,7 @@ export default function Layout({ children }) {
   const [manutencaoCadastroOpen, setManutencaoCadastroOpen] = useState(false);
   const [estoqueOpen, setEstoqueOpen] = useState(false);
   const [estoqueCadastroOpen, setEstoqueCadastroOpen] = useState(false);
+  const [comercialOpen, setComercialOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [transporteOpen, setTransporteOpen] = useState(false);
   const [opcoesSistemaOpen, setOpcoesSistemaOpen] = useState(false);
@@ -266,6 +275,8 @@ export default function Layout({ children }) {
     if (savedEstoque !== null) setEstoqueOpen(JSON.parse(savedEstoque));
     const savedEstoqueCadastro = localStorage.getItem('estoqueCadastroOpen');
     if (savedEstoqueCadastro !== null) setEstoqueCadastroOpen(JSON.parse(savedEstoqueCadastro));
+    const savedComercial = localStorage.getItem('comercialOpen');
+    if (savedComercial !== null) setComercialOpen(JSON.parse(savedComercial));
     const savedTerminal = localStorage.getItem('terminalOpen');
     if (savedTerminal !== null) setTerminalOpen(JSON.parse(savedTerminal));
     const savedTransporte = localStorage.getItem('transporteOpen');
@@ -284,6 +295,7 @@ export default function Layout({ children }) {
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/relatorio'].includes(location.pathname);
+  const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname === '/comercial/vinculo-clientes';
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive;
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
@@ -306,6 +318,7 @@ export default function Layout({ children }) {
     if (isManutencaoCadastroActive && !manutencaoCadastroOpen) setManutencaoCadastroOpen(true);
     if (isEstoqueActive && !estoqueOpen) setEstoqueOpen(true);
     if (isEstoqueCadastroActive && !estoqueCadastroOpen) setEstoqueCadastroOpen(true);
+    if (isComercialActive && !comercialOpen) setComercialOpen(true);
     if (isTerminalActive && !terminalOpen) setTerminalOpen(true);
   }, [location.pathname]);
 
@@ -388,6 +401,12 @@ export default function Layout({ children }) {
     localStorage.setItem('estoqueCadastroOpen', JSON.stringify(newState));
   };
 
+  const toggleComercial = () => {
+    const newState = !comercialOpen;
+    setComercialOpen(newState);
+    localStorage.setItem('comercialOpen', JSON.stringify(newState));
+  };
+
   const toggleTerminal = () => {
     const newState = !terminalOpen;
     setTerminalOpen(newState);
@@ -468,6 +487,12 @@ export default function Layout({ children }) {
     { path: '/estoque/cadastros?type=familia-servico', label: 'Família de Serviço', icon: Layers, moduleKey: 'estoque.familia_servico' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
+  const comercialItems = [
+    { path: '/comercial/cadastros?type=representante', label: 'Representante', icon: UserCog, moduleKey: 'comercial.representante' },
+    { path: '/comercial/tabela-servicos', label: 'Tabela de Serviços', icon: Tags, moduleKey: 'comercial.tabela_servicos' },
+    { path: '/comercial/vinculo-clientes', label: 'Vínculo de Clientes', icon: Link2, moduleKey: 'comercial.vinculo_clientes' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
   const transporteItems = [
     { path: '/fleet', label: 'Cadastro de Veículo', icon: Car, moduleKey: 'frota.veiculos' },
     { path: '/fleet/rpa-terceiro', label: 'Contrato de Frete', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
@@ -509,11 +534,12 @@ export default function Layout({ children }) {
   const isFinanceiroGroupVisible = financeiroItems.length > 0;
   const isOperacionalGroupVisible = operacionalItems.length > 0;
   const isEstoqueGroupVisible = estoqueItems.length > 0 || estoqueCadastroItems.length > 0;
+  const isComercialGroupVisible = comercialItems.length > 0;
   const isOpcoesSistemaGroupVisible = opcoesSistemaItems.length > 0;
 
   const allSearchableItems = useMemo(() => [
     ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...manutencaoItems, ...manutencaoCadastroItems, ...transporteItems, ...cadastroItems,
-    ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems, ...estoqueItems, ...estoqueCadastroItems,
+    ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems, ...estoqueItems, ...estoqueCadastroItems, ...comercialItems,
   ], [isAdmin]);
 
   const filteredItems = searchQuery
@@ -955,6 +981,12 @@ export default function Layout({ children }) {
                   </div>
                 )}
 
+                {/* Comercial */}
+                {isComercialGroupVisible && renderGroupHeader('Comercial', Briefcase, comercialOpen, toggleComercial, isComercialActive, 'nav-comercial-toggle')}
+                {isComercialGroupVisible && comercialOpen && sidebarOpen && (
+                  <div>{comercialItems.map((item) => renderNavItem(item, true))}</div>
+                )}
+
                 {/* Opções do Sistema */}
                 {isOpcoesSistemaGroupVisible && renderGroupHeader('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive, 'nav-opcoes-sistema-toggle')}
                 {isOpcoesSistemaGroupVisible && opcoesSistemaOpen && sidebarOpen && (
@@ -1070,6 +1102,10 @@ export default function Layout({ children }) {
                     {estoqueCadastroItems.length > 0 && estoqueCadastroOpen && estoqueCadastroItems.map((item) => renderMobileNavItem(item, true))}
                   </div>
                 )}
+
+                {/* Comercial Mobile */}
+                {isComercialGroupVisible && renderMobileGroupToggle('Comercial', Briefcase, comercialOpen, toggleComercial, isComercialActive)}
+                {isComercialGroupVisible && comercialOpen && comercialItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Opções do Sistema Mobile */}
                 {isOpcoesSistemaGroupVisible && renderMobileGroupToggle('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive)}

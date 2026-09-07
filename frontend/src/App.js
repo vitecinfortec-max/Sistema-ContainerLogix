@@ -37,6 +37,9 @@ import EditContainerInspectionPage from './pages/EditContainerInspectionPage';
 import ContainerAuditsPage from './pages/ContainerAuditsPage';
 import NewContainerAuditPage from './pages/NewContainerAuditPage';
 import ContainerAuditDetailPage from './pages/ContainerAuditDetailPage';
+import ComercialCadastrosPage from './pages/ComercialCadastrosPage';
+import ServicePriceTablePage from './pages/ServicePriceTablePage';
+import ClientRepresentativeLinksPage from './pages/ClientRepresentativeLinksPage';
 import FlexTankPage from './pages/FlexTankPage';
 import NewFlexTankMovementPage from './pages/NewFlexTankMovementPage';
 import FlexTankMovementDetailPage from './pages/FlexTankMovementDetailPage';
@@ -393,6 +396,30 @@ function App() {
             element={
               <ProtectedRoute moduleKey="terminal.auditoria">
                 <ContainerAuditDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comercial/cadastros"
+            element={
+              <ProtectedRoute moduleKey="comercial.representante">
+                <ComercialCadastrosPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comercial/tabela-servicos"
+            element={
+              <ProtectedRoute moduleKey="comercial.tabela_servicos">
+                <ServicePriceTablePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comercial/vinculo-clientes"
+            element={
+              <ProtectedRoute moduleKey="comercial.vinculo_clientes">
+                <ClientRepresentativeLinksPage />
               </ProtectedRoute>
             }
           />

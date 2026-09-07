@@ -30,7 +30,12 @@ export default function EditMovementPage() {
   const [inspectionNotes, setInspectionNotes] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [servicePriceEntries, setServicePriceEntries] = useState([]);
   const clientInputRef = useRef(null);
+  // Só true depois que o usuário troca cliente/serviço manualmente - evita
+  // sobrescrever um Valor do Serviço já salvo assim que a página carrega os
+  // dados existentes da movimentação.
+  const userChangedPricingInputRef = useRef(false);
   const { register, handleSubmit, setValue, watch } = useForm();
 
   const operationType = watch('operation_type');
@@ -55,6 +60,28 @@ export default function EditMovementPage() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Carrega a tabela de preços do cliente selecionado (Comercial > Tabela de
+  // Serviços), usada abaixo para preencher o Valor do Serviço automaticamente.
+  useEffect(() => {
+    if (!clientName) {
+      setServicePriceEntries([]);
+      return;
+    }
+    api.getServicePriceEntries({ client_name: clientName })
+      .then((res) => setServicePriceEntries(res.data))
+      .catch(() => setServicePriceEntries([]));
+  }, [clientName]);
+
+  // Preenche o Valor do Serviço automaticamente quando cliente + serviço
+  // batem com uma entrada da Tabela de Serviços - só depois que o usuário
+  // trocou um dos dois manualmente, nunca na primeira carga da movimentação.
+  useEffect(() => {
+    if (!userChangedPricingInputRef.current) return;
+    if (!serviceType || servicePriceEntries.length === 0) return;
+    const match = servicePriceEntries.find((e) => e.service_type_name === serviceType);
+    if (match) setValue('service_value', match.value);
+  }, [serviceType, servicePriceEntries, setValue]);
 
   const loadMovement = async () => {
     try {
@@ -320,6 +347,7 @@ export default function EditMovementPage() {
                             className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer text-sm"
                             onMouseDown={(e) => {
                               e.preventDefault();
+                              userChangedPricingInputRef.current = true;
                               setClientSearch(client.name);
                               setValue('client_name', client.name);
                               setShowClientDropdown(false);
@@ -461,7 +489,7 @@ export default function EditMovementPage() {
                       {serviceTypes.length > 0 ? `(${serviceTypes.length} cadastrados)` : ''}
                     </span>
                   </div>
-                  <Select value={serviceType || 'none'} onValueChange={(value) => setValue('service_type', value === 'none' ? '' : value)}>
+                  <Select value={serviceType || 'none'} onValueChange={(value) => { userChangedPricingInputRef.current = true; setValue('service_type', value === 'none' ? '' : value); }}>
                     <SelectTrigger id="service_type" data-testid="service-type-select" className="h-12">
                       <SelectValue />
                     </SelectTrigger>

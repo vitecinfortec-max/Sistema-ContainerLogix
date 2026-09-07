@@ -24,6 +24,7 @@ from routers.invoices import api_router as invoices_router
 from routers.photo_registries import api_router as photo_registries_router
 from routers.container_inspections import api_router as container_inspections_router
 from routers.container_audits import api_router as container_audits_router
+from routers.commercial import api_router as commercial_router
 from routers.flex_tank import api_router as flex_tank_router
 from routers.frota import api_router as frota_router
 from routers.loading_schedule import api_router as loading_schedule_router
@@ -76,6 +77,7 @@ app.include_router(invoices_router)
 app.include_router(photo_registries_router)
 app.include_router(container_inspections_router)
 app.include_router(container_audits_router)
+app.include_router(commercial_router)
 app.include_router(flex_tank_router)
 app.include_router(frota_router)
 app.include_router(loading_schedule_router)

@@ -2625,6 +2625,111 @@ def generate_container_audit_pdf(audit: dict, company: dict = None) -> bytes:
     return buffer.getvalue()
 
 
+def generate_commission_report_pdf(data: dict, company: dict = None) -> bytes:
+    """Gera o PDF do Relatório de Comissão: para cada representante, o valor
+    faturado de cada cliente vinculado no período, a comissão calculada
+    (valor faturado x percentual do vínculo) e o total do representante."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=15*mm,
+        bottomMargin=20*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    def money(value):
+        return format_currency(value)
+
+    logo_buffer = download_logo(company)
+    header_elements = _build_pdf_header(styles, logo_buffer, "Relatório de Comissão", company=company, content_width=doc.width)
+    elements.extend(header_elements)
+
+    period_text = f"Período: {fmt_date(data.get('start_date')) if data.get('start_date') else 'Início'} a {fmt_date(data.get('end_date')) if data.get('end_date') else 'Hoje'}"
+    info_style = ParagraphStyle(
+        'CommissionInfoBar', parent=styles['Normal'], fontSize=10,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
+    )
+    info_data = [[Paragraph(period_text, info_style)]]
+    info_table = Table(info_data, colWidths=[doc.width])
+    info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 15))
+
+    gen_info_style = ParagraphStyle(
+        'CommissionGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    section_title_style = ParagraphStyle(
+        'CommissionSectionTitle', parent=styles['Normal'], fontSize=11,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceBefore=10, spaceAfter=6
+    )
+    cell_style = ParagraphStyle('CommissionCell', parent=styles['Normal'], fontSize=9, leading=11)
+
+    representatives = data.get('representatives', [])
+    if not representatives:
+        elements.append(Paragraph("Nenhuma comissão encontrada para o período informado.", cell_style))
+
+    for rep in representatives:
+        elements.append(Paragraph(rep['representative_name'], section_title_style))
+
+        rows = [['Cliente', '% Comissão', 'Valor Faturado', 'Comissão']]
+        for cl in rep['clients']:
+            rows.append([
+                Paragraph(cl['client_name'], cell_style),
+                f"{cl['commission_percentage']:.2f}%",
+                money(cl['total_billed']),
+                money(cl['commission_value']),
+            ])
+        rows.append(['', '', 'TOTAL DO REPRESENTANTE:', money(rep['total_commission'])])
+
+        table = Table(rows, colWidths=[doc.width*0.40, doc.width*0.15, doc.width*0.225, doc.width*0.225], repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (1, 1), (1, -1), 'CENTER'),
+            ('ALIGN', (2, 0), (3, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
+            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+            ('FONTNAME', (2, -1), (3, -1), 'Helvetica-Bold'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        elements.append(table)
+        elements.append(Spacer(1, 12))
+
+    if representatives:
+        grand_total_style = ParagraphStyle(
+            'CommissionGrandTotal', parent=styles['Normal'], fontSize=12,
+            textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', alignment=TA_RIGHT, spaceBefore=10
+        )
+        elements.append(Paragraph(f"TOTAL GERAL: {money(data.get('grand_total', 0))}", grand_total_style))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
 VEHICLE_CHECKLIST_TEMPLATE_SECTIONS = list(VEHICLE_CHECKLIST_TEMPLATE.keys())
 
 
