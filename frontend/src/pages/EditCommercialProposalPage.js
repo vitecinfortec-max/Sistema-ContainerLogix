@@ -6,10 +6,15 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Download } from 'lucide-react';
+
+const CURRENCY_OPTIONS = [['BRL', 'R$ - Real'], ['USD', '$ - Dólar']];
+const CURRENCY_SYMBOL = { BRL: 'R$', USD: '$' };
+const formatMoney = (value, currency) => `${CURRENCY_SYMBOL[currency] || currency} ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function EditCommercialProposalPage() {
   const { id } = useParams();
@@ -23,6 +28,7 @@ export default function EditCommercialProposalPage() {
   const [recipientName, setRecipientName] = useState('');
   const [subject, setSubject] = useState('');
   const [validityDays, setValidityDays] = useState('7');
+  const [currency, setCurrency] = useState('BRL');
   const [items, setItems] = useState([{ description: '', value: '' }]);
   const [freeTimeText, setFreeTimeText] = useState('');
   const [paymentTermsText, setPaymentTermsText] = useState('');
@@ -40,6 +46,7 @@ export default function EditCommercialProposalPage() {
       setRecipientName(p.recipient_name || '');
       setSubject(p.subject || '');
       setValidityDays(String(p.validity_days ?? 7));
+      setCurrency(p.currency || 'BRL');
       setItems((p.items && p.items.length > 0) ? p.items.map(i => ({ description: i.description, value: String(i.value) })) : [{ description: '', value: '' }]);
       setFreeTimeText(p.free_time_text || '');
       setPaymentTermsText(p.payment_terms_text || '');
@@ -78,6 +85,7 @@ export default function EditCommercialProposalPage() {
         recipient_name: recipientName.trim(),
         subject: subject.trim(),
         validity_days: Number(validityDays) || 7,
+        currency,
         items: validItems.map(i => ({ description: i.description.trim(), value: Number(i.value) })),
         free_time_text: freeTimeText.trim() || null,
         payment_terms_text: paymentTermsText.trim() || null,
@@ -166,12 +174,24 @@ export default function EditCommercialProposalPage() {
           </Card>
 
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between space-y-0">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between space-y-0 flex-wrap gap-2">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Serviços e Valores</CardTitle>
-              <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Item
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="w-36">
+                  <Select value={currency} onValueChange={setCurrency}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CURRENCY_OPTIONS.map(([value, label]) => (
+                        <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Item
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-4 space-y-3">
               {items.map((item, idx) => (
@@ -181,7 +201,7 @@ export default function EditCommercialProposalPage() {
                     <Input value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} className="h-9" />
                   </div>
                   <div className="w-40">
-                    <Label className="text-xs">Valor (R$)</Label>
+                    <Label className="text-xs">Valor ({CURRENCY_SYMBOL[currency]})</Label>
                     <Input type="number" step="0.01" min="0" value={item.value} onChange={(e) => updateItem(idx, 'value', e.target.value)} className="h-9" />
                   </div>
                   <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => removeItem(idx)} disabled={items.length === 1}>
@@ -191,7 +211,7 @@ export default function EditCommercialProposalPage() {
               ))}
               <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  Total: {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  Total: {formatMoney(total, currency)}
                 </span>
               </div>
             </CardContent>

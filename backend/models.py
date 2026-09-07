@@ -675,6 +675,7 @@ class CommercialProposal(BaseModel):
     subject: str = "Armazenagem e Movimentação de Contêineres"
     recipient_name: str
     validity_days: int = 7
+    currency: str = "BRL"  # Moeda dos valores da proposta: BRL (R$) ou USD ($) - clientes do exterior
     items: List[CommercialProposalItem] = Field(default_factory=list)
     free_time_text: Optional[str] = None
     payment_terms_text: Optional[str] = None
@@ -688,6 +689,7 @@ class CommercialProposalCreate(BaseModel):
     subject: str = "Armazenagem e Movimentação de Contêineres"
     recipient_name: str
     validity_days: int = 7
+    currency: str = "BRL"
     items: List[CommercialProposalItem] = Field(default_factory=list)
     free_time_text: Optional[str] = None
     payment_terms_text: Optional[str] = None
@@ -700,6 +702,7 @@ class CommercialProposalResponse(BaseModel):
     subject: str
     recipient_name: str
     validity_days: int
+    currency: str = "BRL"
     items: List[CommercialProposalItem] = Field(default_factory=list)
     free_time_text: Optional[str] = None
     payment_terms_text: Optional[str] = None

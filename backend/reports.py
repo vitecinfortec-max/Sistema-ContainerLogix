@@ -2870,11 +2870,12 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
     )
     elements.append(Paragraph("SERVIÇOS E VALORES", section_title_style))
 
+    proposal_currency = proposal.get('currency') or 'BRL'
     cell_style = ParagraphStyle('ProposalCell', parent=styles['Normal'], fontSize=9, leading=11)
     items = proposal.get('items', []) or []
     data = [['Serviço', 'Valor']]
     for item in items:
-        data.append([Paragraph(item.get('description', '-'), cell_style), format_currency(item.get('value', 0))])
+        data.append([Paragraph(item.get('description', '-'), cell_style), format_currency(item.get('value', 0), proposal_currency)])
 
     items_table = Table(data, colWidths=[doc.width*0.7, doc.width*0.3], repeatRows=1)
     items_table.setStyle(TableStyle([
@@ -2893,7 +2894,8 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
     elements.append(items_table)
 
     note_style = ParagraphStyle('ProposalNote', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#808080'), spaceBefore=4, spaceAfter=14)
-    elements.append(Paragraph("Valores expressos em Reais (R$).", note_style))
+    currency_note = {'USD': 'Dólares Americanos (US$)'}.get(proposal_currency, 'Reais (R$)')
+    elements.append(Paragraph(f"Valores expressos em {currency_note}.", note_style))
 
     # ========== BLOCOS DESTACADOS: FREE TIME / FORMA DE PAGAMENTO ==========
     callout_style = ParagraphStyle('ProposalCallout', parent=styles['Normal'], fontSize=9, textColor=colors.black, leading=13)
