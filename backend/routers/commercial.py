@@ -17,16 +17,25 @@ from reports import generate_commission_report_pdf, generate_service_price_table
 api_router = APIRouter(prefix="/api")
 
 
-def _billed_between(start_date: Optional[str], end_date: Optional[str]) -> dict:
-    """Filtro sobre 'billed_at' (string ISO) dentro de um período, convertendo
-    para Date dentro do próprio MongoDB - mesma técnica de _created_at_gte
-    usada em movements.py, mas com limite inferior E superior."""
+def _created_at_between(start_date: Optional[str], end_date: Optional[str]) -> dict:
+    """Filtro sobre 'created_at' (data da própria movimentação/serviço, string
+    ISO) dentro de um período, convertendo para Date dentro do próprio
+    MongoDB - mesma técnica de _created_at_gte usada em movements.py, mas com
+    limite inferior E superior.
+
+    Usa created_at (data do serviço) em vez de billed_at (data em que a
+    fatura foi gerada) de propósito: o período de um relatório de comissão
+    é "comissão sobre o que foi prestado em agosto", não "sobre o que foi
+    faturado em agosto" - na prática o faturamento de um mês inteiro costuma
+    ser feito de uma vez só, dias ou semanas depois, então filtrar por
+    billed_at fazia o relatório de um período inteiro voltar zerado sempre
+    que o faturamento daquelas movimentações só aconteceu no mês seguinte."""
     conditions = []
     if start_date:
-        conditions.append({"$gte": [{"$toDate": "$billed_at"}, datetime.fromisoformat(start_date)]})
+        conditions.append({"$gte": [{"$toDate": "$created_at"}, datetime.fromisoformat(start_date)]})
     if end_date:
         end_dt = datetime.fromisoformat(end_date).replace(hour=23, minute=59, second=59)
-        conditions.append({"$lte": [{"$toDate": "$billed_at"}, end_dt]})
+        conditions.append({"$lte": [{"$toDate": "$created_at"}, end_dt]})
     if not conditions:
         return {}
     return {"$expr": {"$and": conditions} if len(conditions) > 1 else conditions[0]}
@@ -263,7 +272,7 @@ async def _compute_commission_report(representative_id: Optional[str], start_dat
         rep_query = {"id": representative_id}
     representatives = await db.representatives.find(rep_query, {"_id": 0}).sort("name", 1).to_list(None)
 
-    date_filter = _billed_between(start_date, end_date)
+    date_filter = _created_at_between(start_date, end_date)
     report_representatives = []
     grand_total = 0.0
 
