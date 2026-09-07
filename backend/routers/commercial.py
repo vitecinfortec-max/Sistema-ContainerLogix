@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 import io
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -29,6 +30,15 @@ def _billed_between(start_date: Optional[str], end_date: Optional[str]) -> dict:
     if not conditions:
         return {}
     return {"$expr": {"$and": conditions} if len(conditions) > 1 else conditions[0]}
+
+
+def _exact_client_name_filter(client_name: str) -> dict:
+    """Filtro de client_name por igualdade exata, sem diferenciar maiúsculas/
+    minúsculas - ContainerMovement não tem client_id (só client_name como
+    texto livre), mesmo cuidado já usado na Auditoria de Estoque. re.escape
+    evita que um nome com parênteses/pontos (comum em razão social, ex.
+    "CIA. INDUSTRIA DE OLEOS (CIONE)") quebre a regex."""
+    return {"$regex": f"^{re.escape(client_name.strip())}$", "$options": "i"}
 
 
 # ==================== REPRESENTANTE ====================
@@ -101,7 +111,7 @@ async def get_service_price_entries(
         # Match exato, sem diferenciar maiúsculas/minúsculas - mesmo cuidado
         # já usado em _get_expected_stock_for_client (Auditoria de Estoque),
         # evita casar com um cliente parecido por acidente.
-        query['client_name'] = {"$regex": f"^{client_name.strip()}$", "$options": "i"}
+        query['client_name'] = _exact_client_name_filter(client_name)
     items = await db.service_price_entries.find(query, {"_id": 0}).sort("service_type_name", 1).to_list(None)
     return [ServicePriceEntryResponse(**{**i, "created_at": datetime.fromisoformat(i['created_at'])}) for i in items]
 
@@ -267,7 +277,7 @@ async def _compute_commission_report(representative_id: Optional[str], start_dat
         clients_data = []
         rep_total = 0.0
         for link in links:
-            match_query = {**date_filter, "client_name": link['client_name'], "billed": True}
+            match_query = {**date_filter, "client_name": _exact_client_name_filter(link['client_name']), "billed": True}
             movements = await db.movements.find(match_query, {"_id": 0, "service_value": 1}).to_list(None)
             total_billed = round_money(sum((m.get('service_value') or 0) for m in movements))
             commission_value = round_money(total_billed * (link['commission_percentage'] / 100))
