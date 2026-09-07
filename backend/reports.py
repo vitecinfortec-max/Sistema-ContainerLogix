@@ -93,6 +93,7 @@ DEFAULT_COMPANY = {
     'address': 'Configure em "Dados da Empresa"',
     'phone': '(00) 00000-0000',
     'email': 'contato@suaempresa.com',
+    'slogan': '',  # opcional - sem padrão óbvio, some da assinatura quando vazio
     'bank_name': 'Configure em "Dados da Empresa"',
     'bank_agency': '-',
     'bank_account': '-',
@@ -2800,6 +2801,140 @@ def generate_service_price_table_pdf(client_name: str, entries: list, company: d
     if not entries:
         elements.append(Spacer(1, 10))
         elements.append(Paragraph("Nenhum serviço cadastrado para este cliente.", cell_style))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
+def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> bytes:
+    """Gera o PDF da Proposta Comercial: cabeçalho, número/destinatário/data/
+    validade, tabela de serviços e valores, blocos de Free Time e Forma de
+    Pagamento (quando preenchidos), e fechamento com assinatura da empresa."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=15*mm,
+        bottomMargin=20*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = download_logo(company)
+    header_elements = _build_pdf_header(styles, logo_buffer, "PROPOSTA COMERCIAL", company=company, content_width=doc.width)
+    elements.extend(header_elements)
+
+    subject_style = ParagraphStyle(
+        'ProposalSubject', parent=styles['Normal'], fontSize=11,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
+    )
+    elements.append(Paragraph(proposal.get('subject') or '', subject_style))
+
+    # ========== Nº / DESTINATÁRIO / DATA / VALIDADE ==========
+    label_style = ParagraphStyle('ProposalInfoLabel', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#808080'))
+    value_style = ParagraphStyle('ProposalInfoValue', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=colors.black)
+    date_only = fmt_datetime(proposal.get('created_at')).split(' ')[0] if proposal.get('created_at') else now_brt().strftime('%d/%m/%Y')
+
+    info_table = Table([
+        [Paragraph('Nº DA PROPOSTA', label_style), Paragraph('EM NOME DE', label_style), Paragraph('DATA', label_style), Paragraph('VALIDADE', label_style)],
+        [Paragraph(str(proposal.get('proposal_number', '-')), value_style), Paragraph(proposal.get('recipient_name', '-'), value_style),
+         Paragraph(date_only, value_style), Paragraph(f"{proposal.get('validity_days', 7)} dias", value_style)],
+    ], colWidths=[doc.width*0.2, doc.width*0.4, doc.width*0.2, doc.width*0.2])
+    info_table.setStyle(TableStyle([
+        ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor('#CCCCCC')),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
+        ('TOPPADDING', (0, 1), (-1, 1), 4),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 14))
+
+    body_style = ParagraphStyle('ProposalBody', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.black, spaceAfter=10)
+    elements.append(Paragraph(f"Prezado(a) {proposal.get('recipient_name', '-')},", body_style))
+    elements.append(Paragraph(
+        f"Agradecemos o contato e apresentamos, a seguir, nossa proposta comercial para os serviços de "
+        f"{(proposal.get('subject') or '').lower()} na {c['name']}.",
+        body_style
+    ))
+
+    # ========== SERVIÇOS E VALORES ==========
+    section_title_style = ParagraphStyle(
+        'ProposalSectionTitle', parent=styles['Normal'], fontSize=11,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceAfter=6
+    )
+    elements.append(Paragraph("SERVIÇOS E VALORES", section_title_style))
+
+    cell_style = ParagraphStyle('ProposalCell', parent=styles['Normal'], fontSize=9, leading=11)
+    items = proposal.get('items', []) or []
+    data = [['Serviço', 'Valor']]
+    for item in items:
+        data.append([Paragraph(item.get('description', '-'), cell_style), format_currency(item.get('value', 0))])
+
+    items_table = Table(data, colWidths=[doc.width*0.7, doc.width*0.3], repeatRows=1)
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F8F8')]),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(items_table)
+
+    note_style = ParagraphStyle('ProposalNote', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#808080'), spaceBefore=4, spaceAfter=14)
+    elements.append(Paragraph("Valores expressos em Reais (R$).", note_style))
+
+    # ========== BLOCOS DESTACADOS: FREE TIME / FORMA DE PAGAMENTO ==========
+    callout_style = ParagraphStyle('ProposalCallout', parent=styles['Normal'], fontSize=9, textColor=colors.black, leading=13)
+
+    def callout_block(title, text):
+        elements.append(Paragraph(title, section_title_style))
+        box_data = [[Paragraph(text, callout_style)]]
+        box_table = Table(box_data, colWidths=[doc.width])
+        box_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FFF9E6')),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#FFD700')),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        elements.append(box_table)
+        elements.append(Spacer(1, 12))
+
+    if proposal.get('free_time_text'):
+        callout_block("FREE TIME DE ARMAZENAGEM", proposal['free_time_text'])
+
+    if proposal.get('payment_terms_text'):
+        callout_block("FORMA DE PAGAMENTO", proposal['payment_terms_text'])
+
+    elements.append(Paragraph(
+        f"Esta proposta tem validade de {proposal.get('validity_days', 7)} dias a partir da data de emissão.",
+        body_style
+    ))
+    elements.append(Paragraph(
+        "Ficamos à disposição para esclarecer quaisquer dúvidas e para tratativas sobre as condições operacionais deste serviço.",
+        body_style
+    ))
+
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph("Atenciosamente,", body_style))
+    signature_style = ParagraphStyle('ProposalSignature', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', textColor=colors.black)
+    elements.append(Paragraph(c['name'], signature_style))
+    if c.get('slogan'):
+        slogan_style = ParagraphStyle('ProposalSlogan', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#808080'))
+        elements.append(Paragraph(c['slogan'], slogan_style))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)

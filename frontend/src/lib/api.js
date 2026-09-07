@@ -251,6 +251,14 @@ export const api = {
   deleteClientRepresentativeLink: (id) => axios.delete(`${API}/client-representative-links/${id}`),
   downloadCommissionReportPdf: (params) => axios.get(`${API}/reports/commission/pdf`, { params, responseType: 'blob' }),
 
+  // Comercial: Proposta Comercial
+  getCommercialProposals: () => axios.get(`${API}/commercial-proposals`),
+  getCommercialProposal: (id) => axios.get(`${API}/commercial-proposals/${id}`),
+  createCommercialProposal: (data) => axios.post(`${API}/commercial-proposals`, data),
+  updateCommercialProposal: (id, data) => axios.put(`${API}/commercial-proposals/${id}`, data),
+  deleteCommercialProposal: (id) => axios.delete(`${API}/commercial-proposals/${id}`),
+  downloadCommercialProposalPdf: (id) => axios.get(`${API}/commercial-proposals/${id}/pdf`, { responseType: 'blob' }),
+
   // Flex Tank (Controle de Estoque de Bolsas)
   getFlexTankMovements: (params) => axios.get(`${API}/flex-tank/movements`, { params }),
   getFlexTankMovement: (id) => axios.get(`${API}/flex-tank/movements/${id}`),

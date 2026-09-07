@@ -62,6 +62,7 @@ class CompanySettings(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    slogan: Optional[str] = None
     bank_name: Optional[str] = None
     bank_agency: Optional[str] = None
     bank_account: Optional[str] = None
@@ -75,6 +76,7 @@ class CompanySettingsUpdate(BaseModel):
     address: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    slogan: Optional[str] = None
     bank_name: Optional[str] = None
     bank_agency: Optional[str] = None
     bank_account: Optional[str] = None
@@ -656,6 +658,54 @@ class ClientRepresentativeLinkResponse(BaseModel):
     commission_percentage: float
     status: str
     created_at: datetime
+
+
+class CommercialProposalItem(BaseModel):
+    description: str
+    value: float
+
+class CommercialProposal(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    proposal_seq: int  # valor numérico puro do contador do ano
+    proposal_number: str  # formatado "20260002"
+    subject: str = "Armazenagem e Movimentação de Contêineres"
+    recipient_name: str
+    validity_days: int = 7
+    items: List[CommercialProposalItem] = Field(default_factory=list)
+    free_time_text: Optional[str] = None
+    payment_terms_text: Optional[str] = None
+    status: str = "ATIVO"
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+class CommercialProposalCreate(BaseModel):
+    subject: str = "Armazenagem e Movimentação de Contêineres"
+    recipient_name: str
+    validity_days: int = 7
+    items: List[CommercialProposalItem] = Field(default_factory=list)
+    free_time_text: Optional[str] = None
+    payment_terms_text: Optional[str] = None
+    status: str = "ATIVO"
+
+class CommercialProposalResponse(BaseModel):
+    id: str
+    proposal_seq: int
+    proposal_number: str
+    subject: str
+    recipient_name: str
+    validity_days: int
+    items: List[CommercialProposalItem] = Field(default_factory=list)
+    free_time_text: Optional[str] = None
+    payment_terms_text: Optional[str] = None
+    status: str
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 # Invoice (Fatura) Model

@@ -306,6 +306,7 @@ MODULE_CATALOG = [
         {"key": "comercial.representante", "label": "Representante"},
         {"key": "comercial.tabela_servicos", "label": "Tabela de Serviços"},
         {"key": "comercial.vinculo_clientes", "label": "Vínculo de Clientes"},
+        {"key": "comercial.proposta", "label": "Proposta Comercial"},
     ]},
 ]
 
@@ -325,6 +326,7 @@ PATH_MODULE_MAP = [
     ("/api/service-price-entries", "comercial.tabela_servicos"),
     ("/api/client-representative-links", "comercial.vinculo_clientes"),
     ("/api/reports/commission", "comercial.vinculo_clientes"),
+    ("/api/commercial-proposals", "comercial.proposta"),
     ("/api/vehicle-revisions", "frota.revisao"),
     ("/api/vehicle-checklists", "frota.checklist"),
     ("/api/vehicles", "frota.veiculos"),

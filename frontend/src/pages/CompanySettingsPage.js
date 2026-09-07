@@ -32,6 +32,7 @@ const formatPhone = (value) => {
 const EMPTY_FORM = {
   name: '',
   cnpj: '',
+  slogan: '',
   address: '',
   phone: '',
   email: '',
@@ -226,6 +227,17 @@ export default function CompanySettingsPage() {
                       data-testid="company-name-input"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      disabled={!isAdmin}
+                      className="h-10 text-[13px]"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="slogan" className="text-[13px]">Slogan / Tagline</Label>
+                    <Input
+                      id="slogan"
+                      data-testid="company-slogan-input"
+                      value={formData.slogan}
+                      onChange={(e) => setFormData({ ...formData, slogan: e.target.value })}
                       disabled={!isAdmin}
                       className="h-10 text-[13px]"
                     />

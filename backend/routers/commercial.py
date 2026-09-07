@@ -10,9 +10,13 @@ from models import (
     Representative, RepresentativeCreate, RepresentativeResponse,
     ServicePriceEntry, ServicePriceEntryCreate, ServicePriceEntryResponse,
     ClientRepresentativeLink, ClientRepresentativeLinkCreate, ClientRepresentativeLinkResponse,
+    CommercialProposal, CommercialProposalCreate, CommercialProposalResponse,
 )
 from shared import db, get_current_active_user, get_company_settings, round_money
-from reports import generate_commission_report_pdf, generate_service_price_table_pdf
+from reports import (
+    generate_commission_report_pdf, generate_service_price_table_pdf, now_brt,
+    generate_commercial_proposal_pdf,
+)
 
 api_router = APIRouter(prefix="/api")
 
@@ -358,4 +362,85 @@ async def download_commission_report_pdf(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="Relatorio_Comissao.pdf"'}
+    )
+
+
+# ==================== PROPOSTA COMERCIAL ====================
+
+async def get_next_proposal_number():
+    """Sequencial anual (reinicia em 1 a cada ano civil), formatado AAAA9999."""
+    year = now_brt().year
+    counter = await db.counters.find_one_and_update(
+        {"_id": f"proposal_number_{year}"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    seq = counter["seq"]
+    return seq, f"{year}{seq:04d}"
+
+
+@api_router.post("/commercial-proposals", response_model=CommercialProposalResponse)
+async def create_commercial_proposal(data: CommercialProposalCreate, current_user: dict = Depends(get_current_active_user)):
+    seq, number = await get_next_proposal_number()
+    proposal = CommercialProposal(
+        **data.model_dump(),
+        proposal_seq=seq,
+        proposal_number=number,
+        created_by=current_user['sub'],
+        created_by_name=current_user['name'],
+    )
+    doc = proposal.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.commercial_proposals.insert_one(doc)
+    return CommercialProposalResponse(**doc)
+
+@api_router.get("/commercial-proposals", response_model=List[CommercialProposalResponse])
+async def list_commercial_proposals(current_user: dict = Depends(get_current_active_user)):
+    items = await db.commercial_proposals.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    return [CommercialProposalResponse(**{**i, "created_at": datetime.fromisoformat(i['created_at'])}) for i in items]
+
+@api_router.get("/commercial-proposals/{proposal_id}", response_model=CommercialProposalResponse)
+async def get_commercial_proposal(proposal_id: str, current_user: dict = Depends(get_current_active_user)):
+    proposal = await db.commercial_proposals.find_one({"id": proposal_id}, {"_id": 0})
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposta não encontrada")
+    return CommercialProposalResponse(**proposal)
+
+@api_router.put("/commercial-proposals/{proposal_id}", response_model=CommercialProposalResponse)
+async def update_commercial_proposal(proposal_id: str, data: CommercialProposalCreate, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.commercial_proposals.find_one({"id": proposal_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Proposta não encontrada")
+    update_data = {
+        **data.model_dump(),
+        "id": proposal_id,
+        "proposal_seq": existing['proposal_seq'],
+        "proposal_number": existing['proposal_number'],
+        "created_by": existing['created_by'],
+        "created_by_name": existing['created_by_name'],
+        "created_at": existing['created_at'],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.commercial_proposals.replace_one({"id": proposal_id}, update_data)
+    return CommercialProposalResponse(**update_data)
+
+@api_router.delete("/commercial-proposals/{proposal_id}")
+async def delete_commercial_proposal(proposal_id: str, current_user: dict = Depends(get_current_active_user)):
+    result = await db.commercial_proposals.delete_one({"id": proposal_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Proposta não encontrada")
+    return {"message": "Proposta removida com sucesso"}
+
+@api_router.get("/commercial-proposals/{proposal_id}/pdf")
+async def download_commercial_proposal_pdf(proposal_id: str, current_user: dict = Depends(get_current_active_user)):
+    proposal = await db.commercial_proposals.find_one({"id": proposal_id}, {"_id": 0})
+    if not proposal:
+        raise HTTPException(status_code=404, detail="Proposta não encontrada")
+    company = await get_company_settings()
+    pdf_bytes = generate_commercial_proposal_pdf(proposal, company=company)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Proposta_{proposal["proposal_number"]}.pdf"'}
     )

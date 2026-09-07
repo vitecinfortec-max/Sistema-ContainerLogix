@@ -40,6 +40,9 @@ import ContainerAuditDetailPage from './pages/ContainerAuditDetailPage';
 import ComercialCadastrosPage from './pages/ComercialCadastrosPage';
 import ServicePriceTablePage from './pages/ServicePriceTablePage';
 import ClientRepresentativeLinksPage from './pages/ClientRepresentativeLinksPage';
+import ComercialProposalsPage from './pages/ComercialProposalsPage';
+import NewCommercialProposalPage from './pages/NewCommercialProposalPage';
+import EditCommercialProposalPage from './pages/EditCommercialProposalPage';
 import FlexTankPage from './pages/FlexTankPage';
 import NewFlexTankMovementPage from './pages/NewFlexTankMovementPage';
 import FlexTankMovementDetailPage from './pages/FlexTankMovementDetailPage';
@@ -420,6 +423,30 @@ function App() {
             element={
               <ProtectedRoute moduleKey="comercial.vinculo_clientes">
                 <ClientRepresentativeLinksPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comercial/proposta"
+            element={
+              <ProtectedRoute moduleKey="comercial.proposta">
+                <ComercialProposalsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comercial/proposta/new"
+            element={
+              <ProtectedRoute moduleKey="comercial.proposta">
+                <NewCommercialProposalPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comercial/proposta/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="comercial.proposta">
+                <EditCommercialProposalPage />
               </ProtectedRoute>
             }
           />

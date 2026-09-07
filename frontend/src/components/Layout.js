@@ -103,6 +103,8 @@ const PAGE_TITLES = {
   '/comercial/cadastros': 'Representante',
   '/comercial/tabela-servicos': 'Tabela de Serviços',
   '/comercial/vinculo-clientes': 'Vínculo de Clientes',
+  '/comercial/proposta': 'Proposta Comercial',
+  '/comercial/proposta/new': 'Nova Proposta Comercial',
   '/flex-tank': 'Flex Tank',
   '/flex-tank/movements/new': 'Nova Movimentação Flex Tank',
   '/loading-schedules': 'Programação de Carregamento',
@@ -295,7 +297,7 @@ export default function Layout({ children }) {
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/relatorio'].includes(location.pathname);
-  const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname === '/comercial/vinculo-clientes';
+  const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive;
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
@@ -491,6 +493,7 @@ export default function Layout({ children }) {
     { path: '/comercial/cadastros?type=representante', label: 'Representante', icon: UserCog, moduleKey: 'comercial.representante' },
     { path: '/comercial/tabela-servicos', label: 'Tabela de Serviços', icon: Tags, moduleKey: 'comercial.tabela_servicos' },
     { path: '/comercial/vinculo-clientes', label: 'Vínculo de Clientes', icon: Link2, moduleKey: 'comercial.vinculo_clientes' },
+    { path: '/comercial/proposta', label: 'Proposta Comercial', icon: FileText, moduleKey: 'comercial.proposta' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const transporteItems = [
@@ -563,6 +566,7 @@ export default function Layout({ children }) {
     if (location.pathname.includes('/container-inspections/') && location.pathname.includes('/edit')) return 'Editar Vistoria de Container';
     if (location.pathname.includes('/container-inspections/') && location.pathname !== '/container-inspections/new') return 'Detalhes da Vistoria de Container';
     if (location.pathname.includes('/container-audits/') && location.pathname !== '/container-audits/new') return 'Detalhe da Auditoria';
+    if (location.pathname.includes('/comercial/proposta/') && location.pathname !== '/comercial/proposta/new') return 'Editar Proposta Comercial';
     return 'ContainerLogix';
   }, [location.pathname, location.search]);
 
