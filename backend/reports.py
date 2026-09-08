@@ -1223,8 +1223,18 @@ def generate_billing_excel(movements: list, company: dict = None, storage_charge
         ws = wb.active
         ws.title = "Faturamento"
 
-        total_value = sum(m.get('service_value', 0) or 0 for m in movements)
-        val_str = f"R$ {total_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        # Cada movimentação carrega sua própria moeda (campo "currency") -
+        # mesma lógica multi-moeda do PDF: soma por moeda, só junta num texto
+        # "R$ X + $ Y" quando o relatório mistura mais de uma.
+        currency_totals = {}
+        for m in movements:
+            cur = m.get('currency') or 'BRL'
+            currency_totals[cur] = currency_totals.get(cur, 0) + (m.get('service_value') or 0)
+        single_currency = next(iter(currency_totals), 'BRL') if len(currency_totals) <= 1 else None
+        if single_currency:
+            val_str = format_currency(currency_totals.get(single_currency, 0), single_currency)
+        else:
+            val_str = ' + '.join(format_currency(v, cur) for cur, v in currency_totals.items())
         stats_text = f"Total: {len(movements)} movimentações  |  Valor Total: {val_str}"
 
         headers = [
@@ -1262,16 +1272,37 @@ def generate_billing_excel(movements: list, company: dict = None, storage_charge
         # Center alignment for: ID(0), Tipo(2), Status(8), Tamanho(9)
         center_cols = {0, 2, 8, 9}
 
+        currency_excel_format = {'BRL': 'R$ #,##0.00', 'USD': '$ #,##0.00', 'EUR': '€ #,##0.00'}
+        default_value_format = currency_excel_format.get(single_currency or 'BRL', 'R$ #,##0.00')
+
         _bsoft_style_excel(
             ws, "Relatório de Faturamento", stats_text, headers, data_rows, col_widths,
             center_cols=center_cols,
             right_align_cols={12},
-            number_fmt_cols={12: 'R$ #,##0.00'},
-            total_col=12,
+            number_fmt_cols={12: default_value_format},
+            total_col=12 if single_currency else None,
+            total_number_format=default_value_format,
             stats_text=stats_text,
             company_name=c['name'],
             logo_buffer=download_logo(company)
         )
+
+        # Quando o relatório mistura moedas, cada linha precisa do formato da
+        # sua própria moeda (o número passado pra _bsoft_style_excel acima é
+        # só o padrão de coluna) e o total vira uma linha manual por moeda -
+        # nunca um SUM único, que misturaria valores de moedas diferentes.
+        if not single_currency:
+            value_col = 2 + 12  # first_col (B=2) + índice da coluna Valor
+            data_start = 9  # header_row (8) + 1, mesma convenção de _bsoft_style_excel
+            for idx, m in enumerate(movements):
+                cur = m.get('currency') or 'BRL'
+                ws.cell(row=data_start + idx, column=value_col).number_format = currency_excel_format.get(cur, 'R$ #,##0.00')
+            total_row = data_start + len(movements) + 1
+            label_cell = ws.cell(row=total_row, column=value_col - 1, value='TOTAL:')
+            label_cell.font = Font(name='Calibri', size=9, bold=True)
+            label_cell.alignment = Alignment(horizontal='right', vertical='center')
+            total_cell = ws.cell(row=total_row, column=value_col, value=val_str)
+            total_cell.font = Font(name='Calibri', size=9, bold=True)
 
         # ========== DIÁRIAS DE ARMAZENAGEM EM ABERTO ==========
         # Seção adicional, calculada na hora (nada é persistido) - containers
@@ -1404,11 +1435,22 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
     elements.extend(header_elements)
 
     # ========== STATISTICS BAR ==========
+    # Cada movimentação carrega sua própria moeda (campo "currency", BRL por
+    # padrão) - clientes do exterior podem ter sido cadastrados em USD (ver
+    # Tabela de Serviços). Soma-se por moeda em vez de tratar tudo como R$,
+    # e só junta num texto único "R$ X + $ Y" quando o relatório mistura
+    # mais de uma moeda (o comum é uma só, especialmente com filtro de cliente).
     total_records = len(movements)
-    total_value = sum(m.get('service_value', 0) or 0 for m in movements)
+    currency_totals = {}
+    for m in movements:
+        cur = m.get('currency') or 'BRL'
+        currency_totals[cur] = currency_totals.get(cur, 0) + (m.get('service_value') or 0)
+    if len(currency_totals) <= 1:
+        value_str = format_currency(next(iter(currency_totals.values()), 0), next(iter(currency_totals), 'BRL'))
+    else:
+        value_str = ' + '.join(format_currency(v, cur) for cur, v in currency_totals.items())
     total_billed = sum(1 for m in movements if m.get('billed'))
     total_unbilled = total_records - total_billed
-    value_str = f"R$ {total_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
     stats_text = f"Total: {total_records}  |  Faturadas: {total_billed}  |  Não Faturadas: {total_unbilled}  |  Valor Total: {value_str}"
 
@@ -1464,7 +1506,7 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
         created_at = dt_brt.strftime('%d/%m/%Y %H:%M') if dt_brt else str(m.get('created_at', '-'))
 
         service_value = m.get('service_value')
-        val_str = f"R$ {service_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if service_value else '-'
+        val_str = format_currency(service_value, m.get('currency') or 'BRL') if service_value else '-'
 
         data.append([
             cell(m.get('transaction_id', '-'), align='center'),

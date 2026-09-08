@@ -106,11 +106,21 @@ export default function NewMovementPage() {
 
   // Preenche o Valor do Serviço automaticamente quando cliente + serviço
   // selecionados batem com uma entrada da Tabela de Serviços - não impede
-  // edição manual depois, só sugere um valor de partida.
+  // edição manual depois, só sugere um valor de partida. Também guarda a
+  // moeda cadastrada nessa entrada (R$ ou $), usada no envio do formulário.
+  const [matchedCurrency, setMatchedCurrency] = useState(null);
   useEffect(() => {
-    if (!serviceType || servicePriceEntries.length === 0) return;
+    if (!serviceType || servicePriceEntries.length === 0) {
+      setMatchedCurrency(null);
+      return;
+    }
     const match = servicePriceEntries.find((e) => e.service_type_name === serviceType);
-    if (match) setValue('service_value', match.value);
+    if (match) {
+      setValue('service_value', match.value);
+      setMatchedCurrency(match.currency || 'BRL');
+    } else {
+      setMatchedCurrency(null);
+    }
   }, [serviceType, servicePriceEntries, setValue]);
 
   const loadData = async () => {
@@ -163,8 +173,10 @@ export default function NewMovementPage() {
     }
     setLoading(true);
     try {
-      // Determinar moeda baseada no cliente
-      const currency = data.client_name === 'CARU Containers Brasil Locação' ? 'USD' : 'BRL';
+      // Moeda vem da Tabela de Serviços do cliente (campo Moeda cadastrado
+      // junto com o serviço) quando há um serviço selecionado que bate com
+      // uma entrada cadastrada; senão cai no caso hardcoded legado abaixo.
+      const currency = matchedCurrency || (data.client_name === 'CARU Containers Brasil Locação' ? 'USD' : 'BRL');
       
       // Incluir fotos e moeda no payload
       const payload = {
@@ -653,7 +665,7 @@ export default function NewMovementPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="service_value">
-                    Valor do Serviço ({clientName === 'CARU Containers Brasil Locação' ? 'US$' : 'R$'})
+                    Valor do Serviço ({(matchedCurrency || (clientName === 'CARU Containers Brasil Locação' ? 'USD' : 'BRL')) === 'USD' ? 'US$' : 'R$'})
                   </Label>
                   <Input
                     id="service_value"

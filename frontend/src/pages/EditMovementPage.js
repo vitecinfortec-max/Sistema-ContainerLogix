@@ -44,6 +44,7 @@ export default function EditMovementPage() {
   const shippingLine = watch('shipping_line');
   const clientName = watch('client_name');
   const serviceType = watch('service_type');
+  const existingCurrency = watch('currency');
 
   useEffect(() => {
     loadMovement();
@@ -76,11 +77,17 @@ export default function EditMovementPage() {
   // Preenche o Valor do Serviço automaticamente quando cliente + serviço
   // batem com uma entrada da Tabela de Serviços - só depois que o usuário
   // trocou um dos dois manualmente, nunca na primeira carga da movimentação.
+  // Também guarda a moeda cadastrada nessa entrada (R$ ou $), usada no envio
+  // do formulário no lugar da moeda antiga da movimentação.
+  const [matchedCurrency, setMatchedCurrency] = useState(null);
   useEffect(() => {
     if (!userChangedPricingInputRef.current) return;
     if (!serviceType || servicePriceEntries.length === 0) return;
     const match = servicePriceEntries.find((e) => e.service_type_name === serviceType);
-    if (match) setValue('service_value', match.value);
+    if (match) {
+      setValue('service_value', match.value);
+      setMatchedCurrency(match.currency || 'BRL');
+    }
   }, [serviceType, servicePriceEntries, setValue]);
 
   const loadMovement = async () => {
@@ -152,8 +159,10 @@ export default function EditMovementPage() {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      // Determinar moeda baseada no cliente
-      const currency = data.client_name === 'CARU Containers Brasil Locação' ? 'USD' : 'BRL';
+      // Moeda vem da Tabela de Serviços do cliente quando o usuário trocou
+      // cliente/serviço nesta edição; senão preserva a moeda já salva na
+      // movimentação, e só cai no caso hardcoded legado se nem isso existir.
+      const currency = matchedCurrency || data.currency || (data.client_name === 'CARU Containers Brasil Locação' ? 'USD' : 'BRL');
       
       // Incluir fotos e moeda no payload
       const payload = {
@@ -490,7 +499,7 @@ export default function EditMovementPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="service_value">
-                    Valor do Serviço ({clientName === 'CARU Containers Brasil Locação' ? 'US$' : 'R$'})
+                    Valor do Serviço ({(matchedCurrency || existingCurrency || (clientName === 'CARU Containers Brasil Locação' ? 'USD' : 'BRL')) === 'USD' ? 'US$' : 'R$'})
                   </Label>
                   <Input
                     id="service_value"
