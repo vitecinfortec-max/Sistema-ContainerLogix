@@ -1215,6 +1215,154 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
         return buffer.getvalue()
 
 
+def _write_storage_charges_excel(ws, storage_charges: list, start_row: int) -> int:
+    """Escreve a seção de cobrança de Diária de Armazenagem a partir de
+    start_row (título + uma tabela por moeda, com subtotal). Retorna a
+    próxima linha livre depois da seção. Reaproveitado como bloco extra do
+    Relatório de Faturamento e como corpo do Relatório de Diárias
+    standalone (generate_storage_overage_excel_report)."""
+    if not storage_charges:
+        return start_row
+
+    last_row = start_row
+    storage_title_font = Font(size=12, bold=True, color=PRIMARY_COLOR)
+    storage_header_font = Font(size=9, bold=True, color="FFFFFF")
+    storage_header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
+    storage_subtotal_font = Font(size=9, bold=True)
+    storage_subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+
+    ws.cell(row=last_row, column=2, value="COBRANÇA DE DIÁRIA DE ARMAZENAGEM — CONTAINERS ACIMA DO FREE TIME")
+    ws.cell(row=last_row, column=2).font = storage_title_font
+    ws.merge_cells(start_row=last_row, start_column=2, end_row=last_row, end_column=8)
+    last_row += 2
+
+    by_currency = {}
+    for charge in storage_charges:
+        by_currency.setdefault(charge.get('currency') or 'BRL', []).append(charge)
+
+    storage_headers = ['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor']
+    for currency, group in by_currency.items():
+        for col, header in enumerate(storage_headers, start=2):
+            header_cell = ws.cell(row=last_row, column=col, value=header)
+            header_cell.font = storage_header_font
+            header_cell.fill = storage_header_fill
+        last_row += 1
+        for charge in group:
+            ws.cell(row=last_row, column=2, value=charge['container_number'])
+            ws.cell(row=last_row, column=3, value=charge['client_name'])
+            ws.cell(row=last_row, column=4, value=charge['entry_date'].strftime('%d/%m/%Y'))
+            ws.cell(row=last_row, column=5, value=charge['days_in_yard'])
+            ws.cell(row=last_row, column=6, value=charge['free_time_days'])
+            ws.cell(row=last_row, column=7, value=charge['extra_days'])
+            ws.cell(row=last_row, column=8, value=format_currency(charge['service_value'], currency))
+            last_row += 1
+        subtotal = round(sum(charge['service_value'] for charge in group), 2)
+        ws.cell(row=last_row, column=6, value='SUBTOTAL:').font = storage_subtotal_font
+        ws.cell(row=last_row, column=7, value=format_currency(subtotal, currency)).font = storage_subtotal_font
+        for col in range(2, 9):
+            ws.cell(row=last_row, column=col).fill = storage_subtotal_fill
+        last_row += 2
+
+    return last_row + 1
+
+
+def generate_storage_overage_excel_report(storage_charges: list, company: dict = None) -> bytes:
+    """Relatório standalone (Excel) com só a cobrança de Diária de
+    Armazenagem - mesmo bloco usado como seção extra do Relatório de
+    Faturamento, mas sem a tabela de movimentações."""
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Diárias"
+
+        stats_text = f"Containers em Aberto: {len(storage_charges)}  |  Valor Total: {_storage_charges_totals_text(storage_charges)}"
+
+        ws.column_dimensions['A'].width = 3
+        for letter, w in {'B': 16, 'C': 26, 'D': 12, 'E': 14, 'F': 10, 'G': 14, 'H': 14}.items():
+            ws.column_dimensions[letter].width = w
+
+        logo_buffer = download_logo(company)
+        if logo_buffer is not None:
+            try:
+                target_height_px = 92
+                try:
+                    logo_buffer.seek(0)
+                    with PILImage.open(logo_buffer) as pil_img:
+                        orig_w, orig_h = pil_img.size
+                    target_width_px = int(target_height_px * orig_w / orig_h) if orig_h else target_height_px
+                except Exception:
+                    target_width_px = target_height_px
+                logo_buffer.seek(0)
+                logo_img = XLImage(logo_buffer)
+                logo_img.height = target_height_px
+                logo_img.width = target_width_px
+                ws.add_image(logo_img, 'A2')
+            except Exception as e:
+                logger.error(f"Error adding logo to storage overage Excel: {e}")
+
+        ws.merge_cells('B2:H3')
+        cell = ws['B2']
+        cell.value = c['name']
+        cell.font = Font(name='Calibri', size=38, bold=True, color=PRIMARY_COLOR)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[2].height = 30
+        ws.row_dimensions[3].height = 40.5
+
+        ws.merge_cells('B4:H4')
+        cell = ws['B4']
+        cell.value = "Relatório de Diárias de Armazenagem"
+        cell.font = Font(name='Calibri', size=16, color=PRIMARY_COLOR)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[4].height = 21
+
+        ws.row_dimensions[5].height = 13
+
+        ws.merge_cells('B6:H6')
+        cell = ws['B6']
+        cell.value = stats_text
+        cell.font = Font(name='Calibri', size=12, bold=True, color=PRIMARY_COLOR)
+        cell.fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type='solid')
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[6].height = 28
+
+        ws.merge_cells('B7:H7')
+        cell = ws['B7']
+        cell.value = f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')} | Fuso: UTC-3 (Brasília)"
+        cell.font = Font(name='Calibri', size=9, color='808080')
+        cell.alignment = Alignment(horizontal='center')
+        ws.row_dimensions[7].height = 15
+
+        if storage_charges:
+            last_row = _write_storage_charges_excel(ws, storage_charges, 9)
+        else:
+            ws.cell(row=9, column=2, value="Nenhum container em estoque passou do free time configurado na Tabela de Serviços.")
+            ws.cell(row=9, column=2).font = Font(size=10, color='808080')
+            last_row = 9
+
+        ws.sheet_view.showGridLines = False
+        ws.print_area = f'A1:H{max(last_row, 9)}'
+        ws.page_setup.orientation = 'landscape'
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.print_options.horizontalCentered = True
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+    except Exception as e:
+        logger.error(f"Error generating storage overage Excel: {e}")
+        wb = Workbook()
+        ws = wb.active
+        ws['A1'] = "Erro ao gerar relatório."
+        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+
 def generate_billing_excel(movements: list, company: dict = None, storage_charges: list = None) -> bytes:
     """Generate billing Excel report with Bsoft template style."""
     try:
@@ -1309,48 +1457,7 @@ def generate_billing_excel(movements: list, company: dict = None, storage_charge
         # em estoque que já passaram do free time acordado na Tabela de
         # Serviços. Cada moeda presente ganha seu próprio subtotal, nunca um
         # total único misturando moedas.
-        last_row = ws.max_row + 3  # Pular 3 linhas após a tabela
-
-        if storage_charges:
-            storage_title_font = Font(size=12, bold=True, color=PRIMARY_COLOR)
-            storage_header_font = Font(size=9, bold=True, color="FFFFFF")
-            storage_header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
-            storage_subtotal_font = Font(size=9, bold=True)
-            storage_subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-
-            ws.cell(row=last_row, column=2, value="COBRANÇA DE DIÁRIA DE ARMAZENAGEM — CONTAINERS ACIMA DO FREE TIME")
-            ws.cell(row=last_row, column=2).font = storage_title_font
-            ws.merge_cells(start_row=last_row, start_column=2, end_row=last_row, end_column=8)
-            last_row += 2
-
-            by_currency = {}
-            for charge in storage_charges:
-                by_currency.setdefault(charge.get('currency') or 'BRL', []).append(charge)
-
-            storage_headers = ['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor']
-            for currency, group in by_currency.items():
-                for col, header in enumerate(storage_headers, start=2):
-                    header_cell = ws.cell(row=last_row, column=col, value=header)
-                    header_cell.font = storage_header_font
-                    header_cell.fill = storage_header_fill
-                last_row += 1
-                for charge in group:
-                    ws.cell(row=last_row, column=2, value=charge['container_number'])
-                    ws.cell(row=last_row, column=3, value=charge['client_name'])
-                    ws.cell(row=last_row, column=4, value=charge['entry_date'].strftime('%d/%m/%Y'))
-                    ws.cell(row=last_row, column=5, value=charge['days_in_yard'])
-                    ws.cell(row=last_row, column=6, value=charge['free_time_days'])
-                    ws.cell(row=last_row, column=7, value=charge['extra_days'])
-                    ws.cell(row=last_row, column=8, value=format_currency(charge['service_value'], currency))
-                    last_row += 1
-                subtotal = round(sum(charge['service_value'] for charge in group), 2)
-                ws.cell(row=last_row, column=6, value='SUBTOTAL:').font = storage_subtotal_font
-                ws.cell(row=last_row, column=7, value=format_currency(subtotal, currency)).font = storage_subtotal_font
-                for col in range(2, 9):
-                    ws.cell(row=last_row, column=col).fill = storage_subtotal_fill
-                last_row += 2
-
-            last_row += 1
+        last_row = _write_storage_charges_excel(ws, storage_charges, ws.max_row + 3)
 
         # ========== DADOS BANCÁRIOS ==========
 
@@ -1572,53 +1679,7 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
     # estoque que já passaram do free time acordado na Tabela de Serviços.
     # Não soma com o total de movimentações acima: cada moeda presente ganha
     # sua própria subtabela/subtotal, nunca um total único misturando moedas.
-    if storage_charges:
-        section_title_style = ParagraphStyle(
-            'StorageSectionTitle', parent=styles['Normal'], fontSize=11,
-            textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceBefore=14, spaceAfter=6
-        )
-        elements.append(Paragraph("COBRANÇA DE DIÁRIA DE ARMAZENAGEM — CONTAINERS ACIMA DO FREE TIME", section_title_style))
-
-        storage_cell_style = ParagraphStyle('StorageCell', parent=styles['Normal'], fontSize=8, leading=10)
-
-        by_currency = {}
-        for charge in storage_charges:
-            by_currency.setdefault(charge.get('currency') or 'BRL', []).append(charge)
-
-        for currency, group in by_currency.items():
-            rows = [['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor']]
-            for charge in group:
-                rows.append([
-                    Paragraph(charge['container_number'], storage_cell_style),
-                    Paragraph(charge['client_name'], storage_cell_style),
-                    charge['entry_date'].strftime('%d/%m/%Y'),
-                    str(charge['days_in_yard']),
-                    str(charge['free_time_days']),
-                    str(charge['extra_days']),
-                    format_currency(charge['service_value'], currency),
-                ])
-            subtotal = round(sum(charge['service_value'] for charge in group), 2)
-            rows.append(['', '', '', '', '', 'SUBTOTAL:', format_currency(subtotal, currency)])
-
-            storage_table = Table(rows, colWidths=[doc.width*0.14, doc.width*0.26, doc.width*0.12, doc.width*0.14, doc.width*0.1, doc.width*0.12, doc.width*0.12], repeatRows=1)
-            storage_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 8),
-                ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
-                ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
-                ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-                ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-                ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ]))
-            elements.append(storage_table)
-            elements.append(Spacer(1, 10))
+    elements.extend(_build_storage_charges_pdf_elements(styles, doc.width, storage_charges))
 
     # Build with footer
     footer = _make_pdf_footer(c['name'])
@@ -1627,6 +1688,136 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
     buffer.close()
 
     return pdf_bytes
+
+
+def _build_storage_charges_pdf_elements(styles, doc_width, storage_charges: list) -> list:
+    """Monta os elementos (título + uma tabela por moeda, com subtotal) da
+    cobrança de Diária de Armazenagem. Reaproveitado como seção extra do
+    Relatório de Faturamento e como corpo do Relatório de Diárias
+    standalone (generate_storage_overage_pdf_report)."""
+    if not storage_charges:
+        return []
+
+    elements = []
+    section_title_style = ParagraphStyle(
+        'StorageSectionTitle', parent=styles['Normal'], fontSize=11,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceBefore=14, spaceAfter=6
+    )
+    elements.append(Paragraph("COBRANÇA DE DIÁRIA DE ARMAZENAGEM — CONTAINERS ACIMA DO FREE TIME", section_title_style))
+
+    storage_cell_style = ParagraphStyle('StorageCell', parent=styles['Normal'], fontSize=8, leading=10)
+
+    by_currency = {}
+    for charge in storage_charges:
+        by_currency.setdefault(charge.get('currency') or 'BRL', []).append(charge)
+
+    for currency, group in by_currency.items():
+        rows = [['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor']]
+        for charge in group:
+            rows.append([
+                Paragraph(charge['container_number'], storage_cell_style),
+                Paragraph(charge['client_name'], storage_cell_style),
+                charge['entry_date'].strftime('%d/%m/%Y'),
+                str(charge['days_in_yard']),
+                str(charge['free_time_days']),
+                str(charge['extra_days']),
+                format_currency(charge['service_value'], currency),
+            ])
+        subtotal = round(sum(charge['service_value'] for charge in group), 2)
+        rows.append(['', '', '', '', '', 'SUBTOTAL:', format_currency(subtotal, currency)])
+
+        storage_table = Table(rows, colWidths=[doc_width*0.14, doc_width*0.26, doc_width*0.12, doc_width*0.14, doc_width*0.1, doc_width*0.12, doc_width*0.12], repeatRows=1)
+        storage_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
+            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+            ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(storage_table)
+        elements.append(Spacer(1, 10))
+
+    return elements
+
+
+def _storage_charges_totals_text(storage_charges: list) -> str:
+    """'Valor Total: R$ X' ou, quando há mais de uma moeda, 'R$ X + $ Y'."""
+    currency_totals = {}
+    for charge in storage_charges:
+        cur = charge.get('currency') or 'BRL'
+        currency_totals[cur] = currency_totals.get(cur, 0) + (charge.get('service_value') or 0)
+    if len(currency_totals) <= 1:
+        return format_currency(next(iter(currency_totals.values()), 0), next(iter(currency_totals), 'BRL'))
+    return ' + '.join(format_currency(v, cur) for cur, v in currency_totals.items())
+
+
+def generate_storage_overage_pdf_report(storage_charges: list, company: dict = None, report_title: str = "Relatório de Diárias de Armazenagem") -> bytes:
+    """Relatório standalone com só a cobrança de Diária de Armazenagem
+    (containers em estoque acima do free time cadastrado na Tabela de
+    Serviços) - mesmo cálculo/seção usados no Relatório de Faturamento,
+    mas sem misturar com a lista de movimentações."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=10*mm,
+        leftMargin=10*mm,
+        topMargin=10*mm,
+        bottomMargin=15*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = download_logo(company)
+    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
+    elements.extend(header_elements)
+
+    stats_text = f"Containers em Aberto: {len(storage_charges)}  |  Valor Total: {_storage_charges_totals_text(storage_charges)}"
+    stats_style = ParagraphStyle(
+        'StorageOverageStatsBar', parent=styles['Normal'], fontSize=10,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
+    )
+    stats_table = Table([[Paragraph(stats_text, stats_style)]], colWidths=[doc.width])
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+    ]))
+    elements.append(stats_table)
+
+    gen_info_style = ParagraphStyle(
+        'StorageOverageGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    if storage_charges:
+        elements.extend(_build_storage_charges_pdf_elements(styles, doc.width, storage_charges))
+    else:
+        empty_style = ParagraphStyle(
+            'StorageOverageEmpty', parent=styles['Normal'], fontSize=10,
+            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
+        )
+        elements.append(Paragraph("Nenhum container em estoque passou do free time configurado na Tabela de Serviços.", empty_style))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
 
 
 def generate_invoice_pdf(invoice: dict, movements: list, company: dict = None) -> bytes:

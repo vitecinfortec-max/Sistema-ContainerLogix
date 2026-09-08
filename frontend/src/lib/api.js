@@ -118,6 +118,8 @@ export const api = {
   downloadBillingPDFReport: (params) => axios.get(`${API}/reports/billing/pdf`, { params, responseType: 'blob' }),
   downloadBillingExcelReport: (params) => axios.get(`${API}/reports/billing/excel`, { params, responseType: 'blob' }),
   getBillingDailyChart: () => axios.get(`${API}/reports/billing/daily-chart`),
+  downloadStorageOveragePdfReport: (params) => axios.get(`${API}/reports/storage-overage/pdf`, { params, responseType: 'blob' }),
+  downloadStorageOverageExcelReport: (params) => axios.get(`${API}/reports/storage-overage/excel`, { params, responseType: 'blob' }),
   
   // Yard Control (Controle de Pátio)
   getYardControl: (params) => axios.get(`${API}/yard-control`, { params }),

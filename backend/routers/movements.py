@@ -54,6 +54,7 @@ from auth import get_password_hash, verify_password, create_access_token, get_cu
 from reports import (
     generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel,
     generate_movement_voucher_pdf, generate_yard_control_pdf,
+    generate_storage_overage_pdf_report, generate_storage_overage_excel_report,
     now_brt, to_brt, merge_company, DEFAULT_COMPANY
 )
 
@@ -1897,6 +1898,52 @@ async def download_billing_excel_report(
         io.BytesIO(excel_buffer),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=relatorio_faturamento.xlsx"}
+    )
+
+
+@api_router.get("/reports/storage-overage/pdf")
+async def download_storage_overage_pdf_report(
+    client_name: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    storage_charges = await _compute_storage_overage_charges(
+        client_name if client_name and client_name != 'all' else None,
+        status_filter if status_filter and status_filter != 'all' else None,
+    )
+
+    report_title = "Relatório de Diárias de Armazenagem"
+    if client_name and client_name != 'all':
+        report_title += f" - Cliente: {client_name}"
+
+    company = await get_company_settings()
+    pdf_buffer = generate_storage_overage_pdf_report(storage_charges, company=company, report_title=report_title)
+
+    return StreamingResponse(
+        io.BytesIO(pdf_buffer),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=relatorio_diarias_armazenagem.pdf"}
+    )
+
+
+@api_router.get("/reports/storage-overage/excel")
+async def download_storage_overage_excel_report(
+    client_name: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    storage_charges = await _compute_storage_overage_charges(
+        client_name if client_name and client_name != 'all' else None,
+        status_filter if status_filter and status_filter != 'all' else None,
+    )
+
+    company = await get_company_settings()
+    excel_buffer = generate_storage_overage_excel_report(storage_charges, company=company)
+
+    return StreamingResponse(
+        io.BytesIO(excel_buffer),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=relatorio_diarias_armazenagem.xlsx"}
     )
 
 

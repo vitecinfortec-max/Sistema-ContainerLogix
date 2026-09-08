@@ -178,6 +178,55 @@ export default function ReportsBillingPage() {
     }
   };
 
+  const buildStorageOverageParams = () => {
+    const params = {};
+    if (filterClient !== 'all') params.client_name = filterClient;
+    if (filterStatus !== 'all') params.status_filter = filterStatus;
+    return params;
+  };
+
+  const downloadStorageOveragePDF = async () => {
+    setLoading(true);
+    try {
+      const params = buildStorageOverageParams();
+      const response = await api.downloadStorageOveragePdfReport(params);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const timestamp = format(new Date(), 'dd-MM-yyyy_HH-mm');
+      link.setAttribute('download', `relatorio_diarias_armazenagem_${timestamp}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Relatório de Diárias de Armazenagem PDF gerado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao gerar relatório de diárias de armazenagem PDF');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadStorageOverageExcel = async () => {
+    setLoading(true);
+    try {
+      const params = buildStorageOverageParams();
+      const response = await api.downloadStorageOverageExcelReport(params);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const timestamp = format(new Date(), 'dd-MM-yyyy_HH-mm');
+      link.setAttribute('download', `relatorio_diarias_armazenagem_${timestamp}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Relatório de Diárias de Armazenagem Excel gerado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao gerar relatório de diárias de armazenagem Excel');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="reports-billing-page">
@@ -326,29 +375,62 @@ export default function ReportsBillingPage() {
         </Card>
 
         {/* Barra de ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={downloadPDF}
-            disabled={loading}
-            title="Baixar PDF"
-            data-testid="download-billing-pdf-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <FileText className="w-4 h-4 text-red-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={downloadExcel}
-            disabled={loading}
-            title="Baixar Excel"
-            data-testid="download-billing-excel-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-green-600" />
-          </Button>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wide font-semibold">Faturamento</Label>
+            <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={downloadPDF}
+                disabled={loading}
+                title="Baixar PDF"
+                data-testid="download-billing-pdf-button"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <FileText className="w-4 h-4 text-red-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={downloadExcel}
+                disabled={loading}
+                title="Baixar Excel"
+                data-testid="download-billing-excel-button"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-green-600" />
+              </Button>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wide font-semibold">Diárias de Armazenagem</Label>
+            <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={downloadStorageOveragePDF}
+                disabled={loading}
+                title="Baixar PDF de Diárias"
+                data-testid="download-storage-overage-pdf-button"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <FileText className="w-4 h-4 text-red-600" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={downloadStorageOverageExcel}
+                disabled={loading}
+                title="Baixar Excel de Diárias"
+                data-testid="download-storage-overage-excel-button"
+                className="h-9 w-9 p-0 disabled:opacity-30"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-green-600" />
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Faturamento por Dia */}
