@@ -1,6 +1,6 @@
 import asyncio
 import os
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from typing import Optional, List, Literal
 import io
 import re
@@ -1710,14 +1710,25 @@ async def download_excel_report(
 
 # ==================== RELATÓRIO DE FATURAMENTO ====================
 
-async def _compute_storage_overage_charges(client_name: Optional[str] = None, status_filter: Optional[str] = None) -> list:
+async def _compute_storage_overage_charges(
+    client_name: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+) -> list:
     """Calcula, na hora (nada é salvo), o valor de Diária de Armazenagem devido
     por cada container atualmente em estoque que já passou do free time
     acordado na Tabela de Serviços (Comercial > Tabela de Serviços,
     billing_type == "DIARIA"). Reaproveita o mesmo algoritmo de última-
     movimentação-por-container de _get_expected_stock_for_client
     (container_audits.py) - evita o bug de contagem entradas>saídas do
-    _get_current_stock_movements, sem depender dele."""
+    _get_current_stock_movements, sem depender dele.
+
+    date_from/date_to restringem quais dias excedentes entram na conta
+    (e no valor): só os dias excedentes que caem dentro do período
+    selecionado são cobrados nesta chamada - evita cobrar de novo, num
+    relatório de um período fechado, os dias excedentes que já foram
+    cobrados/mostrados em um relatório de período anterior."""
     entry_query = {"billing_type": "DIARIA", "status": "ATIVO"}
     diaria_entries = await db.service_price_entries.find(entry_query, {"_id": 0}).to_list(None)
     if client_name:
@@ -1759,7 +1770,10 @@ async def _compute_storage_overage_charges(client_name: Optional[str] = None, st
             continue
         entry_date = parse_datetime_value(container['created_at'])
         days_in_yard = (today - entry_date.date()).days
-        extra_days = days_in_yard - free_time_days
+        excess_start = entry_date.date() + timedelta(days=free_time_days)
+        period_start = max(excess_start, date_from) if date_from else excess_start
+        period_end = min(today, date_to) if date_to else today
+        extra_days = (period_end - period_start).days
         if extra_days <= 0:
             continue
         charges.append({
@@ -1830,6 +1844,8 @@ async def download_billing_pdf_report(
         storage_charges = await _compute_storage_overage_charges(
             client_name if client_name and client_name != 'all' else None,
             status_filter if status_filter and status_filter != 'all' else None,
+            datetime.fromisoformat(date_from).date() if date_from else None,
+            datetime.fromisoformat(date_to).date() if date_to else None,
         )
 
     company = await get_company_settings()
@@ -1889,6 +1905,8 @@ async def download_billing_excel_report(
         storage_charges = await _compute_storage_overage_charges(
             client_name if client_name and client_name != 'all' else None,
             status_filter if status_filter and status_filter != 'all' else None,
+            datetime.fromisoformat(date_from).date() if date_from else None,
+            datetime.fromisoformat(date_to).date() if date_to else None,
         )
 
     company = await get_company_settings()
@@ -1905,16 +1923,24 @@ async def download_billing_excel_report(
 async def download_storage_overage_pdf_report(
     client_name: Optional[str] = None,
     status_filter: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
     storage_charges = await _compute_storage_overage_charges(
         client_name if client_name and client_name != 'all' else None,
         status_filter if status_filter and status_filter != 'all' else None,
+        datetime.fromisoformat(date_from).date() if date_from else None,
+        datetime.fromisoformat(date_to).date() if date_to else None,
     )
 
     report_title = "Relatório de Diárias de Armazenagem"
     if client_name and client_name != 'all':
         report_title += f" - Cliente: {client_name}"
+    if date_from or date_to:
+        de = datetime.fromisoformat(date_from).strftime('%d/%m/%Y') if date_from else '...'
+        ate = datetime.fromisoformat(date_to).strftime('%d/%m/%Y') if date_to else '...'
+        report_title += f" - Período: {de} a {ate}"
 
     company = await get_company_settings()
     pdf_buffer = generate_storage_overage_pdf_report(storage_charges, company=company, report_title=report_title)
@@ -1930,15 +1956,27 @@ async def download_storage_overage_pdf_report(
 async def download_storage_overage_excel_report(
     client_name: Optional[str] = None,
     status_filter: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
     storage_charges = await _compute_storage_overage_charges(
         client_name if client_name and client_name != 'all' else None,
         status_filter if status_filter and status_filter != 'all' else None,
+        datetime.fromisoformat(date_from).date() if date_from else None,
+        datetime.fromisoformat(date_to).date() if date_to else None,
     )
 
+    report_title = "Relatório de Diárias de Armazenagem"
+    if client_name and client_name != 'all':
+        report_title += f" - Cliente: {client_name}"
+    if date_from or date_to:
+        de = datetime.fromisoformat(date_from).strftime('%d/%m/%Y') if date_from else '...'
+        ate = datetime.fromisoformat(date_to).strftime('%d/%m/%Y') if date_to else '...'
+        report_title += f" - Período: {de} a {ate}"
+
     company = await get_company_settings()
-    excel_buffer = generate_storage_overage_excel_report(storage_charges, company=company)
+    excel_buffer = generate_storage_overage_excel_report(storage_charges, company=company, report_title=report_title)
 
     return StreamingResponse(
         io.BytesIO(excel_buffer),

@@ -1266,7 +1266,7 @@ def _write_storage_charges_excel(ws, storage_charges: list, start_row: int) -> i
     return last_row + 1
 
 
-def generate_storage_overage_excel_report(storage_charges: list, company: dict = None) -> bytes:
+def generate_storage_overage_excel_report(storage_charges: list, company: dict = None, report_title: str = "Relatório de Diárias de Armazenagem") -> bytes:
     """Relatório standalone (Excel) com só a cobrança de Diária de
     Armazenagem - mesmo bloco usado como seção extra do Relatório de
     Faturamento, mas sem a tabela de movimentações."""
@@ -1311,7 +1311,7 @@ def generate_storage_overage_excel_report(storage_charges: list, company: dict =
 
         ws.merge_cells('B4:H4')
         cell = ws['B4']
-        cell.value = "Relatório de Diárias de Armazenagem"
+        cell.value = report_title
         cell.font = Font(name='Calibri', size=16, color=PRIMARY_COLOR)
         cell.alignment = Alignment(horizontal='center', vertical='center')
         ws.row_dimensions[4].height = 21

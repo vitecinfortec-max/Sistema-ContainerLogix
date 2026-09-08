@@ -182,6 +182,8 @@ export default function ReportsBillingPage() {
     const params = {};
     if (filterClient !== 'all') params.client_name = filterClient;
     if (filterStatus !== 'all') params.status_filter = filterStatus;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
     return params;
   };
 
@@ -412,7 +414,7 @@ export default function ReportsBillingPage() {
                 size="sm"
                 onClick={downloadStorageOveragePDF}
                 disabled={loading}
-                title="Baixar PDF de Diárias"
+                title={dateFrom || dateTo ? 'Baixar PDF de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar PDF de Diárias'}
                 data-testid="download-storage-overage-pdf-button"
                 className="h-9 w-9 p-0 disabled:opacity-30"
               >
@@ -423,13 +425,18 @@ export default function ReportsBillingPage() {
                 size="sm"
                 onClick={downloadStorageOverageExcel}
                 disabled={loading}
-                title="Baixar Excel de Diárias"
+                title={dateFrom || dateTo ? 'Baixar Excel de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar Excel de Diárias'}
                 data-testid="download-storage-overage-excel-button"
                 className="h-9 w-9 p-0 disabled:opacity-30"
               >
                 <FileSpreadsheet className="w-4 h-4 text-green-600" />
               </Button>
             </div>
+            {(dateFrom || dateTo) && (
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 max-w-[220px]">
+                Considera só os dias excedentes dentro do período selecionado.
+              </p>
+            )}
           </div>
         </div>
 
