@@ -150,9 +150,14 @@ async def get_rpa_driver_info(driver_id: str, current_user: dict = Depends(get_c
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
 
     driver_vehicles = await db.vehicles.find({"driver_id": driver_id}, {"_id": 0}).to_list(50)
-    truck_plate = next((v["plate"] for v in driver_vehicles if v.get("vehicle_type") in ("CAVALO", "CAMINHÃO")), None)
-    trailer_plate = next((v["plate"] for v in driver_vehicles if v.get("vehicle_type") == "CARRETA"), None)
-    truck_owner = None
+    truck_vehicle = next((v for v in driver_vehicles if v.get("vehicle_type") in ("CAVALO", "CAMINHÃO")), None)
+    trailer_vehicle = next((v for v in driver_vehicles if v.get("vehicle_type") == "CARRETA"), None)
+    truck_plate = (truck_vehicle or {}).get("plate")
+    trailer_plate = (trailer_vehicle or {}).get("plate")
+    truck_renavam = (truck_vehicle or {}).get("renavam")
+    trailer_renavam = (trailer_vehicle or {}).get("renavam")
+    truck_owner = (truck_vehicle or {}).get("transport_company")
+    trailer_owner = (trailer_vehicle or {}).get("transport_company")
 
     if not truck_plate and not trailer_plate:
         last_mov = await db.movements.find_one(
@@ -171,6 +176,9 @@ async def get_rpa_driver_info(driver_id: str, current_user: dict = Depends(get_c
         "truck_plate": truck_plate,
         "trailer_plate": trailer_plate,
         "truck_owner": truck_owner,
+        "trailer_owner": trailer_owner,
+        "truck_renavam": truck_renavam,
+        "trailer_renavam": trailer_renavam,
     }
 
 

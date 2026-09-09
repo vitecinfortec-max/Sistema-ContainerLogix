@@ -16,6 +16,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
+import { Autocomplete } from '../components/Autocomplete';
 import { format } from 'date-fns';
 import {
   Plus, Pencil, Trash2, FileText, Download, Search, X, Save, Calculator,
@@ -105,7 +106,10 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
   const [showContratadoSuggestions, setShowContratadoSuggestions] = useState(false);
   const contratadoBoxRef = useRef(null);
 
-  useEffect(() => { loadRpas(); loadDrivers(); loadClients(); loadCompanies(); }, [rpaType]);
+  // Autocomplete de placa (cavalo/carreta) - reaproveita o cadastro de veículos
+  const [vehicles, setVehicles] = useState([]);
+
+  useEffect(() => { loadRpas(); loadDrivers(); loadClients(); loadCompanies(); loadVehicles(); }, [rpaType]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -148,6 +152,34 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       console.error('Erro ao carregar transportadoras:', e);
       toast.error('Erro ao carregar transportadoras');
     }
+  };
+
+  const loadVehicles = async () => {
+    try {
+      const r = await api.getVehicles({ per_page: 1000 });
+      setVehicles(r.data?.items || r.data || []);
+    } catch (e) {
+      console.error('Erro ao carregar veículos:', e);
+    }
+  };
+
+  const selectTruckVehicle = (vehicle) => {
+    setForm((prev) => ({
+      ...prev,
+      truck_plate: vehicle.plate,
+      truck_renavam: vehicle.renavam || prev.truck_renavam,
+      truck_owner: vehicle.transport_company || prev.truck_owner,
+      vehicle_type: vehicle.vehicle_type || prev.vehicle_type,
+    }));
+  };
+
+  const selectTrailerVehicle = (vehicle) => {
+    setForm((prev) => ({
+      ...prev,
+      trailer_plate: vehicle.plate,
+      trailer_renavam: vehicle.renavam || prev.trailer_renavam,
+      trailer_owner: vehicle.transport_company || prev.trailer_owner,
+    }));
   };
 
   const handleClientSearch = (term) => {
@@ -195,7 +227,18 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
   const selectContratado = (company) => {
     setContratadoSearch(company.name);
     setShowContratadoSuggestions(false);
-    setForm((prev) => ({ ...prev, contratado_id: company.id, contratado_name: company.name }));
+    setForm((prev) => ({
+      ...prev,
+      contratado_id: company.id,
+      contratado_name: company.name,
+      bank_agency: company.bank_agency || prev.bank_agency,
+      bank_account: company.bank_account || prev.bank_account,
+      bank_pix: company.pix_key || prev.bank_pix,
+      bank_beneficiary: company.trade_name || company.name || prev.bank_beneficiary,
+    }));
+    if (company.bank_agency || company.bank_account || company.pix_key) {
+      toast.success('Dados bancários preenchidos a partir da transportadora');
+    }
   };
 
   const clearContratado = () => {
@@ -243,8 +286,11 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
         driver_cpf: info.driver_cpf || driver.cpf || prev.driver_cpf,
         driver_phone: info.driver_phone || driver.phone || prev.driver_phone,
         truck_plate: info.truck_plate || prev.truck_plate,
-        trailer_plate: info.trailer_plate || prev.trailer_plate,
+        truck_renavam: info.truck_renavam || prev.truck_renavam,
         truck_owner: info.truck_owner || prev.truck_owner,
+        trailer_plate: info.trailer_plate || prev.trailer_plate,
+        trailer_renavam: info.trailer_renavam || prev.trailer_renavam,
+        trailer_owner: info.trailer_owner || prev.trailer_owner,
       }));
       const filled = [];
       if (info.truck_plate) filled.push('Veículo Principal');
@@ -825,10 +871,36 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Field label="Telefone" value={form.driver_phone} onChange={(v) => onChange('driver_phone', v)} testid="rpa-driver-phone" />
               <Field label="CPF" value={form.driver_cpf} onChange={(v) => onChange('driver_cpf', v)} testid="rpa-driver-cpf" />
               <Field label="Tipo de Veículo Principal" value={form.vehicle_type} onChange={(v) => onChange('vehicle_type', v)} testid="rpa-vehicle-type" />
-              <Field label="Veículo Principal (Placa)" value={form.truck_plate} onChange={(v) => onChange('truck_plate', v)} testid="rpa-truck-plate" />
+              <div>
+                <Label className="mb-1 block">
+                  Veículo Principal (Placa) <span className="text-emerald-600 normal-case font-normal">(digite para buscar cadastrados)</span>
+                </Label>
+                <Autocomplete
+                  className="text-sm"
+                  value={form.truck_plate}
+                  onChange={(v) => onChange('truck_plate', v.toUpperCase())}
+                  options={vehicles}
+                  displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                  valueField="id"
+                  onSelect={selectTruckVehicle}
+                />
+              </div>
               <Field label="Renavam" value={form.truck_renavam} onChange={(v) => onChange('truck_renavam', v)} testid="rpa-truck-renavam" />
               <Field label="Proprietário" value={form.truck_owner} onChange={(v) => onChange('truck_owner', v)} testid="rpa-truck-owner" />
-              <Field label="Vinculado 01 (Placa)" value={form.trailer_plate} onChange={(v) => onChange('trailer_plate', v)} testid="rpa-trailer-plate" />
+              <div>
+                <Label className="mb-1 block">
+                  Vinculado 01 (Placa) <span className="text-emerald-600 normal-case font-normal">(digite para buscar cadastrados)</span>
+                </Label>
+                <Autocomplete
+                  className="text-sm"
+                  value={form.trailer_plate}
+                  onChange={(v) => onChange('trailer_plate', v.toUpperCase())}
+                  options={vehicles}
+                  displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                  valueField="id"
+                  onSelect={selectTrailerVehicle}
+                />
+              </div>
               <Field label="Renavam Vinculado 01" value={form.trailer_renavam} onChange={(v) => onChange('trailer_renavam', v)} testid="rpa-trailer-renavam" />
               <Field label="Proprietário Vinculado 01" value={form.trailer_owner} onChange={(v) => onChange('trailer_owner', v)} testid="rpa-trailer-owner" />
               <Field label="Vinculado 02 (Placa)" value={form.trailer2_plate} onChange={(v) => onChange('trailer2_plate', v)} testid="rpa-trailer2-plate" />

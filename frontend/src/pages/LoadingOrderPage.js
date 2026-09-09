@@ -117,7 +117,7 @@ export default function LoadingOrderPage() {
   };
   const loadVehicles = async () => {
     try {
-      const r = await api.getVehicles();
+      const r = await api.getVehicles({ per_page: 1000 });
       setVehicles(r.data?.items || r.data || []);
     } catch (e) { /* ignore */ }
   };
@@ -154,7 +154,14 @@ export default function LoadingOrderPage() {
   const onChange = (field, val) => setForm((p) => ({ ...p, [field]: val }));
 
   const onSelectDriver = (d) => {
-    setForm((p) => ({ ...p, driver_id: d.id, driver_name: d.name, driver_cpf: d.cpf || p.driver_cpf }));
+    setForm((p) => ({
+      ...p,
+      driver_id: d.id,
+      driver_name: d.name,
+      driver_cpf: d.cpf || p.driver_cpf,
+      truck_plate: d.default_truck_plate || p.truck_plate,
+      trailer_plate: d.default_trailer_plate || p.trailer_plate,
+    }));
   };
 
   const handleSave = async () => {
