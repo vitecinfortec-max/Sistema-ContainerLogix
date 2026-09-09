@@ -224,6 +224,11 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
         topMargin=10*mm,
         bottomMargin=10*mm
     )
+    # Largura útil real da página - usada em todas as tabelas/caixas abaixo pra
+    # que elas se alinhem exatamente com o cabeçalho padrão (antes usavam um
+    # valor fixo de 700pt, mais estreito que a área útil real em A4 paisagem
+    # com essas margens, deixando uma sobra visível à direita).
+    CONTENT_WIDTH = doc.width
 
     elements = []
     styles = getSampleStyleSheet()
@@ -232,7 +237,7 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
     logo_buffer = load_logo_buffer(company)
 
     # ========== HEADER padrão do sistema (logo + dados da empresa + linha + título) ==========
-    elements.extend(_build_pdf_header(styles, logo_buffer, "Status de Entrega", company=company, content_width=doc.width))
+    elements.extend(_build_pdf_header(styles, logo_buffer, "Status de Entrega", company=company, content_width=CONTENT_WIDTH))
 
     # Converter para horário de Brasília
     from zoneinfo import ZoneInfo
@@ -268,8 +273,9 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
     value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
     section_title = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
     
-    # Largura padrão para todas as seções (700px para alinhar com o título)
-    SECTION_WIDTH = 700
+    # Largura padrão para todas as seções (mesma largura útil da página, pra
+    # alinhar exatamente com o cabeçalho/título)
+    SECTION_WIDTH = CONTENT_WIDTH
     
     # Header da seção
     info_header = [[Paragraph("Informações da Programação", section_title)]]
@@ -378,12 +384,15 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
             row.append(item.get('bag_number') or '-')
         table_data.append(row)
 
-    # Larguras ajustadas para 700px total (igual ao padrão do PDF de Programação)
-    # Total = 700px para alinhar perfeitamente com o cabeçalho e demais seções
+    # Larguras-base somam 700pt (proporções pensadas pro conteúdo de cada
+    # coluna); escaladas pra CONTENT_WIDTH pra ocupar a área útil real da
+    # página em vez de deixar sobra à direita.
     if has_bag_numbers:
-        col_widths = [20, 65, 60, 40, 65, 60, 52, 52, 52, 52, 52, 50, 80]  # Total = 700
+        base_widths = [20, 65, 60, 40, 65, 60, 52, 52, 52, 52, 52, 50, 80]
     else:
-        col_widths = [20, 85, 70, 50, 80, 85, 52, 52, 52, 52, 52, 50]  # Total = 700
+        base_widths = [20, 85, 70, 50, 80, 85, 52, 52, 52, 52, 52, 50]
+    scale = CONTENT_WIDTH / sum(base_widths)
+    col_widths = [w * scale for w in base_widths]
     data_table = Table(table_data, colWidths=col_widths)
     data_table.setStyle(TableStyle([
         # Header row - verde padrão (igual ao PDF de referência)

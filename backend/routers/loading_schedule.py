@@ -234,6 +234,11 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
         topMargin=10*mm,
         bottomMargin=10*mm
     )
+    # Largura útil real da página - usada em todas as tabelas/caixas abaixo pra
+    # que elas se alinhem exatamente com o cabeçalho padrão (antes usavam um
+    # valor fixo de 700pt, mais estreito que a área útil real em A4 paisagem
+    # com essas margens, deixando uma sobra visível à direita).
+    CONTENT_WIDTH = doc.width
 
     elements = []
     styles = getSampleStyleSheet()
@@ -242,7 +247,7 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     logo_buffer = load_logo_buffer(company)
 
     # ========== HEADER padrão do sistema (logo + dados da empresa + linha + título) ==========
-    elements.extend(_build_pdf_header(styles, logo_buffer, "Programação de Carregamento", company=company, content_width=doc.width))
+    elements.extend(_build_pdf_header(styles, logo_buffer, "Programação de Carregamento", company=company, content_width=CONTENT_WIDTH))
 
     # Converter para horário de Brasília (UTC-3)
     from zoneinfo import ZoneInfo
@@ -280,7 +285,7 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     
     # Header da seção
     client_header = [[Paragraph("Informações dos Clientes", section_title)]]
-    client_header_table = Table(client_header, colWidths=[700])
+    client_header_table = Table(client_header, colWidths=[CONTENT_WIDTH])
     client_header_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
@@ -305,7 +310,7 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
 
     client_content = [client_row1, client_row2]
 
-    client_table = Table(client_content, colWidths=[350, 350])
+    client_table = Table(client_content, colWidths=[CONTENT_WIDTH / 2, CONTENT_WIDTH / 2])
     client_table.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
         ('LINEAFTER', (0, 0), (0, -1), 0.5, colors.HexColor('#CCCCCC')),
@@ -320,7 +325,7 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     
     # ========== BOX 2: Tabela de Programações ==========
     prog_header = [[Paragraph("Itens da Programação", section_title)]]
-    prog_header_table = Table(prog_header, colWidths=[700])
+    prog_header_table = Table(prog_header, colWidths=[CONTENT_WIDTH])
     prog_header_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
@@ -381,10 +386,15 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
             row.append(item.get('bag_number') or '-')
         table_data.append(row)
 
+    # Larguras-base somam 700pt (proporções pensadas pro conteúdo de cada
+    # coluna); escaladas pra CONTENT_WIDTH pra ocupar a área útil real da
+    # página em vez de deixar sobra à direita.
     if has_bag_numbers:
-        col_widths = [20, 45, 95, 60, 50, 50, 110, 55, 70, 55, 90]  # Total = 700 para alinhar com cabeçalho
+        base_widths = [20, 45, 95, 60, 50, 50, 110, 55, 70, 55, 90]
     else:
-        col_widths = [20, 55, 100, 70, 55, 55, 130, 60, 90, 65]  # Total = 700 para alinhar com cabeçalho
+        base_widths = [20, 55, 100, 70, 55, 55, 130, 60, 90, 65]
+    scale = CONTENT_WIDTH / sum(base_widths)
+    col_widths = [w * scale for w in base_widths]
     main_table = Table(table_data, colWidths=col_widths)
     main_table_style = [
         # Header row - verde padrão
@@ -418,7 +428,7 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     # ========== BOX 3: Observações (se houver) ==========
     if schedule.get('observations'):
         obs_header = [[Paragraph("Observações", section_title)]]
-        obs_header_table = Table(obs_header, colWidths=[700])
+        obs_header_table = Table(obs_header, colWidths=[CONTENT_WIDTH])
         obs_header_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
             ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
@@ -430,7 +440,7 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
         
         obs_content_style = ParagraphStyle('ObsContent', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK)
         obs_content = [[Paragraph(schedule['observations'], obs_content_style)]]
-        obs_table = Table(obs_content, colWidths=[700])
+        obs_table = Table(obs_content, colWidths=[CONTENT_WIDTH])
         obs_table.setStyle(TableStyle([
             ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
             ('TOPPADDING', (0, 0), (-1, -1), 8),
