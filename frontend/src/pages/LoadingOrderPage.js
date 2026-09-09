@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { ComboField } from '../components/ui/combo-field';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
@@ -42,6 +41,10 @@ const SIZE_TYPE_OPTIONS = [
   ['40HC', '40HC'], ['40RF', '40RF'], ['40OT', '40OT'], ['40FR', '40FR'], ['40DRY', '40DRY'],
 ];
 
+function emptyItem() {
+  return { container_number: '', size_type: '', gross_weight: '', seal: '', shipping_line: '' };
+}
+
 function buildEmpty() {
   return {
     order_type: 'COLETA',
@@ -49,13 +52,8 @@ function buildEmpty() {
     collection_window: '',
     origin_terminal: '',
     port: '',
-    container_number: '',
-    size_type: '',
-    gross_weight: '',
-    seal: '',
-    shipping_line: '',
+    items: [emptyItem()],
     booking: '',
-    quantity: 1,
     driver_id: '', driver_name: '', driver_cpf: '',
     transport_company: '',
     truck_plate: '',
@@ -79,9 +77,10 @@ export default function LoadingOrderPage() {
   const [companies, setCompanies] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [shippingLines, setShippingLines] = useState([]);
+  const [terminals, setTerminals] = useState([]);
   const debounceRef = useRef(null);
 
-  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); }, []);
+  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); loadTerminals(); }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -127,6 +126,12 @@ export default function LoadingOrderPage() {
       setShippingLines(r.data || []);
     } catch (e) { /* ignore */ }
   };
+  const loadTerminals = async () => {
+    try {
+      const r = await api.getTerminals();
+      setTerminals(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
 
   const reset = () => setForm(buildEmpty());
 
@@ -146,7 +151,7 @@ export default function LoadingOrderPage() {
       const d = r.data;
       setEditingId(id);
       setNextNumber(d.order_number);
-      setForm({ ...buildEmpty(), ...d });
+      setForm({ ...buildEmpty(), ...d, items: (d.items && d.items.length) ? d.items : [emptyItem()] });
       setDialogOpen(true);
     } catch (e) { toast.error('Erro ao carregar ordem de carregamento'); }
   };
@@ -164,14 +169,65 @@ export default function LoadingOrderPage() {
     }));
   };
 
+  const addContainerItem = () => {
+    setForm((prev) => ({ ...prev, items: [...prev.items, emptyItem()] }));
+  };
+  const updateContainerItem = (idx, field, value) => {
+    setForm((prev) => {
+      const items = [...prev.items];
+      items[idx] = { ...items[idx], [field]: value };
+      return { ...prev, items };
+    });
+  };
+  const removeContainerItem = (idx) => {
+    setForm((prev) => ({ ...prev, items: prev.items.filter((_, i) => i !== idx) }));
+  };
+
+  const handleItemContainerBlur = async (idx, e) => {
+    const formatted = formatContainerNumber(e.target.value);
+    if (form.order_type !== 'ENTREGA' || !formatted) {
+      updateContainerItem(idx, 'container_number', formatted);
+      return;
+    }
+    try {
+      const response = await api.getOpenEntryForContainer(formatted);
+      const entry = response.data?.entry;
+      updateContainerItem(idx, 'container_number', formatted);
+      if (!entry) return;
+      setForm((prev) => {
+        const items = [...prev.items];
+        items[idx] = {
+          ...items[idx],
+          container_number: formatted,
+          size_type: entry.size_type || items[idx].size_type,
+          shipping_line: entry.shipping_line || items[idx].shipping_line,
+          seal: entry.seal || items[idx].seal,
+          gross_weight: entry.tare || items[idx].gross_weight,
+        };
+        return { ...prev, items };
+      });
+      toast.success(`Dados da entrada #${entry.transaction_id} preenchidos automaticamente (Booking não incluso)`);
+    } catch (error) {
+      // Sem entrada em aberto para esse container - segue preenchimento manual
+      updateContainerItem(idx, 'container_number', formatted);
+    }
+  };
+
   const handleSave = async () => {
-    if (!form.container_number || !form.driver_name) {
-      toast.error('Preencha os campos obrigatórios (Container e Motorista)');
+    if (!form.driver_name) {
+      toast.error('Preencha os campos obrigatórios (Motorista)');
+      return;
+    }
+    const items = form.items
+      .filter((it) => (it.container_number || '').trim())
+      .map((it) => ({ ...it, container_number: formatContainerNumber(it.container_number) }));
+    if (items.length === 0) {
+      toast.error('Adicione ao menos um container à ordem');
       return;
     }
     setSaving(true);
     try {
-      const payload = { ...form, quantity: Number(form.quantity || 1) };
+      const payload = { ...form, items };
       if (editingId) {
         await api.updateLoadingOrder(editingId, payload);
         toast.success('Ordem de Carregamento atualizada!');
@@ -361,7 +417,11 @@ export default function LoadingOrderPage() {
                       </TableCell>
                       <TableCell className="text-[13px] font-semibold text-primary">Nº {o.order_number}</TableCell>
                       <TableCell className="text-[12px]">{ORDER_TYPE_LABELS[o.order_type] || o.order_type}</TableCell>
-                      <TableCell className="text-[12px] font-mono">{o.container_number || '-'}</TableCell>
+                      <TableCell className="text-[12px] font-mono">
+                        {o.items && o.items.length > 0
+                          ? `${o.items[0].container_number || '-'}${o.items.length > 1 ? ` +${o.items.length - 1}` : ''}`
+                          : '-'}
+                      </TableCell>
                       <TableCell className="text-[13px]">{o.driver_name || '-'}</TableCell>
                       <TableCell className="text-[13px]">{o.transport_company || '-'}</TableCell>
                       <TableCell>
@@ -394,28 +454,99 @@ export default function LoadingOrderPage() {
             <div className="grid grid-cols-3 gap-3">
               <SelectField label="Tipo *" value={form.order_type} onChange={(v) => onChange('order_type', v)} options={ORDER_TYPE_OPTIONS} testid="loading-order-type" />
               <SelectField label="Status" value={form.status} onChange={(v) => onChange('status', v)} options={STATUS_OPTIONS} testid="loading-order-status" />
-              <Field label="Janela" value={form.collection_window} onChange={(v) => onChange('collection_window', v)} testid="loading-order-window" />
+              <WindowField value={form.collection_window} onChange={(v) => onChange('collection_window', v)} />
             </div>
 
             <SectionTitle>Origem e Destino</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Terminal de Origem" value={form.origin_terminal} onChange={(v) => onChange('origin_terminal', v)} testid="loading-order-origin" />
+              <div>
+                <Label className="mb-1 block">Terminal de Origem</Label>
+                <Autocomplete
+                  value={form.origin_terminal}
+                  onChange={(v) => onChange('origin_terminal', v)}
+                  onSelect={(t) => onChange('origin_terminal', t.name)}
+                  options={terminals}
+                  displayField="name"
+                  className="h-9 text-sm"
+                />
+              </div>
               <Field label="Porto" value={form.port} onChange={(v) => onChange('port', v)} testid="loading-order-port" />
             </div>
 
             <SectionTitle>Especificações do Container e Carga</SectionTitle>
-            <div className="grid grid-cols-4 gap-3">
-              <Field label="ID do Container *" value={form.container_number} onChange={(v) => onChange('container_number', v.toUpperCase())} onBlur={(e) => onChange('container_number', formatContainerNumber(e.target.value))} testid="loading-order-container" />
-              <SelectField label="Tipo/Tamanho" value={form.size_type} onChange={(v) => onChange('size_type', v)} options={SIZE_TYPE_OPTIONS} testid="loading-order-size" />
-              <Field label="Peso Bruto" value={form.gross_weight} onChange={(v) => onChange('gross_weight', v)} testid="loading-order-weight" />
-              <Field label="Lacre (Seal)" value={form.seal} onChange={(v) => onChange('seal', v)} testid="loading-order-seal" />
-            </div>
             <div className="grid grid-cols-3 gap-3">
-              <ComboField label="Armador" value={form.shipping_line} onChange={(v) => onChange('shipping_line', v)} options={shippingLines.map((s) => [s.name, s.name])}
-                searchPlaceholder="Buscar armador..." emptyLabel="Nenhum armador encontrado" testid="loading-order-shipping-line" />
               <Field label="Booking/Ref." value={form.booking} onChange={(v) => onChange('booking', v)} testid="loading-order-booking" />
-              <Field type="number" label="Quantidade" value={form.quantity} onChange={(v) => onChange('quantity', v)} testid="loading-order-quantity" />
             </div>
+
+            <div className="flex items-center justify-between mt-1">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Containers da Ordem</Label>
+              <Button variant="outline" size="sm" onClick={addContainerItem} type="button" className="h-7 text-xs" data-testid="loading-order-add-item">
+                <Plus className="w-3 h-3 mr-1" />Adicionar Container
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {form.items.map((it, idx) => (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                  <div className="col-span-3">
+                    <Label className="text-xs mb-1 block">ID do Container <span className="text-red-500">*</span></Label>
+                    <Input
+                      value={it.container_number}
+                      onChange={(e) => updateContainerItem(idx, 'container_number', e.target.value.toUpperCase())}
+                      onBlur={(e) => handleItemContainerBlur(idx, e)}
+                      className="h-8 text-sm"
+                      data-testid={`loading-order-item-container-${idx}`}
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <Label className="text-xs mb-1 block">Tipo/Tamanho</Label>
+                    <Select value={it.size_type || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'size_type', v === '_empty' ? '' : v)}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_empty">-</SelectItem>
+                        {SIZE_TYPE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-xs mb-1 block">Peso Bruto</Label>
+                    <Input value={it.gross_weight} onChange={(e) => updateContainerItem(idx, 'gross_weight', e.target.value)} className="h-8 text-sm" />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-xs mb-1 block">Armador</Label>
+                    <Select value={it.shipping_line || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'shipping_line', v === '_empty' ? '' : v)}>
+                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent className="max-h-80 overflow-y-auto">
+                        <SelectItem value="_empty">-</SelectItem>
+                        {it.shipping_line && !shippingLines.some((l) => l.name === it.shipping_line) && (
+                          <SelectItem value={it.shipping_line}>{it.shipping_line}</SelectItem>
+                        )}
+                        {shippingLines.map((line) => <SelectItem key={line.id} value={line.name}>{line.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-1">
+                    <Label className="text-xs mb-1 block">Lacre</Label>
+                    <Input value={it.seal} onChange={(e) => updateContainerItem(idx, 'seal', e.target.value)} className="h-8 text-sm" />
+                  </div>
+                  <div className="col-span-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeContainerItem(idx)}
+                      disabled={form.items.length <= 1}
+                      className="h-8 px-2 text-red-500 hover:text-red-700 disabled:opacity-30"
+                      data-testid={`loading-order-item-remove-${idx}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {shippingLines.length === 0 && (
+              <p className="text-xs text-amber-600 -mt-1">Nenhum armador cadastrado. Vá em "Cadastro" para adicionar.</p>
+            )}
 
             <SectionTitle>Dados do Transporte (Transportador/Motorista)</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
@@ -525,6 +656,32 @@ function SelectField({ label, value, onChange, options, testid }) {
           ))}
         </SelectContent>
       </Select>
+    </div>
+  );
+}
+
+function WindowField({ value, onChange }) {
+  const [start, end] = (value || '').split(' - ').map((s) => s.trim());
+  return (
+    <div>
+      <Label className="mb-1 block">Janela</Label>
+      <div className="flex items-center gap-1.5">
+        <Input
+          type="time"
+          value={start || ''}
+          onChange={(e) => onChange(`${e.target.value}${end ? ' - ' + end : ''}`)}
+          className="h-9 text-sm"
+          data-testid="loading-order-window-start"
+        />
+        <span className="text-xs text-muted-foreground shrink-0">até</span>
+        <Input
+          type="time"
+          value={end || ''}
+          onChange={(e) => onChange(`${start || ''} - ${e.target.value}`)}
+          className="h-9 text-sm"
+          data-testid="loading-order-window-end"
+        />
+      </div>
     </div>
   );
 }

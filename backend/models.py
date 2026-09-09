@@ -2648,6 +2648,16 @@ class FuelSupplyOrderResponse(FuelSupplyOrder):
 LOADING_ORDER_TYPE_OPTIONS = ["COLETA", "ENTREGA"]
 LOADING_ORDER_STATUS_OPTIONS = ["PENDENTE", "APROVADA", "CANCELADA"]
 
+class LoadingOrderContainerItem(BaseModel):
+    """Uma unidade de container dentro de uma Ordem de Carregamento (uma ordem
+    pode levar múltiplos containers - Booking é único pra ordem inteira, fica
+    fora daqui, direto em LoadingOrder)."""
+    container_number: Optional[str] = None
+    size_type: Optional[str] = None
+    gross_weight: Optional[str] = None
+    seal: Optional[str] = None
+    shipping_line: Optional[str] = None  # Armador - pode variar por container
+
 class LoadingOrder(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -2661,13 +2671,8 @@ class LoadingOrder(BaseModel):
     origin_terminal: Optional[str] = None
     port: Optional[str] = None
 
-    container_number: Optional[str] = None
-    size_type: Optional[str] = None
-    gross_weight: Optional[str] = None
-    seal: Optional[str] = None
-    shipping_line: Optional[str] = None  # Armador
+    items: List[LoadingOrderContainerItem] = []
     booking: Optional[str] = None
-    quantity: int = 1
 
     driver_id: Optional[str] = None
     driver_name: Optional[str] = None
@@ -2690,13 +2695,8 @@ class LoadingOrderCreate(BaseModel):
     collection_window: Optional[str] = None
     origin_terminal: Optional[str] = None
     port: Optional[str] = None
-    container_number: Optional[str] = None
-    size_type: Optional[str] = None
-    gross_weight: Optional[str] = None
-    seal: Optional[str] = None
-    shipping_line: Optional[str] = None
+    items: List[LoadingOrderContainerItem] = []
     booking: Optional[str] = None
-    quantity: int = 1
     driver_id: Optional[str] = None
     driver_name: Optional[str] = None
     driver_cpf: Optional[str] = None

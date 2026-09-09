@@ -29,7 +29,7 @@ async def list_loading_orders(
         import re
         search_escaped = re.escape(search)
         query["$or"] = [
-            {"container_number": {"$regex": search_escaped, "$options": "i"}},
+            {"items.container_number": {"$regex": search_escaped, "$options": "i"}},
             {"driver_name": {"$regex": search_escaped, "$options": "i"}},
             {"transport_company": {"$regex": search_escaped, "$options": "i"}},
         ]
@@ -54,6 +54,9 @@ async def get_loading_order(order_id: str, current_user: dict = Depends(get_curr
 
 @api_router.post("/loading-orders", response_model=LoadingOrderResponse)
 async def create_loading_order(data: LoadingOrderCreate, current_user: dict = Depends(get_current_active_user)):
+    if not data.items:
+        raise HTTPException(status_code=400, detail="A Ordem de Carregamento deve conter ao menos 1 container")
+
     counter = await db.counters.find_one_and_update(
         {"_id": "loading_order_number"},
         {"$inc": {"seq": 1}},
@@ -79,6 +82,8 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
     existing = await db.loading_orders.find_one({"id": order_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Ordem de Carregamento não encontrada")
+    if not data.items:
+        raise HTTPException(status_code=400, detail="A Ordem de Carregamento deve conter ao menos 1 container")
     update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.loading_orders.update_one({"id": order_id}, {"$set": update_data})
@@ -187,29 +192,63 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
     ]))
     elements.append(Spacer(1, 4))
 
+    items = order.get('items') or []
+
     elements.append(boxed_section('Especificações do Container e Carga', [
         field_row([
-            ('ID do Container', order.get('container_number')),
-            ('Tipo/Tamanho', order.get('size_type')),
-            ('Armador', order.get('shipping_line')),
             ('Booking/Ref.', order.get('booking')),
-        ]),
-        field_row([
-            ('Peso Bruto', order.get('gross_weight')),
-            ('Lacre (Seal)', order.get('seal')),
-            ('Quantidade', order.get('quantity')),
-        ], n_cols=3),
+            ('Quantidade de Containers', len(items) or None),
+        ], n_cols=2),
     ]))
+    elements.append(Spacer(1, 3))
+
+    if items:
+        item_header = ["#", "ID do Container", "Tipo/Tamanho", "Peso Bruto", "Armador", "Lacre (Seal)"]
+        item_rows = [item_header]
+        for idx, it in enumerate(items, 1):
+            item_rows.append([
+                str(idx),
+                it.get('container_number') or '-',
+                it.get('size_type') or '-',
+                it.get('gross_weight') or '-',
+                it.get('shipping_line') or '-',
+                it.get('seal') or '-',
+            ])
+        base_widths = [20, 110, 70, 70, 120, 70]
+        scale = width / sum(base_widths)
+        item_col_widths = [w * scale for w in base_widths]
+        items_table = Table(item_rows, colWidths=item_col_widths, repeatRows=1)
+        items_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+            ('ALIGN', (2, 0), (3, -1), 'CENTER'),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('BOX', (0, 0), (-1, -1), 1, colors.black),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
+        ]))
+        elements.append(items_table)
+    else:
+        elements.append(Paragraph('Nenhum container informado nesta ordem.', styles['Normal']))
     elements.append(Spacer(1, 4))
 
     elements.append(boxed_section('Dados do Transporte (Transportador/Motorista)', [
         field_row([
             ('Motorista', order.get('driver_name')),
+        ], n_cols=1),
+        field_row([
             ('CPF', order.get('driver_cpf')),
             ('Transportadora', order.get('transport_company')),
             ('Placa Cavalo', order.get('truck_plate')),
             ('Placa Carreta', order.get('trailer_plate')),
-        ], n_cols=5),
+        ], n_cols=4),
     ]))
     elements.append(Spacer(1, 4))
 
