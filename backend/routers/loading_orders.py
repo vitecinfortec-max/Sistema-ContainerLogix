@@ -96,15 +96,18 @@ async def delete_loading_order(order_id: str, current_user: dict = Depends(get_c
 
 @api_router.get("/loading-orders/{order_id}/pdf")
 async def download_loading_order_pdf(order_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Gera o PDF da minuta de Ordem de Carregamento (coleta/entrega de container)."""
+    """Gera o PDF da Ordem de Carregamento no mesmo layout visual do
+    comprovante de Registro de Gate (cabeçalho padrão, caixas com título,
+    área de assinaturas, código de barras) - reaproveita os helpers de
+    generate_movement_voucher_pdf em reports.py."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.platypus import Image as RLImage
-    from reports import download_logo
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.graphics.barcode import code128
+    from reports import download_logo, _build_pdf_header, _voucher_field, _voucher_field_row, _voucher_boxed_section
 
     order = await db.loading_orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
@@ -119,8 +122,6 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         except Exception:
             return str(s)
 
-    BLACK = colors.HexColor('#000000')
-    GRAY_BG = colors.HexColor('#E8E8E8')
     STATUS_HEX = {
         "APROVADA": "#15803D",
         "PENDENTE": "#B45309",
@@ -128,178 +129,194 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
     }.get(order.get('status'), "#000000")
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4,
-                            leftMargin=10 * mm, rightMargin=10 * mm,
-                            topMargin=8 * mm, bottomMargin=8 * mm)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=12 * mm, leftMargin=12 * mm, topMargin=7 * mm, bottomMargin=6 * mm
+    )
+    width = doc.width
     styles = getSampleStyleSheet()
-
     logo_buffer = download_logo(company)
-    logo_img = RLImage(logo_buffer, width=20 * mm, height=20 * mm) if logo_buffer else Paragraph("", styles['Normal'])
 
-    def field(label, val):
-        return Paragraph(f"<font size='7' color='#555'>{label}</font><br/>"
-                         f"<font size='8'><b>{val if val else '-'}</b></font>",
-                         ParagraphStyle('F', parent=styles['Normal'], leading=11))
+    label_value_style = styles['Normal']
+    box_title_style = ParagraphStyle('LOBoxTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
+    title_style = ParagraphStyle('LOTitle', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER)
+    subtitle_style = ParagraphStyle('LOSubtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)
+    footer_style = ParagraphStyle('LOFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=colors.HexColor('#555555'))
 
-    def section_bar(title):
-        t = Table([[Paragraph(f"<b>{title}</b>", ParagraphStyle('SB', parent=styles['Normal'], fontSize=8.5))]],
-                  colWidths=[190 * mm])
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), GRAY_BG),
-            ('LINEBELOW', (0, 0), (-1, -1), 0.5, BLACK),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        return t
+    def field(label, value):
+        return _voucher_field(label, value, label_value_style)
 
-    def grid(rows, col_widths):
-        t = Table(rows, colWidths=col_widths)
-        t.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 0.5, BLACK),
-            ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.grey),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        return t
+    def field_row(pairs, n_cols=4):
+        return _voucher_field_row(pairs, width, label_value_style, n_cols=n_cols)
+
+    def boxed_section(title, row_tables, extra=None):
+        return _voucher_boxed_section(title, row_tables, width, box_title_style, extra=extra)
 
     elements = []
 
-    company_style = ParagraphStyle('CompHead', parent=styles['Normal'], fontSize=9, leading=11,
-                                   fontName='Helvetica-Bold')
-    company_address_line = (company['address'] or '').replace('\n', ', ')
-    company_para = Paragraph(
-        f"<b>{company['name']}</b><br/>"
-        f"<font size='8'>{company_address_line}<br/>"
-        f"CNPJ: {company['cnpj']}, Fone: {company['phone']}</font>", company_style)
+    # Header: logo + dados completos da empresa - mesmo bloco compartilhado
+    # com os demais documentos (_build_pdf_header), sem a linha/título padrão
+    # já que o título aqui é o box abaixo (mesmo truque do comprovante).
+    elements.extend(_build_pdf_header(styles, logo_buffer, '', company=company, content_width=width)[:2])
 
-    title_style = ParagraphStyle('LOTit', parent=styles['Normal'], fontSize=13, leading=15,
-                                 alignment=TA_RIGHT, fontName='Helvetica-Bold')
-    right_para = Paragraph(
-        f"Ordem de Carregamento<br/>"
-        f"<font size='9'>{_ORDER_TYPE_LABELS.get(order.get('order_type'), order.get('order_type'))}</font><br/>"
-        f"<font size='9'>Nº: <b>{order['order_number']}</b></font>", title_style)
-
-    header = Table([[logo_img, company_para, right_para]], colWidths=[22 * mm, 96 * mm, 72 * mm])
-    header.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('LEFTPADDING', (1, 0), (1, 0), 4),
+    # Título
+    order_type_label = _ORDER_TYPE_LABELS.get(order.get('order_type'), order.get('order_type'))
+    title_tbl = Table([
+        [Paragraph('ORDEM DE CARREGAMENTO', title_style)],
+        [Paragraph(f"Nº {order['order_number']} - {order_type_label}", subtitle_style)],
+    ], colWidths=[width])
+    title_tbl.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
     ]))
-    elements.append(header)
-    elements.append(Spacer(1, 4))
+    elements.append(title_tbl)
+    elements.append(Spacer(1, 5))
 
-    # Dados do agendamento e controle
-    elements.append(section_bar("Dados do Agendamento e Controle"))
-    status_val = f"<font color='{STATUS_HEX}'><b>{_STATUS_LABELS.get(order.get('status'), order.get('status'))}</b></font>"
-    ag_t = Table([[
-        field("Data/Hora Emissão", fmt_dt(order.get('created_at'))),
-        field("Janela", order.get('collection_window')),
-        Paragraph(f"<font size='7' color='#555'>Status</font><br/><font size='8'>{status_val}</font>",
-                 ParagraphStyle('StatusF', parent=styles['Normal'], leading=11)),
-    ]], colWidths=[63.3 * mm, 63.3 * mm, 63.3 * mm])
-    ag_t.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.5, BLACK),
-        ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.grey),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+    status_label = _STATUS_LABELS.get(order.get('status'), order.get('status'))
+    elements.append(boxed_section('Dados do Agendamento, Controle e Destino', [
+        field_row([
+            ('Data/Hora Emissão', fmt_dt(order.get('created_at'))),
+            ('Janela', order.get('collection_window')),
+            ('Status', f'<font color="{STATUS_HEX}">{status_label}</font>' if status_label else None),
+        ], n_cols=3),
+        field_row([
+            ('Terminal de Origem', order.get('origin_terminal')),
+            ('Porto', order.get('port')),
+        ], n_cols=2),
     ]))
-    elements.append(ag_t)
     elements.append(Spacer(1, 4))
 
-    # Origem e destino
-    elements.append(section_bar("Origem e Destino"))
-    elements.append(grid([[
-        field("Terminal de Origem", order.get('origin_terminal')),
-        field("Porto", order.get('port')),
-    ]], [95 * mm, 95 * mm]))
+    elements.append(boxed_section('Especificações do Container e Carga', [
+        field_row([
+            ('ID do Container', order.get('container_number')),
+            ('Tipo/Tamanho', order.get('size_type')),
+            ('Armador', order.get('shipping_line')),
+            ('Booking/Ref.', order.get('booking')),
+        ]),
+        field_row([
+            ('Peso Bruto', order.get('gross_weight')),
+            ('Lacre (Seal)', order.get('seal')),
+            ('Quantidade', order.get('quantity')),
+        ], n_cols=3),
+    ]))
     elements.append(Spacer(1, 4))
 
-    # Especificações do container e carga
-    elements.append(section_bar("Especificações do Container e Carga"))
-    elements.append(grid([[
-        field("ID do Container", order.get('container_number')),
-        field("Tipo/Tamanho", order.get('size_type')),
-        field("Peso Bruto", order.get('gross_weight')),
-        field("Lacre (Seal)", order.get('seal')),
-    ], [
-        field("Armador", order.get('shipping_line')),
-        field("Booking/Ref.", order.get('booking')),
-        field("Quantidade", order.get('quantity')),
-        Paragraph("", styles['Normal']),
-    ]], [47.5 * mm, 47.5 * mm, 47.5 * mm, 47.5 * mm]))
-    elements.append(Spacer(1, 4))
-
-    # Dados do transporte
-    elements.append(section_bar("Dados do Transporte (Transportador/Motorista)"))
-    elements.append(grid([[
-        field("Nome do Motorista", order.get('driver_name')),
-        field("CPF", order.get('driver_cpf')),
-    ], [
-        field("Transportadora Contratada", order.get('transport_company')),
-        Paragraph("", styles['Normal']),
-    ], [
-        field("Placa do Cavalo", order.get('truck_plate')),
-        field("Placa da Carreta", order.get('trailer_plate')),
-    ]], [95 * mm, 95 * mm]))
+    elements.append(boxed_section('Dados do Transporte (Transportador/Motorista)', [
+        field_row([
+            ('Motorista', order.get('driver_name')),
+            ('CPF', order.get('driver_cpf')),
+            ('Transportadora', order.get('transport_company')),
+            ('Placa Cavalo', order.get('truck_plate')),
+            ('Placa Carreta', order.get('trailer_plate')),
+        ], n_cols=5),
+    ]))
     elements.append(Spacer(1, 4))
 
     if order.get('observations'):
-        elements.append(section_bar("Observações"))
-        elements.append(grid([[Paragraph(
-            f"<font size='8'>{order['observations'].replace(chr(10), '<br/>')}</font>", styles['Normal']
-        )]], [190 * mm]))
+        elements.append(boxed_section('Observações', [], extra=[
+            Paragraph(str(order['observations']).replace(chr(10), '<br/>'), styles['Normal']),
+        ]))
         elements.append(Spacer(1, 4))
 
     # Instruções operacionais fixas (boilerplate, igual pra todas as ordens)
-    elements.append(section_bar("Instruções Operacionais / Operações Portuárias"))
-    instr_style = ParagraphStyle('Instr', parent=styles['Normal'], fontSize=7.5, leading=11)
-    elements.append(grid([[Paragraph(
+    instr_style = ParagraphStyle('LOInstr', parent=styles['Normal'], fontSize=7.5, leading=9.5)
+    elements.append(boxed_section('Instruções Operacionais / Operações Portuárias', [], extra=[Paragraph(
         "<b>OBSERVAÇÕES IMPORTANTES</b><br/>"
         "• Motorista deve apresentar a OS de agendamento na portaria principal do terminal.<br/>"
         "• Obrigatório o uso completo de EPI (Capacete, colete refletivo, bota de biqueira de aço e óculos de proteção).<br/>"
         "• Verificar rigorosamente a integridade estrutural do container e as marcas do lacre antes de deixar o bolsão do terminal.<br/>"
         "• Em caso de divergência de lacre ou avarias aparentes, não retirar/entregar a unidade e acionar imediatamente a central de operações.",
         instr_style
-    )]], [190 * mm]))
+    )]))
     elements.append(Spacer(1, 4))
 
     # Checklist de inspeção visual (pra preencher na hora, igual referência)
-    elements.append(section_bar("Checklist de Inspeção Visual"))
     checklist_items = [
         "Portas, trincos e borrachas de vedação",
         "Teto e painéis laterais (furos/amassados)",
         "Assoalho interno e limpeza",
         "Lacre intacto e batendo com a OS",
     ]
-    check_rows = [[Paragraph("<b>Item de Inspeção</b>", styles['Normal']),
-                   Paragraph("<b>OK</b>", ParagraphStyle('C', parent=styles['Normal'], alignment=TA_CENTER)),
-                   Paragraph("<b>DM</b>", ParagraphStyle('C', parent=styles['Normal'], alignment=TA_CENTER))]]
+    check_center_style = ParagraphStyle('LOCheckC', parent=styles['Normal'], alignment=TA_CENTER)
+    check_rows = [[
+        Paragraph("<b>Item de Inspeção</b>", styles['Normal']),
+        Paragraph("<b>OK</b>", check_center_style),
+        Paragraph("<b>DM</b>", check_center_style),
+    ]]
     for i, item in enumerate(checklist_items, 1):
         check_rows.append([
             Paragraph(f"<font size='8'>{i}. {item}</font>", styles['Normal']),
-            Paragraph("[ &nbsp; ]", ParagraphStyle('C', parent=styles['Normal'], alignment=TA_CENTER)),
-            Paragraph("[ &nbsp; ]", ParagraphStyle('C', parent=styles['Normal'], alignment=TA_CENTER)),
+            Paragraph("[ &nbsp; ]", check_center_style),
+            Paragraph("[ &nbsp; ]", check_center_style),
         ])
-    check_t = Table(check_rows, colWidths=[150 * mm, 20 * mm, 20 * mm])
+    check_item_width = width - 20 - 80
+    check_t = Table(check_rows, colWidths=[check_item_width, 40, 40])
     check_t.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.5, BLACK),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
         ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.grey),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
         ('LEFTPADDING', (0, 0), (-1, -1), 4),
     ]))
-    elements.append(check_t)
-    elements.append(Spacer(1, 8))
+    elements.append(boxed_section('Checklist de Inspeção Visual', [], extra=[check_t]))
+    elements.append(Spacer(1, 5))
+
+    # Área de assinaturas - mesmo padrão do comprovante de movimentação
+    sig_title_style = ParagraphStyle('LOSigTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', alignment=TA_CENTER)
+    sig_info_style = ParagraphStyle('LOSigInfo', parent=styles['Normal'], fontSize=8)
+    sig_data = [[
+        [
+            Paragraph('Assinatura do Motorista', sig_title_style),
+            Spacer(1, 14),
+            HRFlowable(width='100%', thickness=0.8, color=colors.black),
+            Paragraph(f"Nome: {order.get('driver_name') or '-'}", sig_info_style),
+            Paragraph(f"CPF: {order.get('driver_cpf') or '-'}", sig_info_style),
+        ],
+        [
+            Paragraph('Assinatura do Responsável', sig_title_style),
+            Spacer(1, 14),
+            HRFlowable(width='100%', thickness=0.8, color=colors.black),
+            Paragraph(f"Nome: {order.get('created_by_name') or '-'}", sig_info_style),
+            Paragraph(f"Data: {now_brt().strftime('%d/%m/%Y')}", sig_info_style),
+        ],
+    ]]
+    sig_tbl = Table(sig_data, colWidths=[width / 2] * 2)
+    sig_tbl.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 15),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 15),
+    ]))
+    elements.append(sig_tbl)
+    elements.append(Spacer(1, 5))
+
+    # Código de barras + usuário + data/hora de impressão
+    barcode_value = str(order.get('order_number') or 0).zfill(6)
+    try:
+        bc = code128.Code128(barcode_value, barWidth=1.0, barHeight=28)
+    except Exception:
+        bc = None
+    bc_num = Paragraph(f"<b>{order['order_number']}</b>", ParagraphStyle('LOBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER))
+    left_cell = [bc, bc_num] if bc else [bc_num]
+    right_info = [
+        Paragraph(f"<b>Usuário: {order.get('created_by_name') or '-'}</b>", styles['Normal']),
+        Paragraph(f"<b>Data e hora da impressão: {now_brt().strftime('%d/%m/%Y %H:%M')}</b>", styles['Normal']),
+    ]
+    info_tbl = Table([[left_cell, right_info]], colWidths=[100, width - 100])
+    info_tbl.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.black),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elements.append(info_tbl)
+    elements.append(Spacer(1, 4))
 
     elements.append(Paragraph(
-        f"<font size='7' color='#888'>{now_brt().strftime('%d/%m/%Y %H:%M')} &nbsp;&nbsp; "
-        f"{company['name']} - Sistema de Gestão</font>",
-        ParagraphStyle('Footer', parent=styles['Normal'], alignment=TA_CENTER)
+        f"{company['name']} | Este documento é válido como Ordem de Carregamento",
+        footer_style
     ))
 
     doc.build(elements)

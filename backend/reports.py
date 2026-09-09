@@ -3862,6 +3862,49 @@ _MOVEMENT_DAMAGE_LABELS = {
 }
 
 
+def _voucher_field(label, value, label_value_style):
+    """Um par label/valor no estilo 'comprovante' - extraído de
+    generate_movement_voucher_pdf pra ser reaproveitado por outros documentos
+    no mesmo formato visual (ex: Ordem de Carregamento)."""
+    v = value if value not in (None, '') else '-'
+    return Paragraph(f'<font size=7 color="#333333">{label}</font><br/><font size=10><b>{v}</b></font>', label_value_style)
+
+
+def _voucher_field_row(pairs, width, label_value_style, n_cols=4):
+    cells = [_voucher_field(l, v, label_value_style) for l, v in pairs]
+    while len(cells) < n_cols:
+        cells.append('')
+    col_w = width / n_cols
+    t = Table([cells], colWidths=[col_w] * n_cols)
+    t.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    return t
+
+
+def _voucher_boxed_section(title, row_tables, width, box_title_style, extra=None):
+    inner = [Paragraph(f'<b>{title}</b>', box_title_style)]
+    for i, rt in enumerate(row_tables):
+        inner.append(Spacer(1, 6 if i == 0 else 8))
+        inner.append(rt)
+    if extra:
+        inner.append(Spacer(1, 6 if row_tables else 2))
+        inner.extend(extra)
+    wrapper = Table([[inner]], colWidths=[width])
+    wrapper.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    return wrapper
+
+
 def generate_movement_voucher_pdf(movements: list, via: str, company: dict = None) -> bytes:
     """Gera o comprovante de Registro de Gate em PDF - uma página por movimentação
     selecionada, todas na mesma via escolhida (TERMINAL ou MOTORISTA)."""
@@ -3886,41 +3929,13 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
     footer_style = ParagraphStyle('VoucherFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=colors.HexColor('#555555'))
 
     def field(label, value):
-        v = value if value not in (None, '') else '-'
-        return Paragraph(f'<font size=7 color="#333333">{label}</font><br/><font size=10><b>{v}</b></font>', label_value_style)
+        return _voucher_field(label, value, label_value_style)
 
     def field_row(pairs, n_cols=4):
-        cells = [field(l, v) for l, v in pairs]
-        while len(cells) < n_cols:
-            cells.append('')
-        col_w = width / n_cols
-        t = Table([cells], colWidths=[col_w] * n_cols)
-        t.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 0),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-        ]))
-        return t
+        return _voucher_field_row(pairs, width, label_value_style, n_cols=n_cols)
 
     def boxed_section(title, row_tables, extra=None):
-        inner = [Paragraph(f'<b>{title}</b>', box_title_style)]
-        for i, rt in enumerate(row_tables):
-            inner.append(Spacer(1, 6 if i == 0 else 8))
-            inner.append(rt)
-        if extra:
-            inner.append(Spacer(1, 6 if row_tables else 2))
-            inner.extend(extra)
-        wrapper = Table([[inner]], colWidths=[width])
-        wrapper.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, colors.black),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        return wrapper
+        return _voucher_boxed_section(title, row_tables, width, box_title_style, extra=extra)
 
     elements = []
     for idx, m in enumerate(movements):
