@@ -52,6 +52,7 @@ from models import (
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, decode_token
 from reports import (
     generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel,
+    _build_pdf_header, _make_pdf_footer,
     now_brt, to_brt, merge_company, DEFAULT_COMPANY
 )
 
@@ -203,17 +204,15 @@ async def update_loading_schedule_status(schedule_id: str, new_status: str, curr
 
 @api_router.get("/loading-schedules/{schedule_id}/pdf")
 async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Gera PDF da programação de carregamento - Layout similar ao comprovante de movimentação"""
+    """Gera PDF da programação de carregamento - mesmo layout padrão dos demais
+    relatórios do sistema (cabeçalho/rodapé via _build_pdf_header/_make_pdf_footer)"""
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
     from reportlab.lib.units import mm
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-    from reportlab.graphics.barcode import code128
-    from reportlab.graphics.shapes import Drawing
-    import requests
-    
+
     schedule = await db.loading_schedules.find_one({"id": schedule_id}, {"_id": 0})
     if not schedule:
         raise HTTPException(status_code=404, detail="Programação não encontrada")
@@ -221,12 +220,12 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
 
-    # Cores
+    # Cores (usadas nas seções em caixa abaixo do cabeçalho)
     BLACK = colors.black
     BORDER_COLOR = colors.black
     HEADER_BG = colors.HexColor('#F5F5F5')
     PRIMARY_GREEN = colors.HexColor('#008B7B')
-    
+
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
@@ -235,52 +234,23 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
         topMargin=10*mm,
         bottomMargin=10*mm
     )
-    
+
     elements = []
     styles = getSampleStyleSheet()
-    
+
     # Download logo
     logo_buffer = load_logo_buffer(company)
 
-    # ========== HEADER com Logo, Empresa, Código de Barras ==========
-    company_style = ParagraphStyle('Company', parent=styles['Normal'], fontSize=18, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=20)
-    slogan_style = ParagraphStyle('Slogan', parent=styles['Normal'], fontSize=9, fontName='Helvetica', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=11)
-    address_style = ParagraphStyle('Address', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_CENTER, textColor=BLACK, leading=10)
-    info_right_style = ParagraphStyle('InfoRight', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_RIGHT, textColor=BLACK)
+    # ========== HEADER padrão do sistema (logo + dados da empresa + linha + título) ==========
+    elements.extend(_build_pdf_header(styles, logo_buffer, "Programação de Carregamento", company=company, content_width=doc.width))
 
-    # Logo
-    logo_cell = ""
-    if logo_buffer:
-        try:
-            logo_cell = Image(logo_buffer, width=45, height=45)
-        except:
-            pass
-
-    # Informações da empresa (centro)
-    company_text = Paragraph(company['name'], company_style)
-    address_text = Paragraph(company['address'].replace('\n', ' - '), address_style)
-
-    center_content = [[company_text], [address_text]]
-    center_table = Table(center_content, colWidths=[400])
-    center_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-    ]))
-    
-    # Código de barras e informações (direita)
-    barcode_value = f"PROG{schedule['schedule_number']:06d}"
-    barcode = code128.Code128(barcode_value, barWidth=1.2, barHeight=30)
-    
     # Converter para horário de Brasília (UTC-3)
     from zoneinfo import ZoneInfo
     created_at = parse_datetime_value(schedule['created_at'])
     brasilia_tz = ZoneInfo('America/Sao_Paulo')
     created_at_brasilia = created_at.astimezone(brasilia_tz)
     date_str = created_at_brasilia.strftime('%d/%m/%Y')
-    time_str = created_at_brasilia.strftime('%H:%M')
-    
+
     # Abreviar nome do criador (primeiro e segundo nome, ignorando preposições)
     full_creator_name = schedule.get('created_by_name', 'Sistema')
     if full_creator_name:
@@ -295,56 +265,14 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
             creator_short_name = ' '.join(name_parts[:2]) if len(name_parts) >= 2 else name_parts[0] if name_parts else 'Sistema'
     else:
         creator_short_name = 'Sistema'
-    
-    barcode_info = Paragraph(f"<b>Nº {schedule['schedule_number']}</b>", ParagraphStyle('BarcodeNum', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', alignment=TA_CENTER))
-    date_info = Paragraph(f"Data: {date_str}", info_right_style)
-    user_info = Paragraph(f"Criado por: {creator_short_name}", info_right_style)
-    
-    right_content = [[barcode], [barcode_info], [date_info], [user_info]]
-    right_table = Table(right_content, colWidths=[150])
-    right_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-    ]))
-    
-    # Montar header completo
-    header_data = [[logo_cell, center_table, right_table]]
-    header_table = Table(header_data, colWidths=[55, 450, 160])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
-    ]))
-    elements.append(header_table)
-    
-    # Linha separadora verde
-    elements.append(Spacer(1, 5))
-    line_data = [[""]]
-    line_table = Table(line_data, colWidths=[700])
-    line_table.setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -1), 2, PRIMARY_GREEN),
-    ]))
-    elements.append(line_table)
-    elements.append(Spacer(1, 10))
-    
-    # ========== TÍTULO: Box com borda ==========
-    title_style = ParagraphStyle('Title', parent=styles['Normal'], fontSize=12, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=PRIMARY_GREEN)
-    
-    title_content = [[Paragraph("PROGRAMAÇÃO DE CARREGAMENTO", title_style)]]
-    title_table = Table(title_content, colWidths=[700])
-    title_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 2, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(title_table)
-    elements.append(Spacer(1, 10))
-    
+
+    # ========== LINHA DE ESTATÍSTICAS + DATA DE GERAÇÃO (mesmo padrão dos demais relatórios) ==========
+    stats_style = ParagraphStyle('StatsLine', parent=styles['Normal'], fontSize=11, textColor=PRIMARY_GREEN, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceBefore=6, spaceAfter=8)
+    elements.append(Paragraph(f"Nº {schedule['schedule_number']}  |  Data de Criação: {date_str}  |  Criado por: {creator_short_name}", stats_style))
+
+    gen_info_style = ParagraphStyle('GenInfo', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12)
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
     # ========== BOX 1: Informações dos Clientes ==========
     label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8, fontName='Helvetica', textColor=BLACK)
     value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
@@ -511,13 +439,9 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
         ]))
         elements.append(obs_table)
         elements.append(Spacer(1, 12))
-    
-    # ========== RODAPÉ ==========
-    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
-    elements.append(Spacer(1, 15))
-    elements.append(Paragraph(f"Gerado em {now_brt().strftime('%d/%m/%Y %H:%M')} - ContainerLogix - {company['name']}", footer_style))
 
-    doc.build(elements)
+    footer = _make_pdf_footer(company['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     buffer.seek(0)
 
     filename = f"programacao_carregamento_{schedule['schedule_number']}.pdf"
