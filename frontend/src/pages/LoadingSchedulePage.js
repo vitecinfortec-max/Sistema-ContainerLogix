@@ -11,6 +11,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
+import { formatContainerNumber } from '../lib/containerNumber';
 import { Calendar, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -181,9 +182,16 @@ export default function LoadingSchedulePage() {
   };
 
   const handleItemChange = (index, field, value) => {
-    const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setFormData(prev => ({ ...prev, items: newItems }));
+    // Usa a forma funcional do setState (lê `prev`, não `formData` do closure)
+    // porque o Autocomplete dispara onChange + onSelect em sequência síncrona
+    // ao clicar numa sugestão (ex: driver_id/driver_name/driver_cpf) - com
+    // `formData.items` direto, cada chamada partia do mesmo estado desatualizado
+    // e só o último campo alterado sobrevivia, apagando os anteriores.
+    setFormData(prev => {
+      const newItems = [...prev.items];
+      newItems[index] = { ...newItems[index], [field]: value };
+      return { ...prev, items: newItems };
+    });
   };
 
   const addItem = () => {
@@ -640,7 +648,12 @@ export default function LoadingSchedulePage() {
                       </div>
                       <div>
                         <Label className="text-xs mb-1 block">Nº Container</Label>
-                        <Input className="h-9" value={item.container_number} onChange={(e) => handleItemChange(index, 'container_number', e.target.value.toUpperCase())} />
+                        <Input
+                          className="h-9"
+                          value={item.container_number}
+                          onChange={(e) => handleItemChange(index, 'container_number', e.target.value.toUpperCase())}
+                          onBlur={(e) => handleItemChange(index, 'container_number', formatContainerNumber(e.target.value))}
+                        />
                       </div>
                       <div>
                         <Label className="text-xs mb-1 block">Lacre</Label>
