@@ -41,10 +41,15 @@ const SIZE_TYPE_OPTIONS = [
   ['40HC', '40HC'], ['40RF', '40RF'], ['40OT', '40OT'], ['40FR', '40FR'], ['40DRY', '40DRY'],
 ];
 
+const CONTAINER_STATUS_OPTIONS = [
+  ['CHEIO', 'Cheio'],
+  ['VAZIO', 'Vazio'],
+];
+
 const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 function emptyItem() {
-  return { container_number: '', size_type: '', gross_weight: '', seal: '', shipping_line: '' };
+  return { container_number: '', status: 'CHEIO', size_type: '', gross_weight: '', seal: '', shipping_line: '' };
 }
 
 function buildEmpty() {
@@ -56,6 +61,7 @@ function buildEmpty() {
     port: '',
     items: [emptyItem()],
     booking: '',
+    client_name: '',
     route_id: '', route_name: '', freight_value: null,
     driver_id: '', driver_name: '', driver_cpf: '',
     transport_company: '',
@@ -82,9 +88,10 @@ export default function LoadingOrderPage() {
   const [shippingLines, setShippingLines] = useState([]);
   const [terminals, setTerminals] = useState([]);
   const [freightRoutes, setFreightRoutes] = useState([]);
+  const [clients, setClients] = useState([]);
   const debounceRef = useRef(null);
 
-  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); loadTerminals(); loadFreightRoutes(); }, []);
+  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); loadTerminals(); loadFreightRoutes(); loadClients(); }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -140,6 +147,12 @@ export default function LoadingOrderPage() {
     try {
       const r = await api.getFreightRoutes();
       setFreightRoutes(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
+  const loadClients = async () => {
+    try {
+      const r = await api.getClients();
+      setClients(r.data || []);
     } catch (e) { /* ignore */ }
   };
 
@@ -235,6 +248,7 @@ export default function LoadingOrderPage() {
           shipping_line: entry.shipping_line || items[idx].shipping_line,
           seal: entry.seal || items[idx].seal,
           gross_weight: entry.tare || items[idx].gross_weight,
+          status: entry.status || items[idx].status,
         };
         return { ...prev, items };
       });
@@ -545,6 +559,17 @@ export default function LoadingOrderPage() {
             <SectionTitle>Especificações do Container e Carga</SectionTitle>
             <div className="grid grid-cols-3 gap-3">
               <Field label="Booking/Ref." value={form.booking} onChange={(v) => onChange('booking', v)} testid="loading-order-booking" />
+              <div>
+                <Label className="mb-1 block">Cliente</Label>
+                <Autocomplete
+                  value={form.client_name}
+                  onChange={(v) => onChange('client_name', v)}
+                  onSelect={(c) => onChange('client_name', c.name)}
+                  options={clients}
+                  displayField="name"
+                  className="h-9 text-sm"
+                />
+              </div>
             </div>
 
             <div className="flex items-center justify-between mt-1">
@@ -555,60 +580,74 @@ export default function LoadingOrderPage() {
             </div>
             <div className="space-y-2">
               {form.items.map((it, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                  <div className="col-span-3">
-                    <Label className="text-xs mb-1 block">ID do Container <span className="text-red-500">*</span></Label>
-                    <Input
-                      value={it.container_number}
-                      onChange={(e) => updateContainerItem(idx, 'container_number', e.target.value.toUpperCase())}
-                      onBlur={(e) => handleItemContainerBlur(idx, e)}
-                      className="h-8 text-sm"
-                      data-testid={`loading-order-item-container-${idx}`}
-                    />
+                <div key={idx} className="flex flex-col gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                  <div className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-4">
+                      <Label className="text-xs mb-1 block">ID do Container <span className="text-red-500">*</span></Label>
+                      <Input
+                        value={it.container_number}
+                        onChange={(e) => updateContainerItem(idx, 'container_number', e.target.value.toUpperCase())}
+                        onBlur={(e) => handleItemContainerBlur(idx, e)}
+                        className="h-8 text-sm"
+                        data-testid={`loading-order-item-container-${idx}`}
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs mb-1 block">Status</Label>
+                      <Select value={it.status || 'CHEIO'} onValueChange={(v) => updateContainerItem(idx, 'status', v)}>
+                        <SelectTrigger className="h-8 text-sm" data-testid={`loading-order-item-status-${idx}`}><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CONTAINER_STATUS_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs mb-1 block">Tipo/Tamanho</Label>
+                      <Select value={it.size_type || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'size_type', v === '_empty' ? '' : v)}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_empty">-</SelectItem>
+                          {SIZE_TYPE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs mb-1 block">Armador</Label>
+                      <Select value={it.shipping_line || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'shipping_line', v === '_empty' ? '' : v)}>
+                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent className="max-h-80 overflow-y-auto">
+                          <SelectItem value="_empty">-</SelectItem>
+                          {it.shipping_line && !shippingLines.some((l) => l.name === it.shipping_line) && (
+                            <SelectItem value={it.shipping_line}>{it.shipping_line}</SelectItem>
+                          )}
+                          {shippingLines.map((line) => <SelectItem key={line.id} value={line.name}>{line.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="col-span-3">
-                    <Label className="text-xs mb-1 block">Tipo/Tamanho</Label>
-                    <Select value={it.size_type || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'size_type', v === '_empty' ? '' : v)}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="_empty">-</SelectItem>
-                        {SIZE_TYPE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs mb-1 block">Peso Bruto</Label>
-                    <Input value={it.gross_weight} onChange={(e) => updateContainerItem(idx, 'gross_weight', e.target.value)} className="h-8 text-sm" />
-                  </div>
-                  <div className="col-span-2">
-                    <Label className="text-xs mb-1 block">Armador</Label>
-                    <Select value={it.shipping_line || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'shipping_line', v === '_empty' ? '' : v)}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent className="max-h-80 overflow-y-auto">
-                        <SelectItem value="_empty">-</SelectItem>
-                        {it.shipping_line && !shippingLines.some((l) => l.name === it.shipping_line) && (
-                          <SelectItem value={it.shipping_line}>{it.shipping_line}</SelectItem>
-                        )}
-                        {shippingLines.map((line) => <SelectItem key={line.id} value={line.name}>{line.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-1">
-                    <Label className="text-xs mb-1 block">Lacre</Label>
-                    <Input value={it.seal} onChange={(e) => updateContainerItem(idx, 'seal', e.target.value)} className="h-8 text-sm" />
-                  </div>
-                  <div className="col-span-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeContainerItem(idx)}
-                      disabled={form.items.length <= 1}
-                      className="h-8 px-2 text-red-500 hover:text-red-700 disabled:opacity-30"
-                      data-testid={`loading-order-item-remove-${idx}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                  <div className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-3">
+                      <Label className="text-xs mb-1 block">Peso Bruto</Label>
+                      <Input value={it.gross_weight} onChange={(e) => updateContainerItem(idx, 'gross_weight', e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-xs mb-1 block">Lacre</Label>
+                      <Input value={it.seal} onChange={(e) => updateContainerItem(idx, 'seal', e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="col-span-4" />
+                    <div className="col-span-2 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeContainerItem(idx)}
+                        disabled={form.items.length <= 1}
+                        className="h-8 px-2 text-red-500 hover:text-red-700 disabled:opacity-30"
+                        data-testid={`loading-order-item-remove-${idx}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}

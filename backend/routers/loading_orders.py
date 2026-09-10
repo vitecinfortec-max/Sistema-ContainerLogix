@@ -11,6 +11,7 @@ from models import (
 from shared import db, get_current_active_user, get_company_settings
 from reports import merge_company, now_brt
 from routers.freight_payments import create_freight_payment_for_order, cancel_pending_freight_payment_for_order
+from routers.movements import validate_loading_order_movements, create_movements_for_loading_order
 
 api_router = APIRouter(prefix="/api")
 
@@ -58,6 +59,11 @@ async def create_loading_order(data: LoadingOrderCreate, current_user: dict = De
     if not data.items:
         raise HTTPException(status_code=400, detail="A Ordem de Carregamento deve conter ao menos 1 container")
 
+    if data.status == 'APROVADA':
+        conflicts = await validate_loading_order_movements(data.model_dump(), loading_order_id=None)
+        if conflicts:
+            raise HTTPException(status_code=400, detail="Não é possível aprovar: " + " | ".join(conflicts))
+
     counter = await db.counters.find_one_and_update(
         {"_id": "loading_order_number"},
         {"$inc": {"seq": 1}},
@@ -78,6 +84,7 @@ async def create_loading_order(data: LoadingOrderCreate, current_user: dict = De
 
     if doc.get('status') == 'APROVADA':
         await create_freight_payment_for_order(doc, current_user)
+        await create_movements_for_loading_order(doc, current_user)
 
     return doc
 
@@ -92,12 +99,20 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
     old_status = existing.get('status')
     update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    new_status = update_data.get('status', old_status)
+
+    if old_status != 'APROVADA' and new_status == 'APROVADA':
+        merged_preview = {**existing, **update_data}
+        conflicts = await validate_loading_order_movements(merged_preview, loading_order_id=order_id)
+        if conflicts:
+            raise HTTPException(status_code=400, detail="Não é possível aprovar: " + " | ".join(conflicts))
+
     await db.loading_orders.update_one({"id": order_id}, {"$set": update_data})
     updated = await db.loading_orders.find_one({"id": order_id}, {"_id": 0})
 
-    new_status = updated.get('status')
     if old_status != 'APROVADA' and new_status == 'APROVADA':
         await create_freight_payment_for_order(updated, current_user)
+        await create_movements_for_loading_order(updated, current_user)
     elif old_status == 'APROVADA' and new_status != 'APROVADA':
         await cancel_pending_freight_payment_for_order(order_id, current_user)
 

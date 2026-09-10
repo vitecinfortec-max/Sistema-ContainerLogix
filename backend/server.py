@@ -227,6 +227,22 @@ async def startup_event():
         # lançamento automático de Pagamento Frete - não pode travar o
         # startup do sistema por causa disso.
         logger.warning(f"Não foi possível criar índice único em freight_payments.loading_order_id: {e}")
+    try:
+        # Trava de segurança contra corrida na checagem de idempotência da
+        # movimentação de estoque automática da Ordem de Carregamento.
+        # partialFilterExpression precisa ser {"$type": "string"}, não
+        # {"$exists": true} - toda movimentação manual grava
+        # loading_order_id=null explicitamente (o campo nunca fica
+        # ausente), e {"$exists": true} trataria todo esse null como valor
+        # igual, quebrando a Emissão de EIR normal (mesmo container tendo
+        # várias movimentações na vida, todas com loading_order_id: null).
+        await db.movements.create_index(
+            [("loading_order_id", 1), ("container_number", 1)],
+            unique=True,
+            partialFilterExpression={"loading_order_id": {"$type": "string"}},
+        )
+    except Exception as e:
+        logger.warning(f"Não foi possível criar índice único em movements.(loading_order_id, container_number): {e}")
 
     start_scheduler()
 

@@ -13,7 +13,7 @@ from urllib.parse import quote as url_quote
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel as PydanticBaseModel
+from pydantic import BaseModel as PydanticBaseModel, ValidationError
 
 from models import (
     User, UserCreate, UserLogin, UserResponse, Token,
@@ -66,6 +66,7 @@ from shared import (
 )
 
 api_router = APIRouter(prefix="/api")
+logger = logging.getLogger(__name__)
 
 
 async def _find_last_movement(container_number: str):
@@ -88,8 +89,17 @@ async def get_last_movement_for_container(container_number: str, current_user: d
     return {"movement": last}
 
 
-@api_router.post("/movements", response_model=ContainerMovementResponse)
-async def create_movement(movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_active_user)):
+async def _create_container_movement(
+    movement_input: ContainerMovementCreate,
+    current_user: dict,
+    loading_order_id: Optional[str] = None,
+) -> ContainerMovementResponse:
+    """Cria uma movimentação de estoque (Entrada/Saída) - caminho único usado
+    tanto pelo POST /movements manual (Emissão de EIR) quanto pelo gatilho
+    automático da Ordem de Carregamento, pra garantir que a trava de
+    duplicidade, o contador de transação e o broadcast de WebSocket nunca
+    fiquem divergentes entre os dois (ver quick-exit em yard-control pra um
+    exemplo do que dá errado quando esse caminho é duplicado à mão)."""
     # Trava de duplicidade: não permite registrar uma Entrada quando a
     # movimentação mais recente desse container já é uma Entrada (ainda não
     # saiu), nem uma Saída quando a mais recente já é uma Saída (já saiu e
@@ -112,7 +122,7 @@ async def create_movement(movement_input: ContainerMovementCreate, current_user:
 
     # Usar contador atômico para garantir sequência única
     next_transaction_id = await get_next_transaction_id()
-    
+
     movement = ContainerMovement(
         transaction_id=next_transaction_id,
         operation_type=movement_input.operation_type,
@@ -140,16 +150,17 @@ async def create_movement(movement_input: ContainerMovementCreate, current_user:
         container_photos=movement_input.container_photos,
         container_damages=movement_input.container_damages,
         inspection_notes=movement_input.inspection_notes,
+        loading_order_id=loading_order_id,
         created_by=current_user['sub'],
         user_name=current_user['name']
     )
-    
+
     doc = movement.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     if doc.get('billed_at'):
         doc['billed_at'] = doc['billed_at'].isoformat()
     await db.movements.insert_one(doc)
-    
+
     response = ContainerMovementResponse(
         id=movement.id,
         transaction_id=movement.transaction_id,
@@ -178,12 +189,13 @@ async def create_movement(movement_input: ContainerMovementCreate, current_user:
         container_photos=movement.container_photos,
         container_damages=movement.container_damages,
         inspection_notes=movement.inspection_notes,
+        loading_order_id=movement.loading_order_id,
         billed=movement.billed,
         billed_at=movement.billed_at,
         created_at=movement.created_at,
         user_name=movement.user_name
     )
-    
+
     # Notificar todos os clientes conectados via WebSocket
     await manager.broadcast({
         "type": "MOVEMENT_CREATED",
@@ -209,8 +221,128 @@ async def create_movement(movement_input: ContainerMovementCreate, current_user:
             "user_name": response.user_name
         }
     })
-    
+
     return response
+
+
+@api_router.post("/movements", response_model=ContainerMovementResponse)
+async def create_movement(movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_active_user)):
+    return await _create_container_movement(movement_input, current_user)
+
+
+_LOADING_ORDER_TYPE_TO_OPERATION = {"COLETA": "ENTRADA", "ENTREGA": "SAIDA"}
+_VALID_MOVEMENT_SIZE_TYPES = {"20DC", "20RF", "20OT", "20FR", "40HC", "40RF", "40OT", "40FR", "40DRY"}
+_VALID_MOVEMENT_STATUSES = {"CHEIO", "VAZIO"}
+
+
+async def validate_loading_order_movements(order: dict, loading_order_id: Optional[str] = None) -> List[str]:
+    """Verifica se aprovar essa Ordem de Carregamento consegue gerar a
+    movimentação de estoque de cada container sem violar a trava de
+    duplicidade nem faltar campo obrigatório de ContainerMovementCreate.
+    Retorna uma lista de mensagens de erro (vazia = pode aprovar). DEVE ser
+    chamada ANTES de qualquer escrita no banco em create_loading_order/
+    update_loading_order (loading_orders.py), já que uma falha aqui precisa
+    bloquear a aprovação inteira, não só avisar depois de já ter salvo."""
+    errors = []
+    items = [it for it in (order.get('items') or []) if (it.get('container_number') or '').strip()]
+    if not items:
+        return errors  # já bloqueado antes por "ao menos 1 container" - defensivo
+
+    operation_type = _LOADING_ORDER_TYPE_TO_OPERATION.get(order.get('order_type'), 'ENTRADA')
+    tipo_label = 'ENTRADA' if operation_type == 'ENTRADA' else 'SAÍDA'
+
+    # Campos de nível de ordem: opcionais em LoadingOrder, mas obrigatórios
+    # em ContainerMovementCreate - sem essa checagem o hook quebraria com um
+    # ValidationError não tratado depois que o status já teria sido gravado.
+    required_order_fields = {
+        'driver_name': 'Motorista', 'driver_cpf': 'CPF do Motorista',
+        'truck_plate': 'Placa do Cavalo', 'trailer_plate': 'Placa da Carreta',
+        'transport_company': 'Transportadora',
+    }
+    for field, label in required_order_fields.items():
+        if not (order.get(field) or '').strip():
+            errors.append(f"{label} é obrigatório para gerar as movimentações de estoque ao aprovar.")
+
+    for item in items:
+        container_number = item['container_number'].strip().upper()
+        if item.get('size_type') not in _VALID_MOVEMENT_SIZE_TYPES:
+            errors.append(f"Container {container_number}: Tipo/Tamanho é obrigatório e deve ser válido.")
+        if item.get('status') not in _VALID_MOVEMENT_STATUSES:
+            errors.append(f"Container {container_number}: Status (Cheio/Vazio) é obrigatório.")
+        if not (item.get('shipping_line') or '').strip():
+            errors.append(f"Container {container_number}: Armador é obrigatório.")
+
+        if loading_order_id:
+            existing_own = await db.movements.find_one(
+                {"loading_order_id": loading_order_id, "container_number": container_number},
+                {"_id": 0, "id": 1}
+            )
+            if existing_own:
+                continue  # idempotência: essa ordem já gerou a movimentação desse container
+
+        last_movement = await _find_last_movement(container_number)
+        if last_movement and last_movement.get('operation_type') == operation_type:
+            last_dt = parse_datetime_value(last_movement['created_at'])
+            last_dt_brt = to_brt(last_dt) if last_dt else None
+            date_str = last_dt_brt.strftime('%d/%m/%Y %H:%M') if last_dt_brt else '-'
+            errors.append(
+                f"Container {container_number}: já teve uma {tipo_label} registrada (Transação #{last_movement.get('transaction_id')}, "
+                f"em {date_str}) sem uma movimentação do tipo oposto depois. Não é possível registrar outra {tipo_label} em duplicidade."
+            )
+    return errors
+
+
+async def create_movements_for_loading_order(order: dict, current_user: dict) -> List[dict]:
+    """Gera a movimentação de estoque (Entrada pra Coleta, Saída pra Entrega)
+    de cada container de uma Ordem de Carregamento recém-Aprovada. Espelha
+    create_freight_payment_for_order (freight_payments.py). Chamado depois
+    que validate_loading_order_movements já bloqueou a transição se houvesse
+    conflito - então nenhuma falha é esperada aqui; mesmo assim cada item
+    roda isolado num try/except pra não deixar uma falha pontual (corrida
+    rara entre o precheck e este hook) derrubar os containers já processados,
+    já que nesse ponto o status da ordem já foi gravado e não tem como
+    'desfazer' de forma limpa."""
+    operation_type = _LOADING_ORDER_TYPE_TO_OPERATION.get(order.get('order_type'), 'ENTRADA')
+    results = []
+    for item in (order.get('items') or []):
+        container_number = (item.get('container_number') or '').strip().upper()
+        if not container_number:
+            continue
+
+        existing = await db.movements.find_one(
+            {"loading_order_id": order['id'], "container_number": container_number}, {"_id": 0}
+        )
+        if existing:
+            results.append(existing)
+            continue
+
+        try:
+            payload = ContainerMovementCreate(
+                operation_type=operation_type,
+                driver_name=order.get('driver_name') or '',
+                driver_cpf=order.get('driver_cpf') or '',
+                truck_plate=order.get('truck_plate') or '',
+                trailer_plate_1=order.get('trailer_plate') or '',
+                transport_company=order.get('transport_company') or '',
+                client_name=order.get('client_name'),
+                container_number=container_number,
+                status=item.get('status'),
+                size_type=item.get('size_type'),
+                tare=item.get('gross_weight'),
+                shipping_line=item.get('shipping_line') or '',
+                seal=item.get('seal'),
+                booking=order.get('booking'),
+                origin_terminal=order.get('origin_terminal'),
+            )
+            response = await _create_container_movement(payload, current_user, loading_order_id=order['id'])
+            results.append(response.model_dump())
+        except (ValidationError, HTTPException) as e:
+            logger.error(
+                f"Falha ao gerar movimentação automática pro container {container_number} "
+                f"da Ordem de Carregamento Nº {order.get('order_number')}: {e}"
+            )
+    return results
+
 
 class MovementPDFRequest(PydanticBaseModel):
     movement_ids: List[str]
@@ -638,7 +770,8 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     update_data['user_name'] = existing['user_name']
     update_data['billed'] = existing.get('billed', False)
     update_data['billed_at'] = existing.get('billed_at')
-    
+    update_data['loading_order_id'] = existing.get('loading_order_id')
+
     # Arredondar valor monetário para evitar problemas de precisão
     if update_data.get('service_value') is not None:
         update_data['service_value'] = round_money(update_data['service_value'])
@@ -673,6 +806,7 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
         container_photos=update_data.get('container_photos'),
         container_damages=update_data.get('container_damages', []),
         inspection_notes=update_data.get('inspection_notes'),
+        loading_order_id=update_data.get('loading_order_id'),
         billed=update_data.get('billed', False),
         billed_at=parse_datetime_value(update_data['billed_at']) if update_data.get('billed_at') else None,
         created_at=parse_datetime_value(update_data['created_at']),

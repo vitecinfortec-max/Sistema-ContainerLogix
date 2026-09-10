@@ -435,6 +435,7 @@ class ContainerMovement(BaseModel):
     container_photos: Optional[dict] = None  # Fotos do container (frente, traseira, esquerda, direita) - upload removido da UI, mantido só por compatibilidade com registros antigos
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres não cobertas pelas opções de avaria
+    loading_order_id: Optional[str] = None  # Vinculo com a Ordem de Carregamento que gerou essa movimentação (interno, nunca vem do formulário)
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -496,6 +497,7 @@ class ContainerMovementResponse(BaseModel):
     container_photos: Optional[dict] = None  # Fotos do container
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres
+    loading_order_id: Optional[str] = None  # Vinculo com a Ordem de Carregamento que gerou essa movimentação
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
     created_at: datetime
@@ -2653,6 +2655,7 @@ class LoadingOrderContainerItem(BaseModel):
     pode levar múltiplos containers - Booking é único pra ordem inteira, fica
     fora daqui, direto em LoadingOrder)."""
     container_number: Optional[str] = None
+    status: Optional[str] = None  # CHEIO | VAZIO - necessário pra gerar a movimentação de estoque na Aprovação
     size_type: Optional[str] = None
     gross_weight: Optional[str] = None
     seal: Optional[str] = None
@@ -2673,6 +2676,7 @@ class LoadingOrder(BaseModel):
 
     items: List[LoadingOrderContainerItem] = []
     booking: Optional[str] = None
+    client_name: Optional[str] = None  # Cliente (nível da ordem inteira, mesmo padrão do Booking)
 
     route_id: Optional[str] = None
     route_name: Optional[str] = None  # snapshot "origem x destino" no momento da escolha
@@ -2701,6 +2705,7 @@ class LoadingOrderCreate(BaseModel):
     port: Optional[str] = None
     items: List[LoadingOrderContainerItem] = []
     booking: Optional[str] = None
+    client_name: Optional[str] = None
     route_id: Optional[str] = None
     route_name: Optional[str] = None
     freight_value: Optional[float] = None
