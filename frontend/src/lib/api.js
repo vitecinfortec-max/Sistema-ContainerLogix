@@ -402,6 +402,7 @@ export const api = {
   getLoadingOrders: (params) => axios.get(`${API}/loading-orders`, { params }),
   getLoadingOrder: (id) => axios.get(`${API}/loading-orders/${id}`),
   getLoadingOrderNextNumber: () => axios.get(`${API}/loading-orders/next-number`),
+  getNextAutoBookingNumber: () => axios.get(`${API}/loading-orders/next-booking-number`),
   createLoadingOrder: (data) => axios.post(`${API}/loading-orders`, data),
   updateLoadingOrder: (id, data) => axios.put(`${API}/loading-orders/${id}`, data),
   deleteLoadingOrder: (id) => axios.delete(`${API}/loading-orders/${id}`),

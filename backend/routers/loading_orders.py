@@ -46,6 +46,37 @@ async def get_next_loading_order_number(current_user: dict = Depends(get_current
     return {"next_number": (counter["seq"] + 1) if counter else 1}
 
 
+async def _get_next_auto_booking_number() -> int:
+    """Contador atômico pro Booking/Ref. gerado automaticamente em Ordens de
+    Entrega (só quando a instância tem um prefixo configurado em Dados da
+    Empresa - ver CompanySettings.auto_booking_prefix)."""
+    counter = await db.counters.find_one_and_update(
+        {"_id": "auto_booking_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    return counter["seq"]
+
+
+def _format_auto_booking(prefix: str, seq: int) -> str:
+    return f"{prefix}{seq:05d}"
+
+
+@api_router.get("/loading-orders/next-booking-number")
+async def get_next_auto_booking_number_preview(current_user: dict = Depends(get_current_active_user)):
+    """Prévia pra tela do próximo Booking automático de uma Ordem de Entrega
+    - retorna null se a instância não tem um prefixo configurado (feature
+    desligada). O valor real só é reservado de forma atômica ao salvar."""
+    company = await get_company_settings()
+    prefix = (company.get('auto_booking_prefix') or '').strip()
+    if not prefix:
+        return {"next_booking": None}
+    counter = await db.counters.find_one({"_id": "auto_booking_number"})
+    next_seq = (counter["seq"] + 1) if counter else 1
+    return {"next_booking": _format_auto_booking(prefix, next_seq)}
+
+
 @api_router.get("/loading-orders/{order_id}", response_model=LoadingOrderResponse)
 async def get_loading_order(order_id: str, current_user: dict = Depends(get_current_active_user)):
     doc = await db.loading_orders.find_one({"id": order_id}, {"_id": 0})
@@ -58,6 +89,13 @@ async def get_loading_order(order_id: str, current_user: dict = Depends(get_curr
 async def create_loading_order(data: LoadingOrderCreate, current_user: dict = Depends(get_current_active_user)):
     if not data.items:
         raise HTTPException(status_code=400, detail="A Ordem de Carregamento deve conter ao menos 1 container")
+
+    if data.order_type == 'ENTREGA' and not (data.booking or '').strip():
+        company = await get_company_settings()
+        prefix = (company.get('auto_booking_prefix') or '').strip()
+        if prefix:
+            seq = await _get_next_auto_booking_number()
+            data.booking = _format_auto_booking(prefix, seq)
 
     if data.status == 'APROVADA':
         conflicts = await validate_loading_order_movements(data.model_dump(), loading_order_id=None)
@@ -100,6 +138,15 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
     update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     new_status = update_data.get('status', old_status)
+
+    effective_order_type = update_data.get('order_type', existing.get('order_type'))
+    effective_booking = update_data.get('booking', existing.get('booking'))
+    if effective_order_type == 'ENTREGA' and not (effective_booking or '').strip():
+        company = await get_company_settings()
+        prefix = (company.get('auto_booking_prefix') or '').strip()
+        if prefix:
+            seq = await _get_next_auto_booking_number()
+            update_data['booking'] = _format_auto_booking(prefix, seq)
 
     if old_status != 'APROVADA' and new_status == 'APROVADA':
         merged_preview = {**existing, **update_data}

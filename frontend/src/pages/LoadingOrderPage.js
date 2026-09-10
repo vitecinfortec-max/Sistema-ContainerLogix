@@ -89,9 +89,10 @@ export default function LoadingOrderPage() {
   const [terminals, setTerminals] = useState([]);
   const [freightRoutes, setFreightRoutes] = useState([]);
   const [clients, setClients] = useState([]);
+  const [nextBookingPreview, setNextBookingPreview] = useState(null);
   const debounceRef = useRef(null);
 
-  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); loadTerminals(); loadFreightRoutes(); loadClients(); }, []);
+  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); loadTerminals(); loadFreightRoutes(); loadClients(); loadNextBookingPreview(); }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -154,6 +155,12 @@ export default function LoadingOrderPage() {
       const r = await api.getClients();
       setClients(r.data || []);
     } catch (e) { /* ignore */ }
+  };
+  const loadNextBookingPreview = async () => {
+    try {
+      const r = await api.getNextAutoBookingNumber();
+      setNextBookingPreview(r.data?.next_booking || null);
+    } catch (e) { setNextBookingPreview(null); }
   };
 
   const reset = () => setForm(buildEmpty());
@@ -283,6 +290,7 @@ export default function LoadingOrderPage() {
       }
       setDialogOpen(false);
       loadList();
+      loadNextBookingPreview();
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'Erro ao salvar ordem de carregamento');
     } finally { setSaving(false); }
@@ -558,7 +566,22 @@ export default function LoadingOrderPage() {
 
             <SectionTitle>Especificações do Container e Carga</SectionTitle>
             <div className="grid grid-cols-3 gap-3">
-              <Field label="Booking/Ref." value={form.booking} onChange={(v) => onChange('booking', v)} testid="loading-order-booking" />
+              {form.order_type === 'ENTREGA' && nextBookingPreview ? (
+                <div>
+                  <Label className="mb-1 block">Booking/Ref.</Label>
+                  <Input
+                    disabled
+                    value={form.booking || nextBookingPreview}
+                    className="h-9 text-sm bg-slate-50 dark:bg-slate-800"
+                    data-testid="loading-order-booking"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">
+                    {form.booking ? 'Gerado automaticamente' : 'Será gerado automaticamente ao salvar'}
+                  </p>
+                </div>
+              ) : (
+                <Field label="Booking/Ref." value={form.booking} onChange={(v) => onChange('booking', v)} testid="loading-order-booking" />
+              )}
               <div>
                 <Label className="mb-1 block">Cliente</Label>
                 <Autocomplete

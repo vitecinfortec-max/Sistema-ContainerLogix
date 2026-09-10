@@ -40,7 +40,8 @@ const EMPTY_FORM = {
   bank_agency: '',
   bank_account: '',
   pix_key: '',
-  logo_filename: ''
+  logo_filename: '',
+  auto_booking_prefix: ''
 };
 
 export default function CompanySettingsPage() {
@@ -355,6 +356,30 @@ export default function CompanySettingsPage() {
                     className="h-10 text-[13px]"
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Ordem de Carregamento</CardTitle>
+              <CardDescription className="text-[12px]">Controla o preenchimento automático do Booking/Ref. em ordens do tipo Entrega</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-5">
+              <div className="max-w-sm space-y-1.5">
+                <Label htmlFor="auto_booking_prefix" className="text-[13px]">Prefixo de Booking Automático (Entrega)</Label>
+                <Input
+                  id="auto_booking_prefix"
+                  data-testid="company-auto-booking-prefix-input"
+                  value={formData.auto_booking_prefix}
+                  onChange={(e) => setFormData({ ...formData, auto_booking_prefix: e.target.value.toUpperCase() })}
+                  disabled={!isAdmin}
+                  className="h-10 text-[13px] font-mono"
+                  maxLength={10}
+                />
+                <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                  Se preenchido (ex: "TLL"), toda Ordem de Carregamento do tipo Entrega passa a gerar o Booking/Ref. sozinha, em sequência (TLL00001, TLL00002...). Deixe em branco para continuar preenchendo manualmente.
+                </p>
               </div>
             </CardContent>
           </Card>
