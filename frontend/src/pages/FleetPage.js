@@ -11,6 +11,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
+import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
@@ -122,6 +123,7 @@ export default function FleetPage() {
   const [vehicleForm, setVehicleForm] = useState(buildEmptyVehicleForm());
   const [drivers, setDrivers] = useState([]);
   const [driverPopoverOpen, setDriverPopoverOpen] = useState(false);
+  const [transportCompanies, setTransportCompanies] = useState([]);
 
   const vehicleTypes = [
     { value: 'CAMINHÃO', label: 'Caminhão' },
@@ -171,6 +173,7 @@ export default function FleetPage() {
     } else if (activeTab === 'vehicles') {
       loadVehicles();
       loadDrivers();
+      loadTransportCompanies();
     }
   }, [activeTab, pagination.page, vehiclePagination.page]);
 
@@ -181,6 +184,15 @@ export default function FleetPage() {
     } catch (error) {
       console.error('Erro ao carregar motoristas:', error);
       toast.error('Erro ao carregar motoristas');
+    }
+  };
+
+  const loadTransportCompanies = async () => {
+    try {
+      const response = await api.getCompanies();
+      setTransportCompanies(response.data?.items || response.data || []);
+    } catch (error) {
+      console.error('Erro ao carregar transportadoras:', error);
     }
   };
 
@@ -1444,7 +1456,13 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label>Transportadora Vinculada</Label>
-                <Input value={vehicleForm.transport_company} onChange={(e) => handleVehicleFormChange('transport_company', e.target.value)} />
+                <Autocomplete
+                  value={vehicleForm.transport_company}
+                  onChange={(v) => handleVehicleFormChange('transport_company', v)}
+                  onSelect={(c) => handleVehicleFormChange('transport_company', c.name)}
+                  options={transportCompanies}
+                  displayField="name"
+                />
               </div>
             </div>
             <div>
