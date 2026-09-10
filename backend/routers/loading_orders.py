@@ -136,7 +136,7 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
-        rightMargin=12 * mm, leftMargin=12 * mm, topMargin=7 * mm, bottomMargin=6 * mm
+        rightMargin=10 * mm, leftMargin=10 * mm, topMargin=4 * mm, bottomMargin=3 * mm
     )
     width = doc.width
     styles = getSampleStyleSheet()
@@ -172,11 +172,11 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
     ], colWidths=[width])
     title_tbl.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
     elements.append(title_tbl)
-    elements.append(Spacer(1, 5))
+    elements.append(Spacer(1, 2))
 
     status_label = _STATUS_LABELS.get(order.get('status'), order.get('status'))
     elements.append(boxed_section('Dados do Agendamento, Controle e Destino', [
@@ -190,7 +190,7 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
             ('Destino', order.get('port')),
         ], n_cols=2),
     ]))
-    elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 2))
 
     items = order.get('items') or []
 
@@ -200,7 +200,7 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
             ('Quantidade de Containers', len(items) or None),
         ], n_cols=2),
     ]))
-    elements.append(Spacer(1, 3))
+    elements.append(Spacer(1, 2))
 
     if items:
         item_header = ["#", "ID do Container", "Tipo/Tamanho", "Peso Bruto", "Armador", "Lacre (Seal)"]
@@ -221,15 +221,15 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         items_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('FONTSIZE', (0, 0), (-1, -1), 7.5),
             ('ALIGN', (0, 0), (0, -1), 'CENTER'),
             ('ALIGN', (2, 0), (3, -1), 'CENTER'),
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
             ('BOX', (0, 0), (-1, -1), 1, colors.black),
             ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
             ('RIGHTPADDING', (0, 0), (-1, -1), 5),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
@@ -237,7 +237,7 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         elements.append(items_table)
     else:
         elements.append(Paragraph('Nenhum container informado nesta ordem.', styles['Normal']))
-    elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 2))
 
     elements.append(boxed_section('Dados do Transporte (Transportador/Motorista)', [
         field_row([
@@ -250,16 +250,17 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
             ('Placa Carreta', order.get('trailer_plate')),
         ], n_cols=4),
     ]))
-    elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 2))
 
     if order.get('observations'):
+        obs_style = ParagraphStyle('LOObs', parent=styles['Normal'], fontSize=8.5, leading=10.5)
         elements.append(boxed_section('Observações', [], extra=[
-            Paragraph(str(order['observations']).replace(chr(10), '<br/>'), styles['Normal']),
+            Paragraph(str(order['observations']).replace(chr(10), '<br/>'), obs_style),
         ]))
-        elements.append(Spacer(1, 4))
+        elements.append(Spacer(1, 2))
 
     # Instruções operacionais fixas (boilerplate, igual pra todas as ordens)
-    instr_style = ParagraphStyle('LOInstr', parent=styles['Normal'], fontSize=7.5, leading=9.5)
+    instr_style = ParagraphStyle('LOInstr', parent=styles['Normal'], fontSize=7, leading=8.5)
     elements.append(boxed_section('Instruções Operacionais / Operações Portuárias', [], extra=[Paragraph(
         "<b>OBSERVAÇÕES IMPORTANTES</b><br/>"
         "• Motorista deve apresentar a OS de agendamento na portaria principal do terminal.<br/>"
@@ -268,7 +269,7 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         "• Em caso de divergência de lacre ou avarias aparentes, não retirar/entregar a unidade e acionar imediatamente a central de operações.",
         instr_style
     )]))
-    elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 2))
 
     # Checklist de inspeção visual (pra preencher na hora, igual referência)
     checklist_items = [
@@ -277,15 +278,17 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         "Assoalho interno e limpeza",
         "Lacre intacto e batendo com a OS",
     ]
-    check_center_style = ParagraphStyle('LOCheckC', parent=styles['Normal'], alignment=TA_CENTER)
+    check_header_style = ParagraphStyle('LOCheckHeader', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold')
+    check_center_style = ParagraphStyle('LOCheckC', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER)
+    check_item_style = ParagraphStyle('LOCheckItem', parent=styles['Normal'], fontSize=7.5)
     check_rows = [[
-        Paragraph("<b>Item de Inspeção</b>", styles['Normal']),
-        Paragraph("<b>OK</b>", check_center_style),
-        Paragraph("<b>DM</b>", check_center_style),
+        Paragraph("Item de Inspeção", check_header_style),
+        Paragraph("OK", check_center_style),
+        Paragraph("DM", check_center_style),
     ]]
     for i, item in enumerate(checklist_items, 1):
         check_rows.append([
-            Paragraph(f"<font size='8'>{i}. {item}</font>", styles['Normal']),
+            Paragraph(f"{i}. {item}", check_item_style),
             Paragraph("[ &nbsp; ]", check_center_style),
             Paragraph("[ &nbsp; ]", check_center_style),
         ])
@@ -295,27 +298,27 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
         ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.grey),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+        ('TOPPADDING', (0, 0), (-1, -1), 1.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
         ('LEFTPADDING', (0, 0), (-1, -1), 4),
     ]))
     elements.append(boxed_section('Checklist de Inspeção Visual', [], extra=[check_t]))
-    elements.append(Spacer(1, 5))
+    elements.append(Spacer(1, 2))
 
     # Área de assinaturas - mesmo padrão do comprovante de movimentação
-    sig_title_style = ParagraphStyle('LOSigTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', alignment=TA_CENTER)
-    sig_info_style = ParagraphStyle('LOSigInfo', parent=styles['Normal'], fontSize=8)
+    sig_title_style = ParagraphStyle('LOSigTitle', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica-Bold', alignment=TA_CENTER)
+    sig_info_style = ParagraphStyle('LOSigInfo', parent=styles['Normal'], fontSize=7.5)
     sig_data = [[
         [
             Paragraph('Assinatura do Motorista', sig_title_style),
-            Spacer(1, 14),
+            Spacer(1, 9),
             HRFlowable(width='100%', thickness=0.8, color=colors.black),
             Paragraph(f"Nome: {order.get('driver_name') or '-'}", sig_info_style),
             Paragraph(f"CPF: {order.get('driver_cpf') or '-'}", sig_info_style),
         ],
         [
             Paragraph('Assinatura do Responsável', sig_title_style),
-            Spacer(1, 14),
+            Spacer(1, 9),
             HRFlowable(width='100%', thickness=0.8, color=colors.black),
             Paragraph(f"Nome: {order.get('created_by_name') or '-'}", sig_info_style),
             Paragraph(f"Data: {now_brt().strftime('%d/%m/%Y')}", sig_info_style),
@@ -324,34 +327,35 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
     sig_tbl = Table(sig_data, colWidths=[width / 2] * 2)
     sig_tbl.setStyle(TableStyle([
         ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('LEFTPADDING', (0, 0), (-1, -1), 15),
         ('RIGHTPADDING', (0, 0), (-1, -1), 15),
     ]))
     elements.append(sig_tbl)
-    elements.append(Spacer(1, 5))
+    elements.append(Spacer(1, 2))
 
     # Código de barras + usuário + data/hora de impressão
     barcode_value = str(order.get('order_number') or 0).zfill(6)
     try:
-        bc = code128.Code128(barcode_value, barWidth=1.0, barHeight=28)
+        bc = code128.Code128(barcode_value, barWidth=1.0, barHeight=20)
     except Exception:
         bc = None
-    bc_num = Paragraph(f"<b>{order['order_number']}</b>", ParagraphStyle('LOBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER))
+    bc_num = Paragraph(f"<b>{order['order_number']}</b>", ParagraphStyle('LOBcNum', parent=styles['Normal'], fontSize=7.5, alignment=TA_CENTER))
     left_cell = [bc, bc_num] if bc else [bc_num]
+    info_text_style = ParagraphStyle('LOInfoText', parent=styles['Normal'], fontSize=8.5)
     right_info = [
-        Paragraph(f"<b>Usuário: {order.get('created_by_name') or '-'}</b>", styles['Normal']),
-        Paragraph(f"<b>Data e hora da impressão: {now_brt().strftime('%d/%m/%Y %H:%M')}</b>", styles['Normal']),
+        Paragraph(f"<b>Usuário: {order.get('created_by_name') or '-'}</b>", info_text_style),
+        Paragraph(f"<b>Data e hora da impressão: {now_brt().strftime('%d/%m/%Y %H:%M')}</b>", info_text_style),
     ]
     info_tbl = Table([[left_cell, right_info]], colWidths=[100, width - 100])
     info_tbl.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('LINEBELOW', (0, 0), (-1, -1), 1, colors.black),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
     elements.append(info_tbl)
-    elements.append(Spacer(1, 4))
+    elements.append(Spacer(1, 2))
 
     elements.append(Paragraph(
         f"{company['name']} | Este documento é válido como Ordem de Carregamento",
