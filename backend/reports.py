@@ -3379,8 +3379,8 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
         pagesize=A4,
         rightMargin=15*mm,
         leftMargin=15*mm,
-        topMargin=15*mm,
-        bottomMargin=20*mm
+        topMargin=10*mm,
+        bottomMargin=12*mm
     )
 
     elements = []
@@ -3392,7 +3392,7 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
 
     subject_style = ParagraphStyle(
         'ProposalSubject', parent=styles['Normal'], fontSize=11,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=6
     )
     elements.append(Paragraph(proposal.get('subject') or '', subject_style))
 
@@ -3413,9 +3413,9 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
     ]))
     elements.append(info_table)
-    elements.append(Spacer(1, 14))
+    elements.append(Spacer(1, 8))
 
-    body_style = ParagraphStyle('ProposalBody', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.black, spaceAfter=10)
+    body_style = ParagraphStyle('ProposalBody', parent=styles['Normal'], fontSize=10, leading=13, textColor=colors.black, spaceAfter=6)
     elements.append(Paragraph(f"Prezado(a) {proposal.get('recipient_name', '-')},", body_style))
     elements.append(Paragraph(
         f"Agradecemos o contato e apresentamos, a seguir, nossa proposta comercial para os serviços de "
@@ -3426,7 +3426,7 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
     # ========== SERVIÇOS E VALORES ==========
     section_title_style = ParagraphStyle(
         'ProposalSectionTitle', parent=styles['Normal'], fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceAfter=6
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceAfter=4
     )
     elements.append(Paragraph("SERVIÇOS E VALORES", section_title_style))
 
@@ -3453,12 +3453,12 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
     ]))
     elements.append(items_table)
 
-    note_style = ParagraphStyle('ProposalNote', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#808080'), spaceBefore=4, spaceAfter=14)
+    note_style = ParagraphStyle('ProposalNote', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#808080'), spaceBefore=2, spaceAfter=8)
     currency_note = {'USD': 'Dólares Americanos (US$)'}.get(proposal_currency, 'Reais (R$)')
     elements.append(Paragraph(f"Valores expressos em {currency_note}.", note_style))
 
     # ========== BLOCOS DESTACADOS: FREE TIME / FORMA DE PAGAMENTO ==========
-    callout_style = ParagraphStyle('ProposalCallout', parent=styles['Normal'], fontSize=9, textColor=colors.black, leading=13)
+    callout_style = ParagraphStyle('ProposalCallout', parent=styles['Normal'], fontSize=9, textColor=colors.black, leading=11)
 
     def callout_block(title, text):
         elements.append(Paragraph(title, section_title_style))
@@ -3467,13 +3467,13 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
         box_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FFF9E6')),
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#FFD700')),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ('LEFTPADDING', (0, 0), (-1, -1), 8),
             ('RIGHTPADDING', (0, 0), (-1, -1), 8),
         ]))
         elements.append(box_table)
-        elements.append(Spacer(1, 12))
+        elements.append(Spacer(1, 6))
 
     if proposal.get('free_time_text'):
         callout_block("FREE TIME DE ARMAZENAGEM", proposal['free_time_text'])
@@ -3490,7 +3490,7 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
         body_style
     ))
 
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 6))
     elements.append(Paragraph("Atenciosamente,", body_style))
     signature_style = ParagraphStyle('ProposalSignature', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', textColor=colors.black)
     elements.append(Paragraph(c['name'], signature_style))
