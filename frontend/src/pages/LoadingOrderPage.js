@@ -470,7 +470,7 @@ export default function LoadingOrderPage() {
                   className="h-9 text-sm"
                 />
               </div>
-              <Field label="Porto" value={form.port} onChange={(v) => onChange('port', v)} testid="loading-order-port" />
+              <Field label="Destino" value={form.port} onChange={(v) => onChange('port', v)} testid="loading-order-port" />
             </div>
 
             <SectionTitle>Especificações do Container e Carga</SectionTitle>

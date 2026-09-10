@@ -187,7 +187,7 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         ], n_cols=3),
         field_row([
             ('Terminal de Origem', order.get('origin_terminal')),
-            ('Porto', order.get('port')),
+            ('Destino', order.get('port')),
         ], n_cols=2),
     ]))
     elements.append(Spacer(1, 4))
