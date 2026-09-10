@@ -2674,6 +2674,10 @@ class LoadingOrder(BaseModel):
     items: List[LoadingOrderContainerItem] = []
     booking: Optional[str] = None
 
+    route_id: Optional[str] = None
+    route_name: Optional[str] = None  # snapshot "origem x destino" no momento da escolha
+    freight_value: Optional[float] = None  # travado a partir da Rota selecionada
+
     driver_id: Optional[str] = None
     driver_name: Optional[str] = None
     driver_cpf: Optional[str] = None
@@ -2697,6 +2701,9 @@ class LoadingOrderCreate(BaseModel):
     port: Optional[str] = None
     items: List[LoadingOrderContainerItem] = []
     booking: Optional[str] = None
+    route_id: Optional[str] = None
+    route_name: Optional[str] = None
+    freight_value: Optional[float] = None
     driver_id: Optional[str] = None
     driver_name: Optional[str] = None
     driver_cpf: Optional[str] = None
@@ -2712,6 +2719,97 @@ class LoadingOrderUpdate(LoadingOrderCreate):
 
 class LoadingOrderResponse(LoadingOrder):
     pass
+
+
+# ==================== TRANSPORTE - ROTA / PAGAMENTO DE FRETE ====================
+
+FREIGHT_ROUTE_STATUS_OPTIONS = ["ATIVO", "INATIVO"]
+
+
+class FreightRoute(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    origin: str
+    destination: str
+    freight_value: float
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+
+class FreightRouteCreate(BaseModel):
+    origin: str
+    destination: str
+    freight_value: float
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+
+
+class FreightRouteResponse(FreightRouteCreate):
+    id: str
+    created_at: datetime
+
+
+FREIGHT_PAYMENT_STATUS_OPTIONS = ["PENDENTE", "PAGO", "CANCELADO"]
+
+
+class FreightPayment(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    payment_number: int
+    loading_order_id: str
+    order_number: int
+    route_id: str
+    route_name: Optional[str] = None
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
+    transport_company: Optional[str] = None
+    freight_value: float
+    status: str = "PENDENTE"
+    paid_at: Optional[datetime] = None
+    paid_by: Optional[str] = None
+    paid_by_name: Optional[str] = None
+    observations: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+    created_by_name: str
+    updated_at: Optional[datetime] = None
+
+
+class FreightPaymentUpdate(BaseModel):
+    freight_value: Optional[float] = None
+    observations: Optional[str] = None
+
+
+class FreightPaymentResponse(FreightPayment):
+    pass
+
+
+class FreightPaymentHistory(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    freight_payment_id: str
+    payment_number: int
+    action: Literal["CREATED", "UPDATED"]
+    changes: dict
+    user_id: str
+    user_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class FreightPaymentHistoryResponse(BaseModel):
+    id: str
+    freight_payment_id: str
+    payment_number: int
+    action: str
+    changes: dict
+    user_name: str
+    created_at: datetime
 
 
 # ==================== ESTOQUE - CADASTROS DE APOIO ====================

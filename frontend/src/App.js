@@ -62,6 +62,8 @@ import OrdemServicoPage from './pages/OrdemServicoPage';
 import FuelSupplyPage from './pages/FuelSupplyPage';
 import FuelSupplyOrderPage from './pages/FuelSupplyOrderPage';
 import LoadingOrderPage from './pages/LoadingOrderPage';
+import FreightRoutesPage from './pages/FreightRoutesPage';
+import FreightPaymentsPage from './pages/FreightPaymentsPage';
 import CompanySettingsPage from './pages/CompanySettingsPage';
 import UsersPage from './pages/UsersPage';
 import ModulesPage from './pages/ModulesPage';
@@ -183,6 +185,22 @@ function App() {
             element={
               <ProtectedRoute moduleKey="operacional.ordem_carregamento">
                 <LoadingOrderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/freight-routes"
+            element={
+              <ProtectedRoute adminOnly moduleKey="cadastro.rota">
+                <FreightRoutesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/freight-payments"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.pagamento_frete">
+                <FreightPaymentsPage />
               </ProtectedRoute>
             }
           />

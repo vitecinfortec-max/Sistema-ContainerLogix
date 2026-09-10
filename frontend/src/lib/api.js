@@ -406,6 +406,20 @@ export const api = {
   updateLoadingOrder: (id, data) => axios.put(`${API}/loading-orders/${id}`, data),
   deleteLoadingOrder: (id) => axios.delete(`${API}/loading-orders/${id}`),
   getLoadingOrderPDF: (id) => axios.get(`${API}/loading-orders/${id}/pdf`, { responseType: 'blob' }),
+
+  // Rota (Transporte)
+  getFreightRoutes: () => axios.get(`${API}/freight-routes`),
+  createFreightRoute: (data) => axios.post(`${API}/freight-routes`, data),
+  updateFreightRoute: (id, data) => axios.put(`${API}/freight-routes/${id}`, data),
+  deleteFreightRoute: (id) => axios.delete(`${API}/freight-routes/${id}`),
+
+  // Pagamento Frete (Transporte)
+  getFreightPayments: (params) => axios.get(`${API}/freight-payments`, { params }),
+  getFreightPayment: (id) => axios.get(`${API}/freight-payments/${id}`),
+  updateFreightPayment: (id, data) => axios.put(`${API}/freight-payments/${id}`, data),
+  updateFreightPaymentStatus: (id, status) => axios.put(`${API}/freight-payments/${id}/status?status=${status}`),
+  getFreightPaymentReportPDF: (params) => axios.get(`${API}/freight-payments/report/pdf`, { params, responseType: 'blob' }),
+  getFreightPaymentReportExcel: (params) => axios.get(`${API}/freight-payments/report/excel`, { params, responseType: 'blob' }),
 };
 
 export default api;

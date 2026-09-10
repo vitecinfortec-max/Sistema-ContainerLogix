@@ -36,6 +36,8 @@ from routers.rpa_terceiro import api_router as rpa_terceiro_router
 from routers.ordem_servico import api_router as ordem_servico_router
 from routers.fuel_supply import api_router as fuel_supply_router
 from routers.loading_orders import api_router as loading_orders_router
+from routers.freight_routes import api_router as freight_routes_router
+from routers.freight_payments import api_router as freight_payments_router
 from routers.locations import api_router as locations_router
 from routers.stock import api_router as stock_router
 from routers.expense_reports import api_router as expense_reports_router
@@ -89,6 +91,8 @@ app.include_router(rpa_terceiro_router)
 app.include_router(ordem_servico_router)
 app.include_router(fuel_supply_router)
 app.include_router(loading_orders_router)
+app.include_router(freight_routes_router)
+app.include_router(freight_payments_router)
 app.include_router(locations_router)
 app.include_router(stock_router)
 app.include_router(expense_reports_router)
@@ -216,6 +220,13 @@ async def startup_event():
     await db.drivers.create_index("cpf")
     await db.clients.create_index("cnpj")
     await db.transport_companies.create_index("cnpj")
+    try:
+        await db.freight_payments.create_index("loading_order_id", unique=True)
+    except Exception as e:
+        # Trava de segurança contra corrida na checagem de idempotência do
+        # lançamento automático de Pagamento Frete - não pode travar o
+        # startup do sistema por causa disso.
+        logger.warning(f"Não foi possível criar índice único em freight_payments.loading_order_id: {e}")
 
     start_scheduler()
 

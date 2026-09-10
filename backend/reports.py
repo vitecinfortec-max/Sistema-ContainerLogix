@@ -2193,6 +2193,223 @@ def generate_invoice_excel(invoice: dict, movements: list, company: dict = None)
         return buffer.getvalue()
 
 
+FREIGHT_PAYMENT_STATUS_LABELS = {"PENDENTE": "Pendente", "PAGO": "Pago", "CANCELADO": "Cancelado"}
+
+
+def generate_freight_payment_report_pdf(driver_info: dict, payments: list, period: dict, company: dict = None) -> bytes:
+    """Gera a 'Prestação de Contas' de Pagamento Frete de um motorista: lista
+    itemizada de cada Ordem de Carregamento aprovada numa Rota cadastrada,
+    com status de pagamento e totais - mesmo layout Bsoft de generate_invoice_pdf."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=10 * mm, leftMargin=10 * mm, topMargin=10 * mm, bottomMargin=15 * mm
+    )
+    c = merge_company(company)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = download_logo(company)
+    report_title = "PRESTAÇÃO DE CONTAS - PAGAMENTO FRETE"
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
+
+    period_str = f"{period.get('date_from') or '-'} a {period.get('date_to') or '-'}"
+    driver_info_text = (
+        f"Motorista: {driver_info.get('name', '-')}  |  CPF: {driver_info.get('cpf', '-') or '-'}  |  "
+        f"Período: {period_str}  |  Lançamentos: {len(payments)}"
+    )
+    driver_style = ParagraphStyle(
+        'FPDriverInfo', parent=styles['Normal'], fontSize=10,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
+    )
+    driver_table = Table([[Paragraph(driver_info_text, driver_style)]], colWidths=[doc.width])
+    driver_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+    ]))
+    elements.append(driver_table)
+
+    gen_info_style = ParagraphStyle(
+        'FPGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    cell_style_l = ParagraphStyle('FPCellL', parent=styles['Normal'], fontSize=8, leading=9.5, alignment=TA_LEFT)
+    cell_style_c = ParagraphStyle('FPCellC', parent=cell_style_l, alignment=TA_CENTER)
+    cell_style_r = ParagraphStyle('FPCellR', parent=cell_style_l, alignment=TA_RIGHT)
+
+    def cell(text, align='left'):
+        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
+        return Paragraph(str(text) if text not in (None, '') else '-', style)
+
+    def money(v):
+        return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    table_data = [['Nº Pgto', 'Nº Ordem', 'Rota', 'Data Aprovação', 'Valor do Frete', 'Status', 'Data Pagamento']]
+
+    total_pago = 0.0
+    total_pendente = 0.0
+    for p in payments:
+        value = p.get('freight_value') or 0
+        status_p = p.get('status', 'PENDENTE')
+        if status_p == 'PAGO':
+            total_pago += value
+        elif status_p == 'PENDENTE':
+            total_pendente += value
+        created = to_brt(p.get('created_at'))
+        paid = to_brt(p.get('paid_at')) if p.get('paid_at') else None
+        table_data.append([
+            cell(p.get('payment_number'), align='center'),
+            cell(p.get('order_number'), align='center'),
+            cell(p.get('route_name'), align='left'),
+            cell(created.strftime('%d/%m/%Y %H:%M') if created else '-', align='center'),
+            cell(money(value), align='right'),
+            cell(FREIGHT_PAYMENT_STATUS_LABELS.get(status_p, status_p), align='center'),
+            cell(paid.strftime('%d/%m/%Y %H:%M') if paid else '-', align='center'),
+        ])
+
+    total_geral = total_pago + total_pendente
+    table_data.append(['', '', '', 'TOTAL PAGO:', money(total_pago), '', ''])
+    table_data.append(['', '', '', 'TOTAL PENDENTE:', money(total_pendente), '', ''])
+    table_data.append(['', '', '', 'TOTAL GERAL:', money(total_geral), '', ''])
+
+    base_widths = [45, 55, 160, 80, 80, 60, 80]
+    scale = doc.width / sum(base_widths)
+    col_widths = [w * scale for w in base_widths]
+
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+
+    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
+    border_gray = colors.HexColor('#CCCCCC')
+    zebra_gray = colors.HexColor('#F8F8F8')
+    n_data_rows = len(payments)
+    totals_start = 1 + n_data_rows
+
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+        ('TOPPADDING', (0, 0), (-1, 0), 5),
+
+        ('TOPPADDING', (0, 1), (-1, totals_start - 1), 3),
+        ('BOTTOMPADDING', (0, 1), (-1, totals_start - 1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+
+        ('GRID', (0, 0), (-1, totals_start - 1), 0.5, border_gray),
+        ('BOX', (0, 0), (-1, totals_start - 1), 1, header_bg),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, totals_start - 1), [colors.white, zebra_gray]),
+
+        ('FONTNAME', (3, totals_start), (4, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (3, totals_start), (4, -1), 9),
+        ('ALIGN', (3, totals_start), (3, -1), 'RIGHT'),
+        ('ALIGN', (4, totals_start), (4, -1), 'RIGHT'),
+        ('TOPPADDING', (0, totals_start), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, totals_start), (-1, -1), 4),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('BOX', (3, totals_start), (4, -1), 1, header_bg),
+    ]))
+    elements.append(table)
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+
+def generate_freight_payment_report_excel(driver_info: dict, payments: list, period: dict, company: dict = None) -> bytes:
+    """Versão Excel da prestação de contas de Pagamento Frete (mesmo template
+    Bsoft de generate_invoice_excel)."""
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        sheet_title = re.sub(r'[\\/?*\[\]:]', '-', f"Frete {driver_info.get('name', '')}").strip()
+        ws.title = sheet_title[:31] or "Pagamento Frete"
+
+        total_pago = sum((p.get('freight_value') or 0) for p in payments if p.get('status') == 'PAGO')
+        total_pendente = sum((p.get('freight_value') or 0) for p in payments if p.get('status') == 'PENDENTE')
+        total_geral = total_pago + total_pendente
+
+        period_str = f"{period.get('date_from') or '-'} a {period.get('date_to') or '-'}"
+        title = f"PRESTAÇÃO DE CONTAS - PAGAMENTO FRETE - Motorista: {driver_info.get('name', '-')}"
+        val_str = f"R$ {total_geral:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        stats_text = f"Período: {period_str}  |  Lançamentos: {len(payments)}  |  Total Geral: {val_str}"
+
+        headers = ['Nº Pgto', 'Nº Ordem', 'Rota', 'Data Aprovação', 'Valor do Frete', 'Status', 'Data Pagamento']
+
+        data_rows = []
+        for p in payments:
+            created = to_brt(p.get('created_at'))
+            paid = to_brt(p.get('paid_at')) if p.get('paid_at') else None
+            data_rows.append([
+                p.get('payment_number'),
+                p.get('order_number'),
+                p.get('route_name') or '-',
+                created.strftime('%d/%m/%Y %H:%M') if created else '-',
+                p.get('freight_value') or 0,
+                FREIGHT_PAYMENT_STATUS_LABELS.get(p.get('status'), p.get('status')),
+                paid.strftime('%d/%m/%Y %H:%M') if paid else '-',
+            ])
+
+        col_widths = {'B': 9, 'C': 9, 'D': 32, 'E': 16, 'F': 14, 'G': 12, 'H': 16}
+        center_cols = {0, 1, 5}
+
+        _bsoft_style_excel(
+            ws, title, stats_text,
+            headers, data_rows, col_widths,
+            center_cols=center_cols,
+            right_align_cols={4},
+            number_fmt_cols={4: 'R$ #,##0.00'},
+            total_col=None,
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company)
+        )
+
+        data_start = 9
+        totals_row = data_start + len(data_rows) + 1
+
+        bold_font = Font(name='Calibri', size=10, bold=True)
+        normal_font = Font(name='Calibri', size=10)
+
+        for offset, (label, value) in enumerate([
+            ("Total Pago:", total_pago),
+            ("Total Pendente:", total_pendente),
+            ("Total Geral:", total_geral),
+        ]):
+            row = totals_row + offset
+            ws.cell(row=row, column=2, value=label).font = bold_font
+            value_cell = ws.cell(row=row, column=3, value=value)
+            value_cell.number_format = 'R$ #,##0.00'
+            value_cell.font = normal_font
+
+        ws.print_area = f'A1:H{totals_row + 2}'
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+    except Exception as e:
+        logger.error(f"Error generating freight payment report Excel: {e}")
+        wb = Workbook()
+        ws = wb.active
+        ws['A1'] = "Erro ao gerar prestação de contas."
+        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
 
 def generate_intl_invoice_pdf(invoice: dict, company: dict = None) -> bytes:
     """

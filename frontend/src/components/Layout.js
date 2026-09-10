@@ -52,7 +52,9 @@ import {
   UserCog,
   Tags,
   Link2,
-  Briefcase
+  Briefcase,
+  Route,
+  HandCoins
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -83,6 +85,8 @@ const PAGE_TITLES = {
   '/estoque': 'Estoque',
   '/estoque/relatorio': 'Relatório de Estoque',
   '/loading-orders': 'Ordem de Carregamento',
+  '/freight-routes': 'Rota',
+  '/freight-payments': 'Pagamento Frete',
   '/fleet/checklist': 'Checklist',
   '/cadastro': 'Cadastro',
   '/company-settings': 'Dados da Empresa',
@@ -299,7 +303,7 @@ export default function Layout({ children }) {
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/relatorio'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive;
-  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders';
+  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
@@ -500,6 +504,8 @@ export default function Layout({ children }) {
     { path: '/fleet', label: 'Cadastro de Veículo', icon: Car, moduleKey: 'frota.veiculos' },
     { path: '/fleet/rpa-terceiro', label: 'Contrato de Frete', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
     { path: '/loading-orders', label: 'Ordem de Carregamento', icon: PackageCheck, moduleKey: 'operacional.ordem_carregamento' },
+    { path: '/freight-routes', label: 'Rota', icon: Route, moduleKey: 'cadastro.rota' },
+    { path: '/freight-payments', label: 'Pagamento Frete', icon: HandCoins, moduleKey: 'financeiro.pagamento_frete' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const cadastroItems = [

@@ -41,6 +41,8 @@ const SIZE_TYPE_OPTIONS = [
   ['40HC', '40HC'], ['40RF', '40RF'], ['40OT', '40OT'], ['40FR', '40FR'], ['40DRY', '40DRY'],
 ];
 
+const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 function emptyItem() {
   return { container_number: '', size_type: '', gross_weight: '', seal: '', shipping_line: '' };
 }
@@ -54,6 +56,7 @@ function buildEmpty() {
     port: '',
     items: [emptyItem()],
     booking: '',
+    route_id: '', route_name: '', freight_value: null,
     driver_id: '', driver_name: '', driver_cpf: '',
     transport_company: '',
     truck_plate: '',
@@ -78,9 +81,10 @@ export default function LoadingOrderPage() {
   const [vehicles, setVehicles] = useState([]);
   const [shippingLines, setShippingLines] = useState([]);
   const [terminals, setTerminals] = useState([]);
+  const [freightRoutes, setFreightRoutes] = useState([]);
   const debounceRef = useRef(null);
 
-  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); loadTerminals(); }, []);
+  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); loadTerminals(); loadFreightRoutes(); }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -132,6 +136,12 @@ export default function LoadingOrderPage() {
       setTerminals(r.data || []);
     } catch (e) { /* ignore */ }
   };
+  const loadFreightRoutes = async () => {
+    try {
+      const r = await api.getFreightRoutes();
+      setFreightRoutes(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
 
   const reset = () => setForm(buildEmpty());
 
@@ -157,6 +167,28 @@ export default function LoadingOrderPage() {
   };
 
   const onChange = (field, val) => setForm((p) => ({ ...p, [field]: val }));
+
+  const onChangeOrderType = (v) => {
+    setForm((p) => ({
+      ...p,
+      order_type: v,
+      ...(v !== 'COLETA' ? { route_id: '', route_name: '', freight_value: null } : {}),
+    }));
+  };
+
+  const onSelectRoute = (routeId) => {
+    const route = freightRoutes.find((r) => r.id === routeId);
+    if (!route) {
+      setForm((p) => ({ ...p, route_id: '', route_name: '', freight_value: null }));
+      return;
+    }
+    setForm((p) => ({
+      ...p,
+      route_id: route.id,
+      route_name: `${route.origin} x ${route.destination}`,
+      freight_value: route.freight_value,
+    }));
+  };
 
   const onSelectDriver = (d) => {
     setForm((p) => ({
@@ -393,13 +425,14 @@ export default function LoadingOrderPage() {
                     <TableHead className="text-[12px] font-semibold">Container</TableHead>
                     <TableHead className="text-[12px] font-semibold">Motorista</TableHead>
                     <TableHead className="text-[12px] font-semibold">Transportadora</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Rota</TableHead>
                     <TableHead className="text-[12px] font-semibold">Status</TableHead>
                     <TableHead className="text-[12px] font-semibold">Emissão</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {list.length === 0 && !loading && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma ordem de carregamento cadastrada.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma ordem de carregamento cadastrada.</TableCell></TableRow>
                   )}
                   {list.map((o) => (
                     <TableRow
@@ -424,6 +457,7 @@ export default function LoadingOrderPage() {
                       </TableCell>
                       <TableCell className="text-[13px]">{o.driver_name || '-'}</TableCell>
                       <TableCell className="text-[13px]">{o.transport_company || '-'}</TableCell>
+                      <TableCell className="text-[13px]">{o.route_name || '-'}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE_CLASS[o.status] || 'bg-slate-100 text-slate-600'}`}>
                           {STATUS_LABELS[o.status] || o.status}
@@ -452,7 +486,7 @@ export default function LoadingOrderPage() {
           <div className="space-y-5">
             <SectionTitle>Dados do Agendamento e Controle</SectionTitle>
             <div className="grid grid-cols-3 gap-3">
-              <SelectField label="Tipo *" value={form.order_type} onChange={(v) => onChange('order_type', v)} options={ORDER_TYPE_OPTIONS} testid="loading-order-type" />
+              <SelectField label="Tipo *" value={form.order_type} onChange={onChangeOrderType} options={ORDER_TYPE_OPTIONS} testid="loading-order-type" />
               <SelectField label="Status" value={form.status} onChange={(v) => onChange('status', v)} options={STATUS_OPTIONS} testid="loading-order-status" />
               <WindowField value={form.collection_window} onChange={(v) => onChange('collection_window', v)} />
             </div>
@@ -472,6 +506,41 @@ export default function LoadingOrderPage() {
               </div>
               <Field label="Destino" value={form.port} onChange={(v) => onChange('port', v)} testid="loading-order-port" />
             </div>
+
+            {form.order_type === 'COLETA' && (
+              <>
+                <SectionTitle>Rota e Frete</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block">Rota</Label>
+                    <Select value={form.route_id || '_empty'} onValueChange={(v) => onSelectRoute(v === '_empty' ? '' : v)}>
+                      <SelectTrigger className="h-9 text-sm" data-testid="loading-order-route"><SelectValue placeholder="Selecione uma rota" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_empty">-</SelectItem>
+                        {freightRoutes
+                          .filter((r) => r.status === 'ATIVO' || r.id === form.route_id)
+                          .map((r) => (
+                            <SelectItem key={r.id} value={r.id}>{r.origin} x {r.destination}</SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    {freightRoutes.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">Nenhuma rota cadastrada. Vá em "Transporte &gt; Rota" para adicionar.</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label className="mb-1 block">Valor do Frete</Label>
+                    <Input
+                      disabled
+                      value={form.route_id ? formatMoney(form.freight_value) : '-'}
+                      className="h-9 text-sm bg-slate-50 dark:bg-slate-800"
+                      data-testid="loading-order-freight-value"
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Preenchido automaticamente pela Rota selecionada</p>
+                  </div>
+                </div>
+              </>
+            )}
 
             <SectionTitle>Especificações do Container e Carga</SectionTitle>
             <div className="grid grid-cols-3 gap-3">
