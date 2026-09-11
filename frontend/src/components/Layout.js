@@ -54,7 +54,11 @@ import {
   Link2,
   Briefcase,
   Route,
-  HandCoins
+  HandCoins,
+  ShoppingBag,
+  ShoppingCart,
+  BadgeDollarSign,
+  Users
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -109,6 +113,9 @@ const PAGE_TITLES = {
   '/comercial/vinculo-clientes': 'Vínculo de Clientes',
   '/comercial/proposta': 'Proposta Comercial',
   '/comercial/proposta/new': 'Nova Proposta Comercial',
+  '/container-representatives': 'Cadastro de Representantes',
+  '/container-purchases': 'Compra de Container',
+  '/container-sales': 'Registro de Venda',
   '/flex-tank': 'Flex Tank',
   '/flex-tank/movements/new': 'Nova Movimentação Flex Tank',
   '/loading-schedules': 'Programação de Carregamento',
@@ -151,6 +158,7 @@ const GROUP_COLORS = {
   'Opções do Sistema': 'chart-7',
   Estoque: 'chart-8',
   Comercial: 'chart-9',
+  'Gestão de Container': 'chart-10',
 };
 
 export default function Layout({ children }) {
@@ -174,6 +182,7 @@ export default function Layout({ children }) {
   const [estoqueOpen, setEstoqueOpen] = useState(false);
   const [estoqueCadastroOpen, setEstoqueCadastroOpen] = useState(false);
   const [comercialOpen, setComercialOpen] = useState(false);
+  const [gestaoContainerOpen, setGestaoContainerOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [transporteOpen, setTransporteOpen] = useState(false);
   const [opcoesSistemaOpen, setOpcoesSistemaOpen] = useState(false);
@@ -283,6 +292,8 @@ export default function Layout({ children }) {
     if (savedEstoqueCadastro !== null) setEstoqueCadastroOpen(JSON.parse(savedEstoqueCadastro));
     const savedComercial = localStorage.getItem('comercialOpen');
     if (savedComercial !== null) setComercialOpen(JSON.parse(savedComercial));
+    const savedGestaoContainer = localStorage.getItem('gestaoContainerOpen');
+    if (savedGestaoContainer !== null) setGestaoContainerOpen(JSON.parse(savedGestaoContainer));
     const savedTerminal = localStorage.getItem('terminalOpen');
     if (savedTerminal !== null) setTerminalOpen(JSON.parse(savedTerminal));
     const savedTransporte = localStorage.getItem('transporteOpen');
@@ -302,6 +313,7 @@ export default function Layout({ children }) {
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/relatorio'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
+  const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive;
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
@@ -325,6 +337,7 @@ export default function Layout({ children }) {
     if (isEstoqueActive && !estoqueOpen) setEstoqueOpen(true);
     if (isEstoqueCadastroActive && !estoqueCadastroOpen) setEstoqueCadastroOpen(true);
     if (isComercialActive && !comercialOpen) setComercialOpen(true);
+    if (isGestaoContainerActive && !gestaoContainerOpen) setGestaoContainerOpen(true);
     if (isTerminalActive && !terminalOpen) setTerminalOpen(true);
   }, [location.pathname]);
 
@@ -411,6 +424,12 @@ export default function Layout({ children }) {
     const newState = !comercialOpen;
     setComercialOpen(newState);
     localStorage.setItem('comercialOpen', JSON.stringify(newState));
+  };
+
+  const toggleGestaoContainer = () => {
+    const newState = !gestaoContainerOpen;
+    setGestaoContainerOpen(newState);
+    localStorage.setItem('gestaoContainerOpen', JSON.stringify(newState));
   };
 
   const toggleTerminal = () => {
@@ -500,6 +519,12 @@ export default function Layout({ children }) {
     { path: '/comercial/proposta', label: 'Proposta Comercial', icon: FileText, moduleKey: 'comercial.proposta' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
+  const gestaoContainerItems = [
+    { path: '/container-purchases', label: 'Compra de Container', icon: ShoppingCart, moduleKey: 'gestao_container.compra' },
+    { path: '/container-representatives', label: 'Cadastro de Representantes', icon: Users, moduleKey: 'gestao_container.representante' },
+    { path: '/container-sales', label: 'Registro de Venda', icon: BadgeDollarSign, moduleKey: 'gestao_container.venda' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
   const transporteItems = [
     { path: '/fleet', label: 'Cadastro de Veículo', icon: Car, moduleKey: 'frota.veiculos' },
     { path: '/fleet/rpa-terceiro', label: 'Contrato de Frete', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
@@ -544,11 +569,13 @@ export default function Layout({ children }) {
   const isOperacionalGroupVisible = operacionalItems.length > 0;
   const isEstoqueGroupVisible = estoqueItems.length > 0 || estoqueCadastroItems.length > 0;
   const isComercialGroupVisible = comercialItems.length > 0;
+  const isGestaoContainerGroupVisible = gestaoContainerItems.length > 0;
   const isOpcoesSistemaGroupVisible = opcoesSistemaItems.length > 0;
 
   const allSearchableItems = useMemo(() => [
     ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...manutencaoItems, ...manutencaoCadastroItems, ...transporteItems, ...cadastroItems,
     ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems, ...estoqueItems, ...estoqueCadastroItems, ...comercialItems,
+    ...gestaoContainerItems,
   ], [isAdmin]);
 
   const filteredItems = searchQuery
@@ -998,6 +1025,12 @@ export default function Layout({ children }) {
                   <div>{comercialItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
+                {/* Gestão de Container */}
+                {isGestaoContainerGroupVisible && renderGroupHeader('Gestão de Container', ShoppingBag, gestaoContainerOpen, toggleGestaoContainer, isGestaoContainerActive, 'nav-gestao-container-toggle')}
+                {isGestaoContainerGroupVisible && gestaoContainerOpen && sidebarOpen && (
+                  <div>{gestaoContainerItems.map((item) => renderNavItem(item, true))}</div>
+                )}
+
                 {/* Opções do Sistema */}
                 {isOpcoesSistemaGroupVisible && renderGroupHeader('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive, 'nav-opcoes-sistema-toggle')}
                 {isOpcoesSistemaGroupVisible && opcoesSistemaOpen && sidebarOpen && (
@@ -1117,6 +1150,10 @@ export default function Layout({ children }) {
                 {/* Comercial Mobile */}
                 {isComercialGroupVisible && renderMobileGroupToggle('Comercial', Briefcase, comercialOpen, toggleComercial, isComercialActive)}
                 {isComercialGroupVisible && comercialOpen && comercialItems.map((item) => renderMobileNavItem(item))}
+
+                {/* Gestão de Container Mobile */}
+                {isGestaoContainerGroupVisible && renderMobileGroupToggle('Gestão de Container', ShoppingBag, gestaoContainerOpen, toggleGestaoContainer, isGestaoContainerActive)}
+                {isGestaoContainerGroupVisible && gestaoContainerOpen && gestaoContainerItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Opções do Sistema Mobile */}
                 {isOpcoesSistemaGroupVisible && renderMobileGroupToggle('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive)}

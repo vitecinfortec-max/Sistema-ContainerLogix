@@ -12,6 +12,8 @@ from shared import db, get_current_active_user, get_company_settings
 from reports import merge_company, now_brt
 from routers.freight_payments import create_freight_payment_for_order, cancel_pending_freight_payment_for_order
 from routers.movements import validate_loading_order_movements, create_movements_for_loading_order
+from routers.container_purchases import create_purchase_records_for_order
+from routers.container_sales import create_sale_records_for_order
 
 api_router = APIRouter(prefix="/api")
 
@@ -123,6 +125,8 @@ async def create_loading_order(data: LoadingOrderCreate, current_user: dict = De
     if doc.get('status') == 'APROVADA':
         await create_freight_payment_for_order(doc, current_user)
         await create_movements_for_loading_order(doc, current_user)
+        await create_purchase_records_for_order(doc, current_user)
+        await create_sale_records_for_order(doc, current_user)
 
     return doc
 
@@ -160,8 +164,13 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
     if old_status != 'APROVADA' and new_status == 'APROVADA':
         await create_freight_payment_for_order(updated, current_user)
         await create_movements_for_loading_order(updated, current_user)
+        await create_purchase_records_for_order(updated, current_user)
+        await create_sale_records_for_order(updated, current_user)
     elif old_status == 'APROVADA' and new_status != 'APROVADA':
         await cancel_pending_freight_payment_for_order(order_id, current_user)
+        # Compra/Venda de Container nunca são revertidas automaticamente -
+        # mesma filosofia de "registro permanente" já usada em Pagamento
+        # Frete (Pago) e Movimentação de Estoque.
 
     return updated
 

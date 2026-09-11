@@ -2684,6 +2684,9 @@ class LoadingOrder(BaseModel):
     route_name: Optional[str] = None  # snapshot "origem x destino" no momento da escolha
     freight_value: Optional[float] = None  # travado a partir da Rota selecionada
 
+    representative_id: Optional[str] = None  # Representante (vendedor) - só usado em Entrega, nunca aparece no PDF
+    representative_name: Optional[str] = None
+
     driver_id: Optional[str] = None
     driver_name: Optional[str] = None
     driver_cpf: Optional[str] = None
@@ -2711,6 +2714,8 @@ class LoadingOrderCreate(BaseModel):
     route_id: Optional[str] = None
     route_name: Optional[str] = None
     freight_value: Optional[float] = None
+    representative_id: Optional[str] = None
+    representative_name: Optional[str] = None
     driver_id: Optional[str] = None
     driver_name: Optional[str] = None
     driver_cpf: Optional[str] = None
@@ -2817,6 +2822,166 @@ class FreightPaymentHistoryResponse(BaseModel):
     changes: dict
     user_name: str
     created_at: datetime
+
+
+# ==================== GESTÃO DE CONTAINER ====================
+# Compra/revenda de containers - separado de propósito do "Representative"
+# do grupo Comercial (aquele é comissão % sobre faturamento com 1 vínculo
+# ativo por cliente; este é comissão fixa por venda, valor vendido x valor
+# recebido - dois modelos de negócio incompatíveis, nenhum código
+# compartilhado entre eles).
+
+CONTAINER_REPRESENTATIVE_TIPO_OPTIONS = ["PF", "PJ"]
+
+
+class ContainerRepresentative(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tipo: Literal["PF", "PJ"] = "PF"
+    name: str  # Nome completo (PF) ou Razão Social (PJ)
+    trade_name: Optional[str] = None  # Nome Fantasia - só PJ
+    cpf: Optional[str] = None  # só PF
+    cnpj: Optional[str] = None  # só PJ
+    contact_name: Optional[str] = None  # pessoa de contato - só PJ
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    pix_key: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+
+class ContainerRepresentativeCreate(BaseModel):
+    tipo: Literal["PF", "PJ"] = "PF"
+    name: str
+    trade_name: Optional[str] = None
+    cpf: Optional[str] = None
+    cnpj: Optional[str] = None
+    contact_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    pix_key: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+
+
+class ContainerRepresentativeResponse(ContainerRepresentativeCreate):
+    id: str
+    created_at: datetime
+
+
+CONTAINER_PURCHASE_STATUS_OPTIONS = ["DISPONIVEL", "VENDIDO"]
+
+
+class ContainerPurchase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    container_number: str
+    booking: Optional[str] = None
+    origin_terminal: Optional[str] = None  # "Terminal de Coleta"
+    entry_date: Optional[datetime] = None
+    purchase_value: Optional[float] = None
+    sale_value: Optional[float] = None  # preço-alvo/estimado - independente do valor real de uma ContainerSale
+    status: str = "DISPONIVEL"  # DISPONIVEL | VENDIDO - só muda via vínculo automático com uma Venda
+    loading_order_id: Optional[str] = None  # None = lançamento manual, fora do fluxo de Ordem de Carregamento
+    order_number: Optional[int] = None  # snapshot pra exibir "Ordem Nº X" na lista sem lookup extra
+    movement_id: Optional[str] = None  # FK à ContainerMovement (ENTRADA) que originou este registro
+    sale_id: Optional[str] = None  # backref: preenchido quando uma ContainerSale vincula a este registro
+    sold_at: Optional[datetime] = None
+    observations: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+
+class ContainerPurchaseCreate(BaseModel):
+    container_number: str
+    booking: Optional[str] = None
+    origin_terminal: Optional[str] = None
+    entry_date: Optional[datetime] = None
+    purchase_value: Optional[float] = None
+    sale_value: Optional[float] = None
+    observations: Optional[str] = None
+
+
+class ContainerPurchaseUpdate(BaseModel):
+    container_number: Optional[str] = None
+    booking: Optional[str] = None
+    origin_terminal: Optional[str] = None
+    entry_date: Optional[datetime] = None
+    purchase_value: Optional[float] = None
+    sale_value: Optional[float] = None
+    observations: Optional[str] = None
+
+
+class ContainerPurchaseResponse(ContainerPurchase):
+    pass
+
+
+CONTAINER_SALE_STATUS_OPTIONS = ["PENDENTE", "RECEBIDO"]
+
+
+class ContainerSale(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    container_number: str
+    booking: Optional[str] = None
+    origin_terminal: Optional[str] = None  # copiado da Compra vinculada, quando existe
+    entry_date: Optional[datetime] = None  # idem
+    purchase_id: Optional[str] = None  # None se não achou uma Compra Disponível pra esse container
+    representative_id: Optional[str] = None
+    representative_name: Optional[str] = None
+    sale_value: Optional[float] = None  # valor combinado da venda - preenchido manualmente após a criação
+    received_value: Optional[float] = None
+    status: str = "PENDENTE"  # PENDENTE | RECEBIDO
+    received_at: Optional[datetime] = None
+    loading_order_id: Optional[str] = None
+    order_number: Optional[int] = None
+    movement_id: Optional[str] = None  # FK à ContainerMovement (SAIDA) que originou este registro
+    observations: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+
+class ContainerSaleCreate(BaseModel):
+    container_number: str
+    booking: Optional[str] = None
+    origin_terminal: Optional[str] = None
+    entry_date: Optional[datetime] = None
+    representative_id: Optional[str] = None
+    representative_name: Optional[str] = None
+    sale_value: Optional[float] = None
+    received_value: Optional[float] = None
+    observations: Optional[str] = None
+
+
+class ContainerSaleUpdate(BaseModel):
+    container_number: Optional[str] = None
+    booking: Optional[str] = None
+    origin_terminal: Optional[str] = None
+    entry_date: Optional[datetime] = None
+    representative_id: Optional[str] = None
+    representative_name: Optional[str] = None
+    sale_value: Optional[float] = None
+    received_value: Optional[float] = None
+    observations: Optional[str] = None
+
+
+class ContainerSaleResponse(ContainerSale):
+    pass
 
 
 # ==================== ESTOQUE - CADASTROS DE APOIO ====================

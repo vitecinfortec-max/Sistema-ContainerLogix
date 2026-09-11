@@ -38,6 +38,9 @@ from routers.fuel_supply import api_router as fuel_supply_router
 from routers.loading_orders import api_router as loading_orders_router
 from routers.freight_routes import api_router as freight_routes_router
 from routers.freight_payments import api_router as freight_payments_router
+from routers.container_representatives import api_router as container_representatives_router
+from routers.container_purchases import api_router as container_purchases_router
+from routers.container_sales import api_router as container_sales_router
 from routers.locations import api_router as locations_router
 from routers.stock import api_router as stock_router
 from routers.expense_reports import api_router as expense_reports_router
@@ -93,6 +96,9 @@ app.include_router(fuel_supply_router)
 app.include_router(loading_orders_router)
 app.include_router(freight_routes_router)
 app.include_router(freight_payments_router)
+app.include_router(container_representatives_router)
+app.include_router(container_purchases_router)
+app.include_router(container_sales_router)
 app.include_router(locations_router)
 app.include_router(stock_router)
 app.include_router(expense_reports_router)
@@ -243,6 +249,25 @@ async def startup_event():
         )
     except Exception as e:
         logger.warning(f"Não foi possível criar índice único em movements.(loading_order_id, container_number): {e}")
+
+    await db.container_purchases.create_index("container_number")
+    await db.container_sales.create_index("container_number")
+    try:
+        await db.container_purchases.create_index(
+            [("loading_order_id", 1), ("container_number", 1)],
+            unique=True,
+            partialFilterExpression={"loading_order_id": {"$type": "string"}},
+        )
+    except Exception as e:
+        logger.warning(f"Não foi possível criar índice único em container_purchases.(loading_order_id, container_number): {e}")
+    try:
+        await db.container_sales.create_index(
+            [("loading_order_id", 1), ("container_number", 1)],
+            unique=True,
+            partialFilterExpression={"loading_order_id": {"$type": "string"}},
+        )
+    except Exception as e:
+        logger.warning(f"Não foi possível criar índice único em container_sales.(loading_order_id, container_number): {e}")
 
     start_scheduler()
 

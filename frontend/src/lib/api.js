@@ -421,6 +421,25 @@ export const api = {
   updateFreightPaymentStatus: (id, status) => axios.put(`${API}/freight-payments/${id}/status?status=${status}`),
   getFreightPaymentReportPDF: (params) => axios.get(`${API}/freight-payments/report/pdf`, { params, responseType: 'blob' }),
   getFreightPaymentReportExcel: (params) => axios.get(`${API}/freight-payments/report/excel`, { params, responseType: 'blob' }),
+
+  // Cadastro de Representantes (Gestão de Container)
+  getContainerRepresentatives: () => axios.get(`${API}/container-representatives`),
+  createContainerRepresentative: (data) => axios.post(`${API}/container-representatives`, data),
+  updateContainerRepresentative: (id, data) => axios.put(`${API}/container-representatives/${id}`, data),
+  deleteContainerRepresentative: (id) => axios.delete(`${API}/container-representatives/${id}`),
+
+  // Compra de Container (Gestão de Container)
+  getContainerPurchases: (params) => axios.get(`${API}/container-purchases`, { params }),
+  getContainerPurchase: (id) => axios.get(`${API}/container-purchases/${id}`),
+  createContainerPurchase: (data) => axios.post(`${API}/container-purchases`, data),
+  updateContainerPurchase: (id, data) => axios.put(`${API}/container-purchases/${id}`, data),
+
+  // Registro de Venda (Gestão de Container)
+  getContainerSales: (params) => axios.get(`${API}/container-sales`, { params }),
+  getContainerSale: (id) => axios.get(`${API}/container-sales/${id}`),
+  createContainerSale: (data) => axios.post(`${API}/container-sales`, data),
+  updateContainerSale: (id, data) => axios.put(`${API}/container-sales/${id}`, data),
+  updateContainerSaleStatus: (id, status) => axios.put(`${API}/container-sales/${id}/status?status=${status}`),
 };
 
 export default api;

@@ -64,6 +64,9 @@ import FuelSupplyOrderPage from './pages/FuelSupplyOrderPage';
 import LoadingOrderPage from './pages/LoadingOrderPage';
 import FreightRoutesPage from './pages/FreightRoutesPage';
 import FreightPaymentsPage from './pages/FreightPaymentsPage';
+import ContainerRepresentativesPage from './pages/ContainerRepresentativesPage';
+import ContainerPurchasesPage from './pages/ContainerPurchasesPage';
+import ContainerSalesPage from './pages/ContainerSalesPage';
 import CompanySettingsPage from './pages/CompanySettingsPage';
 import UsersPage from './pages/UsersPage';
 import ModulesPage from './pages/ModulesPage';
@@ -201,6 +204,30 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.pagamento_frete">
                 <FreightPaymentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-representatives"
+            element={
+              <ProtectedRoute adminOnly moduleKey="gestao_container.representante">
+                <ContainerRepresentativesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-purchases"
+            element={
+              <ProtectedRoute adminOnly moduleKey="gestao_container.compra">
+                <ContainerPurchasesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-sales"
+            element={
+              <ProtectedRoute adminOnly moduleKey="gestao_container.venda">
+                <ContainerSalesPage />
               </ProtectedRoute>
             }
           />

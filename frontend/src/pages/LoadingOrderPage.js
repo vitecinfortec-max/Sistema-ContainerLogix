@@ -63,6 +63,7 @@ function buildEmpty() {
     booking: '',
     client_name: '',
     route_id: '', route_name: '', freight_value: null,
+    representative_id: '', representative_name: '',
     driver_id: '', driver_name: '', driver_cpf: '',
     transport_company: '',
     truck_plate: '',
@@ -90,9 +91,10 @@ export default function LoadingOrderPage() {
   const [freightRoutes, setFreightRoutes] = useState([]);
   const [clients, setClients] = useState([]);
   const [nextBookingPreview, setNextBookingPreview] = useState(null);
+  const [representatives, setRepresentatives] = useState([]);
   const debounceRef = useRef(null);
 
-  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); loadTerminals(); loadFreightRoutes(); loadClients(); loadNextBookingPreview(); }, []);
+  useEffect(() => { loadList(); loadDrivers(); loadCompanies(); loadVehicles(); loadShippingLines(); loadTerminals(); loadFreightRoutes(); loadClients(); loadNextBookingPreview(); loadRepresentatives(); }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -162,6 +164,12 @@ export default function LoadingOrderPage() {
       setNextBookingPreview(r.data?.next_booking || null);
     } catch (e) { setNextBookingPreview(null); }
   };
+  const loadRepresentatives = async () => {
+    try {
+      const r = await api.getContainerRepresentatives();
+      setRepresentatives(r.data || []);
+    } catch (e) { /* ignore */ }
+  };
 
   const reset = () => setForm(buildEmpty());
 
@@ -193,6 +201,7 @@ export default function LoadingOrderPage() {
       ...p,
       order_type: v,
       ...(v !== 'COLETA' ? { route_id: '', route_name: '', freight_value: null } : {}),
+      ...(v !== 'ENTREGA' ? { representative_id: '', representative_name: '' } : {}),
     }));
   };
 
@@ -559,6 +568,28 @@ export default function LoadingOrderPage() {
                       data-testid="loading-order-freight-value"
                     />
                     <p className="text-xs text-slate-400 mt-1">Preenchido automaticamente pela Rota selecionada</p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {form.order_type === 'ENTREGA' && (
+              <>
+                <SectionTitle>Representante</SectionTitle>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="mb-1 block">Representante</Label>
+                    <Autocomplete
+                      value={form.representative_name}
+                      onChange={(v) => onChange('representative_name', v)}
+                      onSelect={(r) => setForm((p) => ({ ...p, representative_id: r.id, representative_name: r.name }))}
+                      options={representatives}
+                      displayField="name"
+                      className="h-9 text-sm"
+                    />
+                    {representatives.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">Nenhum representante cadastrado. Vá em "Gestão de Container &gt; Cadastro de Representantes" para adicionar.</p>
+                    )}
                   </div>
                 </div>
               </>
