@@ -180,6 +180,11 @@ async def delete_loading_order(order_id: str, current_user: dict = Depends(get_c
     result = await db.loading_orders.delete_one({"id": order_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Ordem de Carregamento não encontrada")
+    # Compra/Venda de Container nascidas dessa ordem não fazem sentido sem
+    # ela - ao contrário de Pagamento Frete e Movimentação de Estoque, que
+    # continuam existindo mesmo se a ordem de origem for apagada.
+    await db.container_purchases.delete_many({"loading_order_id": order_id})
+    await db.container_sales.delete_many({"loading_order_id": order_id})
     return {"message": "Ordem de Carregamento removida"}
 
 

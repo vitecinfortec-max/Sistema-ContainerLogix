@@ -11,8 +11,9 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Search, ShoppingCart } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, ShoppingCart } from 'lucide-react';
 
 const STATUS_LABELS = { DISPONIVEL: 'Disponível', VENDIDO: 'Vendido' };
 const STATUS_BADGE_CLASS = {
@@ -35,6 +36,7 @@ function buildEmpty() {
 }
 
 export default function ContainerPurchasesPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -144,6 +146,24 @@ export default function ContainerPurchasesPage() {
     } finally { setSaving(false); }
   };
 
+  const handleDelete = async (purchase) => {
+    if (await confirm('Tem certeza que deseja excluir esta Compra de Container?')) {
+      try {
+        await api.deleteContainerPurchase(purchase.id);
+        toast.success('Compra de Container excluída');
+        setSelectedIds(prev => {
+          if (!prev.has(purchase.id)) return prev;
+          const next = new Set(prev);
+          next.delete(purchase.id);
+          return next;
+        });
+        loadList();
+      } catch (e) {
+        toast.error(e?.response?.data?.detail || 'Erro ao excluir compra de container');
+      }
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="container-purchases-page">
@@ -205,6 +225,17 @@ export default function ContainerPurchasesPage() {
             className="h-9 w-9 p-0 disabled:opacity-30"
           >
             <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelected && handleDelete(singleSelected)}
+            disabled={!singleSelected}
+            title="Excluir"
+            data-testid="delete-container-purchase-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
           </Button>
           {selectedIds.size > 0 && (
             <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
@@ -371,6 +402,7 @@ export default function ContainerPurchasesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

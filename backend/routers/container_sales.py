@@ -185,3 +185,13 @@ async def update_container_sale(sale_id: str, data: ContainerSaleUpdate, current
     await db.container_sales.update_one({"id": sale_id}, {"$set": update_data})
     updated = await db.container_sales.find_one({"id": sale_id}, {"_id": 0})
     return updated
+
+
+@api_router.delete("/container-sales/{sale_id}")
+async def delete_container_sale(sale_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Exclusão manual - não reverte a Compra vinculada (se houver) de volta
+    pra Disponível, ela fica marcada como Vendida mesmo sem a Venda."""
+    result = await db.container_sales.delete_one({"id": sale_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Registro de Venda não encontrado")
+    return {"message": "Registro de Venda removido"}

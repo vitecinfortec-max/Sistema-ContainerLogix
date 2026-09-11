@@ -433,6 +433,7 @@ export const api = {
   getContainerPurchase: (id) => axios.get(`${API}/container-purchases/${id}`),
   createContainerPurchase: (data) => axios.post(`${API}/container-purchases`, data),
   updateContainerPurchase: (id, data) => axios.put(`${API}/container-purchases/${id}`, data),
+  deleteContainerPurchase: (id) => axios.delete(`${API}/container-purchases/${id}`),
 
   // Registro de Venda (Gestão de Container)
   getContainerSales: (params) => axios.get(`${API}/container-sales`, { params }),
@@ -440,6 +441,7 @@ export const api = {
   createContainerSale: (data) => axios.post(`${API}/container-sales`, data),
   updateContainerSale: (id, data) => axios.put(`${API}/container-sales/${id}`, data),
   updateContainerSaleStatus: (id, status) => axios.put(`${API}/container-sales/${id}/status?status=${status}`),
+  deleteContainerSale: (id) => axios.delete(`${API}/container-sales/${id}`),
 };
 
 export default api;

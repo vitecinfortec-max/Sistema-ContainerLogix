@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, CheckCircle2, RotateCcw, Search, BadgeDollarSign } from 'lucide-react';
+import { Plus, Pencil, Trash2, CheckCircle2, RotateCcw, Search, BadgeDollarSign } from 'lucide-react';
 
 const STATUS_LABELS = { PENDENTE: 'Pendente', RECEBIDO: 'Recebido' };
 const STATUS_BADGE_CLASS = {
@@ -35,6 +36,7 @@ function buildEmpty() {
 }
 
 export default function ContainerSalesPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [representatives, setRepresentatives] = useState([]);
@@ -161,6 +163,24 @@ export default function ContainerSalesPage() {
     } finally { setSaving(false); }
   };
 
+  const handleDelete = async (sale) => {
+    if (await confirm('Tem certeza que deseja excluir este Registro de Venda?')) {
+      try {
+        await api.deleteContainerSale(sale.id);
+        toast.success('Registro de Venda excluído');
+        setSelectedIds(prev => {
+          if (!prev.has(sale.id)) return prev;
+          const next = new Set(prev);
+          next.delete(sale.id);
+          return next;
+        });
+        loadList();
+      } catch (e) {
+        toast.error(e?.response?.data?.detail || 'Erro ao excluir registro de venda');
+      }
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="container-sales-page">
@@ -244,6 +264,17 @@ export default function ContainerSalesPage() {
             className="h-9 w-9 p-0 disabled:opacity-30"
           >
             <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelected && handleDelete(singleSelected)}
+            disabled={!singleSelected}
+            title="Excluir"
+            data-testid="delete-container-sale-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
           </Button>
           {selectedIds.size > 0 && (
             <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
@@ -394,6 +425,7 @@ export default function ContainerSalesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

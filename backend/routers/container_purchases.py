@@ -140,3 +140,14 @@ async def update_container_purchase(purchase_id: str, data: ContainerPurchaseUpd
     await db.container_purchases.update_one({"id": purchase_id}, {"$set": update_data})
     updated = await db.container_purchases.find_one({"id": purchase_id}, {"_id": 0})
     return updated
+
+
+@api_router.delete("/container-purchases/{purchase_id}")
+async def delete_container_purchase(purchase_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Exclusão manual - não desfaz o vínculo com uma eventual Venda ligada
+    (purchase_id na Venda só é usado no momento da criação, nunca relido
+    depois), nem revalida nada na Ordem de Carregamento de origem."""
+    result = await db.container_purchases.delete_one({"id": purchase_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Compra de Container não encontrada")
+    return {"message": "Compra de Container removida"}
