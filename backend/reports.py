@@ -12,6 +12,7 @@ import re
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.drawing.image import Image as XLImage
+from xml.sax.saxutils import escape as xml_escape
 import requests
 from PIL import Image as PILImage
 import logging
@@ -2199,11 +2200,16 @@ FREIGHT_PAYMENT_STATUS_LABELS = {"PENDENTE": "Pendente", "PAGO": "Pago", "CANCEL
 def generate_freight_payment_report_pdf(driver_info: dict, payments: list, period: dict, company: dict = None) -> bytes:
     """Gera a 'Prestação de Contas' de Pagamento Frete de um motorista: lista
     itemizada de cada Ordem de Carregamento aprovada numa Rota cadastrada,
-    com status de pagamento e totais - mesmo layout Bsoft de generate_invoice_pdf."""
+    com status de pagamento e totais - layout espelha o Relatório de
+    Movimentações (paisagem, cabeçalho + linha de estatísticas + tabela teal
+    com zebra striping), incluindo Nº do Container/Tamanho/Placas lidos da
+    Ordem de Carregamento de origem. Quando a ordem levou mais de um
+    container na mesma viagem, os valores de Nº do Container/Tamanho ficam
+    empilhados (um abaixo do outro) dentro da mesma linha/célula."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer, pagesize=A4,
-        rightMargin=10 * mm, leftMargin=10 * mm, topMargin=10 * mm, bottomMargin=15 * mm
+        buffer, pagesize=landscape(A4),
+        rightMargin=10 * mm, leftMargin=10 * mm, topMargin=15 * mm, bottomMargin=15 * mm
     )
     c = merge_company(company)
     elements = []
@@ -2214,28 +2220,20 @@ def generate_freight_payment_report_pdf(driver_info: dict, payments: list, perio
     elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
     period_str = f"{period.get('date_from') or '-'} a {period.get('date_to') or '-'}"
-    driver_info_text = (
+    stats_text = (
         f"Motorista: {driver_info.get('name', '-')}  |  CPF: {driver_info.get('cpf', '-') or '-'}  |  "
         f"Período: {period_str}  |  Lançamentos: {len(payments)}"
     )
-    driver_style = ParagraphStyle(
-        'FPDriverInfo', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
+    stats_style = ParagraphStyle(
+        'FPStatsLine', parent=styles['Normal'], fontSize=11,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER,
+        fontName='Helvetica-Bold', spaceBefore=6, spaceAfter=8
     )
-    driver_table = Table([[Paragraph(driver_info_text, driver_style)]], colWidths=[doc.width])
-    driver_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(driver_table)
+    elements.append(Paragraph(stats_text, stats_style))
 
     gen_info_style = ParagraphStyle(
         'FPGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
     )
     elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
 
@@ -2247,10 +2245,18 @@ def generate_freight_payment_report_pdf(driver_info: dict, payments: list, perio
         style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
         return Paragraph(str(text) if text not in (None, '') else '-', style)
 
+    def multiline_cell(values, align='left'):
+        values = [xml_escape(str(v)) if v not in (None, '') else '-' for v in values] or ['-']
+        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
+        return Paragraph('<br/>'.join(values), style)
+
     def money(v):
         return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
-    table_data = [['Nº Pgto', 'Nº Ordem', 'Rota', 'Data Aprovação', 'Valor do Frete', 'Status', 'Data Pagamento']]
+    table_data = [[
+        'Ordem Nº', 'Nº Pgto', 'Rota', 'Data Aprovação', 'Nº do Container',
+        'Tamanho', 'Placa Cavalo', 'Placa Carreta', 'Valor do Frete', 'Status', 'Data Pagamento'
+    ]]
 
     total_pago = 0.0
     total_pendente = 0.0
@@ -2263,22 +2269,30 @@ def generate_freight_payment_report_pdf(driver_info: dict, payments: list, perio
             total_pendente += value
         created = to_brt(p.get('created_at'))
         paid = to_brt(p.get('paid_at')) if p.get('paid_at') else None
+        items = p.get('container_items') or []
+        container_numbers = [it.get('container_number') for it in items]
+        sizes = [it.get('size_type') for it in items]
+
         table_data.append([
-            cell(p.get('payment_number'), align='center'),
             cell(p.get('order_number'), align='center'),
+            cell(p.get('payment_number'), align='center'),
             cell(p.get('route_name'), align='left'),
-            cell(created.strftime('%d/%m/%Y %H:%M') if created else '-', align='center'),
+            cell(created.strftime('%d/%m/%Y %H:%M') if created else '-', align='left'),
+            multiline_cell(container_numbers, align='left'),
+            multiline_cell(sizes, align='center'),
+            cell(p.get('truck_plate'), align='left'),
+            cell(p.get('trailer_plate'), align='left'),
             cell(money(value), align='right'),
             cell(FREIGHT_PAYMENT_STATUS_LABELS.get(status_p, status_p), align='center'),
-            cell(paid.strftime('%d/%m/%Y %H:%M') if paid else '-', align='center'),
+            cell(paid.strftime('%d/%m/%Y %H:%M') if paid else '-', align='left'),
         ])
 
     total_geral = total_pago + total_pendente
-    table_data.append(['', '', '', 'TOTAL PAGO:', money(total_pago), '', ''])
-    table_data.append(['', '', '', 'TOTAL PENDENTE:', money(total_pendente), '', ''])
-    table_data.append(['', '', '', 'TOTAL GERAL:', money(total_geral), '', ''])
+    table_data.append(['', '', '', '', '', '', '', 'TOTAL PAGO:', money(total_pago), '', ''])
+    table_data.append(['', '', '', '', '', '', '', 'TOTAL PENDENTE:', money(total_pendente), '', ''])
+    table_data.append(['', '', '', '', '', '', '', 'TOTAL GERAL:', money(total_geral), '', ''])
 
-    base_widths = [45, 55, 160, 80, 80, 60, 80]
+    base_widths = [45, 45, 120, 65, 85, 50, 60, 60, 70, 55, 65]
     scale = doc.width / sum(base_widths)
     col_widths = [w * scale for w in base_widths]
 
@@ -2309,14 +2323,14 @@ def generate_freight_payment_report_pdf(driver_info: dict, payments: list, perio
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ROWBACKGROUNDS', (0, 1), (-1, totals_start - 1), [colors.white, zebra_gray]),
 
-        ('FONTNAME', (3, totals_start), (4, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (3, totals_start), (4, -1), 9),
-        ('ALIGN', (3, totals_start), (3, -1), 'RIGHT'),
-        ('ALIGN', (4, totals_start), (4, -1), 'RIGHT'),
+        ('FONTNAME', (7, totals_start), (8, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (7, totals_start), (8, -1), 9),
+        ('ALIGN', (7, totals_start), (7, -1), 'RIGHT'),
+        ('ALIGN', (8, totals_start), (8, -1), 'RIGHT'),
         ('TOPPADDING', (0, totals_start), (-1, -1), 4),
         ('BOTTOMPADDING', (0, totals_start), (-1, -1), 4),
         ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('BOX', (3, totals_start), (4, -1), 1, header_bg),
+        ('BOX', (7, totals_start), (8, -1), 1, header_bg),
     ]))
     elements.append(table)
 
@@ -2328,8 +2342,11 @@ def generate_freight_payment_report_pdf(driver_info: dict, payments: list, perio
 
 
 def generate_freight_payment_report_excel(driver_info: dict, payments: list, period: dict, company: dict = None) -> bytes:
-    """Versão Excel da prestação de contas de Pagamento Frete (mesmo template
-    Bsoft de generate_invoice_excel)."""
+    """Versão Excel da prestação de contas de Pagamento Frete, mesmo template
+    Bsoft do Relatório de Movimentações (_bsoft_style_excel), incluindo Nº do
+    Container/Tamanho/Placas lidos da Ordem de Carregamento de origem. Quando
+    a ordem levou mais de um container na mesma viagem, os valores de Nº do
+    Container/Tamanho ficam empilhados (quebra de linha dentro da célula)."""
     try:
         c = merge_company(company)
         wb = Workbook()
@@ -2346,38 +2363,65 @@ def generate_freight_payment_report_excel(driver_info: dict, payments: list, per
         val_str = f"R$ {total_geral:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
         stats_text = f"Período: {period_str}  |  Lançamentos: {len(payments)}  |  Total Geral: {val_str}"
 
-        headers = ['Nº Pgto', 'Nº Ordem', 'Rota', 'Data Aprovação', 'Valor do Frete', 'Status', 'Data Pagamento']
+        headers = [
+            'Ordem Nº', 'Nº Pgto', 'Rota', 'Data Aprovação', 'Nº do Container',
+            'Tamanho', 'Placa Cavalo', 'Placa Carreta', 'Valor do Frete', 'Status', 'Data Pagamento'
+        ]
 
         data_rows = []
+        multiline_row_lines = []
         for p in payments:
             created = to_brt(p.get('created_at'))
             paid = to_brt(p.get('paid_at')) if p.get('paid_at') else None
+            items = p.get('container_items') or []
+            container_numbers = [str(it.get('container_number')) if it.get('container_number') else '-' for it in items] or ['-']
+            sizes = [str(it.get('size_type')) if it.get('size_type') else '-' for it in items] or ['-']
             data_rows.append([
-                p.get('payment_number'),
                 p.get('order_number'),
+                p.get('payment_number'),
                 p.get('route_name') or '-',
                 created.strftime('%d/%m/%Y %H:%M') if created else '-',
+                '\n'.join(container_numbers),
+                '\n'.join(sizes),
+                p.get('truck_plate') or '-',
+                p.get('trailer_plate') or '-',
                 p.get('freight_value') or 0,
                 FREIGHT_PAYMENT_STATUS_LABELS.get(p.get('status'), p.get('status')),
                 paid.strftime('%d/%m/%Y %H:%M') if paid else '-',
             ])
+            multiline_row_lines.append(max(len(container_numbers), len(sizes)))
 
-        col_widths = {'B': 9, 'C': 9, 'D': 32, 'E': 16, 'F': 14, 'G': 12, 'H': 16}
-        center_cols = {0, 1, 5}
+        col_widths = {
+            'B': 9, 'C': 9, 'D': 26, 'E': 16, 'F': 16,
+            'G': 9, 'H': 12, 'I': 12, 'J': 14, 'K': 12, 'L': 16
+        }
+        center_cols = {0, 1, 5, 9}
 
         _bsoft_style_excel(
             ws, title, stats_text,
             headers, data_rows, col_widths,
             center_cols=center_cols,
-            right_align_cols={4},
-            number_fmt_cols={4: 'R$ #,##0.00'},
+            right_align_cols={8},
+            number_fmt_cols={8: 'R$ #,##0.00'},
             total_col=None,
             stats_text=stats_text,
             company_name=c['name'],
             logo_buffer=download_logo(company)
         )
 
+        # Quebra de linha dentro da célula pra Nº do Container/Tamanho quando a
+        # ordem levou mais de um container (empilhados um abaixo do outro) +
+        # altura de linha ajustada pra caber todas as linhas empilhadas.
         data_start = 9
+        wrap_align_left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        wrap_align_center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        for row_offset, n_lines in enumerate(multiline_row_lines):
+            row_num = data_start + row_offset
+            ws.cell(row=row_num, column=2 + 4).alignment = wrap_align_left    # Nº do Container (col F)
+            ws.cell(row=row_num, column=2 + 5).alignment = wrap_align_center  # Tamanho (col G)
+            if n_lines > 1:
+                ws.row_dimensions[row_num].height = max(15, 14 * n_lines)
+
         totals_row = data_start + len(data_rows) + 1
 
         bold_font = Font(name='Calibri', size=10, bold=True)
@@ -2394,7 +2438,7 @@ def generate_freight_payment_report_excel(driver_info: dict, payments: list, per
             value_cell.number_format = 'R$ #,##0.00'
             value_cell.font = normal_font
 
-        ws.print_area = f'A1:H{totals_row + 2}'
+        ws.print_area = f'A1:L{totals_row + 2}'
 
         buffer = io.BytesIO()
         wb.save(buffer)

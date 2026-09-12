@@ -130,6 +130,23 @@ async def cancel_pending_freight_payment_for_order(loading_order_id: str, curren
     return None
 
 
+async def _enrich_payments_with_order_data(payments: List[dict]) -> None:
+    """Anexa a cada pagamento (in-place) o Nº do Container/Tamanho de cada
+    item e as Placas do veículo, lidos da Ordem de Carregamento de origem -
+    usado só na Prestação de Contas em PDF/Excel; esses campos não fazem
+    parte do FreightPayment em si."""
+    order_ids = list({p['loading_order_id'] for p in payments if p.get('loading_order_id')})
+    orders_by_id = {}
+    if order_ids:
+        orders = await db.loading_orders.find({"id": {"$in": order_ids}}, {"_id": 0}).to_list(None)
+        orders_by_id = {o['id']: o for o in orders}
+    for p in payments:
+        order = orders_by_id.get(p.get('loading_order_id'))
+        p['truck_plate'] = order.get('truck_plate') if order else None
+        p['trailer_plate'] = order.get('trailer_plate') if order else None
+        p['container_items'] = (order.get('items') or []) if order else []
+
+
 def _build_freight_payment_query(driver_id: Optional[str], status: Optional[str], route_id: Optional[str], date_from: Optional[str], date_to: Optional[str]) -> dict:
     query = {}
     if driver_id:
@@ -161,6 +178,7 @@ async def download_freight_payment_report_pdf(
 
     query = _build_freight_payment_query(driver_id, None, None, date_from, date_to)
     payments = await db.freight_payments.find(query, {"_id": 0}).sort("created_at", 1).to_list(None)
+    await _enrich_payments_with_order_data(payments)
     company = merge_company(await get_company_settings())
 
     pdf_bytes = generate_freight_payment_report_pdf(
@@ -187,6 +205,7 @@ async def download_freight_payment_report_excel(
 
     query = _build_freight_payment_query(driver_id, None, None, date_from, date_to)
     payments = await db.freight_payments.find(query, {"_id": 0}).sort("created_at", 1).to_list(None)
+    await _enrich_payments_with_order_data(payments)
     company = merge_company(await get_company_settings())
 
     excel_bytes = generate_freight_payment_report_excel(
