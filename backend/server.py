@@ -22,6 +22,7 @@ from routers.cadastros import api_router as cadastros_router
 from routers.movements import api_router as movements_router
 from routers.invoices import api_router as invoices_router
 from routers.container_inspections import api_router as container_inspections_router
+from routers.container_repair_services import api_router as container_repair_services_router
 from routers.container_audits import api_router as container_audits_router
 from routers.commercial import api_router as commercial_router
 from routers.flex_tank import api_router as flex_tank_router
@@ -79,6 +80,7 @@ app.include_router(cadastros_router)
 app.include_router(movements_router)
 app.include_router(invoices_router)
 app.include_router(container_inspections_router)
+app.include_router(container_repair_services_router)
 app.include_router(container_audits_router)
 app.include_router(commercial_router)
 app.include_router(flex_tank_router)
@@ -224,6 +226,10 @@ async def startup_event():
     await db.drivers.create_index("cpf")
     await db.clients.create_index("cnpj")
     await db.transport_companies.create_index("cnpj")
+    try:
+        await db.container_repair_services.create_index("name", unique=True)
+    except Exception as e:
+        logger.warning(f"Não foi possível criar índice único em container_repair_services.name: {e}")
     try:
         await db.freight_payments.create_index("loading_order_id", unique=True)
     except Exception as e:

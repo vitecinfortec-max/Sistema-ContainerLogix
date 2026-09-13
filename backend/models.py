@@ -407,6 +407,17 @@ class InsuranceCompanyResponse(InsuranceCompanyCreate):
     id: str
     created_at: datetime
 
+# Fotos da Vistoria de Container dentro de Movimentação, no layout do
+# Registro Fotográfico (grade de fotos), mas com tipos livres (não 4 posições
+# fixas) e até 12 fotos - substitui o antigo campo `container_photos` (dict
+# de 4 posições fixas), que fica só de compatibilidade com registros antigos.
+MAX_MOVEMENT_VISTORIA_PHOTOS = 12
+
+class ContainerMovementPhoto(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    type: str  # front, back, left, right ou internal
+    url: str
+
 class ContainerMovement(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -437,6 +448,7 @@ class ContainerMovement(BaseModel):
     container_photos: Optional[dict] = None  # Fotos do container (frente, traseira, esquerda, direita) - upload removido da UI, mantido só por compatibilidade com registros antigos
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres não cobertas pelas opções de avaria
+    vistoria_photos: List[ContainerMovementPhoto] = Field(default_factory=list)  # Fotos da Vistoria de Container (até 12) - ver MAX_MOVEMENT_VISTORIA_PHOTOS
     loading_order_id: Optional[str] = None  # Vinculo com a Ordem de Carregamento que gerou essa movimentação (interno, nunca vem do formulário)
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
@@ -499,6 +511,7 @@ class ContainerMovementResponse(BaseModel):
     container_photos: Optional[dict] = None  # Fotos do container
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres
+    vistoria_photos: List[ContainerMovementPhoto] = Field(default_factory=list)  # Fotos da Vistoria de Container (até 12)
     loading_order_id: Optional[str] = None  # Vinculo com a Ordem de Carregamento que gerou essa movimentação
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
@@ -576,6 +589,28 @@ class ServiceTypeResponse(BaseModel):
     id: str
     name: str
     description: Optional[str] = None
+    created_at: datetime
+
+
+# ===== VISTORIA DE CONTAINER: TIPO DE SERVIÇOS (M&R) =====
+# Catálogo de serviços de reparo/M&R de container, usado no campo "Tipo de
+# Serviços" da Vistoria de Container (dentro de Novo/Editar Movimentação) -
+# populado em lote a partir da tabela de serviços e preços do cliente (só o
+# nome do serviço; categoria/preço não fazem parte do fluxo de vistoria).
+class ContainerRepairService(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+
+class ContainerRepairServiceCreate(BaseModel):
+    name: str
+
+class ContainerRepairServiceResponse(BaseModel):
+    id: str
+    name: str
     created_at: datetime
 
 

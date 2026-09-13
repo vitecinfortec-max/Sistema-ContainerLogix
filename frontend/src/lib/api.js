@@ -100,13 +100,26 @@ export const api = {
   createServiceType: (data) => axios.post(`${API}/service-types`, data),
   updateServiceType: (id, data) => axios.put(`${API}/service-types/${id}`, data),
   deleteServiceType: (id) => axios.delete(`${API}/service-types/${id}`),
-  
+
+  // Container Repair Services (Tipo de Serviços da Vistoria de Container)
+  getContainerRepairServices: () => axios.get(`${API}/container-repair-services`),
+  createContainerRepairService: (data) => axios.post(`${API}/container-repair-services`, data),
+  deleteContainerRepairService: (id) => axios.delete(`${API}/container-repair-services/${id}`),
+
   // Movements
   getMovements: (params) => axios.get(`${API}/movements`, { params }),
   createMovement: (data) => axios.post(`${API}/movements`, data),
   getMovement: (id) => axios.get(`${API}/movements/${id}`),
   updateMovement: (id, data) => axios.put(`${API}/movements/${id}`, data),
   deleteMovement: (id) => axios.delete(`${API}/movements/${id}`),
+  uploadMovementPhoto: (id, type, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/movements/${id}/upload-photo?type=${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteMovementPhoto: (id, photoId) => axios.delete(`${API}/movements/${id}/photo/${photoId}`),
   getOpenEntryForContainer: (containerNumber) => axios.get(`${API}/movements/open-entry/${containerNumber}`),
   getLastMovementForContainer: (containerNumber) => axios.get(`${API}/movements/last-for-container/${containerNumber}`),
   downloadMovementsPdf: (movementIds, via) => axios.post(`${API}/movements/pdf`, { movement_ids: movementIds, via }, { responseType: 'blob' }),

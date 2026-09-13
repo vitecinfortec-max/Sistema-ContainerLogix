@@ -28,6 +28,8 @@ export default function EditMovementPage() {
   const [containerPhotos, setContainerPhotos] = useState(null);
   const [containerDamages, setContainerDamages] = useState([]);
   const [inspectionNotes, setInspectionNotes] = useState('');
+  const [vistoriaPhotos, setVistoriaPhotos] = useState([]); // { id, type, url } - já salvas; add/remove chamam a API na hora
+  const [uploadingVistoriaPhoto, setUploadingVistoriaPhoto] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [servicePriceEntries, setServicePriceEntries] = useState([]);
@@ -113,6 +115,10 @@ export default function EditMovementPage() {
         setInspectionNotes(movement.inspection_notes);
       }
 
+      if (movement.vistoria_photos) {
+        setVistoriaPhotos(movement.vistoria_photos);
+      }
+
       // Atualizar o campo de busca do cliente
       if (movement.client_name) {
         setClientSearch(movement.client_name);
@@ -153,6 +159,29 @@ export default function EditMovementPage() {
       toast.error('Erro ao carregar dados auxiliares');
     } finally {
       setLoadingAux(false);
+    }
+  };
+
+  const handleAddVistoriaPhoto = async (type, file) => {
+    setUploadingVistoriaPhoto(true);
+    try {
+      const response = await api.uploadMovementPhoto(id, type, file);
+      setVistoriaPhotos(prev => [...prev, response.data]);
+      toast.success('Foto adicionada!');
+    } catch (error) {
+      toast.error('Erro ao enviar foto');
+    } finally {
+      setUploadingVistoriaPhoto(false);
+    }
+  };
+
+  const handleRemoveVistoriaPhoto = async (photoId) => {
+    try {
+      await api.deleteMovementPhoto(id, photoId);
+      setVistoriaPhotos(prev => prev.filter(p => p.id !== photoId));
+      toast.success('Foto removida!');
+    } catch (error) {
+      toast.error('Erro ao remover foto');
     }
   };
 
@@ -541,6 +570,11 @@ export default function EditMovementPage() {
             notes={inspectionNotes}
             onNotesChange={setInspectionNotes}
             disabled={loading}
+            movementInfo={watch()}
+            photos={vistoriaPhotos}
+            onAddPhoto={handleAddVistoriaPhoto}
+            onRemovePhoto={handleRemoveVistoriaPhoto}
+            uploadingPhoto={uploadingVistoriaPhoto}
           />
 
           <div className="flex justify-end gap-4">
