@@ -97,7 +97,7 @@ export default function EditContainerInspectionPage() {
       setShippingLines(shippingLinesRes.data);
       setTerminals(Array.isArray(terminalsRes.data) ? terminalsRes.data : []);
     } catch (error) {
-      toast.error('Erro ao carregar vistoria');
+      toast.error('Erro ao carregar registro');
       navigate('/container-inspections');
     } finally {
       setLoading(false);
@@ -107,7 +107,7 @@ export default function EditContainerInspectionPage() {
   const handleAddPhoto = async (file) => {
     if (!file) return;
     if (photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS) {
-      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria`);
+      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por registro`);
       return;
     }
 
@@ -209,11 +209,11 @@ export default function EditContainerInspectionPage() {
         damage_items: noDamage ? [] : damageItems
       });
 
-      toast.success('Vistoria atualizada com sucesso!');
+      toast.success('Registro atualizado com sucesso!');
       navigate(`/container-inspections/${id}`);
     } catch (error) {
-      console.error('Erro ao atualizar vistoria:', error);
-      toast.error('Erro ao atualizar vistoria');
+      console.error('Erro ao atualizar registro:', error);
+      toast.error('Erro ao atualizar registro');
     } finally {
       setSaving(false);
     }
@@ -247,9 +247,9 @@ export default function EditContainerInspectionPage() {
           </Button>
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Editar Vistoria #{inspectionNumber}
+              Editar Registro Fotográfico #{inspectionNumber}
             </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Edite as informações da vistoria de container</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Edite as informações do registro fotográfico de container</p>
           </div>
         </div>
 

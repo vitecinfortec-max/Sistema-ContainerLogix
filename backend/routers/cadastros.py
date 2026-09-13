@@ -30,7 +30,6 @@ from models import (
     ServiceType, ServiceTypeCreate, ServiceTypeResponse,
     Invoice, InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceMovementDetail,
     InvoiceHistory, InvoiceHistoryResponse,
-    PhotoRegistry, PhotoRegistryCreate, PhotoRegistryUpdate, PhotoRegistryResponse,
     ContainerInspectionPhoto, ContainerInspection, ContainerInspectionCreate,
     ContainerInspectionUpdate, ContainerInspectionResponse,
     CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS,

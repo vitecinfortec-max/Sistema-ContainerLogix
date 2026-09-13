@@ -255,7 +255,7 @@ async def validate_and_read_upload(file: UploadFile, allowed_extensions: set) ->
 # dele de uma vez, sem precisar listar item por item.
 MODULE_CATALOG = [
     {"key": "terminal", "label": "Terminal", "items": [
-        {"key": "terminal.vistoria", "label": "Vistoria de Container"},
+        {"key": "terminal.vistoria", "label": "Registro Fotográfico"},
         {"key": "terminal.movimentacoes", "label": "Movimentações"},
         {"key": "terminal.flex_tank", "label": "Flex Tank"},
         {"key": "terminal.auditoria", "label": "Auditoria"},

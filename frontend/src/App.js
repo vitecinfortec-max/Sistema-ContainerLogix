@@ -26,10 +26,6 @@ import StockReportPage from './pages/StockReportPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
 import BillingPage from './pages/BillingPage';
-import PhotoRegistriesPage from './pages/PhotoRegistriesPage';
-import NewPhotoRegistryPage from './pages/NewPhotoRegistryPage';
-import PhotoRegistryDetailPage from './pages/PhotoRegistryDetailPage';
-import EditPhotoRegistryPage from './pages/EditPhotoRegistryPage';
 import ContainerInspectionsPage from './pages/ContainerInspectionsPage';
 import NewContainerInspectionPage from './pages/NewContainerInspectionPage';
 import ContainerInspectionDetailPage from './pages/ContainerInspectionDetailPage';
@@ -357,38 +353,6 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.faturas">
                 <BillingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/photo-registries"
-            element={
-              <ProtectedRoute>
-                <PhotoRegistriesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/photo-registries/new"
-            element={
-              <ProtectedRoute>
-                <NewPhotoRegistryPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/photo-registries/:id"
-            element={
-              <ProtectedRoute>
-                <PhotoRegistryDetailPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/photo-registries/:id/edit"
-            element={
-              <ProtectedRoute>
-                <EditPhotoRegistryPage />
               </ProtectedRoute>
             }
           />

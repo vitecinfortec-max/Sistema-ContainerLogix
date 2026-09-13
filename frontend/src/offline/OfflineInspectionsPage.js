@@ -91,7 +91,7 @@ export default function OfflineInspectionsPage() {
 
   const handleAddPhoto = async (useCamera) => {
     if (photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS) {
-      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria`);
+      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por registro`);
       return;
     }
     setSavingPhoto(true);
@@ -131,9 +131,9 @@ export default function OfflineInspectionsPage() {
       }
       setShowForm(false);
       load();
-      toast.success('Vistoria salva!');
+      toast.success('Registro salvo!');
     } catch (e) {
-      toast.error('Erro ao salvar vistoria');
+      toast.error('Erro ao salvar registro');
     }
   };
 
@@ -150,17 +150,17 @@ export default function OfflineInspectionsPage() {
 
   return (
     <div className="p-4 space-y-3">
-      <h1 className="text-2xl font-bold">Vistoria de Container</h1>
+      <h1 className="text-2xl font-bold">Registro Fotográfico</h1>
 
       <Button onClick={openNew} className="w-full" data-testid="inspection-add-btn">
         <Plus className="w-4 h-4 mr-2" />
-        Nova Vistoria
+        Novo Registro
       </Button>
 
       {loading ? (
         <p className="text-sm text-muted-foreground text-center py-4">Carregando...</p>
       ) : inspections.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">Nenhuma vistoria registrada ainda.</p>
+        <p className="text-sm text-muted-foreground text-center py-4">Nenhum registro cadastrado ainda.</p>
       ) : (
         <div className="space-y-2">
           {inspections.map((insp) => (
@@ -189,7 +189,7 @@ export default function OfflineInspectionsPage() {
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar Vistoria' : 'Nova Vistoria'}</DialogTitle>
+            <DialogTitle>{editing ? 'Editar Registro' : 'Novo Registro'}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3">

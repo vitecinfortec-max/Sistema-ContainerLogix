@@ -14,8 +14,8 @@ export const DEFAULT_COMPANY = {
 };
 
 // Busca os dados de "Dados da Empresa" para usar nos cabeçalhos impressos
-// (Vistoria de Container, Movimentação, Registro Fotográfico), com fallback
-// para os valores padrão em qualquer campo ainda não cadastrado.
+// (Registro Fotográfico, Movimentação, etc.), com fallback para os valores
+// padrão em qualquer campo ainda não cadastrado.
 export function useCompanySettings() {
   const [company, setCompany] = useState(DEFAULT_COMPANY);
 

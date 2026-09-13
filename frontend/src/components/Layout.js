@@ -102,10 +102,8 @@ const PAGE_TITLES = {
   '/reports/billing': 'Relatório de Faturamento',
   '/billing': 'Faturamento',
   '/international-invoices': 'Invoice Internacional',
-  '/photo-registries': 'Registro Fotográfico',
-  '/photo-registries/new': 'Novo Registro Fotográfico',
-  '/container-inspections': 'Vistoria de Container',
-  '/container-inspections/new': 'Nova Vistoria de Container',
+  '/container-inspections': 'Registro Fotográfico',
+  '/container-inspections/new': 'Novo Registro Fotográfico',
   '/container-audits': 'Auditoria',
   '/container-audits/new': 'Nova Auditoria',
   '/comercial/cadastros': 'Representante',
@@ -460,7 +458,7 @@ export default function Layout({ children }) {
   // nome "ContainerLogix" (logo/breadcrumb, já linkam pra /dashboard).
   const mainNavItems = [];
 
-  // Vistoria de Container passou a viver dentro do grupo "Registro de Gate"
+  // Registro Fotográfico passou a viver dentro do grupo "Registro de Gate"
   // (movimentacoesItems) - array mantido vazio pra não precisar remover todo
   // o encaixe de renderização (mesmo padrão do mainNavItems acima).
   const terminalItems = [];
@@ -472,16 +470,16 @@ export default function Layout({ children }) {
 
   const movimentacoesItems = [
     { path: '/movements', label: 'Emitir EIR', icon: List, moduleKey: 'terminal.movimentacoes' },
-    { path: '/container-inspections', label: 'Vistoria de Container', icon: ClipboardCheck, moduleKey: 'terminal.vistoria' },
+    { path: '/container-inspections', label: 'Registro Fotográfico', icon: ClipboardCheck, moduleKey: 'terminal.vistoria' },
     { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package, moduleKey: 'terminal.movimentacoes' },
     { path: '/yard-control', label: 'Controle de Pátio', icon: Clock, moduleKey: 'terminal.movimentacoes' },
     { path: '/reports/movements', label: 'Relatório de Movimentação', icon: BarChart3, moduleKey: 'terminal.movimentacoes' },
     { path: '/container-audits', label: 'Auditoria', icon: ListChecks, moduleKey: 'terminal.auditoria' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
-  // Cadastros voltados especificamente pro Terminal (usados em Vistoria/
-  // Movimentação) - separados do grupo geral "Cadastro" pra ficarem à mão
-  // de quem trabalha no Terminal, sem precisar sair do grupo.
+  // Cadastros voltados especificamente pro Terminal (usados em Registro
+  // Fotográfico/Movimentação) - separados do grupo geral "Cadastro" pra
+  // ficarem à mão de quem trabalha no Terminal, sem precisar sair do grupo.
   const terminalCadastroItems = [
     { path: '/shipping-lines', label: 'Armador', icon: Ship, moduleKey: 'cadastro.armador' },
     { path: '/service-types', label: 'Tipos de Serviço', icon: ClipboardList, moduleKey: 'cadastro.tipos_servico' },
@@ -595,9 +593,8 @@ export default function Layout({ children }) {
     if (location.pathname.includes('/flex-tank/movements/') && location.pathname !== '/flex-tank/movements/new') return 'Detalhes da Movimentação Flex Tank';
     if (location.pathname.includes('/movements/') && location.pathname.includes('/edit')) return 'Editar Gate';
     if (location.pathname.includes('/movements/')) return 'Detalhes do Gate';
-    if (location.pathname.includes('/photo-registries/') && location.pathname !== '/photo-registries/new') return 'Detalhes do Registro Fotográfico';
-    if (location.pathname.includes('/container-inspections/') && location.pathname.includes('/edit')) return 'Editar Vistoria de Container';
-    if (location.pathname.includes('/container-inspections/') && location.pathname !== '/container-inspections/new') return 'Detalhes da Vistoria de Container';
+    if (location.pathname.includes('/container-inspections/') && location.pathname.includes('/edit')) return 'Editar Registro Fotográfico';
+    if (location.pathname.includes('/container-inspections/') && location.pathname !== '/container-inspections/new') return 'Detalhes do Registro Fotográfico';
     if (location.pathname.includes('/container-audits/') && location.pathname !== '/container-audits/new') return 'Detalhe da Auditoria';
     if (location.pathname.includes('/comercial/proposta/') && location.pathname !== '/comercial/proposta/new') return 'Editar Proposta Comercial';
     if (location.pathname.startsWith('/comercial/tabela-servicos/')) return 'Tabela de Serviços';
@@ -1206,7 +1203,7 @@ export default function Layout({ children }) {
             }`}
           >
             <ClipboardCheck className="w-6 h-6" strokeWidth={1.8} />
-            <span className="text-[11px] font-medium">Vistoria</span>
+            <span className="text-[11px] font-medium">Registro</span>
           </Link>
           <button
             type="button"

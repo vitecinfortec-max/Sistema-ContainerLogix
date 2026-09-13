@@ -187,22 +187,7 @@ export const api = {
   deleteFile: (filename) => axios.delete(`${API}/upload/${filename}`),
   getFileUrl: (path) => `${BASE_URL}${path}`,
   
-  // Photo Registries (Registro Fotográfico)
-  getPhotoRegistries: (params) => axios.get(`${API}/photo-registries`, { params }),
-  getPhotoRegistry: (id) => axios.get(`${API}/photo-registries/${id}`),
-  createPhotoRegistry: (data) => axios.post(`${API}/photo-registries`, data),
-  updatePhotoRegistry: (id, data) => axios.put(`${API}/photo-registries/${id}`, data),
-  deletePhotoRegistry: (id) => axios.delete(`${API}/photo-registries/${id}`),
-  uploadPhotoRegistryPhoto: (id, position, file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return axios.post(`${API}/photo-registries/${id}/upload-photo?position=${position}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-  },
-  deletePhotoRegistryPhoto: (id, position) => axios.delete(`${API}/photo-registries/${id}/photo/${position}`),
-  
-  // Container Inspections (Vistoria de Container)
+  // Container Inspections (Registro Fotográfico)
   getContainerInspections: (params) => axios.get(`${API}/container-inspections`, { params }),
   getContainerInspection: (id) => axios.get(`${API}/container-inspections/${id}`),
   createContainerInspection: (data) => axios.post(`${API}/container-inspections`, data),

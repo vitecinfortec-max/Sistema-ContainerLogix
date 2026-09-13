@@ -44,18 +44,18 @@ export default function ContainerInspectionsPage() {
         totalPages: response.data.total_pages
       }));
     } catch (error) {
-      toast.error('Erro ao carregar vistorias');
+      toast.error('Erro ao carregar registros');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Tem certeza que deseja excluir esta vistoria?'))) return;
+    if (!(await confirm('Tem certeza que deseja excluir este registro?'))) return;
 
     try {
       await api.deleteContainerInspection(id);
-      toast.success('Vistoria excluída com sucesso!');
+      toast.success('Registro excluído com sucesso!');
       setSelectedIds(prev => {
         if (!prev.has(id)) return prev;
         const next = new Set(prev);
@@ -64,7 +64,7 @@ export default function ContainerInspectionsPage() {
       });
       loadInspections();
     } catch (error) {
-      toast.error('Erro ao excluir vistoria');
+      toast.error('Erro ao excluir registro');
     }
   };
 
@@ -102,8 +102,8 @@ export default function ContainerInspectionsPage() {
       <div className="space-y-5" data-testid="container-inspections-page">
         {/* Header */}
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Vistoria de Container</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerenciamento de vistorias de containers</p>
+          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Registro Fotográfico</h1>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerenciamento de registros fotográficos de containers</p>
         </div>
 
         {/* Filtros */}
@@ -129,7 +129,7 @@ export default function ContainerInspectionsPage() {
           </CardContent>
         </Card>
 
-        {/* Barra de ações - marque uma vistoria na tabela abaixo pra habilitar as ações */}
+        {/* Barra de ações - marque um registro na tabela abaixo pra habilitar as ações */}
         <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
           <Button
             variant="ghost"
@@ -188,7 +188,7 @@ export default function ContainerInspectionsPage() {
             <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
               <span className="flex items-center gap-2">
                 <ClipboardCheck className="w-4 h-4" />
-                Vistorias ({pagination.total})
+                Registros ({pagination.total})
               </span>
             </CardTitle>
           </CardHeader>
@@ -196,7 +196,7 @@ export default function ContainerInspectionsPage() {
             {loading ? (
               <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
             ) : filteredInspections.length === 0 ? (
-              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Nenhuma vistoria de container encontrada</div>
+              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Nenhum registro fotográfico encontrado</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">

@@ -21,7 +21,6 @@ from routers.auth import api_router as auth_router
 from routers.cadastros import api_router as cadastros_router
 from routers.movements import api_router as movements_router
 from routers.invoices import api_router as invoices_router
-from routers.photo_registries import api_router as photo_registries_router
 from routers.container_inspections import api_router as container_inspections_router
 from routers.container_audits import api_router as container_audits_router
 from routers.commercial import api_router as commercial_router
@@ -79,7 +78,6 @@ app.include_router(auth_router)
 app.include_router(cadastros_router)
 app.include_router(movements_router)
 app.include_router(invoices_router)
-app.include_router(photo_registries_router)
 app.include_router(container_inspections_router)
 app.include_router(container_audits_router)
 app.include_router(commercial_router)

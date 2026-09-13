@@ -803,71 +803,7 @@ class InvoiceHistoryResponse(BaseModel):
     created_at: datetime
 
 
-# ===== REGISTRO FOTOGRÁFICO =====
-class PhotoRegistry(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    registry_number: int  # Número sequencial do registro
-    container_number: str
-    container_seal: Optional[str] = None  # Numeração do Container (lacre)
-    collection_terminal: Optional[str] = None  # Terminal de Coleta
-    booking: Optional[str] = None
-    client_id: Optional[str] = None
-    client_name: Optional[str] = None
-    shipping_line_id: Optional[str] = None
-    shipping_line_name: Optional[str] = None
-    
-    # Fotos (URLs dos arquivos)
-    photo_front: Optional[str] = None
-    photo_back: Optional[str] = None
-    photo_left: Optional[str] = None
-    photo_right: Optional[str] = None
-    
-    # Metadados
-    created_by: str
-    created_by_name: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: Optional[datetime] = None
-
-class PhotoRegistryCreate(BaseModel):
-    container_number: str
-    container_seal: Optional[str] = None
-    collection_terminal: Optional[str] = None
-    booking: Optional[str] = None
-    client_id: Optional[str] = None
-    shipping_line_id: Optional[str] = None
-
-class PhotoRegistryUpdate(BaseModel):
-    container_number: Optional[str] = None
-    container_seal: Optional[str] = None
-    collection_terminal: Optional[str] = None
-    booking: Optional[str] = None
-    client_id: Optional[str] = None
-    shipping_line_id: Optional[str] = None
-
-class PhotoRegistryResponse(BaseModel):
-    id: str
-    registry_number: int
-    container_number: str
-    container_seal: Optional[str] = None
-    collection_terminal: Optional[str] = None
-    booking: Optional[str] = None
-    client_id: Optional[str] = None
-    client_name: Optional[str] = None
-    shipping_line_id: Optional[str] = None
-    shipping_line_name: Optional[str] = None
-    photo_front: Optional[str] = None
-    photo_back: Optional[str] = None
-    photo_left: Optional[str] = None
-    photo_right: Optional[str] = None
-    created_by: str
-    created_by_name: str
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-
-# Tipos de foto disponíveis para a Vistoria de Container
+# Tipos de foto disponíveis para o Registro Fotográfico
 CONTAINER_INSPECTION_PHOTO_TYPES = ["front", "back", "left", "right", "internal"]
 MAX_CONTAINER_INSPECTION_PHOTOS = 8
 
@@ -876,12 +812,12 @@ class ContainerInspectionPhoto(BaseModel):
     type: str  # front, back, left, right ou internal
     url: str
 
-# ===== VISTORIA DE CONTAINER =====
+# ===== REGISTRO FOTOGRÁFICO =====
 class ContainerInspection(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    inspection_number: int  # Número sequencial da vistoria
+    inspection_number: int  # Número sequencial do registro
     container_number: str
     container_seal: Optional[str] = None  # Numeração do Container (lacre)
     size_type: Optional[str] = None  # Tamanho/Tipo do container (ex: 20DC, 40HC)

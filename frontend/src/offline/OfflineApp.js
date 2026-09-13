@@ -1,5 +1,5 @@
 // Ponto de entrada do app Android offline: sem login, sem servidor — só os 3
-// módulos habilitados (Movimentação, Vistoria, Cadastros Básicos) + Backup,
+// módulos habilitados (Movimentação, Registro Fotográfico, Cadastros Básicos) + Backup,
 // gravando tudo em SQLite local (ver ../lib/offlineDb.js).
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from '../components/ui/sonner';

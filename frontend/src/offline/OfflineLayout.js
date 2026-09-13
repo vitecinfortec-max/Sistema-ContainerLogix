@@ -4,7 +4,7 @@ import { Home, Truck, ClipboardCheck, Users, DatabaseBackup } from 'lucide-react
 const TABS = [
   { path: '/home', icon: Home, label: 'Início' },
   { path: '/movements', icon: Truck, label: 'Movim.' },
-  { path: '/inspections', icon: ClipboardCheck, label: 'Vistoria' },
+  { path: '/inspections', icon: ClipboardCheck, label: 'Registro' },
   { path: '/registries', icon: Users, label: 'Cadastros' },
   { path: '/backup', icon: DatabaseBackup, label: 'Backup' },
 ];

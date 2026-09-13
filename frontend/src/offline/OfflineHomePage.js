@@ -17,7 +17,7 @@ export default function OfflineHomePage() {
 
   const items = [
     { icon: Truck, label: 'Gate', count: counts.movements, path: '/movements' },
-    { icon: ClipboardCheck, label: 'Vistoria de Container', count: counts.inspections, path: '/inspections' },
+    { icon: ClipboardCheck, label: 'Registro Fotográfico', count: counts.inspections, path: '/inspections' },
     { icon: Users, label: 'Cadastros Básicos', path: '/registries' },
     { icon: DatabaseBackup, label: 'Backup', path: '/backup' },
   ];

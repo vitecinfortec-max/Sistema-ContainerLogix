@@ -121,7 +121,7 @@ export default function NewContainerInspectionPage() {
   const handleAddPhoto = async (file) => {
     if (!file) return;
     if (photos.length >= MAX_CONTAINER_INSPECTION_PHOTOS) {
-      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria`);
+      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por registro`);
       return;
     }
     const compressed = await compressImage(file);
@@ -177,11 +177,11 @@ export default function NewContainerInspectionPage() {
         photos.map((photo) => api.uploadContainerInspectionPhoto(inspectionId, photo.type, photo.file))
       );
 
-      toast.success('Vistoria criada com sucesso!');
+      toast.success('Registro criado com sucesso!');
       navigate(`/container-inspections/${inspectionId}`);
     } catch (error) {
-      console.error('Erro ao criar vistoria:', error);
-      toast.error('Erro ao criar vistoria');
+      console.error('Erro ao criar registro:', error);
+      toast.error('Erro ao criar registro');
     } finally {
       setSaving(false);
     }
@@ -210,9 +210,9 @@ export default function NewContainerInspectionPage() {
           </Button>
           <div>
             <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-              Nova Vistoria de Container
+              Novo Registro Fotográfico
             </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Preencha os dados da vistoria</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Preencha os dados do registro</p>
           </div>
         </div>
 
@@ -545,7 +545,7 @@ export default function NewContainerInspectionPage() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Salvar Vistoria
+                  Salvar Registro
                 </>
               )}
             </Button>

@@ -27,7 +27,6 @@ from models import (
     ServiceType, ServiceTypeCreate, ServiceTypeResponse,
     Invoice, InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceMovementDetail,
     InvoiceHistory, InvoiceHistoryResponse,
-    PhotoRegistry, PhotoRegistryCreate, PhotoRegistryUpdate, PhotoRegistryResponse,
     ContainerInspectionPhoto, ContainerInspection, ContainerInspectionCreate,
     ContainerInspectionUpdate, ContainerInspectionResponse,
     CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS,
@@ -64,7 +63,7 @@ from shared import (
 
 api_router = APIRouter(prefix="/api")
 
-# ========== VISTORIA DE CONTAINER ==========
+# ========== REGISTRO FOTOGRÁFICO ==========
 
 @api_router.get("/container-inspections")
 async def list_container_inspections(
@@ -72,7 +71,7 @@ async def list_container_inspections(
     per_page: int = 20,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Lista todas as vistorias de container"""
+    """Lista todos os registros fotográficos de container"""
     skip = (page - 1) * per_page
     
     total = await db.container_inspections.count_documents({})
@@ -89,10 +88,10 @@ async def list_container_inspections(
 
 @api_router.get("/container-inspections/{inspection_id}", response_model=ContainerInspectionResponse)
 async def get_container_inspection(inspection_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Obtém uma vistoria de container pelo ID"""
+    """Obtém um registro fotográfico de container pelo ID"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
     if not inspection:
-        raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
+        raise HTTPException(status_code=404, detail="Registro fotográfico de container não encontrado")
     return ContainerInspectionResponse(**migrate_inspection_photos(inspection))
 
 @api_router.post("/container-inspections", response_model=ContainerInspectionResponse)
@@ -100,7 +99,7 @@ async def create_container_inspection(
     data: ContainerInspectionCreate,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Cria uma nova vistoria de container"""
+    """Cria um novo registro fotográfico de container"""
     # Gerar número sequencial
     counter = await db.counters.find_one_and_update(
         {"_id": "inspection_number"},
@@ -154,10 +153,10 @@ async def update_container_inspection(
     data: ContainerInspectionUpdate,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Atualiza uma vistoria de container"""
+    """Atualiza um registro fotográfico de container"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
     if not inspection:
-        raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
+        raise HTTPException(status_code=404, detail="Registro fotográfico de container não encontrado")
     
     update_data = {}
     
@@ -218,14 +217,14 @@ async def upload_container_inspection_photo(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Faz upload de uma foto para uma vistoria de container (até 8 fotos, cada uma com um tipo)"""
+    """Faz upload de uma foto para um registro fotográfico de container (até 8 fotos, cada uma com um tipo)"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
     if not inspection:
-        raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
+        raise HTTPException(status_code=404, detail="Registro fotográfico de container não encontrado")
 
     inspection = migrate_inspection_photos(inspection)
     if len(inspection["photos"]) >= MAX_CONTAINER_INSPECTION_PHOTOS:
-        raise HTTPException(status_code=400, detail=f"Limite de {MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria atingido")
+        raise HTTPException(status_code=400, detail=f"Limite de {MAX_CONTAINER_INSPECTION_PHOTOS} fotos por registro atingido")
 
     file_ext, content = await validate_and_read_upload(file, ALLOWED_EXTENSIONS)
 
@@ -258,10 +257,10 @@ async def delete_container_inspection_photo(
     photo_id: str,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Remove uma foto de uma vistoria de container"""
+    """Remove uma foto de um registro fotográfico de container"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
     if not inspection:
-        raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
+        raise HTTPException(status_code=404, detail="Registro fotográfico de container não encontrado")
 
     inspection = migrate_inspection_photos(inspection)
     remaining_photos = [p for p in inspection["photos"] if p["id"] != photo_id]
@@ -286,10 +285,10 @@ async def delete_container_inspection(
     inspection_id: str,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Exclui uma vistoria de container"""
+    """Exclui um registro fotográfico de container"""
     inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
     if not inspection:
-        raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
+        raise HTTPException(status_code=404, detail="Registro fotográfico de container não encontrado")
     
     # Remover diretório de fotos
     try:
@@ -301,5 +300,5 @@ async def delete_container_inspection(
     
     await db.container_inspections.delete_one({"id": inspection_id})
     
-    return {"message": "Vistoria de container excluída com sucesso"}
+    return {"message": "Registro fotográfico de container excluído com sucesso"}
 

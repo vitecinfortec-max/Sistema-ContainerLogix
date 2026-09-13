@@ -72,7 +72,7 @@ export default function ContainerInspectionDetailPage() {
       const response = await api.getContainerInspection(id);
       setInspection(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar vistoria');
+      toast.error('Erro ao carregar registro');
       navigate('/container-inspections');
     } finally {
       setLoading(false);
@@ -83,7 +83,7 @@ export default function ContainerInspectionDetailPage() {
     if (!file) return;
     const currentCount = (inspection?.photos || []).length;
     if (currentCount >= MAX_CONTAINER_INSPECTION_PHOTOS) {
-      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por vistoria`);
+      toast.error(`Máximo de ${MAX_CONTAINER_INSPECTION_PHOTOS} fotos por registro`);
       return;
     }
 
@@ -158,7 +158,7 @@ export default function ContainerInspectionDetailPage() {
   if (!inspection) {
     return (
       <Layout>
-        <div className="text-center py-8">Vistoria não encontrada</div>
+        <div className="text-center py-8">Registro não encontrado</div>
       </Layout>
     );
   }
@@ -214,10 +214,10 @@ export default function ContainerInspectionDetailPage() {
           marginBottom: '10px'
         }}>
           <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#000' }}>
-            VISTORIA DE CONTAINER
+            REGISTRO FOTOGRÁFICO DE CONTÊINER
           </div>
           <div style={{ fontSize: '11px', color: '#000', marginTop: '2px' }}>
-            Vistoria Nº {inspection.inspection_number}
+            Registro Nº {inspection.inspection_number}
           </div>
         </div>
 
@@ -323,12 +323,12 @@ export default function ContainerInspectionDetailPage() {
           </div>
         </div>
 
-        {/* Fotos da Vistoria */}
+        {/* Fotos do Registro */}
         {inspection.photos && inspection.photos.length > 0 && (
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr 1fr 1fr',
-            gap: '6px',
+            gap: '8px',
             marginBottom: '8px'
           }}>
             {inspection.photos.map(photo => (
@@ -339,16 +339,16 @@ export default function ContainerInspectionDetailPage() {
               }}>
                 <div style={{
                   backgroundColor: '#f0f0f0',
-                  padding: '3px 8px',
+                  padding: '4px 8px',
                   borderBottom: '1px solid #000',
                   fontWeight: 'bold',
-                  fontSize: '9px',
+                  fontSize: '10px',
                   textAlign: 'center'
                 }}>
                   {PHOTO_LABELS[photo.type] || photo.type}
                 </div>
                 <div style={{
-                  height: '45mm',
+                  height: '100mm',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -380,13 +380,13 @@ export default function ContainerInspectionDetailPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', flex: 1 }}>
               <div>
-                <strong>Vistoriado por: {inspection.created_by_name}</strong>
+                <strong>Registrado por: {inspection.created_by_name}</strong>
               </div>
               <div>
                 <strong>Data de criação: {format(new Date(inspection.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
               </div>
               <div>
-                <strong>Data da vistoria: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
+                <strong>Data de emissão: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
               </div>
             </div>
             {barcodeImage && (
@@ -399,7 +399,7 @@ export default function ContainerInspectionDetailPage() {
             )}
           </div>
           <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', borderTop: '1px solid #ddd', paddingTop: '4px' }}>
-            {company.name} | Este documento é válido como vistoria de container
+            {company.name} | Este documento é válido como registro fotográfico
           </div>
         </div>
       </div>
@@ -423,7 +423,7 @@ export default function ContainerInspectionDetailPage() {
             </Button>
             <div>
               <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-                Vistoria #{inspection.inspection_number}
+                Registro Fotográfico #{inspection.inspection_number}
               </h1>
               <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
                 Criado em {format(new Date(inspection.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
@@ -618,7 +618,7 @@ export default function ContainerInspectionDetailPage() {
         {/* Metadados e Código de Barras */}
         <Card>
           <CardHeader>
-            <CardTitle>Informações da Vistoria</CardTitle>
+            <CardTitle>Informações do Registro</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">

@@ -333,7 +333,7 @@ export const offlineMovements = {
   remove: (id) => removeById('container_movements', id),
 };
 
-// ---- Vistoria de Container ----
+// ---- Registro Fotográfico ----
 
 function rowToInspection(row) {
   if (!row) return null;
