@@ -54,7 +54,7 @@ export default function ContainerInspectionDetailPage() {
 
   useEffect(() => {
     if (inspection) {
-      const barcodeValue = `VC${String(inspection.inspection_number).padStart(6, '0')}`;
+      const barcodeValue = `RFC${String(inspection.inspection_number).padStart(6, '0')}`;
       const barcodeImg = generateBarcodeImage(barcodeValue);
       setBarcodeImage(barcodeImg);
     }
@@ -393,7 +393,7 @@ export default function ContainerInspectionDetailPage() {
               <div style={{ textAlign: 'center' }}>
                 <img src={barcodeImage} alt="Código de Barras" style={{ height: '50px', width: 'auto' }} />
                 <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000', marginTop: '2px' }}>
-                  {`VC${String(inspection.inspection_number).padStart(6, '0')}`}
+                  {`RFC${String(inspection.inspection_number).padStart(6, '0')}`}
                 </div>
               </div>
             )}
