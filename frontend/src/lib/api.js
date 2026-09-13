@@ -406,6 +406,9 @@ export const api = {
   updateFreightPaymentStatus: (id, status) => axios.put(`${API}/freight-payments/${id}/status?status=${status}`),
   getFreightPaymentReportPDF: (params) => axios.get(`${API}/freight-payments/report/pdf`, { params, responseType: 'blob' }),
   getFreightPaymentReportExcel: (params) => axios.get(`${API}/freight-payments/report/excel`, { params, responseType: 'blob' }),
+  markFreightPaymentsPaidBatch: (paymentIds) => axios.post(`${API}/freight-payments/mark-paid-batch`, { payment_ids: paymentIds }),
+  getFreightPaymentBatches: (params) => axios.get(`${API}/freight-payments/batches`, { params }),
+  getFreightPaymentBatchReceiptPDF: (batchId) => axios.get(`${API}/freight-payments/batches/${batchId}/receipt/pdf`, { responseType: 'blob' }),
 
   // Cadastro de Representantes (Gestão de Container)
   getContainerRepresentatives: () => axios.get(`${API}/container-representatives`),

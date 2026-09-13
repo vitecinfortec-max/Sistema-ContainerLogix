@@ -2,7 +2,7 @@ import io
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.responses import StreamingResponse
 from pymongo.errors import DuplicateKeyError
 
@@ -10,9 +10,13 @@ from models import (
     FREIGHT_PAYMENT_STATUS_OPTIONS,
     FreightPayment, FreightPaymentUpdate, FreightPaymentResponse,
     FreightPaymentHistory, FreightPaymentHistoryResponse,
+    FreightPaymentBatch, FreightPaymentBatchResponse,
 )
 from shared import db, get_current_admin_user, get_company_settings
-from reports import merge_company, generate_freight_payment_report_pdf, generate_freight_payment_report_excel
+from reports import (
+    merge_company, generate_freight_payment_report_pdf, generate_freight_payment_report_excel,
+    generate_freight_payment_receipt_pdf,
+)
 
 api_router = APIRouter(prefix="/api")
 
@@ -27,6 +31,17 @@ async def get_next_freight_payment_number():
     """Obtém o próximo payment_number usando um contador atômico."""
     result = await db.counters.find_one_and_update(
         {"_id": "freight_payment_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    return result["seq"]
+
+
+async def get_next_freight_payment_batch_number():
+    """Obtém o próximo batch_number (Ordem de Pagamento) usando um contador atômico."""
+    result = await db.counters.find_one_and_update(
+        {"_id": "freight_payment_batch_number"},
         {"$inc": {"seq": 1}},
         upsert=True,
         return_document=True
@@ -165,61 +180,182 @@ def _build_freight_payment_query(driver_id: Optional[str], status: Optional[str]
     return query
 
 
-@api_router.get("/freight-payments/report/pdf")
-async def download_freight_payment_report_pdf(
-    driver_id: str,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_admin_user)
-):
+async def _resolve_report_payments(driver_id: Optional[str], date_from: Optional[str], date_to: Optional[str], payment_ids: Optional[List[str]]):
+    """Resolve a lista de lançamentos + dados do motorista + período pra um
+    relatório de Prestação de Contas, em 2 modos possíveis:
+    - `payment_ids` explícito (novo: a tela manda exatamente os lançamentos
+      marcados na tabela, todos do mesmo motorista - sem filtro de data);
+    - `driver_id` + `date_from`/`date_to` (modo antigo, mantido por
+      compatibilidade)."""
+    if payment_ids:
+        payments = await db.freight_payments.find({"id": {"$in": payment_ids}}, {"_id": 0}).sort("created_at", 1).to_list(None)
+        if not payments:
+            raise HTTPException(status_code=404, detail="Nenhum lançamento encontrado")
+        driver_ids = {p.get('driver_id') for p in payments}
+        if len(driver_ids) != 1 or not next(iter(driver_ids)):
+            raise HTTPException(status_code=400, detail="Selecione lançamentos de um único motorista")
+        first = payments[0]
+        driver_info = {"name": first.get('driver_name'), "cpf": first.get('driver_cpf')}
+        period = {"date_from": None, "date_to": None}
+        return payments, driver_info, period
+
+    if not driver_id:
+        raise HTTPException(status_code=400, detail="Informe driver_id ou payment_ids")
     driver = await db.drivers.find_one({"id": driver_id}, {"_id": 0})
     if not driver:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
-
     query = _build_freight_payment_query(driver_id, None, None, date_from, date_to)
     payments = await db.freight_payments.find(query, {"_id": 0}).sort("created_at", 1).to_list(None)
+    driver_info = {"name": driver.get('name'), "cpf": driver.get('cpf')}
+    period = {"date_from": date_from, "date_to": date_to}
+    return payments, driver_info, period
+
+
+@api_router.get("/freight-payments/report/pdf")
+async def download_freight_payment_report_pdf(
+    driver_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    payment_ids: Optional[str] = Query(None, description="IDs separados por vírgula"),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    ids_list = [i for i in payment_ids.split(',') if i] if payment_ids else None
+    payments, driver_info, period = await _resolve_report_payments(driver_id, date_from, date_to, ids_list)
     await _enrich_payments_with_order_data(payments)
     company = merge_company(await get_company_settings())
 
     pdf_bytes = generate_freight_payment_report_pdf(
-        driver_info={"name": driver.get('name'), "cpf": driver.get('cpf')},
+        driver_info=driver_info,
         payments=payments,
-        period={"date_from": date_from, "date_to": date_to},
+        period=period,
         company=company,
     )
-    filename = f"PrestacaoContas_{(driver.get('name') or 'motorista').replace(' ', '_')}.pdf"
+    filename = f"PrestacaoContas_{(driver_info.get('name') or 'motorista').replace(' ', '_')}.pdf"
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                              headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
 @api_router.get("/freight-payments/report/excel")
 async def download_freight_payment_report_excel(
-    driver_id: str,
+    driver_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    payment_ids: Optional[str] = Query(None, description="IDs separados por vírgula"),
     current_user: dict = Depends(get_current_admin_user)
 ):
-    driver = await db.drivers.find_one({"id": driver_id}, {"_id": 0})
-    if not driver:
-        raise HTTPException(status_code=404, detail="Motorista não encontrado")
-
-    query = _build_freight_payment_query(driver_id, None, None, date_from, date_to)
-    payments = await db.freight_payments.find(query, {"_id": 0}).sort("created_at", 1).to_list(None)
+    ids_list = [i for i in payment_ids.split(',') if i] if payment_ids else None
+    payments, driver_info, period = await _resolve_report_payments(driver_id, date_from, date_to, ids_list)
     await _enrich_payments_with_order_data(payments)
     company = merge_company(await get_company_settings())
 
     excel_bytes = generate_freight_payment_report_excel(
-        driver_info={"name": driver.get('name'), "cpf": driver.get('cpf')},
+        driver_info=driver_info,
         payments=payments,
-        period={"date_from": date_from, "date_to": date_to},
+        period=period,
         company=company,
     )
-    filename = f"PrestacaoContas_{(driver.get('name') or 'motorista').replace(' ', '_')}.xlsx"
+    filename = f"PrestacaoContas_{(driver_info.get('name') or 'motorista').replace(' ', '_')}.xlsx"
     return StreamingResponse(
         io.BytesIO(excel_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@api_router.post("/freight-payments/mark-paid-batch", response_model=FreightPaymentBatchResponse)
+async def mark_freight_payments_paid_batch(
+    payment_ids: List[str] = Body(..., embed=True),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Marca 1+ lançamentos de Pagamento Frete como Pago de uma vez, todos do
+    MESMO motorista, criando uma Ordem de Pagamento (FreightPaymentBatch) que
+    os agrupa - inclusive quando é 1 único lançamento, pra toda vez que algo
+    é pago existir um registro na lista de Ordens de Pagamento com direito a
+    recibo. Único jeito de marcar como Pago (ver update_freight_payment_status)."""
+    if not payment_ids:
+        raise HTTPException(status_code=400, detail="Selecione ao menos 1 lançamento")
+
+    payments = await db.freight_payments.find({"id": {"$in": payment_ids}}, {"_id": 0}).to_list(None)
+    if len(payments) != len(set(payment_ids)):
+        raise HTTPException(status_code=404, detail="Um ou mais lançamentos não foram encontrados")
+    if any(p.get('status') != 'PENDENTE' for p in payments):
+        raise HTTPException(status_code=400, detail="Só é possível gerar uma Ordem de Pagamento com lançamentos Pendentes")
+
+    driver_ids = {p.get('driver_id') for p in payments}
+    if len(driver_ids) != 1 or not next(iter(driver_ids)):
+        raise HTTPException(status_code=400, detail="Todos os lançamentos selecionados devem ser do mesmo motorista")
+
+    first = payments[0]
+    batch_number = await get_next_freight_payment_batch_number()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    batch = FreightPaymentBatch(
+        batch_number=batch_number,
+        driver_id=first.get('driver_id'),
+        driver_name=first.get('driver_name'),
+        driver_cpf=first.get('driver_cpf'),
+        transport_company=first.get('transport_company'),
+        payment_ids=payment_ids,
+        item_count=len(payments),
+        total_value=round(sum((p.get('freight_value') or 0) for p in payments), 2),
+        created_by=current_user['sub'],
+        created_by_name=current_user['name'],
+    )
+    batch_doc = batch.model_dump()
+    batch_doc['created_at'] = batch_doc['created_at'].isoformat()
+    await db.freight_payment_batches.insert_one(batch_doc)
+
+    await db.freight_payments.update_many(
+        {"id": {"$in": payment_ids}},
+        {"$set": {
+            "status": "PAGO",
+            "paid_at": now_iso,
+            "paid_by": current_user['sub'],
+            "paid_by_name": current_user['name'],
+            "batch_id": batch.id,
+            "updated_at": now_iso,
+        }}
+    )
+
+    for p in payments:
+        await log_freight_payment_history(
+            freight_payment_id=p['id'],
+            payment_number=p['payment_number'],
+            action="UPDATED",
+            changes={"status": {"from": "PENDENTE", "to": "PAGO"}, "batch_id": batch.id, "batch_number": batch_number},
+            user_id=current_user['sub'],
+            user_name=current_user['name'],
+        )
+
+    return batch_doc
+
+
+@api_router.get("/freight-payments/batches", response_model=List[FreightPaymentBatchResponse])
+async def list_freight_payment_batches(
+    driver_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    query = {"driver_id": driver_id} if driver_id else {}
+    rows = await db.freight_payment_batches.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
+    return rows
+
+
+@api_router.get("/freight-payments/batches/{batch_id}/receipt/pdf")
+async def download_freight_payment_batch_receipt_pdf(
+    batch_id: str,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    batch = await db.freight_payment_batches.find_one({"id": batch_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Ordem de Pagamento não encontrada")
+
+    payments = await db.freight_payments.find({"id": {"$in": batch['payment_ids']}}, {"_id": 0}).sort("created_at", 1).to_list(None)
+    company = merge_company(await get_company_settings())
+
+    pdf_bytes = generate_freight_payment_receipt_pdf(batch=batch, payments=payments, company=company)
+    filename = f"Recibo_{(batch.get('driver_name') or 'motorista').replace(' ', '_')}_{batch['batch_number']}.pdf"
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
+                             headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
 @api_router.get("/freight-payments", response_model=List[FreightPaymentResponse])
@@ -250,10 +386,15 @@ async def update_freight_payment_status(
     status: str,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Atualiza o status do lançamento (Pendente/Pago/Cancelado) - mesmo
-    padrão de PUT /invoices/{id}/status."""
+    """Atualiza o status do lançamento pra Pendente ou Cancelado - mesmo
+    padrão de PUT /invoices/{id}/status. Marcar como Pago não passa mais por
+    aqui: só acontece em lote via POST /freight-payments/mark-paid-batch,
+    pra garantir que todo lançamento Pago tenha uma Ordem de Pagamento
+    (batch_id) por trás."""
     if status not in FREIGHT_PAYMENT_STATUS_OPTIONS:
         raise HTTPException(status_code=400, detail="Status inválido")
+    if status == 'PAGO':
+        raise HTTPException(status_code=400, detail="Para marcar como Pago, use a opção de gerar Ordem de Pagamento")
 
     payment = await db.freight_payments.find_one({"id": payment_id}, {"_id": 0})
     if not payment:
@@ -261,14 +402,11 @@ async def update_freight_payment_status(
 
     old_status = payment.get('status', 'PENDENTE')
     update_data = {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}
-    if status == 'PAGO':
-        update_data['paid_at'] = datetime.now(timezone.utc).isoformat()
-        update_data['paid_by'] = current_user['sub']
-        update_data['paid_by_name'] = current_user['name']
-    elif old_status == 'PAGO' and status != 'PAGO':
+    if old_status == 'PAGO' and status != 'PAGO':
         update_data['paid_at'] = None
         update_data['paid_by'] = None
         update_data['paid_by_name'] = None
+        update_data['batch_id'] = None
 
     await db.freight_payments.update_one({"id": payment_id}, {"$set": update_data})
 

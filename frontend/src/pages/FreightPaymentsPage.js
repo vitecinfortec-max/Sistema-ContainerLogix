@@ -13,7 +13,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { HandCoins, CheckCircle2, RotateCcw, Pencil, Search, Download, FileSpreadsheet } from 'lucide-react';
+import { HandCoins, CheckCircle2, RotateCcw, Pencil, Search, Download, FileSpreadsheet, Receipt } from 'lucide-react';
 
 const STATUS_LABELS = { PENDENTE: 'Pendente', PAGO: 'Pago', CANCELADO: 'Cancelado' };
 const STATUS_BADGE_CLASS = {
@@ -41,13 +41,13 @@ export default function FreightPaymentsPage() {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const [reportDriverName, setReportDriverName] = useState('');
-  const [reportDriverId, setReportDriverId] = useState('');
-  const [reportDateFrom, setReportDateFrom] = useState('');
-  const [reportDateTo, setReportDateTo] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
 
-  useEffect(() => { loadDrivers(); }, []);
+  const [batches, setBatches] = useState([]);
+  const [loadingBatches, setLoadingBatches] = useState(false);
+
+  useEffect(() => { loadDrivers(); loadBatches(); }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadList(); }, [driverFilterId, statusFilter, dateFrom, dateTo]);
 
@@ -72,6 +72,18 @@ export default function FreightPaymentsPage() {
       toast.error('Erro ao carregar pagamentos de frete');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBatches = async () => {
+    setLoadingBatches(true);
+    try {
+      const r = await api.getFreightPaymentBatches();
+      setBatches(r.data || []);
+    } catch (e) {
+      toast.error('Erro ao carregar ordens de pagamento');
+    } finally {
+      setLoadingBatches(false);
     }
   };
 
@@ -105,14 +117,39 @@ export default function FreightPaymentsPage() {
   };
 
   const singleSelected = selectedIds.size === 1 ? list.find((p) => p.id === [...selectedIds][0]) : null;
+  const selectedItems = list.filter((p) => selectedIds.has(p.id));
+  const selectedDriverIds = new Set(selectedItems.map((p) => p.driver_id));
+  // Vários lançamentos podem ser marcados como Pago de uma vez, desde que
+  // todos sejam do mesmo motorista (vira 1 Ordem de Pagamento) - ver
+  // handleMarkPaidBatch. Exportar PDF/Excel usa a mesma checagem de
+  // motorista único, mas aceita qualquer status (é só um extrato).
+  const sameDriverSelected = selectedItems.length > 0 && selectedDriverIds.size === 1 && !!selectedItems[0].driver_id;
+  const canMarkPaidBatch = sameDriverSelected && selectedItems.every((p) => p.status === 'PENDENTE');
+  const canExportReport = sameDriverSelected;
 
   const markStatus = async (id, status) => {
     try {
       await api.updateFreightPaymentStatus(id, status);
-      toast.success(status === 'PAGO' ? 'Marcado como Pago' : 'Marcado como Pendente');
+      toast.success('Marcado como Pendente');
       loadList();
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'Erro ao atualizar status');
+    }
+  };
+
+  const handleMarkPaidBatch = async () => {
+    if (!canMarkPaidBatch || markingPaid) return;
+    setMarkingPaid(true);
+    try {
+      const r = await api.markFreightPaymentsPaidBatch([...selectedIds]);
+      toast.success(`Ordem de Pagamento Nº ${r.data.batch_number} gerada!`);
+      setSelectedIds(new Set());
+      loadList();
+      loadBatches();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Erro ao gerar Ordem de Pagamento');
+    } finally {
+      setMarkingPaid(false);
     }
   };
 
@@ -138,34 +175,40 @@ export default function FreightPaymentsPage() {
     } finally { setSaving(false); }
   };
 
-  const onSelectReportDriver = (d) => {
-    setReportDriverName(d.name);
-    setReportDriverId(d.id);
-  };
-
   const downloadReport = async (kind) => {
-    if (!reportDriverId) {
-      toast.error('Selecione um motorista');
-      return;
-    }
+    if (!canExportReport || generating) return;
     setGenerating(true);
     try {
-      const params = { driver_id: reportDriverId };
-      if (reportDateFrom) params.date_from = reportDateFrom;
-      if (reportDateTo) params.date_to = reportDateTo;
+      const params = { payment_ids: [...selectedIds].join(',') };
       const r = kind === 'pdf' ? await api.getFreightPaymentReportPDF(params) : await api.getFreightPaymentReportExcel(params);
       const ext = kind === 'pdf' ? 'pdf' : 'xlsx';
+      const driverName = selectedItems[0]?.driver_name || 'motorista';
       const url = window.URL.createObjectURL(new Blob([r.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `PrestacaoContas_${reportDriverName.replace(/\s+/g, '_')}.${ext}`);
+      link.setAttribute('download', `PrestacaoContas_${driverName.replace(/\s+/g, '_')}.${ext}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       toast.success('Relatório gerado!');
     } catch (e) {
-      toast.error('Erro ao gerar relatório');
+      toast.error(e?.response?.data?.detail || 'Erro ao gerar relatório');
     } finally { setGenerating(false); }
+  };
+
+  const handleDownloadReceipt = async (batch) => {
+    try {
+      const r = await api.getFreightPaymentBatchReceiptPDF(batch.id);
+      const url = window.URL.createObjectURL(new Blob([r.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Recibo_${(batch.driver_name || 'motorista').replace(/\s+/g, '_')}_${batch.batch_number}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (e) {
+      toast.error('Erro ao gerar recibo');
+    }
   };
 
   return (
@@ -223,15 +266,18 @@ export default function FreightPaymentsPage() {
           </CardContent>
         </Card>
 
-        {/* Barra de ações - marque um lançamento na tabela abaixo pra habilitar as ações. Sem
+        {/* Barra de ações - marque 1+ lançamentos na tabela abaixo pra habilitar as ações. Sem
             botão "Adicionar": lançamentos só nascem automaticamente quando uma Ordem de Coleta
-            numa Rota cadastrada é Aprovada. */}
+            numa Rota cadastrada é Aprovada. Marcar como Pago aceita vários lançamentos de uma vez,
+            desde que sejam todos do mesmo motorista (gera 1 Ordem de Pagamento) - as demais ações
+            (Pendente/Editar) continuam 1 por vez. PDF/Excel exportam a Prestação de Contas dos
+            lançamentos selecionados (também exige motorista único, mas aceita qualquer status). */}
         <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => singleSelected && markStatus(singleSelected.id, 'PAGO')}
-            disabled={!singleSelected || singleSelected.status !== 'PENDENTE'}
+            onClick={handleMarkPaidBatch}
+            disabled={!canMarkPaidBatch || markingPaid}
             title="Marcar como Pago"
             data-testid="freight-payment-mark-paid"
             className="h-9 w-9 p-0 disabled:opacity-30"
@@ -259,6 +305,29 @@ export default function FreightPaymentsPage() {
             className="h-9 w-9 p-0 disabled:opacity-30"
           >
             <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => downloadReport('pdf')}
+            disabled={!canExportReport || generating}
+            title="Gerar Prestação de Contas em PDF"
+            data-testid="freight-payment-report-pdf"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Download className="w-4 h-4 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => downloadReport('excel')}
+            disabled={!canExportReport || generating}
+            title="Gerar Prestação de Contas em Excel"
+            data-testid="freight-payment-report-excel"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
           </Button>
           {selectedIds.size > 0 && (
             <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
@@ -337,37 +406,56 @@ export default function FreightPaymentsPage() {
 
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Gerar Prestação de Contas</CardTitle>
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+              <Receipt className="w-4 h-4" />
+              {loadingBatches ? 'Carregando...' : `Ordens de Pagamento (${batches.length})`}
+            </CardTitle>
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Geradas ao marcar 1+ lançamentos como Pago - revise aqui e baixe o recibo de cada uma.
+            </p>
           </CardHeader>
-          <CardContent className="p-4">
-            <div className="grid grid-cols-4 gap-3 items-end">
-              <div>
-                <Label className="mb-1 block text-xs">Motorista *</Label>
-                <Autocomplete
-                  value={reportDriverName}
-                  onChange={(v) => { setReportDriverName(v); if (!v) setReportDriverId(''); }}
-                  onSelect={onSelectReportDriver}
-                  options={drivers}
-                  displayField="name"
-                  className="h-9 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="mb-1 block text-xs">De</Label>
-                <Input type="date" className="h-9 text-sm" value={reportDateFrom} onChange={(e) => setReportDateFrom(e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1 block text-xs">Até</Label>
-                <Input type="date" className="h-9 text-sm" value={reportDateTo} onChange={(e) => setReportDateTo(e.target.value)} />
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" className="h-9 text-[13px]" disabled={generating} onClick={() => downloadReport('pdf')} data-testid="freight-payment-report-pdf">
-                  <Download className="w-4 h-4 mr-1.5" />PDF
-                </Button>
-                <Button variant="outline" className="h-9 text-[13px]" disabled={generating} onClick={() => downloadReport('excel')} data-testid="freight-payment-report-excel">
-                  <FileSpreadsheet className="w-4 h-4 mr-1.5" />Excel
-                </Button>
-              </div>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50 dark:bg-slate-800">
+                    <TableHead className="text-[12px] font-semibold">Nº</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Motorista</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Transportadora</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Lançamentos</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Valor Total</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Data do Pagamento</TableHead>
+                    <TableHead className="text-[12px] font-semibold text-right pr-4">Recibo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {batches.length === 0 && !loadingBatches && (
+                    <TableRow><TableCell colSpan={7} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma Ordem de Pagamento gerada ainda.</TableCell></TableRow>
+                  )}
+                  {batches.map((b) => (
+                    <TableRow key={b.id} data-testid={`freight-payment-batch-row-${b.batch_number}`}>
+                      <TableCell className="text-[13px] font-semibold text-primary">Nº {b.batch_number}</TableCell>
+                      <TableCell className="text-[13px]">{b.driver_name || '-'}</TableCell>
+                      <TableCell className="text-[13px]">{b.transport_company || '-'}</TableCell>
+                      <TableCell className="text-[13px]">{b.item_count}</TableCell>
+                      <TableCell className="text-[13px] font-semibold">{formatMoney(b.total_value)}</TableCell>
+                      <TableCell className="text-[12px]">{b.created_at ? format(new Date(b.created_at), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
+                      <TableCell className="text-right pr-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownloadReceipt(b)}
+                          title="Baixar Recibo de Pagamento"
+                          data-testid={`freight-payment-batch-receipt-${b.batch_number}`}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Download className="w-4 h-4 text-primary" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>

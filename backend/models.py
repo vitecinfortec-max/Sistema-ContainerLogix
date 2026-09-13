@@ -2721,6 +2721,7 @@ class FreightPayment(BaseModel):
     paid_at: Optional[datetime] = None
     paid_by: Optional[str] = None
     paid_by_name: Optional[str] = None
+    batch_id: Optional[str] = None  # Ordem de Pagamento que quitou este lançamento (ver FreightPaymentBatch) - null enquanto Pendente
     observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
@@ -2758,6 +2759,32 @@ class FreightPaymentHistoryResponse(BaseModel):
     changes: dict
     user_name: str
     created_at: datetime
+
+
+class FreightPaymentBatch(BaseModel):
+    """Ordem de Pagamento / Prestação de Contas: agrupa 1+ lançamentos de
+    Pagamento Frete do MESMO motorista, pagos juntos de uma vez - criada
+    automaticamente ao marcar como Pago (nunca por POST direto do usuário).
+    Snapshot congelado no momento do pagamento: nunca é atualizada depois,
+    mesmo que um item individual seja revertido pra Pendente."""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    batch_number: int
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
+    transport_company: Optional[str] = None
+    payment_ids: List[str] = Field(default_factory=list)
+    item_count: int = 0
+    total_value: float = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str
+    created_by_name: str
+
+
+class FreightPaymentBatchResponse(FreightPaymentBatch):
+    pass
 
 
 # ==================== GESTÃO DE CONTAINER ====================
