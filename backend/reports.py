@@ -2291,9 +2291,9 @@ def generate_freight_payment_report_pdf(driver_info: dict, payments: list, perio
     # Rótulo e valor ficam em células mescladas (SPAN) em vez de espremidos
     # numa única coluna estreita (Placa Carreta) - "TOTAL PENDENTE:" sozinho
     # já não cabia em ~60pt e vazava pra fora da caixa.
-    table_data.append(['', '', '', '', 'TOTAL PAGO:', '', '', '', money(total_pago), '', ''])
-    table_data.append(['', '', '', '', 'TOTAL PENDENTE:', '', '', '', money(total_pendente), '', ''])
-    table_data.append(['', '', '', '', 'TOTAL GERAL:', '', '', '', money(total_geral), '', ''])
+    table_data.append(['', '', '', '', '', '', 'TOTAL PAGO:', '', money(total_pago), '', ''])
+    table_data.append(['', '', '', '', '', '', 'TOTAL PENDENTE:', '', money(total_pendente), '', ''])
+    table_data.append(['', '', '', '', '', '', 'TOTAL GERAL:', '', money(total_geral), '', ''])
 
     base_widths = [45, 45, 120, 65, 85, 50, 60, 60, 70, 55, 65]
     scale = doc.width / sum(base_widths)
@@ -2326,17 +2326,17 @@ def generate_freight_payment_report_pdf(driver_info: dict, payments: list, perio
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('ROWBACKGROUNDS', (0, 1), (-1, totals_start - 1), [colors.white, zebra_gray]),
 
-        ('FONTNAME', (4, totals_start), (8, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (4, totals_start), (8, -1), 9),
-        ('ALIGN', (4, totals_start), (4, -1), 'RIGHT'),
+        ('FONTNAME', (6, totals_start), (8, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (6, totals_start), (8, -1), 9),
+        ('ALIGN', (6, totals_start), (6, -1), 'RIGHT'),
         ('ALIGN', (8, totals_start), (8, -1), 'RIGHT'),
         ('TOPPADDING', (0, totals_start), (-1, -1), 4),
         ('BOTTOMPADDING', (0, totals_start), (-1, -1), 4),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('BOX', (4, totals_start), (9, -1), 1, header_bg),
-        ('SPAN', (4, totals_start), (7, totals_start)),
-        ('SPAN', (4, totals_start + 1), (7, totals_start + 1)),
-        ('SPAN', (4, totals_start + 2), (7, totals_start + 2)),
+        ('BACKGROUND', (6, -1), (9, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('BOX', (6, totals_start), (9, -1), 1, header_bg),
+        ('SPAN', (6, totals_start), (7, totals_start)),
+        ('SPAN', (6, totals_start + 1), (7, totals_start + 1)),
+        ('SPAN', (6, totals_start + 2), (7, totals_start + 2)),
         ('SPAN', (8, totals_start), (9, totals_start)),
         ('SPAN', (8, totals_start + 1), (9, totals_start + 1)),
         ('SPAN', (8, totals_start + 2), (9, totals_start + 2)),
