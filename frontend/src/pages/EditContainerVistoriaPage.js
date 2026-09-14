@@ -60,13 +60,13 @@ export default function EditContainerVistoriaPage() {
 
   const loadData = async () => {
     try {
-      const [vistoriaRes, clientsRes, shippingLinesRes, vehiclesRes, companiesRes, repairServicesRes] = await Promise.all([
+      const [vistoriaRes, clientsRes, shippingLinesRes, vehiclesRes, companiesRes, serviceTypesRes] = await Promise.all([
         api.getContainerVistoria(id),
         api.getClients(),
         api.getShippingLines(),
         api.getVehicles(),
         api.getTransportCompanies(),
-        api.getContainerRepairServices(),
+        api.getServiceTypes({ per_page: 1000 }),
       ]);
 
       const vistoria = vistoriaRes.data;
@@ -90,7 +90,7 @@ export default function EditContainerVistoriaPage() {
       setShippingLines(shippingLinesRes.data);
       setVehicles(Array.isArray(vehiclesRes.data) ? vehiclesRes.data : (vehiclesRes.data?.items || []));
       setTransportCompanies(companiesRes.data);
-      setRepairServices(repairServicesRes.data || []);
+      setRepairServices(serviceTypesRes.data?.items || []);
     } catch (error) {
       toast.error('Erro ao carregar vistoria');
       navigate('/container-vistorias');

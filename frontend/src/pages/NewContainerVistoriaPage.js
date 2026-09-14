@@ -60,18 +60,18 @@ export default function NewContainerVistoriaPage() {
 
   const loadData = async () => {
     try {
-      const [clientsRes, shippingLinesRes, vehiclesRes, companiesRes, repairServicesRes] = await Promise.all([
+      const [clientsRes, shippingLinesRes, vehiclesRes, companiesRes, serviceTypesRes] = await Promise.all([
         api.getClients(),
         api.getShippingLines(),
         api.getVehicles(),
         api.getTransportCompanies(),
-        api.getContainerRepairServices(),
+        api.getServiceTypes({ per_page: 1000 }),
       ]);
       setClients(clientsRes.data);
       setShippingLines(shippingLinesRes.data);
       setVehicles(Array.isArray(vehiclesRes.data) ? vehiclesRes.data : (vehiclesRes.data?.items || []));
       setTransportCompanies(companiesRes.data);
-      setRepairServices(repairServicesRes.data || []);
+      setRepairServices(serviceTypesRes.data?.items || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados');
