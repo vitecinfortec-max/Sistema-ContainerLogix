@@ -132,14 +132,14 @@ export default function EditMovementPage() {
       const [clientsRes, shippingLinesRes, serviceTypesRes, vehiclesRes, terminalsRes] = await Promise.all([
         api.getClients(),
         api.getShippingLines(),
-        api.getServiceTypes(),
+        api.getServiceTypes({ per_page: 1000 }),
         api.getVehicles({ per_page: 1000 }),
         api.getTerminals()
       ]);
 
       const clientsData = Array.isArray(clientsRes.data) ? clientsRes.data : [];
       const shippingLinesData = Array.isArray(shippingLinesRes.data) ? shippingLinesRes.data : [];
-      const serviceTypesData = Array.isArray(serviceTypesRes.data) ? serviceTypesRes.data : [];
+      const serviceTypesData = Array.isArray(serviceTypesRes.data?.items) ? serviceTypesRes.data.items : [];
       const vehiclesData = Array.isArray(vehiclesRes.data?.items) ? vehiclesRes.data.items : [];
       const terminalsData = Array.isArray(terminalsRes.data) ? terminalsRes.data : [];
 

@@ -96,7 +96,7 @@ export const api = {
   deleteInsuranceCompany: (id) => axios.delete(`${API}/insurance-companies/${id}`),
 
   // Service Types
-  getServiceTypes: () => axios.get(`${API}/service-types`),
+  getServiceTypes: (params) => axios.get(`${API}/service-types`, { params }),
   createServiceType: (data) => axios.post(`${API}/service-types`, data),
   updateServiceType: (id, data) => axios.put(`${API}/service-types/${id}`, data),
   deleteServiceType: (id) => axios.delete(`${API}/service-types/${id}`),

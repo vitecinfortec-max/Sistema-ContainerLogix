@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -25,15 +25,40 @@ export default function ServiceTypesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [pagination, setPagination] = useState({
+    page: 1,
+    perPage: 50,
+    total: 0,
+    totalPages: 0
+  });
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     loadServiceTypes();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page]);
+
+  useEffect(() => {
+    setPagination(prev => (prev.page === 1 ? prev : { ...prev, page: 1 }));
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { loadServiceTypes(); }, 350);
+    return () => debounceRef.current && clearTimeout(debounceRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   const loadServiceTypes = async () => {
     try {
-      const response = await api.getServiceTypes();
-      setServiceTypes(response.data);
+      const response = await api.getServiceTypes({
+        page: search.trim() ? 1 : pagination.page,
+        per_page: pagination.perPage,
+        search: search.trim() || undefined
+      });
+      setServiceTypes(response.data.items);
+      setPagination(prev => ({
+        ...prev,
+        total: response.data.total,
+        totalPages: response.data.total_pages
+      }));
     } catch (error) {
       toast.error('Erro ao carregar tipos de serviço');
     } finally {
@@ -112,7 +137,7 @@ export default function ServiceTypesPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = filteredServiceTypes.map(s => s.id);
+    const pageIds = serviceTypes.map(s => s.id);
     const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -122,16 +147,7 @@ export default function ServiceTypesPage() {
     });
   };
 
-  const filteredServiceTypes = serviceTypes.filter((serviceType) => {
-    const term = search.trim().toLowerCase();
-    if (!term) return true;
-    return (
-      serviceType.name?.toLowerCase().includes(term) ||
-      serviceType.description?.toLowerCase().includes(term)
-    );
-  });
-
-  const singleSelectedServiceType = selectedIds.size === 1 ? filteredServiceTypes.find(s => s.id === [...selectedIds][0]) : null;
+  const singleSelectedServiceType = selectedIds.size === 1 ? serviceTypes.find(s => s.id === [...selectedIds][0]) : null;
 
   if (loading) {
     return (
@@ -264,18 +280,18 @@ export default function ServiceTypesPage() {
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
               <ClipboardList className="w-4 h-4" />
-              Lista de Tipos de Serviço ({filteredServiceTypes.length})
+              Lista de Tipos de Serviço ({pagination.total})
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {filteredServiceTypes.length > 0 ? (
+            {serviceTypes.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
                       <th className="w-9 px-4 py-2.5">
                         <Checkbox
-                          checked={filteredServiceTypes.length > 0 && filteredServiceTypes.every(s => selectedIds.has(s.id))}
+                          checked={serviceTypes.length > 0 && serviceTypes.every(s => selectedIds.has(s.id))}
                           onCheckedChange={toggleSelectAllOnPage}
                           data-testid="select-all-checkbox"
                         />
@@ -286,7 +302,7 @@ export default function ServiceTypesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredServiceTypes.map((serviceType) => (
+                    {serviceTypes.map((serviceType) => (
                       <tr
                         key={serviceType.id}
                         onClick={() => toggleSelect(serviceType.id)}
@@ -317,6 +333,20 @@ export default function ServiceTypesPage() {
                   {search ? 'Nenhum tipo de serviço encontrado' : 'Nenhum tipo de serviço cadastrado'}
                 </p>
                 {!search && <p className="text-[11px] mt-1">Clique em "Novo Tipo de Serviço" para adicionar</p>}
+              </div>
+            )}
+
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="text-xs text-slate-400 dark:text-slate-500">Página {pagination.page} de {pagination.totalPages}</div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
+                    Anterior
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page === pagination.totalPages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>
+                    Próximo
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

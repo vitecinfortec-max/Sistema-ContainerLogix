@@ -132,7 +132,7 @@ export default function NewMovementPage() {
         api.getTransportCompanies(),
         api.getClients(),
         api.getShippingLines(),
-        api.getServiceTypes(),
+        api.getServiceTypes({ per_page: 1000 }),
         api.getVehicles({ per_page: 1000 }),
         api.getTerminals()
       ]);
@@ -142,7 +142,7 @@ export default function NewMovementPage() {
       const companiesData = Array.isArray(companiesRes.data) ? companiesRes.data : [];
       const clientsData = Array.isArray(clientsRes.data) ? clientsRes.data : [];
       const shippingLinesData = Array.isArray(shippingLinesRes.data) ? shippingLinesRes.data : [];
-      const serviceTypesData = Array.isArray(serviceTypesRes.data) ? serviceTypesRes.data : [];
+      const serviceTypesData = Array.isArray(serviceTypesRes.data?.items) ? serviceTypesRes.data.items : [];
       const vehiclesData = Array.isArray(vehiclesRes.data?.items) ? vehiclesRes.data.items : [];
       const terminalsData = Array.isArray(terminalsRes.data) ? terminalsRes.data : [];
 

@@ -49,11 +49,11 @@ export default function ServicePriceTableClientPage() {
     setLoading(true);
     try {
       const [clientsRes, serviceTypesRes, entriesRes] = await Promise.all([
-        api.getClients(), api.getServiceTypes(), api.getServicePriceEntries({ client_id: clientId }),
+        api.getClients(), api.getServiceTypes({ per_page: 1000 }), api.getServicePriceEntries({ client_id: clientId }),
       ]);
       const client = (clientsRes.data || []).find(c => c.id === clientId);
       setClientName(client ? client.name : '');
-      setServiceTypes(Array.isArray(serviceTypesRes.data) ? serviceTypesRes.data : []);
+      setServiceTypes(Array.isArray(serviceTypesRes.data?.items) ? serviceTypesRes.data.items : []);
       setEntries(entriesRes.data);
     } catch (error) {
       toast.error('Erro ao carregar tabela de serviços do cliente');

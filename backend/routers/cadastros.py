@@ -507,15 +507,21 @@ async def create_service_type(service_type_input: ServiceTypeCreate, current_use
         created_at=service_type.created_at
     )
 
-@api_router.get("/service-types", response_model=List[ServiceTypeResponse])
+@api_router.get("/service-types")
 async def get_service_types(
     page: int = 1,
-    per_page: int = 100,
+    per_page: int = 50,
+    search: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
+    query = {}
+    if search:
+        query["name"] = {"$regex": re.escape(search), "$options": "i"}
+
     skip = (page - 1) * per_page
-    service_types = await db.service_types.find({}, {"_id": 0}).sort("name", 1).skip(skip).limit(per_page).to_list(per_page)
-    return [
+    total = await db.service_types.count_documents(query)
+    service_types = await db.service_types.find(query, {"_id": 0}).sort("name", 1).skip(skip).limit(per_page).to_list(per_page)
+    items = [
         ServiceTypeResponse(
             id=st['id'],
             name=st['name'],
@@ -524,6 +530,13 @@ async def get_service_types(
         )
         for st in service_types
     ]
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": (total + per_page - 1) // per_page
+    }
 
 @api_router.put("/service-types/{service_type_id}", response_model=ServiceTypeResponse)
 async def update_service_type(service_type_id: str, service_type_input: ServiceTypeCreate, current_user: dict = Depends(get_current_active_user)):
