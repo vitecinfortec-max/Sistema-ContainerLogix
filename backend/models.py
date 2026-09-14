@@ -407,17 +407,6 @@ class InsuranceCompanyResponse(InsuranceCompanyCreate):
     id: str
     created_at: datetime
 
-# Fotos da Vistoria de Container dentro de Movimentação, no layout do
-# Registro Fotográfico (grade de fotos), mas com tipos livres (não 4 posições
-# fixas) e até 12 fotos - substitui o antigo campo `container_photos` (dict
-# de 4 posições fixas), que fica só de compatibilidade com registros antigos.
-MAX_MOVEMENT_VISTORIA_PHOTOS = 12
-
-class ContainerMovementPhoto(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    type: str  # front, back, left, right ou internal
-    url: str
-
 class ContainerMovement(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
@@ -448,7 +437,6 @@ class ContainerMovement(BaseModel):
     container_photos: Optional[dict] = None  # Fotos do container (frente, traseira, esquerda, direita) - upload removido da UI, mantido só por compatibilidade com registros antigos
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres não cobertas pelas opções de avaria
-    vistoria_photos: List[ContainerMovementPhoto] = Field(default_factory=list)  # Fotos da Vistoria de Container (até 12) - ver MAX_MOVEMENT_VISTORIA_PHOTOS
     loading_order_id: Optional[str] = None  # Vinculo com a Ordem de Carregamento que gerou essa movimentação (interno, nunca vem do formulário)
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
@@ -511,7 +499,6 @@ class ContainerMovementResponse(BaseModel):
     container_photos: Optional[dict] = None  # Fotos do container
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres
-    vistoria_photos: List[ContainerMovementPhoto] = Field(default_factory=list)  # Fotos da Vistoria de Container (até 12)
     loading_order_id: Optional[str] = None  # Vinculo com a Ordem de Carregamento que gerou essa movimentação
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
@@ -612,6 +599,87 @@ class ContainerRepairServiceResponse(BaseModel):
     id: str
     name: str
     created_at: datetime
+
+
+# ===== VISTORIA DE CONTAINER (item próprio, não ligado à Movimentação) =====
+# Vistoria de danos/serviços de reparo constatados na chegada do container,
+# no mesmo molde do Registro Fotográfico (item próprio, com sequencial,
+# código de barras e fotos), mas com o "Tipo de Serviços" buscado no
+# catálogo de reparo (ContainerRepairService) em vez de danos fixos.
+MAX_VISTORIA_PHOTOS = 12
+
+class ContainerVistoriaPhoto(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    type: str  # front, back, left, right ou internal
+    url: str
+
+class ContainerVistoria(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    vistoria_number: int  # Número sequencial da vistoria
+    container_number: str
+    client_name: Optional[str] = None
+    shipping_line: Optional[str] = None  # Armador
+    truck_plate: Optional[str] = None  # Placa do Cavalo
+    trailer_plate: Optional[str] = None  # Carreta
+    transport_company: Optional[str] = None  # Transportadora
+    size_type: Optional[str] = None  # Tamanho/Tipo
+    tare: Optional[str] = None
+    no_damage: bool = False  # Sem Avarias
+    damage_items: List[str] = Field(default_factory=list)  # Tipo de Serviços (nomes do catálogo de reparo)
+    observations: Optional[str] = None
+    photos: List[ContainerVistoriaPhoto] = Field(default_factory=list)  # até MAX_VISTORIA_PHOTOS
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+class ContainerVistoriaCreate(BaseModel):
+    container_number: str
+    client_name: Optional[str] = None
+    shipping_line: Optional[str] = None
+    truck_plate: Optional[str] = None
+    trailer_plate: Optional[str] = None
+    transport_company: Optional[str] = None
+    size_type: Optional[str] = None
+    tare: Optional[str] = None
+    no_damage: bool = False
+    damage_items: List[str] = Field(default_factory=list)
+    observations: Optional[str] = None
+
+class ContainerVistoriaUpdate(BaseModel):
+    container_number: Optional[str] = None
+    client_name: Optional[str] = None
+    shipping_line: Optional[str] = None
+    truck_plate: Optional[str] = None
+    trailer_plate: Optional[str] = None
+    transport_company: Optional[str] = None
+    size_type: Optional[str] = None
+    tare: Optional[str] = None
+    no_damage: Optional[bool] = None
+    damage_items: Optional[List[str]] = None
+    observations: Optional[str] = None
+
+class ContainerVistoriaResponse(BaseModel):
+    id: str
+    vistoria_number: int
+    container_number: str
+    client_name: Optional[str] = None
+    shipping_line: Optional[str] = None
+    truck_plate: Optional[str] = None
+    trailer_plate: Optional[str] = None
+    transport_company: Optional[str] = None
+    size_type: Optional[str] = None
+    tare: Optional[str] = None
+    no_damage: bool = False
+    damage_items: List[str] = Field(default_factory=list)
+    observations: Optional[str] = None
+    photos: List[ContainerVistoriaPhoto] = Field(default_factory=list)
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 # ===== COMERCIAL: Representante, Tabela de Serviços, Vínculo de Clientes =====

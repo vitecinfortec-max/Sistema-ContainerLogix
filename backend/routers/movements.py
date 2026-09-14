@@ -23,7 +23,6 @@ from models import (
     Client, ClientCreate, ClientResponse,
     Supplier, SupplierCreate, SupplierResponse,
     ContainerMovement, ContainerMovementCreate, ContainerMovementResponse,
-    ContainerMovementPhoto, MAX_MOVEMENT_VISTORIA_PHOTOS,
     DailyMovementPoint, DailyBillingPoint, DriverRankingEntry, DashboardStats,
     ShippingLine, ShippingLineCreate, ShippingLineResponse,
     ServiceType, ServiceTypeCreate, ServiceTypeResponse,
@@ -189,7 +188,6 @@ async def _create_container_movement(
         container_photos=movement.container_photos,
         container_damages=movement.container_damages,
         inspection_notes=movement.inspection_notes,
-        vistoria_photos=movement.vistoria_photos,
         loading_order_id=movement.loading_order_id,
         billed=movement.billed,
         billed_at=movement.billed_at,
@@ -467,7 +465,6 @@ async def get_movements(
                 currency=m.get('currency') or 'BRL',
                 container_photos=m.get('container_photos'),
                 container_damages=m.get('container_damages', []),
-                vistoria_photos=m.get('vistoria_photos', []),
                 billed=m.get('billed', False),
                 billed_at=parse_datetime_value(m['billed_at']) if m.get('billed_at') else None,
                 created_at=parse_datetime_value(m['created_at']),
@@ -543,7 +540,6 @@ async def get_movements(
             container_photos=m.get('container_photos'),
             container_damages=m.get('container_damages', []),
             inspection_notes=m.get('inspection_notes'),
-            vistoria_photos=m.get('vistoria_photos', []),
             billed=m.get('billed', False),
             billed_at=parse_datetime_value(m['billed_at']) if m.get('billed_at') else None,
             created_at=parse_datetime_value(m['created_at']),
@@ -641,7 +637,6 @@ async def get_unbilled_movements(
             container_photos=m.get('container_photos'),
             container_damages=m.get('container_damages', []),
             inspection_notes=m.get('inspection_notes'),
-            vistoria_photos=m.get('vistoria_photos', []),
             billed=m.get('billed', False),
             billed_at=parse_datetime_value(m['billed_at']) if m.get('billed_at') else None,
             created_at=parse_datetime_value(m['created_at']),
@@ -749,7 +744,6 @@ async def get_movement(movement_id: str, current_user: dict = Depends(get_curren
         container_photos=movement.get('container_photos'),
         container_damages=movement.get('container_damages', []),
         inspection_notes=movement.get('inspection_notes'),
-        vistoria_photos=movement.get('vistoria_photos', []),
         billed=movement.get('billed', False),
         billed_at=parse_datetime_value(movement['billed_at']) if movement.get('billed_at') else None,
         created_at=parse_datetime_value(movement['created_at']),
@@ -776,11 +770,10 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     update_data['billed'] = existing.get('billed', False)
     update_data['billed_at'] = existing.get('billed_at')
     update_data['loading_order_id'] = existing.get('loading_order_id')
-    # Fotos não fazem parte de ContainerMovementCreate (gerenciadas por
-    # endpoints próprios) - sem isso, o replace_one abaixo (substitui o
-    # documento inteiro) apagaria as fotos já anexadas a cada edição.
+    # container_photos não faz parte de ContainerMovementCreate - sem isso, o
+    # replace_one abaixo (substitui o documento inteiro) apagaria o campo
+    # legado em qualquer edição.
     update_data['container_photos'] = existing.get('container_photos')
-    update_data['vistoria_photos'] = existing.get('vistoria_photos', [])
 
     # Arredondar valor monetário para evitar problemas de precisão
     if update_data.get('service_value') is not None:
@@ -816,75 +809,12 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
         container_photos=update_data.get('container_photos'),
         container_damages=update_data.get('container_damages', []),
         inspection_notes=update_data.get('inspection_notes'),
-        vistoria_photos=update_data.get('vistoria_photos', []),
         loading_order_id=update_data.get('loading_order_id'),
         billed=update_data.get('billed', False),
         billed_at=parse_datetime_value(update_data['billed_at']) if update_data.get('billed_at') else None,
         created_at=parse_datetime_value(update_data['created_at']),
         user_name=update_data['user_name']
     )
-
-@api_router.post("/movements/{movement_id}/upload-photo")
-async def upload_movement_photo(
-    movement_id: str,
-    photo_type: str = Query(..., alias="type", regex="^(front|back|left|right|internal)$"),
-    file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_active_user)
-):
-    """Faz upload de uma foto pra Vistoria de Container de uma movimentação
-    (até MAX_MOVEMENT_VISTORIA_PHOTOS fotos, cada uma com um tipo) - mesmo
-    padrão de upload_container_inspection_photo em container_inspections.py."""
-    movement = await db.movements.find_one({"id": movement_id}, {"_id": 0, "vistoria_photos": 1})
-    if not movement:
-        raise HTTPException(status_code=404, detail="Movimentação não encontrada")
-
-    existing_photos = movement.get('vistoria_photos') or []
-    if len(existing_photos) >= MAX_MOVEMENT_VISTORIA_PHOTOS:
-        raise HTTPException(status_code=400, detail=f"Limite de {MAX_MOVEMENT_VISTORIA_PHOTOS} fotos por vistoria atingido")
-
-    file_ext, content = await validate_and_read_upload(file, ALLOWED_EXTENSIONS)
-
-    photo_dir = UPLOADS_DIR / "movements" / movement_id
-    photo_dir.mkdir(parents=True, exist_ok=True)
-
-    photo_id = str(uuid.uuid4())
-    file_path = photo_dir / f"{photo_id}{file_ext}"
-    with open(file_path, "wb") as buffer:
-        buffer.write(content)
-
-    photo_url = f"/api/uploads/movements/{movement_id}/{photo_id}{file_ext}"
-    photo_entry = {"id": photo_id, "type": photo_type, "url": photo_url}
-    await db.movements.update_one(
-        {"id": movement_id},
-        {"$set": {"vistoria_photos": existing_photos + [photo_entry]}}
-    )
-
-    return photo_entry
-
-
-@api_router.delete("/movements/{movement_id}/photo/{photo_id}")
-async def delete_movement_photo(movement_id: str, photo_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Remove uma foto da Vistoria de Container de uma movimentação."""
-    movement = await db.movements.find_one({"id": movement_id}, {"_id": 0, "vistoria_photos": 1})
-    if not movement:
-        raise HTTPException(status_code=404, detail="Movimentação não encontrada")
-
-    existing_photos = movement.get('vistoria_photos') or []
-    remaining_photos = [p for p in existing_photos if p['id'] != photo_id]
-    if len(remaining_photos) == len(existing_photos):
-        raise HTTPException(status_code=404, detail="Foto não encontrada")
-
-    photo_dir = UPLOADS_DIR / "movements" / movement_id
-    for file_path in photo_dir.glob(f"{photo_id}.*"):
-        file_path.unlink()
-
-    await db.movements.update_one(
-        {"id": movement_id},
-        {"$set": {"vistoria_photos": remaining_photos}}
-    )
-
-    return {"message": "Foto removida com sucesso"}
-
 
 @api_router.delete("/movements/{movement_id}")
 async def delete_movement(movement_id: str, current_user: dict = Depends(get_current_active_user)):
@@ -900,14 +830,6 @@ async def delete_movement(movement_id: str, current_user: dict = Depends(get_cur
     result = await db.movements.delete_one({"id": movement_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Movimentação não encontrada")
-
-    # Remove os arquivos de foto da Vistoria de Container, se houver
-    try:
-        photo_dir = UPLOADS_DIR / "movements" / movement_id
-        if photo_dir.exists():
-            shutil.rmtree(photo_dir)
-    except Exception:
-        pass
 
     # Notificar todos os clientes conectados via WebSocket
     await manager.broadcast({

@@ -4275,14 +4275,6 @@ _MOVEMENT_DAMAGE_LABELS = {
     'LACRE_VIOLADO': 'Lacre Violado',
 }
 
-_MOVEMENT_PHOTO_TYPE_LABELS = {
-    'front': 'Frente',
-    'back': 'Traseira',
-    'left': 'Lateral Esquerda',
-    'right': 'Lateral Direita',
-    'internal': 'Interno',
-}
-
 
 def _voucher_field(label, value, label_value_style):
     """Um par label/valor no estilo 'comprovante' - extraído de
@@ -4438,20 +4430,11 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
         damages = m.get('container_damages') or []
         photos = m.get('container_photos')
         notes = m.get('inspection_notes')
-        vistoria_photos = m.get('vistoria_photos') or []
-        if damages or photos or notes or vistoria_photos:
+        if damages or photos or notes:
             extra = [field('Estado do Container', ', '.join(_MOVEMENT_DAMAGE_LABELS.get(d, d) for d in damages) if damages else '-')]
             if photos:
                 extra.append(Spacer(1, 4))
                 extra.append(Paragraph(f"{len(photos)} foto(s) do container anexada(s) ao registro digital.", ParagraphStyle('VoucherPhotoNote', parent=styles['Normal'], fontSize=8)))
-            if vistoria_photos:
-                extra.append(Spacer(1, 4))
-                photo_note = f"{len(vistoria_photos)} foto(s) da vistoria anexada(s)"
-                if via == 'TERMINAL':
-                    photo_note += " - ver Registro Fotográfico da Vistoria a seguir."
-                else:
-                    photo_note += "."
-                extra.append(Paragraph(photo_note, ParagraphStyle('VoucherVistoriaPhotoNote', parent=styles['Normal'], fontSize=8)))
             if notes:
                 extra.append(Spacer(1, 4))
                 extra.append(field('Observações da Vistoria', notes))
@@ -4513,73 +4496,6 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
             f"{c['name']} | Este documento é válido como comprovante de movimentação",
             footer_style
         ))
-
-        # Grade de fotos da Vistoria (Registro Fotográfico), no mesmo padrão
-        # visual do módulo Registro Fotográfico, numa página própria - só na
-        # Via Terminal (decisão do usuário: não alongar a via do motorista).
-        if via == 'TERMINAL' and vistoria_photos:
-            elements.append(PageBreak())
-            elements.extend(_build_pdf_header(styles, logo_buffer, '', company=company, content_width=width)[:2])
-
-            photos_title_tbl = Table([
-                [Paragraph('REGISTRO FOTOGRÁFICO DA VISTORIA', title_style)],
-                [Paragraph(f"ID Transação: #{m.get('transaction_id')}", subtitle_style)],
-            ], colWidths=[width])
-            photos_title_tbl.setStyle(TableStyle([
-                ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
-                ('TOPPADDING', (0, 0), (-1, -1), 4),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ]))
-            elements.append(photos_title_tbl)
-            elements.append(Spacer(1, 10))
-
-            photo_header_style = ParagraphStyle('VoucherPhotoBoxTitle', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', alignment=TA_CENTER, spaceAfter=4)
-            photo_placeholder_style = ParagraphStyle('VoucherPhotoUnavailable', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
-
-            photos_per_row = 4
-            col_width = width / photos_per_row
-            cells = []
-            for photo in vistoria_photos:
-                label = _MOVEMENT_PHOTO_TYPE_LABELS.get(photo.get('type'), (photo.get('type') or '-').title())
-                img_flowable = None
-                try:
-                    url = photo.get('url') or ''
-                    marker = '/movements/'
-                    if marker in url:
-                        relative = url.split(marker, 1)[1]
-                        file_path = UPLOADS_DIR / 'movements' / relative
-                        if file_path.exists():
-                            img_flowable = Image(str(file_path), width=col_width - 20, height=190, kind='proportional')
-                except Exception as e:
-                    logger.error(f"Error loading movement vistoria photo: {e}")
-                if img_flowable is None:
-                    img_flowable = Paragraph("[Foto indisponível]", photo_placeholder_style)
-                cells.append([Paragraph(label, photo_header_style), img_flowable])
-
-            rows = []
-            current_row = []
-            for cell_content in cells:
-                current_row.append(cell_content)
-                if len(current_row) == photos_per_row:
-                    rows.append(current_row)
-                    current_row = []
-            if current_row:
-                while len(current_row) < photos_per_row:
-                    current_row.append('')
-                rows.append(current_row)
-
-            photos_grid = Table(rows, colWidths=[col_width] * photos_per_row)
-            photos_grid.setStyle(TableStyle([
-                ('GRID', (0, 0), (-1, -1), 0.75, colors.HexColor('#CCCCCC')),
-                ('BOX', (0, 0), (-1, -1), 1, colors.black),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('TOPPADDING', (0, 0), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-                ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-            ]))
-            elements.append(photos_grid)
 
     doc.build(elements)
     buffer.seek(0)

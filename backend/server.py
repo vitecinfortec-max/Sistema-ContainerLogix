@@ -23,6 +23,7 @@ from routers.movements import api_router as movements_router
 from routers.invoices import api_router as invoices_router
 from routers.container_inspections import api_router as container_inspections_router
 from routers.container_repair_services import api_router as container_repair_services_router
+from routers.container_vistorias import api_router as container_vistorias_router
 from routers.container_audits import api_router as container_audits_router
 from routers.commercial import api_router as commercial_router
 from routers.flex_tank import api_router as flex_tank_router
@@ -81,6 +82,7 @@ app.include_router(movements_router)
 app.include_router(invoices_router)
 app.include_router(container_inspections_router)
 app.include_router(container_repair_services_router)
+app.include_router(container_vistorias_router)
 app.include_router(container_audits_router)
 app.include_router(commercial_router)
 app.include_router(flex_tank_router)
@@ -256,6 +258,8 @@ async def startup_event():
 
     await db.container_purchases.create_index("container_number")
     await db.container_sales.create_index("container_number")
+    await db.container_vistorias.create_index("container_number")
+    await db.container_vistorias.create_index("created_at")
     try:
         await db.container_purchases.create_index(
             [("loading_order_id", 1), ("container_number", 1)],

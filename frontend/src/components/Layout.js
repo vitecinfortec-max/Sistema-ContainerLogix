@@ -104,6 +104,8 @@ const PAGE_TITLES = {
   '/international-invoices': 'Invoice Internacional',
   '/container-inspections': 'Registro Fotográfico',
   '/container-inspections/new': 'Novo Registro Fotográfico',
+  '/container-vistorias': 'Vistoria de Container',
+  '/container-vistorias/new': 'Nova Vistoria de Container',
   '/container-audits': 'Auditoria',
   '/container-audits/new': 'Nova Auditoria',
   '/comercial/cadastros': 'Representante',
@@ -300,7 +302,7 @@ export default function Layout({ children }) {
     if (savedOpcoesSistema !== null) setOpcoesSistemaOpen(JSON.parse(savedOpcoesSistema));
   }, []);
 
-  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/');
+  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/');
   const isCadastroActive = location.pathname === '/cadastro';
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
@@ -471,6 +473,7 @@ export default function Layout({ children }) {
   const movimentacoesItems = [
     { path: '/movements', label: 'Emitir EIR', icon: List, moduleKey: 'terminal.movimentacoes' },
     { path: '/container-inspections', label: 'Registro Fotográfico', icon: ClipboardCheck, moduleKey: 'terminal.vistoria' },
+    { path: '/container-vistorias', label: 'Vistoria de Container', icon: ShieldCheck, moduleKey: 'terminal.vistoria_container' },
     { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package, moduleKey: 'terminal.movimentacoes' },
     { path: '/yard-control', label: 'Controle de Pátio', icon: Clock, moduleKey: 'terminal.movimentacoes' },
     { path: '/reports/movements', label: 'Relatório de Movimentação', icon: BarChart3, moduleKey: 'terminal.movimentacoes' },
@@ -595,6 +598,8 @@ export default function Layout({ children }) {
     if (location.pathname.includes('/movements/')) return 'Detalhes do Gate';
     if (location.pathname.includes('/container-inspections/') && location.pathname.includes('/edit')) return 'Editar Registro Fotográfico';
     if (location.pathname.includes('/container-inspections/') && location.pathname !== '/container-inspections/new') return 'Detalhes do Registro Fotográfico';
+    if (location.pathname.includes('/container-vistorias/') && location.pathname.includes('/edit')) return 'Editar Vistoria de Container';
+    if (location.pathname.includes('/container-vistorias/') && location.pathname !== '/container-vistorias/new') return 'Detalhes da Vistoria de Container';
     if (location.pathname.includes('/container-audits/') && location.pathname !== '/container-audits/new') return 'Detalhe da Auditoria';
     if (location.pathname.includes('/comercial/proposta/') && location.pathname !== '/comercial/proposta/new') return 'Editar Proposta Comercial';
     if (location.pathname.startsWith('/comercial/tabela-servicos/')) return 'Tabela de Serviços';

@@ -256,6 +256,7 @@ async def validate_and_read_upload(file: UploadFile, allowed_extensions: set) ->
 MODULE_CATALOG = [
     {"key": "terminal", "label": "Terminal", "items": [
         {"key": "terminal.vistoria", "label": "Registro Fotográfico"},
+        {"key": "terminal.vistoria_container", "label": "Vistoria de Container"},
         {"key": "terminal.movimentacoes", "label": "Movimentações"},
         {"key": "terminal.flex_tank", "label": "Flex Tank"},
         {"key": "terminal.auditoria", "label": "Auditoria"},
@@ -322,6 +323,7 @@ MODULE_CATALOG = [
 # menu sozinho não impede alguém de chamar a rota direto).
 PATH_MODULE_MAP = [
     ("/api/container-inspections", "terminal.vistoria"),
+    ("/api/container-vistorias", "terminal.vistoria_container"),
     ("/api/reports/movements", "terminal.movimentacoes"),
     ("/api/movements", "terminal.movimentacoes"),
     ("/api/yard-control", "terminal.movimentacoes"),

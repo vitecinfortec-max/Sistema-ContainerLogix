@@ -11,13 +11,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
 import { DAMAGE_LABELS } from '../components/ContainerPhotoUpload';
-import { CONTAINER_INSPECTION_PHOTO_TYPES } from './NewContainerInspectionPage';
 import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings';
-
-const VISTORIA_PHOTO_TYPE_LABELS = CONTAINER_INSPECTION_PHOTO_TYPES.reduce((acc, { value, label }) => {
-  acc[value] = label;
-  return acc;
-}, {});
 
 // Função para gerar código de barras como imagem base64
 function generateBarcodeImage(value) {
@@ -108,7 +102,6 @@ export default function MovementDetailPage() {
 
   // Componente de Via para impressão - Layout compacto para caber em A4
   const ViaSection = ({ viaType }) => (
-    <>
     <div className="via-section" style={{
       width: '210mm',
       height: '297mm',
@@ -379,8 +372,8 @@ export default function MovementDetailPage() {
         </div>
       )}
 
-      {/* BOX 5: Vistoria de Container - Exibir se houver avarias marcadas, fotos anexadas (antigas ou novas) ou observações de vistoria */}
-      {((movement.container_damages && movement.container_damages.length > 0) || movement.container_photos || movement.inspection_notes || (movement.vistoria_photos && movement.vistoria_photos.length > 0)) && (
+      {/* BOX 5: Vistoria de Container - Exibir se houver avarias marcadas, fotos anexadas ou observações de vistoria */}
+      {((movement.container_damages && movement.container_damages.length > 0) || movement.container_photos || movement.inspection_notes) && (
         <div style={{
           border: '1px solid #000',
           borderRadius: '4px',
@@ -406,11 +399,6 @@ export default function MovementDetailPage() {
             {movement.container_photos && (
               <div style={{ fontSize: '10px', color: '#000', marginBottom: '4px' }}>
                 {Object.keys(movement.container_photos).length} foto(s) do container anexada(s) ao registro digital.
-              </div>
-            )}
-            {movement.vistoria_photos && movement.vistoria_photos.length > 0 && (
-              <div style={{ fontSize: '10px', color: '#000', marginBottom: '4px' }}>
-                {movement.vistoria_photos.length} foto(s) da vistoria anexada(s){viaType === 'VIA TERMINAL' ? ' - ver Registro Fotográfico da Vistoria a seguir.' : '.'}
               </div>
             )}
             {movement.inspection_notes && (
@@ -498,90 +486,6 @@ export default function MovementDetailPage() {
         </div>
       </div>
     </div>
-
-    {/* PÁGINA DE FOTOS DA VISTORIA - só na Via Terminal (não alonga a via do
-        motorista), mesmo layout do módulo Registro Fotográfico. */}
-    {viaType === 'VIA TERMINAL' && movement.vistoria_photos && movement.vistoria_photos.length > 0 && (
-      <div className="via-section" style={{
-        width: '210mm',
-        minHeight: '297mm',
-        padding: '8mm 12mm',
-        fontFamily: 'Arial, sans-serif',
-        backgroundColor: '#fff',
-        boxSizing: 'border-box',
-        pageBreakAfter: 'always'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '10px',
-          gap: '14px'
-        }}>
-          <img
-            src={getCompanyLogoUrl(company)}
-            alt={company.name}
-            style={{ maxHeight: '46px', maxWidth: '46px', width: 'auto', height: 'auto', objectFit: 'contain' }}
-          />
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#000' }}>{company.name}</div>
-            <div style={{ fontSize: '9px', color: '#000' }}>CNPJ: {company.cnpj}</div>
-            {(company.address || '').split('\n').filter(Boolean).map((line, i) => (
-              <div key={i} style={{ fontSize: '9px', color: '#000' }}>{line.trim()}</div>
-            ))}
-            <div style={{ fontSize: '9px', color: '#000' }}>{company.email} | {company.phone}</div>
-          </div>
-        </div>
-
-        <div style={{
-          backgroundColor: '#fff',
-          border: '2px solid #000',
-          padding: '8px 15px',
-          borderRadius: '4px',
-          textAlign: 'center',
-          marginBottom: '10px'
-        }}>
-          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#000', letterSpacing: '1px' }}>
-            REGISTRO FOTOGRÁFICO DA VISTORIA
-          </div>
-          <div style={{ fontSize: '12px', color: '#000', marginTop: '3px' }}>
-            ID Transação: #{movement.transaction_id}
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-          {movement.vistoria_photos.map((photo) => (
-            <div key={photo.id} style={{ border: '1px solid #000', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{
-                backgroundColor: '#f0f0f0',
-                padding: '4px 6px',
-                borderBottom: '1px solid #000',
-                fontWeight: 'bold',
-                fontSize: '9px',
-                textAlign: 'center'
-              }}>
-                {VISTORIA_PHOTO_TYPE_LABELS[photo.type] || photo.type}
-              </div>
-              <div style={{
-                height: '65mm',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#fafafa',
-                padding: '4px'
-              }}>
-                <img
-                  src={api.getFileUrl(photo.url)}
-                  alt={VISTORIA_PHOTO_TYPE_LABELS[photo.type] || photo.type}
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    )}
-    </>
   );
 
   if (loading) {
@@ -816,45 +720,6 @@ export default function MovementDetailPage() {
                       </div>
                     </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Fotos da Vistoria de Container */}
-          {movement.vistoria_photos && movement.vistoria_photos.length > 0 && (
-            <Card className="mb-2">
-              <CardHeader className="bg-slate-50 dark:bg-slate-800 py-2">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <Camera className="w-4 h-4" />
-                  Fotos da Vistoria ({movement.vistoria_photos.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="py-3">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {movement.vistoria_photos.map((photo) => {
-                    const label = VISTORIA_PHOTO_TYPE_LABELS[photo.type] || photo.type;
-                    const url = api.getFileUrl(photo.url);
-                    return (
-                      <div key={photo.id} className="space-y-1">
-                        <p className="text-xs text-muted-foreground font-medium">{label}</p>
-                        <div
-                          className="relative aspect-square rounded-lg overflow-hidden border cursor-pointer group"
-                          onClick={() => setPreviewImage({ url, label })}
-                          data-testid={`vistoria-photo-view-${photo.id}`}
-                        >
-                          <img
-                            src={url}
-                            alt={label}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                            <ZoomIn className="w-8 h-8 text-white" />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
               </CardContent>
             </Card>

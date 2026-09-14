@@ -112,14 +112,6 @@ export const api = {
   getMovement: (id) => axios.get(`${API}/movements/${id}`),
   updateMovement: (id, data) => axios.put(`${API}/movements/${id}`, data),
   deleteMovement: (id) => axios.delete(`${API}/movements/${id}`),
-  uploadMovementPhoto: (id, type, file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return axios.post(`${API}/movements/${id}/upload-photo?type=${type}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-  },
-  deleteMovementPhoto: (id, photoId) => axios.delete(`${API}/movements/${id}/photo/${photoId}`),
   getOpenEntryForContainer: (containerNumber) => axios.get(`${API}/movements/open-entry/${containerNumber}`),
   getLastMovementForContainer: (containerNumber) => axios.get(`${API}/movements/last-for-container/${containerNumber}`),
   downloadMovementsPdf: (movementIds, via) => axios.post(`${API}/movements/pdf`, { movement_ids: movementIds, via }, { responseType: 'blob' }),
@@ -214,6 +206,21 @@ export const api = {
     });
   },
   deleteContainerInspectionPhoto: (id, photoId) => axios.delete(`${API}/container-inspections/${id}/photo/${photoId}`),
+
+  // Vistoria de Container
+  getContainerVistorias: (params) => axios.get(`${API}/container-vistorias`, { params }),
+  getContainerVistoria: (id) => axios.get(`${API}/container-vistorias/${id}`),
+  createContainerVistoria: (data) => axios.post(`${API}/container-vistorias`, data),
+  updateContainerVistoria: (id, data) => axios.put(`${API}/container-vistorias/${id}`, data),
+  deleteContainerVistoria: (id) => axios.delete(`${API}/container-vistorias/${id}`),
+  uploadContainerVistoriaPhoto: (id, type, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/container-vistorias/${id}/upload-photo?type=${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteContainerVistoriaPhoto: (id, photoId) => axios.delete(`${API}/container-vistorias/${id}/photo/${photoId}`),
 
   // Auditoria de Estoque (Terminal)
   getContainerAudits: (params) => axios.get(`${API}/container-audits`, { params }),

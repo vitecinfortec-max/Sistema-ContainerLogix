@@ -30,6 +30,10 @@ import ContainerInspectionsPage from './pages/ContainerInspectionsPage';
 import NewContainerInspectionPage from './pages/NewContainerInspectionPage';
 import ContainerInspectionDetailPage from './pages/ContainerInspectionDetailPage';
 import EditContainerInspectionPage from './pages/EditContainerInspectionPage';
+import ContainerVistoriasPage from './pages/ContainerVistoriasPage';
+import NewContainerVistoriaPage from './pages/NewContainerVistoriaPage';
+import ContainerVistoriaDetailPage from './pages/ContainerVistoriaDetailPage';
+import EditContainerVistoriaPage from './pages/EditContainerVistoriaPage';
 import ContainerAuditsPage from './pages/ContainerAuditsPage';
 import NewContainerAuditPage from './pages/NewContainerAuditPage';
 import ContainerAuditDetailPage from './pages/ContainerAuditDetailPage';
@@ -385,6 +389,38 @@ function App() {
             element={
               <ProtectedRoute moduleKey="terminal.vistoria">
                 <EditContainerInspectionPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-vistorias"
+            element={
+              <ProtectedRoute moduleKey="terminal.vistoria_container">
+                <ContainerVistoriasPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-vistorias/new"
+            element={
+              <ProtectedRoute moduleKey="terminal.vistoria_container">
+                <NewContainerVistoriaPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-vistorias/:id"
+            element={
+              <ProtectedRoute moduleKey="terminal.vistoria_container">
+                <ContainerVistoriaDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-vistorias/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="terminal.vistoria_container">
+                <EditContainerVistoriaPage />
               </ProtectedRoute>
             }
           />

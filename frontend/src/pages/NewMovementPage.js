@@ -34,7 +34,6 @@ export default function NewMovementPage() {
   const [containerPhotos, setContainerPhotos] = useState(null);
   const [containerDamages, setContainerDamages] = useState([]);
   const [inspectionNotes, setInspectionNotes] = useState('');
-  const [vistoriaPhotos, setVistoriaPhotos] = useState([]); // { id, type, file, previewUrl } - upload só acontece no submit
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [containerDuplicateError, setContainerDuplicateError] = useState('');
@@ -167,23 +166,6 @@ export default function NewMovementPage() {
     }
   };
 
-  const handleAddVistoriaPhoto = (type, file) => {
-    setVistoriaPhotos(prev => [...prev, {
-      id: `local-${Date.now()}-${Math.random()}`,
-      type,
-      file,
-      previewUrl: URL.createObjectURL(file),
-    }]);
-  };
-
-  const handleRemoveVistoriaPhoto = (id) => {
-    setVistoriaPhotos(prev => {
-      const photo = prev.find(p => p.id === id);
-      if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl);
-      return prev.filter(p => p.id !== id);
-    });
-  };
-
   const onSubmit = async (data) => {
     if (containerDuplicateError) {
       toast.error(containerDuplicateError);
@@ -205,15 +187,6 @@ export default function NewMovementPage() {
         inspection_notes: inspectionNotes
       };
       const response = await api.createMovement(payload);
-
-      // Upload das fotos da Vistoria em paralelo (já comprimidas) - só depois
-      // que a movimentação existe, já que o upload precisa do id gerado.
-      if (vistoriaPhotos.length > 0) {
-        await Promise.all(
-          vistoriaPhotos.map((photo) => api.uploadMovementPhoto(response.data.id, photo.type, photo.file))
-        );
-      }
-
       localStorage.removeItem(AUTO_SAVE_KEY);
       toast.success('Registro cadastrado com sucesso!');
 
@@ -737,10 +710,6 @@ export default function NewMovementPage() {
             notes={inspectionNotes}
             onNotesChange={setInspectionNotes}
             disabled={loading}
-            movementInfo={formData}
-            photos={vistoriaPhotos}
-            onAddPhoto={handleAddVistoriaPhoto}
-            onRemovePhoto={handleRemoveVistoriaPhoto}
           />
 
           <div className="flex justify-end gap-4">
