@@ -282,6 +282,14 @@ export const api = {
   updateVehicleRevision: (id, data) => axios.put(`${API}/vehicle-revisions/${id}`, data),
   deleteVehicleRevision: (id) => axios.delete(`${API}/vehicle-revisions/${id}`),
   getVehicleRevisionPDF: (id) => axios.get(`${API}/vehicle-revisions/${id}/pdf`, { responseType: 'blob' }),
+  uploadVehicleRevisionKmPhoto: (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/vehicle-revisions/${id}/upload-km-photo`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteVehicleRevisionKmPhoto: (id) => axios.delete(`${API}/vehicle-revisions/${id}/km-photo`),
 
   getVehicleChecklistTemplate: () => axios.get(`${API}/vehicle-checklists/template`),
   getSimpleVehicleChecklistTemplate: (vehicleType) => axios.get(`${API}/vehicle-checklists/simple-template`, { params: { vehicle_type: vehicleType } }),

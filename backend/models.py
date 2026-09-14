@@ -1611,7 +1611,8 @@ class VehicleRevision(BaseModel):
     mechanic_name: str  # Nome do mecânico
     performed_by: Optional[str] = None  # Quem realizou a revisão
     observations: Optional[str] = None
-    
+    current_km_photo_url: Optional[str] = None  # Foto do hodômetro (Km) no momento da revisão
+
     # Metadados
     created_by: str  # Quem gerou a revisão
     created_by_name: str
@@ -1663,6 +1664,7 @@ class VehicleRevisionResponse(BaseModel):
     mechanic_name: str
     performed_by: Optional[str] = None
     observations: Optional[str] = None
+    current_km_photo_url: Optional[str] = None
     created_by: str
     created_by_name: str
     created_at: datetime
@@ -2424,6 +2426,7 @@ class OrdemServico(BaseModel):
 
     # ===== Apropriação =====
     appropriation_plate: Optional[str] = None  # Equipamento agregador
+    appropriation_id: Optional[str] = None  # Referência ao Vehicle.id
 
     # ===== Supervisão e Notificações =====
     supervision_type: str = 'outros'  # banco | outros
@@ -2486,6 +2489,7 @@ class OrdemServicoCreate(BaseModel):
     forecast_close_at: Optional[str] = None
     closed_at: Optional[str] = None
     appropriation_plate: Optional[str] = None
+    appropriation_id: Optional[str] = None
     supervision_type: str = 'outros'
     supervision_value: Optional[str] = None
     reading_initial: float = 0.0

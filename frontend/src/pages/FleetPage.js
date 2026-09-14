@@ -16,9 +16,10 @@ import { api } from '../lib/api';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Truck, Wrench, Plus, Eye, Trash2, FileText, Search, Printer, Pencil, Car, Check, ChevronsUpDown } from 'lucide-react';
+import { Truck, Wrench, Plus, Eye, Trash2, FileText, Search, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { compressImage } from '../lib/imageCompression';
 
 export default function FleetPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -72,9 +73,17 @@ export default function FleetPage() {
     carreta_revision_type: ''
   });
 
+  // Foto do Km (hodômetro) - anexada no momento da criação da revisão (CAVALO)
+  const [kmPhoto, setKmPhoto] = useState(null); // { file, previewUrl }
+
+  // Lista completa de veículos, usada pelo autocomplete de Placa (independente
+  // da paginação de 15/página da aba "Veículos")
+  const [allVehicles, setAllVehicles] = useState([]);
+
   // Modal de detalhes
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedRevision, setSelectedRevision] = useState(null);
+  const [uploadingDetailKmPhoto, setUploadingDetailKmPhoto] = useState(false);
 
   // ========== VEÍCULOS ==========
   const [vehicles, setVehicles] = useState([]);
@@ -176,6 +185,21 @@ export default function FleetPage() {
       loadTransportCompanies();
     }
   }, [activeTab, pagination.page, vehiclePagination.page]);
+
+  // Carrega a frota inteira uma vez (independente da aba/paginação) para o
+  // autocomplete de Placa do Controle de Revisão puxar do cadastro real.
+  useEffect(() => {
+    loadAllVehiclesForAutocomplete();
+  }, []);
+
+  const loadAllVehiclesForAutocomplete = async () => {
+    try {
+      const response = await api.getVehicles({ per_page: 1000 });
+      setAllVehicles(response.data?.items || []);
+    } catch (error) {
+      console.error('Erro ao carregar veículos:', error);
+    }
+  };
 
   const loadDrivers = async () => {
     try {
@@ -422,6 +446,20 @@ export default function FleetPage() {
       observations: '',
       carreta_revision_type: ''
     });
+    if (kmPhoto?.previewUrl) URL.revokeObjectURL(kmPhoto.previewUrl);
+    setKmPhoto(null);
+  };
+
+  const handleAddKmPhoto = async (file) => {
+    if (!file) return;
+    const compressed = await compressImage(file);
+    if (kmPhoto?.previewUrl) URL.revokeObjectURL(kmPhoto.previewUrl);
+    setKmPhoto({ file: compressed, previewUrl: URL.createObjectURL(compressed) });
+  };
+
+  const handleRemoveKmPhoto = () => {
+    if (kmPhoto?.previewUrl) URL.revokeObjectURL(kmPhoto.previewUrl);
+    setKmPhoto(null);
   };
 
   const handleSubmit = async () => {
@@ -483,7 +521,14 @@ export default function FleetPage() {
         };
       }
 
-      await api.createVehicleRevision(data);
+      const response = await api.createVehicleRevision(data);
+      if (kmPhoto?.file) {
+        try {
+          await api.uploadVehicleRevisionKmPhoto(response.data.id, kmPhoto.file);
+        } catch (photoError) {
+          toast.error('Revisão registrada, mas houve erro ao enviar a foto do Km');
+        }
+      }
       toast.success('Revisão registrada com sucesso!');
       setNewModalOpen(false);
       resetForm();
@@ -516,6 +561,36 @@ export default function FleetPage() {
   const handleViewDetails = async (revision) => {
     setSelectedRevision(revision);
     setDetailModalOpen(true);
+  };
+
+  const handleDetailKmPhotoUpload = async (file) => {
+    if (!file || !selectedRevision) return;
+    setUploadingDetailKmPhoto(true);
+    try {
+      const compressed = await compressImage(file);
+      const response = await api.uploadVehicleRevisionKmPhoto(selectedRevision.id, compressed);
+      const updated = { ...selectedRevision, current_km_photo_url: response.data.current_km_photo_url };
+      setSelectedRevision(updated);
+      setRevisions(prev => prev.map(r => r.id === updated.id ? updated : r));
+      toast.success('Foto do Km adicionada!');
+    } catch (error) {
+      toast.error('Erro ao enviar foto do Km');
+    } finally {
+      setUploadingDetailKmPhoto(false);
+    }
+  };
+
+  const handleDetailKmPhotoRemove = async () => {
+    if (!selectedRevision) return;
+    try {
+      await api.deleteVehicleRevisionKmPhoto(selectedRevision.id);
+      const updated = { ...selectedRevision, current_km_photo_url: null };
+      setSelectedRevision(updated);
+      setRevisions(prev => prev.map(r => r.id === updated.id ? updated : r));
+      toast.success('Foto do Km removida!');
+    } catch (error) {
+      toast.error('Erro ao remover foto do Km');
+    }
   };
 
   const toggleSelectRevision = (id) => {
@@ -958,9 +1033,12 @@ export default function FleetPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <Label>Placa do Veículo *</Label>
-                    <Input
+                    <Autocomplete
                       value={formData.vehicle_plate}
-                      onChange={(e) => handleInputChange('vehicle_plate', e.target.value.toUpperCase())}
+                      onChange={(v) => handleInputChange('vehicle_plate', v.toUpperCase())}
+                      onSelect={(v) => { handleInputChange('vehicle_plate', v.plate); handleInputChange('vehicle_model', v.model || ''); }}
+                      options={allVehicles}
+                      displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                     />
                   </div>
                   <div>
@@ -996,6 +1074,50 @@ export default function FleetPage() {
                       onChange={(e) => handleInputChange('current_km', e.target.value)}
                     />
                   </div>
+                </div>
+
+                <div>
+                  <Label className="mb-2 block">Foto do Km (Hodômetro)</Label>
+                  {kmPhoto ? (
+                    <div className="relative inline-block">
+                      <img src={kmPhoto.previewUrl} alt="Foto do Km" className="w-40 h-28 object-cover rounded-lg border" />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6"
+                        onClick={handleRemoveKmPhoto}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={() => document.getElementById('km-photo-camera-input').click()}>
+                        <Camera className="w-4 h-4 mr-2" />
+                        Câmera
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => document.getElementById('km-photo-gallery-input').click()}>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Galeria
+                      </Button>
+                      <input
+                        id="km-photo-camera-input"
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => { handleAddKmPhoto(e.target.files?.[0]); e.target.value = ''; }}
+                      />
+                      <input
+                        id="km-photo-gallery-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => { handleAddKmPhoto(e.target.files?.[0]); e.target.value = ''; }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">
@@ -1078,9 +1200,12 @@ export default function FleetPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label>Placa *</Label>
-                    <Input
+                    <Autocomplete
                       value={formData.vehicle_plate}
-                      onChange={(e) => handleInputChange('vehicle_plate', e.target.value.toUpperCase())}
+                      onChange={(v) => handleInputChange('vehicle_plate', v.toUpperCase())}
+                      onSelect={(v) => { handleInputChange('vehicle_plate', v.plate); handleInputChange('vehicle_model', v.model || ''); }}
+                      options={allVehicles}
+                      displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                     />
                   </div>
                   <div>
@@ -1197,6 +1322,54 @@ export default function FleetPage() {
                   <p className="text-sm text-muted-foreground">Mecânico</p>
                   <p className="font-bold">{selectedRevision.mechanic_name}</p>
                 </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <p className="text-sm text-muted-foreground mb-2">Foto do Km (Hodômetro)</p>
+                {selectedRevision.current_km_photo_url ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={api.getFileUrl(selectedRevision.current_km_photo_url)}
+                      alt="Foto do Km"
+                      className="w-48 h-32 object-cover rounded-lg border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6"
+                      onClick={handleDetailKmPhotoRemove}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" disabled={uploadingDetailKmPhoto} onClick={() => document.getElementById('detail-km-photo-camera-input').click()}>
+                      {uploadingDetailKmPhoto ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                      Câmera
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" disabled={uploadingDetailKmPhoto} onClick={() => document.getElementById('detail-km-photo-gallery-input').click()}>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Galeria
+                    </Button>
+                    <input
+                      id="detail-km-photo-camera-input"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => { handleDetailKmPhotoUpload(e.target.files?.[0]); e.target.value = ''; }}
+                    />
+                    <input
+                      id="detail-km-photo-gallery-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => { handleDetailKmPhotoUpload(e.target.files?.[0]); e.target.value = ''; }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="border-t pt-4">

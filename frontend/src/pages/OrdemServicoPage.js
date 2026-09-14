@@ -469,7 +469,17 @@ export default function OrdemServicoPage() {
                     className="h-9 text-sm font-mono"
                   />
                 </div>
-                <Field label="Apropriação (Equip. Agregador)" value={form.appropriation_plate} onChange={(v) => onChange('appropriation_plate', v)} testid="os-approp" />
+                <div>
+                  <Label className="mb-1 block">Apropriação (Equip. Agregador)</Label>
+                  <Autocomplete
+                    value={form.appropriation_plate}
+                    onChange={(v) => onChange('appropriation_plate', v)}
+                    onSelect={(vh) => { onChange('appropriation_plate', vh.plate); onChange('appropriation_id', vh.id); }}
+                    options={vehicles}
+                    displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                    className="h-9 text-sm font-mono"
+                  />
+                </div>
                 <div>
                   <Label className="mb-1 block">Pessoa *</Label>
                   <Autocomplete
@@ -605,7 +615,7 @@ function buildEmpty() {
     address: '', city_uf: '', city: '', state: '', is_retorno: false, contact_type: 'banco', contact_value: '',
     opened_at: new Date().toISOString().slice(0, 16),
     budget_at: '', approved_at: '', forecast_close_at: '', closed_at: '',
-    appropriation_plate: '', supervision_type: 'outros', supervision_value: '',
+    appropriation_plate: '', appropriation_id: '', supervision_type: 'outros', supervision_value: '',
     reading_initial: 0, reading_final: 0,
     description: '', associated_actions: '', closure_remark: '',
     observations: '',

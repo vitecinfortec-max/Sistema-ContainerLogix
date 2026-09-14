@@ -503,6 +503,59 @@ async def create_vehicle_revision(
     
     return VehicleRevisionResponse(**revision_dict)
 
+@api_router.post("/vehicle-revisions/{revision_id}/upload-km-photo")
+async def upload_vehicle_revision_km_photo(
+    revision_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Faz upload da foto do Km (hodômetro) da revisão - substitui a foto anterior, se houver."""
+    revision = await db.vehicle_revisions.find_one({"id": revision_id}, {"_id": 0, "id": 1})
+    if not revision:
+        raise HTTPException(status_code=404, detail="Revisão não encontrada")
+
+    file_ext, content = await validate_and_read_upload(file, ALLOWED_EXTENSIONS)
+
+    photo_dir = UPLOADS_DIR / "vehicle_revisions" / revision_id
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    for old_file in photo_dir.glob("*"):
+        old_file.unlink()
+
+    photo_id = str(uuid.uuid4())
+    file_path = photo_dir / f"{photo_id}{file_ext}"
+    with open(file_path, "wb") as buffer:
+        buffer.write(content)
+
+    photo_url = f"/api/uploads/vehicle_revisions/{revision_id}/{photo_id}{file_ext}"
+    await db.vehicle_revisions.update_one(
+        {"id": revision_id},
+        {"$set": {"current_km_photo_url": photo_url, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    return {"current_km_photo_url": photo_url}
+
+@api_router.delete("/vehicle-revisions/{revision_id}/km-photo")
+async def delete_vehicle_revision_km_photo(
+    revision_id: str,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Remove a foto do Km da revisão."""
+    revision = await db.vehicle_revisions.find_one({"id": revision_id}, {"_id": 0, "id": 1})
+    if not revision:
+        raise HTTPException(status_code=404, detail="Revisão não encontrada")
+
+    photo_dir = UPLOADS_DIR / "vehicle_revisions" / revision_id
+    if photo_dir.exists():
+        for old_file in photo_dir.glob("*"):
+            old_file.unlink()
+
+    await db.vehicle_revisions.update_one(
+        {"id": revision_id},
+        {"$set": {"current_km_photo_url": None, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    return {"message": "Foto removida com sucesso"}
+
 @api_router.delete("/vehicle-revisions/{revision_id}")
 async def delete_vehicle_revision(
     revision_id: str,
@@ -512,6 +565,14 @@ async def delete_vehicle_revision(
     result = await db.vehicle_revisions.delete_one({"id": revision_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Revisão não encontrada")
+
+    try:
+        photo_dir = UPLOADS_DIR / "vehicle_revisions" / revision_id
+        if photo_dir.exists():
+            shutil.rmtree(photo_dir)
+    except Exception:
+        pass
+
     return {"message": "Revisão excluída com sucesso"}
 
 
@@ -701,7 +762,25 @@ async def generate_revision_pdf(
     ]))
     elements.append(vehicle_table)
     elements.append(Spacer(1, 20))
-    
+
+    # ========== FOTO DO HODÔMETRO (KM) ==========
+    km_photo_url = revision.get('current_km_photo_url')
+    if km_photo_url:
+        try:
+            relative = km_photo_url.split('/api/uploads/', 1)[1]
+            km_photo_path = UPLOADS_DIR / relative
+            if km_photo_path.exists():
+                km_photo_title_style = ParagraphStyle(
+                    'KmPhotoTitle', parent=styles['Normal'], fontSize=9,
+                    fontName='Helvetica-Bold', textColor=colors.HexColor(f'#{PRIMARY_COLOR}')
+                )
+                elements.append(Paragraph("FOTO DO HODÔMETRO (KM):", km_photo_title_style))
+                elements.append(Spacer(1, 5))
+                elements.append(Image(str(km_photo_path), width=200, height=150, kind='proportional'))
+                elements.append(Spacer(1, 15))
+        except Exception:
+            pass
+
     # ========== PRÓXIMA REVISÃO - TÍTULO ==========
     section_title_style = ParagraphStyle(
         'SectionTitle',
