@@ -179,13 +179,13 @@ export default function ContainerInspectionDetailPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: '10px',
+          marginBottom: '6px',
           gap: '16px'
         }}>
           <img
             src={getCompanyLogoUrl(company)}
             alt={company.name}
-            style={{ height: '95px', width: 'auto' }}
+            style={{ height: '68px', width: 'auto' }}
           />
           <div style={{ textAlign: 'center' }}>
             <div style={{
@@ -205,13 +205,13 @@ export default function ContainerInspectionDetailPage() {
         </div>
 
         {/* Título */}
-        <div style={{ 
-          backgroundColor: '#fff', 
+        <div style={{
+          backgroundColor: '#fff',
           border: '2px solid #000',
-          padding: '6px 10px', 
-          borderRadius: '4px', 
-          textAlign: 'center', 
-          marginBottom: '10px'
+          padding: '4px 10px',
+          borderRadius: '4px',
+          textAlign: 'center',
+          marginBottom: '6px'
         }}>
           <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#000' }}>
             REGISTRO FOTOGRÁFICO DE CONTÊINER
@@ -222,22 +222,22 @@ export default function ContainerInspectionDetailPage() {
         </div>
 
         {/* Informações */}
-        <div style={{ 
-          border: '1px solid #000', 
-          borderRadius: '4px', 
-          marginBottom: '8px',
+        <div style={{
+          border: '1px solid #000',
+          borderRadius: '4px',
+          marginBottom: '6px',
           overflow: 'hidden'
         }}>
-          <div style={{ 
-            backgroundColor: '#f0f0f0', 
-            padding: '4px 8px', 
+          <div style={{
+            backgroundColor: '#f0f0f0',
+            padding: '3px 8px',
             borderBottom: '1px solid #000',
             fontWeight: 'bold',
             fontSize: '10px'
           }}>
             Informações do Container
           </div>
-          <div style={{ padding: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+          <div style={{ padding: '6px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
             <div>
               <div style={{ fontSize: '8px', color: '#666' }}>Número do Container</div>
               <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.container_number}</div>
@@ -300,19 +300,19 @@ export default function ContainerInspectionDetailPage() {
         <div style={{
           border: '1px solid #000',
           borderRadius: '4px',
-          marginBottom: '8px',
+          marginBottom: '6px',
           overflow: 'hidden'
         }}>
           <div style={{
             backgroundColor: '#f0f0f0',
-            padding: '4px 8px',
+            padding: '3px 8px',
             borderBottom: '1px solid #000',
             fontWeight: 'bold',
             fontSize: '10px'
           }}>
             Itens de Vistoria
           </div>
-          <div style={{ padding: '8px', fontSize: '10px' }}>
+          <div style={{ padding: '6px 8px', fontSize: '10px' }}>
             {inspection.no_damage ? (
               <strong>Container sem avarias</strong>
             ) : inspection.damage_items && inspection.damage_items.length > 0 ? (
@@ -327,28 +327,31 @@ export default function ContainerInspectionDetailPage() {
         {inspection.photos && inspection.photos.length > 0 && (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr 1fr',
-            gap: '8px',
-            marginBottom: '8px'
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '6px',
+            marginBottom: '6px'
           }}>
             {inspection.photos.map(photo => (
               <div key={photo.id} style={{
                 border: '1px solid #000',
                 borderRadius: '4px',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                maxHeight: '55mm'
               }}>
                 <div style={{
                   backgroundColor: '#f0f0f0',
-                  padding: '4px 8px',
+                  padding: '2px 8px',
                   borderBottom: '1px solid #000',
                   fontWeight: 'bold',
-                  fontSize: '10px',
+                  fontSize: '9px',
                   textAlign: 'center'
                 }}>
                   {PHOTO_LABELS[photo.type] || photo.type}
                 </div>
                 <div style={{
-                  height: '100mm',
+                  height: '48mm',
+                  maxHeight: '48mm',
+                  overflow: 'hidden',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -359,8 +362,11 @@ export default function ContainerInspectionDetailPage() {
                     src={getPhotoUrl(photo.url)}
                     alt={PHOTO_LABELS[photo.type] || photo.type}
                     style={{
+                      display: 'block',
                       width: '100%',
                       height: '100%',
+                      maxWidth: '100%',
+                      maxHeight: '100%',
                       objectFit: 'contain'
                     }}
                   />
@@ -373,11 +379,11 @@ export default function ContainerInspectionDetailPage() {
         {/* Rodapé */}
         <div style={{
           borderTop: '1px solid #000',
-          paddingTop: '6px',
-          fontSize: '11px',
+          paddingTop: '4px',
+          fontSize: '10px',
           color: '#000'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', flex: 1 }}>
               <div>
                 <strong>Registrado por: {inspection.created_by_name}</strong>
@@ -391,14 +397,14 @@ export default function ContainerInspectionDetailPage() {
             </div>
             {barcodeImage && (
               <div style={{ textAlign: 'center' }}>
-                <img src={barcodeImage} alt="Código de Barras" style={{ height: '50px', width: 'auto' }} />
-                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000', marginTop: '2px' }}>
+                <img src={barcodeImage} alt="Código de Barras" style={{ height: '38px', width: 'auto' }} />
+                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#000', marginTop: '1px' }}>
                   {`RFC${String(inspection.inspection_number).padStart(6, '0')}`}
                 </div>
               </div>
             )}
           </div>
-          <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', borderTop: '1px solid #ddd', paddingTop: '4px' }}>
+          <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', borderTop: '1px solid #ddd', paddingTop: '3px' }}>
             {company.name} | Este documento é válido como registro fotográfico
           </div>
         </div>
