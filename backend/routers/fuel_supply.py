@@ -266,7 +266,7 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
     from reportlab.platypus import Image as RLImage
     from reports import download_logo
 
@@ -321,16 +321,16 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
         elems = []
 
         # ========== CABEÇALHO ==========
-        company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontSize=14,
+        company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontSize=12,
                                        textColor=colors.black, alignment=TA_CENTER,
-                                       fontName='Helvetica-Bold', leading=16)
-        address_style = ParagraphStyle('Address', parent=styles['Normal'], fontSize=8,
-                                       textColor=colors.black, alignment=TA_CENTER, leading=10)
+                                       fontName='Helvetica-Bold', leading=14)
+        address_style = ParagraphStyle('Address', parent=styles['Normal'], fontSize=7,
+                                       textColor=colors.black, alignment=TA_CENTER, leading=9)
 
         logo_cell = ""
         if logo_buffer:
             try:
-                logo_cell = RLImage(logo_buffer, width=50, height=50)
+                logo_cell = RLImage(logo_buffer, width=36, height=36)
             except Exception:
                 pass
 
@@ -351,19 +351,19 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
             ('ALIGN', (1, 0), (1, 0), 'CENTER'),
         ]))
         elems.append(header_table)
-        elems.append(Spacer(1, 5))
+        elems.append(Spacer(1, 2))
 
         line_table = Table([[""]], colWidths=[WIDTH])
         line_table.setStyle(TableStyle([
             ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor(f'#{PRIMARY_COLOR}')),
         ]))
         elems.append(line_table)
-        elems.append(Spacer(1, 10))
+        elems.append(Spacer(1, 5))
 
         # ========== TÍTULO ==========
-        title_style = ParagraphStyle('Title', parent=styles['Normal'], fontSize=16,
+        title_style = ParagraphStyle('Title', parent=styles['Normal'], fontSize=14,
                                      textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER,
-                                     fontName='Helvetica-Bold', spaceAfter=15)
+                                     fontName='Helvetica-Bold', spaceAfter=6)
         elems.append(Paragraph("ORDEM DE ABASTECIMENTO", title_style))
 
         # ========== INFO BAR ==========
@@ -378,12 +378,12 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
         ]))
         elems.append(info_table)
-        elems.append(Spacer(1, 15))
+        elems.append(Spacer(1, 6))
 
         # ========== DADOS DO ABASTECIMENTO ==========
         label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
@@ -402,15 +402,15 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
             ('BACKGROUND', (2, 0), (2, -1), colors.HexColor('#F5F5F5')),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
         ]))
         elems.append(dados_table)
-        elems.append(Spacer(1, 10))
+        elems.append(Spacer(1, 4))
 
         # ========== QUANTIDADE E VALOR - TÍTULO ==========
-        section_title_style = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=11,
+        section_title_style = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=10,
                                              textColor=colors.white, alignment=TA_CENTER,
                                              fontName='Helvetica-Bold')
         section_table = Table([[Paragraph("QUANTIDADE E VALOR", section_title_style)]], colWidths=[WIDTH])
@@ -418,8 +418,8 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
             ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ]))
         elems.append(section_table)
 
@@ -440,31 +440,31 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ]))
         elems.append(items_table)
-        elems.append(Spacer(1, 6))
+        elems.append(Spacer(1, 3))
 
         extenso = _valor_por_extenso(total_value) if has_total and total_value else ''
         if extenso:
-            extenso_style = ParagraphStyle('Extenso', parent=styles['Normal'], fontSize=9,
+            extenso_style = ParagraphStyle('Extenso', parent=styles['Normal'], fontSize=8,
                                            fontName='Helvetica-Bold', alignment=TA_CENTER)
             extenso_table = Table([[Paragraph(f"Valor por extenso: {extenso}", extenso_style)]], colWidths=[WIDTH])
             extenso_table.setStyle(TableStyle([
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-                ('TOPPADDING', (0, 0), (-1, -1), 5),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
             ]))
             elems.append(extenso_table)
-            elems.append(Spacer(1, 10))
+            elems.append(Spacer(1, 5))
         else:
-            elems.append(Spacer(1, 4))
+            elems.append(Spacer(1, 2))
 
         # ========== DADOS PARA CONFERÊNCIA (preenchimento manual) + OBSERVAÇÃO ==========
-        manual_style = ParagraphStyle('Manual', parent=styles['Normal'], fontSize=8, leading=13,
+        manual_style = ParagraphStyle('Manual', parent=styles['Normal'], fontSize=7.5, leading=9.5,
                                       fontName='Helvetica')
-        obs_style = ParagraphStyle('ObsCell', parent=styles['Normal'], fontSize=8, fontName='Helvetica')
+        obs_style = ParagraphStyle('ObsCell', parent=styles['Normal'], fontSize=7.5, fontName='Helvetica')
         obs_block = Table([[
             Paragraph("Data abastecimento:<br/>Km de abastecimento:<br/>Quantidade em litros:<br/>"
                      "Km último abastecimento:<br/>Média:", manual_style),
@@ -474,19 +474,19 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
         ]))
         elems.append(obs_block)
-        elems.append(Spacer(1, 6))
+        elems.append(Spacer(1, 1))
 
         elems.append(Paragraph(
             "Favor anexar esta via junto com a nota fiscal que será enviada para cobrança. Obrigado.",
-            ParagraphStyle('Note', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Oblique',
-                          textColor=colors.grey)
+            ParagraphStyle('Note', parent=styles['Normal'], fontSize=6.5, fontName='Helvetica-Oblique',
+                          textColor=colors.grey, leading=8)
         ))
-        elems.append(Spacer(1, 10))
+        elems.append(Spacer(1, 2))
 
         # ========== ASSINATURAS ==========
         sig_data = [
@@ -497,15 +497,16 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
         sig_table.setStyle(TableStyle([
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 1), (-1, 1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 1), (-1, 1), 5),
+            ('FONTSIZE', (0, 0), (-1, -1), 7),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
         ]))
         elems.append(sig_table)
 
         # ========== RODAPÉ ==========
-        footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8,
-                                      textColor=colors.grey, alignment=TA_CENTER)
-        elems.append(Spacer(1, 10))
+        footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=6.5,
+                                      textColor=colors.grey, alignment=TA_CENTER, leading=7.5)
+        elems.append(Spacer(1, 1))
         elems.append(Paragraph(
             f"Criado por: {order.get('created_by_name') or '-'} em {fmt_dt(order.get('created_at'))}", footer_style
         ))
@@ -516,7 +517,17 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
         return elems
 
     elements = build_via()
-    elements.append(PageBreak())
+    elements.append(Spacer(1, 5))
+    elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#999999'),
+                               dash=(4, 3), spaceBefore=0, spaceAfter=0))
+    elements.append(Paragraph(
+        "&#9986;  corte aqui  &#9986;",
+        ParagraphStyle('CutLine', parent=styles['Normal'], fontSize=6.5, textColor=colors.HexColor('#999999'),
+                      alignment=TA_CENTER, spaceBefore=1, spaceAfter=1)
+    ))
+    elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#999999'),
+                               dash=(4, 3), spaceBefore=0, spaceAfter=0))
+    elements.append(Spacer(1, 5))
     elements += build_via()
 
     doc.build(elements)
