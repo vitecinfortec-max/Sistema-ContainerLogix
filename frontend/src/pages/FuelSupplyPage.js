@@ -50,7 +50,7 @@ const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currenc
 
 function buildEmpty() {
   return {
-    supply_order: '',
+    supply_order: '', fuel_supply_order_id: '',
     equipment_id: '', equipment_plate: '',
     driver_id: '', driver_name: '',
     supply_date: new Date().toISOString().split('T')[0],
@@ -129,7 +129,7 @@ export default function FuelSupplyPage() {
   const loadFuelOrders = async () => {
     try {
       const r = await api.getFuelSupplyOrders();
-      setFuelOrders(r.data || []);
+      setFuelOrders((r.data || []).filter((o) => !o.is_launched));
     } catch (e) { /* ignore */ }
   };
 
@@ -139,6 +139,7 @@ export default function FuelSupplyPage() {
     setForm((p) => ({
       ...p,
       supply_order: `Nº ${order.order_number}`,
+      fuel_supply_order_id: order.id,
       equipment_plate: order.equipment_plate || p.equipment_plate,
       equipment_id: order.equipment_id || p.equipment_id,
       supplier_name: order.supplier_name || p.supplier_name,
@@ -221,6 +222,7 @@ export default function FuelSupplyPage() {
       }
       setDialogOpen(false);
       loadList();
+      loadFuelOrders();
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'Erro ao salvar abastecimento');
     } finally { setSaving(false); }
@@ -238,6 +240,7 @@ export default function FuelSupplyPage() {
         return next;
       });
       loadList();
+      loadFuelOrders();
     } catch (e) { toast.error('Erro ao excluir'); }
   };
 

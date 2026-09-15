@@ -173,6 +173,9 @@ async def list_fuel_supply_orders(
             {"company_name": {"$regex": search_escaped, "$options": "i"}},
         ]
     rows = await db.fuel_supply_orders.find(query, {"_id": 0}).sort("order_number", -1).to_list(None)
+    launched_ids = set(await db.fuel_supplies.distinct("fuel_supply_order_id", {"fuel_supply_order_id": {"$ne": None}}))
+    for r in rows:
+        r["is_launched"] = r["id"] in launched_ids
     return rows
 
 

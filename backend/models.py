@@ -2540,7 +2540,8 @@ class FuelSupply(BaseModel):
     supply_number: int  # Número sequencial
 
     # ===== Cabeçalho =====
-    supply_order: Optional[str] = None  # Ordem de Abastecimento (texto livre - sem cadastro próprio)
+    supply_order: Optional[str] = None  # Ordem de Abastecimento (texto livre, preenchido ao selecionar uma ordem existente ou digitado à mão)
+    fuel_supply_order_id: Optional[str] = None  # Vínculo com a Ordem de Abastecimento de origem (FuelSupplyOrder.id) - usado só para marcar a ordem como já lançada, nunca vem do formulário direto
     equipment_id: Optional[str] = None  # Equipamento (Vehicle.id)
     equipment_plate: Optional[str] = None
     driver_id: Optional[str] = None  # Operador/Motorista
@@ -2587,6 +2588,7 @@ class FuelSupply(BaseModel):
 
 class FuelSupplyCreate(BaseModel):
     supply_order: Optional[str] = None
+    fuel_supply_order_id: Optional[str] = None
     equipment_id: Optional[str] = None
     equipment_plate: Optional[str] = None
     driver_id: Optional[str] = None
@@ -2683,7 +2685,7 @@ class FuelSupplyOrderUpdate(FuelSupplyOrderCreate):
 
 
 class FuelSupplyOrderResponse(FuelSupplyOrder):
-    pass
+    is_launched: bool = False  # calculado: True se já existe um Abastecimento lançado a partir desta ordem
 
 
 # ==================== TRANSPORTE - ORDEM DE CARREGAMENTO ====================
