@@ -761,7 +761,7 @@ async def generate_revision_pdf(
         ('LEFTPADDING', (0, 0), (-1, -1), 5),
     ]))
     elements.append(vehicle_table)
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 10))
 
     # ========== FOTO DO HODÔMETRO (KM) ==========
     km_photo_url = revision.get('current_km_photo_url')
@@ -775,9 +775,9 @@ async def generate_revision_pdf(
                     fontName='Helvetica-Bold', textColor=colors.HexColor(f'#{PRIMARY_COLOR}')
                 )
                 elements.append(Paragraph("FOTO DO HODÔMETRO (KM):", km_photo_title_style))
-                elements.append(Spacer(1, 5))
-                elements.append(Image(str(km_photo_path), width=200, height=150, kind='proportional'))
-                elements.append(Spacer(1, 15))
+                elements.append(Spacer(1, 4))
+                elements.append(Image(str(km_photo_path), width=190, height=130, kind='proportional'))
+                elements.append(Spacer(1, 10))
         except Exception:
             pass
 
@@ -797,8 +797,8 @@ async def generate_revision_pdf(
         ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))
     elements.append(section_table)
     
@@ -840,14 +840,14 @@ async def generate_revision_pdf(
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
         ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('LEFTPADDING', (0, 0), (-1, -1), 8),
         # Alternating rows
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F8F8')]),
     ]))
     elements.append(next_table)
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 12))
     
     # ========== OBSERVAÇÕES ==========
     if revision.get('observations'):
@@ -865,9 +865,9 @@ async def generate_revision_pdf(
             fontName='Helvetica'
         )
         elements.append(Paragraph("OBSERVAÇÕES:", obs_title_style))
-        elements.append(Spacer(1, 5))
+        elements.append(Spacer(1, 4))
         elements.append(Paragraph(revision.get('observations', ''), obs_style))
-        elements.append(Spacer(1, 15))
+        elements.append(Spacer(1, 8))
     
     # ========== RODAPÉ COM ASSINATURA ==========
     footer_style = ParagraphStyle(
@@ -879,7 +879,7 @@ async def generate_revision_pdf(
     )
     
     created_at = parse_datetime_value(revision['created_at']).astimezone(timezone(timedelta(hours=-3)))
-    elements.append(Spacer(1, 30))
+    elements.append(Spacer(1, 8))
 
     # Linha de assinatura
     sig_data = [
@@ -894,7 +894,7 @@ async def generate_revision_pdf(
         ('TOPPADDING', (0, 1), (-1, 1), 5),
     ]))
     elements.append(sig_table)
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 10))
     
     elements.append(Paragraph(f"Registrado por: {revision['created_by_name']} em {created_at.strftime('%d/%m/%Y às %H:%M')}", footer_style))
     elements.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
