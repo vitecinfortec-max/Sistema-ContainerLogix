@@ -64,7 +64,7 @@ export default function EditContainerVistoriaPage() {
         api.getContainerVistoria(id),
         api.getClients(),
         api.getShippingLines(),
-        api.getVehicles(),
+        api.getVehicles({ per_page: 1000 }),
         api.getTransportCompanies(),
         api.getServiceTypes({ per_page: 1000 }),
       ]);

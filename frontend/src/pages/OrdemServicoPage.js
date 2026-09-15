@@ -97,7 +97,7 @@ export default function OrdemServicoPage() {
 
   const loadVehicles = async () => {
     try {
-      const r = await api.getVehicles();
+      const r = await api.getVehicles({ per_page: 1000 });
       setVehicles(r.data?.items || r.data || []);
     } catch (e) { /* ignore */ }
   };
