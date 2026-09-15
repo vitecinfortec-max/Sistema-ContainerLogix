@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Input } from './ui/input';
+import { Search } from 'lucide-react';
 
 // Componente de autocomplete genérico - antes copiado de forma idêntica em
 // LoadingSchedulePage, DailyRateRequestPage, ExpenseReportsPage e
@@ -54,8 +55,9 @@ export function Autocomplete({ value, onChange, options, displayField = 'name', 
 
   return (
     <div ref={wrapperRef} className="relative">
+      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
       <Input
-        className={`h-9 ${className}`}
+        className={`h-9 pl-8 ${className}`}
         value={inputValue}
         onChange={handleInputChange}
         onFocus={() => setIsOpen(true)}

@@ -11,7 +11,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { ComboField } from '../components/ui/combo-field';
 import { Autocomplete } from '../components/Autocomplete';
 import { CityStateFields } from '../components/AddressFields';
 import { api } from '../lib/api';
@@ -416,27 +415,42 @@ export default function FuelSupplyPage() {
                   className="text-sm"
                 />
               </div>
-              <ComboField label="Equipamento *" value={form.equipment_plate || ''} onChange={(v) => {
-                onChange('equipment_plate', v);
-                const vh = vehicles.find((x) => x.plate === v);
-                onChange('equipment_id', vh?.id || '');
-              }} options={vehicles.map((v) => [v.plate, `${v.plate} ${v.model || ''}`.trim()])}
-                searchPlaceholder="Buscar equipamento..." emptyLabel="Nenhum equipamento encontrado" testid="fuel-equipment" />
-              <ComboField label="Operador / Motorista" value={form.driver_name || ''} onChange={(v) => {
-                onChange('driver_name', v);
-                const dr = drivers.find((x) => x.name === v);
-                onChange('driver_id', dr?.id || '');
-              }} options={drivers.map((d) => [d.name, d.name])}
-                searchPlaceholder="Buscar motorista..." emptyLabel="Nenhum motorista encontrado" testid="fuel-driver" />
+              <div>
+                <Label className="mb-1 block">Equipamento <span className="text-red-500">*</span></Label>
+                <Autocomplete
+                  value={form.equipment_plate}
+                  onChange={(v) => onChange('equipment_plate', v)}
+                  onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
+                  options={vehicles}
+                  displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                  className="text-sm font-mono"
+                />
+              </div>
+              <div>
+                <Label className="mb-1 block">Operador / Motorista</Label>
+                <Autocomplete
+                  value={form.driver_name}
+                  onChange={(v) => onChange('driver_name', v)}
+                  onSelect={(dr) => { onChange('driver_name', dr.name); onChange('driver_id', dr.id); }}
+                  options={drivers}
+                  displayField="name"
+                  className="text-sm"
+                />
+              </div>
               <Field type="date" label="Data do Abastecimento *" value={form.supply_date} onChange={(v) => onChange('supply_date', v)} testid="fuel-supply-date" />
               <Field type="date" label="Data de Entrada *" value={form.entry_date} onChange={(v) => onChange('entry_date', v)} testid="fuel-entry-date" />
               <Field type="number" label="Leitura *" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-reading" />
-              <ComboField label="Fornecedor *" value={form.supplier_name || ''} onChange={(v) => {
-                onChange('supplier_name', v);
-                const sp = suppliers.find((x) => x.name === v);
-                onChange('supplier_id', sp?.id || '');
-              }} options={suppliers.map((s) => [s.name, s.name])}
-                searchPlaceholder="Buscar fornecedor..." emptyLabel="Nenhum fornecedor encontrado" testid="fuel-supplier" />
+              <div>
+                <Label className="mb-1 block">Fornecedor <span className="text-red-500">*</span></Label>
+                <Autocomplete
+                  value={form.supplier_name}
+                  onChange={(v) => onChange('supplier_name', v)}
+                  onSelect={(sp) => { onChange('supplier_name', sp.name); onChange('supplier_id', sp.id); }}
+                  options={suppliers}
+                  displayField="name"
+                  className="text-sm"
+                />
+              </div>
               <CityStateFields
                 flat
                 value={{ city: form.city, state: form.state }}

@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { ComboField } from '../components/ui/combo-field';
+import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -364,30 +365,45 @@ export default function FuelSupplyOrderPage() {
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <ComboField label="Empresa" value={form.company_id || ''} onChange={(v) => {
-                onChange('company_id', v);
-                const c = companies.find((x) => x.id === v);
-                onChange('company_name', c?.name || '');
-              }} options={companies.map((c) => [c.id, c.name])}
-                searchPlaceholder="Buscar empresa..." emptyLabel="Nenhuma empresa encontrada" testid="fuel-order-company" />
+              <div>
+                <Label className="mb-1 block">Empresa</Label>
+                <Autocomplete
+                  value={form.company_name}
+                  onChange={(v) => onChange('company_name', v)}
+                  onSelect={(c) => { onChange('company_name', c.name); onChange('company_id', c.id); }}
+                  options={companies}
+                  displayField="name"
+                  className="text-sm"
+                />
+              </div>
               <Field label="Solicitante" value={form.requester} onChange={(v) => onChange('requester', v)} testid="fuel-order-requester" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field type="date" label="Data *" value={form.order_date} onChange={(v) => onChange('order_date', v)} testid="fuel-order-date" />
-              <ComboField label="Equipamento *" value={form.equipment_plate || ''} onChange={(v) => {
-                onChange('equipment_plate', v);
-                const vh = vehicles.find((x) => x.plate === v);
-                onChange('equipment_id', vh?.id || '');
-              }} options={vehicles.map((v) => [v.plate, `${v.plate} ${v.model || ''}`.trim()])}
-                searchPlaceholder="Buscar equipamento..." emptyLabel="Nenhum equipamento encontrado" testid="fuel-order-equipment" />
+              <div>
+                <Label className="mb-1 block">Equipamento <span className="text-red-500">*</span></Label>
+                <Autocomplete
+                  value={form.equipment_plate}
+                  onChange={(v) => onChange('equipment_plate', v)}
+                  onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
+                  options={vehicles}
+                  displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                  className="text-sm font-mono"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <ComboField label="Fornecedor" value={form.supplier_name || ''} onChange={(v) => {
-                onChange('supplier_name', v);
-                const sp = suppliers.find((x) => x.name === v);
-                onChange('supplier_id', sp?.id || '');
-              }} options={suppliers.map((s) => [s.name, s.name])}
-                searchPlaceholder="Buscar fornecedor..." emptyLabel="Nenhum fornecedor encontrado" testid="fuel-order-supplier" />
+              <div>
+                <Label className="mb-1 block">Fornecedor</Label>
+                <Autocomplete
+                  value={form.supplier_name}
+                  onChange={(v) => onChange('supplier_name', v)}
+                  onSelect={(sp) => { onChange('supplier_name', sp.name); onChange('supplier_id', sp.id); }}
+                  options={suppliers}
+                  displayField="name"
+                  className="text-sm"
+                />
+              </div>
               <ComboField label="Produto *" value={form.fuel_type} onChange={(v) => onChange('fuel_type', v)} options={FUEL_TYPE_OPTIONS}
                 searchPlaceholder="Buscar produto..." emptyLabel="Nenhum produto encontrado" testid="fuel-order-fuel-type" />
             </div>
