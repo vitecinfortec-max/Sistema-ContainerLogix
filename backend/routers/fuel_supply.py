@@ -49,10 +49,12 @@ from models import (
     ExpenseReport, ExpenseReportCreate, ExpenseReportResponse,
     FuelSupply, FuelSupplyCreate, FuelSupplyUpdate, FuelSupplyResponse,
     FuelSupplyOrder, FuelSupplyOrderCreate, FuelSupplyOrderUpdate, FuelSupplyOrderResponse,
+    DailyFuelSupplyPoint,
 )
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, decode_token
 from reports import (
     generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel,
+    generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel,
     now_brt, to_brt, merge_company, DEFAULT_COMPANY
 )
 
@@ -153,6 +155,126 @@ async def delete_fuel_supply(supply_id: str, current_user: dict = Depends(get_cu
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
     return {"message": "Abastecimento removido"}
+
+
+_FUEL_SUPPLY_FUEL_TYPE_LABELS = {
+    "DIESEL_S10": "Diesel S10", "DIESEL_S500": "Diesel S500",
+    "GASOLINA_COMUM": "Gasolina Comum", "GASOLINA_ADITIVADA": "Gasolina Aditivada",
+    "ETANOL": "Etanol", "ARLA_32": "Arla 32", "GNV": "GNV", "OUTRO": "Outro",
+}
+
+
+async def _filter_fuel_supplies(
+    date_from: Optional[str], date_to: Optional[str],
+    equipment_plate: Optional[str], supplier_name: Optional[str], fuel_type: Optional[str],
+) -> list:
+    """Consulta db.fuel_supplies com os mesmos filtros usados pelo Relatório
+    de Abastecimento (resumo, gráfico diário, PDF e Excel), sempre a partir
+    de supply_date (data real do abastecimento, não created_at)."""
+    query = {}
+    if equipment_plate and equipment_plate != 'all':
+        query['equipment_plate'] = equipment_plate
+    if supplier_name and supplier_name != 'all':
+        query['supplier_name'] = supplier_name
+    if fuel_type and fuel_type != 'all':
+        query['fuel_type'] = fuel_type
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            date_query['$gte'] = date_from
+        if date_to:
+            date_query['$lte'] = date_to
+        query['supply_date'] = date_query
+    rows = await db.fuel_supplies.find(query, {"_id": 0}).sort("supply_date", -1).to_list(None)
+    out = []
+    for r in rows:
+        calc = _fuel_calc(r)
+        calc['fuel_type_label'] = _FUEL_SUPPLY_FUEL_TYPE_LABELS.get(calc.get('fuel_type'), calc.get('fuel_type'))
+        out.append(calc)
+    return out
+
+
+@api_router.get("/reports/fuel-supply/summary")
+async def get_fuel_supply_report_summary(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    equipment_plate: Optional[str] = None, supplier_name: Optional[str] = None, fuel_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    rows = await _filter_fuel_supplies(date_from, date_to, equipment_plate, supplier_name, fuel_type)
+    total_liters = round(sum(r.get('liters') or 0 for r in rows), 2)
+    total_value = round(sum(r.get('total_value') or 0 for r in rows), 2)
+    return {
+        "count": len(rows),
+        "total_liters": total_liters,
+        "total_value": total_value,
+        "avg_price_per_liter": round(total_value / total_liters, 2) if total_liters else 0,
+    }
+
+
+async def _compute_daily_fuel_supply_chart(today: datetime) -> List[DailyFuelSupplyPoint]:
+    """Valor/litros abastecidos por dia dos últimos 14 dias (por supply_date,
+    a data real do abastecimento) - mesma estratégia de agregação em janela
+    fixa usada em movements.py's _compute_daily_billing_chart."""
+    day0 = (today - timedelta(days=13)).strftime('%Y-%m-%d')
+    rows = await db.fuel_supplies.find({"supply_date": {"$gte": day0}}, {"_id": 0}).to_list(None)
+    by_day: dict = {}
+    for r in rows:
+        day_key = r.get('supply_date')
+        if not day_key:
+            continue
+        calc = _fuel_calc(r)
+        entry = by_day.setdefault(day_key, {"value": 0.0, "liters": 0.0})
+        entry["value"] += calc.get('total_value') or 0
+        entry["liters"] += float(r.get('liters') or 0)
+
+    daily_chart = []
+    for i in range(13, -1, -1):
+        day_key = (today - timedelta(days=i)).strftime('%Y-%m-%d')
+        totals = by_day.get(day_key, {})
+        daily_chart.append(DailyFuelSupplyPoint(
+            date=day_key,
+            total_value=round(totals.get('value', 0), 2),
+            total_liters=round(totals.get('liters', 0), 2),
+        ))
+    return daily_chart
+
+
+@api_router.get("/reports/fuel-supply/daily-chart", response_model=List[DailyFuelSupplyPoint])
+async def get_fuel_supply_daily_chart(current_user: dict = Depends(get_current_admin_user)):
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    return await _compute_daily_fuel_supply_chart(today)
+
+
+@api_router.get("/reports/fuel-supply/pdf")
+async def download_fuel_supply_report_pdf(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    equipment_plate: Optional[str] = None, supplier_name: Optional[str] = None, fuel_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    rows = await _filter_fuel_supplies(date_from, date_to, equipment_plate, supplier_name, fuel_type)
+    company = await get_company_settings()
+    pdf_buffer = generate_fuel_supply_report_pdf(rows, company=company)
+    return StreamingResponse(
+        io.BytesIO(pdf_buffer),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=relatorio_abastecimento.pdf"}
+    )
+
+
+@api_router.get("/reports/fuel-supply/excel")
+async def download_fuel_supply_report_excel(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    equipment_plate: Optional[str] = None, supplier_name: Optional[str] = None, fuel_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    rows = await _filter_fuel_supplies(date_from, date_to, equipment_plate, supplier_name, fuel_type)
+    company = await get_company_settings()
+    excel_buffer = generate_fuel_supply_report_excel(rows, company=company)
+    return StreamingResponse(
+        io.BytesIO(excel_buffer),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=relatorio_abastecimento.xlsx"}
+    )
 
 
 # ==================== ORDEM DE ABASTECIMENTO ====================

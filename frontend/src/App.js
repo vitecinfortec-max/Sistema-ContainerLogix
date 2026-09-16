@@ -60,6 +60,7 @@ import UnitSegregationPage from './pages/UnitSegregationPage';
 import RPATerceiroPage from './pages/RPATerceiroPage';
 import OrdemServicoPage from './pages/OrdemServicoPage';
 import FuelSupplyPage from './pages/FuelSupplyPage';
+import ReportsFuelSupplyPage from './pages/ReportsFuelSupplyPage';
 import FuelSupplyOrderPage from './pages/FuelSupplyOrderPage';
 import LoadingOrderPage from './pages/LoadingOrderPage';
 import FreightRoutesPage from './pages/FreightRoutesPage';
@@ -180,6 +181,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="frota.abastecimento">
                 <FuelSupplyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/fuel-supply"
+            element={
+              <ProtectedRoute adminOnly moduleKey="frota.relatorio_abastecimento">
+                <ReportsFuelSupplyPage />
               </ProtectedRoute>
             }
           />

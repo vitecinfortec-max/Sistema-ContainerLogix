@@ -515,6 +515,11 @@ class DailyBillingPoint(BaseModel):
     billed: float
     unbilled: float
 
+class DailyFuelSupplyPoint(BaseModel):
+    date: str  # YYYY-MM-DD
+    total_value: float
+    total_liters: float
+
 class DriverRankingEntry(BaseModel):
     driver_name: str
     entries: int

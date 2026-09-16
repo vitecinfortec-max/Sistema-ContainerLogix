@@ -411,6 +411,12 @@ export const api = {
   deleteFuelSupplyOrder: (id) => axios.delete(`${API}/fuel-supply-orders/${id}`),
   getFuelSupplyOrderPDF: (id) => axios.get(`${API}/fuel-supply-orders/${id}/pdf`, { responseType: 'blob' }),
 
+  // Relatório de Abastecimento (Frota)
+  getFuelSupplyReportSummary: (params) => axios.get(`${API}/reports/fuel-supply/summary`, { params }),
+  getFuelSupplyDailyChart: () => axios.get(`${API}/reports/fuel-supply/daily-chart`),
+  downloadFuelSupplyPDFReport: (params) => axios.get(`${API}/reports/fuel-supply/pdf`, { params, responseType: 'blob' }),
+  downloadFuelSupplyExcelReport: (params) => axios.get(`${API}/reports/fuel-supply/excel`, { params, responseType: 'blob' }),
+
   // Ordem de Carregamento (Transporte)
   getLoadingOrders: (params) => axios.get(`${API}/loading-orders`, { params }),
   getLoadingOrder: (id) => axios.get(`${API}/loading-orders/${id}`),

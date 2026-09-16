@@ -269,6 +269,7 @@ MODULE_CATALOG = [
         {"key": "frota.checklist", "label": "Checklist"},
         {"key": "frota.ordem_abastecimento", "label": "Ordem de Abastecimento"},
         {"key": "frota.abastecimento", "label": "Abastecimento"},
+        {"key": "frota.relatorio_abastecimento", "label": "Relatório de Abastecimento"},
     ]},
     {"key": "cadastro", "label": "Cadastro", "items": [
         {"key": "cadastro.pessoas", "label": "Pessoas"},
@@ -370,6 +371,7 @@ PATH_MODULE_MAP = [
     ("/api/stock/report", "estoque.relatorio"),
     ("/api/products", "estoque.produto"),
     ("/api/fuel-supplies", "frota.abastecimento"),
+    ("/api/reports/fuel-supply", "frota.relatorio_abastecimento"),
     ("/api/loading-schedules", "operacional.programacao_carregamento"),
     ("/api/delivery-status", "operacional.status_entrega"),
 ]

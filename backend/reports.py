@@ -1364,6 +1364,130 @@ def generate_storage_overage_excel_report(storage_charges: list, company: dict =
         return buffer.getvalue()
 
 
+def generate_fuel_supply_report_excel(supplies: list, company: dict = None, report_title: str = "Relatório de Abastecimento") -> bytes:
+    """Relatório standalone dos Abastecimentos (fuel supply) - mesmo padrão
+    visual/estrutura do Relatório de Diárias de Armazenagem
+    (generate_storage_overage_excel_report), com uma linha por abastecimento."""
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Abastecimentos"
+
+        total_liters = round(sum(s.get('liters') or 0 for s in supplies), 2)
+        total_value = round(sum(s.get('total_value') or 0 for s in supplies), 2)
+        liters_text = f"{total_liters:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        stats_text = f"Abastecimentos: {len(supplies)}  |  Litros: {liters_text}  |  Valor Total: {format_currency(total_value, 'BRL')}"
+
+        ws.column_dimensions['A'].width = 3
+        for letter, w in {'B': 12, 'C': 14, 'D': 20, 'E': 20, 'F': 16, 'G': 12, 'H': 14, 'I': 14}.items():
+            ws.column_dimensions[letter].width = w
+
+        logo_buffer = download_logo(company)
+        if logo_buffer is not None:
+            try:
+                target_height_px = 92
+                try:
+                    logo_buffer.seek(0)
+                    with PILImage.open(logo_buffer) as pil_img:
+                        orig_w, orig_h = pil_img.size
+                    target_width_px = int(target_height_px * orig_w / orig_h) if orig_h else target_height_px
+                except Exception:
+                    target_width_px = target_height_px
+                logo_buffer.seek(0)
+                logo_img = XLImage(logo_buffer)
+                logo_img.height = target_height_px
+                logo_img.width = target_width_px
+                ws.add_image(logo_img, 'A2')
+            except Exception as e:
+                logger.error(f"Error adding logo to fuel supply Excel: {e}")
+
+        ws.merge_cells('B2:I3')
+        cell = ws['B2']
+        cell.value = c['name']
+        cell.font = Font(name='Calibri', size=38, bold=True, color=PRIMARY_COLOR)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[2].height = 30
+        ws.row_dimensions[3].height = 40.5
+
+        ws.merge_cells('B4:I4')
+        cell = ws['B4']
+        cell.value = report_title
+        cell.font = Font(name='Calibri', size=16, color=PRIMARY_COLOR)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[4].height = 21
+
+        ws.row_dimensions[5].height = 13
+
+        ws.merge_cells('B6:I6')
+        cell = ws['B6']
+        cell.value = stats_text
+        cell.font = Font(name='Calibri', size=12, bold=True, color=PRIMARY_COLOR)
+        cell.fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type='solid')
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[6].height = 28
+
+        ws.merge_cells('B7:I7')
+        cell = ws['B7']
+        cell.value = f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')} | Fuso: UTC-3 (Brasília)"
+        cell.font = Font(name='Calibri', size=9, color='808080')
+        cell.alignment = Alignment(horizontal='center')
+        ws.row_dimensions[7].height = 15
+
+        last_row = 9
+        if supplies:
+            header_font = Font(size=9, bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
+            headers = ['Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total']
+            for col, header in enumerate(headers, start=2):
+                header_cell = ws.cell(row=last_row, column=col, value=header)
+                header_cell.font = header_font
+                header_cell.fill = header_fill
+            last_row += 1
+            for s in supplies:
+                ws.cell(row=last_row, column=2, value=fmt_date(s.get('supply_date')))
+                ws.cell(row=last_row, column=3, value=s.get('equipment_plate') or '-')
+                ws.cell(row=last_row, column=4, value=s.get('driver_name') or '-')
+                ws.cell(row=last_row, column=5, value=s.get('supplier_name') or '-')
+                ws.cell(row=last_row, column=6, value=s.get('fuel_type_label') or '-')
+                ws.cell(row=last_row, column=7, value=s.get('liters') or 0)
+                ws.cell(row=last_row, column=8, value=format_currency(s.get('unit_price') or 0))
+                ws.cell(row=last_row, column=9, value=format_currency(s.get('total_value') or 0))
+                last_row += 1
+            subtotal_font = Font(size=9, bold=True)
+            subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+            ws.cell(row=last_row, column=8, value='TOTAL:').font = subtotal_font
+            ws.cell(row=last_row, column=9, value=format_currency(total_value)).font = subtotal_font
+            for col in range(2, 10):
+                ws.cell(row=last_row, column=col).fill = subtotal_fill
+            last_row += 1
+        else:
+            ws.cell(row=last_row, column=2, value="Nenhum abastecimento encontrado para os filtros selecionados.")
+            ws.cell(row=last_row, column=2).font = Font(size=10, color='808080')
+
+        ws.sheet_view.showGridLines = False
+        ws.print_area = f'A1:I{max(last_row, 9)}'
+        ws.page_setup.orientation = 'landscape'
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.print_options.horizontalCentered = True
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+    except Exception as e:
+        logger.error(f"Error generating fuel supply Excel: {e}")
+        wb = Workbook()
+        ws = wb.active
+        ws['A1'] = "Erro ao gerar relatório."
+        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+
 def generate_billing_excel(movements: list, company: dict = None, storage_charges: list = None) -> bytes:
     """Generate billing Excel report with Bsoft template style."""
     try:
@@ -1815,6 +1939,101 @@ def generate_storage_overage_pdf_report(storage_charges: list, company: dict = N
             textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
         )
         elements.append(Paragraph("Nenhum container em estoque passou do free time configurado na Tabela de Serviços.", empty_style))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
+def generate_fuel_supply_report_pdf(supplies: list, company: dict = None, report_title: str = "Relatório de Abastecimento") -> bytes:
+    """Relatório standalone dos Abastecimentos (fuel supply) - mesmo padrão
+    visual do Relatório de Diárias de Armazenagem (generate_storage_overage_pdf_report):
+    stats bar (contagem/litros/valor) + uma linha de tabela por abastecimento."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=10*mm,
+        leftMargin=10*mm,
+        topMargin=10*mm,
+        bottomMargin=15*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = download_logo(company)
+    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
+    elements.extend(header_elements)
+
+    total_liters = round(sum(s.get('liters') or 0 for s in supplies), 2)
+    total_value = round(sum(s.get('total_value') or 0 for s in supplies), 2)
+    liters_text = f"{total_liters:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    stats_text = f"Abastecimentos: {len(supplies)}  |  Litros: {liters_text}  |  Valor Total: {format_currency(total_value, 'BRL')}"
+    stats_style = ParagraphStyle(
+        'FuelSupplyStatsBar', parent=styles['Normal'], fontSize=10,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
+    )
+    stats_table = Table([[Paragraph(stats_text, stats_style)]], colWidths=[doc.width])
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+    ]))
+    elements.append(stats_table)
+
+    gen_info_style = ParagraphStyle(
+        'FuelSupplyGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    if supplies:
+        cell_style = ParagraphStyle('FuelSupplyCell', parent=styles['Normal'], fontSize=8, leading=10)
+        rows = [['Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total']]
+        for s in supplies:
+            rows.append([
+                fmt_date(s.get('supply_date')),
+                Paragraph(s.get('equipment_plate') or '-', cell_style),
+                Paragraph(s.get('driver_name') or '-', cell_style),
+                Paragraph(s.get('supplier_name') or '-', cell_style),
+                Paragraph(s.get('fuel_type_label') or '-', cell_style),
+                f"{(s.get('liters') or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                format_currency(s.get('unit_price') or 0),
+                format_currency(s.get('total_value') or 0),
+            ])
+        rows.append(['', '', '', '', '', '', 'TOTAL:', format_currency(total_value)])
+
+        col_widths = [doc.width*0.09, doc.width*0.12, doc.width*0.16, doc.width*0.18, doc.width*0.13, doc.width*0.1, doc.width*0.11, doc.width*0.11]
+        table = Table(rows, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+            ('ALIGN', (5, 0), (-1, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
+            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+            ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(table)
+    else:
+        empty_style = ParagraphStyle(
+            'FuelSupplyEmpty', parent=styles['Normal'], fontSize=10,
+            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
+        )
+        elements.append(Paragraph("Nenhum abastecimento encontrado para os filtros selecionados.", empty_style))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)

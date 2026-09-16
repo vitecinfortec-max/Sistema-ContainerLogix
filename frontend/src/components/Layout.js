@@ -82,6 +82,7 @@ const PAGE_TITLES = {
   '/fleet/ordem-servico': 'Ordem de Serviço',
   '/fleet/ordem-abastecimento': 'Ordem de Abastecimento',
   '/fleet/abastecimento': 'Abastecimento',
+  '/reports/fuel-supply': 'Relatório de Abastecimento',
   '/fleet/os-categories': 'Cadastro de Categoria',
   '/estoque/cadastros': 'Cadastro',
   '/estoque/servicos': 'Cadastro de Serviço',
@@ -314,7 +315,7 @@ export default function Layout({ children }) {
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/relatorio'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
-  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive;
+  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/reports/fuel-supply' || isManutencaoCadastroActive;
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
@@ -494,6 +495,7 @@ export default function Layout({ children }) {
     { path: '/fleet/checklist', label: 'Checklist', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
     { path: '/fleet/ordem-abastecimento', label: 'Ordem de Abastecimento', icon: Clipboard, moduleKey: 'frota.ordem_abastecimento' },
     { path: '/fleet/abastecimento', label: 'Abastecimento', icon: Fuel, moduleKey: 'frota.abastecimento' },
+    { path: '/reports/fuel-supply', label: 'Relatório de Abastecimento', icon: BarChart3, moduleKey: 'frota.relatorio_abastecimento' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const manutencaoCadastroItems = [
