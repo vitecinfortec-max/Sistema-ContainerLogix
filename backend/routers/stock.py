@@ -1,8 +1,10 @@
 import io
 from datetime import datetime
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from typing import List
 
 from models import (
@@ -11,9 +13,12 @@ from models import (
     ServiceFamily, ServiceFamilyCreate, ServiceFamilyResponse,
     ServiceCatalogItem, ServiceCatalogItemCreate, ServiceCatalogItemResponse,
     Product, ProductCreate, ProductResponse,
+    StockEntry, StockEntryResponse,
+    Supplier,
 )
-from shared import db, get_current_active_user, get_company_settings
+from shared import db, get_current_active_user, get_company_settings, validate_and_read_upload
 from reports import generate_stock_report_excel, generate_stock_report_pdf
+from nfe_import import parse_nfe_xml
 
 api_router = APIRouter(prefix="/api")
 
@@ -240,3 +245,183 @@ async def download_stock_report_pdf(current_user: dict = Depends(get_current_act
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=relatorio_estoque.pdf"}
     )
+
+
+# ==================== ENTRADAS DE ESTOQUE (IMPORTAÇÃO DE XML DE NF-e) ====================
+
+ALLOWED_XML_EXTENSIONS = {'.xml'}
+
+
+def _normalize_text(s: str) -> str:
+    return (s or '').strip().lower()
+
+
+def _only_digits(s: str) -> str:
+    return ''.join(ch for ch in (s or '') if ch.isdigit())
+
+
+async def _match_product(item: dict):
+    """Tenta achar um Product já cadastrado pro item da NF-e: primeiro por
+    código de barras/EAN exato (mais confiável), senão por NCM + descrição
+    normalizada (minúsculo, sem espaços nas pontas) iguais."""
+    barcode = (item.get('barcode') or '').strip()
+    if barcode:
+        found = await db.products.find_one({"barcode": barcode}, {"_id": 0})
+        if found:
+            return found
+    ncm = (item.get('ncm') or '').strip()
+    description_norm = _normalize_text(item.get('description'))
+    if ncm and description_norm:
+        async for p in db.products.find({"ncm": ncm}, {"_id": 0}):
+            if _normalize_text(p.get('description')) == description_norm:
+                return p
+    return None
+
+
+async def _match_supplier(cnpj: str):
+    digits = _only_digits(cnpj)
+    if not digits:
+        return None
+    async for s in db.suppliers.find({}, {"_id": 0}):
+        if _only_digits(s.get('cnpj')) == digits:
+            return s
+    return None
+
+
+@api_router.post("/stock/nfe-import/parse")
+async def parse_nfe_import(file: UploadFile = File(...), current_user: dict = Depends(get_current_active_user)):
+    """Recebe o XML da NF-e, extrai emitente + itens e devolve uma prévia
+    (com sugestão de Produto/Fornecedor já cadastrados, quando encontrados)
+    pra revisão do usuário - não grava nada no banco ainda."""
+    _, content = await validate_and_read_upload(file, ALLOWED_XML_EXTENSIONS)
+    try:
+        parsed = parse_nfe_xml(content)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    matched_supplier = await _match_supplier(parsed['supplier_cnpj'])
+
+    items_out = []
+    for item in parsed['items']:
+        matched_product = await _match_product(item)
+        items_out.append({
+            **item,
+            "matched_product_id": matched_product['id'] if matched_product else None,
+            "matched_product_name": matched_product['description'] if matched_product else None,
+        })
+
+    return {
+        "nfe_number": parsed['nfe_number'],
+        "nfe_key": parsed['nfe_key'],
+        "nfe_issue_date": parsed['nfe_issue_date'],
+        "supplier_cnpj": parsed['supplier_cnpj'],
+        "supplier_name": parsed['supplier_name'],
+        "matched_supplier_id": matched_supplier['id'] if matched_supplier else None,
+        "matched_supplier_name": matched_supplier['name'] if matched_supplier else None,
+        "items": items_out,
+    }
+
+
+class NfeImportItemConfirm(BaseModel):
+    barcode: Optional[str] = None
+    description: str
+    ncm: Optional[str] = None
+    cfop: Optional[str] = None
+    unit: Optional[str] = None
+    quantity: float
+    unit_value: float = 0.0
+    total_value: float = 0.0
+    matched_product_id: Optional[str] = None  # None = criar produto novo
+
+
+class NfeImportConfirm(BaseModel):
+    nfe_number: Optional[str] = None
+    nfe_key: Optional[str] = None
+    nfe_issue_date: Optional[str] = None
+    supplier_cnpj: Optional[str] = None
+    supplier_name: Optional[str] = None
+    matched_supplier_id: Optional[str] = None  # None = criar fornecedor novo a partir do emitente
+    items: List[NfeImportItemConfirm]
+
+
+@api_router.post("/stock/nfe-import/confirm")
+async def confirm_nfe_import(data: NfeImportConfirm, current_user: dict = Depends(get_current_active_user)):
+    """Efetiva a importação revisada: cria/atualiza o Fornecedor, cria
+    Produtos novos (quando o item não foi vinculado a um já existente),
+    soma a quantidade em Product.stock_quantity e grava um StockEntry por
+    item, pra manter o extrato de onde cada entrada veio."""
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Nenhum item para importar")
+    for item in data.items:
+        if not item.description.strip():
+            raise HTTPException(status_code=400, detail="Há um item sem descrição")
+        if item.quantity <= 0:
+            raise HTTPException(status_code=400, detail=f"Quantidade inválida para o item \"{item.description}\"")
+
+    supplier_id = data.matched_supplier_id
+    supplier_name = (data.supplier_name or '').strip() or None
+    if not supplier_id and supplier_name:
+        supplier = Supplier(name=supplier_name, cnpj=data.supplier_cnpj, created_by=current_user['sub'])
+        doc = supplier.model_dump()
+        doc['created_at'] = doc['created_at'].isoformat()
+        await db.suppliers.insert_one(doc)
+        supplier_id = supplier.id
+
+    products_created = 0
+    products_updated = 0
+
+    for item in data.items:
+        if item.matched_product_id:
+            product_doc = await db.products.find_one({"id": item.matched_product_id}, {"_id": 0})
+            if not product_doc:
+                raise HTTPException(status_code=404, detail=f"Produto vinculado não encontrado: {item.description}")
+            product_id = product_doc['id']
+            product_name = product_doc['description']
+            new_qty = float(product_doc.get('stock_quantity') or 0) + item.quantity
+            await db.products.update_one({"id": product_id}, {"$set": {"stock_quantity": new_qty}})
+            products_updated += 1
+        else:
+            counter = await db.counters.find_one_and_update(
+                {"_id": "product_code"}, {"$inc": {"seq": 1}}, upsert=True, return_document=True
+            )
+            product = Product(
+                code=counter["seq"],
+                description=item.description,
+                barcode=item.barcode or None,
+                ncm=item.ncm or None,
+                cfop=item.cfop or None,
+                unit=item.unit or None,
+                reference_value=item.unit_value,
+                stock_quantity=item.quantity,
+                linked_party_name=supplier_name,
+                created_by=current_user['sub'], created_by_name=current_user['name'],
+            )
+            doc = product.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.products.insert_one(doc)
+            product_id = product.id
+            product_name = product.description
+            products_created += 1
+
+        entry = StockEntry(
+            product_id=product_id, product_name=product_name,
+            quantity=item.quantity, unit_value=item.unit_value, total_value=item.total_value,
+            supplier_id=supplier_id, supplier_name=supplier_name,
+            nfe_number=data.nfe_number, nfe_key=data.nfe_key, nfe_issue_date=data.nfe_issue_date,
+            created_by=current_user['sub'], created_by_name=current_user['name'],
+        )
+        entry_doc = entry.model_dump()
+        entry_doc['created_at'] = entry_doc['created_at'].isoformat()
+        await db.stock_entries.insert_one(entry_doc)
+
+    return {
+        "products_created": products_created,
+        "products_updated": products_updated,
+        "entries_created": len(data.items),
+    }
+
+
+@api_router.get("/stock/entries", response_model=List[StockEntryResponse])
+async def get_stock_entries(current_user: dict = Depends(get_current_active_user)):
+    items = await db.stock_entries.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
+    return [StockEntryResponse(**{**i, "created_at": datetime.fromisoformat(i['created_at'])}) for i in items]

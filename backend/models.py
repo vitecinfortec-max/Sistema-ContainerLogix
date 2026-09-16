@@ -3217,6 +3217,33 @@ class ProductResponse(ProductCreate):
     created_at: datetime
 
 
+class StockEntry(BaseModel):
+    """Registro de entrada de estoque - histórico de onde cada quantidade
+    somada a um Product veio (hoje, só via importação de XML de NF-e).
+    Product.stock_quantity continua sendo o saldo corrente (editável à
+    mão); StockEntry é o extrato/auditoria de como ele chegou lá."""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    product_id: str
+    product_name: str
+    quantity: float
+    unit_value: float = 0.0
+    total_value: float = 0.0
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    nfe_number: Optional[str] = None
+    nfe_key: Optional[str] = None  # chave de acesso (44 dígitos)
+    nfe_issue_date: Optional[str] = None  # YYYY-MM-DD
+    observations: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class StockEntryResponse(StockEntry):
+    pass
+
+
 # ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================
 
 class ExpenseReportReceipt(BaseModel):

@@ -22,6 +22,7 @@ import EstoqueCadastrosPage from './pages/EstoqueCadastrosPage';
 import ServiceCatalogPage from './pages/ServiceCatalogPage';
 import ProductPage from './pages/ProductPage';
 import StockPage from './pages/StockPage';
+import StockEntriesPage from './pages/StockEntriesPage';
 import StockReportPage from './pages/StockReportPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
@@ -330,6 +331,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="estoque.consulta">
                 <StockPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/entradas"
+            element={
+              <ProtectedRoute moduleKey="estoque.entradas">
+                <StockEntriesPage />
               </ProtectedRoute>
             }
           />

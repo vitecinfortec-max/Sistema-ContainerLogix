@@ -69,6 +69,16 @@ export const api = {
   updateProduct: (id, data) => axios.put(`${API}/products/${id}`, data),
   deleteProduct: (id) => axios.delete(`${API}/products/${id}`),
 
+  getStockEntries: () => axios.get(`${API}/stock/entries`),
+  parseNfeImport: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/stock/nfe-import/parse`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  confirmNfeImport: (data) => axios.post(`${API}/stock/nfe-import/confirm`, data),
+
   getStockReportExcel: () => axios.get(`${API}/stock/report/excel`, { responseType: 'blob' }),
   getStockReportPDF: () => axios.get(`${API}/stock/report/pdf`, { responseType: 'blob' }),
 

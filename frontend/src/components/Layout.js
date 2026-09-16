@@ -58,7 +58,8 @@ import {
   ShoppingBag,
   ShoppingCart,
   BadgeDollarSign,
-  Users
+  Users,
+  FileUp
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -88,6 +89,7 @@ const PAGE_TITLES = {
   '/estoque/servicos': 'Cadastro de Serviço',
   '/estoque/produtos': 'Produto',
   '/estoque': 'Estoque',
+  '/estoque/entradas': 'Entradas de Estoque',
   '/estoque/relatorio': 'Relatório de Estoque',
   '/loading-orders': 'Ordem de Carregamento',
   '/freight-routes': 'Rota',
@@ -312,7 +314,7 @@ export default function Layout({ children }) {
   const fleetTab = new URLSearchParams(location.search).get('tab');
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
-  const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/relatorio'].includes(location.pathname);
+  const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/relatorio'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/reports/fuel-supply' || isManutencaoCadastroActive;
@@ -504,6 +506,7 @@ export default function Layout({ children }) {
 
   const estoqueItems = [
     { path: '/estoque', label: 'Estoque', icon: Boxes, moduleKey: 'estoque.consulta' },
+    { path: '/estoque/entradas', label: 'Entradas de Estoque', icon: FileUp, moduleKey: 'estoque.entradas' },
     { path: '/estoque/produtos', label: 'Produto', icon: Package, moduleKey: 'estoque.produto' },
     { path: '/estoque/servicos', label: 'Cadastro de Serviço', icon: Wrench, moduleKey: 'estoque.cadastro_servico' },
     { path: '/estoque/relatorio', label: 'Relatório de Estoque', icon: FileSpreadsheet, moduleKey: 'estoque.relatorio' },
