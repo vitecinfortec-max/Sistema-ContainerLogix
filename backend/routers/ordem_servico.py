@@ -392,6 +392,13 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     # menor fonte de sobra nas colunas de valor, que raramente precisam de
     # toda a largura reservada).
     item_desc_style = ParagraphStyle('OSItemDesc', parent=styles['Normal'], fontSize=7.5, leading=9)
+    # boxed_section (_voucher_boxed_section) tem 10pt de LEFTPADDING/
+    # RIGHTPADDING dentro da caixa preta - uma tabela de itens construída com
+    # a largura cheia da página (`width`) sobra 20pt e a última coluna vaza
+    # pra fora do retângulo (bug reportado: "V. c/ Desc."/"V. Total" cortando
+    # a borda direita da caixa). As tabelas de item usam essa largura
+    # reduzida em vez de `width`.
+    item_table_width = width - 20
 
     prod_header = ['Código', 'Descrição', 'Qtd', 'Un', 'V. Unit.', 'V. Total', 'Desc.', 'V. c/ Desc.']
     prod_rows = [prod_header]
@@ -419,7 +426,7 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
         money(os_doc.get('products_total')),
     ])
     prod_base_widths = [35, 250, 30, 28, 48, 48, 38, 55]
-    prod_scale = width / sum(prod_base_widths)
+    prod_scale = item_table_width / sum(prod_base_widths)
     prod_t = Table(prod_rows, colWidths=[w * prod_scale for w in prod_base_widths], repeatRows=1)
     prod_style = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
@@ -460,7 +467,7 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
         ])
     serv_rows.append(['', 'Total', '', '', '', money(os_doc.get('services_total'))])
     serv_base_widths = [35, 330, 30, 48, 48, 48]
-    serv_scale = width / sum(serv_base_widths)
+    serv_scale = item_table_width / sum(serv_base_widths)
     serv_t = Table(serv_rows, colWidths=[w * serv_scale for w in serv_base_widths], repeatRows=1)
     serv_style = [
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
