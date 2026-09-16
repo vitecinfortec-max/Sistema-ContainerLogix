@@ -3222,6 +3222,12 @@ class ProductResponse(ProductCreate):
     created_at: datetime
 
 
+class StockValueByWarehousePoint(BaseModel):
+    warehouse_name: str
+    total_quantity: float
+    total_value: float
+
+
 class StockEntry(BaseModel):
     """Registro de entrada de estoque - histórico de onde cada quantidade
     somada a um Product veio (hoje, só via importação de XML de NF-e).

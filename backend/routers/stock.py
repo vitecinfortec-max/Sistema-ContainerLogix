@@ -14,6 +14,7 @@ from models import (
     ServiceFamily, ServiceFamilyCreate, ServiceFamilyResponse,
     ServiceCatalogItem, ServiceCatalogItemCreate, ServiceCatalogItemResponse,
     Product, ProductCreate, ProductResponse,
+    StockValueByWarehousePoint,
     StockEntry, StockEntryResponse,
     StockMovement, StockMovementCreate, StockMovementUpdate, StockMovementResponse,
     Supplier,
@@ -226,9 +227,76 @@ async def delete_product(item_id: str, current_user: dict = Depends(get_current_
 
 # ==================== RELATÓRIO DE ESTOQUE ====================
 
+async def _filter_products_report(
+    search: Optional[str] = None,
+    warehouse_id: Optional[str] = None,
+    family_id: Optional[str] = None,
+    status: Optional[str] = None,
+):
+    query = {}
+    if search:
+        search_escaped = re.escape(search)
+        query["$or"] = [
+            {"description": {"$regex": search_escaped, "$options": "i"}},
+            {"barcode": {"$regex": search_escaped, "$options": "i"}},
+        ]
+    if warehouse_id:
+        query["warehouse_id"] = warehouse_id
+    if family_id:
+        query["family_id"] = family_id
+    if status:
+        query["status"] = status
+    return await db.products.find(query, {"_id": 0}).sort("code", 1).to_list(None)
+
+
+@api_router.get("/stock/report/summary")
+async def get_stock_report_summary(
+    search: Optional[str] = None,
+    warehouse_id: Optional[str] = None,
+    family_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    products = await _filter_products_report(search, warehouse_id, family_id, status)
+    total_quantity = sum(float(p.get('stock_quantity') or 0) for p in products)
+    total_value = sum(float(p.get('stock_quantity') or 0) * float(p.get('reference_value') or 0) for p in products)
+    zero_stock_count = sum(1 for p in products if float(p.get('stock_quantity') or 0) <= 0)
+    return {
+        "count": len(products),
+        "total_quantity": total_quantity,
+        "total_value": total_value,
+        "zero_stock_count": zero_stock_count,
+    }
+
+
+@api_router.get("/stock/report/by-warehouse", response_model=List[StockValueByWarehousePoint])
+async def get_stock_report_by_warehouse(
+    search: Optional[str] = None,
+    warehouse_id: Optional[str] = None,
+    family_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Agrupa o valor em estoque por Almoxarifado, pro gráfico do relatório."""
+    products = await _filter_products_report(search, warehouse_id, family_id, status)
+    grouped = {}
+    for p in products:
+        name = p.get('warehouse_name') or 'Sem Almoxarifado'
+        g = grouped.setdefault(name, {"warehouse_name": name, "total_quantity": 0.0, "total_value": 0.0})
+        g["total_quantity"] += float(p.get('stock_quantity') or 0)
+        g["total_value"] += float(p.get('stock_quantity') or 0) * float(p.get('reference_value') or 0)
+    return sorted(grouped.values(), key=lambda x: x["total_value"], reverse=True)
+
+
 @api_router.get("/stock/report/excel")
-async def download_stock_report_excel(current_user: dict = Depends(get_current_active_user)):
-    products = await db.products.find({}, {"_id": 0}).sort("code", 1).to_list(None)
+async def download_stock_report_excel(
+    search: Optional[str] = None,
+    warehouse_id: Optional[str] = None,
+    family_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    products = await _filter_products_report(search, warehouse_id, family_id, status)
     company = await get_company_settings()
     excel_bytes = generate_stock_report_excel(products, company=company)
     return StreamingResponse(
@@ -238,8 +306,14 @@ async def download_stock_report_excel(current_user: dict = Depends(get_current_a
     )
 
 @api_router.get("/stock/report/pdf")
-async def download_stock_report_pdf(current_user: dict = Depends(get_current_active_user)):
-    products = await db.products.find({}, {"_id": 0}).sort("code", 1).to_list(None)
+async def download_stock_report_pdf(
+    search: Optional[str] = None,
+    warehouse_id: Optional[str] = None,
+    family_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    products = await _filter_products_report(search, warehouse_id, family_id, status)
     company = await get_company_settings()
     pdf_bytes = generate_stock_report_pdf(products, company=company)
     return StreamingResponse(

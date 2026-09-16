@@ -79,8 +79,10 @@ export const api = {
   },
   confirmNfeImport: (data) => axios.post(`${API}/stock/nfe-import/confirm`, data),
 
-  getStockReportExcel: () => axios.get(`${API}/stock/report/excel`, { responseType: 'blob' }),
-  getStockReportPDF: () => axios.get(`${API}/stock/report/pdf`, { responseType: 'blob' }),
+  getStockReportSummary: (params) => axios.get(`${API}/stock/report/summary`, { params }),
+  getStockReportByWarehouse: (params) => axios.get(`${API}/stock/report/by-warehouse`, { params }),
+  getStockReportExcel: (params) => axios.get(`${API}/stock/report/excel`, { params, responseType: 'blob' }),
+  getStockReportPDF: (params) => axios.get(`${API}/stock/report/pdf`, { params, responseType: 'blob' }),
 
   getStockMovements: (params) => axios.get(`${API}/stock/movements`, { params }),
   getStockMovementNextNumber: () => axios.get(`${API}/stock/movements/next-number`),
