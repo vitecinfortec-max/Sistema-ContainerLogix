@@ -32,6 +32,14 @@ const STATUS_COLORS = {
 const fmtMoney = (v) =>
   Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// Junta os campos estruturados do cadastro (street/number/neighborhood) numa
+// única linha de texto, pro campo "Endereço" (texto livre) da OS.
+const formatAddress = (details) => {
+  if (!details) return '';
+  const streetLine = [details.street, details.number].filter(Boolean).join(', ');
+  return [streetLine, details.neighborhood].filter(Boolean).join(' - ');
+};
+
 export default function OrdemServicoPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
@@ -485,7 +493,21 @@ export default function OrdemServicoPage() {
                   <Autocomplete
                     value={form.person_name}
                     onChange={(v) => onChange('person_name', v)}
-                    onSelect={(p) => { onChange('person_name', p.name); onChange('person_id', p.id); onChange('person_type', p._type); }}
+                    onSelect={(p) => {
+                      onChange('person_name', p.name);
+                      onChange('person_id', p.id);
+                      onChange('person_type', p._type);
+                      // Preenche CPF, telefone e endereço com o que já está no
+                      // cadastro de Motorista/Funcionário, em vez de deixar
+                      // esses campos em branco pro usuário redigitar.
+                      onChange('person_doc', p.cpf || '');
+                      onChange('contact_value', p.phone || '');
+                      const addr = p.address_details || {};
+                      onChange('address', formatAddress(addr));
+                      onChange('city', addr.city || '');
+                      onChange('state', addr.state || '');
+                      onChange('city_uf', addr.city && addr.state ? `${addr.city}/${addr.state}` : (addr.city || addr.state || ''));
+                    }}
                     options={people}
                     displayField="name"
                     className="h-9 text-sm"
