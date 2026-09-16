@@ -79,6 +79,8 @@ export const api = {
 
   getStates: () => axios.get(`${API}/locations/states`),
   getCitiesByUF: (uf) => axios.get(`${API}/locations/cities`, { params: { uf } }),
+  lookupCep: (cep) => axios.get(`${API}/lookup/cep/${cep}`),
+  lookupCnpj: (cnpj) => axios.get(`${API}/lookup/cnpj/${cnpj}`),
 
   getTerminals: () => axios.get(`${API}/terminals`),
   createTerminal: (data) => axios.post(`${API}/terminals`, data),

@@ -1,9 +1,12 @@
 import { useState, useEffect, Fragment } from 'react';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Autocomplete } from './Autocomplete';
 import { api } from '../lib/api';
+import { toast } from 'sonner';
+import { Search, Loader2 } from 'lucide-react';
 
 const UF_OPTIONS = [
   ['AC', 'Acre'], ['AL', 'Alagoas'], ['AP', 'Amapá'], ['AM', 'Amazonas'], ['BA', 'Bahia'],
@@ -98,6 +101,7 @@ export function CityStateFields({ value, onChange, cityLabel = 'Cidade', stateLa
 export function AddressFields({ value, onChange, international = false }) {
   const v = value || {};
   const [cities, setCities] = useState([]);
+  const [cepLoading, setCepLoading] = useState(false);
 
   useEffect(() => {
     if (international || !v.state) { setCities([]); return; }
@@ -111,6 +115,31 @@ export function AddressFields({ value, onChange, international = false }) {
   const setState = (val) => {
     const uf = val === '_empty' ? '' : val;
     onChange({ ...v, state: uf, city: '' });
+  };
+
+  const lookupCep = async () => {
+    const digits = (v.zip || '').replace(/\D/g, '');
+    if (digits.length !== 8) {
+      toast.error('Digite um CEP válido (8 dígitos) para buscar');
+      return;
+    }
+    setCepLoading(true);
+    try {
+      const r = await api.lookupCep(digits);
+      const d = r.data;
+      onChange({
+        ...v,
+        street: d.street || v.street,
+        neighborhood: d.neighborhood || v.neighborhood,
+        city: d.city || v.city,
+        state: d.state || v.state,
+      });
+      toast.success('Endereço preenchido a partir do CEP');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'CEP não encontrado');
+    } finally {
+      setCepLoading(false);
+    }
   };
 
   return (
@@ -132,7 +161,22 @@ export function AddressFields({ value, onChange, international = false }) {
         </div>
         <div>
           <FieldLabel>CEP</FieldLabel>
-          <Input value={v.zip || ''} onChange={(e) => set('zip', formatCEP(e.target.value))} className="h-9 text-sm font-mono" maxLength={9} />
+          <div className="flex gap-1.5">
+            <Input value={v.zip || ''} onChange={(e) => set('zip', formatCEP(e.target.value))} className="h-9 text-sm font-mono" maxLength={9} />
+            {!international && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={lookupCep}
+                disabled={cepLoading}
+                title="Buscar endereço pelo CEP"
+              >
+                {cepLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              </Button>
+            )}
+          </div>
         </div>
         <div>
           <FieldLabel>UF</FieldLabel>

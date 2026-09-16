@@ -43,6 +43,7 @@ from routers.container_representatives import api_router as container_representa
 from routers.container_purchases import api_router as container_purchases_router
 from routers.container_sales import api_router as container_sales_router
 from routers.locations import api_router as locations_router
+from routers.lookup import api_router as lookup_router
 from routers.stock import api_router as stock_router
 from routers.expense_reports import api_router as expense_reports_router
 from routers.users import api_router as users_router
@@ -102,6 +103,7 @@ app.include_router(container_representatives_router)
 app.include_router(container_purchases_router)
 app.include_router(container_sales_router)
 app.include_router(locations_router)
+app.include_router(lookup_router)
 app.include_router(stock_router)
 app.include_router(expense_reports_router)
 app.include_router(users_router)

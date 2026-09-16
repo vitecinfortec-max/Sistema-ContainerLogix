@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Plus, Trash2, Edit, Search, Truck, IdCard, Store, ShieldCheck, Users, Warehouse,
-  Building2, ChevronDown,
+  Building2, ChevronDown, Loader2,
 } from 'lucide-react';
 
 const formatCPF = (value) => {
@@ -55,6 +55,12 @@ const formatCnpjCpf = (value) => {
 };
 
 const MASKS = { cpf: formatCPF, cnpj: formatCNPJ, doc: formatCnpjCpf, tel: formatPhone };
+
+const formatCEP = (value) => {
+  const digits = (value || '').replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 5) return digits;
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+};
 
 const STATUS_ATIVO_INATIVO = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 const STATUS_COM_BLOQUEADO = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo'], ['BLOQUEADO', 'Bloqueado']];
@@ -300,6 +306,7 @@ export default function CadastroUnificadoPage() {
   const [formData, setFormData] = useState(() => buildEmptyForm(activeType));
   const [submitting, setSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [cnpjLoading, setCnpjLoading] = useState(false);
 
   useEffect(() => {
     setSearchParams(activeTypeKey === TYPES[0].key ? {} : { type: activeTypeKey }, { replace: true });
@@ -352,6 +359,49 @@ export default function CadastroUnificadoPage() {
   };
 
   const setField = (name, value) => setFormData((p) => ({ ...p, [name]: value }));
+
+  // Preenche nome/contato/endereço a partir do CNPJ digitado, usando os
+  // dados públicos da Receita Federal (via BrasilAPI). Só escreve em campos
+  // que já existem no schema do tipo ativo (buildEmptyForm sempre inicializa
+  // todas as chaves de type.fields, mesmo vazias) - assim funciona igual
+  // pras 5 telas (Transportadora/Fornecedor/Seguradora/Cliente/Terminal)
+  // sem precisar de código por tipo.
+  const lookupCnpj = async (rawValue) => {
+    const digits = (rawValue || '').replace(/\D/g, '');
+    if (digits.length !== 14) {
+      toast.error('Digite um CNPJ válido (14 dígitos) para buscar');
+      return;
+    }
+    setCnpjLoading(true);
+    try {
+      const r = await api.lookupCnpj(digits);
+      const d = r.data;
+      setFormData((p) => {
+        const next = { ...p };
+        if ('name' in next && d.name) next.name = d.name;
+        if ('trade_name' in next && d.trade_name) next.trade_name = d.trade_name;
+        if ('phone' in next && d.phone) next.phone = formatPhone(d.phone);
+        if ('email' in next && d.email) next.email = d.email;
+        if ('address_details' in next) {
+          next.address_details = {
+            ...(next.address_details || {}),
+            street: d.street || next.address_details?.street || '',
+            number: d.number || next.address_details?.number || '',
+            neighborhood: d.neighborhood || next.address_details?.neighborhood || '',
+            zip: d.zip ? formatCEP(d.zip) : next.address_details?.zip || '',
+            city: d.city || next.address_details?.city || '',
+            state: d.state || next.address_details?.state || '',
+          };
+        }
+        return next;
+      });
+      toast.success('Dados preenchidos a partir do CNPJ');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'CNPJ não encontrado');
+    } finally {
+      setCnpjLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -485,6 +535,27 @@ export default function CadastroUnificadoPage() {
                       </Select>
                     ) : f.type === 'textarea' ? (
                       <Textarea value={formData[f.name] || ''} onChange={(e) => setField(f.name, e.target.value)} className="text-[13px] min-h-[70px]" />
+                    ) : (f.mask === 'cnpj' || f.mask === 'doc') ? (
+                      <div className="flex gap-1.5">
+                        <Input
+                          type="text"
+                          value={formData[f.name] || ''}
+                          onChange={(e) => setField(f.name, MASKS[f.mask](e.target.value))}
+                          required={f.required}
+                          className="h-10 text-[13px]"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-10 w-10 shrink-0"
+                          onClick={() => lookupCnpj(formData[f.name])}
+                          disabled={cnpjLoading}
+                          title="Buscar dados pelo CNPJ"
+                        >
+                          {cnpjLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                        </Button>
+                      </div>
                     ) : (
                       <Input
                         type={f.type === 'date' ? 'date' : f.type === 'email' ? 'email' : 'text'}
