@@ -1,6 +1,6 @@
 import io
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -14,13 +14,16 @@ from models import (
     ServiceFamily, ServiceFamilyCreate, ServiceFamilyResponse,
     ServiceCatalogItem, ServiceCatalogItemCreate, ServiceCatalogItemResponse,
     Product, ProductCreate, ProductResponse,
-    StockValueByWarehousePoint,
+    StockValueByWarehousePoint, DailyStockLedgerPoint,
     StockEntry, StockEntryResponse,
     StockMovement, StockMovementCreate, StockMovementUpdate, StockMovementResponse,
     Supplier,
 )
 from shared import db, get_current_active_user, get_company_settings, validate_and_read_upload
-from reports import generate_stock_report_excel, generate_stock_report_pdf
+from reports import (
+    generate_stock_report_excel, generate_stock_report_pdf,
+    generate_stock_ledger_report_excel, generate_stock_ledger_report_pdf,
+)
 from nfe_import import parse_nfe_xml
 
 api_router = APIRouter(prefix="/api")
@@ -863,3 +866,172 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
     filename = f"MovimentacaoEstoque_{movement['movement_number']}.pdf"
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                              headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+# ==================== RELATÓRIO DE MOVIMENTAÇÕES DE ESTOQUE (ENTRADAS E SAÍDAS) ====================
+# Une as duas origens reais de entrada/saída de Product.stock_quantity num único
+# extrato: StockEntry (só Entrada, sempre vinda de importação de XML de NF-e) e
+# StockMovement (Entrada/Saída manual, com Finalidade Veículo/OS/Outro). Cada
+# linha do extrato carrega pra onde foi (OS) ou de onde veio (Nota Fiscal).
+
+def _stock_entry_to_ledger_row(entry: dict) -> dict:
+    date = (entry.get('nfe_issue_date') or '').strip() or str(entry.get('created_at') or '')[:10]
+    nfe_number = entry.get('nfe_number')
+    return {
+        'date': date,
+        'operation_type': 'ENTRADA',
+        'product_code': None,
+        'product_name': entry.get('product_name') or '-',
+        'quantity': float(entry.get('quantity') or 0),
+        'unit_value': float(entry.get('unit_value') or 0),
+        'total_value': float(entry.get('total_value') or 0),
+        'warehouse_name': None,
+        'supplier_name': entry.get('supplier_name'),
+        'reference_type': 'NFE' if nfe_number else None,
+        'reference_label': f"NF {nfe_number}" if nfe_number else None,
+        'source': 'ENTRADA_NFE',
+    }
+
+
+def _stock_movement_to_ledger_rows(movement: dict) -> list:
+    operation_type = movement.get('operation_type')
+    if operation_type == 'ENTRADA' and movement.get('nfe_number'):
+        reference_type, reference_label = 'NFE', f"NF {movement['nfe_number']}"
+    elif movement.get('purpose_type') == 'OS' and movement.get('purpose_os_number'):
+        reference_type, reference_label = 'OS', f"OS Nº {movement['purpose_os_number']}"
+    elif movement.get('purpose_type') == 'VEICULO' and movement.get('purpose_vehicle_plate'):
+        reference_type, reference_label = 'VEICULO', movement['purpose_vehicle_plate']
+    elif movement.get('purpose_text'):
+        reference_type, reference_label = 'OUTRO', movement['purpose_text']
+    else:
+        reference_type, reference_label = None, None
+
+    rows = []
+    for item in (movement.get('items') or []):
+        rows.append({
+            'date': movement.get('movement_date'),
+            'operation_type': operation_type,
+            'product_code': item.get('product_code'),
+            'product_name': item.get('product_description') or '-',
+            'quantity': float(item.get('quantity') or 0),
+            'unit_value': float(item.get('unit_value') or 0),
+            'total_value': float(item.get('total_value') or 0),
+            'warehouse_name': movement.get('warehouse_name'),
+            'supplier_name': movement.get('supplier_name'),
+            'reference_type': reference_type,
+            'reference_label': reference_label,
+            'source': 'MOVIMENTACAO',
+        })
+    return rows
+
+
+async def _build_stock_ledger(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    operation_type: Optional[str] = None,
+    search: Optional[str] = None,
+    reference_type: Optional[str] = None,
+) -> list:
+    movements = await db.stock_movements.find({}, {"_id": 0}).to_list(None)
+    rows = []
+    for m in movements:
+        rows.extend(_stock_movement_to_ledger_rows(m))
+
+    if operation_type != 'SAIDA':
+        entries = await db.stock_entries.find({}, {"_id": 0}).to_list(None)
+        rows.extend(_stock_entry_to_ledger_row(e) for e in entries)
+
+    if operation_type:
+        rows = [r for r in rows if r['operation_type'] == operation_type]
+    if date_from:
+        rows = [r for r in rows if (r['date'] or '') >= date_from]
+    if date_to:
+        rows = [r for r in rows if (r['date'] or '') <= date_to]
+    if search:
+        needle = search.strip().lower()
+        rows = [r for r in rows if needle in (r['product_name'] or '').lower()]
+    if reference_type:
+        if reference_type == 'SEM_REFERENCIA':
+            rows = [r for r in rows if not r['reference_type']]
+        else:
+            rows = [r for r in rows if r['reference_type'] == reference_type]
+
+    rows.sort(key=lambda r: r['date'] or '', reverse=True)
+    return rows
+
+
+def _compute_daily_stock_ledger_chart(rows: list) -> list:
+    today = datetime.now(timezone.utc).date()
+    days = [today - timedelta(days=i) for i in range(13, -1, -1)]
+    by_date = {d.isoformat(): {"date": d.isoformat(), "entrada_value": 0.0, "saida_value": 0.0} for d in days}
+    for r in rows:
+        bucket = by_date.get(r.get('date'))
+        if bucket is None:
+            continue
+        key = 'entrada_value' if r['operation_type'] == 'ENTRADA' else 'saida_value'
+        bucket[key] += r['total_value']
+    return [by_date[d.isoformat()] for d in days]
+
+
+@api_router.get("/stock/ledger/summary")
+async def get_stock_ledger_summary(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    operation_type: Optional[str] = None,
+    search: Optional[str] = None,
+    reference_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    rows = await _build_stock_ledger(date_from, date_to, operation_type, search, reference_type)
+    entrada_rows = [r for r in rows if r['operation_type'] == 'ENTRADA']
+    saida_rows = [r for r in rows if r['operation_type'] == 'SAIDA']
+    return {
+        "entrada_count": len(entrada_rows),
+        "entrada_value": round(sum(r['total_value'] for r in entrada_rows), 2),
+        "saida_count": len(saida_rows),
+        "saida_value": round(sum(r['total_value'] for r in saida_rows), 2),
+    }
+
+
+@api_router.get("/stock/ledger/daily-chart", response_model=List[DailyStockLedgerPoint])
+async def get_stock_ledger_daily_chart(current_user: dict = Depends(get_current_active_user)):
+    rows = await _build_stock_ledger()
+    return _compute_daily_stock_ledger_chart(rows)
+
+
+@api_router.get("/stock/ledger/pdf")
+async def download_stock_ledger_pdf(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    operation_type: Optional[str] = None,
+    search: Optional[str] = None,
+    reference_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    rows = await _build_stock_ledger(date_from, date_to, operation_type, search, reference_type)
+    company = await get_company_settings()
+    pdf_bytes = generate_stock_ledger_report_pdf(rows, company=company)
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=relatorio_movimentacoes_estoque.pdf"}
+    )
+
+
+@api_router.get("/stock/ledger/excel")
+async def download_stock_ledger_excel(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    operation_type: Optional[str] = None,
+    search: Optional[str] = None,
+    reference_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    rows = await _build_stock_ledger(date_from, date_to, operation_type, search, reference_type)
+    company = await get_company_settings()
+    excel_bytes = generate_stock_ledger_report_excel(rows, company=company)
+    return StreamingResponse(
+        io.BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=relatorio_movimentacoes_estoque.xlsx"}
+    )

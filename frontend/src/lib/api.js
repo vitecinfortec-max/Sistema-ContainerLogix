@@ -84,6 +84,11 @@ export const api = {
   getStockReportExcel: (params) => axios.get(`${API}/stock/report/excel`, { params, responseType: 'blob' }),
   getStockReportPDF: (params) => axios.get(`${API}/stock/report/pdf`, { params, responseType: 'blob' }),
 
+  getStockLedgerSummary: (params) => axios.get(`${API}/stock/ledger/summary`, { params }),
+  getStockLedgerDailyChart: () => axios.get(`${API}/stock/ledger/daily-chart`),
+  getStockLedgerPDF: (params) => axios.get(`${API}/stock/ledger/pdf`, { params, responseType: 'blob' }),
+  getStockLedgerExcel: (params) => axios.get(`${API}/stock/ledger/excel`, { params, responseType: 'blob' }),
+
   getStockMovements: (params) => axios.get(`${API}/stock/movements`, { params }),
   getStockMovementNextNumber: () => axios.get(`${API}/stock/movements/next-number`),
   getStockMovement: (id) => axios.get(`${API}/stock/movements/${id}`),

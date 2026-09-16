@@ -982,6 +982,163 @@ def generate_stock_report_excel(products: list, company: dict = None) -> bytes:
         return buffer.getvalue()
 
 
+def generate_stock_ledger_report_pdf(rows: list, company: dict = None, report_title: str = "Relatório de Movimentações de Estoque") -> bytes:
+    """Extrato de Entradas e Saídas de estoque (StockEntry de NF-e + StockMovement
+    manual, já unidos em `rows` por _build_stock_ledger) - mesmo padrão visual do
+    Relatório de Serviços, com a Referência (NF/OS/Veículo) na última coluna."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=10*mm,
+        leftMargin=10*mm,
+        topMargin=10*mm,
+        bottomMargin=15*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = download_logo(company)
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
+
+    entrada_rows = [r for r in rows if r.get('operation_type') == 'ENTRADA']
+    saida_rows = [r for r in rows if r.get('operation_type') == 'SAIDA']
+    entrada_total = round(sum(r.get('total_value') or 0 for r in entrada_rows), 2)
+    saida_total = round(sum(r.get('total_value') or 0 for r in saida_rows), 2)
+    stats_text = (
+        f"Entradas: {len(entrada_rows)} ({format_currency(entrada_total, 'BRL')})  |  "
+        f"Saídas: {len(saida_rows)} ({format_currency(saida_total, 'BRL')})"
+    )
+    stats_style = ParagraphStyle(
+        'StockLedgerStatsBar', parent=styles['Normal'], fontSize=10,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
+    )
+    stats_table = Table([[Paragraph(stats_text, stats_style)]], colWidths=[doc.width])
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+    ]))
+    elements.append(stats_table)
+
+    gen_info_style = ParagraphStyle(
+        'StockLedgerGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    if rows:
+        cell_style = ParagraphStyle('StockLedgerCell', parent=styles['Normal'], fontSize=7.5, leading=9)
+        table_rows = [['Data', 'Tipo', 'Produto', 'Almoxarifado', 'Qtd', 'V. Unit.', 'V. Total', 'Referência']]
+        for r in rows:
+            table_rows.append([
+                fmt_date(r.get('date')),
+                'Entrada' if r.get('operation_type') == 'ENTRADA' else 'Saída',
+                Paragraph(r.get('product_name') or '-', cell_style),
+                Paragraph(r.get('warehouse_name') or '-', cell_style),
+                f"{r.get('quantity', 0):.2f}".replace('.', ','),
+                format_currency(r.get('unit_value') or 0),
+                format_currency(r.get('total_value') or 0),
+                Paragraph(r.get('reference_label') or '-', cell_style),
+            ])
+
+        col_widths = [doc.width*0.07, doc.width*0.08, doc.width*0.23, doc.width*0.16, doc.width*0.07, doc.width*0.12, doc.width*0.12, doc.width*0.15]
+        table = Table(table_rows, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 7.5),
+            ('ALIGN', (0, 0), (1, -1), 'CENTER'),
+            ('ALIGN', (4, 0), (6, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F8F8')]),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(table)
+    else:
+        empty_style = ParagraphStyle(
+            'StockLedgerEmpty', parent=styles['Normal'], fontSize=10,
+            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
+        )
+        elements.append(Paragraph("Nenhuma movimentação encontrada para os filtros selecionados.", empty_style))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
+def generate_stock_ledger_report_excel(rows: list, company: dict = None, report_title: str = "Relatório de Movimentações de Estoque") -> bytes:
+    """Gera Excel do extrato de Entradas e Saídas de estoque (uma linha por item movimentado)."""
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Movimentações de Estoque"
+
+        entrada_rows = [r for r in rows if r.get('operation_type') == 'ENTRADA']
+        saida_rows = [r for r in rows if r.get('operation_type') == 'SAIDA']
+        entrada_total = round(sum(r.get('total_value') or 0 for r in entrada_rows), 2)
+        saida_total = round(sum(r.get('total_value') or 0 for r in saida_rows), 2)
+        stats_text = (
+            f"Entradas: {len(entrada_rows)} ({format_currency(entrada_total)})  |  "
+            f"Saídas: {len(saida_rows)} ({format_currency(saida_total)})"
+        )
+
+        headers = ['Data', 'Tipo', 'Produto', 'Almoxarifado', 'Quantidade', 'Valor Unit.', 'Valor Total', 'Referência']
+        col_widths = {'B': 12, 'C': 10, 'D': 32, 'E': 20, 'F': 12, 'G': 14, 'H': 14, 'I': 24}
+        center_cols = {0, 1, 4}
+        right_align_cols = {5, 6}
+        number_fmt_cols = {5: 'R$ #,##0.00', 6: 'R$ #,##0.00'}
+
+        data_rows = [
+            [
+                fmt_date(r.get('date')),
+                'Entrada' if r.get('operation_type') == 'ENTRADA' else 'Saída',
+                r.get('product_name') or '-',
+                r.get('warehouse_name') or '-',
+                r.get('quantity') or 0,
+                r.get('unit_value') or 0,
+                r.get('total_value') or 0,
+                r.get('reference_label') or '-',
+            ]
+            for r in rows
+        ]
+
+        _bsoft_style_excel(
+            ws, report_title, stats_text, headers, data_rows, col_widths,
+            center_cols=center_cols,
+            right_align_cols=right_align_cols,
+            number_fmt_cols=number_fmt_cols,
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company)
+        )
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+    except Exception as e:
+        logger.error(f"Error generating stock ledger report Excel: {e}")
+        wb = Workbook()
+        ws = wb.active
+        ws['A1'] = "Erro ao gerar relatório."
+        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+
 def generate_delivery_status_excel(status: dict, company: dict = None) -> bytes:
     """Gera Excel de um Status de Entrega (um motorista/veículo por linha)."""
     try:

@@ -3228,6 +3228,12 @@ class StockValueByWarehousePoint(BaseModel):
     total_value: float
 
 
+class DailyStockLedgerPoint(BaseModel):
+    date: str
+    entrada_value: float
+    saida_value: float
+
+
 class StockEntry(BaseModel):
     """Registro de entrada de estoque - histórico de onde cada quantidade
     somada a um Product veio (hoje, só via importação de XML de NF-e).
