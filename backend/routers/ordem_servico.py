@@ -48,10 +48,12 @@ from models import (
     OSCategory, OSCategoryCreate, OSCategoryResponse,
     ExpenseReportReceipt, ExpenseReportDeposit, ExpenseReportPurchase,
     ExpenseReport, ExpenseReportCreate, ExpenseReportResponse,
+    DailyServiceOrderPoint,
 )
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, decode_token
 from reports import (
     generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel,
+    generate_service_orders_report_pdf, generate_service_orders_report_excel,
     now_brt, to_brt, merge_company, DEFAULT_COMPANY
 )
 
@@ -620,5 +622,125 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     filename = f"OS_{os_doc['os_number']}.pdf"
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                              headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+# ==================== RELATÓRIO DE SERVIÇOS ====================
+
+_OS_STATUS_LABELS = {
+    "ABERTO": "Aberto", "ANDAMENTO": "Em Andamento", "FECHADO": "Fechado", "CANCELADO": "Cancelado",
+}
+
+
+async def _filter_ordem_servico_report(
+    date_from: Optional[str], date_to: Optional[str],
+    equipment_plate: Optional[str], status: Optional[str], category: Optional[str],
+) -> list:
+    """Consulta db.ordem_servico com os mesmos filtros usados pelo Relatório
+    de Serviços (resumo, gráfico diário, PDF e Excel), sempre a partir de
+    opened_at (Data de Abertura, não created_at)."""
+    query = {}
+    if equipment_plate and equipment_plate != 'all':
+        query['equipment_plate'] = equipment_plate
+    if status and status != 'all':
+        query['status'] = status
+    if category and category != 'all':
+        query['category'] = category
+    rows = await db.ordem_servico.find(query, {"_id": 0}).sort("opened_at", -1).to_list(None)
+    out = [_os_serialize(r) for r in rows]
+    if date_from or date_to:
+        filtered = []
+        for r in out:
+            day = (r.get('opened_at') or '')[:10]
+            if date_from and (not day or day < date_from):
+                continue
+            if date_to and (not day or day > date_to):
+                continue
+            filtered.append(r)
+        out = filtered
+    return out
+
+
+@api_router.get("/reports/service-orders/summary")
+async def get_service_orders_report_summary(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    equipment_plate: Optional[str] = None, status: Optional[str] = None, category: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    rows = await _filter_ordem_servico_report(date_from, date_to, equipment_plate, status, category)
+    total_value = round(sum(r.get('grand_total') or 0 for r in rows), 2)
+    count = len(rows)
+    open_count = sum(1 for r in rows if r.get('status') in ('ABERTO', 'ANDAMENTO'))
+    return {
+        "count": count,
+        "total_value": total_value,
+        "avg_value": round(total_value / count, 2) if count else 0,
+        "open_count": open_count,
+    }
+
+
+async def _compute_daily_service_orders_chart(today: datetime) -> List[DailyServiceOrderPoint]:
+    """Valor/contagem de Ordens de Serviço por dia dos últimos 14 dias (por
+    opened_at, a Data de Abertura) - mesma estratégia de janela fixa usada
+    no gráfico diário do Relatório de Abastecimento."""
+    day0 = (today - timedelta(days=13)).strftime('%Y-%m-%d')
+    rows = await db.ordem_servico.find({}, {"_id": 0}).to_list(None)
+    by_day: dict = {}
+    for r in rows:
+        day = (r.get('opened_at') or '')[:10]
+        if not day or day < day0:
+            continue
+        calc = _os_serialize(r)
+        entry = by_day.setdefault(day, {"value": 0.0, "count": 0})
+        entry["value"] += calc.get('grand_total') or 0
+        entry["count"] += 1
+
+    daily_chart = []
+    for i in range(13, -1, -1):
+        day = (today - timedelta(days=i)).strftime('%Y-%m-%d')
+        totals = by_day.get(day, {})
+        daily_chart.append(DailyServiceOrderPoint(
+            date=day,
+            total_value=round(totals.get('value', 0), 2),
+            count=totals.get('count', 0),
+        ))
+    return daily_chart
+
+
+@api_router.get("/reports/service-orders/daily-chart", response_model=List[DailyServiceOrderPoint])
+async def get_service_orders_daily_chart(current_user: dict = Depends(get_current_admin_user)):
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    return await _compute_daily_service_orders_chart(today)
+
+
+@api_router.get("/reports/service-orders/pdf")
+async def download_service_orders_report_pdf(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    equipment_plate: Optional[str] = None, status: Optional[str] = None, category: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    rows = await _filter_ordem_servico_report(date_from, date_to, equipment_plate, status, category)
+    company = await get_company_settings()
+    pdf_buffer = generate_service_orders_report_pdf(rows, company=company)
+    return StreamingResponse(
+        io.BytesIO(pdf_buffer),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=relatorio_servicos.pdf"}
+    )
+
+
+@api_router.get("/reports/service-orders/excel")
+async def download_service_orders_report_excel(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    equipment_plate: Optional[str] = None, status: Optional[str] = None, category: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    rows = await _filter_ordem_servico_report(date_from, date_to, equipment_plate, status, category)
+    company = await get_company_settings()
+    excel_buffer = generate_service_orders_report_excel(rows, company=company)
+    return StreamingResponse(
+        io.BytesIO(excel_buffer),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=relatorio_servicos.xlsx"}
+    )
 
 

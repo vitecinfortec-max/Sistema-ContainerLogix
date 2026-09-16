@@ -436,6 +436,12 @@ export const api = {
   downloadFuelSupplyPDFReport: (params) => axios.get(`${API}/reports/fuel-supply/pdf`, { params, responseType: 'blob' }),
   downloadFuelSupplyExcelReport: (params) => axios.get(`${API}/reports/fuel-supply/excel`, { params, responseType: 'blob' }),
 
+  // Relatório de Serviços (Frota)
+  getServiceOrdersReportSummary: (params) => axios.get(`${API}/reports/service-orders/summary`, { params }),
+  getServiceOrdersDailyChart: () => axios.get(`${API}/reports/service-orders/daily-chart`),
+  downloadServiceOrdersPDFReport: (params) => axios.get(`${API}/reports/service-orders/pdf`, { params, responseType: 'blob' }),
+  downloadServiceOrdersExcelReport: (params) => axios.get(`${API}/reports/service-orders/excel`, { params, responseType: 'blob' }),
+
   // Ordem de Carregamento (Transporte)
   getLoadingOrders: (params) => axios.get(`${API}/loading-orders`, { params }),
   getLoadingOrder: (id) => axios.get(`${API}/loading-orders/${id}`),

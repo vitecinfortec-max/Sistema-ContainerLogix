@@ -520,6 +520,11 @@ class DailyFuelSupplyPoint(BaseModel):
     total_value: float
     total_liters: float
 
+class DailyServiceOrderPoint(BaseModel):
+    date: str  # YYYY-MM-DD
+    total_value: float
+    count: int
+
 class DriverRankingEntry(BaseModel):
     driver_name: str
     entries: int

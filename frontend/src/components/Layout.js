@@ -85,6 +85,7 @@ const PAGE_TITLES = {
   '/fleet/ordem-abastecimento': 'Ordem de Abastecimento',
   '/fleet/abastecimento': 'Abastecimento',
   '/reports/fuel-supply': 'Relatório de Abastecimento',
+  '/reports/service-orders': 'Relatório de Serviços',
   '/fleet/os-categories': 'Cadastro de Categoria',
   '/estoque/cadastros': 'Cadastro',
   '/estoque/servicos': 'Cadastro de Serviço',
@@ -184,6 +185,7 @@ export default function Layout({ children }) {
   const [flexTankOpen, setFlexTankOpen] = useState(false);
   const [terminalCadastroOpen, setTerminalCadastroOpen] = useState(false);
   const [manutencaoCadastroOpen, setManutencaoCadastroOpen] = useState(false);
+  const [manutencaoRelatorioOpen, setManutencaoRelatorioOpen] = useState(false);
   const [estoqueOpen, setEstoqueOpen] = useState(false);
   const [estoqueCadastroOpen, setEstoqueCadastroOpen] = useState(false);
   const [comercialOpen, setComercialOpen] = useState(false);
@@ -291,6 +293,8 @@ export default function Layout({ children }) {
     if (savedTerminalCadastro !== null) setTerminalCadastroOpen(JSON.parse(savedTerminalCadastro));
     const savedManutencaoCadastro = localStorage.getItem('manutencaoCadastroOpen');
     if (savedManutencaoCadastro !== null) setManutencaoCadastroOpen(JSON.parse(savedManutencaoCadastro));
+    const savedManutencaoRelatorio = localStorage.getItem('manutencaoRelatorioOpen');
+    if (savedManutencaoRelatorio !== null) setManutencaoRelatorioOpen(JSON.parse(savedManutencaoRelatorio));
     const savedEstoque = localStorage.getItem('estoqueOpen');
     if (savedEstoque !== null) setEstoqueOpen(JSON.parse(savedEstoque));
     const savedEstoqueCadastro = localStorage.getItem('estoqueCadastroOpen');
@@ -315,11 +319,12 @@ export default function Layout({ children }) {
   // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
   const fleetTab = new URLSearchParams(location.search).get('tab');
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
+  const isManutencaoRelatorioActive = location.pathname === '/reports/fuel-supply' || location.pathname === '/reports/service-orders';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
-  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/reports/fuel-supply' || isManutencaoCadastroActive;
+  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
@@ -339,6 +344,7 @@ export default function Layout({ children }) {
     if (isFlexTankActive && !flexTankOpen) setFlexTankOpen(true);
     if (isTerminalCadastroActive && !terminalCadastroOpen) setTerminalCadastroOpen(true);
     if (isManutencaoCadastroActive && !manutencaoCadastroOpen) setManutencaoCadastroOpen(true);
+    if (isManutencaoRelatorioActive && !manutencaoRelatorioOpen) setManutencaoRelatorioOpen(true);
     if (isEstoqueActive && !estoqueOpen) setEstoqueOpen(true);
     if (isEstoqueCadastroActive && !estoqueCadastroOpen) setEstoqueCadastroOpen(true);
     if (isComercialActive && !comercialOpen) setComercialOpen(true);
@@ -411,6 +417,12 @@ export default function Layout({ children }) {
     const newState = !manutencaoCadastroOpen;
     setManutencaoCadastroOpen(newState);
     localStorage.setItem('manutencaoCadastroOpen', JSON.stringify(newState));
+  };
+
+  const toggleManutencaoRelatorio = () => {
+    const newState = !manutencaoRelatorioOpen;
+    setManutencaoRelatorioOpen(newState);
+    localStorage.setItem('manutencaoRelatorioOpen', JSON.stringify(newState));
   };
 
   const toggleEstoque = () => {
@@ -499,11 +511,15 @@ export default function Layout({ children }) {
     { path: '/fleet/checklist', label: 'Checklist', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
     { path: '/fleet/ordem-abastecimento', label: 'Ordem de Abastecimento', icon: Clipboard, moduleKey: 'frota.ordem_abastecimento' },
     { path: '/fleet/abastecimento', label: 'Abastecimento', icon: Fuel, moduleKey: 'frota.abastecimento' },
-    { path: '/reports/fuel-supply', label: 'Relatório de Abastecimento', icon: BarChart3, moduleKey: 'frota.relatorio_abastecimento' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const manutencaoCadastroItems = [
     { path: '/fleet/os-categories', label: 'Cadastro de Categoria', icon: Tag, moduleKey: 'frota.cadastro_categoria' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
+  const manutencaoRelatorioItems = [
+    { path: '/reports/fuel-supply', label: 'Relatório de Abastecimento', icon: BarChart3, moduleKey: 'frota.relatorio_abastecimento' },
+    { path: '/reports/service-orders', label: 'Relatório de Serviços', icon: BarChart3, moduleKey: 'frota.relatorio_servicos' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const estoqueItems = [
@@ -582,7 +598,7 @@ export default function Layout({ children }) {
   const isOpcoesSistemaGroupVisible = opcoesSistemaItems.length > 0;
 
   const allSearchableItems = useMemo(() => [
-    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...manutencaoItems, ...manutencaoCadastroItems, ...transporteItems, ...cadastroItems,
+    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...manutencaoItems, ...manutencaoCadastroItems, ...manutencaoRelatorioItems, ...transporteItems, ...cadastroItems,
     ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems, ...estoqueItems, ...estoqueCadastroItems, ...comercialItems,
     ...gestaoContainerItems,
   ], [isAdmin]);
@@ -990,6 +1006,10 @@ export default function Layout({ children }) {
                     {manutencaoCadastroItems.length > 0 && manutencaoCadastroOpen && (
                       <div>{manutencaoCadastroItems.map((item) => renderNavItem(item, true, true))}</div>
                     )}
+                    {manutencaoRelatorioItems.length > 0 && renderGroupHeader('Relatório', FileSpreadsheet, manutencaoRelatorioOpen, toggleManutencaoRelatorio, isManutencaoRelatorioActive, 'nav-manutencao-relatorio-toggle', true)}
+                    {manutencaoRelatorioItems.length > 0 && manutencaoRelatorioOpen && (
+                      <div>{manutencaoRelatorioItems.map((item) => renderNavItem(item, true, true))}</div>
+                    )}
                   </div>
                 )}
 
@@ -1128,6 +1148,8 @@ export default function Layout({ children }) {
                     {manutencaoItems.map((item) => renderMobileNavItem(item))}
                     {manutencaoCadastroItems.length > 0 && renderMobileGroupToggle('Cadastro', FolderOpen, manutencaoCadastroOpen, toggleManutencaoCadastro, isManutencaoCadastroActive, true)}
                     {manutencaoCadastroItems.length > 0 && manutencaoCadastroOpen && manutencaoCadastroItems.map((item) => renderMobileNavItem(item, true))}
+                    {manutencaoRelatorioItems.length > 0 && renderMobileGroupToggle('Relatório', FileSpreadsheet, manutencaoRelatorioOpen, toggleManutencaoRelatorio, isManutencaoRelatorioActive, true)}
+                    {manutencaoRelatorioItems.length > 0 && manutencaoRelatorioOpen && manutencaoRelatorioItems.map((item) => renderMobileNavItem(item, true))}
                   </div>
                 )}
 
