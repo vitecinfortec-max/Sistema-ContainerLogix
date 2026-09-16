@@ -317,11 +317,12 @@ export default function FuelSupplyOrderPage() {
                     <TableHead className="text-[12px] font-semibold">Produto</TableHead>
                     <TableHead className="text-[12px] font-semibold">Tipo</TableHead>
                     <TableHead className="text-[12px] font-semibold">Solicitante</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {list.length === 0 && !loading && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma ordem de abastecimento cadastrada.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma ordem de abastecimento cadastrada.</TableCell></TableRow>
                   )}
                   {list.map((o) => (
                     <TableRow
@@ -344,6 +345,11 @@ export default function FuelSupplyOrderPage() {
                       <TableCell className="text-[12px]">{FUEL_TYPE_LABELS[o.fuel_type] || o.fuel_type || '-'}</TableCell>
                       <TableCell className="text-[12px]">{SUPPLY_MODE_LABELS[o.supply_mode] || o.supply_mode || '-'}</TableCell>
                       <TableCell className="text-[13px]">{o.requester || '-'}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${o.is_launched ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {o.is_launched ? 'Lançado' : 'Pendente'}
+                        </span>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
