@@ -174,8 +174,11 @@ async def list_fuel_supply_orders(
         ]
     rows = await db.fuel_supply_orders.find(query, {"_id": 0}).sort("order_number", -1).to_list(None)
     launched_ids = set(await db.fuel_supplies.distinct("fuel_supply_order_id", {"fuel_supply_order_id": {"$ne": None}}))
+    # Abastecimentos lançados antes do vínculo fuel_supply_order_id existir só têm o texto livre
+    # "Nº X" em supply_order - sem isso, ordens antigas já usadas voltariam a aparecer como disponíveis.
+    launched_order_texts = set(await db.fuel_supplies.distinct("supply_order", {"supply_order": {"$ne": None}}))
     for r in rows:
-        r["is_launched"] = r["id"] in launched_ids
+        r["is_launched"] = r["id"] in launched_ids or f"Nº {r['order_number']}" in launched_order_texts
     return rows
 
 
