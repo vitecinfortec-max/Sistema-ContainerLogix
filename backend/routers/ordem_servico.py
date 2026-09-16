@@ -222,6 +222,7 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     from reportlab.lib.enums import TA_CENTER
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
     from reportlab.graphics.barcode import code128
+    from xml.sax.saxutils import escape as xml_escape
     from reports import (
         download_logo, _build_pdf_header, _voucher_field_row, _voucher_boxed_section,
         PRIMARY_COLOR, HEADER_BG_COLOR,
@@ -238,6 +239,13 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
             return f"{float(v or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         except Exception:
             return "0,00"
+
+    def safe_text(value):
+        """Escapa '&', '<', '>' antes de entrar num Paragraph - texto livre
+        (descrição de item, observação etc.) pode conter esses caracteres e o
+        Paragraph do ReportLab interpreta o conteúdo como mini-XML, então sem
+        isso um '&' sozinho, por exemplo, quebra a geração do PDF."""
+        return xml_escape(str(value)) if value not in (None, '') else ''
 
     def fmt_dt(s):
         if not s:
@@ -365,17 +373,26 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     elements.append(Spacer(1, 6))
 
     elements.append(boxed_section('Detalhamento da Demanda', [], extra=[
-        Paragraph((os_doc.get('description') or '-').replace(chr(10), '<br/>'), text_block_style),
+        Paragraph(safe_text(os_doc.get('description')).replace(chr(10), '<br/>') or '-', text_block_style),
     ]))
     elements.append(Spacer(1, 6))
 
     if os_doc.get('associated_actions'):
         elements.append(boxed_section('Ações Associadas', [], extra=[
-            Paragraph(str(os_doc['associated_actions']).replace(chr(10), '<br/>'), text_block_style),
+            Paragraph(safe_text(os_doc['associated_actions']).replace(chr(10), '<br/>'), text_block_style),
         ]))
         elements.append(Spacer(1, 6))
 
     # ===== Produtos =====
+    # Descrição entra como Paragraph (não string solta) pra quebrar linha
+    # dentro da coluna - antes, uma descrição um pouco mais longa não
+    # quebrava e vazava por cima da coluna Qtd ao lado (bug visível no PDF:
+    # "WK1060/21,00" era na real "WK1060/2" da descrição colado no "1,00" da
+    # Qtd, sem quebra nem espaço). A coluna também ficou mais larga (era a
+    # menor fonte de sobra nas colunas de valor, que raramente precisam de
+    # toda a largura reservada).
+    item_desc_style = ParagraphStyle('OSItemDesc', parent=styles['Normal'], fontSize=7.5, leading=9)
+
     prod_header = ['Código', 'Descrição', 'Qtd', 'Un', 'V. Unit.', 'V. Total', 'Desc.', 'V. c/ Desc.']
     prod_rows = [prod_header]
     products = os_doc.get('products') or []
@@ -384,7 +401,7 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
         unit_price = float(p.get('unit_price') or 0)
         prod_rows.append([
             p.get('code') or '-',
-            p.get('description') or '-',
+            Paragraph(safe_text(p.get('description')) or '-', item_desc_style),
             f"{qty:.2f}".replace('.', ','),
             p.get('unit') or 'UN',
             money(unit_price),
@@ -401,7 +418,7 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
         money(sum(float(p.get('discount') or 0) for p in products)),
         money(os_doc.get('products_total')),
     ])
-    prod_base_widths = [45, 205, 40, 35, 55, 55, 45, 65]
+    prod_base_widths = [35, 250, 30, 28, 48, 48, 38, 55]
     prod_scale = width / sum(prod_base_widths)
     prod_t = Table(prod_rows, colWidths=[w * prod_scale for w in prod_base_widths], repeatRows=1)
     prod_style = [
@@ -435,14 +452,14 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     for s in services:
         serv_rows.append([
             s.get('code') or '-',
-            s.get('description') or '-',
+            Paragraph(safe_text(s.get('description')) or '-', item_desc_style),
             f"{float(s.get('quantity') or 0):.2f}".replace('.', ','),
             s.get('unit') or 'quantidade',
             money(s.get('unit_price')),
             money(s.get('total')),
         ])
     serv_rows.append(['', 'Total', '', '', '', money(os_doc.get('services_total'))])
-    serv_base_widths = [45, 300, 40, 55, 55, 55]
+    serv_base_widths = [35, 330, 30, 48, 48, 48]
     serv_scale = width / sum(serv_base_widths)
     serv_t = Table(serv_rows, colWidths=[w * serv_scale for w in serv_base_widths], repeatRows=1)
     serv_style = [
@@ -491,13 +508,13 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     elements.append(boxed_section('Parecer de Encerramento', [], extra=[
         Paragraph('Uso no fechamento: ' + '_' * 95, ParagraphStyle('OSUso', parent=styles['Normal'], fontSize=8)),
         Spacer(1, 5),
-        Paragraph((os_doc.get('closure_remark') or '-').replace(chr(10), '<br/>'), text_block_style),
+        Paragraph(safe_text(os_doc.get('closure_remark')).replace(chr(10), '<br/>') or '-', text_block_style),
     ]))
     elements.append(Spacer(1, 6))
 
     if os_doc.get('observations'):
         elements.append(boxed_section('Observações', [], extra=[
-            Paragraph(str(os_doc['observations']).replace(chr(10), '<br/>'), text_block_style),
+            Paragraph(safe_text(os_doc['observations']).replace(chr(10), '<br/>'), text_block_style),
         ]))
         elements.append(Spacer(1, 6))
 
