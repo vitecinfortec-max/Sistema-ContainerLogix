@@ -115,18 +115,50 @@ export default function StockMovementsPage() {
   };
 
   // ===== Finalidade (Veículo / OS / texto livre) =====
+  // OS primeiro na lista: o Autocomplete só mostra os 10 primeiros
+  // resultados do filtro, e com Veículo na frente uma placa que bate com
+  // várias OS's diferentes esmagava as OS's do resultado, escondendo a
+  // que interessava (relatado pelo usuário buscando por "1").
   const purposeOptions = [
-    ...vehicles.map((v) => ({ ...v, _kind: 'VEICULO' })),
     ...ordensServico.map((o) => ({ ...o, _kind: 'OS' })),
+    ...vehicles.map((v) => ({ ...v, _kind: 'VEICULO' })),
   ];
+  // A placa do veículo vinculado entra no texto da OS só pra fins de busca/
+  // exibição na lista - buscar pela placa também encontra a OS que usa esse
+  // veículo, não só o cadastro do veículo em si.
   const purposeDisplay = (opt) => (opt._kind === 'VEICULO'
     ? `${opt.plate}${opt.model ? ' - ' + opt.model : ''}`
-    : `OS Nº ${opt.os_number}${opt.person_name ? ' - ' + opt.person_name : ''}`);
+    : `OS Nº ${opt.os_number}${opt.equipment_plate ? ' - ' + opt.equipment_plate : ''}${opt.person_name ? ' - ' + opt.person_name : ''}`);
 
   const onPurposeChange = (v) => setForm((p) => ({
     ...p, purpose_text: v, purpose_type: 'OUTRO',
     purpose_vehicle_id: '', purpose_vehicle_plate: '', purpose_os_id: '', purpose_os_number: '',
   }));
+
+  // Ao vincular a uma OS, se a movimentação ainda não tem itens, importa os
+  // materiais já lançados nos "Produtos" dessa OS pra já sair pronta pra
+  // gerar a Saída/baixa no estoque - tenta casar cada item com um Produto
+  // do catálogo pela descrição (mesma estratégia usada na importação de
+  // NF-e); o que não casar entra com a descrição preenchida mas sem
+  // produto vinculado, pro usuário resolver manualmente antes de salvar.
+  const importItemsFromOS = (osRecord) => {
+    const osProducts = osRecord.products || [];
+    const norm = (s) => (s || '').trim().toLowerCase();
+    return osProducts.map((p) => {
+      const match = products.find((prod) => norm(prod.description) === norm(p.description));
+      const quantity = Number(p.quantity || 0);
+      const unitValue = Number(p.unit_price || 0);
+      return {
+        product_id: match ? match.id : '',
+        product_code: match ? match.code : null,
+        product_description: p.description || '',
+        quantity,
+        unit_value: unitValue,
+        total_value: quantity * unitValue,
+      };
+    });
+  };
+
   const onPurposeSelect = (opt) => {
     if (opt._kind === 'VEICULO') {
       setForm((p) => ({
@@ -134,12 +166,28 @@ export default function StockMovementsPage() {
         purpose_vehicle_id: opt.id, purpose_vehicle_plate: opt.plate,
         purpose_os_id: '', purpose_os_number: '',
       }));
-    } else {
-      setForm((p) => ({
-        ...p, purpose_type: 'OS', purpose_text: `OS Nº ${opt.os_number}`,
-        purpose_os_id: opt.id, purpose_os_number: opt.os_number,
-        purpose_vehicle_id: '', purpose_vehicle_plate: '',
-      }));
+      return;
+    }
+
+    const osProducts = opt.products || [];
+    const canImport = osProducts.length > 0 && (form.items || []).length === 0;
+    const importedItems = canImport ? importItemsFromOS(opt) : null;
+
+    setForm((p) => ({
+      ...p, purpose_type: 'OS', purpose_text: `OS Nº ${opt.os_number}`,
+      purpose_os_id: opt.id, purpose_os_number: opt.os_number,
+      purpose_vehicle_id: '', purpose_vehicle_plate: '',
+      ...(importedItems ? { items: importedItems, operation_type: 'SAIDA' } : {}),
+    }));
+
+    if (importedItems) {
+      const unmatched = importedItems.filter((i) => !i.product_id).length;
+      toast.success(
+        `${importedItems.length} item(ns) da OS Nº ${opt.os_number} importado(s) para a Saída`
+        + (unmatched > 0 ? ` - ${unmatched} sem produto correspondente no catálogo, selecione manualmente` : '')
+      );
+    } else if (osProducts.length > 0) {
+      toast.info('Essa OS tem materiais cadastrados, mas a movimentação já tem itens - remova-os e selecione a OS de novo para importar automaticamente.');
     }
   };
 
