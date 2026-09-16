@@ -23,6 +23,7 @@ import ServiceCatalogPage from './pages/ServiceCatalogPage';
 import ProductPage from './pages/ProductPage';
 import StockPage from './pages/StockPage';
 import StockEntriesPage from './pages/StockEntriesPage';
+import StockMovementsPage from './pages/StockMovementsPage';
 import StockReportPage from './pages/StockReportPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
@@ -339,6 +340,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="estoque.entradas">
                 <StockEntriesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/movimentacao"
+            element={
+              <ProtectedRoute moduleKey="estoque.movimentacao">
+                <StockMovementsPage />
               </ProtectedRoute>
             }
           />

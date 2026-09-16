@@ -1,4 +1,5 @@
 import io
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -14,6 +15,7 @@ from models import (
     ServiceCatalogItem, ServiceCatalogItemCreate, ServiceCatalogItemResponse,
     Product, ProductCreate, ProductResponse,
     StockEntry, StockEntryResponse,
+    StockMovement, StockMovementCreate, StockMovementResponse,
     Supplier,
 )
 from shared import db, get_current_active_user, get_company_settings, validate_and_read_upload
@@ -425,3 +427,106 @@ async def confirm_nfe_import(data: NfeImportConfirm, current_user: dict = Depend
 async def get_stock_entries(current_user: dict = Depends(get_current_active_user)):
     items = await db.stock_entries.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
     return [StockEntryResponse(**{**i, "created_at": datetime.fromisoformat(i['created_at'])}) for i in items]
+
+
+# ==================== MOVIMENTAÇÃO DE ESTOQUE (ENTRADA/SAÍDA MANUAL) ====================
+
+def _stock_movement_serialize(doc: dict) -> dict:
+    out = {**doc}
+    if isinstance(out.get('created_at'), str):
+        out['created_at'] = datetime.fromisoformat(out['created_at'])
+    out['total_value'] = round(sum(float(i.get('total_value') or 0) for i in (out.get('items') or [])), 2)
+    return out
+
+
+@api_router.get("/stock/movements/next-number")
+async def get_next_stock_movement_number(current_user: dict = Depends(get_current_active_user)):
+    """Só uma prévia pra exibir na tela; o número real é reservado de forma
+    atômica na criação (mesmo padrão de Ordem de Serviço/RPA/etc.)."""
+    counter = await db.counters.find_one({"_id": "stock_movement_number"})
+    return {"next_number": (counter["seq"] + 1) if counter else 1}
+
+
+@api_router.post("/stock/movements", response_model=StockMovementResponse)
+async def create_stock_movement(data: StockMovementCreate, current_user: dict = Depends(get_current_active_user)):
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Adicione ao menos um item à movimentação")
+    for item in data.items:
+        if item.quantity <= 0:
+            raise HTTPException(status_code=400, detail=f"Quantidade inválida para o item \"{item.product_description}\"")
+
+    # Carrega os produtos e confere saldo ANTES de gravar qualquer coisa -
+    # numa Saída, nenhum item deve ser aplicado se algum deles não tiver
+    # saldo suficiente (evita baixa parcial no estoque).
+    products_by_id = {}
+    for item in data.items:
+        product = await db.products.find_one({"id": item.product_id}, {"_id": 0})
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Produto não encontrado: {item.product_description}")
+        products_by_id[item.product_id] = product
+    if data.operation_type == "SAIDA":
+        # Soma por produto antes de comparar - o mesmo produto pode aparecer
+        # em mais de uma linha, e validar cada linha isolada contra o mesmo
+        # saldo deixaria passar uma soma que no total excede o estoque.
+        requested_by_product = {}
+        for item in data.items:
+            requested_by_product[item.product_id] = requested_by_product.get(item.product_id, 0) + item.quantity
+        for product_id, requested in requested_by_product.items():
+            available = float(products_by_id[product_id].get('stock_quantity') or 0)
+            if available < requested:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Saldo insuficiente para \"{products_by_id[product_id]['description']}\": "
+                           f"disponível {available:g}, solicitado {requested:g}"
+                )
+
+    counter = await db.counters.find_one_and_update(
+        {"_id": "stock_movement_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    movement = StockMovement(
+        movement_number=counter["seq"],
+        **data.model_dump(),
+        created_by=current_user['sub'],
+        created_by_name=current_user['name'],
+    )
+
+    sign = 1 if movement.operation_type == "ENTRADA" else -1
+    for item in movement.items:
+        await db.products.update_one({"id": item.product_id}, {"$inc": {"stock_quantity": sign * item.quantity}})
+
+    doc = movement.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.stock_movements.insert_one(doc)
+    return _stock_movement_serialize(doc)
+
+
+@api_router.get("/stock/movements", response_model=List[StockMovementResponse])
+async def get_stock_movements(
+    search: Optional[str] = None,
+    operation_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    query = {}
+    if operation_type:
+        query['operation_type'] = operation_type
+    if search:
+        search_escaped = re.escape(search)
+        query["$or"] = [
+            {"purpose_text": {"$regex": search_escaped, "$options": "i"}},
+            {"purpose_vehicle_plate": {"$regex": search_escaped, "$options": "i"}},
+            {"nfe_number": {"$regex": search_escaped, "$options": "i"}},
+            {"warehouse_name": {"$regex": search_escaped, "$options": "i"}},
+        ]
+    items = await db.stock_movements.find(query, {"_id": 0}).sort("movement_number", -1).to_list(None)
+    return [_stock_movement_serialize(i) for i in items]
+
+
+@api_router.get("/stock/movements/{movement_id}", response_model=StockMovementResponse)
+async def get_stock_movement(movement_id: str, current_user: dict = Depends(get_current_active_user)):
+    doc = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
+    return _stock_movement_serialize(doc)

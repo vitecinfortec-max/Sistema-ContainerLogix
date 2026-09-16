@@ -305,6 +305,7 @@ MODULE_CATALOG = [
         {"key": "estoque.produto", "label": "Produto"},
         {"key": "estoque.consulta", "label": "Estoque"},
         {"key": "estoque.entradas", "label": "Entradas de Estoque"},
+        {"key": "estoque.movimentacao", "label": "Movimentação de Estoque"},
         {"key": "estoque.relatorio", "label": "Relatório de Estoque"},
     ]},
     {"key": "comercial", "label": "Comercial", "items": [
@@ -372,6 +373,7 @@ PATH_MODULE_MAP = [
     ("/api/stock/report", "estoque.relatorio"),
     ("/api/stock/entries", "estoque.entradas"),
     ("/api/stock/nfe-import", "estoque.entradas"),
+    ("/api/stock/movements", "estoque.movimentacao"),
     ("/api/products", "estoque.produto"),
     ("/api/fuel-supplies", "frota.abastecimento"),
     ("/api/reports/fuel-supply", "frota.relatorio_abastecimento"),

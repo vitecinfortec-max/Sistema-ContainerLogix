@@ -3169,7 +3169,7 @@ class Product(BaseModel):
     code: int  # gerado automaticamente via contador
     description: str
     photo_url: Optional[str] = None
-    stock_quantity: float = 0.0  # atualizado manualmente - o backlog não pede lançamentos de entrada/saída ainda
+    stock_quantity: float = 0.0  # saldo corrente - também pode ser editado à mão, além de ser movimentado por StockEntry (NF-e) e StockMovement (Entrada/Saída manual)
     warehouse_id: Optional[str] = None
     warehouse_name: Optional[str] = None
     barcode: Optional[str] = None  # código de barras / SKU
@@ -3242,6 +3242,82 @@ class StockEntry(BaseModel):
 
 class StockEntryResponse(StockEntry):
     pass
+
+
+# ==================== MOVIMENTAÇÃO DE ESTOQUE ====================
+
+STOCK_MOVEMENT_PURPOSE_TYPES = ["VEICULO", "OS", "OUTRO"]
+
+
+class StockMovementItem(BaseModel):
+    """Item (produto) de uma Movimentação de Estoque."""
+    product_id: str
+    product_code: Optional[int] = None
+    product_description: str = ''
+    quantity: float
+    unit_value: float = 0.0
+    total_value: float = 0.0  # quantity * unit_value
+
+
+class StockMovement(BaseModel):
+    """Lançamento manual de Entrada/Saída de estoque - ao contrário do
+    StockEntry (só criado pela importação de XML de NF-e), cobre qualquer
+    movimentação e soma/subtrai Product.stock_quantity na hora. A Finalidade
+    pode ser vinculada a um Veículo (placa) ou a uma Ordem de Serviço - só
+    referência/rastreabilidade, não altera os Produtos da OS - ou texto
+    livre quando nenhum dos dois se aplica."""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    movement_number: int  # gerado automaticamente via contador atômico
+    operation_type: Literal["ENTRADA", "SAIDA"]
+    movement_date: str  # YYYY-MM-DD
+    nfe_number: Optional[str] = None
+    nfe_value: Optional[float] = None
+    warehouse_id: str
+    warehouse_name: str
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+
+    purpose_type: Optional[str] = None  # VEICULO | OS | OUTRO
+    purpose_text: Optional[str] = None  # texto exibido: placa, "OS Nº X" ou texto livre
+    purpose_vehicle_id: Optional[str] = None
+    purpose_vehicle_plate: Optional[str] = None
+    purpose_os_id: Optional[str] = None
+    purpose_os_number: Optional[int] = None
+
+    account_entry: Optional[str] = None  # Conta Lançamento
+    observations: Optional[str] = None
+
+    items: List[StockMovementItem] = []
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class StockMovementCreate(BaseModel):
+    operation_type: Literal["ENTRADA", "SAIDA"]
+    movement_date: str
+    nfe_number: Optional[str] = None
+    nfe_value: Optional[float] = None
+    warehouse_id: str
+    warehouse_name: str
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    purpose_type: Optional[str] = None
+    purpose_text: Optional[str] = None
+    purpose_vehicle_id: Optional[str] = None
+    purpose_vehicle_plate: Optional[str] = None
+    purpose_os_id: Optional[str] = None
+    purpose_os_number: Optional[int] = None
+    account_entry: Optional[str] = None
+    observations: Optional[str] = None
+    items: List[StockMovementItem] = []
+
+
+class StockMovementResponse(StockMovement):
+    total_value: float = 0.0
 
 
 # ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================

@@ -82,6 +82,11 @@ export const api = {
   getStockReportExcel: () => axios.get(`${API}/stock/report/excel`, { responseType: 'blob' }),
   getStockReportPDF: () => axios.get(`${API}/stock/report/pdf`, { responseType: 'blob' }),
 
+  getStockMovements: (params) => axios.get(`${API}/stock/movements`, { params }),
+  getStockMovementNextNumber: () => axios.get(`${API}/stock/movements/next-number`),
+  getStockMovement: (id) => axios.get(`${API}/stock/movements/${id}`),
+  createStockMovement: (data) => axios.post(`${API}/stock/movements`, data),
+
   getOSCategories: () => axios.get(`${API}/os-categories`),
   createOSCategory: (data) => axios.post(`${API}/os-categories`, data),
   updateOSCategory: (id, data) => axios.put(`${API}/os-categories/${id}`, data),
