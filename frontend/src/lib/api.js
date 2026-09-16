@@ -86,6 +86,8 @@ export const api = {
   getStockMovementNextNumber: () => axios.get(`${API}/stock/movements/next-number`),
   getStockMovement: (id) => axios.get(`${API}/stock/movements/${id}`),
   createStockMovement: (data) => axios.post(`${API}/stock/movements`, data),
+  updateStockMovement: (id, data) => axios.put(`${API}/stock/movements/${id}`, data),
+  getStockMovementPDF: (id) => axios.get(`${API}/stock/movements/${id}/pdf`, { responseType: 'blob' }),
 
   getOSCategories: () => axios.get(`${API}/os-categories`),
   createOSCategory: (data) => axios.post(`${API}/os-categories`, data),

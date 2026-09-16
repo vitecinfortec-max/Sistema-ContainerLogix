@@ -1,6 +1,6 @@
 import io
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -15,7 +15,7 @@ from models import (
     ServiceCatalogItem, ServiceCatalogItemCreate, ServiceCatalogItemResponse,
     Product, ProductCreate, ProductResponse,
     StockEntry, StockEntryResponse,
-    StockMovement, StockMovementCreate, StockMovementResponse,
+    StockMovement, StockMovementCreate, StockMovementUpdate, StockMovementResponse,
     Supplier,
 )
 from shared import db, get_current_active_user, get_company_settings, validate_and_read_upload
@@ -435,7 +435,22 @@ def _stock_movement_serialize(doc: dict) -> dict:
     out = {**doc}
     if isinstance(out.get('created_at'), str):
         out['created_at'] = datetime.fromisoformat(out['created_at'])
+    if isinstance(out.get('updated_at'), str):
+        out['updated_at'] = datetime.fromisoformat(out['updated_at'])
     out['total_value'] = round(sum(float(i.get('total_value') or 0) for i in (out.get('items') or [])), 2)
+    return out
+
+
+def _stock_movement_effect_by_product(operation_type: str, items) -> dict:
+    """Soma, por produto, o quanto uma movimentação altera o estoque (+ pra
+    Entrada, - pra Saída). `items` aceita tanto dict (documento do Mongo)
+    quanto StockMovementItem (Pydantic, no create/update)."""
+    sign = 1 if operation_type == "ENTRADA" else -1
+    out = {}
+    for it in items:
+        pid = it.get('product_id') if isinstance(it, dict) else it.product_id
+        qty = it.get('quantity') if isinstance(it, dict) else it.quantity
+        out[pid] = out.get(pid, 0) + sign * float(qty or 0)
     return out
 
 
@@ -503,6 +518,62 @@ async def create_stock_movement(data: StockMovementCreate, current_user: dict = 
     return _stock_movement_serialize(doc)
 
 
+@api_router.put("/stock/movements/{movement_id}", response_model=StockMovementResponse)
+async def update_stock_movement(movement_id: str, data: StockMovementUpdate, current_user: dict = Depends(get_current_active_user)):
+    """Edita uma Movimentação já lançada. Recalcula o efeito no estoque como
+    a DIFERENÇA entre o que a movimentação antiga já aplicou e o que a nova
+    versão deveria aplicar (por produto) - assim cobre trocar quantidade,
+    trocar Entrada<->Saída, adicionar/remover item, tudo num único ajuste
+    atômico por produto, sem precisar desfazer e refazer em duas etapas."""
+    existing = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Adicione ao menos um item à movimentação")
+    for item in data.items:
+        if item.quantity <= 0:
+            raise HTTPException(status_code=400, detail=f"Quantidade inválida para o item \"{item.product_description}\"")
+
+    old_effect = _stock_movement_effect_by_product(existing.get('operation_type'), existing.get('items') or [])
+    new_effect = _stock_movement_effect_by_product(data.operation_type, data.items)
+    net_delta = {
+        pid: new_effect.get(pid, 0) - old_effect.get(pid, 0)
+        for pid in set(old_effect) | set(new_effect)
+    }
+
+    products_by_id = {}
+    for pid in net_delta:
+        product = await db.products.find_one({"id": pid}, {"_id": 0})
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Produto vinculado a esta movimentação não foi encontrado (id {pid})")
+        products_by_id[pid] = product
+    for pid, delta in net_delta.items():
+        if delta < 0:
+            available = float(products_by_id[pid].get('stock_quantity') or 0)
+            if available + delta < 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Saldo insuficiente para \"{products_by_id[pid]['description']}\" com essa edição: "
+                           f"disponível {available:g}, faltariam {-(available + delta):g}"
+                )
+
+    for pid, delta in net_delta.items():
+        if delta != 0:
+            await db.products.update_one({"id": pid}, {"$inc": {"stock_quantity": delta}})
+
+    update_data = {
+        **data.model_dump(),
+        "id": movement_id,
+        "movement_number": existing["movement_number"],
+        "created_by": existing["created_by"],
+        "created_by_name": existing["created_by_name"],
+        "created_at": existing["created_at"],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.stock_movements.replace_one({"id": movement_id}, update_data)
+    return _stock_movement_serialize(update_data)
+
+
 @api_router.get("/stock/movements", response_model=List[StockMovementResponse])
 async def get_stock_movements(
     search: Optional[str] = None,
@@ -530,3 +601,191 @@ async def get_stock_movement(movement_id: str, current_user: dict = Depends(get_
     if not doc:
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
     return _stock_movement_serialize(doc)
+
+
+@api_router.get("/stock/movements/{movement_id}/pdf")
+async def download_stock_movement_pdf(movement_id: str, current_user: dict = Depends(get_current_active_user)):
+    """Gera o PDF da Movimentação de Estoque no mesmo layout visual do
+    comprovante de Registro de Gate/EIR - mesmo padrão já usado em Ordem de
+    Serviço e Ordem de Carregamento."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.graphics.barcode import code128
+    from xml.sax.saxutils import escape as xml_escape
+    from reports import (
+        download_logo, _build_pdf_header, _voucher_field_row, _voucher_boxed_section,
+        merge_company, now_brt, PRIMARY_COLOR, HEADER_BG_COLOR,
+    )
+
+    doc_data = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
+    if not doc_data:
+        raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
+    movement = _stock_movement_serialize(doc_data)
+    company = merge_company(await get_company_settings())
+
+    def money(v):
+        try:
+            return f"{float(v or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except Exception:
+            return "0,00"
+
+    def fmt_date(s):
+        if not s:
+            return None
+        try:
+            return datetime.fromisoformat(str(s)).strftime('%d/%m/%Y')
+        except Exception:
+            return str(s)
+
+    def safe_text(value):
+        return xml_escape(str(value)) if value not in (None, '') else ''
+
+    OPERATION_LABELS = {'ENTRADA': 'Entrada', 'SAIDA': 'Saída'}
+    OPERATION_HEX = {'ENTRADA': '#15803D', 'SAIDA': '#B91C1C'}.get(movement.get('operation_type'), '#000000')
+
+    buffer = io.BytesIO()
+    pdf_doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=10 * mm, leftMargin=10 * mm, topMargin=6 * mm, bottomMargin=6 * mm
+    )
+    width = pdf_doc.width
+    styles = getSampleStyleSheet()
+    logo_buffer = download_logo(company)
+
+    label_value_style = styles['Normal']
+    box_title_style = ParagraphStyle('SMBoxTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
+    title_style = ParagraphStyle('SMTitle', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER)
+    subtitle_style = ParagraphStyle('SMSubtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)
+    footer_style = ParagraphStyle('SMFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=colors.HexColor('#555555'))
+    text_block_style = ParagraphStyle('SMTextBlock', parent=styles['Normal'], fontSize=8.5, leading=10.5)
+    item_desc_style = ParagraphStyle('SMItemDesc', parent=styles['Normal'], fontSize=7.5, leading=9)
+
+    def field_row(pairs, n_cols=4):
+        return _voucher_field_row(pairs, width, label_value_style, n_cols=n_cols)
+
+    def boxed_section(title, row_tables, extra=None):
+        return _voucher_boxed_section(title, row_tables, width, box_title_style, extra=extra)
+
+    elements = []
+    elements.extend(_build_pdf_header(styles, logo_buffer, '', company=company, content_width=width)[:2])
+
+    title_tbl = Table([
+        [Paragraph('MOVIMENTAÇÃO DE ESTOQUE', title_style)],
+        [Paragraph(f"Nº {movement['movement_number']} - {OPERATION_LABELS.get(movement.get('operation_type'), movement.get('operation_type'))}", subtitle_style)],
+    ], colWidths=[width])
+    title_tbl.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(title_tbl)
+    elements.append(Spacer(1, 6))
+
+    elements.append(boxed_section('Dados da Movimentação', [
+        field_row([
+            ('Operação', f'<font color="{OPERATION_HEX}">{OPERATION_LABELS.get(movement.get("operation_type"), movement.get("operation_type"))}</font>'),
+            ('Data', fmt_date(movement.get('movement_date'))),
+            ('Nota Fiscal', movement.get('nfe_number')),
+            ('Valor Nota Fiscal', money(movement['nfe_value']) if movement.get('nfe_value') is not None else None),
+        ]),
+        field_row([
+            ('Almoxarifado', movement.get('warehouse_name')),
+            ('Fornecedor', movement.get('supplier_name')),
+            ('Conta Lançamento', movement.get('account_entry')),
+        ], n_cols=3),
+        field_row([
+            ('Finalidade', movement.get('purpose_text')),
+        ], n_cols=1),
+    ]))
+    elements.append(Spacer(1, 6))
+
+    if movement.get('observations'):
+        elements.append(boxed_section('Observações', [], extra=[
+            Paragraph(safe_text(movement['observations']).replace(chr(10), '<br/>'), text_block_style),
+        ]))
+        elements.append(Spacer(1, 6))
+
+    item_header = ['Código', 'Descrição', 'Qtd', 'V. Unit.', 'V. Total']
+    item_rows = [item_header]
+    for it in (movement.get('items') or []):
+        item_rows.append([
+            str(it.get('product_code')) if it.get('product_code') is not None else '-',
+            Paragraph(safe_text(it.get('product_description')) or '-', item_desc_style),
+            f"{float(it.get('quantity') or 0):.2f}".replace('.', ','),
+            money(it.get('unit_value')),
+            money(it.get('total_value')),
+        ])
+    item_rows.append(['', 'Total', '', '', money(movement.get('total_value'))])
+    item_base_widths = [40, 320, 40, 55, 55]
+    item_table_width = width - 20
+    item_scale = item_table_width / sum(item_base_widths)
+    item_t = Table(item_rows, colWidths=[w * item_scale for w in item_base_widths], repeatRows=1)
+    item_style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 7.5),
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
+        ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING', (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+    ]
+    if movement.get('items'):
+        item_style.append(('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#FAFAFA')]))
+    item_t.setStyle(TableStyle(item_style))
+    elements.append(boxed_section('Itens', [], extra=[item_t]))
+    elements.append(Spacer(1, 6))
+
+    grand_total_style = ParagraphStyle('SMGrandTotal', parent=styles['Normal'], fontSize=11,
+                                       fontName='Helvetica-Bold', alignment=TA_CENTER,
+                                       textColor=colors.HexColor(f'#{PRIMARY_COLOR}'))
+    total_tbl = Table([[Paragraph(f"VALOR TOTAL: {money(movement.get('total_value'))}", grand_total_style)]], colWidths=[width])
+    total_tbl.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elements.append(total_tbl)
+    elements.append(Spacer(1, 8))
+
+    barcode_value = str(movement.get('movement_number') or 0).zfill(6)
+    try:
+        bc = code128.Code128(barcode_value, barWidth=1.0, barHeight=28)
+    except Exception:
+        bc = None
+    bc_num = Paragraph(f"<b>{movement['movement_number']}</b>", ParagraphStyle('SMBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER))
+    left_cell = [bc, bc_num] if bc else [bc_num]
+    right_info = [
+        Paragraph(f"<b>Usuário: {safe_text(movement.get('created_by_name')) or '-'}</b>", styles['Normal']),
+        Paragraph(f"<b>Data e hora da impressão: {now_brt().strftime('%d/%m/%Y %H:%M')}</b>", styles['Normal']),
+    ]
+    info_tbl = Table([[left_cell, right_info]], colWidths=[100, width - 100])
+    info_tbl.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.black),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(info_tbl)
+    elements.append(Spacer(1, 6))
+
+    elements.append(Paragraph(
+        f"{company['name']} | Este documento é válido como comprovante de Movimentação de Estoque",
+        footer_style
+    ))
+
+    pdf_doc.build(elements)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    filename = f"MovimentacaoEstoque_{movement['movement_number']}.pdf"
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
+                             headers={"Content-Disposition": f"attachment; filename={filename}"})

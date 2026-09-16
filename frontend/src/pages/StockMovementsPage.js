@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+import { Checkbox } from '../components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -14,7 +15,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Plus, Trash2, Save, Search, ArrowLeftRight, Car, ClipboardList } from 'lucide-react';
+import { Plus, Trash2, Save, Search, ArrowLeftRight, Car, ClipboardList, Pencil, Download } from 'lucide-react';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -36,9 +37,11 @@ export default function StockMovementsPage() {
   const [ordensServico, setOrdensServico] = useState([]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [nextNumber, setNextNumber] = useState(null);
   const [form, setForm] = useState(buildEmpty());
   const [saving, setSaving] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {
     loadMovements(); loadWarehouses(); loadSuppliers(); loadProducts();
@@ -77,11 +80,61 @@ export default function StockMovementsPage() {
 
   const openCreate = async () => {
     setForm(buildEmpty());
+    setEditingId(null);
     try {
       const r = await api.getStockMovementNextNumber();
       setNextNumber(r.data?.next_number || 1);
     } catch (e) { setNextNumber(null); }
     setDialogOpen(true);
+  };
+
+  const openEdit = async (id) => {
+    try {
+      const r = await api.getStockMovement(id);
+      const d = r.data;
+      setEditingId(id);
+      setNextNumber(d.movement_number);
+      setForm({
+        ...buildEmpty(),
+        ...d,
+        nfe_value: d.nfe_value ?? '',
+        items: d.items?.length ? d.items : [],
+      });
+      setDialogOpen(true);
+    } catch (e) { toast.error('Erro ao carregar movimentação'); }
+  };
+
+  const downloadPDF = async (id, num) => {
+    try {
+      const r = await api.getStockMovementPDF(id);
+      const url = window.URL.createObjectURL(new Blob([r.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `MovimentacaoEstoque_${num}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('PDF gerado!');
+    } catch (e) { toast.error('Erro ao gerar PDF'); }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllOnPage = () => {
+    const pageIds = movements.map((m) => m.id);
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
   };
 
   // ===== Itens =====
@@ -229,8 +282,13 @@ export default function StockMovementsPage() {
           total_value: Number(it.quantity || 0) * Number(it.unit_value || 0),
         })),
       };
-      await api.createStockMovement(payload);
-      toast.success('Movimentação de Estoque registrada!');
+      if (editingId) {
+        await api.updateStockMovement(editingId, payload);
+        toast.success('Movimentação de Estoque atualizada!');
+      } else {
+        await api.createStockMovement(payload);
+        toast.success('Movimentação de Estoque registrada!');
+      }
       setDialogOpen(false);
       loadMovements();
       loadProducts();
@@ -238,6 +296,8 @@ export default function StockMovementsPage() {
       toast.error(e?.response?.data?.detail || 'Erro ao salvar movimentação');
     } finally { setSaving(false); }
   };
+
+  const singleSelectedMovement = selectedIds.size === 1 ? movements.find((m) => m.id === [...selectedIds][0]) : null;
 
   return (
     <Layout>
@@ -271,10 +331,37 @@ export default function StockMovementsPage() {
         </Card>
 
         <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button variant="ghost" size="sm" onClick={openCreate} title="Nova Movimentação" data-testid="stock-movement-new-btn" className="h-9 px-3 gap-2 text-[13px] font-medium">
+          <Button variant="ghost" size="sm" onClick={openCreate} title="Nova Movimentação" data-testid="stock-movement-new-btn" className="h-9 w-9 p-0">
             <Plus className="w-4 h-4 text-primary" />
-            Nova Movimentação
           </Button>
+          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedMovement && openEdit(singleSelectedMovement.id)}
+            disabled={!singleSelectedMovement}
+            title="Editar"
+            data-testid="stock-movement-edit-btn"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Pencil className="w-4 h-4 text-blue-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => singleSelectedMovement && downloadPDF(singleSelectedMovement.id, singleSelectedMovement.movement_number)}
+            disabled={!singleSelectedMovement}
+            title="Baixar PDF"
+            data-testid="stock-movement-pdf-btn"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+          </Button>
+          {selectedIds.size > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
+              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
 
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
@@ -290,6 +377,13 @@ export default function StockMovementsPage() {
                 <table className="w-full">
                   <thead className="bg-slate-50 dark:bg-slate-800 border-b">
                     <tr>
+                      <th className="w-9 px-4 py-2.5">
+                        <Checkbox
+                          checked={movements.length > 0 && movements.every((m) => selectedIds.has(m.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="stock-movement-select-all"
+                        />
+                      </th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nº</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Data</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Operação</th>
@@ -301,7 +395,19 @@ export default function StockMovementsPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {movements.map((m) => (
-                      <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-800" data-testid="stock-movement-row">
+                      <tr
+                        key={m.id}
+                        onClick={() => toggleSelect(m.id)}
+                        className={`cursor-pointer transition-colors ${selectedIds.has(m.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        data-testid="stock-movement-row"
+                      >
+                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(m.id)}
+                            onCheckedChange={() => toggleSelect(m.id)}
+                            data-testid={`stock-movement-row-checkbox-${m.movement_number}`}
+                          />
+                        </td>
                         <td className="px-4 py-2.5 text-[13px] font-semibold text-emerald-700">Nº {m.movement_number}</td>
                         <td className="px-4 py-2.5 text-[12px] text-slate-500 dark:text-slate-400">{m.movement_date ? format(new Date(m.movement_date + 'T00:00:00'), 'dd/MM/yyyy') : '-'}</td>
                         <td className="px-4 py-2.5"><Badge variant="secondary" className={`text-[10px] ${OPERATION_COLORS[m.operation_type] || ''}`}>{OPERATION_LABELS[m.operation_type] || m.operation_type}</Badge></td>
@@ -333,7 +439,7 @@ export default function StockMovementsPage() {
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="flex items-center gap-2 text-base">
               <ArrowLeftRight className="w-5 h-5 text-emerald-600" />
-              Movimentação de Estoque - Inclusão
+              {editingId ? 'Editar Movimentação de Estoque' : 'Movimentação de Estoque - Inclusão'}
               {nextNumber !== null && <Badge variant="outline" className="ml-2 text-emerald-700 border-emerald-300">Nº {nextNumber}</Badge>}
             </DialogTitle>
           </DialogHeader>
@@ -457,7 +563,7 @@ export default function StockMovementsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="stock-movement-cancel">Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="stock-movement-save">
-              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : 'Salvar Movimentação'}
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar Movimentação' : 'Salvar Movimentação'}
             </Button>
           </DialogFooter>
         </DialogContent>

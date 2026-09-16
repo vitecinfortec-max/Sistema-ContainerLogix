@@ -3294,6 +3294,7 @@ class StockMovement(BaseModel):
     created_by: str
     created_by_name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
 
 
 class StockMovementCreate(BaseModel):
@@ -3314,6 +3315,10 @@ class StockMovementCreate(BaseModel):
     account_entry: Optional[str] = None
     observations: Optional[str] = None
     items: List[StockMovementItem] = []
+
+
+class StockMovementUpdate(StockMovementCreate):
+    pass
 
 
 class StockMovementResponse(StockMovement):
