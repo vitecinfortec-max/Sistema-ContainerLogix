@@ -93,8 +93,7 @@ const PAGE_TITLES = {
   '/estoque': 'Estoque',
   '/estoque/entradas': 'Entradas de Estoque',
   '/estoque/movimentacao': 'Movimentação de Estoque',
-  '/estoque/relatorio': 'Relatório de Estoque',
-  '/estoque/relatorio-movimentacoes': 'Relatório de Movimentações de Estoque',
+  '/estoque/relatorio': 'Relatórios do Estoque',
   '/loading-orders': 'Ordem de Carregamento',
   '/freight-routes': 'Rota',
   '/freight-payments': 'Pagamento Frete',
@@ -529,8 +528,7 @@ export default function Layout({ children }) {
     { path: '/estoque/movimentacao', label: 'Movimentação de Estoque', icon: ArrowLeftRight, moduleKey: 'estoque.movimentacao' },
     { path: '/estoque/produtos', label: 'Produto', icon: Package, moduleKey: 'estoque.produto' },
     { path: '/estoque/servicos', label: 'Cadastro de Serviço', icon: Wrench, moduleKey: 'estoque.cadastro_servico' },
-    { path: '/estoque/relatorio', label: 'Relatório de Estoque', icon: FileSpreadsheet, moduleKey: 'estoque.relatorio' },
-    { path: '/estoque/relatorio-movimentacoes', label: 'Relatório de Movimentações', icon: BarChart3, moduleKey: 'estoque.relatorio_movimentacoes' },
+    { path: '/estoque/relatorio', label: 'Relatórios do Estoque', icon: FileSpreadsheet, moduleKey: 'estoque.relatorio' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const estoqueCadastroItems = [

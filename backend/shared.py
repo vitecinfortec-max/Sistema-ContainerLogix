@@ -307,8 +307,7 @@ MODULE_CATALOG = [
         {"key": "estoque.consulta", "label": "Estoque"},
         {"key": "estoque.entradas", "label": "Entradas de Estoque"},
         {"key": "estoque.movimentacao", "label": "Movimentação de Estoque"},
-        {"key": "estoque.relatorio", "label": "Relatório de Estoque"},
-        {"key": "estoque.relatorio_movimentacoes", "label": "Relatório de Movimentações de Estoque"},
+        {"key": "estoque.relatorio", "label": "Relatórios do Estoque"},
     ]},
     {"key": "comercial", "label": "Comercial", "items": [
         {"key": "comercial.representante", "label": "Representante"},
@@ -372,7 +371,7 @@ PATH_MODULE_MAP = [
     ("/api/product-families", "estoque.familia_produto"),
     ("/api/service-families", "estoque.familia_servico"),
     ("/api/service-catalog", "estoque.cadastro_servico"),
-    ("/api/stock/ledger", "estoque.relatorio_movimentacoes"),
+    ("/api/stock/ledger", "estoque.relatorio"),
     ("/api/stock/report", "estoque.relatorio"),
     ("/api/stock/entries", "estoque.entradas"),
     ("/api/stock/nfe-import", "estoque.entradas"),

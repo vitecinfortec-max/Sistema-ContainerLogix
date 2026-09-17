@@ -25,7 +25,6 @@ import StockPage from './pages/StockPage';
 import StockEntriesPage from './pages/StockEntriesPage';
 import StockMovementsPage from './pages/StockMovementsPage';
 import StockReportPage from './pages/StockReportPage';
-import StockLedgerReportPage from './pages/StockLedgerReportPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
 import BillingPage from './pages/BillingPage';
@@ -366,14 +365,6 @@ function App() {
             element={
               <ProtectedRoute moduleKey="estoque.relatorio">
                 <StockReportPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/estoque/relatorio-movimentacoes"
-            element={
-              <ProtectedRoute moduleKey="estoque.relatorio_movimentacoes">
-                <StockLedgerReportPage />
               </ProtectedRoute>
             }
           />
