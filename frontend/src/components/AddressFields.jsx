@@ -144,21 +144,7 @@ export function AddressFields({ value, onChange, international = false }) {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-3">
-        <div className="col-span-2">
-          <FieldLabel>Rua/Rodovia</FieldLabel>
-          <Input value={v.street || ''} onChange={(e) => set('street', e.target.value)} className="h-9 text-sm" />
-        </div>
-        <div>
-          <FieldLabel>Número</FieldLabel>
-          <Input value={v.number || ''} onChange={(e) => set('number', e.target.value)} className="h-9 text-sm" />
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <FieldLabel>Bairro</FieldLabel>
-          <Input value={v.neighborhood || ''} onChange={(e) => set('neighborhood', e.target.value)} className="h-9 text-sm" />
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div>
           <FieldLabel>CEP</FieldLabel>
           <div className="flex gap-1.5">
@@ -178,6 +164,20 @@ export function AddressFields({ value, onChange, international = false }) {
             )}
           </div>
         </div>
+        <div className="sm:col-span-2">
+          <FieldLabel>Rua/Rodovia</FieldLabel>
+          <Input value={v.street || ''} onChange={(e) => set('street', e.target.value)} className="h-9 text-sm" />
+        </div>
+        <div>
+          <FieldLabel>Número</FieldLabel>
+          <Input value={v.number || ''} onChange={(e) => set('number', e.target.value)} className="h-9 text-sm" />
+        </div>
+      </div>
+      <div className={international ? 'grid grid-cols-1 sm:grid-cols-4 gap-3' : 'grid grid-cols-1 sm:grid-cols-3 gap-3'}>
+        <div>
+          <FieldLabel>Bairro</FieldLabel>
+          <Input value={v.neighborhood || ''} onChange={(e) => set('neighborhood', e.target.value)} className="h-9 text-sm" />
+        </div>
         <div>
           <FieldLabel>UF</FieldLabel>
           {international ? (
@@ -193,8 +193,6 @@ export function AddressFields({ value, onChange, international = false }) {
             </Select>
           )}
         </div>
-      </div>
-      <div className={international ? 'grid grid-cols-2 gap-3' : ''}>
         <div>
           <FieldLabel>Cidade</FieldLabel>
           {international ? (
