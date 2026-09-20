@@ -124,6 +124,27 @@ def _compute_delivery_status(current_status: str, items: list) -> str:
     return 'ATIVO'
 
 
+async def _sync_loading_schedule_status(schedule_id: str, delivery_status: str):
+    """Espelha a conclusão do Status de Entrega na Programação de Carregamento
+    que o originou (schedule_id) - fica CONCLUIDO quando o Status de Entrega
+    também está, volta pra ATIVO se deixar de estar (mesma lógica de
+    _compute_delivery_status, nunca um "trinco" só de ida). Um Status de
+    Entrega CANCELADO não mexe na Programação (cancelar o acompanhamento não
+    significa que o carregamento em si foi cancelado). Nunca mexe numa
+    Programação CANCELADA manualmente."""
+    if delivery_status == 'CANCELADO':
+        return
+    schedule = await db.loading_schedules.find_one({"id": schedule_id}, {"_id": 0, "status": 1})
+    if not schedule or schedule.get("status") == "CANCELADO":
+        return
+    new_status = "CONCLUIDO" if delivery_status == 'CONCLUIDO' else "ATIVO"
+    if schedule.get("status") != new_status:
+        await db.loading_schedules.update_one(
+            {"id": schedule_id},
+            {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+
+
 @api_router.post("/delivery-status", response_model=DeliveryStatusResponse)
 async def create_delivery_status(data: DeliveryStatusCreate, current_user: dict = Depends(get_current_active_user)):
     """Cria um novo status de entrega baseado em uma programação"""
@@ -143,6 +164,7 @@ async def create_delivery_status(data: DeliveryStatusCreate, current_user: dict 
     next_number = counter["seq"]
 
     processed_items = [item.model_dump() if hasattr(item, 'model_dump') else item for item in data.items]
+    computed_status = _compute_delivery_status('ATIVO', processed_items)
 
     # Criar o status com dados da programação
     status = DeliveryStatus(
@@ -156,12 +178,13 @@ async def create_delivery_status(data: DeliveryStatusCreate, current_user: dict 
         status_date=data.status_date,
         items=processed_items,
         observations=data.observations,
-        status=_compute_delivery_status('ATIVO', processed_items),
+        status=computed_status,
         created_by=current_user["sub"],
         created_by_name=current_user["name"]
     )
 
     await db.delivery_statuses.insert_one(status.model_dump())
+    await _sync_loading_schedule_status(schedule["id"], computed_status)
 
     result = await db.delivery_statuses.find_one({"id": status.id}, {"_id": 0})
     return result
@@ -174,16 +197,18 @@ async def update_delivery_status(status_id: str, data: DeliveryStatusCreate, cur
         raise HTTPException(status_code=404, detail="Status de entrega não encontrado")
 
     updated_items = [item.model_dump() for item in data.items]
+    computed_status = _compute_delivery_status(existing.get("status", "ATIVO"), updated_items)
     update_data = {
         "status_date": data.status_date,
         "items": updated_items,
         "observations": data.observations,
-        "status": _compute_delivery_status(existing.get("status", "ATIVO"), updated_items),
+        "status": computed_status,
         "updated_at": datetime.now(timezone.utc)
     }
 
     await db.delivery_statuses.update_one({"id": status_id}, {"$set": update_data})
-    
+    await _sync_loading_schedule_status(existing["schedule_id"], computed_status)
+
     result = await db.delivery_statuses.find_one({"id": status_id}, {"_id": 0})
     return result
 
