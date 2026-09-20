@@ -198,7 +198,7 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib import colors
     from reportlab.lib.units import mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, KeepTogether
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
@@ -321,13 +321,13 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
         ('LINEAFTER', (0, 0), (0, -1), 0.5, colors.HexColor('#CCCCCC')),
         ('LINEBELOW', (0, 0), (-1, 1), 0.5, colors.HexColor('#CCCCCC')),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('LEFTPADDING', (0, 0), (-1, -1), 10),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
     ]))
     elements.append(info_table)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 6))
     
     # ========== BOX 2: Tabela de Status de Entrega ==========
     status_header = [[Paragraph("Status de Entrega por Motorista", section_title)]]
@@ -383,13 +383,16 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
             row.append(item.get('bag_number') or '-')
         table_data.append(row)
 
-    # Larguras-base somam 700pt (proporções pensadas pro conteúdo de cada
+    # Larguras-base somam ~700pt (proporções pensadas pro conteúdo de cada
     # coluna); escaladas pra CONTENT_WIDTH pra ocupar a área útil real da
-    # página em vez de deixar sobra à direita.
+    # página em vez de deixar sobra à direita. LOCAL mais larga (e as 6
+    # colunas de horário um pouco mais estreitas, que só têm "HH:MM") reduz
+    # quantas linhas o nome do local quebra - cada linha a menos evita
+    # transbordar pra uma 2ª página com poucos motoristas na lista.
     if has_bag_numbers:
-        base_widths = [20, 65, 60, 40, 65, 60, 52, 52, 52, 52, 52, 50, 80]
+        base_widths = [20, 65, 60, 40, 65, 85, 48, 48, 48, 48, 48, 50, 80]
     else:
-        base_widths = [20, 85, 70, 50, 80, 85, 52, 52, 52, 52, 52, 50]
+        base_widths = [20, 85, 70, 50, 80, 115, 47, 47, 47, 47, 47, 50]
     scale = CONTENT_WIDTH / sum(base_widths)
     col_widths = [w * scale for w in base_widths]
     data_table = Table(table_data, colWidths=col_widths)
@@ -409,16 +412,16 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
         ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
         ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('LEFTPADDING', (0, 0), (-1, -1), 3),
         ('RIGHTPADDING', (0, 0), (-1, -1), 3),
         # Alternating row colors
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F9F9F9')]),
     ]))
     elements.append(data_table)
-    elements.append(Spacer(1, 8))
-    
+    elements.append(Spacer(1, 5))
+
     # ========== Observações ==========
     if delivery_status.get('observations'):
         obs_header = [[Paragraph("Observações", section_title)]]
@@ -430,18 +433,21 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ('LEFTPADDING', (0, 0), (-1, -1), 10),
         ]))
-        elements.append(obs_header_table)
-        
+
         obs_content_style = ParagraphStyle('ObsContent', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK)
         obs_content = [[Paragraph(delivery_status['observations'], obs_content_style)]]
         obs_table = Table(obs_content, colWidths=[SECTION_WIDTH])
         obs_table.setStyle(TableStyle([
             ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('LEFTPADDING', (0, 0), (-1, -1), 10),
         ]))
-        elements.append(obs_table)
+        # Header + conteúdo da seção viajam juntos - antes eram 2 flowables
+        # soltos e o ReportLab podia decidir que só o header cabia na página
+        # atual, deixando a caixa "Observações" órfã (vazia) na página 1 e o
+        # texto de verdade sozinho na página 2.
+        elements.append(KeepTogether([obs_header_table, obs_table]))
         elements.append(Spacer(1, 12))
 
     footer = _make_pdf_footer(company['name'])
