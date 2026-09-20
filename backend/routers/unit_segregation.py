@@ -66,6 +66,7 @@ api_router = APIRouter(prefix="/api")
 # ==================== SEGREGAÇÃO DE UNIDADE ENDPOINTS ====================
 
 from models import UnitSegregation, UnitSegregationCreate, UnitSegregationUpdate, UnitSegregationResponse, UnitSegregationItem
+from routers.movements import _normalize_client_name
 
 
 def _unit_segregation_serialize(doc: dict) -> dict:
@@ -714,3 +715,58 @@ async def check_container_segregation_batch(
     return result
 
 
+@api_router.post("/unit-segregations/resync-retrievals")
+async def resync_unit_segregation_retrievals(current_user: dict = Depends(get_current_admin_user)):
+    """Reprocessamento único (idempotente, pode rodar quantas vezes quiser):
+    varre toda Segregação ATIVA com item ainda Pendente e procura, no
+    histórico de movimentações, uma EIR de Saída desse container cujo
+    Cliente OU Comprador já bata com o cliente reservado - dá baixa
+    retroativa se achar. Necessário porque a baixa só é registrada no
+    momento em que a EIR é emitida (ver _mark_segregation_retrieved em
+    routers/movements.py); uma EIR de Saída emitida ANTES desse campo
+    reconhecer o Comprador nunca dispara a baixa sozinha até ser reemitida."""
+    segregations = await db.unit_segregations.find(
+        {"status": "ATIVO", "items.retrieved": False}, {"_id": 0}
+    ).to_list(None)
+    items_checked = 0
+    items_updated = 0
+    for segregation in segregations:
+        reserved = _normalize_client_name(segregation.get("client_name"))
+        for item in segregation.get("items", []):
+            if item.get("retrieved"):
+                continue
+            items_checked += 1
+            container_number = (item.get("container_number") or "").strip().upper()
+            if not container_number:
+                continue
+            candidates = await db.movements.find(
+                {"container_number": container_number, "operation_type": "SAIDA"},
+                {"_id": 0, "transaction_id": 1, "client_name": 1, "buyer_name": 1, "created_at": 1},
+            ).sort("created_at", -1).to_list(None)
+            movement = next(
+                (m for m in candidates if reserved in (
+                    _normalize_client_name(m.get("client_name")), _normalize_client_name(m.get("buyer_name"))
+                )),
+                None
+            )
+            if not movement:
+                continue
+            result = await db.unit_segregations.update_one(
+                {
+                    "id": segregation["id"],
+                    "items.container_number": item["container_number"],
+                    "items.retrieved": False,
+                },
+                {"$set": {
+                    "items.$.retrieved": True,
+                    "items.$.retrieved_at": movement.get("created_at") or datetime.now(timezone.utc).isoformat(),
+                    "items.$.retrieved_transaction_id": movement["transaction_id"],
+                }}
+            )
+            if result.modified_count:
+                items_updated += 1
+    return {
+        "segregations_checked": len(segregations),
+        "items_checked": items_checked,
+        "items_updated": items_updated,
+    }

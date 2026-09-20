@@ -124,10 +124,17 @@ async def _check_segregation_conflict(
 async def _mark_segregation_retrieved(container_number: str, transaction_id: int):
     """Dá baixa (retirada) no item segregado desse container, assim que a EIR
     de Saída pro cliente certo é emitida - chamado incondicionalmente em toda
-    Saída; só tem efeito se existir mesmo uma segregação ATIVA pra ele (query
-    não casa e o update vira no-op, senão)."""
+    Saída (criação ou edição); só tem efeito se existir mesmo uma segregação
+    ATIVA pra ele com o item ainda Pendente (query não casa e o update vira
+    no-op, senão) - a guarda "items.retrieved": {"$ne": True} evita que uma
+    edição posterior da mesma EIR (ex: corrigindo um campo não relacionado)
+    fique reescrevendo retrieved_at/retrieved_transaction_id a cada save."""
     await db.unit_segregations.update_one(
-        {"status": "ATIVO", "items.container_number": container_number.strip().upper()},
+        {
+            "status": "ATIVO",
+            "items.container_number": container_number.strip().upper(),
+            "items.retrieved": {"$ne": True},
+        },
         {"$set": {
             "items.$.retrieved": True,
             "items.$.retrieved_at": datetime.now(timezone.utc).isoformat(),
@@ -843,9 +850,25 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     # Arredondar valor monetário para evitar problemas de precisão
     if update_data.get('service_value') is not None:
         update_data['service_value'] = round_money(update_data['service_value'])
-    
+
+    # Mesma trava #1 da Segregação de Unidade aplicada na criação
+    # (_create_container_movement) - editar uma EIR também pode trocar
+    # container/operação/cliente/comprador pra uma combinação que deveria
+    # estar bloqueada, e sem isso aqui o reconhecimento da baixa (abaixo)
+    # nunca rodava pra EIRs de Saída que só ganharam o Cliente/Comprador
+    # certo numa edição posterior à criação.
+    segregation_error = await _check_segregation_conflict(
+        update_data['container_number'], update_data['operation_type'],
+        update_data.get('client_name'), update_data.get('buyer_name')
+    )
+    if segregation_error:
+        raise HTTPException(status_code=400, detail=segregation_error)
+
     await db.movements.replace_one({"id": movement_id}, update_data)
-    
+
+    if update_data['operation_type'] == 'SAIDA':
+        await _mark_segregation_retrieved(update_data['container_number'], update_data['transaction_id'])
+
     return ContainerMovementResponse(
         id=movement_id,
         transaction_id=update_data['transaction_id'],
