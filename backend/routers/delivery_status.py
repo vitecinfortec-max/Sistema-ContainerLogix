@@ -124,25 +124,57 @@ def _compute_delivery_status(current_status: str, items: list) -> str:
     return 'ATIVO'
 
 
-async def _sync_loading_schedule_status(schedule_id: str, delivery_status: str):
+async def _sync_loading_schedule_status(schedule_id: str, delivery_status: str) -> bool:
     """Espelha a conclusão do Status de Entrega na Programação de Carregamento
     que o originou (schedule_id) - fica CONCLUIDO quando o Status de Entrega
     também está, volta pra ATIVO se deixar de estar (mesma lógica de
     _compute_delivery_status, nunca um "trinco" só de ida). Um Status de
     Entrega CANCELADO não mexe na Programação (cancelar o acompanhamento não
     significa que o carregamento em si foi cancelado). Nunca mexe numa
-    Programação CANCELADA manualmente."""
+    Programação CANCELADA manualmente. Retorna se algo foi de fato alterado
+    (usado pelo reprocessamento em massa pra contar quantas mudaram)."""
     if delivery_status == 'CANCELADO':
-        return
+        return False
     schedule = await db.loading_schedules.find_one({"id": schedule_id}, {"_id": 0, "status": 1})
     if not schedule or schedule.get("status") == "CANCELADO":
-        return
+        return False
     new_status = "CONCLUIDO" if delivery_status == 'CONCLUIDO' else "ATIVO"
-    if schedule.get("status") != new_status:
-        await db.loading_schedules.update_one(
-            {"id": schedule_id},
-            {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
-        )
+    if schedule.get("status") == new_status:
+        return False
+    await db.loading_schedules.update_one(
+        {"id": schedule_id},
+        {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    return True
+
+
+@api_router.post("/delivery-status/resync-schedules")
+async def resync_delivery_status_schedules(current_user: dict = Depends(get_current_admin_user)):
+    """Reprocessamento único (idempotente, pode rodar quantas vezes quiser):
+    recalcula o status de todo Status de Entrega já existente e sincroniza a
+    Programação de Carregamento que o originou. Necessário porque
+    _compute_delivery_status/_sync_loading_schedule_status só passaram a
+    rodar em create/update a partir desse deploy - um Status de Entrega que
+    já estava com todos os horários preenchidos ANTES disso nunca dispara o
+    recálculo sozinho até ser salvo de novo pela tela."""
+    statuses = await db.delivery_statuses.find({}, {"_id": 0}).to_list(None)
+    delivery_updated = 0
+    schedules_updated = 0
+    for doc in statuses:
+        computed = _compute_delivery_status(doc.get("status", "ATIVO"), doc.get("items") or [])
+        if computed != doc.get("status"):
+            await db.delivery_statuses.update_one(
+                {"id": doc["id"]},
+                {"$set": {"status": computed, "updated_at": datetime.now(timezone.utc)}}
+            )
+            delivery_updated += 1
+        if doc.get("schedule_id") and await _sync_loading_schedule_status(doc["schedule_id"], computed):
+            schedules_updated += 1
+    return {
+        "delivery_statuses_checked": len(statuses),
+        "delivery_statuses_updated": delivery_updated,
+        "schedules_updated": schedules_updated,
+    }
 
 
 @api_router.post("/delivery-status", response_model=DeliveryStatusResponse)
