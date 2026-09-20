@@ -36,10 +36,13 @@ export default function NewMovementPage() {
   const [inspectionNotes, setInspectionNotes] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [buyerSearch, setBuyerSearch] = useState('');
+  const [showBuyerDropdown, setShowBuyerDropdown] = useState(false);
   const [containerDuplicateError, setContainerDuplicateError] = useState('');
   const [segregationError, setSegregationError] = useState('');
   const [servicePriceEntries, setServicePriceEntries] = useState([]);
   const clientInputRef = useRef(null);
+  const buyerInputRef = useRef(null);
   const { notifyNewMovement, requestPermission, permission } = useNotifications();
   
   const savedDraft = localStorage.getItem(AUTO_SAVE_KEY);
@@ -87,6 +90,9 @@ export default function NewMovementPage() {
     const handleClickOutside = (event) => {
       if (clientInputRef.current && !clientInputRef.current.contains(event.target)) {
         setShowClientDropdown(false);
+      }
+      if (buyerInputRef.current && !buyerInputRef.current.contains(event.target)) {
+        setShowBuyerDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -729,6 +735,71 @@ export default function NewMovementPage() {
                     className="h-12 font-mono"
                   />
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
+                </div>
+
+                <div className="space-y-2 relative" ref={buyerInputRef}>
+                  <Label htmlFor="buyer_name">Comprador</Label>
+                  <div className="relative">
+                    <Input
+                      id="buyer_name"
+                      data-testid="buyer-name-input"
+                      className="h-12 pr-10"
+                      value={buyerSearch}
+                      onChange={(e) => {
+                        setBuyerSearch(e.target.value);
+                        setShowBuyerDropdown(true);
+                        if (e.target.value === '') {
+                          setValue('buyer_name', '');
+                        }
+                      }}
+                      onFocus={() => setShowBuyerDropdown(true)}
+                    />
+                    {buyerSearch && (
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400"
+                        onClick={() => {
+                          setBuyerSearch('');
+                          setValue('buyer_name', '');
+                          setShowBuyerDropdown(false);
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  {showBuyerDropdown && buyerSearch && (
+                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {clients
+                        .filter(client =>
+                          client.name.toLowerCase().includes(buyerSearch.toLowerCase())
+                        )
+                        .slice(0, 10)
+                        .map(client => (
+                          <div
+                            key={client.id}
+                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer text-sm"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setBuyerSearch(client.name);
+                              setValue('buyer_name', client.name);
+                              setShowBuyerDropdown(false);
+                            }}
+                          >
+                            {client.name}
+                          </div>
+                        ))
+                      }
+                      {clients.filter(client =>
+                        client.name.toLowerCase().includes(buyerSearch.toLowerCase())
+                      ).length === 0 && (
+                        <div className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400">
+                          Nenhum cliente encontrado
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">Este campo não aparece na impressão</p>
                 </div>
 
                 <div className="space-y-2 md:col-span-2">

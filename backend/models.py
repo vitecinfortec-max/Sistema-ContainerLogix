@@ -420,6 +420,7 @@ class ContainerMovement(BaseModel):
     trailer_plate_2: Optional[str] = None
     transport_company: str
     client_name: Optional[str] = None  # Cliente (não aparece na impressão)
+    buyer_name: Optional[str] = None  # Comprador (não aparece na impressão)
     container_number: str
     status: Literal["CHEIO", "VAZIO"]
     size_type: Literal["20DC", "20RF", "20OT", "20FR", "40HC", "40RF", "40OT", "40FR", "40DRY"]
@@ -453,6 +454,7 @@ class ContainerMovementCreate(BaseModel):
     trailer_plate_2: Optional[str] = None
     transport_company: str
     client_name: Optional[str] = None  # Cliente
+    buyer_name: Optional[str] = None  # Comprador
     container_number: str
     status: Literal["CHEIO", "VAZIO"]
     size_type: Literal["20DC", "20RF", "20OT", "20FR", "40HC", "40RF", "40OT", "40FR", "40DRY"]
@@ -482,6 +484,7 @@ class ContainerMovementResponse(BaseModel):
     trailer_plate_2: Optional[str] = None
     transport_company: Optional[str] = None
     client_name: Optional[str] = None  # Cliente
+    buyer_name: Optional[str] = None  # Comprador
     container_number: str
     status: str
     size_type: str

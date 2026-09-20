@@ -664,6 +664,10 @@ export default function MovementDetailPage() {
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">Terminal de Origem</p>
                   <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.origin_terminal || '-'}</p>
                 </div>
+                <div className="col-span-2">
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Comprador</p>
+                  <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.buyer_name || '-'}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
