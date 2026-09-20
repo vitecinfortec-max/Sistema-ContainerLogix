@@ -10,7 +10,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { ClipboardCheck, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText, Clock, FileSpreadsheet } from 'lucide-react';
+import { ClipboardCheck, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText, Clock, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -268,6 +268,15 @@ export default function DeliveryStatusPage() {
     return nomes[0] || parts[0] || '-';
   };
 
+  // Status do registro (ATIVO/CONCLUIDO/CANCELADO) é derivado automaticamente
+  // pelo backend a partir de items[].delivery_completed - ver
+  // _compute_delivery_status em routers/delivery_status.py.
+  const getRecordStatusBadgeClass = (status) => (
+    status === 'CONCLUIDO' ? 'bg-green-100 text-green-800' :
+    status === 'CANCELADO' ? 'bg-red-100 text-red-800' :
+    'bg-blue-100 text-blue-800'
+  );
+
   return (
     <Layout>
       <div className="space-y-5" data-testid="delivery-status-page">
@@ -437,11 +446,7 @@ export default function DeliveryStatusPage() {
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{status.destination_client_name}</td>
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{status.items?.length || 0}</td>
                           <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${
-                              status.status === 'CONCLUIDO' ? 'bg-green-100 text-green-800' :
-                              status.status === 'CANCELADO' ? 'bg-red-100 text-red-800' :
-                              'bg-blue-100 text-blue-800'
-                            }`}>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${getRecordStatusBadgeClass(status.status)}`}>
                               {status.status}
                             </span>
                           </td>
@@ -564,6 +569,12 @@ export default function DeliveryStatusPage() {
                           <span className="text-slate-400 dark:text-slate-500">|</span>
                           <span className="text-sm text-slate-500 dark:text-slate-400">{item.container_number}</span>
                         </>
+                      )}
+                      {item.delivery_completed && (
+                        <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800" data-testid={`delivery-finalized-badge-${index}`}>
+                          <CheckCircle2 className="w-3 h-3" />
+                          Finalizado
+                        </span>
                       )}
                     </div>
 
@@ -693,6 +704,11 @@ export default function DeliveryStatusPage() {
             <DialogTitle className="flex items-center gap-2">
               <ClipboardCheck className="w-5 h-5" />
               Status de Entrega #{selectedStatus?.status_number}
+              {selectedStatus && (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${getRecordStatusBadgeClass(selectedStatus.status)}`}>
+                  {selectedStatus.status}
+                </span>
+              )}
             </DialogTitle>
           </DialogHeader>
 
@@ -733,6 +749,7 @@ export default function DeliveryStatusPage() {
                         <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Saída</th>
                         <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Agend. Porto</th>
                         <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Entrega Final.</th>
+                        <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
                         {selectedStatus.items?.some(i => i.bag_number) && (
                           <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº da Bolsa</th>
                         )}
@@ -751,6 +768,18 @@ export default function DeliveryStatusPage() {
                           <td className="px-3 py-2 text-center">{item.departure_time || '-'}</td>
                           <td className="px-3 py-2 text-center">{item.port_schedule_time || '-'}</td>
                           <td className="px-3 py-2 text-center">{item.delivery_completed || '-'}</td>
+                          <td className="px-3 py-2 text-center">
+                            {item.delivery_completed ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Finalizado
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                Pendente
+                              </span>
+                            )}
+                          </td>
                           {selectedStatus.items?.some(i => i.bag_number) && (
                             <td className="px-3 py-2 font-mono">{item.bag_number || '-'}</td>
                           )}
