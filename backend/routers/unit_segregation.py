@@ -543,10 +543,12 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
 
 @api_router.get("/unit-segregations/{segregation_id}/label")
 async def get_unit_segregation_label(segregation_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Gera a etiqueta de identificação da Segregação de Unidade - uma página
-    por container (formato de etiqueta 100x150mm), pra colar/afixar na
-    unidade sinalizando que está reservada pro cliente."""
-    from reportlab.lib.pagesizes import A4
+    """Gera a etiqueta de identificação da Segregação de Unidade - grade de
+    até 8 etiquetas por página (4 colunas x 2 linhas, A4 paisagem), pra
+    imprimir, recortar e colar/afixar em cada unidade sinalizando que está
+    reservada pro cliente. Mais de 8 containers viram páginas seguintes, cada
+    uma com sua própria grade de até 8."""
+    from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.units import mm
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
@@ -563,69 +565,98 @@ async def get_unit_segregation_label(segregation_id: str, current_user: dict = D
         raise HTTPException(status_code=400, detail="Essa segregação não tem containers para gerar etiqueta")
 
     company = merge_company(await get_company_settings())
-    LABEL_SIZE = (100 * mm, 150 * mm)
-    LABEL_WIDTH = LABEL_SIZE[0] - 12 * mm
+
+    COLS, ROWS = 4, 2
+    PER_PAGE = COLS * ROWS
 
     PRIMARY_GREEN = colors.HexColor('#047857')
     BLACK = colors.HexColor('#1F2937')
+    BORDER_GRAY = colors.HexColor('#D1D5DB')
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer, pagesize=LABEL_SIZE,
-        leftMargin=6 * mm, rightMargin=6 * mm, topMargin=6 * mm, bottomMargin=6 * mm
+        buffer, pagesize=landscape(A4),
+        leftMargin=8 * mm, rightMargin=8 * mm, topMargin=8 * mm, bottomMargin=8 * mm
     )
     styles = getSampleStyleSheet()
 
-    company_style = ParagraphStyle('LblCompany', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
-    title_style = ParagraphStyle('LblTitle', parent=styles['Normal'], fontSize=13, leading=16, fontName='Helvetica-Bold', textColor=colors.white, alignment=TA_CENTER)
-    container_style = ParagraphStyle('LblContainer', parent=styles['Normal'], fontSize=30, leading=36, fontName='Helvetica-Bold', textColor=BLACK, alignment=TA_CENTER)
-    client_label_style = ParagraphStyle('LblClientLabel', parent=styles['Normal'], fontSize=8, leading=10, fontName='Helvetica', textColor=colors.grey, alignment=TA_CENTER)
-    client_style = ParagraphStyle('LblClient', parent=styles['Normal'], fontSize=14, leading=17, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
-    detail_style = ParagraphStyle('LblDetail', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK, alignment=TA_CENTER)
-    footer_style = ParagraphStyle('LblFooter', parent=styles['Normal'], fontSize=7, textColor=colors.grey, alignment=TA_CENTER)
+    CELL_WIDTH = doc.width / COLS
+    CELL_TEXT_WIDTH = CELL_WIDTH - 6 * mm  # descontando o padding esquerdo/direito da célula
 
-    elements = []
-    for idx, item in enumerate(items):
-        if idx > 0:
-            elements.append(PageBreak())
+    company_style = ParagraphStyle('LblCompany', parent=styles['Normal'], fontSize=7, leading=9, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
+    title_style = ParagraphStyle('LblTitle', parent=styles['Normal'], fontSize=8, leading=10, fontName='Helvetica-Bold', textColor=colors.white, alignment=TA_CENTER)
+    container_style = ParagraphStyle('LblContainer', parent=styles['Normal'], fontSize=18, leading=21, fontName='Helvetica-Bold', textColor=BLACK, alignment=TA_CENTER)
+    client_label_style = ParagraphStyle('LblClientLabel', parent=styles['Normal'], fontSize=6, leading=8, fontName='Helvetica', textColor=colors.grey, alignment=TA_CENTER)
+    client_style = ParagraphStyle('LblClient', parent=styles['Normal'], fontSize=9, leading=11, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
+    detail_style = ParagraphStyle('LblDetail', parent=styles['Normal'], fontSize=6.5, leading=8.5, fontName='Helvetica', textColor=BLACK, alignment=TA_CENTER)
+    footer_style = ParagraphStyle('LblFooter', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
 
-        elements.append(Paragraph(company['name'], company_style))
-        elements.append(Spacer(1, 6))
-
-        title_tbl = Table([[Paragraph('UNIDADE SEGREGADA', title_style)]], colWidths=[LABEL_WIDTH])
+    def build_label_cell(item):
+        cell = [
+            Paragraph(company['name'], company_style),
+            Spacer(1, 2),
+        ]
+        title_tbl = Table([[Paragraph('UNIDADE SEGREGADA', title_style)]], colWidths=[CELL_TEXT_WIDTH])
         title_tbl.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), PRIMARY_GREEN),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ]))
-        elements.append(title_tbl)
-        elements.append(Spacer(1, 14))
-
-        elements.append(Paragraph(item.get('container_number', '-'), container_style))
-        elements.append(Spacer(1, 14))
-
-        elements.append(Paragraph('RESERVADO PARA', client_label_style))
-        elements.append(Paragraph(segregation['client_name'], client_style))
-        elements.append(Spacer(1, 10))
+        cell.append(title_tbl)
+        cell.append(Spacer(1, 5))
+        cell.append(Paragraph(item.get('container_number', '-'), container_style))
+        cell.append(Spacer(1, 5))
+        cell.append(Paragraph('RESERVADO PARA', client_label_style))
+        cell.append(Paragraph(segregation['client_name'], client_style))
+        cell.append(Spacer(1, 3))
 
         detail_parts = [f"Segregação Nº {segregation['segregation_number']}"]
         if item.get('shipping_line_name') or item.get('shipping_line'):
             detail_parts.append(item.get('shipping_line_name') or item.get('shipping_line'))
         if item.get('tare'):
             detail_parts.append(f"Tara: {item['tare']}")
-        elements.append(Paragraph(' | '.join(detail_parts), detail_style))
-        elements.append(Spacer(1, 16))
+        cell.append(Paragraph(' | '.join(detail_parts), detail_style))
+        cell.append(Spacer(1, 5))
 
         try:
-            barcode = code128.Code128(item.get('container_number', ''), barWidth=0.9, barHeight=22)
-            bc_tbl = Table([[barcode]], colWidths=[LABEL_WIDTH])
+            barcode = code128.Code128(item.get('container_number', ''), barWidth=0.5, barHeight=13)
+            bc_tbl = Table([[barcode]], colWidths=[CELL_TEXT_WIDTH])
             bc_tbl.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
-            elements.append(bc_tbl)
+            cell.append(bc_tbl)
         except Exception:
             pass
+        return cell
 
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph(f"Gerado em {now_brt().strftime('%d/%m/%Y %H:%M')} - {company['name']}", footer_style))
+    elements = []
+    for page_start in range(0, len(items), PER_PAGE):
+        if page_start > 0:
+            elements.append(PageBreak())
+
+        page_items = items[page_start:page_start + PER_PAGE]
+        grid_rows = []
+        for r in range(ROWS):
+            row = []
+            for c in range(COLS):
+                idx = r * COLS + c
+                row.append(build_label_cell(page_items[idx]) if idx < len(page_items) else '')
+            grid_rows.append(row)
+
+        grid = Table(grid_rows, colWidths=[CELL_WIDTH] * COLS)
+        grid.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 0.75, BORDER_GRAY),
+            ('INNERGRID', (0, 0), (-1, -1), 0.75, BORDER_GRAY),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3 * mm),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3 * mm),
+        ]))
+        elements.append(grid)
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph(
+            f"Segregação Nº {segregation['segregation_number']} - Gerado em {now_brt().strftime('%d/%m/%Y %H:%M')} - {company['name']}",
+            footer_style
+        ))
 
     doc.build(elements)
     buffer.seek(0)
