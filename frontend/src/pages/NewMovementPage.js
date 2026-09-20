@@ -62,6 +62,7 @@ export default function NewMovementPage() {
   const sizeType = watch('size_type');
   const shippingLine = watch('shipping_line');
   const clientName = watch('client_name');
+  const buyerName = watch('buyer_name');
   const serviceType = watch('service_type');
 
   useEffect(() => {
@@ -263,10 +264,13 @@ export default function NewMovementPage() {
   }, []);
 
   // Trava #1 da Segregação de Unidade: se o container está Segregado
-  // (ATIVO) pra um cliente, só libera Saída pro mesmo cliente reservado -
-  // mesmo padrão de checagem "ao digitar" já usado pra checkContainerDuplicate,
-  // só que também precisa reconferir quando o Cliente muda (não só o container).
-  const checkSegregation = useCallback(async (containerNumber, opType, clientNm) => {
+  // (ATIVO) pra um cliente, só libera Saída quando esse cliente aparece no
+  // campo Cliente OU no campo Comprador (reconhece qualquer um dos dois,
+  // já que na prática quem retira um container comprado costuma ser
+  // preenchido em Comprador) - mesmo padrão de checagem "ao digitar" já
+  // usado pra checkContainerDuplicate, só que também precisa reconferir
+  // quando o Cliente ou o Comprador mudam (não só o container).
+  const checkSegregation = useCallback(async (containerNumber, opType, clientNm, buyerNm) => {
     if (!containerNumber || opType !== 'SAIDA') {
       setSegregationError('');
       return;
@@ -277,9 +281,10 @@ export default function NewMovementPage() {
       if (seg?.is_segregated) {
         const segClient = (seg.segregation?.client_name || '').trim().toLowerCase();
         const currentClient = (clientNm || '').trim().toLowerCase();
-        if (segClient !== currentClient) {
+        const currentBuyer = (buyerNm || '').trim().toLowerCase();
+        if (segClient !== currentClient && segClient !== currentBuyer) {
           setSegregationError(
-            `Este container está segregado (reservado) para o cliente "${seg.segregation.client_name}". Selecione esse cliente para emitir a saída, ou libere a segregação em Segregação de Unidade.`
+            `Este container está segregado (reservado) para o cliente "${seg.segregation.client_name}". Selecione esse cliente no campo Cliente ou Comprador para emitir a saída, ou libere a segregação em Segregação de Unidade.`
           );
           return;
         }
@@ -294,7 +299,7 @@ export default function NewMovementPage() {
     const containerNumber = formatContainerNumber(e.target.value);
     setValue('container_number', containerNumber);
     checkContainerDuplicate(containerNumber, operationType);
-    checkSegregation(containerNumber, operationType, clientName);
+    checkSegregation(containerNumber, operationType, clientName, buyerName);
     if (operationType !== 'SAIDA') return;
     if (!containerNumber) return;
     try {
@@ -319,16 +324,16 @@ export default function NewMovementPage() {
   };
 
   // Reconfere a trava de duplicidade e a de Segregação quando o Tipo de
-  // Operação ou o Cliente mudam (o container pode já ter sido digitado antes
-  // de o usuário trocar o tipo/cliente).
+  // Operação, o Cliente ou o Comprador mudam (o container pode já ter sido
+  // digitado antes de o usuário trocar algum desses campos).
   useEffect(() => {
     const containerNumber = formData.container_number;
     if (containerNumber) {
       checkContainerDuplicate(containerNumber, operationType);
-      checkSegregation(containerNumber, operationType, clientName);
+      checkSegregation(containerNumber, operationType, clientName, buyerName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operationType, clientName]);
+  }, [operationType, clientName, buyerName]);
 
   const handleCompanyChange = (companyName) => {
     setValue('transport_company', companyName);

@@ -92,10 +92,16 @@ def _normalize_client_name(name: Optional[str]) -> str:
     return (name or '').strip().casefold()
 
 
-async def _check_segregation_conflict(container_number: str, operation_type: str, client_name: Optional[str]) -> Optional[str]:
+async def _check_segregation_conflict(
+    container_number: str, operation_type: str,
+    client_name: Optional[str], buyer_name: Optional[str] = None,
+) -> Optional[str]:
     """Trava #1 da Segregação de Unidade: se o container está Segregado
-    (ATIVO) pra um cliente, uma EIR de Saída só pode ser emitida pro mesmo
-    cliente reservado - qualquer outro (ou nenhum) client_name é bloqueado.
+    (ATIVO) pra um cliente, uma EIR de Saída só pode ser emitida quando o
+    cliente reservado aparece no campo Cliente OU no campo Comprador da EIR
+    (o reconhecimento da baixa é feito por qualquer um dos dois, já que na
+    prática quem retira um container comprado costuma ser preenchido em
+    Comprador, não em Cliente) - qualquer outra combinação é bloqueada.
     Retorna a mensagem de erro (ou None se pode seguir). Não se aplica a
     Entrada, só a Saída, já que a segregação reserva o container pra retirada."""
     if operation_type != 'SAIDA':
@@ -106,10 +112,11 @@ async def _check_segregation_conflict(container_number: str, operation_type: str
     )
     if not segregation:
         return None
-    if _normalize_client_name(client_name) != _normalize_client_name(segregation['client_name']):
+    reserved = _normalize_client_name(segregation['client_name'])
+    if reserved not in (_normalize_client_name(client_name), _normalize_client_name(buyer_name)):
         return (
             f"Este container está segregado (reservado) para o cliente \"{segregation['client_name']}\". "
-            f"Selecione esse cliente para emitir a saída, ou libere a segregação em Segregação de Unidade."
+            f"Selecione esse cliente no campo Cliente ou Comprador para emitir a saída, ou libere a segregação em Segregação de Unidade."
         )
     return None
 
@@ -161,7 +168,8 @@ async def _create_container_movement(
         )
 
     segregation_error = await _check_segregation_conflict(
-        movement_input.container_number, movement_input.operation_type, movement_input.client_name
+        movement_input.container_number, movement_input.operation_type,
+        movement_input.client_name, movement_input.buyer_name
     )
     if segregation_error:
         raise HTTPException(status_code=400, detail=segregation_error)
