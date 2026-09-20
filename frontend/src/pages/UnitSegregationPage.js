@@ -10,7 +10,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Checkbox } from '../components/ui/checkbox';
-import { Package, Plus, Eye, Trash2, Search, Printer, Pencil, Unlock, X } from 'lucide-react';
+import { Package, Plus, Eye, Trash2, Search, Printer, Pencil, Unlock, X, Tag, CheckCircle2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatContainerNumber } from '../lib/containerNumber';
@@ -268,6 +268,23 @@ export default function UnitSegregationPage() {
     }
   };
 
+  const handlePrintLabel = async (id) => {
+    try {
+      const response = await api.getUnitSegregationLabel(id);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `etiqueta_segregacao_${id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error('Erro ao gerar etiqueta');
+    }
+  };
+
   const viewDetails = (item) => {
     setSelectedItem(item);
     setDetailModalOpen(true);
@@ -280,6 +297,15 @@ export default function UnitSegregationPage() {
       'CANCELADO': 'bg-red-100 text-red-800'
     };
     return styles[status] || 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200';
+  };
+
+  // Retirada: computado no backend a partir de items[].retrieved (baixa
+  // automática dada quando a EIR de Saída pro cliente certo é emitida).
+  const getRetrievalBadge = (retrievalStatus) => {
+    if (retrievalStatus === 'CONCLUIDO') {
+      return { className: 'bg-emerald-100 text-emerald-800', icon: CheckCircle2, label: 'Concluído' };
+    }
+    return { className: 'bg-amber-100 text-amber-800', icon: Clock, label: 'Pendente' };
   };
 
   const toggleSelect = (id) => {
@@ -416,6 +442,17 @@ export default function UnitSegregationPage() {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => singleSelectedItem && handlePrintLabel(singleSelectedItem.id)}
+            disabled={!singleSelectedItem}
+            title="Gerar Etiqueta"
+            data-testid="label-segregation-button"
+            className="h-9 w-9 p-0 disabled:opacity-30"
+          >
+            <Tag className="w-4 h-4 text-purple-600" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)}
             disabled={!singleSelectedItem}
             title="Excluir"
@@ -463,6 +500,7 @@ export default function UnitSegregationPage() {
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Containers</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Retirada</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -505,6 +543,18 @@ export default function UnitSegregationPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${getStatusBadge(item.status)}`}>
                             {item.status}
                           </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {(() => {
+                            const rb = getRetrievalBadge(item.retrieval_status);
+                            const RIcon = rb.icon;
+                            return (
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${rb.className}`}>
+                                <RIcon className="w-3 h-3" />
+                                {rb.label}
+                              </span>
+                            );
+                          })()}
                         </td>
                       </tr>
                     ))}
@@ -703,6 +753,19 @@ export default function UnitSegregationPage() {
                   </span>
                 </div>
                 <div>
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Retirada</span>
+                  {(() => {
+                    const rb = getRetrievalBadge(selectedItem.retrieval_status);
+                    const RIcon = rb.icon;
+                    return (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${rb.className}`}>
+                        <RIcon className="w-3 h-3" />
+                        {rb.label}
+                      </span>
+                    );
+                  })()}
+                </div>
+                <div>
                   <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Criado em</span>
                   <span className="text-sm">{selectedItem.created_at ? format(new Date(selectedItem.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '-'}</span>
                 </div>
@@ -725,6 +788,7 @@ export default function UnitSegregationPage() {
                         <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Container</th>
                         <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Tara</th>
                         <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Armador</th>
+                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Retirada</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -734,6 +798,19 @@ export default function UnitSegregationPage() {
                           <td className="px-4 py-2 font-mono">{container.container_number}</td>
                           <td className="px-4 py-2">{container.tare || '-'}</td>
                           <td className="px-4 py-2">{container.shipping_line_name || container.shipping_line}</td>
+                          <td className="px-4 py-2">
+                            {container.retrieved ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800" title={container.retrieved_at ? format(new Date(container.retrieved_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : ''}>
+                                <CheckCircle2 className="w-3 h-3" />
+                                Retirado{container.retrieved_transaction_id ? ` (#${container.retrieved_transaction_id})` : ''}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">
+                                <Clock className="w-3 h-3" />
+                                Pendente
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -765,6 +842,10 @@ export default function UnitSegregationPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailModalOpen(false)}>Fechar</Button>
+            <Button variant="outline" onClick={() => { handlePrintLabel(selectedItem.id); }}>
+              <Tag className="w-4 h-4 mr-2" />
+              Gerar Etiqueta
+            </Button>
             <Button onClick={() => { handlePrint(selectedItem.id); }}>
               <Printer className="w-4 h-4 mr-2" />
               Imprimir PDF

@@ -37,6 +37,7 @@ export default function NewMovementPage() {
   const [clientSearch, setClientSearch] = useState('');
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [containerDuplicateError, setContainerDuplicateError] = useState('');
+  const [segregationError, setSegregationError] = useState('');
   const [servicePriceEntries, setServicePriceEntries] = useState([]);
   const clientInputRef = useRef(null);
   const { notifyNewMovement, requestPermission, permission } = useNotifications();
@@ -171,6 +172,10 @@ export default function NewMovementPage() {
       toast.error(containerDuplicateError);
       return;
     }
+    if (segregationError) {
+      toast.error(segregationError);
+      return;
+    }
     setLoading(true);
     try {
       // Moeda vem da Tabela de Serviços do cliente (campo Moeda cadastrado
@@ -251,10 +256,39 @@ export default function NewMovementPage() {
     }
   }, []);
 
+  // Trava #1 da Segregação de Unidade: se o container está Segregado
+  // (ATIVO) pra um cliente, só libera Saída pro mesmo cliente reservado -
+  // mesmo padrão de checagem "ao digitar" já usado pra checkContainerDuplicate,
+  // só que também precisa reconferir quando o Cliente muda (não só o container).
+  const checkSegregation = useCallback(async (containerNumber, opType, clientNm) => {
+    if (!containerNumber || opType !== 'SAIDA') {
+      setSegregationError('');
+      return;
+    }
+    try {
+      const response = await api.checkContainerSegregation(containerNumber);
+      const seg = response.data;
+      if (seg?.is_segregated) {
+        const segClient = (seg.segregation?.client_name || '').trim().toLowerCase();
+        const currentClient = (clientNm || '').trim().toLowerCase();
+        if (segClient !== currentClient) {
+          setSegregationError(
+            `Este container está segregado (reservado) para o cliente "${seg.segregation.client_name}". Selecione esse cliente para emitir a saída, ou libere a segregação em Segregação de Unidade.`
+          );
+          return;
+        }
+      }
+      setSegregationError('');
+    } catch (error) {
+      setSegregationError('');
+    }
+  }, []);
+
   const handleContainerNumberBlur = async (e) => {
     const containerNumber = formatContainerNumber(e.target.value);
     setValue('container_number', containerNumber);
     checkContainerDuplicate(containerNumber, operationType);
+    checkSegregation(containerNumber, operationType, clientName);
     if (operationType !== 'SAIDA') return;
     if (!containerNumber) return;
     try {
@@ -278,15 +312,17 @@ export default function NewMovementPage() {
     }
   };
 
-  // Reconfere a trava de duplicidade quando o Tipo de Operação muda (o
-  // container pode já ter sido digitado antes de o usuário trocar o tipo).
+  // Reconfere a trava de duplicidade e a de Segregação quando o Tipo de
+  // Operação ou o Cliente mudam (o container pode já ter sido digitado antes
+  // de o usuário trocar o tipo/cliente).
   useEffect(() => {
     const containerNumber = formData.container_number;
     if (containerNumber) {
       checkContainerDuplicate(containerNumber, operationType);
+      checkSegregation(containerNumber, operationType, clientName);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operationType]);
+  }, [operationType, clientName]);
 
   const handleCompanyChange = (companyName) => {
     setValue('transport_company', companyName);
@@ -534,6 +570,11 @@ export default function NewMovementPage() {
                   {containerDuplicateError && (
                     <p className="text-xs text-red-600 dark:text-red-400 font-medium" data-testid="container-duplicate-error">
                       {containerDuplicateError}
+                    </p>
+                  )}
+                  {segregationError && (
+                    <p className="text-xs text-red-600 dark:text-red-400 font-medium" data-testid="container-segregation-error">
+                      {segregationError}
                     </p>
                   )}
                 </div>

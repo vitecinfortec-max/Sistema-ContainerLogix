@@ -1974,6 +1974,12 @@ class UnitSegregationItem(BaseModel):
     tare: Optional[str] = None  # Tara
     shipping_line: str  # Armador ID
     shipping_line_name: Optional[str] = None  # Nome do armador
+    # Baixa (retirada): marcado automaticamente quando a EIR de Saída desse
+    # container é emitida pro cliente reservado - ver _mark_segregation_retrieved
+    # em routers/movements.py. Nunca setado manualmente pelo formulário.
+    retrieved: bool = False
+    retrieved_at: Optional[datetime] = None
+    retrieved_transaction_id: Optional[int] = None  # Nº da Transação (EIR) que deu baixa
 
 
 class UnitSegregation(BaseModel):
@@ -2025,6 +2031,10 @@ class UnitSegregationResponse(BaseModel):
     client_name: str
     items: List[UnitSegregationItem]
     status: str
+    # Computado a partir de items[].retrieved (nunca persistido) - PENDENTE
+    # enquanto sobrar algum container não retirado, CONCLUIDO quando todos os
+    # containers já tiverem saído numa EIR pro cliente reservado.
+    retrieval_status: str = "PENDENTE"
     observations: Optional[str] = None
     created_by: str
     created_by_name: str

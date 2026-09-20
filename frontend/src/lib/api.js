@@ -398,6 +398,7 @@ export const api = {
   deleteUnitSegregation: (id) => axios.delete(`${API}/unit-segregations/${id}`),
   releaseUnitSegregation: (id) => axios.post(`${API}/unit-segregations/${id}/release`),
   getUnitSegregationPDF: (id) => axios.get(`${API}/unit-segregations/${id}/pdf`, { responseType: 'blob' }),
+  getUnitSegregationLabel: (id) => axios.get(`${API}/unit-segregations/${id}/label`, { responseType: 'blob' }),
   checkContainerSegregation: (containerNumber) => axios.get(`${API}/check-segregation/${containerNumber}`),
   checkContainerSegregationBatch: (containerNumbers) => axios.post(`${API}/check-segregation-batch`, { container_numbers: containerNumbers }),
 

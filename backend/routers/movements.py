@@ -88,6 +88,47 @@ async def get_last_movement_for_container(container_number: str, current_user: d
     return {"movement": last}
 
 
+def _normalize_client_name(name: Optional[str]) -> str:
+    return (name or '').strip().casefold()
+
+
+async def _check_segregation_conflict(container_number: str, operation_type: str, client_name: Optional[str]) -> Optional[str]:
+    """Trava #1 da Segregação de Unidade: se o container está Segregado
+    (ATIVO) pra um cliente, uma EIR de Saída só pode ser emitida pro mesmo
+    cliente reservado - qualquer outro (ou nenhum) client_name é bloqueado.
+    Retorna a mensagem de erro (ou None se pode seguir). Não se aplica a
+    Entrada, só a Saída, já que a segregação reserva o container pra retirada."""
+    if operation_type != 'SAIDA':
+        return None
+    segregation = await db.unit_segregations.find_one(
+        {"items.container_number": container_number.strip().upper(), "status": "ATIVO"},
+        {"_id": 0, "client_name": 1}
+    )
+    if not segregation:
+        return None
+    if _normalize_client_name(client_name) != _normalize_client_name(segregation['client_name']):
+        return (
+            f"Este container está segregado (reservado) para o cliente \"{segregation['client_name']}\". "
+            f"Selecione esse cliente para emitir a saída, ou libere a segregação em Segregação de Unidade."
+        )
+    return None
+
+
+async def _mark_segregation_retrieved(container_number: str, transaction_id: int):
+    """Dá baixa (retirada) no item segregado desse container, assim que a EIR
+    de Saída pro cliente certo é emitida - chamado incondicionalmente em toda
+    Saída; só tem efeito se existir mesmo uma segregação ATIVA pra ele (query
+    não casa e o update vira no-op, senão)."""
+    await db.unit_segregations.update_one(
+        {"status": "ATIVO", "items.container_number": container_number.strip().upper()},
+        {"$set": {
+            "items.$.retrieved": True,
+            "items.$.retrieved_at": datetime.now(timezone.utc).isoformat(),
+            "items.$.retrieved_transaction_id": transaction_id,
+        }}
+    )
+
+
 async def _create_container_movement(
     movement_input: ContainerMovementCreate,
     current_user: dict,
@@ -118,6 +159,12 @@ async def _create_container_movement(
                 f"Não é possível registrar outra {tipo_label} em duplicidade."
             )
         )
+
+    segregation_error = await _check_segregation_conflict(
+        movement_input.container_number, movement_input.operation_type, movement_input.client_name
+    )
+    if segregation_error:
+        raise HTTPException(status_code=400, detail=segregation_error)
 
     # Usar contador atômico para garantir sequência única
     next_transaction_id = await get_next_transaction_id()
@@ -159,6 +206,9 @@ async def _create_container_movement(
     if doc.get('billed_at'):
         doc['billed_at'] = doc['billed_at'].isoformat()
     await db.movements.insert_one(doc)
+
+    if movement.operation_type == 'SAIDA':
+        await _mark_segregation_retrieved(movement.container_number, movement.transaction_id)
 
     response = ContainerMovementResponse(
         id=movement.id,
@@ -288,6 +338,10 @@ async def validate_loading_order_movements(order: dict, loading_order_id: Option
                 f"Container {container_number}: já teve uma {tipo_label} registrada (Transação #{last_movement.get('transaction_id')}, "
                 f"em {date_str}) sem uma movimentação do tipo oposto depois. Não é possível registrar outra {tipo_label} em duplicidade."
             )
+
+        segregation_error = await _check_segregation_conflict(container_number, operation_type, order.get('client_name'))
+        if segregation_error:
+            errors.append(f"Container {container_number}: {segregation_error}")
     return errors
 
 

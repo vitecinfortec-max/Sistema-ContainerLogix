@@ -67,6 +67,17 @@ api_router = APIRouter(prefix="/api")
 
 from models import UnitSegregation, UnitSegregationCreate, UnitSegregationUpdate, UnitSegregationResponse, UnitSegregationItem
 
+
+def _unit_segregation_serialize(doc: dict) -> dict:
+    """Acrescenta `retrieval_status` (PENDENTE/CONCLUIDO), computado a partir
+    de items[].retrieved - nunca persistido, pra nunca ficar dessincronizado
+    do que a baixa automática (movements.py) realmente marcou."""
+    out = {**doc}
+    items = out.get('items') or []
+    out['retrieval_status'] = 'CONCLUIDO' if items and all(i.get('retrieved') for i in items) else 'PENDENTE'
+    return out
+
+
 @api_router.get("/unit-segregations")
 async def get_unit_segregations(
     page: int = 1,
@@ -78,7 +89,7 @@ async def get_unit_segregations(
 ):
     """Lista todas as segregações de unidade com filtros"""
     query = {}
-    
+
     if status:
         query["status"] = status
     if client_id:
@@ -86,15 +97,15 @@ async def get_unit_segregations(
     if container_number:
         # Buscar nos itens
         query["items.container_number"] = {"$regex": re.escape(container_number), "$options": "i"}
-    
+
     total = await db.unit_segregations.count_documents(query)
     skip = (page - 1) * per_page
-    
+
     cursor = db.unit_segregations.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page)
     items = await cursor.to_list(length=per_page)
-    
+
     return {
-        "items": items,
+        "items": [_unit_segregation_serialize(i) for i in items],
         "total": total,
         "page": page,
         "pages": (total + per_page - 1) // per_page
@@ -107,7 +118,7 @@ async def get_unit_segregation(segregation_id: str, current_user: dict = Depends
     segregation = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
     if not segregation:
         raise HTTPException(status_code=404, detail="Segregação não encontrada")
-    return segregation
+    return _unit_segregation_serialize(segregation)
 
 
 @api_router.post("/unit-segregations", response_model=UnitSegregationResponse)
@@ -163,9 +174,8 @@ async def create_unit_segregation(data: UnitSegregationCreate, current_user: dic
     )
     
     await db.unit_segregations.insert_one(segregation.model_dump())
-    
-    result = segregation.model_dump()
-    return result
+
+    return _unit_segregation_serialize(segregation.model_dump())
 
 
 @api_router.put("/unit-segregations/{segregation_id}")
@@ -186,16 +196,28 @@ async def update_unit_segregation(segregation_id: str, data: UnitSegregationUpda
     
     # Se atualizou os itens, buscar nomes dos armadores
     if "items" in update_data and update_data["items"]:
+        # Baixa (retirada) já registrada num container existente não pode se
+        # perder só porque a segregação foi editada (ex: adicionar mais um
+        # container à mesma reserva) - preserva por número de container.
+        existing_by_number = {
+            (i.get('container_number') or '').upper(): i
+            for i in (segregation.get('items') or [])
+        }
         processed_items = []
         for item in update_data["items"]:
             item_dict = item if isinstance(item, dict) else item.model_dump() if hasattr(item, 'model_dump') else dict(item)
             shipowner = await db.shipping_lines.find_one({"id": item_dict.get("shipping_line")}, {"_id": 0, "name": 1})
             shipping_line_name = shipowner["name"] if shipowner else item_dict.get("shipping_line")
+            container_number = item_dict.get("container_number", "").upper()
+            previous = existing_by_number.get(container_number, {})
             processed_items.append({
-                "container_number": item_dict.get("container_number", "").upper(),
+                "container_number": container_number,
                 "tare": item_dict.get("tare"),
                 "shipping_line": item_dict.get("shipping_line"),
-                "shipping_line_name": shipping_line_name
+                "shipping_line_name": shipping_line_name,
+                "retrieved": previous.get("retrieved", False),
+                "retrieved_at": previous.get("retrieved_at"),
+                "retrieved_transaction_id": previous.get("retrieved_transaction_id"),
             })
         update_data["items"] = processed_items
     
@@ -209,9 +231,9 @@ async def update_unit_segregation(segregation_id: str, data: UnitSegregationUpda
         {"id": segregation_id},
         {"$set": update_data}
     )
-    
+
     updated = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
-    return updated
+    return _unit_segregation_serialize(updated)
 
 
 @api_router.delete("/unit-segregations/{segregation_id}")
@@ -242,9 +264,9 @@ async def release_unit_segregation(segregation_id: str, current_user: dict = Dep
             "released_by_name": current_user["name"]
         }}
     )
-    
+
     updated = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
-    return updated
+    return _unit_segregation_serialize(updated)
 
 
 @api_router.get("/unit-segregations/{segregation_id}/pdf")
@@ -516,6 +538,99 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
     buffer.seek(0)
 
     filename = f"segregacao_unidade_{segregation['segregation_number']}.pdf"
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+@api_router.get("/unit-segregations/{segregation_id}/label")
+async def get_unit_segregation_label(segregation_id: str, current_user: dict = Depends(get_current_active_user)):
+    """Gera a etiqueta de identificação da Segregação de Unidade - uma página
+    por container (formato de etiqueta 100x150mm), pra colar/afixar na
+    unidade sinalizando que está reservada pro cliente."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.graphics.barcode import code128
+
+    segregation = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
+    if not segregation:
+        raise HTTPException(status_code=404, detail="Segregação não encontrada")
+
+    items = segregation.get('items') or []
+    if not items:
+        raise HTTPException(status_code=400, detail="Essa segregação não tem containers para gerar etiqueta")
+
+    company = merge_company(await get_company_settings())
+    LABEL_SIZE = (100 * mm, 150 * mm)
+    LABEL_WIDTH = LABEL_SIZE[0] - 12 * mm
+
+    PRIMARY_GREEN = colors.HexColor('#047857')
+    BLACK = colors.HexColor('#1F2937')
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=LABEL_SIZE,
+        leftMargin=6 * mm, rightMargin=6 * mm, topMargin=6 * mm, bottomMargin=6 * mm
+    )
+    styles = getSampleStyleSheet()
+
+    company_style = ParagraphStyle('LblCompany', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
+    title_style = ParagraphStyle('LblTitle', parent=styles['Normal'], fontSize=13, leading=16, fontName='Helvetica-Bold', textColor=colors.white, alignment=TA_CENTER)
+    container_style = ParagraphStyle('LblContainer', parent=styles['Normal'], fontSize=30, leading=36, fontName='Helvetica-Bold', textColor=BLACK, alignment=TA_CENTER)
+    client_label_style = ParagraphStyle('LblClientLabel', parent=styles['Normal'], fontSize=8, leading=10, fontName='Helvetica', textColor=colors.grey, alignment=TA_CENTER)
+    client_style = ParagraphStyle('LblClient', parent=styles['Normal'], fontSize=14, leading=17, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
+    detail_style = ParagraphStyle('LblDetail', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK, alignment=TA_CENTER)
+    footer_style = ParagraphStyle('LblFooter', parent=styles['Normal'], fontSize=7, textColor=colors.grey, alignment=TA_CENTER)
+
+    elements = []
+    for idx, item in enumerate(items):
+        if idx > 0:
+            elements.append(PageBreak())
+
+        elements.append(Paragraph(company['name'], company_style))
+        elements.append(Spacer(1, 6))
+
+        title_tbl = Table([[Paragraph('UNIDADE SEGREGADA', title_style)]], colWidths=[LABEL_WIDTH])
+        title_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), PRIMARY_GREEN),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        elements.append(title_tbl)
+        elements.append(Spacer(1, 14))
+
+        elements.append(Paragraph(item.get('container_number', '-'), container_style))
+        elements.append(Spacer(1, 14))
+
+        elements.append(Paragraph('RESERVADO PARA', client_label_style))
+        elements.append(Paragraph(segregation['client_name'], client_style))
+        elements.append(Spacer(1, 10))
+
+        detail_parts = [f"Segregação Nº {segregation['segregation_number']}"]
+        if item.get('shipping_line_name') or item.get('shipping_line'):
+            detail_parts.append(item.get('shipping_line_name') or item.get('shipping_line'))
+        if item.get('tare'):
+            detail_parts.append(f"Tara: {item['tare']}")
+        elements.append(Paragraph(' | '.join(detail_parts), detail_style))
+        elements.append(Spacer(1, 16))
+
+        try:
+            barcode = code128.Code128(item.get('container_number', ''), barWidth=0.9, barHeight=22)
+            bc_tbl = Table([[barcode]], colWidths=[LABEL_WIDTH])
+            bc_tbl.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
+            elements.append(bc_tbl)
+        except Exception:
+            pass
+
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph(f"Gerado em {now_brt().strftime('%d/%m/%Y %H:%M')} - {company['name']}", footer_style))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    filename = f"etiqueta_segregacao_{segregation['segregation_number']}.pdf"
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
