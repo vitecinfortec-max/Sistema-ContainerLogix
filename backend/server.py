@@ -31,6 +31,7 @@ from routers.frota import api_router as frota_router
 from routers.loading_schedule import api_router as loading_schedule_router
 from routers.daily_rate import api_router as daily_rate_router
 from routers.delivery_status import api_router as delivery_status_router
+from routers.port_services import api_router as port_services_router
 from routers.unit_segregation import api_router as unit_segregation_router
 from routers.intl_invoices import api_router as intl_invoices_router
 from routers.rpa_terceiro import api_router as rpa_terceiro_router
@@ -91,6 +92,7 @@ app.include_router(frota_router)
 app.include_router(loading_schedule_router)
 app.include_router(daily_rate_router)
 app.include_router(delivery_status_router)
+app.include_router(port_services_router)
 app.include_router(unit_segregation_router)
 app.include_router(intl_invoices_router)
 app.include_router(rpa_terceiro_router)
@@ -196,6 +198,7 @@ async def startup_event():
     await _seed_counter("status_number", db.delivery_statuses, "status_number")
     await _seed_counter("segregation_number", db.unit_segregations, "segregation_number")
     await _seed_counter("os_number", db.ordem_servico, "os_number")
+    await _seed_counter("port_service_number", db.port_services, "service_number")
     # "terceiro" primeiro e com query que também cobre RPAs legados sem rpa_type
     # gravado (contavam como "terceiro" na busca antiga) - precisa rodar antes do
     # loop abaixo para não ser pulado por já existir com um valor incompleto.

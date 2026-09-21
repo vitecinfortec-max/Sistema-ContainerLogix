@@ -31,7 +31,7 @@ export const api = {
   deleteShippingLine: (id) => axios.delete(`${API}/shipping-lines/${id}`),
   
   // Clients
-  getClients: () => axios.get(`${API}/clients`),
+  getClients: (params) => axios.get(`${API}/clients`, { params }),
   createClient: (data) => axios.post(`${API}/clients`, data),
   updateClient: (id, data) => axios.put(`${API}/clients/${id}`, data),
   deleteClient: (id) => axios.delete(`${API}/clients/${id}`),
@@ -389,7 +389,19 @@ export const api = {
   updateDeliveryStatusStatus: (id, status) => axios.put(`${API}/delivery-status/${id}/update-status?new_status=${status}`),
   getDeliveryStatusPDF: (id) => axios.get(`${API}/delivery-status/${id}/pdf`, { responseType: 'blob' }),
   getDeliveryStatusExcel: (id) => axios.get(`${API}/delivery-status/${id}/excel`, { responseType: 'blob' }),
-  
+
+  // Operacional - Serviço Portuário
+  getPortServices: (params) => axios.get(`${API}/port-services`, { params }),
+  getPortService: (id) => axios.get(`${API}/port-services/${id}`),
+  createPortService: (data) => axios.post(`${API}/port-services`, data),
+  updatePortService: (id, data) => axios.put(`${API}/port-services/${id}`, data),
+  deletePortService: (id) => axios.delete(`${API}/port-services/${id}`),
+  getPortServicePDF: (id) => axios.get(`${API}/port-services/${id}/pdf`, { responseType: 'blob' }),
+  getPortServicesReportSummary: (params) => axios.get(`${API}/reports/port-services/summary`, { params }),
+  getPortServicesDailyChart: () => axios.get(`${API}/reports/port-services/daily-chart`),
+  downloadPortServicesPDFReport: (params) => axios.get(`${API}/reports/port-services/pdf`, { params, responseType: 'blob' }),
+  downloadPortServicesExcelReport: (params) => axios.get(`${API}/reports/port-services/excel`, { params, responseType: 'blob' }),
+
   // Unit Segregation
   getUnitSegregations: (params) => axios.get(`${API}/unit-segregations`, { params }),
   getUnitSegregation: (id) => axios.get(`${API}/unit-segregations/${id}`),

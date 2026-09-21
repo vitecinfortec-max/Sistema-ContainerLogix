@@ -126,6 +126,8 @@ const PAGE_TITLES = {
   '/flex-tank/movements/new': 'Nova Movimentação Flex Tank',
   '/loading-schedules': 'Programação de Carregamento',
   '/delivery-status': 'Status de Entrega',
+  '/port-services': 'Serviço Portuário',
+  '/reports/port-services': 'Relatório de Serviço Portuário',
   '/daily-rate-requests': 'Solicitação de Diária',
   '/expense-reports': 'Prestação de Contas',
 };
@@ -327,7 +329,7 @@ export default function Layout({ children }) {
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
-  const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status';
+  const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status' || location.pathname === '/port-services' || location.pathname === '/reports/port-services';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
   const isTerminalCadastroActive = location.pathname === '/shipping-lines' || location.pathname === '/service-types';
@@ -582,6 +584,8 @@ export default function Layout({ children }) {
   const operacionalItems = [
     { path: '/loading-schedules', label: 'Programação de Carregamento', icon: Calendar, moduleKey: 'operacional.programacao_carregamento' },
     { path: '/delivery-status', label: 'Status de Entrega', icon: ClipboardCheck, moduleKey: 'operacional.status_entrega' },
+    { path: '/port-services', label: 'Serviço Portuário', icon: Anchor, moduleKey: 'operacional.servico_portuario' },
+    { path: '/reports/port-services', label: 'Relatório de Serviço Portuário', icon: BarChart3, moduleKey: 'operacional.relatorio_servico_portuario' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   // Esconde o grupo inteiro do menu quando todo módulo dentro dele foi

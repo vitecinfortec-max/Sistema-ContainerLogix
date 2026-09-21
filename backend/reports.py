@@ -1770,6 +1770,137 @@ def generate_service_orders_report_excel(orders: list, company: dict = None, rep
         return buffer.getvalue()
 
 
+_TURNO_LABELS_XLSX = {"DIA": "Dia", "NOITE": "Noite"}
+
+
+def generate_port_services_report_excel(services: list, company: dict = None, report_title: str = "Relatório de Serviço Portuário") -> bytes:
+    """Relatório standalone de Serviço Portuário - mesmo padrão visual/
+    estrutura do Relatório de Serviços (generate_service_orders_report_excel),
+    com uma linha por serviço."""
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Serviço Portuário"
+
+        total_value = round(sum(s.get('operation_value') or 0 for s in services), 2)
+        stats_text = f"Serviços: {len(services)}  |  Valor Total: {format_currency(total_value, 'BRL')}"
+
+        ws.column_dimensions['A'].width = 3
+        for letter, w in {'B': 8, 'C': 12, 'D': 22, 'E': 22, 'F': 12, 'G': 8, 'H': 10, 'I': 10, 'J': 14}.items():
+            ws.column_dimensions[letter].width = w
+
+        logo_buffer = download_logo(company)
+        if logo_buffer is not None:
+            try:
+                target_height_px = 92
+                try:
+                    logo_buffer.seek(0)
+                    with PILImage.open(logo_buffer) as pil_img:
+                        orig_w, orig_h = pil_img.size
+                    target_width_px = int(target_height_px * orig_w / orig_h) if orig_h else target_height_px
+                except Exception:
+                    target_width_px = target_height_px
+                logo_buffer.seek(0)
+                logo_img = XLImage(logo_buffer)
+                logo_img.height = target_height_px
+                logo_img.width = target_width_px
+                ws.add_image(logo_img, 'A2')
+            except Exception as e:
+                logger.error(f"Error adding logo to port services Excel: {e}")
+
+        ws.merge_cells('B2:J3')
+        cell = ws['B2']
+        cell.value = c['name']
+        cell.font = Font(name='Calibri', size=38, bold=True, color=PRIMARY_COLOR)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[2].height = 30
+        ws.row_dimensions[3].height = 40.5
+
+        ws.merge_cells('B4:J4')
+        cell = ws['B4']
+        cell.value = report_title
+        cell.font = Font(name='Calibri', size=16, color=PRIMARY_COLOR)
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[4].height = 21
+
+        ws.row_dimensions[5].height = 13
+
+        ws.merge_cells('B6:J6')
+        cell = ws['B6']
+        cell.value = stats_text
+        cell.font = Font(name='Calibri', size=12, bold=True, color=PRIMARY_COLOR)
+        cell.fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type='solid')
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        ws.row_dimensions[6].height = 28
+
+        ws.merge_cells('B7:J7')
+        cell = ws['B7']
+        cell.value = f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')} | Fuso: UTC-3 (Brasília)"
+        cell.font = Font(name='Calibri', size=9, color='808080')
+        cell.alignment = Alignment(horizontal='center')
+        ws.row_dimensions[7].height = 15
+
+        last_row = 9
+        if services:
+            header_font = Font(size=9, bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
+            headers = ['Nº', 'Data', 'Cliente', 'Motorista', 'Placa', 'Turno', 'Entrada', 'Saída', 'Valor']
+            for col, header in enumerate(headers, start=2):
+                header_cell = ws.cell(row=last_row, column=col, value=header)
+                header_cell.font = header_font
+                header_cell.fill = header_fill
+            last_row += 1
+            for s in services:
+                service_date_display = s.get('service_date') or '-'
+                try:
+                    service_date_display = datetime.strptime(s['service_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
+                except Exception:
+                    pass
+                ws.cell(row=last_row, column=2, value=s.get('service_number'))
+                ws.cell(row=last_row, column=3, value=service_date_display)
+                ws.cell(row=last_row, column=4, value=s.get('client_name') or '-')
+                ws.cell(row=last_row, column=5, value=s.get('driver_name') or '-')
+                ws.cell(row=last_row, column=6, value=s.get('cavalo_plate') or '-')
+                ws.cell(row=last_row, column=7, value=_TURNO_LABELS_XLSX.get(s.get('turno'), s.get('turno') or '-'))
+                ws.cell(row=last_row, column=8, value=s.get('entry_time') or '-')
+                ws.cell(row=last_row, column=9, value=s.get('exit_time') or '-')
+                ws.cell(row=last_row, column=10, value=format_currency(s.get('operation_value') or 0))
+                last_row += 1
+            subtotal_font = Font(size=9, bold=True)
+            subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+            ws.cell(row=last_row, column=9, value='TOTAL:').font = subtotal_font
+            ws.cell(row=last_row, column=10, value=format_currency(total_value)).font = subtotal_font
+            for col in range(2, 11):
+                ws.cell(row=last_row, column=col).fill = subtotal_fill
+            last_row += 1
+        else:
+            ws.cell(row=last_row, column=2, value="Nenhum serviço portuário encontrado para os filtros selecionados.")
+            ws.cell(row=last_row, column=2).font = Font(size=10, color='808080')
+
+        ws.sheet_view.showGridLines = False
+        ws.print_area = f'A1:J{max(last_row, 9)}'
+        ws.page_setup.orientation = 'landscape'
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.print_options.horizontalCentered = True
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+    except Exception as e:
+        logger.error(f"Error generating port services Excel: {e}")
+        wb = Workbook()
+        ws = wb.active
+        ws['A1'] = "Erro ao gerar relatório."
+        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+
 def generate_billing_excel(movements: list, company: dict = None, storage_charges: list = None) -> bytes:
     """Generate billing Excel report with Bsoft template style."""
     try:
@@ -2412,6 +2543,109 @@ def generate_service_orders_report_pdf(orders: list, company: dict = None, repor
             textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
         )
         elements.append(Paragraph("Nenhuma ordem de serviço encontrada para os filtros selecionados.", empty_style))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
+_TURNO_LABELS_PDF = {"DIA": "Dia", "NOITE": "Noite"}
+
+
+def generate_port_services_report_pdf(services: list, company: dict = None, report_title: str = "Relatório de Serviço Portuário") -> bytes:
+    """Relatório standalone de Serviço Portuário - mesmo padrão visual do
+    Relatório de Serviços (generate_service_orders_report_pdf): stats bar
+    (contagem/valor) + uma linha de tabela por serviço."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=10*mm,
+        leftMargin=10*mm,
+        topMargin=10*mm,
+        bottomMargin=15*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    logo_buffer = download_logo(company)
+    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
+    elements.extend(header_elements)
+
+    total_value = round(sum(s.get('operation_value') or 0 for s in services), 2)
+    stats_text = f"Serviços: {len(services)}  |  Valor Total: {format_currency(total_value, 'BRL')}"
+    stats_style = ParagraphStyle(
+        'PortServicesStatsBar', parent=styles['Normal'], fontSize=10,
+        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
+    )
+    stats_table = Table([[Paragraph(stats_text, stats_style)]], colWidths=[doc.width])
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+    ]))
+    elements.append(stats_table)
+
+    gen_info_style = ParagraphStyle(
+        'PortServicesGenInfo', parent=styles['Normal'], fontSize=9,
+        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
+    )
+    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+
+    if services:
+        cell_style = ParagraphStyle('PortServicesCell', parent=styles['Normal'], fontSize=8, leading=10)
+        rows = [['Nº', 'Data', 'Cliente', 'Motorista', 'Placa', 'Turno', 'Entrada', 'Saída', 'Valor']]
+        for s in services:
+            date_display = s.get('service_date') or '-'
+            try:
+                date_display = datetime.strptime(s['service_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
+            except Exception:
+                pass
+            rows.append([
+                str(s.get('service_number') or '-'),
+                date_display,
+                Paragraph(s.get('client_name') or '-', cell_style),
+                Paragraph(s.get('driver_name') or '-', cell_style),
+                s.get('cavalo_plate') or '-',
+                _TURNO_LABELS_PDF.get(s.get('turno'), s.get('turno') or '-'),
+                s.get('entry_time') or '-',
+                s.get('exit_time') or '-',
+                format_currency(s.get('operation_value') or 0),
+            ])
+        rows.append(['', '', '', '', '', '', '', 'TOTAL:', format_currency(total_value)])
+
+        col_widths = [doc.width*0.06, doc.width*0.1, doc.width*0.2, doc.width*0.2, doc.width*0.1, doc.width*0.08, doc.width*0.09, doc.width*0.09, doc.width*0.08]
+        table = Table(rows, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGN', (0, 0), (1, -1), 'CENTER'),
+            ('ALIGN', (4, 0), (-1, -1), 'CENTER'),
+            ('ALIGN', (8, 0), (-1, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
+            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+            ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        elements.append(table)
+    else:
+        empty_style = ParagraphStyle(
+            'PortServicesEmpty', parent=styles['Normal'], fontSize=10,
+            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
+        )
+        elements.append(Paragraph("Nenhum serviço portuário encontrado para os filtros selecionados.", empty_style))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)

@@ -57,6 +57,8 @@ import LoadingSchedulePage from './pages/LoadingSchedulePage';
 import DailyRateRequestPage from './pages/DailyRateRequestPage';
 import ExpenseReportsPage from './pages/ExpenseReportsPage';
 import DeliveryStatusPage from './pages/DeliveryStatusPage';
+import PortServicePage from './pages/PortServicePage';
+import ReportsPortServicesPage from './pages/ReportsPortServicesPage';
 import InternationalInvoicePage from './pages/InternationalInvoicePage';
 import UnitSegregationPage from './pages/UnitSegregationPage';
 import RPATerceiroPage from './pages/RPATerceiroPage';
@@ -601,6 +603,22 @@ function App() {
             element={
               <ProtectedRoute moduleKey="operacional.status_entrega">
                 <DeliveryStatusPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/port-services"
+            element={
+              <ProtectedRoute moduleKey="operacional.servico_portuario">
+                <PortServicePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/port-services"
+            element={
+              <ProtectedRoute adminOnly moduleKey="operacional.relatorio_servico_portuario">
+                <ReportsPortServicesPage />
               </ProtectedRoute>
             }
           />

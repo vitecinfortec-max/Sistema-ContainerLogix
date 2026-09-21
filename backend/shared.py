@@ -297,6 +297,8 @@ MODULE_CATALOG = [
         {"key": "operacional.programacao_carregamento", "label": "Programação de Carregamento"},
         {"key": "operacional.status_entrega", "label": "Status de Entrega"},
         {"key": "operacional.ordem_carregamento", "label": "Ordem de Carregamento"},
+        {"key": "operacional.servico_portuario", "label": "Serviço Portuário"},
+        {"key": "operacional.relatorio_servico_portuario", "label": "Relatório de Serviço Portuário"},
     ]},
     {"key": "estoque", "label": "Estoque", "items": [
         {"key": "estoque.almoxarifado", "label": "Almoxarifado"},
@@ -382,6 +384,8 @@ PATH_MODULE_MAP = [
     ("/api/reports/service-orders", "frota.relatorio_servicos"),
     ("/api/loading-schedules", "operacional.programacao_carregamento"),
     ("/api/delivery-status", "operacional.status_entrega"),
+    ("/api/reports/port-services", "operacional.relatorio_servico_portuario"),
+    ("/api/port-services", "operacional.servico_portuario"),
 ]
 
 _module_config_cache = {"value": None, "expires_at": 0}

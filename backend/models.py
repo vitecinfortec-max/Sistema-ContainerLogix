@@ -528,6 +528,11 @@ class DailyServiceOrderPoint(BaseModel):
     total_value: float
     count: int
 
+class DailyPortServicePoint(BaseModel):
+    date: str  # YYYY-MM-DD
+    total_value: float
+    count: int
+
 class DriverRankingEntry(BaseModel):
     driver_name: str
     entries: int
@@ -1961,6 +1966,71 @@ class DeliveryStatusResponse(BaseModel):
     voyage: Optional[str] = None
     status_date: str
     items: List[DeliveryStatusItem]
+    observations: Optional[str] = None
+    status: str
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
+# ==================== OPERACIONAL - SERVIÇO PORTUÁRIO ====================
+
+class PortService(BaseModel):
+    """Serviço Portuário - registro de serviços internos realizados dentro do porto"""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    service_number: int  # Número sequencial do registro
+
+    client_id: str
+    client_name: str
+    driver_id: Optional[str] = None
+    driver_name: str
+    cavalo_plate: str  # Placa do cavalo mecânico
+
+    service_date: str  # Data do serviço (YYYY-MM-DD)
+    turno: Literal["DIA", "NOITE"]
+    entry_time: Optional[str] = None  # Horário de entrada (HH:MM)
+    exit_time: Optional[str] = None  # Horário de saída (HH:MM)
+
+    operation_value: float  # Valor da Operação
+    observations: Optional[str] = None
+
+    status: str = "ATIVO"  # ATIVO (único valor usado por ora)
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+
+class PortServiceCreate(BaseModel):
+    client_id: str
+    client_name: str
+    driver_id: Optional[str] = None
+    driver_name: str
+    cavalo_plate: str
+    service_date: str
+    turno: Literal["DIA", "NOITE"]
+    entry_time: Optional[str] = None
+    exit_time: Optional[str] = None
+    operation_value: float
+    observations: Optional[str] = None
+
+
+class PortServiceResponse(BaseModel):
+    id: str
+    service_number: int
+    client_id: str
+    client_name: str
+    driver_id: Optional[str] = None
+    driver_name: str
+    cavalo_plate: str
+    service_date: str
+    turno: str
+    entry_time: Optional[str] = None
+    exit_time: Optional[str] = None
+    operation_value: float
     observations: Optional[str] = None
     status: str
     created_by: str
