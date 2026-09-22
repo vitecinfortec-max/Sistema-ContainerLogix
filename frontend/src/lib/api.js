@@ -402,6 +402,16 @@ export const api = {
   downloadPortServicesPDFReport: (params) => axios.get(`${API}/reports/port-services/pdf`, { params, responseType: 'blob' }),
   downloadPortServicesExcelReport: (params) => axios.get(`${API}/reports/port-services/excel`, { params, responseType: 'blob' }),
 
+  // Financeiro - Faturamento de Serviço Portuário
+  getPortServiceBillingCandidates: (params) => axios.get(`${API}/port-services/billing-candidates`, { params }),
+  createPortServiceBillingBatch: (data) => axios.post(`${API}/port-services/billing-batches`, data),
+  getPortServiceBillingBatches: (params) => axios.get(`${API}/port-services/billing-batches`, { params }),
+  getPortServiceBillingBatch: (id) => axios.get(`${API}/port-services/billing-batches/${id}`),
+  getPortServiceBillingBatchServices: (id) => axios.get(`${API}/port-services/billing-batches/${id}/services`),
+  updatePortServiceBillingBatchStatus: (id, status) => axios.put(`${API}/port-services/billing-batches/${id}/status?status=${status}`),
+  getPortServiceBillingBatchPDF: (id) => axios.get(`${API}/port-services/billing-batches/${id}/pdf`, { responseType: 'blob' }),
+  getPortServiceBillingBatchExcel: (id) => axios.get(`${API}/port-services/billing-batches/${id}/excel`, { responseType: 'blob' }),
+
   // Unit Segregation
   getUnitSegregations: (params) => axios.get(`${API}/unit-segregations`, { params }),
   getUnitSegregation: (id) => axios.get(`${API}/unit-segregations/${id}`),

@@ -6,10 +6,14 @@ import re
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from models import PortService, PortServiceCreate, PortServiceResponse, DailyPortServicePoint
+from models import (
+    PortService, PortServiceCreate, PortServiceResponse, DailyPortServicePoint,
+    PortServiceBillingBatch, PortServiceBillingBatchCreate, PortServiceBillingBatchResponse,
+)
 from reports import (
     _build_pdf_header, _make_pdf_footer, now_brt, merge_company, format_currency,
     generate_port_services_report_pdf, generate_port_services_report_excel,
+    generate_port_service_invoice_pdf, generate_port_service_invoice_excel,
 )
 from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, load_logo_buffer
 
@@ -54,6 +58,53 @@ async def get_port_services(
 
     return {
         "items": [_port_service_serialize(s) for s in services],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page
+    }
+
+
+# As duas rotas abaixo (billing-candidates, billing-batches) precisam vir
+# ANTES de GET /port-services/{service_id}: como o FastAPI casa rotas na
+# ordem de registro e "billing-candidates"/"billing-batches" têm só 1
+# segmento (igual {service_id}), registradas depois elas seriam engolidas
+# pela rota de path-parameter (tratadas como um service_id literal).
+
+@api_router.get("/port-services/billing-candidates")
+async def get_port_service_billing_candidates(
+    client_id: str,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Lista os Serviços Portuários ATIVOS e ainda não faturados de um
+    cliente num período - candidatos pra entrar numa nova Fatura de Serviço
+    Portuário."""
+    return await _filter_port_services_report(date_from, date_to, client_id, turno=None, billed=False)
+
+
+@api_router.get("/port-services/billing-batches")
+async def get_port_service_billing_batches(
+    page: int = 1,
+    per_page: int = 20,
+    client_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Lista as Faturas de Serviço Portuário com paginação e filtros"""
+    query = {}
+    if client_id:
+        query['client_id'] = client_id
+    if status:
+        query['status'] = status
+
+    total = await db.port_service_billing_batches.count_documents(query)
+    skip = (page - 1) * per_page
+    batches = await db.port_service_billing_batches.find(query, {"_id": 0}).sort("batch_number", -1).skip(skip).limit(per_page).to_list(per_page)
+
+    return {
+        "items": batches,
         "total": total,
         "page": page,
         "per_page": per_page,
@@ -247,15 +298,20 @@ async def generate_port_service_pdf(service_id: str, current_user: dict = Depend
 async def _filter_port_services_report(
     date_from: Optional[str], date_to: Optional[str],
     client_id: Optional[str], turno: Optional[str],
+    billed: Optional[bool] = None,
 ) -> list:
     """Consulta db.port_services com os mesmos filtros usados pelo Relatório
-    de Serviço Portuário (resumo, gráfico diário, PDF e Excel), sempre a
-    partir de service_date (string YYYY-MM-DD, comparável lexicograficamente)."""
+    de Serviço Portuário (resumo, gráfico diário, PDF e Excel) e pela busca
+    de candidatos do Faturamento de Serviço Portuário (billed=False),
+    sempre a partir de service_date (string YYYY-MM-DD, comparável
+    lexicograficamente)."""
     query = {}
     if client_id and client_id != 'all':
         query['client_id'] = client_id
     if turno and turno != 'all':
         query['turno'] = turno
+    if billed is not None:
+        query['billed'] = billed
     if date_from or date_to:
         date_query = {}
         if date_from:
@@ -345,4 +401,163 @@ async def download_port_services_report_excel(
         io.BytesIO(excel_buffer),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=relatorio_servico_portuario.xlsx"}
+    )
+
+
+# ==================== FATURAMENTO DE SERVIÇO PORTUÁRIO ====================
+
+async def get_next_port_service_billing_batch_number():
+    """Obtém o próximo batch_number (Fatura de Serviço Portuário) usando um
+    contador atômico, mesmo padrão de status_number/os_number/port_service_number."""
+    result = await db.counters.find_one_and_update(
+        {"_id": "port_service_billing_batch_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    return result["seq"]
+
+
+@api_router.post("/port-services/billing-batches", response_model=PortServiceBillingBatchResponse)
+async def create_port_service_billing_batch(
+    data: PortServiceBillingBatchCreate,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Realiza o faturamento: cria uma Fatura de Serviço Portuário a partir
+    dos serviços selecionados e marca todos como faturados - mesmo par
+    create+update_many já usado por POST /invoices."""
+    if not data.service_ids:
+        raise HTTPException(status_code=400, detail="Selecione pelo menos um Serviço Portuário")
+
+    services = await db.port_services.find(
+        {"id": {"$in": data.service_ids}}, {"_id": 0}
+    ).to_list(None)
+    if len(services) != len(set(data.service_ids)):
+        raise HTTPException(status_code=404, detail="Um ou mais Serviços Portuários não foram encontrados")
+
+    already_billed = [s for s in services if s.get('billed')]
+    if already_billed:
+        numbers = [str(s.get('service_number')) for s in already_billed]
+        raise HTTPException(status_code=400,
+            detail=f"Os seguintes Serviços Portuários já foram faturados: {', '.join(numbers)}")
+
+    other_client = [s for s in services if s.get('client_id') != data.client_id]
+    if other_client:
+        raise HTTPException(status_code=400,
+            detail="Todos os Serviços Portuários selecionados devem ser do mesmo cliente")
+
+    total_value = round(sum((s.get('operation_value') or 0) for s in services), 2)
+    batch_number = await get_next_port_service_billing_batch_number()
+
+    batch = PortServiceBillingBatch(
+        batch_number=batch_number,
+        client_id=data.client_id,
+        client_name=data.client_name,
+        service_ids=data.service_ids,
+        item_count=len(services),
+        total_value=total_value,
+        period_from=data.period_from,
+        period_to=data.period_to,
+        observations=data.observations,
+        created_by=current_user['sub'],
+        created_by_name=current_user['name'],
+    )
+    await db.port_service_billing_batches.insert_one(batch.model_dump())
+
+    now_iso = datetime.now(timezone.utc)
+    await db.port_services.update_many(
+        {"id": {"$in": data.service_ids}},
+        {"$set": {"billed": True, "billed_at": now_iso, "billing_batch_id": batch.id}}
+    )
+
+    result = await db.port_service_billing_batches.find_one({"id": batch.id}, {"_id": 0})
+    return result
+
+
+@api_router.get("/port-services/billing-batches/{batch_id}", response_model=PortServiceBillingBatchResponse)
+async def get_port_service_billing_batch(batch_id: str, current_user: dict = Depends(get_current_admin_user)):
+    batch = await db.port_service_billing_batches.find_one({"id": batch_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Fatura de Serviço Portuário não encontrada")
+    return batch
+
+
+@api_router.get("/port-services/billing-batches/{batch_id}/services")
+async def get_port_service_billing_batch_services(batch_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Expande os service_ids da fatura pros registros completos de Serviço
+    Portuário, pro modal de detalhe - mesmo papel de GET /invoices/{id}/movements."""
+    batch = await db.port_service_billing_batches.find_one({"id": batch_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Fatura de Serviço Portuário não encontrada")
+    services = await db.port_services.find(
+        {"id": {"$in": batch['service_ids']}}, {"_id": 0}
+    ).sort("service_date", 1).to_list(None)
+    return [_port_service_serialize(s) for s in services]
+
+
+@api_router.put("/port-services/billing-batches/{batch_id}/status")
+async def update_port_service_billing_batch_status(
+    batch_id: str,
+    status: str,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Atualiza o status da fatura (Pendente/Pago/Cancelado). CANCELADO
+    desfaz a baixa dos serviços (volta billed=False), mesmo comportamento
+    de remover item de uma Fatura geral (Invoice) - libera pra entrar numa
+    fatura futura."""
+    if status not in ["PENDENTE", "PAGO", "CANCELADO"]:
+        raise HTTPException(status_code=400, detail="Status inválido")
+
+    batch = await db.port_service_billing_batches.find_one({"id": batch_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Fatura de Serviço Portuário não encontrada")
+
+    update_data = {"status": status}
+    update_data["paid_at"] = datetime.now(timezone.utc) if status == "PAGO" else None
+    await db.port_service_billing_batches.update_one({"id": batch_id}, {"$set": update_data})
+
+    if status == "CANCELADO":
+        await db.port_services.update_many(
+            {"id": {"$in": batch['service_ids']}},
+            {"$set": {"billed": False, "billed_at": None, "billing_batch_id": None}}
+        )
+
+    return {"message": "Status atualizado com sucesso"}
+
+
+@api_router.get("/port-services/billing-batches/{batch_id}/pdf")
+async def download_port_service_billing_batch_pdf(batch_id: str, current_user: dict = Depends(get_current_admin_user)):
+    batch = await db.port_service_billing_batches.find_one({"id": batch_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Fatura de Serviço Portuário não encontrada")
+    services = await db.port_services.find(
+        {"id": {"$in": batch['service_ids']}}, {"_id": 0}
+    ).sort("service_date", 1).to_list(None)
+
+    company = await get_company_settings()
+    pdf_buffer = generate_port_service_invoice_pdf(batch, services, company=company)
+    filename = f"fatura_servico_portuario_{batch['batch_number']}.pdf"
+    return StreamingResponse(
+        io.BytesIO(pdf_buffer),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+@api_router.get("/port-services/billing-batches/{batch_id}/excel")
+async def download_port_service_billing_batch_excel(batch_id: str, current_user: dict = Depends(get_current_admin_user)):
+    batch = await db.port_service_billing_batches.find_one({"id": batch_id}, {"_id": 0})
+    if not batch:
+        raise HTTPException(status_code=404, detail="Fatura de Serviço Portuário não encontrada")
+    services = await db.port_services.find(
+        {"id": {"$in": batch['service_ids']}}, {"_id": 0}
+    ).sort("service_date", 1).to_list(None)
+
+    company = await get_company_settings()
+    excel_buffer = generate_port_service_invoice_excel(batch, services, company=company)
+    filename = f"fatura_servico_portuario_{batch['batch_number']}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(excel_buffer),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )

@@ -199,6 +199,7 @@ async def startup_event():
     await _seed_counter("segregation_number", db.unit_segregations, "segregation_number")
     await _seed_counter("os_number", db.ordem_servico, "os_number")
     await _seed_counter("port_service_number", db.port_services, "service_number")
+    await _seed_counter("port_service_billing_batch_number", db.port_service_billing_batches, "batch_number")
     # "terceiro" primeiro e com query que também cobre RPAs legados sem rpa_type
     # gravado (contavam como "terceiro" na busca antiga) - precisa rodar antes do
     # loop abaixo para não ser pulado por já existir com um valor incompleto.

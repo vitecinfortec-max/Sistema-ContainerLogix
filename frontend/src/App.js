@@ -59,6 +59,7 @@ import ExpenseReportsPage from './pages/ExpenseReportsPage';
 import DeliveryStatusPage from './pages/DeliveryStatusPage';
 import PortServicePage from './pages/PortServicePage';
 import ReportsPortServicesPage from './pages/ReportsPortServicesPage';
+import PortServiceBillingPage from './pages/PortServiceBillingPage';
 import InternationalInvoicePage from './pages/InternationalInvoicePage';
 import UnitSegregationPage from './pages/UnitSegregationPage';
 import RPATerceiroPage from './pages/RPATerceiroPage';
@@ -619,6 +620,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="operacional.relatorio_servico_portuario">
                 <ReportsPortServicesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/port-services-billing"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.faturamento_portuario">
+                <PortServiceBillingPage />
               </ProtectedRoute>
             }
           />

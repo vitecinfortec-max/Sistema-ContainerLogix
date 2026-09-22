@@ -1998,6 +1998,9 @@ class PortService(BaseModel):
     observations: Optional[str] = None
 
     status: str = "ATIVO"  # ATIVO (único valor usado por ora)
+    billed: bool = False  # Indica se já entrou numa Fatura de Serviço Portuário
+    billed_at: Optional[datetime] = None
+    billing_batch_id: Optional[str] = None  # PortServiceBillingBatch que o faturou
     created_by: str
     created_by_name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -2033,10 +2036,70 @@ class PortServiceResponse(BaseModel):
     operation_value: float
     observations: Optional[str] = None
     status: str
+    billed: bool = False
+    billed_at: Optional[datetime] = None
+    billing_batch_id: Optional[str] = None
     created_by: str
     created_by_name: str
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+
+class PortServiceBillingBatch(BaseModel):
+    """Fatura de Serviço Portuário: agrupa 1+ registros do MESMO cliente,
+    faturados juntos num período - criada ao realizar o faturamento.
+    Snapshot dos dados do cliente/serviços (não mudam depois); só o status
+    de pagamento pode ser alterado. CANCELADO desfaz a baixa dos serviços
+    (volta billed=False), mesmo comportamento de remover item de uma
+    Fatura geral (Invoice) - libera pra entrar numa fatura futura."""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    batch_number: int  # Número sequencial da fatura
+
+    client_id: str
+    client_name: str
+    service_ids: List[str] = Field(default_factory=list)
+    item_count: int = 0
+    total_value: float = 0
+
+    period_from: Optional[str] = None  # YYYY-MM-DD
+    period_to: Optional[str] = None  # YYYY-MM-DD
+
+    status: str = "PENDENTE"  # PENDENTE, PAGO, CANCELADO
+    paid_at: Optional[datetime] = None
+    observations: Optional[str] = None
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class PortServiceBillingBatchCreate(BaseModel):
+    client_id: str
+    client_name: str
+    service_ids: List[str]
+    period_from: Optional[str] = None
+    period_to: Optional[str] = None
+    observations: Optional[str] = None
+
+
+class PortServiceBillingBatchResponse(BaseModel):
+    id: str
+    batch_number: int
+    client_id: str
+    client_name: str
+    service_ids: List[str]
+    item_count: int
+    total_value: float
+    period_from: Optional[str] = None
+    period_to: Optional[str] = None
+    status: str
+    paid_at: Optional[datetime] = None
+    observations: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime
 
 
 # ==================== SEGREGAÇÃO DE UNIDADE ====================

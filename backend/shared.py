@@ -292,6 +292,7 @@ MODULE_CATALOG = [
         {"key": "financeiro.prestacao_contas", "label": "Prestação de Contas"},
         {"key": "financeiro.rpa_terceiro", "label": "Contrato de Frete"},
         {"key": "financeiro.pagamento_frete", "label": "Pagamento Frete"},
+        {"key": "financeiro.faturamento_portuario", "label": "Faturamento Portuário"},
     ]},
     {"key": "operacional", "label": "Operacional", "items": [
         {"key": "operacional.programacao_carregamento", "label": "Programação de Carregamento"},
@@ -385,6 +386,8 @@ PATH_MODULE_MAP = [
     ("/api/loading-schedules", "operacional.programacao_carregamento"),
     ("/api/delivery-status", "operacional.status_entrega"),
     ("/api/reports/port-services", "operacional.relatorio_servico_portuario"),
+    ("/api/port-services/billing-batches", "financeiro.faturamento_portuario"),
+    ("/api/port-services/billing-candidates", "financeiro.faturamento_portuario"),
     ("/api/port-services", "operacional.servico_portuario"),
 ]
 
