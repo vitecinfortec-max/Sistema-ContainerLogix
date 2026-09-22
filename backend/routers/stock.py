@@ -357,6 +357,48 @@ async def _match_product(item: dict):
     return None
 
 
+def _merge_duplicate_nfe_items(items: list) -> list:
+    """Uma NF-e pode listar o mesmo produto em mais de uma linha <det> (ex:
+    lotes/números de série diferentes do mesmo item) - sem isso, cada linha
+    vira uma proposta de "produto novo" separada em _match_product (já que
+    nenhuma bate no banco ainda na primeira importação), e confirmar cria
+    produtos duplicados pro mesmo item. Agrupa pelo MESMO critério de
+    _match_product (barcode exato, senão NCM + descrição normalizada,
+    exatamente nessa ordem de prioridade) e soma quantidade/valor - roda
+    ANTES de tentar casar contra o banco, então o resto do fluxo (match,
+    preview, confirmação) já opera em cima de 1 linha por produto."""
+    merged: dict = {}
+    order: list = []
+    for idx, item in enumerate(items):
+        barcode = (item.get('barcode') or '').strip()
+        ncm = (item.get('ncm') or '').strip()
+        description_norm = _normalize_text(item.get('description'))
+        if barcode:
+            key = ('barcode', barcode)
+        elif ncm and description_norm:
+            key = ('ncm_desc', ncm, description_norm)
+        else:
+            # Sem barcode nem NCM+descrição pra identificar com confiança -
+            # nunca funde (mesmo critério de _match_product: sem chave
+            # confiável, não casa com nada).
+            key = ('unmatched', idx)
+
+        if key not in merged:
+            merged[key] = dict(item)
+            order.append(key)
+        else:
+            merged[key]['quantity'] = (merged[key].get('quantity') or 0) + (item.get('quantity') or 0)
+            merged[key]['total_value'] = (merged[key].get('total_value') or 0) + (item.get('total_value') or 0)
+
+    result = []
+    for key in order:
+        m = merged[key]
+        if m.get('quantity'):
+            m['unit_value'] = round(m['total_value'] / m['quantity'], 4)
+        result.append(m)
+    return result
+
+
 async def _match_supplier(cnpj: str):
     digits = _only_digits(cnpj)
     if not digits:
@@ -379,9 +421,10 @@ async def parse_nfe_import(file: UploadFile = File(...), current_user: dict = De
         raise HTTPException(status_code=400, detail=str(e))
 
     matched_supplier = await _match_supplier(parsed['supplier_cnpj'])
+    merged_items = _merge_duplicate_nfe_items(parsed['items'])
 
     items_out = []
-    for item in parsed['items']:
+    for item in merged_items:
         matched_product = await _match_product(item)
         items_out.append({
             **item,
