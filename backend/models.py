@@ -2061,7 +2061,9 @@ class PortServiceBillingBatch(BaseModel):
     client_name: str
     service_ids: List[str] = Field(default_factory=list)
     item_count: int = 0
-    total_value: float = 0
+    total_value: float = 0  # soma bruta dos serviços (sem desconto)
+    discount_value: float = 0  # desconto aplicado, em R$
+    net_total: float = 0  # total_value - discount_value, valor final a cobrar do cliente
 
     period_from: Optional[str] = None  # YYYY-MM-DD
     period_to: Optional[str] = None  # YYYY-MM-DD
@@ -2073,6 +2075,7 @@ class PortServiceBillingBatch(BaseModel):
     created_by: str
     created_by_name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
 
 
 class PortServiceBillingBatchCreate(BaseModel):
@@ -2081,6 +2084,14 @@ class PortServiceBillingBatchCreate(BaseModel):
     service_ids: List[str]
     period_from: Optional[str] = None
     period_to: Optional[str] = None
+    discount_value: Optional[float] = 0
+    observations: Optional[str] = None
+
+
+class PortServiceBillingBatchUpdate(BaseModel):
+    """Edição pós-criação - só desconto e observação (a lista de serviços
+    fica fixa depois de gerada, pra não desencontrar a baixa já feita)."""
+    discount_value: Optional[float] = None
     observations: Optional[str] = None
 
 
@@ -2092,6 +2103,8 @@ class PortServiceBillingBatchResponse(BaseModel):
     service_ids: List[str]
     item_count: int
     total_value: float
+    discount_value: float = 0
+    net_total: float = 0
     period_from: Optional[str] = None
     period_to: Optional[str] = None
     status: str
@@ -2100,6 +2113,7 @@ class PortServiceBillingBatchResponse(BaseModel):
     created_by: str
     created_by_name: str
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
 
 # ==================== SEGREGAÇÃO DE UNIDADE ====================

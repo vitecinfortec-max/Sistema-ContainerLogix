@@ -10,7 +10,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Autocomplete } from '../components/Autocomplete';
-import { Anchor, Search, Eye, Printer, FileSpreadsheet } from 'lucide-react';
+import { Anchor, Search, Eye, Printer, FileSpreadsheet, Pencil, X, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -51,6 +51,8 @@ export default function PortServiceBillingPage() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [searching, setSearching] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [discountValue, setDiscountValue] = useState('');
+  const [batchObservations, setBatchObservations] = useState('');
 
   // Lista de Faturas
   const [batches, setBatches] = useState([]);
@@ -64,6 +66,10 @@ export default function PortServiceBillingPage() {
   const [batchServices, setBatchServices] = useState([]);
   const [loadingBatchServices, setLoadingBatchServices] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editDiscount, setEditDiscount] = useState('');
+  const [editObservations, setEditObservations] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     loadClients();
@@ -134,6 +140,8 @@ export default function PortServiceBillingPage() {
   const selectedTotal = candidates
     .filter(c => selectedIds.has(c.id))
     .reduce((sum, c) => sum + (c.operation_value || 0), 0);
+  const discountNumber = Number(discountValue) || 0;
+  const netTotal = Math.max(0, selectedTotal - discountNumber);
 
   const handleGenerateInvoice = async () => {
     if (selectedIds.size === 0) {
@@ -148,10 +156,14 @@ export default function PortServiceBillingPage() {
         service_ids: [...selectedIds],
         period_from: dateFrom || null,
         period_to: dateTo || null,
+        discount_value: discountNumber,
+        observations: batchObservations || null,
       });
       toast.success('Fatura de Serviço Portuário gerada com sucesso!');
       setCandidates(prev => prev.filter(c => !selectedIds.has(c.id)));
       setSelectedIds(new Set());
+      setDiscountValue('');
+      setBatchObservations('');
       setPagination(prev => ({ ...prev, page: 1 }));
       loadBatches();
     } catch (error) {
@@ -189,6 +201,9 @@ export default function PortServiceBillingPage() {
   const openDetails = async (batch) => {
     setSelectedBatch(batch);
     setDetailModalOpen(true);
+    setEditMode(false);
+    setEditDiscount(String(batch.discount_value || 0));
+    setEditObservations(batch.observations || '');
     setLoadingBatchServices(true);
     try {
       const response = await api.getPortServiceBillingBatchServices(batch.id);
@@ -197,6 +212,30 @@ export default function PortServiceBillingPage() {
       toast.error('Erro ao carregar serviços da fatura');
     } finally {
       setLoadingBatchServices(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedBatch) return;
+    const newDiscount = Number(editDiscount) || 0;
+    if (newDiscount > selectedBatch.total_value) {
+      toast.error('Desconto não pode ser maior que o valor dos serviços');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const response = await api.updatePortServiceBillingBatch(selectedBatch.id, {
+        discount_value: newDiscount,
+        observations: editObservations || null,
+      });
+      toast.success('Fatura atualizada com sucesso!');
+      setSelectedBatch(response.data);
+      setBatches(prev => prev.map(b => b.id === selectedBatch.id ? response.data : b));
+      setEditMode(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar fatura');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -334,9 +373,35 @@ export default function PortServiceBillingPage() {
                     </tbody>
                   </table>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs mb-1 block">Desconto (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="h-9"
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      data-testid="port-service-invoice-discount-input"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label className="text-xs mb-1 block">Observações</Label>
+                    <Input
+                      className="h-9"
+                      value={batchObservations}
+                      onChange={(e) => setBatchObservations(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">
-                    {selectedIds.size} selecionado(s) — Total: <span className="font-semibold text-foreground">{fmtMoney(selectedTotal)}</span>
+                    {selectedIds.size} selecionado(s) — Serviços: {fmtMoney(selectedTotal)}
+                    {discountNumber > 0 && <> — Desconto: {fmtMoney(discountNumber)}</>}
+                    {' '}— Total: <span className="font-semibold text-foreground">{fmtMoney(netTotal)}</span>
                   </span>
                   <Button onClick={handleGenerateInvoice} disabled={generating || selectedIds.size === 0} data-testid="generate-port-service-invoice-button">
                     {generating ? 'Gerando...' : `Gerar Fatura (${selectedIds.size})`}
@@ -442,7 +507,7 @@ export default function PortServiceBillingPage() {
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{batch.client_name}</td>
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtPeriod(batch.period_from, batch.period_to)}</td>
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{batch.item_count}</td>
-                          <td className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">{fmtMoney(batch.total_value)}</td>
+                          <td className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">{fmtMoney(batch.net_total ?? batch.total_value)}</td>
                           <td className="px-4 py-2.5">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${badge.color}`}>{badge.label}</span>
                           </td>
@@ -491,10 +556,6 @@ export default function PortServiceBillingPage() {
                   <p className="font-medium">{fmtPeriod(selectedBatch.period_from, selectedBatch.period_to)}</p>
                 </div>
                 <div className="bg-muted/50 p-3 rounded">
-                  <p className="text-sm text-muted-foreground">Valor Total</p>
-                  <p className="font-medium">{fmtMoney(selectedBatch.total_value)}</p>
-                </div>
-                <div className="bg-muted/50 p-3 rounded">
                   <p className="text-sm text-muted-foreground mb-1">Status</p>
                   <Select value={selectedBatch.status} onValueChange={handleUpdateStatus} disabled={updatingStatus}>
                     <SelectTrigger className="h-8 text-sm">
@@ -507,6 +568,68 @@ export default function PortServiceBillingPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="bg-muted/50 p-3 rounded flex items-end justify-end">
+                  {!editMode ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditMode(true)}
+                      disabled={selectedBatch.status === 'CANCELADO'}
+                      data-testid="edit-port-service-invoice-button"
+                    >
+                      <Pencil className="w-3.5 h-3.5 mr-1.5" /> Editar
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setEditMode(false)} disabled={savingEdit}>
+                        <X className="w-3.5 h-3.5 mr-1.5" /> Cancelar
+                      </Button>
+                      <Button size="sm" onClick={handleSaveEdit} disabled={savingEdit}>
+                        <Check className="w-3.5 h-3.5 mr-1.5" /> {savingEdit ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border rounded p-3 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Valor dos Serviços</span>
+                  <span className="font-medium">{fmtMoney(selectedBatch.total_value)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Desconto</span>
+                  {editMode ? (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="h-8 w-32 text-right"
+                      value={editDiscount}
+                      onChange={(e) => setEditDiscount(e.target.value)}
+                    />
+                  ) : (
+                    <span className="font-medium">{fmtMoney(selectedBatch.discount_value)}</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-sm border-t pt-2">
+                  <span className="font-semibold">Valor Total</span>
+                  <span className="font-semibold text-primary">
+                    {fmtMoney(editMode ? Math.max(0, selectedBatch.total_value - (Number(editDiscount) || 0)) : (selectedBatch.net_total ?? selectedBatch.total_value))}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-muted/50 p-3 rounded">
+                <p className="text-sm text-muted-foreground mb-1">Observações</p>
+                {editMode ? (
+                  <Input
+                    value={editObservations}
+                    onChange={(e) => setEditObservations(e.target.value)}
+                  />
+                ) : (
+                  <p className="font-medium">{selectedBatch.observations || '-'}</p>
+                )}
               </div>
 
               <div>

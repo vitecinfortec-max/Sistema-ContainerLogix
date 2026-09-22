@@ -407,6 +407,7 @@ export const api = {
   createPortServiceBillingBatch: (data) => axios.post(`${API}/port-services/billing-batches`, data),
   getPortServiceBillingBatches: (params) => axios.get(`${API}/port-services/billing-batches`, { params }),
   getPortServiceBillingBatch: (id) => axios.get(`${API}/port-services/billing-batches/${id}`),
+  updatePortServiceBillingBatch: (id, data) => axios.put(`${API}/port-services/billing-batches/${id}`, data),
   getPortServiceBillingBatchServices: (id) => axios.get(`${API}/port-services/billing-batches/${id}/services`),
   updatePortServiceBillingBatchStatus: (id, status) => axios.put(`${API}/port-services/billing-batches/${id}/status?status=${status}`),
   getPortServiceBillingBatchPDF: (id) => axios.get(`${API}/port-services/billing-batches/${id}/pdf`, { responseType: 'blob' }),

@@ -1930,9 +1930,12 @@ def generate_port_service_invoice_excel(batch: dict, services: list, company: di
         ws = wb.active
         ws.title = "Fatura Serviço Portuário"
 
+        net_total = batch.get('net_total')
+        if net_total is None:
+            net_total = batch.get('total_value') or 0
         stats_text = (
             f"Cliente: {batch.get('client_name') or '-'}  |  Período: {_format_port_service_period(batch)}  |  "
-            f"Serviços: {batch.get('item_count', len(services))}  |  Valor Total: {format_currency(batch.get('total_value') or 0, 'BRL')}"
+            f"Serviços: {batch.get('item_count', len(services))}  |  Valor Total: {format_currency(net_total, 'BRL')}"
         )
 
         ws.column_dimensions['A'].width = 3
@@ -2018,11 +2021,34 @@ def generate_port_service_invoice_excel(batch: dict, services: list, company: di
                 last_row += 1
             subtotal_font = Font(size=9, bold=True)
             subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-            ws.cell(row=last_row, column=9, value='TOTAL:').font = subtotal_font
+            discount_value = batch.get('discount_value') or 0
+
+            ws.cell(row=last_row, column=9, value='Valor dos Serviços:').font = subtotal_font
             ws.cell(row=last_row, column=10, value=format_currency(batch.get('total_value') or 0)).font = subtotal_font
             for col in range(2, 11):
                 ws.cell(row=last_row, column=col).fill = subtotal_fill
             last_row += 1
+
+            ws.cell(row=last_row, column=9, value='Desconto:').font = subtotal_font
+            ws.cell(row=last_row, column=10, value=format_currency(discount_value)).font = subtotal_font
+            for col in range(2, 11):
+                ws.cell(row=last_row, column=col).fill = subtotal_fill
+            last_row += 1
+
+            total_font = Font(size=10, bold=True, color=PRIMARY_COLOR)
+            total_fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type="solid")
+            ws.cell(row=last_row, column=9, value='VALOR TOTAL:').font = total_font
+            ws.cell(row=last_row, column=10, value=format_currency(net_total)).font = total_font
+            for col in range(2, 11):
+                ws.cell(row=last_row, column=col).fill = total_fill
+            last_row += 1
+
+            if batch.get('observations'):
+                last_row += 1
+                ws.cell(row=last_row, column=2, value='Observações:').font = Font(size=9, bold=True)
+                last_row += 1
+                ws.cell(row=last_row, column=2, value=batch['observations']).font = Font(size=9)
+                last_row += 1
         else:
             ws.cell(row=last_row, column=2, value="Nenhum serviço nesta fatura.")
             ws.cell(row=last_row, column=2).font = Font(size=10, color='808080')
@@ -2828,9 +2854,13 @@ def generate_port_service_invoice_pdf(batch: dict, services: list, company: dict
     elements.extend(header_elements)
 
     total_value = batch.get('total_value') or 0
+    discount_value = batch.get('discount_value') or 0
+    net_total = batch.get('net_total')
+    if net_total is None:
+        net_total = total_value
     info_text = (
         f"Cliente: {batch.get('client_name') or '-'}  |  Período: {_format_port_service_period(batch)}  |  "
-        f"Serviços: {batch.get('item_count', len(services))}  |  Valor Total: {format_currency(total_value, 'BRL')}"
+        f"Serviços: {batch.get('item_count', len(services))}  |  Valor Total: {format_currency(net_total, 'BRL')}"
     )
     info_style = ParagraphStyle(
         'PortServiceInvoiceInfo', parent=styles['Normal'], fontSize=10,
@@ -2873,7 +2903,9 @@ def generate_port_service_invoice_pdf(batch: dict, services: list, company: dict
                 s.get('exit_time') or '-',
                 format_currency(s.get('operation_value') or 0),
             ])
-        rows.append(['', '', '', '', '', '', '', 'TOTAL:', format_currency(total_value)])
+        rows.append(['', '', '', '', '', '', '', 'Valor dos Serviços:', format_currency(total_value)])
+        rows.append(['', '', '', '', '', '', '', 'Desconto:', format_currency(discount_value)])
+        rows.append(['', '', '', '', '', '', '', 'VALOR TOTAL:', format_currency(net_total)])
 
         col_widths = [doc.width*0.06, doc.width*0.1, doc.width*0.2, doc.width*0.2, doc.width*0.1, doc.width*0.08, doc.width*0.09, doc.width*0.09, doc.width*0.08]
         table = Table(rows, colWidths=col_widths, repeatRows=1)
@@ -2885,16 +2917,27 @@ def generate_port_service_invoice_pdf(batch: dict, services: list, company: dict
             ('ALIGN', (0, 0), (1, -1), 'CENTER'),
             ('ALIGN', (4, 0), (-1, -1), 'CENTER'),
             ('ALIGN', (8, 0), (-1, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('GRID', (0, 0), (-1, -4), 0.5, colors.HexColor('#CCCCCC')),
+            ('BOX', (0, 0), (-1, -4), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -4), [colors.white, colors.HexColor('#F8F8F8')]),
+            ('BACKGROUND', (0, -3), (-1, -2), colors.HexColor(f'#{HEADER_BG_COLOR}')),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.white),
+            ('FONTNAME', (-2, -3), (-1, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (-2, -1), (-1, -1), 10),
             ('TOPPADDING', (0, 0), (-1, -1), 4),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ]))
         elements.append(table)
+
+        if batch.get('observations'):
+            elements.append(Spacer(1, 10))
+            obs_style = ParagraphStyle(
+                'PortServiceInvoiceObs', parent=styles['Normal'], fontSize=9, fontName='Helvetica',
+                textColor=colors.black
+            )
+            elements.append(Paragraph(f"<b>Observações:</b> {batch['observations']}", obs_style))
     else:
         empty_style = ParagraphStyle(
             'PortServiceInvoiceEmpty', parent=styles['Normal'], fontSize=10,
