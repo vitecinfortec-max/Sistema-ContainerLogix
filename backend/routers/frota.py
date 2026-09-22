@@ -38,6 +38,7 @@ from models import (
     VEHICLE_CHECKLIST_TEMPLATE, VEHICLE_CHECKLIST_SECTION_LABELS,
     MAX_VEHICLE_CHECKLIST_PHOTOS, SIMPLE_CHECKLIST_TEMPLATES,
     VehicleRevision, VehicleRevisionCreate, VehicleRevisionResponse,
+    OdometerReading, OdometerReadingCreate, OdometerReadingResponse,
     LoadingScheduleItem, LoadingSchedule, LoadingScheduleCreate, LoadingScheduleResponse,
     DailyRateRequestItem, DailyRateRequest, DailyRateRequestCreate, DailyRateRequestResponse,
     IntlInvoiceItem, IntlInvoice, IntlInvoiceCreate, IntlInvoiceResponse,
@@ -913,5 +914,162 @@ async def get_vehicle_plates(current_user: dict = Depends(get_current_active_use
     all_plates = list(set([p for p in movements_plates if p] + [p for p in revisions_plates if p]))
     all_plates.sort()
     return all_plates
+
+
+# ==================== FROTA - LANÇAMENTO DE HODÔMETRO ====================
+
+NEXT_KM_FIELDS = [
+    "next_oil_motor_km", "next_oil_filter_km", "next_air_filter_km", "next_ac_filter_km",
+    "next_fuel_filter_km", "next_racor_filter_km", "next_apu_filter_km", "next_hydraulic_filter_km",
+    "next_gearbox_oil_km", "next_differential_oil_km", "next_lubrication_km", "next_washing_km",
+]
+
+MAINTENANCE_ALERT_MARGIN_KM = 1000
+
+
+async def _compute_vehicle_maintenance_status(vehicle: dict) -> Optional[dict]:
+    """Calcula a situação de manutenção de um veículo a partir da última Revisão
+    registrada e do maior KM conhecido (revisão, hodômetro ou abastecimento).
+    Retorna None se não houver dado suficiente (sem revisão ou sem nenhum next_*_km preenchido)."""
+    plate = (vehicle.get("plate") or "").upper()
+    if not plate:
+        return None
+
+    revision = await db.vehicle_revisions.find_one(
+        {"vehicle_plate": {"$regex": f"^{re.escape(plate)}$", "$options": "i"}},
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
+    if not revision:
+        return None
+
+    next_due_km = min([revision[f] for f in NEXT_KM_FIELDS if revision.get(f) is not None], default=None)
+    if next_due_km is None:
+        return None
+
+    current_km = revision.get("current_km") or 0
+
+    latest_reading = await db.odometer_readings.find_one(
+        {"vehicle_id": vehicle["id"]}, {"_id": 0, "km": 1}, sort=[("created_at", -1)]
+    )
+    if latest_reading and latest_reading.get("km") is not None:
+        current_km = max(current_km, latest_reading["km"])
+
+    latest_fuel_supply = await db.fuel_supplies.find_one(
+        {"equipment_id": vehicle["id"], "reading": {"$ne": None}}, {"_id": 0, "reading": 1}, sort=[("created_at", -1)]
+    )
+    if latest_fuel_supply and latest_fuel_supply.get("reading") is not None:
+        current_km = max(current_km, latest_fuel_supply["reading"])
+
+    km_remaining = next_due_km - current_km
+    if km_remaining <= 0:
+        maintenance_status = "OVERDUE"
+    elif km_remaining <= MAINTENANCE_ALERT_MARGIN_KM:
+        maintenance_status = "DUE_SOON"
+    else:
+        maintenance_status = "OK"
+
+    return {
+        "vehicle_id": vehicle["id"],
+        "vehicle_plate": plate,
+        "vehicle_model": vehicle.get("model"),
+        "current_km": current_km,
+        "next_due_km": next_due_km,
+        "km_remaining": km_remaining,
+        "status": maintenance_status,
+    }
+
+
+async def get_all_vehicle_maintenance_status() -> list:
+    """Situação de manutenção de todos os veículos com hodômetro próprio (CAVALO/CAMINHÃO, ATIVO)."""
+    vehicles = await db.vehicles.find(
+        {"vehicle_type": {"$in": ["CAVALO", "CAMINHÃO"]}, "status": "ATIVO"},
+        {"_id": 0, "id": 1, "plate": 1, "model": 1}
+    ).to_list(None)
+
+    results = []
+    for vehicle in vehicles:
+        status = await _compute_vehicle_maintenance_status(vehicle)
+        if status:
+            results.append(status)
+    return results
+
+
+@api_router.get("/odometer-readings/maintenance-status")
+async def get_maintenance_status_route(current_user: dict = Depends(get_current_active_user)):
+    """Situação de manutenção de todos os veículos, pra Seção 'Situação de Manutenção'"""
+    return await get_all_vehicle_maintenance_status()
+
+
+@api_router.get("/odometer-readings")
+async def get_odometer_readings(
+    vehicle_plate: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Lista todos os lançamentos de hodômetro"""
+    query = {}
+    if vehicle_plate:
+        query["vehicle_plate"] = {"$regex": re.escape(vehicle_plate.upper()), "$options": "i"}
+
+    skip = (page - 1) * per_page
+
+    total = await db.odometer_readings.count_documents(query)
+    readings = await db.odometer_readings.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+
+    return {
+        "items": readings,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page
+    }
+
+
+@api_router.post("/odometer-readings", response_model=OdometerReadingResponse)
+async def create_odometer_reading(
+    data: OdometerReadingCreate,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Cria um novo lançamento de hodômetro"""
+    counter = await db.counters.find_one_and_update(
+        {"_id": "odometer_reading_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    reading_number = counter["seq"]
+
+    reading = OdometerReading(
+        reading_number=reading_number,
+        vehicle_id=data.vehicle_id,
+        vehicle_plate=data.vehicle_plate.upper(),
+        km=data.km,
+        reading_date=data.reading_date,
+        observations=data.observations,
+        created_by=current_user["sub"],
+        created_by_name=current_user["name"]
+    )
+
+    reading_dict = reading.model_dump()
+    reading_dict["created_at"] = reading_dict["created_at"].isoformat()
+
+    await db.odometer_readings.insert_one(reading_dict)
+    reading_dict.pop('_id', None)
+
+    return OdometerReadingResponse(**reading_dict)
+
+
+@api_router.delete("/odometer-readings/{reading_id}")
+async def delete_odometer_reading(
+    reading_id: str,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Exclui um lançamento de hodômetro"""
+    result = await db.odometer_readings.delete_one({"id": reading_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Lançamento não encontrado")
+    return {"message": "Lançamento excluído com sucesso"}
 
 

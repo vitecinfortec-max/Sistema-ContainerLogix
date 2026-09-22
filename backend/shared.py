@@ -264,6 +264,7 @@ MODULE_CATALOG = [
     {"key": "frota", "label": "Manutenção", "items": [
         {"key": "frota.veiculos", "label": "Cadastro de Veículos"},
         {"key": "frota.revisao", "label": "Controle de Revisão"},
+        {"key": "frota.hodometro", "label": "Lançamento de Hodômetro"},
         {"key": "frota.ordem_servico", "label": "Ordem de Serviço"},
         {"key": "frota.cadastro_categoria", "label": "Cadastro de Categoria"},
         {"key": "frota.checklist", "label": "Checklist"},
@@ -347,6 +348,7 @@ PATH_MODULE_MAP = [
     ("/api/container-representatives", "gestao_container.representante"),
     ("/api/container-sales", "gestao_container.venda"),
     ("/api/vehicle-revisions", "frota.revisao"),
+    ("/api/odometer-readings", "frota.hodometro"),
     ("/api/vehicle-checklists", "frota.checklist"),
     ("/api/vehicles", "frota.veiculos"),
     ("/api/drivers", "cadastro.pessoas"),

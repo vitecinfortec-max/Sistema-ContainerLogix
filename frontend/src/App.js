@@ -65,6 +65,7 @@ import UnitSegregationPage from './pages/UnitSegregationPage';
 import RPATerceiroPage from './pages/RPATerceiroPage';
 import OrdemServicoPage from './pages/OrdemServicoPage';
 import FuelSupplyPage from './pages/FuelSupplyPage';
+import OdometerReadingsPage from './pages/OdometerReadingsPage';
 import ReportsFuelSupplyPage from './pages/ReportsFuelSupplyPage';
 import ReportsServiceOrdersPage from './pages/ReportsServiceOrdersPage';
 import FuelSupplyOrderPage from './pages/FuelSupplyOrderPage';
@@ -155,6 +156,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.rpa_terceiro">
                 <RPATerceiroPage rpaType="terceiro" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/hodometro"
+            element={
+              <ProtectedRoute moduleKey="frota.hodometro">
+                <OdometerReadingsPage />
               </ProtectedRoute>
             }
           />

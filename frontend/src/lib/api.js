@@ -317,6 +317,11 @@ export const api = {
   },
   deleteVehicleRevisionKmPhoto: (id) => axios.delete(`${API}/vehicle-revisions/${id}/km-photo`),
 
+  getOdometerReadings: (params) => axios.get(`${API}/odometer-readings`, { params }),
+  createOdometerReading: (data) => axios.post(`${API}/odometer-readings`, data),
+  deleteOdometerReading: (id) => axios.delete(`${API}/odometer-readings/${id}`),
+  getVehicleMaintenanceStatus: () => axios.get(`${API}/odometer-readings/maintenance-status`),
+
   getVehicleChecklistTemplate: () => axios.get(`${API}/vehicle-checklists/template`),
   getSimpleVehicleChecklistTemplate: (vehicleType) => axios.get(`${API}/vehicle-checklists/simple-template`, { params: { vehicle_type: vehicleType } }),
   getVehicleChecklists: (params) => axios.get(`${API}/vehicle-checklists`, { params }),

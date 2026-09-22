@@ -1689,6 +1689,49 @@ class VehicleRevisionResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class OdometerReading(BaseModel):
+    """Lançamento de Hodômetro - check-in direto de KM de um veículo,
+    independente de abastecimento ou revisão. Junto com FuelSupply.reading
+    e VehicleRevision.current_km, alimenta o cálculo de "KM atual" usado
+    pro alerta de manutenção próxima (ver _compute_vehicle_maintenance_status
+    em routers/frota.py)."""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    reading_number: int  # Número sequencial
+
+    vehicle_id: str
+    vehicle_plate: str
+    km: float
+    reading_date: str  # YYYY-MM-DD
+    observations: Optional[str] = None
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class OdometerReadingCreate(BaseModel):
+    vehicle_id: str
+    vehicle_plate: str
+    km: float
+    reading_date: str
+    observations: Optional[str] = None
+
+
+class OdometerReadingResponse(BaseModel):
+    id: str
+    reading_number: int
+    vehicle_id: str
+    vehicle_plate: str
+    km: float
+    reading_date: str
+    observations: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+
+
 
 # ==================== OPERACIONAL - PROGRAMAÇÃO DE CARREGAMENTO ====================
 

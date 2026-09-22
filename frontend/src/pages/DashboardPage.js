@@ -56,7 +56,7 @@ const DEFAULT_SHORTCUT_IDS = ['new-movement', 'movements', 'report-movements', '
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [alerts, setAlerts] = useState({ over_30: 0, over_60: 0, over_90: 0 });
+  const [alerts, setAlerts] = useState({ over_30: 0, over_60: 0, over_90: 0, maintenance_due_soon: 0, maintenance_overdue: 0 });
   const [userShortcuts, setUserShortcuts] = useState(DEFAULT_SHORTCUT_IDS);
   const [showEditor, setShowEditor] = useState(false);
   const [editorSelection, setEditorSelection] = useState([]);
@@ -95,6 +95,8 @@ export default function DashboardPage() {
         over_30: response.data.yard_over_30_days || 0,
         over_60: response.data.yard_over_60_days || 0,
         over_90: response.data.yard_over_90_days || 0,
+        maintenance_due_soon: response.data.maintenance_due_soon || 0,
+        maintenance_overdue: response.data.maintenance_overdue || 0,
       });
     } catch (error) {
       console.error('Erro ao carregar alertas:', error);
@@ -360,8 +362,26 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-4">
-            {(alerts.over_30 + alerts.over_60 + alerts.over_90) > 0 ? (
+            {(alerts.over_30 + alerts.over_60 + alerts.over_90 + alerts.maintenance_due_soon + alerts.maintenance_overdue) > 0 ? (
               <div className="flex flex-wrap gap-2">
+                {alerts.maintenance_overdue > 0 && (
+                  <button
+                    onClick={() => navigate('/fleet/hodometro')}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                    data-testid="alert-maintenance-overdue"
+                  >
+                    {alerts.maintenance_overdue} veículo{alerts.maintenance_overdue > 1 ? 's' : ''} com manutenção vencida
+                  </button>
+                )}
+                {alerts.maintenance_due_soon > 0 && (
+                  <button
+                    onClick={() => navigate('/fleet/hodometro')}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+                    data-testid="alert-maintenance-due-soon"
+                  >
+                    {alerts.maintenance_due_soon} veículo{alerts.maintenance_due_soon > 1 ? 's' : ''} com manutenção próxima
+                  </button>
+                )}
                 {alerts.over_30 > 0 && (
                   <button
                     onClick={() => navigate('/yard-control?min_days=31')}

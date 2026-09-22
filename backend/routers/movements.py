@@ -63,6 +63,7 @@ from shared import (
     load_logo_buffer, validate_and_read_upload, ALLOWED_EXTENSIONS, ALLOWED_RECEIPT_EXTENSIONS,
     MAX_FILE_SIZE, check_rate_limit, client_ip, UPLOADS_DIR, ROOT_DIR
 )
+from routers.frota import get_all_vehicle_maintenance_status
 
 api_router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -1502,10 +1503,13 @@ async def get_alerts_summary(current_user: dict = Depends(get_current_active_use
     """Resumo leve de alertas - usado pelo sino do topo e pelo card 'Alertas do
     Sistema' do dashboard (containers parados no pátio há mais de 30/60/90 dias)."""
     yard = await get_yard_control(current_user=current_user)
+    maintenance = await get_all_vehicle_maintenance_status()
     return {
         'yard_over_30_days': yard['stats']['over_30_days'],
         'yard_over_60_days': yard['stats']['over_60_days'],
         'yard_over_90_days': yard['stats']['over_90_days'],
+        'maintenance_due_soon': sum(1 for m in maintenance if m['status'] == 'DUE_SOON'),
+        'maintenance_overdue': sum(1 for m in maintenance if m['status'] == 'OVERDUE'),
     }
 
 from pydantic import BaseModel as PydanticBaseModel

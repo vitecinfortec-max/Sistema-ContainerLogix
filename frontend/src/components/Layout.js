@@ -60,7 +60,8 @@ import {
   BadgeDollarSign,
   Users,
   FileUp,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Gauge
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -510,6 +511,7 @@ export default function Layout({ children }) {
 
   const manutencaoItems = [
     { path: '/fleet?tab=revisions', label: 'Controle de Revisão', icon: Wrench, moduleKey: 'frota.revisao' },
+    { path: '/fleet/hodometro', label: 'Lançamento de Hodômetro', icon: Gauge, moduleKey: 'frota.hodometro' },
     { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList, moduleKey: 'frota.ordem_servico' },
     { path: '/fleet/checklist', label: 'Checklist', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
     { path: '/fleet/ordem-abastecimento', label: 'Ordem de Abastecimento', icon: Clipboard, moduleKey: 'frota.ordem_abastecimento' },
