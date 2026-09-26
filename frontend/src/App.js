@@ -66,6 +66,7 @@ import RPATerceiroPage from './pages/RPATerceiroPage';
 import OrdemServicoPage from './pages/OrdemServicoPage';
 import FuelSupplyPage from './pages/FuelSupplyPage';
 import OdometerReadingsPage from './pages/OdometerReadingsPage';
+import FuelConsumptionPage from './pages/FuelConsumptionPage';
 import ReportsFuelSupplyPage from './pages/ReportsFuelSupplyPage';
 import ReportsServiceOrdersPage from './pages/ReportsServiceOrdersPage';
 import FuelSupplyOrderPage from './pages/FuelSupplyOrderPage';
@@ -164,6 +165,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="frota.hodometro">
                 <OdometerReadingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/controle-media"
+            element={
+              <ProtectedRoute moduleKey="frota.controle_media">
+                <FuelConsumptionPage />
               </ProtectedRoute>
             }
           />

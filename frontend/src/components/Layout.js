@@ -61,7 +61,8 @@ import {
   Users,
   FileUp,
   ArrowLeftRight,
-  Gauge
+  Gauge,
+  TrendingUp
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -516,6 +517,7 @@ export default function Layout({ children }) {
     { path: '/fleet/checklist', label: 'Checklist', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
     { path: '/fleet/ordem-abastecimento', label: 'Ordem de Abastecimento', icon: Clipboard, moduleKey: 'frota.ordem_abastecimento' },
     { path: '/fleet/abastecimento', label: 'Abastecimento', icon: Fuel, moduleKey: 'frota.abastecimento' },
+    { path: '/fleet/controle-media', label: 'Controle de Média', icon: TrendingUp, moduleKey: 'frota.controle_media' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const manutencaoCadastroItems = [

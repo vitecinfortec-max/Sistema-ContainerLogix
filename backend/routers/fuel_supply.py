@@ -107,6 +107,84 @@ async def get_next_fuel_supply_number(current_user: dict = Depends(get_current_a
     return {"next_number": (counter["seq"] + 1) if counter else 1}
 
 
+async def _compute_fuel_consumption_pairs() -> list:
+    """Calcula a média (km/L) de cada par de abastecimentos consecutivos de um mesmo
+    veículo (CAVALO/CAMINHÃO, ATIVO). Média do par = (KM do abastecimento atual - KM do
+    anterior) / litros do abastecimento atual. Pares com KM igual/menor que o anterior
+    (erro de digitação) ou sem litros são pulados - nunca gera média negativa/zero."""
+    vehicles = await db.vehicles.find(
+        {"vehicle_type": {"$in": ["CAVALO", "CAMINHÃO"]}, "status": "ATIVO"},
+        {"_id": 0, "id": 1, "plate": 1, "model": 1}
+    ).to_list(None)
+
+    all_pairs = []
+    for vehicle in vehicles:
+        supplies = await db.fuel_supplies.find(
+            {"equipment_id": vehicle["id"], "reading": {"$ne": None}},
+            {"_id": 0, "id": 1, "supply_number": 1, "supply_date": 1, "created_at": 1, "reading": 1, "liters": 1}
+        ).sort([("supply_date", 1), ("created_at", 1)]).to_list(None)
+
+        for i in range(1, len(supplies)):
+            prev, curr = supplies[i - 1], supplies[i]
+            prev_reading, curr_reading = prev.get("reading"), curr.get("reading")
+            liters = curr.get("liters") or 0
+            if prev_reading is None or curr_reading is None:
+                continue
+            if curr_reading <= prev_reading or liters <= 0:
+                continue
+            km_traveled = curr_reading - prev_reading
+            all_pairs.append({
+                "vehicle_id": vehicle["id"],
+                "vehicle_plate": vehicle.get("plate"),
+                "vehicle_model": vehicle.get("model"),
+                "supply_id": curr["id"],
+                "supply_number": curr.get("supply_number"),
+                "supply_date": curr.get("supply_date"),
+                "previous_reading": prev_reading,
+                "current_reading": curr_reading,
+                "km_traveled": km_traveled,
+                "liters": liters,
+                "average": round(km_traveled / liters, 2),
+            })
+
+    all_pairs.sort(key=lambda p: (p["supply_date"] or "", p["supply_number"] or 0), reverse=True)
+    return all_pairs
+
+
+@api_router.get("/fuel-supplies/consumption-summary")
+async def get_fuel_consumption_summary(current_user: dict = Depends(get_current_active_user)):
+    """Média atual (km/L) de cada veículo - a do par de abastecimentos mais recente -
+    pra Seção 'Média Atual por Veículo' do Controle de Média."""
+    pairs = await _compute_fuel_consumption_pairs()
+    by_vehicle = {}
+    for p in pairs:
+        vid = p["vehicle_id"]
+        if vid not in by_vehicle:
+            by_vehicle[vid] = {
+                "vehicle_id": p["vehicle_id"],
+                "vehicle_plate": p["vehicle_plate"],
+                "vehicle_model": p["vehicle_model"],
+                "current_average": p["average"],
+                "last_supply_date": p["supply_date"],
+                "pair_count": 0,
+            }
+        by_vehicle[vid]["pair_count"] += 1
+    return list(by_vehicle.values())
+
+
+@api_router.get("/fuel-supplies/consumption-history")
+async def get_fuel_consumption_history(
+    vehicle_plate: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Lista de todos os pares de abastecimento já calculados, mais recente primeiro."""
+    pairs = await _compute_fuel_consumption_pairs()
+    if vehicle_plate:
+        regex = re.compile(re.escape(vehicle_plate.upper()), re.IGNORECASE)
+        pairs = [p for p in pairs if regex.search(p["vehicle_plate"] or "")]
+    return pairs
+
+
 @api_router.get("/fuel-supplies/{supply_id}", response_model=FuelSupplyResponse)
 async def get_fuel_supply(supply_id: str, current_user: dict = Depends(get_current_active_user)):
     doc = await db.fuel_supplies.find_one({"id": supply_id}, {"_id": 0})
