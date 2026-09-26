@@ -50,6 +50,7 @@ from models import (
     FuelSupply, FuelSupplyCreate, FuelSupplyUpdate, FuelSupplyResponse,
     FuelSupplyOrder, FuelSupplyOrderCreate, FuelSupplyOrderUpdate, FuelSupplyOrderResponse,
     DailyFuelSupplyPoint,
+    TankSettings, TankSettingsUpdate, TankRefill, TankRefillCreate, TankRefillResponse,
 )
 from auth import get_password_hash, verify_password, create_access_token, get_current_user, decode_token
 from reports import (
@@ -742,3 +743,134 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
     filename = f"OrdemAbastecimento_{order['order_number']}.pdf"
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                              headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
+# ==================== FROTA - TANQUE PRÓPRIO ====================
+
+async def _compute_tank_level() -> Optional[dict]:
+    """Calcula o nível atual do tanque próprio: soma dos Reabastecimentos
+    (entradas) menos soma dos Abastecimentos com source=TANQUE_PROPRIO
+    (saídas). Retorna None se o tanque ainda não foi configurado."""
+    settings = await db.tank_settings.find_one({}, {"_id": 0})
+    if not settings:
+        return None
+
+    refills = await db.tank_refills.find({}, {"_id": 0, "liters": 1}).to_list(None)
+    total_in = sum(r.get("liters") or 0 for r in refills)
+
+    supplies = await db.fuel_supplies.find(
+        {"source": "TANQUE_PROPRIO"}, {"_id": 0, "liters": 1}
+    ).to_list(None)
+    total_out = sum(s.get("liters") or 0 for s in supplies)
+
+    current_liters = total_in - total_out
+    capacity = settings["capacity_liters"]
+    minimum = settings["minimum_alert_liters"]
+    percentage = round(max(0, min(100, (current_liters / capacity) * 100)), 1) if capacity > 0 else 0
+
+    return {
+        "configured": True,
+        "capacity_liters": capacity,
+        "minimum_alert_liters": minimum,
+        "current_liters": round(current_liters, 2),
+        "percentage": percentage,
+        "status": "LOW" if current_liters <= minimum else "OK",
+    }
+
+
+@api_router.get("/tank-settings")
+async def get_tank_settings(current_user: dict = Depends(get_current_active_user)):
+    settings = await db.tank_settings.find_one({}, {"_id": 0})
+    return settings or {"capacity_liters": None, "minimum_alert_liters": None}
+
+
+@api_router.put("/tank-settings")
+async def update_tank_settings(data: TankSettingsUpdate, current_user: dict = Depends(get_current_admin_user)):
+    """Define a capacidade e o alerta mínimo do tanque próprio. Restrito a administradores."""
+    settings = TankSettings(**data.model_dump())
+    doc = settings.model_dump()
+    doc["updated_at"] = doc["updated_at"].isoformat()
+    await db.tank_settings.replace_one({}, doc, upsert=True)
+    return doc
+
+
+@api_router.get("/tank-level")
+async def get_tank_level_route(current_user: dict = Depends(get_current_active_user)):
+    """Nível atual do tanque, pro medidor visual de 'Nível do Tanque'."""
+    level = await _compute_tank_level()
+    return level or {"configured": False}
+
+
+@api_router.get("/tank-ledger")
+async def get_tank_ledger(current_user: dict = Depends(get_current_active_user)):
+    """Histórico combinado de Reabastecimentos (ENTRADA) e Abastecimentos do
+    Tanque Próprio (SAÍDA), mais recente primeiro - mesmo espírito de merge
+    já usado em GET /odometer-readings."""
+    refills = await db.tank_refills.find({}, {"_id": 0}).to_list(None)
+    entradas = [{
+        "type": "ENTRADA",
+        "id": r["id"],
+        "date": r.get("refill_date"),
+        "liters": r.get("liters"),
+        "label": r.get("supplier_name") or "-",
+        "reference_number": r.get("refill_number"),
+        "observations": r.get("observations"),
+        "created_at": r.get("created_at"),
+    } for r in refills]
+
+    supplies = await db.fuel_supplies.find(
+        {"source": "TANQUE_PROPRIO"},
+        {"_id": 0, "id": 1, "supply_number": 1, "supply_date": 1, "liters": 1,
+         "equipment_plate": 1, "observations": 1, "created_at": 1}
+    ).to_list(None)
+    saidas = [{
+        "type": "SAIDA",
+        "id": s["id"],
+        "date": s.get("supply_date"),
+        "liters": s.get("liters"),
+        "label": s.get("equipment_plate") or "-",
+        "reference_number": s.get("supply_number"),
+        "observations": s.get("observations"),
+        "created_at": s.get("created_at"),
+    } for s in supplies]
+
+    combined = entradas + saidas
+    combined.sort(key=lambda x: (x.get("date") or "", x.get("created_at") or ""), reverse=True)
+    return combined
+
+
+@api_router.post("/tank-refills", response_model=TankRefillResponse)
+async def create_tank_refill(data: TankRefillCreate, current_user: dict = Depends(get_current_active_user)):
+    counter = await db.counters.find_one_and_update(
+        {"_id": "tank_refill_number"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True
+    )
+    refill_number = counter["seq"]
+
+    refill = TankRefill(
+        refill_number=refill_number,
+        refill_date=data.refill_date,
+        liters=data.liters,
+        supplier_name=data.supplier_name,
+        observations=data.observations,
+        created_by=current_user["sub"],
+        created_by_name=current_user["name"]
+    )
+
+    refill_dict = refill.model_dump()
+    refill_dict["created_at"] = refill_dict["created_at"].isoformat()
+
+    await db.tank_refills.insert_one(refill_dict)
+    refill_dict.pop('_id', None)
+
+    return TankRefillResponse(**refill_dict)
+
+
+@api_router.delete("/tank-refills/{refill_id}")
+async def delete_tank_refill(refill_id: str, current_user: dict = Depends(get_current_active_user)):
+    result = await db.tank_refills.delete_one({"id": refill_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Reabastecimento não encontrado")
+    return {"message": "Reabastecimento excluído com sucesso"}

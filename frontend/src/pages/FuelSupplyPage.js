@@ -20,6 +20,11 @@ import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Search, Save, Fuel } from 'lucide-react';
 
+const SOURCE_OPTIONS = [
+  ['POSTO_EXTERNO', 'Posto Externo'],
+  ['TANQUE_PROPRIO', 'Tanque Próprio'],
+];
+
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
   ['DIESEL_S500', 'Diesel S500'],
@@ -59,6 +64,7 @@ function buildEmpty() {
     reading: '',
     supplier_id: '', supplier_name: '',
     city: '', state: '',
+    source: 'POSTO_EXTERNO',
     fuel_type: '',
     liters: '', unit_price: '', gross_value: '', discounts: 0, additions: 0,
     full_tank: true,
@@ -355,6 +361,7 @@ export default function FuelSupplyPage() {
                     <TableHead className="text-[12px] font-semibold">Equipamento</TableHead>
                     <TableHead className="text-[12px] font-semibold">Motorista</TableHead>
                     <TableHead className="text-[12px] font-semibold">Fornecedor</TableHead>
+                    <TableHead className="text-[12px] font-semibold">Fonte</TableHead>
                     <TableHead className="text-[12px] font-semibold">Combustível</TableHead>
                     <TableHead className="text-[12px] font-semibold text-right">Litros</TableHead>
                     <TableHead className="text-[12px] font-semibold text-right">Valor Total</TableHead>
@@ -362,7 +369,7 @@ export default function FuelSupplyPage() {
                 </TableHeader>
                 <TableBody>
                   {list.length === 0 && !loading && (
-                    <TableRow><TableCell colSpan={9} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhum abastecimento cadastrado.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={10} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhum abastecimento cadastrado.</TableCell></TableRow>
                   )}
                   {list.map((f) => (
                     <TableRow
@@ -383,6 +390,11 @@ export default function FuelSupplyPage() {
                       <TableCell className="text-[12px] font-mono">{f.equipment_plate || '-'}</TableCell>
                       <TableCell className="text-[13px]">{f.driver_name || '-'}</TableCell>
                       <TableCell className="text-[13px]">{f.supplier_name || '-'}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${f.source === 'TANQUE_PROPRIO' ? 'bg-primary/10 text-primary' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                          {f.source === 'TANQUE_PROPRIO' ? 'Tanque Próprio' : 'Posto Externo'}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-[12px]">{FUEL_TYPE_LABELS[f.fuel_type] || f.fuel_type || '-'}</TableCell>
                       <TableCell className="text-[12px] text-right">{Number(f.liters || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell className="text-[13px] font-semibold text-right text-primary">{fmtMoney(f.total_value)}</TableCell>
@@ -460,6 +472,7 @@ export default function FuelSupplyPage() {
                 value={{ city: form.city, state: form.state }}
                 onChange={({ city, state }) => { onChange('city', city); onChange('state', state); }}
               />
+              <SelectField label="Fonte *" value={form.source} onChange={(v) => onChange('source', v)} options={SOURCE_OPTIONS} testid="fuel-source" />
             </div>
 
             <SectionTitle>Combustível / ARLA</SectionTitle>

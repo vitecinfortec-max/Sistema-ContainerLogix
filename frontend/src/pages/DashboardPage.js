@@ -56,7 +56,7 @@ const DEFAULT_SHORTCUT_IDS = ['new-movement', 'movements', 'report-movements', '
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [alerts, setAlerts] = useState({ over_30: 0, over_60: 0, over_90: 0, maintenance_due_soon: 0, maintenance_overdue: 0 });
+  const [alerts, setAlerts] = useState({ over_30: 0, over_60: 0, over_90: 0, maintenance_due_soon: 0, maintenance_overdue: 0, tank_low: false });
   const [userShortcuts, setUserShortcuts] = useState(DEFAULT_SHORTCUT_IDS);
   const [showEditor, setShowEditor] = useState(false);
   const [editorSelection, setEditorSelection] = useState([]);
@@ -97,6 +97,7 @@ export default function DashboardPage() {
         over_90: response.data.yard_over_90_days || 0,
         maintenance_due_soon: response.data.maintenance_due_soon || 0,
         maintenance_overdue: response.data.maintenance_overdue || 0,
+        tank_low: !!response.data.tank_low,
       });
     } catch (error) {
       console.error('Erro ao carregar alertas:', error);
@@ -362,8 +363,17 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-4">
-            {(alerts.over_30 + alerts.over_60 + alerts.over_90 + alerts.maintenance_due_soon + alerts.maintenance_overdue) > 0 ? (
+            {(alerts.over_30 + alerts.over_60 + alerts.over_90 + alerts.maintenance_due_soon + alerts.maintenance_overdue) > 0 || alerts.tank_low ? (
               <div className="flex flex-wrap gap-2">
+                {alerts.tank_low && (
+                  <button
+                    onClick={() => navigate('/fleet/nivel-tanque')}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                    data-testid="alert-tank-low"
+                  >
+                    Tanque de combustível abaixo do mínimo
+                  </button>
+                )}
                 {alerts.maintenance_overdue > 0 && (
                   <button
                     onClick={() => navigate('/fleet/hodometro')}

@@ -2767,6 +2767,7 @@ class FuelSupply(BaseModel):
     supplier_name: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
+    source: str = "POSTO_EXTERNO"  # TANQUE_PROPRIO | POSTO_EXTERNO - só TANQUE_PROPRIO desconta do nível do tanque
 
     # ===== Combustível/ARLA =====
     fuel_type: Optional[str] = None
@@ -2813,6 +2814,7 @@ class FuelSupplyCreate(BaseModel):
     supplier_name: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
+    source: str = "POSTO_EXTERNO"
     fuel_type: Optional[str] = None
     liters: float = 0.0
     unit_price: float = 0.0
@@ -2839,6 +2841,61 @@ class FuelSupplyUpdate(FuelSupplyCreate):
 class FuelSupplyResponse(FuelSupply):
     net_value: float = 0.0  # calculado
     total_value: float = 0.0  # calculado
+
+
+# ==================== FROTA - TANQUE PRÓPRIO ====================
+# Nível do tanque próprio da empresa (de onde os veículos são abastecidos
+# via FuelSupply.source == "TANQUE_PROPRIO") - ver
+# _compute_tank_level em routers/fuel_supply.py. TankSettings é singleton
+# (1 doc só, mesmo padrão de CompanySettings); TankRefill é o ledger de
+# entradas (reabastecimentos do fornecedor).
+
+class TankSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    capacity_liters: float
+    minimum_alert_liters: float
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class TankSettingsUpdate(BaseModel):
+    capacity_liters: float
+    minimum_alert_liters: float
+
+
+class TankRefill(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    refill_number: int
+
+    refill_date: str  # YYYY-MM-DD
+    liters: float
+    supplier_name: Optional[str] = None
+    observations: Optional[str] = None
+
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class TankRefillCreate(BaseModel):
+    refill_date: str
+    liters: float
+    supplier_name: Optional[str] = None
+    observations: Optional[str] = None
+
+
+class TankRefillResponse(BaseModel):
+    id: str
+    refill_number: int
+    refill_date: str
+    liters: float
+    supplier_name: Optional[str] = None
+    observations: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime
 
 
 # ==================== FROTA - ORDEM DE ABASTECIMENTO ====================

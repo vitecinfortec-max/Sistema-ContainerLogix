@@ -64,6 +64,7 @@ from shared import (
     MAX_FILE_SIZE, check_rate_limit, client_ip, UPLOADS_DIR, ROOT_DIR
 )
 from routers.frota import get_all_vehicle_maintenance_status
+from routers.fuel_supply import _compute_tank_level
 
 api_router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -1504,12 +1505,14 @@ async def get_alerts_summary(current_user: dict = Depends(get_current_active_use
     Sistema' do dashboard (containers parados no pátio há mais de 30/60/90 dias)."""
     yard = await get_yard_control(current_user=current_user)
     maintenance = await get_all_vehicle_maintenance_status()
+    tank = await _compute_tank_level()
     return {
         'yard_over_30_days': yard['stats']['over_30_days'],
         'yard_over_60_days': yard['stats']['over_60_days'],
         'yard_over_90_days': yard['stats']['over_90_days'],
         'maintenance_due_soon': sum(1 for m in maintenance if m['status'] == 'DUE_SOON'),
         'maintenance_overdue': sum(1 for m in maintenance if m['status'] == 'OVERDUE'),
+        'tank_low': bool(tank and tank['status'] == 'LOW'),
     }
 
 from pydantic import BaseModel as PydanticBaseModel

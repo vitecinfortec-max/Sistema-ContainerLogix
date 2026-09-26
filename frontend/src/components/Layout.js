@@ -62,7 +62,8 @@ import {
   FileUp,
   ArrowLeftRight,
   Gauge,
-  TrendingUp
+  TrendingUp,
+  Droplet
 } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { format } from 'date-fns';
@@ -86,6 +87,8 @@ const PAGE_TITLES = {
   '/fleet/ordem-servico': 'Ordem de Serviço',
   '/fleet/ordem-abastecimento': 'Ordem de Abastecimento',
   '/fleet/abastecimento': 'Abastecimento',
+  '/fleet/nivel-tanque': 'Nível do Tanque',
+  '/tank-settings': 'Configuração de Tanque',
   '/reports/fuel-supply': 'Relatório de Abastecimento',
   '/reports/service-orders': 'Relatório de Serviços',
   '/fleet/os-categories': 'Cadastro de Categoria',
@@ -186,6 +189,7 @@ export default function Layout({ children }) {
   const [cadastroOpen, setCadastroOpen] = useState(false);
   const [financeiroOpen, setFinanceiroOpen] = useState(false);
   const [manutencaoOpen, setManutencaoOpen] = useState(false);
+  const [abastecimentoOpen, setAbastecimentoOpen] = useState(false);
   const [operacionalOpen, setOperacionalOpen] = useState(false);
   const [flexTankOpen, setFlexTankOpen] = useState(false);
   const [terminalCadastroOpen, setTerminalCadastroOpen] = useState(false);
@@ -290,6 +294,8 @@ export default function Layout({ children }) {
     if (savedFinanceiro !== null) setFinanceiroOpen(JSON.parse(savedFinanceiro));
     const savedManutencao = localStorage.getItem('manutencaoOpen');
     if (savedManutencao !== null) setManutencaoOpen(JSON.parse(savedManutencao));
+    const savedAbastecimento = localStorage.getItem('abastecimentoOpen');
+    if (savedAbastecimento !== null) setAbastecimentoOpen(JSON.parse(savedAbastecimento));
     const savedOperacional = localStorage.getItem('operacionalOpen');
     if (savedOperacional !== null) setOperacionalOpen(JSON.parse(savedOperacional));
     const savedFlexTank = localStorage.getItem('flexTankOpen');
@@ -329,9 +335,10 @@ export default function Layout({ children }) {
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
-  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
+  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
+  const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque';
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
-  const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules';
+  const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules' || location.pathname === '/tank-settings';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status' || location.pathname === '/port-services' || location.pathname === '/reports/port-services';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
@@ -343,6 +350,7 @@ export default function Layout({ children }) {
     if (isCadastroActive && !cadastroOpen) setCadastroOpen(true);
     if (isFinanceiroActive && !financeiroOpen) setFinanceiroOpen(true);
     if (isManutencaoActive && !manutencaoOpen) setManutencaoOpen(true);
+    if (isAbastecimentoActive && !abastecimentoOpen) setAbastecimentoOpen(true);
     if (isTransporteActive && !transporteOpen) setTransporteOpen(true);
     if (isOpcoesSistemaActive && !opcoesSistemaOpen) setOpcoesSistemaOpen(true);
     if (isOperacionalActive && !operacionalOpen) setOperacionalOpen(true);
@@ -398,6 +406,12 @@ export default function Layout({ children }) {
     const newState = !manutencaoOpen;
     setManutencaoOpen(newState);
     localStorage.setItem('manutencaoOpen', JSON.stringify(newState));
+  };
+
+  const toggleAbastecimento = () => {
+    const newState = !abastecimentoOpen;
+    setAbastecimentoOpen(newState);
+    localStorage.setItem('abastecimentoOpen', JSON.stringify(newState));
   };
 
   const toggleOperacional = () => {
@@ -515,9 +529,13 @@ export default function Layout({ children }) {
     { path: '/fleet/hodometro', label: 'Lançamento de Hodômetro', icon: Gauge, moduleKey: 'frota.hodometro' },
     { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList, moduleKey: 'frota.ordem_servico' },
     { path: '/fleet/checklist', label: 'Checklist', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
+    { path: '/fleet/controle-media', label: 'Controle de Média', icon: TrendingUp, moduleKey: 'frota.controle_media' },
+  ].filter((item) => isModuleEnabled(item.moduleKey));
+
+  const abastecimentoItems = [
     { path: '/fleet/ordem-abastecimento', label: 'Ordem de Abastecimento', icon: Clipboard, moduleKey: 'frota.ordem_abastecimento' },
     { path: '/fleet/abastecimento', label: 'Abastecimento', icon: Fuel, moduleKey: 'frota.abastecimento' },
-    { path: '/fleet/controle-media', label: 'Controle de Média', icon: TrendingUp, moduleKey: 'frota.controle_media' },
+    { path: '/fleet/nivel-tanque', label: 'Nível do Tanque', icon: Droplet, moduleKey: 'abastecimento.nivel_tanque' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const manutencaoCadastroItems = [
@@ -576,6 +594,7 @@ export default function Layout({ children }) {
   const opcoesSistemaItems = [
     isAdmin ? [{ path: '/users', label: 'Usuários', icon: ShieldCheck }] : [],
     isSuperadmin ? [{ path: '/modules', label: 'Módulos Contratados', icon: LayoutGrid }] : [],
+    isAdmin && isModuleEnabled('abastecimento.configuracao_tanque') ? [{ path: '/tank-settings', label: 'Configuração de Tanque', icon: Settings }] : [],
   ].flat();
 
   const financeiroItems = [
@@ -599,6 +618,7 @@ export default function Layout({ children }) {
   // some porque "Dados da Empresa" nunca é bloqueado por módulo contratado.
   const isTerminalGroupVisible = terminalItems.length > 0 || movimentacoesItems.length > 0 || flexTankItems.length > 0;
   const isManutencaoGroupVisible = manutencaoItems.length > 0;
+  const isAbastecimentoGroupVisible = abastecimentoItems.length > 0;
   const isTransporteGroupVisible = transporteItems.length > 0;
   const isFinanceiroGroupVisible = financeiroItems.length > 0;
   const isOperacionalGroupVisible = operacionalItems.length > 0;
@@ -608,7 +628,7 @@ export default function Layout({ children }) {
   const isOpcoesSistemaGroupVisible = opcoesSistemaItems.length > 0;
 
   const allSearchableItems = useMemo(() => [
-    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...manutencaoItems, ...manutencaoCadastroItems, ...manutencaoRelatorioItems, ...transporteItems, ...cadastroItems,
+    ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...manutencaoItems, ...abastecimentoItems, ...manutencaoCadastroItems, ...manutencaoRelatorioItems, ...transporteItems, ...cadastroItems,
     ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems, ...estoqueItems, ...estoqueCadastroItems, ...comercialItems,
     ...gestaoContainerItems,
   ], [isAdmin]);
@@ -643,13 +663,14 @@ export default function Layout({ children }) {
   const breadcrumbGroup = useMemo(() => {
     if (isTerminalActive) return 'Terminal';
     if (isManutencaoActive) return 'Manutenção';
+    if (isAbastecimentoActive) return 'Abastecimento';
     if (isTransporteActive) return 'Transporte';
     if (isCadastroActive) return 'Cadastro';
     if (isFinanceiroActive) return 'Financeiro';
     if (isOperacionalActive) return 'Operacional';
     if (isOpcoesSistemaActive) return 'Opções do Sistema';
     return null;
-  }, [isTerminalActive, isManutencaoActive, isTransporteActive, isCadastroActive, isFinanceiroActive, isOperacionalActive, isOpcoesSistemaActive]);
+  }, [isTerminalActive, isManutencaoActive, isAbastecimentoActive, isTransporteActive, isCadastroActive, isFinanceiroActive, isOperacionalActive, isOpcoesSistemaActive]);
 
   // Expand sidebar when clicking a group while collapsed
   const handleGroupClickCollapsed = (toggleFn) => {
@@ -1023,6 +1044,12 @@ export default function Layout({ children }) {
                   </div>
                 )}
 
+                {/* Abastecimento */}
+                {isAbastecimentoGroupVisible && renderGroupHeader('Abastecimento', Fuel, abastecimentoOpen, toggleAbastecimento, isAbastecimentoActive, 'nav-abastecimento-toggle')}
+                {isAbastecimentoGroupVisible && abastecimentoOpen && sidebarOpen && (
+                  <div>{abastecimentoItems.map((item) => renderNavItem(item, true))}</div>
+                )}
+
                 {/* Transporte */}
                 {isTransporteGroupVisible && renderGroupHeader('Transporte', Car, transporteOpen, toggleTransporte, isTransporteActive, 'nav-transporte-toggle')}
                 {isTransporteGroupVisible && transporteOpen && sidebarOpen && (
@@ -1162,6 +1189,9 @@ export default function Layout({ children }) {
                     {manutencaoRelatorioItems.length > 0 && manutencaoRelatorioOpen && manutencaoRelatorioItems.map((item) => renderMobileNavItem(item, true))}
                   </div>
                 )}
+
+                {isAbastecimentoGroupVisible && renderMobileGroupToggle('Abastecimento', Fuel, abastecimentoOpen, toggleAbastecimento, isAbastecimentoActive)}
+                {isAbastecimentoGroupVisible && abastecimentoOpen && abastecimentoItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Transporte Mobile */}
                 {isTransporteGroupVisible && renderMobileGroupToggle('Transporte', Car, transporteOpen, toggleTransporte, isTransporteActive)}

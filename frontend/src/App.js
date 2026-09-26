@@ -67,6 +67,8 @@ import OrdemServicoPage from './pages/OrdemServicoPage';
 import FuelSupplyPage from './pages/FuelSupplyPage';
 import OdometerReadingsPage from './pages/OdometerReadingsPage';
 import FuelConsumptionPage from './pages/FuelConsumptionPage';
+import FuelTankLevelPage from './pages/FuelTankLevelPage';
+import TankSettingsPage from './pages/TankSettingsPage';
 import ReportsFuelSupplyPage from './pages/ReportsFuelSupplyPage';
 import ReportsServiceOrdersPage from './pages/ReportsServiceOrdersPage';
 import FuelSupplyOrderPage from './pages/FuelSupplyOrderPage';
@@ -205,6 +207,22 @@ function App() {
             element={
               <ProtectedRoute moduleKey="frota.abastecimento">
                 <FuelSupplyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/nivel-tanque"
+            element={
+              <ProtectedRoute moduleKey="abastecimento.nivel_tanque">
+                <FuelTankLevelPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tank-settings"
+            element={
+              <ProtectedRoute adminOnly moduleKey="abastecimento.configuracao_tanque">
+                <TankSettingsPage />
               </ProtectedRoute>
             }
           />

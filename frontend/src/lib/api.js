@@ -458,6 +458,12 @@ export const api = {
   deleteFuelSupply: (id) => axios.delete(`${API}/fuel-supplies/${id}`),
   getFuelConsumptionSummary: () => axios.get(`${API}/fuel-supplies/consumption-summary`),
   getFuelConsumptionHistory: (params) => axios.get(`${API}/fuel-supplies/consumption-history`, { params }),
+  getTankSettings: () => axios.get(`${API}/tank-settings`),
+  updateTankSettings: (data) => axios.put(`${API}/tank-settings`, data),
+  getTankLevel: () => axios.get(`${API}/tank-level`),
+  getTankLedger: () => axios.get(`${API}/tank-ledger`),
+  createTankRefill: (data) => axios.post(`${API}/tank-refills`, data),
+  deleteTankRefill: (id) => axios.delete(`${API}/tank-refills/${id}`),
 
   // Ordem de Abastecimento (Frota)
   getFuelSupplyOrders: (params) => axios.get(`${API}/fuel-supply-orders`, { params }),
