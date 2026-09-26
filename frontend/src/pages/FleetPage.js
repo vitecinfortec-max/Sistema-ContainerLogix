@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
-import { cn } from '../lib/utils';
+import { cn, sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Truck, Wrench, Plus, Eye, Trash2, FileText, Search, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2 } from 'lucide-react';
@@ -419,6 +419,13 @@ export default function FleetPage() {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Campos de KM (Controle de Revisão) digitados como texto em vez de
+  // <input type="number"> - ver sanitizeKmInput em lib/utils.js pro motivo.
+  const handleKmChange = (field) => (e) => {
+    const v = sanitizeKmInput(e.target.value);
+    if (v !== null) handleInputChange(field, v);
   };
 
   const resetForm = () => {
@@ -1069,9 +1076,10 @@ export default function FleetPage() {
                   <div>
                     <Label>KM Atual (Trocado com) *</Label>
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.current_km}
-                      onChange={(e) => handleInputChange('current_km', e.target.value)}
+                      onChange={handleKmChange('current_km')}
                     />
                   </div>
                 </div>
@@ -1125,51 +1133,51 @@ export default function FleetPage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                       <Label>Óleo Motor</Label>
-                      <Input type="number" value={formData.next_oil_motor_km} onChange={(e) => handleInputChange('next_oil_motor_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_oil_motor_km} onChange={handleKmChange('next_oil_motor_km')} />
                     </div>
                     <div>
                       <Label>Filtro Óleo</Label>
-                      <Input type="number" value={formData.next_oil_filter_km} onChange={(e) => handleInputChange('next_oil_filter_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_oil_filter_km} onChange={handleKmChange('next_oil_filter_km')} />
                     </div>
                     <div>
                       <Label>Filtro Ar</Label>
-                      <Input type="number" value={formData.next_air_filter_km} onChange={(e) => handleInputChange('next_air_filter_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_air_filter_km} onChange={handleKmChange('next_air_filter_km')} />
                     </div>
                     <div>
                       <Label>Filtro Ar Condicionado</Label>
-                      <Input type="number" value={formData.next_ac_filter_km} onChange={(e) => handleInputChange('next_ac_filter_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_ac_filter_km} onChange={handleKmChange('next_ac_filter_km')} />
                     </div>
                     <div>
                       <Label>Filtro Combustível</Label>
-                      <Input type="number" value={formData.next_fuel_filter_km} onChange={(e) => handleInputChange('next_fuel_filter_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_fuel_filter_km} onChange={handleKmChange('next_fuel_filter_km')} />
                     </div>
                     <div>
                       <Label>Filtro Racor</Label>
-                      <Input type="number" value={formData.next_racor_filter_km} onChange={(e) => handleInputChange('next_racor_filter_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_racor_filter_km} onChange={handleKmChange('next_racor_filter_km')} />
                     </div>
                     <div>
                       <Label>Filtro APU</Label>
-                      <Input type="number" value={formData.next_apu_filter_km} onChange={(e) => handleInputChange('next_apu_filter_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_apu_filter_km} onChange={handleKmChange('next_apu_filter_km')} />
                     </div>
                     <div>
                       <Label>Filtro Hidráulico</Label>
-                      <Input type="number" value={formData.next_hydraulic_filter_km} onChange={(e) => handleInputChange('next_hydraulic_filter_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_hydraulic_filter_km} onChange={handleKmChange('next_hydraulic_filter_km')} />
                     </div>
                     <div>
                       <Label>Óleo Caixa de Marcha</Label>
-                      <Input type="number" value={formData.next_gearbox_oil_km} onChange={(e) => handleInputChange('next_gearbox_oil_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_gearbox_oil_km} onChange={handleKmChange('next_gearbox_oil_km')} />
                     </div>
                     <div>
                       <Label>Óleo Diferencial</Label>
-                      <Input type="number" value={formData.next_differential_oil_km} onChange={(e) => handleInputChange('next_differential_oil_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_differential_oil_km} onChange={handleKmChange('next_differential_oil_km')} />
                     </div>
                     <div>
                       <Label>Lubrificação</Label>
-                      <Input type="number" value={formData.next_lubrication_km} onChange={(e) => handleInputChange('next_lubrication_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_lubrication_km} onChange={handleKmChange('next_lubrication_km')} />
                     </div>
                     <div>
                       <Label>Lavagem</Label>
-                      <Input type="number" value={formData.next_washing_km} onChange={(e) => handleInputChange('next_washing_km', e.target.value)} />
+                      <Input type="text" inputMode="decimal" value={formData.next_washing_km} onChange={handleKmChange('next_washing_km')} />
                     </div>
                   </div>
                 </div>

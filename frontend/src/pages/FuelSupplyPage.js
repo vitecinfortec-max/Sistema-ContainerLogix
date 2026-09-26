@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Autocomplete } from '../components/Autocomplete';
 import { CityStateFields } from '../components/AddressFields';
 import { api } from '../lib/api';
+import { sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
@@ -442,7 +443,7 @@ export default function FuelSupplyPage() {
               </div>
               <Field type="date" label="Data do Abastecimento *" value={form.supply_date} onChange={(v) => onChange('supply_date', v)} testid="fuel-supply-date" />
               <Field type="date" label="Data de Entrada *" value={form.entry_date} onChange={(v) => onChange('entry_date', v)} testid="fuel-entry-date" />
-              <Field type="number" label="Leitura *" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-reading" />
+              <DecimalField label="Leitura *" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-reading" />
               <div>
                 <Label className="mb-1 block">Fornecedor <span className="text-red-500">*</span></Label>
                 <Autocomplete
@@ -547,6 +548,22 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
       <Label className="mb-1 block"><RequiredLabel label={label} /></Label>
       <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
+    </div>
+  );
+}
+
+// Campo numérico decimal digitado como texto em vez de <input type="number">
+// - ver sanitizeKmInput em lib/utils.js pro motivo.
+function DecimalField({ label, value, onChange, testid }) {
+  const handleChange = (e) => {
+    const normalized = sanitizeKmInput(e.target.value);
+    if (normalized !== null) onChange(normalized);
+  };
+  return (
+    <div>
+      <Label className="mb-1 block"><RequiredLabel label={label} /></Label>
+      <Input type="text" inputMode="decimal" value={value ?? ''}
+        onChange={handleChange} className="h-9 text-sm" data-testid={testid} />
     </div>
   );
 }

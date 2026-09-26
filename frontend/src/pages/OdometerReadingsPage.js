@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
+import { sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
@@ -367,12 +368,14 @@ export default function OdometerReadingsPage() {
               <div>
                 <Label>KM *</Label>
                 <Input
-                  type="number"
-                  step="1"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
                   className="h-9"
                   value={formData.km}
-                  onChange={(e) => setFormData(prev => ({ ...prev, km: e.target.value }))}
+                  onChange={(e) => {
+                    const v = sanitizeKmInput(e.target.value);
+                    if (v !== null) setFormData(prev => ({ ...prev, km: v }));
+                  }}
                 />
               </div>
               <div>
