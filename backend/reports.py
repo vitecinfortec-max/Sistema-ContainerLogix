@@ -146,9 +146,59 @@ def download_logo(company: dict = None):
     return None
 
 
+# ==================== IDENTIDADE VISUAL DOS DOCUMENTOS ====================
+# Paleta única dos PDFs e planilhas Excel do sistema - mudar aqui muda o
+# visual de todos os documentos que usam os helpers abaixo de uma vez.
+BRAND_DARK = "0F172A"    # nome da empresa, valores de destaque
+BRAND_TEXT = "334155"    # texto das tabelas
+BRAND_MUTED = "64748B"   # textos secundários (CNPJ, rótulos, rodapé)
+BRAND_LINE = "E2E8F0"    # linhas finas entre as linhas das tabelas
+BRAND_ZEBRA = "F5F9F9"   # fundo das linhas alternadas
+BRAND_SOFT = "E8F4F3"    # fundo suave na cor da marca (indicadores, totais)
+
+
+def _hex(color_hex):
+    return colors.HexColor(f'#{color_hex}')
+
+
+def _downscale_logo(logo_buffer, max_px):
+    """Cópia da logo reduzida (lado maior <= max_px) pra embutir no documento:
+    a logo enviada em "Dados da Empresa" costuma ter 500px+ e ia inteira pra
+    dentro de cada PDF/planilha mesmo aparecendo com ~50px. Mantém a
+    transparência (PNG). Em caso de erro devolve o buffer original."""
+    try:
+        logo_buffer.seek(0)
+        with PILImage.open(logo_buffer) as pil_img:
+            if max(pil_img.size) <= max_px:
+                logo_buffer.seek(0)
+                return logo_buffer
+            img = pil_img.convert('RGBA') if pil_img.mode not in ('RGB', 'RGBA') else pil_img.copy()
+        img.thumbnail((max_px, max_px), PILImage.LANCZOS)
+        out = io.BytesIO()
+        img.save(out, format='PNG', optimize=True)
+        out.seek(0)
+        return out
+    except Exception as e:
+        logger.error(f"Error downscaling logo: {e}")
+        logo_buffer.seek(0)
+        return logo_buffer
+
+
+def _split_report_title(report_title):
+    """Os routers montam títulos como "Relatório de X - Cliente: Y". No
+    cabeçalho o título principal fica em destaque e o complemento (filtro)
+    vira uma linha menor embaixo, em vez de uma linha única enorme."""
+    main, _, rest = (report_title or '').partition(' - ')
+    return main.strip(), rest.strip()
+
+
 def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, company=None, content_width=540):
     """
-    Build standard PDF header with logo on left and company info centered.
+    Cabeçalho padrão dos PDFs: logo + dados da empresa à esquerda, título do
+    documento à direita (com o complemento do título e `generation_info`,
+    quando houver, em linhas menores embaixo) e uma linha na cor da marca
+    separando do conteúdo. Sem logo configurada, o bloco da empresa simplesmente
+    começa na margem - nada de coluna vazia empurrando o texto.
     `content_width` deve ser a largura útil real do documento (doc.width) para
     que o cabeçalho nunca ultrapasse a margem nem fique desalinhado do resto do conteúdo.
     """
@@ -156,145 +206,320 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
     elements = []
 
     # ========== LOGO ==========
-    # Redimensiona mantendo a proporção original (evita esticar/achatar a logo),
-    # limitando à caixa 100x100 (logo maior, a pedido do usuário).
-    logo_cell = ""
+    # Redimensiona mantendo a proporção original (evita esticar/achatar a logo).
+    logo_cell = None
+    logo_w = 0
     if logo_buffer:
         try:
-            max_box = 100
+            max_w, max_h = 120, 58
             logo_buffer.seek(0)
             with PILImage.open(logo_buffer) as pil_img:
                 orig_w, orig_h = pil_img.size
             if orig_w and orig_h:
-                scale = min(max_box / orig_w, max_box / orig_h)
+                scale = min(max_w / orig_w, max_h / orig_h)
                 logo_w, logo_h = orig_w * scale, orig_h * scale
             else:
-                logo_w, logo_h = max_box, max_box
-            logo_buffer.seek(0)
-            logo_cell = Image(logo_buffer, width=logo_w, height=logo_h)
+                logo_w, logo_h = max_h, max_h
+            # ~300dpi no tamanho impresso (1pt = 1/72")
+            logo_cell = Image(_downscale_logo(logo_buffer, int(max(logo_w, logo_h) * 300 / 72)), width=logo_w, height=logo_h)
         except Exception as e:
             logger.error(f"Error adding logo to PDF: {e}")
-    
-    # ========== COMPANY INFO ==========
-    company_style = ParagraphStyle(
-        'CompanyName',
-        parent=styles['Normal'],
-        fontSize=14,
-        textColor=colors.black,
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold',
-        leading=16
+            logo_cell, logo_w = None, 0
+
+    # ========== EMPRESA ==========
+    name_style = ParagraphStyle(
+        'HeaderCompanyName', parent=styles['Normal'], fontName='Helvetica-Bold',
+        fontSize=12, leading=14.5, textColor=_hex(BRAND_DARK),
     )
-    address_style = ParagraphStyle(
-        'Address',
-        parent=styles['Normal'],
-        fontSize=9,
-        textColor=colors.black,
-        alignment=TA_CENTER,
-        leading=12
+    info_style = ParagraphStyle(
+        'HeaderCompanyInfo', parent=styles['Normal'], fontSize=7.5, leading=9.5,
+        textColor=_hex(BRAND_MUTED),
     )
-    
-    address_lines = [line.strip() for line in c['address'].split('\n') if line.strip()]
-    company_info_elements = [
-        Paragraph(c['name'], company_style),
-        Paragraph(f"CNPJ: {c['cnpj']}", address_style),
-    ] + [
-        Paragraph(line, address_style) for line in address_lines
-    ] + [
-        Paragraph(f"{c['email']} | {c['phone']}", address_style),
+    address = '  ·  '.join(line.strip() for line in c['address'].split('\n') if line.strip())
+    company_block = [
+        Paragraph(xml_escape(c['name']), name_style),
+        Paragraph(f"CNPJ {xml_escape(c['cnpj'])}", info_style),
     ]
-    
-    # Inner header table: Logo | Company Info | espaçador (mesma largura da
-    # logo) - a 3ª coluna existe só pra contrabalançar a logo, senão o texto
-    # (centralizado dentro da 2ª coluna) fica visivelmente puxado pra direita
-    # do bloco inteiro sempre que não há logo configurada (coluna 1 vazia mas
-    # ainda ocupando espaço). Largura das colunas calculada a partir de
-    # content_width (em vez de fixa) pra nunca ultrapassar relatórios retrato
-    # com margens mais estreitas.
-    flank_width = min(110, content_width / 3)
-    header_data = [[logo_cell, company_info_elements, '']]
-    header_table = Table(header_data, colWidths=[flank_width, content_width - 2 * flank_width, flank_width])
+    if address:
+        company_block.append(Paragraph(xml_escape(address), info_style))
+    company_block.append(Paragraph(f"{xml_escape(c['email'])}  ·  {xml_escape(c['phone'])}", info_style))
+
+    # ========== TÍTULO ==========
+    title_style = ParagraphStyle(
+        'HeaderReportTitle', parent=styles['Normal'], fontName='Helvetica-Bold',
+        fontSize=13, leading=16, textColor=_hex(PRIMARY_COLOR), alignment=TA_RIGHT,
+    )
+    subtitle_style = ParagraphStyle(
+        'HeaderReportSubtitle', parent=styles['Normal'], fontName='Helvetica-Bold',
+        fontSize=8.5, leading=11, textColor=_hex(BRAND_TEXT), alignment=TA_RIGHT,
+    )
+    extra_style = ParagraphStyle('HeaderReportExtra', parent=info_style, alignment=TA_RIGHT)
+    main_title, title_complement = _split_report_title(report_title)
+    title_block = [Paragraph(xml_escape(main_title), title_style)]
+    if title_complement:
+        title_block.append(Paragraph(xml_escape(title_complement), subtitle_style))
+    if generation_info:
+        title_block.append(Paragraph(xml_escape(generation_info), extra_style))
+
+    title_w = content_width * 0.40
+    if logo_cell:
+        logo_col = logo_w + 12
+        header_table = Table(
+            [[logo_cell, company_block, title_block]],
+            colWidths=[logo_col, content_width - logo_col - title_w, title_w],
+        )
+    else:
+        header_table = Table(
+            [[company_block, title_block]],
+            colWidths=[content_width - title_w, title_w],
+        )
+    # Centralizado com a mesma largura (content_width) das tabelas de dados -
+    # o Frame do SimpleDocTemplate tem 6pt de padding de cada lado, então
+    # alinhar à esquerda deslocaria o cabeçalho em relação ao resto.
+    header_table.hAlign = 'CENTER'
     header_table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (0, 0), (0, 0), 'CENTER'),
-        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-        ('TOPPADDING', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
     ]))
-    
-    # Outer table to center the entire header on the page: largura igual à área
-    # útil real do documento, para nunca "vazar" da margem nem ficar deslocado.
-    outer_table = Table([[header_table]], colWidths=[content_width])
-    outer_table.hAlign = 'CENTER'
-    outer_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(outer_table)
+    elements.append(header_table)
     elements.append(Spacer(1, 8))
-    
-    # Horizontal line separator
-    elements.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor(f'#{PRIMARY_COLOR}'), spaceAfter=10))
-    
-    # ========== REPORT TITLE ==========
-    title_style = ParagraphStyle(
-        'ReportTitle',
-        parent=styles['Normal'],
-        fontSize=14,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold',
-        spaceAfter=10
-    )
-    elements.append(Paragraph(report_title.upper(), title_style))
-    
+    # Faixa na cor da marca como tabela de 1 célula (e não HRFlowable, que
+    # limita a largura à área do Frame e ficaria mais curta que as tabelas).
+    rule = Table([['']], colWidths=[content_width], rowHeights=[2])
+    rule.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), _hex(PRIMARY_COLOR))]))
+    elements.append(rule)
+    elements.append(Spacer(1, 10))
+
     return elements
+
+
+def _install_total_pages(canvas, draw_fn):
+    """Adia a finalização de cada página até o fim do documento (mesma técnica
+    do "NumberedCanvas" da documentação do ReportLab), pra que o rodapé saiba o
+    total de páginas e escreva "Página X de Y" - sem que cada um dos geradores
+    precise trocar o canvasmaker do seu doc.build(). Idempotente: só instala na
+    primeira página."""
+    if getattr(canvas, '_cl_total_pages_hook', False):
+        return
+    canvas._cl_total_pages_hook = True
+    saved_states = []
+    original_show_page = canvas.showPage
+    original_save = canvas.save
+
+    def show_page():
+        saved_states.append(dict(canvas.__dict__))
+        canvas._startPage()
+
+    def save():
+        total = len(saved_states)
+        for state in saved_states:
+            canvas.__dict__.update(state)
+            try:
+                draw_fn(canvas, total)
+            except Exception as e:
+                logger.error(f"Error drawing PDF page count: {e}")
+            original_show_page()
+        original_save()
+
+    canvas.showPage = show_page
+    canvas.save = save
 
 
 def _make_pdf_footer(company_name):
     """Retorna uma função de rodapé (canvas, doc) -> None presa ao nome da empresa
     cadastrada em 'Dados da Empresa' — necessário porque o ReportLab só chama
-    onFirstPage/onLaterPages com (canvas, doc), sem espaço para outros argumentos."""
+    onFirstPage/onLaterPages com (canvas, doc), sem espaço para outros argumentos.
+    Rodapé: empresa + data/hora de emissão à esquerda, "Página X de Y" à direita."""
+    gen_stamp = now_brt().strftime('%d/%m/%Y às %H:%M')
+
     def _footer(canvas, doc):
+        left = doc.leftMargin
+        right = doc.leftMargin + doc.width
+
+        def _draw_page_count(cv, total):
+            cv.saveState()
+            cv.setFont('Helvetica-Bold', 7.5)
+            cv.setFillColor(_hex(BRAND_MUTED))
+            cv.drawRightString(right, 14, f"Página {cv.getPageNumber()} de {total}")
+            cv.restoreState()
+
+        _install_total_pages(canvas, _draw_page_count)
+
         canvas.saveState()
-
-        # Footer line
-        canvas.setStrokeColor(colors.HexColor(f'#{PRIMARY_COLOR}'))
-        canvas.setLineWidth(0.5)
-        canvas.line(doc.leftMargin, 25, doc.width + doc.leftMargin, 25)
-
-        # Page number (left)
-        canvas.setFont('Helvetica', 8)
-        canvas.setFillColor(colors.grey)
-        canvas.drawString(doc.leftMargin, 12, f"Página {doc.page}")
-
-        # System info (right) - inclui data/hora de geração automática do documento
-        gen_stamp = now_brt().strftime('%d/%m/%Y %H:%M')
-        canvas.drawRightString(doc.width + doc.leftMargin, 12, f"Gerado em {gen_stamp} - ContainerLogix - {company_name}")
-
+        canvas.setStrokeColor(_hex(BRAND_LINE))
+        canvas.setLineWidth(0.75)
+        canvas.line(left, 26, right, 26)
+        canvas.setFont('Helvetica', 7.5)
+        canvas.setFillColor(_hex(BRAND_MUTED))
+        canvas.drawString(left, 14, f"{company_name}  ·  Emitido em {gen_stamp}  ·  ContainerLogix")
         canvas.restoreState()
     return _footer
 
 
+def _fmt_int(value):
+    """Inteiro com separador de milhar brasileiro (1.234)."""
+    try:
+        return f"{int(value):,}".replace(',', '.')
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _build_pdf_summary(items, content_width, max_box_width=175):
+    """Faixa de indicadores logo abaixo do cabeçalho: cada (rótulo, valor) vira
+    uma caixinha com fundo suave e barra lateral na cor da marca - substitui a
+    antiga linha de texto "Total: X | Entradas: Y" centralizada."""
+    label_style = ParagraphStyle(
+        'SummaryLabel', fontName='Helvetica-Bold', fontSize=6.5, leading=8,
+        textColor=_hex(BRAND_MUTED),
+    )
+    value_style = ParagraphStyle(
+        'SummaryValue', fontName='Helvetica-Bold', fontSize=13, leading=15.5,
+        textColor=_hex(BRAND_DARK),
+    )
+    gap = 8
+    n = len(items)
+    box_w = min(max_box_width, (content_width - gap * (n - 1)) / n)
+    row, widths, box_cols = [], [], []
+    for i, (label, value) in enumerate(items):
+        if i:
+            row.append('')
+            widths.append(gap)
+        box_cols.append(len(row))
+        row.append([Paragraph(xml_escape(label.upper()), label_style), Paragraph(xml_escape(str(value)), value_style)])
+        widths.append(box_w)
+    # Completa até content_width com uma coluna vazia: a faixa fica com a mesma
+    # largura (e centralização) das tabelas, alinhada à esquerda com elas.
+    filler = content_width - sum(widths)
+    if filler > 0.5:
+        row.append('')
+        widths.append(filler)
+    table = Table([row], colWidths=widths)
+    cmds = [
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+    ]
+    for ci in box_cols:
+        cmds += [
+            ('BACKGROUND', (ci, 0), (ci, 0), _hex(BRAND_SOFT)),
+            ('LINEBEFORE', (ci, 0), (ci, 0), 2.5, _hex(PRIMARY_COLOR)),
+            ('LEFTPADDING', (ci, 0), (ci, 0), 9),
+            ('RIGHTPADDING', (ci, 0), (ci, 0), 6),
+        ]
+    table.setStyle(TableStyle(cmds))
+    return [table, Spacer(1, 10)]
+
+
+def _pdf_align_left(flowable, content_width):
+    """Encosta um bloco CURTO (título de seção) na mesma margem esquerda das
+    tabelas de largura total - hAlign='LEFT' sozinho fica 6pt pra dentro por
+    causa do padding do Frame. Não usar com tabelas longas: a célula única não
+    quebra entre páginas (pra essas, ver _pdf_narrow_table)."""
+    wrapper = Table([[flowable]], colWidths=[content_width])
+    wrapper.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    return wrapper
+
+
+def _pdf_section_title(text, content_width):
+    """Título de seção dentro do documento (ex.: "Saídas por Booking"),
+    alinhado na mesma margem das tabelas. Retorna uma lista de flowables."""
+    style = ParagraphStyle(
+        'SectionTitle', fontName='Helvetica-Bold', fontSize=9.5, leading=12,
+        textColor=_hex(PRIMARY_COLOR),
+    )
+    return [Spacer(1, 14), _pdf_align_left(Paragraph(xml_escape(text), style), content_width), Spacer(1, 5)]
+
+
+def _pdf_header_cells(labels, font_size=7):
+    """Células de cabeçalho de tabela em Paragraph (quebram linha dentro da
+    célula em vez de vazar pra vizinha, como acontecia com "Terminal de Origem")."""
+    style = ParagraphStyle(
+        'TableHeaderCell', fontName='Helvetica-Bold', fontSize=font_size,
+        leading=font_size + 1.5, textColor=colors.white, alignment=TA_CENTER,
+    )
+    return [Paragraph(xml_escape(label), style) for label in labels]
+
+
+def _pdf_table_style(header_rows=1, zebra=True, total_row=False, last_col=-1):
+    """Estilo padrão das tabelas de dados: cabeçalho na cor da marca, linhas
+    separadas só por filetes horizontais claros, listras alternadas e, se
+    houver, linha de total com fundo suave. Retorna a lista de comandos pra
+    o gerador poder somar ajustes próprios (alinhamentos por coluna etc.).
+    `last_col` limita o estilo às colunas reais quando a tabela tem uma coluna
+    de preenchimento no fim (ver _pdf_narrow_table)."""
+    lc = last_col
+    last_header = header_rows - 1
+    cmds = [
+        ('BACKGROUND', (0, 0), (lc, last_header), _hex(PRIMARY_COLOR)),
+        ('TEXTCOLOR', (0, 0), (lc, last_header), colors.white),
+        ('FONTNAME', (0, 0), (lc, last_header), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (lc, -1), 7),
+        ('TEXTCOLOR', (0, header_rows), (lc, -1), _hex(BRAND_TEXT)),
+        ('VALIGN', (0, 0), (lc, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (lc, last_header), 5),
+        ('BOTTOMPADDING', (0, 0), (lc, last_header), 5),
+        ('TOPPADDING', (0, header_rows), (lc, -1), 3.5),
+        ('BOTTOMPADDING', (0, header_rows), (lc, -1), 3.5),
+        ('LEFTPADDING', (0, 0), (lc, -1), 4),
+        ('RIGHTPADDING', (0, 0), (lc, -1), 4),
+        ('LINEBELOW', (0, header_rows), (lc, -1), 0.4, _hex(BRAND_LINE)),
+    ]
+    if zebra:
+        cmds.append(('ROWBACKGROUNDS', (0, header_rows), (lc, -1), [colors.white, _hex(BRAND_ZEBRA)]))
+    if total_row:
+        cmds += [
+            ('BACKGROUND', (0, -1), (lc, -1), _hex(BRAND_SOFT)),
+            ('FONTNAME', (0, -1), (lc, -1), 'Helvetica-Bold'),
+            ('LINEABOVE', (0, -1), (lc, -1), 0.8, _hex(PRIMARY_COLOR)),
+        ]
+    return cmds
+
+
+def _pdf_narrow_table(data, col_widths, content_width, extra_style=None, header_rows=1, total_row=False, zebra=True):
+    """Tabela mais estreita que a página (resumos, totais) encostada na mesma
+    margem esquerda das tabelas de largura total: completa a largura com uma
+    coluna vazia no fim, que fica fora do estilo. Diferente de _pdf_align_left,
+    continua quebrando normalmente entre páginas."""
+    n_cols = len(col_widths)
+    filler = content_width - sum(col_widths)
+    if filler > 0.5:
+        data = [list(row) + [''] for row in data]
+        col_widths = list(col_widths) + [filler]
+    table = Table(data, colWidths=col_widths, repeatRows=header_rows)
+    table.setStyle(TableStyle(
+        _pdf_table_style(header_rows=header_rows, zebra=zebra, total_row=total_row, last_col=n_cols - 1)
+        + (extra_style or [])
+    ))
+    return table
+
+
 def generate_pdf_report(movements: list, report_title: str = "Relatório de Movimentações", company: dict = None) -> bytes:
     """
-    Generate PDF report following the standard J.A LOGÍSTICA layout: logo + dados
-    da empresa no topo (via _build_pdf_header), linha de estatísticas, tabela com
-    cabeçalho teal e rodapé com numeração de página (via _make_pdf_footer) — mesmo
-    padrão visual dos demais relatórios do sistema.
+    Relatório de Movimentações/Entradas/Saídas/Estoque Atual no padrão visual
+    dos documentos do sistema: cabeçalho (_build_pdf_header), faixa de
+    indicadores (_build_pdf_summary), tabela no estilo _pdf_table_style e
+    rodapé com "Página X de Y" (_make_pdf_footer).
     """
     c = merge_company(company)
     buffer = io.BytesIO()
 
-    # Use landscape orientation for A4
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=15*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -304,118 +529,89 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
     logo_buffer = download_logo(company)
     elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
-    # ========== STATISTICS LINE ==========
+    # ========== INDICADORES ==========
     total_records = len(movements)
     total_entries = sum(1 for m in movements if m.get('operation_type') == 'ENTRADA')
     total_exits = sum(1 for m in movements if m.get('operation_type') == 'SAIDA')
-    
+    total_full = sum(1 for m in movements if m.get('status') == 'CHEIO')
+    total_empty = total_records - total_full
+
     if "Estoque" in report_title:
-        stats_text = f"Containers em Estoque: {total_records}"
+        summary = [("Containers em estoque", _fmt_int(total_records))]
     elif "Entradas" in report_title:
-        stats_text = f"Total de Entradas: {total_records}"
+        summary = [("Total de entradas", _fmt_int(total_records))]
     elif "Saídas" in report_title:
-        stats_text = f"Total de Saídas: {total_records}"
+        summary = [("Total de saídas", _fmt_int(total_records))]
     else:
-        stats_text = f"Total: {total_records}  |  Entradas: {total_entries}  |  Saídas: {total_exits}"
-    
-    stats_style = ParagraphStyle(
-        'StatsLine',
-        parent=styles['Normal'],
-        fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold',
-        spaceBefore=6,
-        spaceAfter=8
-    )
-    elements.append(Paragraph(stats_text, stats_style))
-    
-    # ========== GENERATION INFO ==========
-    gen_info_style = ParagraphStyle(
-        'GenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER,
-        spaceAfter=12
-    )
-    gen_date = now_brt().strftime('%d/%m/%Y %H:%M')
-    elements.append(Paragraph(f"Gerado em: {gen_date}", gen_info_style))
-    
-    # ========== TABLE SECTION ==========
+        summary = [
+            ("Total de registros", _fmt_int(total_records)),
+            ("Entradas", _fmt_int(total_entries)),
+            ("Saídas", _fmt_int(total_exits)),
+        ]
+    summary += [("Cheios", _fmt_int(total_full)), ("Vazios", _fmt_int(total_empty))]
+    elements.extend(_build_pdf_summary(summary, doc.width))
+
+    # ========== TABELA ==========
     # Células de texto usam Paragraph (não string pura) pra quebrar linha
     # dentro da própria célula em vez de vazar visualmente pra célula vizinha
     # quando o conteúdo é mais largo que a coluna (nome de motorista grande,
     # CPF, transportadora) - era a causa da sobreposição de texto no relatório.
-    cell_style_l = ParagraphStyle('ReportCellL', parent=styles['Normal'], fontSize=7, leading=8.5, alignment=TA_LEFT)
+    cell_style_l = ParagraphStyle(
+        'ReportCellL', parent=styles['Normal'], fontSize=7, leading=8.5,
+        alignment=TA_LEFT, textColor=_hex(BRAND_TEXT),
+    )
     cell_style_c = ParagraphStyle('ReportCellC', parent=cell_style_l, alignment=TA_CENTER)
 
-    def cell(text, centered=False):
-        return Paragraph(str(text) if text not in (None, '') else '-', cell_style_c if centered else cell_style_l)
+    def cell(text, centered=False, markup=None):
+        if markup is not None:
+            return Paragraph(markup, cell_style_c if centered else cell_style_l)
+        return Paragraph(xml_escape(str(text)) if text not in (None, '') else '-', cell_style_c if centered else cell_style_l)
 
     # 14 colunas
-    data = [[
+    data = [_pdf_header_cells([
         'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista',
         'Placa Cavalo', 'Placa Carreta', 'Transportadora', 'Terminal de Origem',
         'Status', 'Tamanho', 'Tara', 'Armador', 'Booking'
-    ]]
+    ])]
 
     for m in movements:
         dt_brt = to_brt(m.get('created_at'))
         created_at = dt_brt.strftime('%d/%m/%Y %H:%M') if dt_brt else str(m.get('created_at', '-'))
+        is_entry = m.get('operation_type') == 'ENTRADA'
+        type_markup = (
+            f'<font color="#{PRIMARY_COLOR}"><b>ENTRADA</b></font>' if is_entry
+            else '<font color="#B45309"><b>SAÍDA</b></font>'
+        )
+        status = m.get('status', 'VAZIO')
+        status_markup = (
+            f'<font color="#{BRAND_DARK}"><b>{xml_escape(status)}</b></font>' if status == 'CHEIO'
+            else f'<font color="#{BRAND_MUTED}">{xml_escape(status)}</font>'
+        )
 
         data.append([
             cell(m.get('transaction_id', '-'), centered=True),
             cell(created_at),
-            cell("ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA", centered=True),
+            cell(None, centered=True, markup=type_markup),
             cell(m.get('container_number', '-')),
             cell(m.get('driver_name', '-')),
             cell(m.get('truck_plate', '-')),
             cell(m.get('trailer_plate_1', '') or '-'),
             cell(m.get('transport_company', '-')),
             cell(m.get('origin_terminal', '') or '-'),
-            cell(m.get('status', 'VAZIO'), centered=True),
+            cell(None, centered=True, markup=status_markup),
             cell(m.get('size_type', '-'), centered=True),
             cell(str(m.get('tare', '')) if m.get('tare') else '-', centered=True),
             cell(m.get('shipping_line', '-')),
             cell(m.get('booking', '') or '-')
         ])
 
-    # Larguras redistribuídas pra usar a área útil real da página (doc.width em
-    # A4 paisagem, ~785pt) em vez de somar ~680pt e deixar sobra sem uso -
+    # Larguras somam a área útil real da página (doc.width em A4 paisagem, ~785pt);
     # colunas de texto mais longo (Motorista, Transportadora, Terminal de
-    # Origem) ganharam mais espaço pra reduzir a quantidade de quebra de linha
-    # necessária.
-    col_widths = [32, 62, 42, 62, 100, 50, 50, 90, 62, 40, 38, 34, 68, 55]
+    # Origem) têm mais espaço pra reduzir a quantidade de quebra de linha.
+    col_widths = [30, 70, 44, 60, 105, 46, 46, 96, 62, 38, 40, 30, 66, 52]
 
     table = Table(data, colWidths=col_widths, repeatRows=1)
-
-    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
-    border_gray = colors.HexColor('#CCCCCC')
-    zebra_gray = colors.HexColor('#F8F8F8')
-
-    table.setStyle(TableStyle([
-        # Header styling - mesmo teal + texto branco usado nos demais relatórios
-        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 7),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
-        ('TOPPADDING', (0, 0), (-1, 0), 5),
-
-        # Body styling - alinhamento e fonte já vêm do Paragraph de cada célula
-        ('TOPPADDING', (0, 1), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-
-        # Bordas finas cinza, mesmo peso usado nos demais relatórios
-        ('GRID', (0, 0), (-1, -1), 0.5, border_gray),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        # Zebra striping
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, zebra_gray]),
-    ]))
-
+    table.setStyle(TableStyle(_pdf_table_style()))
     elements.append(table)
 
     # ========== SAÍDAS POR BOOKING (resumo) ==========
@@ -427,59 +623,23 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
             booking_counts[key] = booking_counts.get(key, 0) + 1
 
     if booking_counts:
-        elements.append(Spacer(1, 14))
-
-        summary_title_style = ParagraphStyle(
-            'BookingSummaryTitle',
-            parent=styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-            alignment=TA_LEFT,
-            fontName='Helvetica-Bold',
-            spaceAfter=4
-        )
         total_exits_summary = sum(booking_counts.values())
-        elements.append(Paragraph(
-            f"Saídas por Booking ({total_exits_summary} container{'s' if total_exits_summary != 1 else ''})",
-            summary_title_style
+        elements.extend(_pdf_section_title(
+            f"Saídas por Booking ({_fmt_int(total_exits_summary)} container{'s' if total_exits_summary != 1 else ''})",
+            doc.width,
         ))
 
         # Ordenar por quantidade decrescente, depois por nome do booking
         sorted_bookings = sorted(booking_counts.items(), key=lambda x: (-x[1], x[0]))
-        summary_data = [['Booking', 'Qtd. Containers (Saída)']]
+        summary_data = [_pdf_header_cells(['Booking', 'Qtd. Containers (Saída)'])]
         for booking_name, qty in sorted_bookings:
-            summary_data.append([booking_name, str(qty)])
-        summary_data.append(['TOTAL', str(total_exits_summary)])
+            summary_data.append([booking_name, _fmt_int(qty)])
+        summary_data.append(['TOTAL', _fmt_int(total_exits_summary)])
 
-        summary_table = Table(summary_data, colWidths=[180, 110])
-        summary_table.setStyle(TableStyle([
-            # Header
-            ('BACKGROUND', (0, 0), (-1, 0), header_bg),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
-            ('TOPPADDING', (0, 0), (-1, 0), 5),
-
-            # Body
-            ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
-            ('ALIGN', (0, 1), (0, -1), 'LEFT'),
-            ('ALIGN', (1, 1), (1, -1), 'CENTER'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-            ('TOPPADDING', (0, 1), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
-
-            # Total row (last)
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-
-            ('GRID', (0, 0), (-1, -1), 0.25, border_gray),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ]))
-        elements.append(summary_table)
+        elements.append(_pdf_narrow_table(
+            summary_data, [180, 110], doc.width, total_row=True,
+            extra_style=[('FONTSIZE', (0, 0), (1, -1), 7.5), ('ALIGN', (1, 1), (1, -1), 'CENTER')],
+        ))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -623,12 +783,33 @@ def generate_yard_control_pdf(containers: list, stats: dict, company: dict = Non
     return pdf_bytes
 
 
-def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, center_cols=None, right_align_cols=None, number_fmt_cols=None, total_col=None, stats_text=None, company_name=None, logo_buffer=None, total_number_format='R$ #,##0.00'):
+def _xl_fill(color_hex):
+    return PatternFill(start_color=color_hex, end_color=color_hex, fill_type='solid')
+
+
+def _xl_col_px(width_chars):
+    """Largura aproximada, em pixels, de uma coluna do Excel com a fonte padrão."""
+    return int((width_chars or 8.43) * 7 + 5)
+
+
+def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, center_cols=None, right_align_cols=None, number_fmt_cols=None, total_col=None, stats_text=None, company_name=None, logo_buffer=None, total_number_format='R$ #,##0.00', company=None, autofilter=False):
     """
-    Shared Bsoft-style Excel formatting matching the J.A LOGÍSTICA template.
+    Formatação padrão das planilhas Excel do sistema - mesma identidade visual
+    dos PDFs (_build_pdf_header/_pdf_table_style). O layout de linhas é FIXO
+    porque vários geradores escrevem conteúdo extra contando com o cabeçalho
+    das colunas na linha 8 e os dados a partir da linha 9:
+      1   faixa fina na cor da marca
+      2   nome da empresa (logo à esquerda, quando houver)
+      3   CNPJ · endereço · contato (quando `company` é passado)
+      4   espaço
+      5   título do relatório (faixa na cor da marca)
+      6   indicadores (stats_text, ou info_text)
+      7   data/hora de emissão
+      8   cabeçalho das colunas
+      9+  dados (+ linha de TOTAL opcional)
     - ws: worksheet
-    - title: report subtitle text (e.g., "Relatório de Estoque Atual - Cliente: X")
-    - info_text: stats line (e.g., "Containers em Estoque: 182")
+    - title: título do relatório; " - " separa o complemento (ex.: "Relatório X - Cliente: Y")
+    - info_text / stats_text: linha de indicadores (stats_text tem prioridade)
     - headers: list of header strings
     - data_rows: list of lists (each inner list = 1 row of data)
     - col_widths: dict {col_letter: width}
@@ -636,9 +817,16 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
     - right_align_cols: set of 0-based col indices for right alignment
     - number_fmt_cols: dict {0-based col index: format_string}
     - total_col: 0-based col index for SUM total row (or None)
-    - stats_text: optional separate stats text for row 6
+    - company: dict de "Dados da Empresa" (opcional) pra linha de CNPJ/contato
+    - autofilter: liga o filtro do Excel no cabeçalho (relatórios de consulta;
+      desligado em documentos que vão pro cliente, como fatura)
     """
     from openpyxl.utils import get_column_letter
+    from openpyxl.cell.rich_text import CellRichText, TextBlock
+    from openpyxl.cell.text import InlineFont
+    from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
+    from openpyxl.drawing.xdr import XDRPositiveSize2D
+    from openpyxl.utils.units import pixels_to_EMU
 
     if center_cols is None:
         center_cols = set()
@@ -652,137 +840,159 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
     last_col = first_col + num_cols - 1
     first_letter = get_column_letter(first_col)
     last_letter = get_column_letter(last_col)
+    header_row = 8
 
-    # Colors from template
-    TEAL_COLOR = '008B7B'
-    STATS_BG = 'E8F4F5'
-    ZEBRA_GRAY = 'F8F8F8'
+    brand_fill = _xl_fill(PRIMARY_COLOR)
+    soft_fill = _xl_fill(BRAND_SOFT)
+    zebra_fill = _xl_fill(BRAND_ZEBRA)
+    line_side = Side(style='thin', color=BRAND_LINE)
+    brand_side = Side(style='medium', color=PRIMARY_COLOR)
+    white_side = Side(style='thin', color='FFFFFF')
 
-    # Column A spacer
-    ws.column_dimensions['A'].width = 3
+    # Coluna A é só uma margem
+    ws.column_dimensions['A'].width = 2
+    for letter, w in col_widths.items():
+        ws.column_dimensions[letter].width = w
 
-    # Logo da empresa (cadastrado em "Dados da Empresa"), alinhada ao bloco
-    # do nome da empresa (linhas 2-3), mantendo a proporção original da imagem
+    def band(row_num, fill=None, border=None):
+        for ci in range(first_col, last_col + 1):
+            cell = ws.cell(row=row_num, column=ci)
+            if fill is not None:
+                cell.fill = fill
+            if border is not None:
+                cell.border = border
+
+    # ======== LINHA 1: faixa da marca ========
+    ws.row_dimensions[1].height = 5
+    band(1, fill=brand_fill)
+
+    # ======== LOGO ========
+    # Ancorada no início da coluna B, ocupando as linhas 2-3. O nome da empresa
+    # começa na primeira coluna livre depois da logo (calculado pelas larguras
+    # das colunas), então texto e imagem nunca se sobrepõem.
+    text_start_col = first_col
     if logo_buffer is not None:
         try:
-            target_height_px = 92  # aprox. altura das linhas 2-3 (30pt + 40.5pt)
+            target_h = 46
             try:
                 logo_buffer.seek(0)
                 with PILImage.open(logo_buffer) as pil_img:
                     orig_w, orig_h = pil_img.size
-                target_width_px = int(target_height_px * orig_w / orig_h) if orig_h else target_height_px
+                target_w = int(target_h * orig_w / orig_h) if orig_h else target_h
             except Exception:
-                target_width_px = target_height_px
+                target_w = target_h
+            target_w = min(target_w, 160)
 
-            logo_buffer.seek(0)
-            logo_img = XLImage(logo_buffer)
-            logo_img.height = target_height_px
-            logo_img.width = target_width_px
-            ws.add_image(logo_img, 'A2')
+            covered, ci = 0, first_col
+            while ci <= last_col and covered < target_w + 6:
+                covered += _xl_col_px(col_widths.get(get_column_letter(ci)))
+                ci += 1
+            if ci <= last_col - 1:
+                logo_img = XLImage(_downscale_logo(logo_buffer, target_w * 3 if target_w > target_h else target_h * 3))
+                logo_img.width = target_w
+                logo_img.height = target_h
+                marker = AnchorMarker(col=first_col - 1, colOff=pixels_to_EMU(2), row=1, rowOff=pixels_to_EMU(3))
+                logo_img.anchor = OneCellAnchor(
+                    _from=marker,
+                    ext=XDRPositiveSize2D(pixels_to_EMU(target_w), pixels_to_EMU(target_h)),
+                )
+                ws.add_image(logo_img)
+                text_start_col = ci
         except Exception as e:
             logger.error(f"Error adding logo to Excel: {e}")
 
-    # Apply col widths (keys are B, C, D...)
-    for letter, w in col_widths.items():
-        ws.column_dimensions[letter].width = w
+    # ======== LINHAS 2-3: empresa ========
+    ws.merge_cells(start_row=2, start_column=text_start_col, end_row=2, end_column=last_col)
+    c = ws.cell(row=2, column=text_start_col, value=company_name or DEFAULT_COMPANY['name'])
+    c.font = Font(name='Calibri', size=16, bold=True, color=BRAND_DARK)
+    c.alignment = Alignment(horizontal='left', vertical='bottom')
+    ws.row_dimensions[2].height = 22
 
-    # Border style - all thin
-    thin_side = Side(style='thin', color='000000')
-    thin_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+    info_line = None
+    if company:
+        cm = merge_company(company)
+        address = '  ·  '.join(line.strip() for line in cm['address'].split('\n') if line.strip())
+        info_line = '  ·  '.join(p for p in [f"CNPJ {cm['cnpj']}", address, cm['email'], cm['phone']] if p)
+    ws.merge_cells(start_row=3, start_column=text_start_col, end_row=3, end_column=last_col)
+    c = ws.cell(row=3, column=text_start_col, value=info_line)
+    c.font = Font(name='Calibri', size=9, color=BRAND_MUTED)
+    c.alignment = Alignment(horizontal='left', vertical='top')
+    ws.row_dimensions[3].height = 17
 
-    # ======== HEADER ========
-    # Row 2-3: Company name "J.A LOGÍSTICA" (merged B2:O3)
-    ws.merge_cells(f'{first_letter}2:{last_letter}3')
-    c = ws[f'{first_letter}2']
-    c.value = company_name or DEFAULT_COMPANY['name']
-    c.font = Font(name='Calibri', size=38, bold=True, color=TEAL_COLOR)
-    c.alignment = Alignment(horizontal='center', vertical='center')
-    c.border = thin_border
-    ws.row_dimensions[2].height = 30
-    ws.row_dimensions[3].height = 40.5
-    # Apply border to all cells in merged range
-    for r in [2, 3]:
-        for ci in range(first_col, last_col + 1):
-            ws.cell(row=r, column=ci).border = thin_border
+    # ======== LINHA 4: espaço ========
+    ws.row_dimensions[4].height = 8
 
-    # Row 4: Report subtitle (e.g., "Relatório de Estoque Atual - Cliente: X")
-    ws.merge_cells(f'{first_letter}4:{last_letter}4')
-    c = ws[f'{first_letter}4']
-    c.value = title
-    c.font = Font(name='Calibri', size=16, color=TEAL_COLOR)
-    c.alignment = Alignment(horizontal='center', vertical='center')
-    c.border = Border(left=thin_side, right=thin_side, top=Side(), bottom=thin_side)
-    ws.row_dimensions[4].height = 21
-    for ci in range(first_col, last_col + 1):
-        cell = ws.cell(row=4, column=ci)
-        cell.border = Border(left=thin_side, right=thin_side, top=Side(), bottom=thin_side)
+    # ======== LINHA 5: título do relatório ========
+    main_title, title_complement = _split_report_title(title)
+    ws.merge_cells(f'{first_letter}5:{last_letter}5')
+    c = ws[f'{first_letter}5']
+    if title_complement:
+        c.value = CellRichText(
+            TextBlock(InlineFont(rFont='Calibri', sz=13, b=True, color='FFFFFF'), main_title),
+            TextBlock(InlineFont(rFont='Calibri', sz=11, color='FFFFFF'), f"   ·   {title_complement}"),
+        )
+    else:
+        c.value = main_title
+    c.font = Font(name='Calibri', size=13, bold=True, color='FFFFFF')
+    c.alignment = Alignment(horizontal='left', vertical='center', indent=1)
+    ws.row_dimensions[5].height = 26
+    band(5, fill=brand_fill)
 
-    # Row 5: Empty spacer row
-    ws.row_dimensions[5].height = 13
-
-    # Row 6: Stats bar (e.g., "Containers em Estoque: 182")
+    # ======== LINHA 6: indicadores ========
     ws.merge_cells(f'{first_letter}6:{last_letter}6')
     c = ws[f'{first_letter}6']
     c.value = stats_text if stats_text else info_text
-    c.font = Font(name='Calibri', size=12, bold=True, color=TEAL_COLOR)
-    c.fill = PatternFill(start_color=STATS_BG, end_color=STATS_BG, fill_type='solid')
-    c.alignment = Alignment(horizontal='center', vertical='center')
-    c.border = thin_border
-    ws.row_dimensions[6].height = 28
-    for ci in range(first_col, last_col + 1):
-        cell = ws.cell(row=6, column=ci)
-        cell.fill = PatternFill(start_color=STATS_BG, end_color=STATS_BG, fill_type='solid')
-        cell.border = thin_border
+    c.font = Font(name='Calibri', size=11, bold=True, color=PRIMARY_COLOR)
+    c.alignment = Alignment(horizontal='left', vertical='center', indent=1)
+    ws.row_dimensions[6].height = 22
+    band(6, fill=soft_fill)
 
-    # Row 7: Generation date/time
+    # ======== LINHA 7: emissão ========
     ws.merge_cells(f'{first_letter}7:{last_letter}7')
     c = ws[f'{first_letter}7']
-    c.value = f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')} | Fuso: UTC-3 (Brasília)"
-    c.font = Font(name='Calibri', size=9, color='808080')
-    c.alignment = Alignment(horizontal='center')
-    c.border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=Side())
-    ws.row_dimensions[7].height = 15
-    for ci in range(first_col, last_col + 1):
-        ws.cell(row=7, column=ci).border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=Side())
+    c.value = f"Emitido em {now_brt().strftime('%d/%m/%Y às %H:%M')} (horário de Brasília)"
+    c.font = Font(name='Calibri', size=9, italic=True, color=BRAND_MUTED)
+    c.alignment = Alignment(horizontal='left', vertical='center', indent=1)
+    ws.row_dimensions[7].height = 18
 
-    # ======== COLUMN HEADERS (Row 8) ========
-    header_row = 8
-    header_fill = PatternFill(start_color=TEAL_COLOR, end_color=TEAL_COLOR, fill_type='solid')
-    header_font = Font(name='Calibri', size=9, bold=True, color='FFFFFF')
-    center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
-
+    # ======== LINHA 8: cabeçalho das colunas ========
+    header_font = Font(name='Calibri', size=10, bold=True, color='FFFFFF')
+    header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    header_border = Border(left=white_side, right=white_side, bottom=brand_side)
+    needs_two_lines = False
     for i, h in enumerate(headers):
         ci = first_col + i
         cell = ws.cell(row=header_row, column=ci, value=h)
         cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = center_align
-        cell.border = thin_border
-    ws.row_dimensions[header_row].height = 18
+        cell.fill = brand_fill
+        cell.alignment = header_align
+        cell.border = header_border
+        width = col_widths.get(get_column_letter(ci)) or 8.43
+        if len(str(h)) * 1.15 > width:
+            needs_two_lines = True
+    ws.row_dimensions[header_row].height = 30 if needs_two_lines else 20
 
-    # ======== DATA ROWS ========
+    # ======== DADOS ========
     data_start = header_row + 1
     total_data = len(data_rows)
     left_align = Alignment(horizontal='left', vertical='center')
     center_align_data = Alignment(horizontal='center', vertical='center')
     right_align = Alignment(horizontal='right', vertical='center')
-    data_font = Font(name='Calibri', size=9)
+    data_font = Font(name='Calibri', size=10, color=BRAND_TEXT)
+    row_border = Border(bottom=line_side)
 
     for row_offset, row_data in enumerate(data_rows):
         row_num = data_start + row_offset
-        # Zebra striping: odd rows get gray background
-        is_gray_row = (row_offset % 2 == 1)
-        row_fill = PatternFill(start_color=ZEBRA_GRAY, end_color=ZEBRA_GRAY, fill_type='solid') if is_gray_row else PatternFill(fill_type=None)
-        
+        is_zebra_row = (row_offset % 2 == 1)
+
         for i, val in enumerate(row_data):
             ci = first_col + i
             cell = ws.cell(row=row_num, column=ci, value=val)
             cell.font = data_font
-            cell.border = thin_border
-            if is_gray_row:
-                cell.fill = row_fill
-            
-            # Apply alignment based on column type
+            cell.border = row_border
+            if is_zebra_row:
+                cell.fill = zebra_fill
+
             if i in center_cols:
                 cell.alignment = center_align_data
             elif i in right_align_cols or i in number_fmt_cols:
@@ -793,40 +1003,54 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
             if i in number_fmt_cols:
                 cell.number_format = number_fmt_cols[i]
 
-    # ======== TOTAL ROW ========
+    # ======== LINHA DE TOTAL ========
     if total_col is not None and total_data > 0:
         total_row_num = data_start + total_data
-        # Label
+        total_border = Border(top=brand_side, bottom=line_side)
+        band(total_row_num, fill=soft_fill, border=total_border)
+
         label_ci = first_col + total_col - 1
         label_cell = ws.cell(row=total_row_num, column=label_ci, value='TOTAL:')
-        label_cell.font = Font(name='Calibri', size=9, bold=True)
+        label_cell.font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
         label_cell.alignment = Alignment(horizontal='right', vertical='center')
 
-        # Sum formula
         val_ci = first_col + total_col
         val_letter = get_column_letter(val_ci)
         sum_formula = f'=SUM({val_letter}{data_start}:{val_letter}{data_start + total_data - 1})'
         sum_cell = ws.cell(row=total_row_num, column=val_ci, value=sum_formula)
-        sum_cell.font = Font(name='Calibri', size=9, bold=True)
+        sum_cell.font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
         sum_cell.number_format = total_number_format
-        sum_cell.border = thin_border
-        sum_cell.fill = PatternFill(start_color=STATS_BG, end_color=STATS_BG, fill_type='solid')
+        sum_cell.alignment = Alignment(horizontal='right', vertical='center')
+        ws.row_dimensions[total_row_num].height = 20
         last_row = total_row_num
     else:
         last_row = data_start + total_data - 1
 
+    if autofilter and total_data > 0:
+        ws.auto_filter.ref = f'{first_letter}{header_row}:{last_letter}{data_start + total_data - 1}'
+
     # ======== IMPRESSÃO ========
     # Sem isso, o Excel abre/imprime a planilha larga (13-15 colunas) no padrão
     # retrato dele, cortando colunas em várias páginas — configura para caber
-    # numa página de largura, em paisagem, com o cabeçalho fixo ao rolar/imprimir.
+    # numa página de largura, em paisagem, repetindo o cabeçalho das colunas em
+    # cada página impressa e com "Página X de Y" no rodapé.
     ws.sheet_view.showGridLines = False
     ws.freeze_panes = f'{first_letter}{header_row + 1}'
     ws.print_area = f'A1:{last_letter}{max(last_row, header_row)}'
+    ws.print_title_rows = f'{header_row}:{header_row}'
     ws.page_setup.orientation = 'landscape'
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.print_options.horizontalCentered = True
+    ws.page_margins.left = ws.page_margins.right = 0.4
+    ws.page_margins.top = 0.5
+    ws.page_margins.bottom = 0.6
+    ws.oddFooter.left.text = company_name or DEFAULT_COMPANY['name']
+    ws.oddFooter.left.size = 8
+    ws.oddFooter.right.text = "Página &P de &N"
+    ws.oddFooter.right.size = 8
 
 
 def generate_stock_report_pdf(products: list, company: dict = None) -> bytes:
@@ -1232,14 +1456,21 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
         total_entries = sum(1 for m in movements if m.get('operation_type') == 'ENTRADA')
         total_exits = sum(1 for m in movements if m.get('operation_type') == 'SAIDA')
 
+        total_full = sum(1 for m in movements if m.get('status') == 'CHEIO')
+        total_empty = total_records - total_full
+
         if "Estoque" in report_title:
-            stats_text = f"Containers em Estoque: {total_records}"
+            stats_text = f"Containers em estoque: {_fmt_int(total_records)}"
         elif "Entradas" in report_title:
-            stats_text = f"Total de Entradas: {total_records}"
+            stats_text = f"Total de entradas: {_fmt_int(total_records)}"
         elif "Saídas" in report_title:
-            stats_text = f"Total de Saídas: {total_records}"
+            stats_text = f"Total de saídas: {_fmt_int(total_records)}"
         else:
-            stats_text = f"Total: {total_records}  |  Entradas: {total_entries}  |  Saídas: {total_exits}"
+            stats_text = (
+                f"Total de registros: {_fmt_int(total_records)}   •   Entradas: {_fmt_int(total_entries)}"
+                f"   •   Saídas: {_fmt_int(total_exits)}"
+            )
+        stats_text += f"   •   Cheios: {_fmt_int(total_full)}   •   Vazios: {_fmt_int(total_empty)}"
 
         # Headers matching template (14 columns)
         headers = [
@@ -1250,8 +1481,10 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
 
         data_rows = []
         for m in movements:
+            # Data/hora como valor de data de verdade (não texto): ordena e
+            # filtra corretamente no Excel. openpyxl não aceita fuso -> naive BRT.
             dt_brt = to_brt(m.get('created_at'))
-            created_at = dt_brt.strftime('%d/%m/%Y %H:%M') if dt_brt else str(m.get('created_at', ''))
+            created_at = dt_brt.replace(tzinfo=None) if dt_brt else str(m.get('created_at', ''))
             data_rows.append([
                 m.get('transaction_id', '-'),
                 created_at,
@@ -1269,23 +1502,37 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
                 m.get('booking', '') or '-'
             ])
 
-        # Column widths matching template (14 columns: B to O)
+        # 14 colunas: B a O
         col_widths = {
-            'B': 7.3, 'C': 13.7, 'D': 8, 'E': 14, 'F': 30, 'G': 12,
-            'H': 14, 'I': 27.3, 'J': 20, 'K': 5.6, 'L': 7.6,
-            'M': 4.5, 'N': 13.2, 'O': 12
+            'B': 9, 'C': 16, 'D': 10, 'E': 15, 'F': 32, 'G': 11,
+            'H': 11, 'I': 26, 'J': 20, 'K': 9, 'L': 12,
+            'M': 8, 'N': 16, 'O': 13
         }
 
-        # Center alignment for: ID Trans.(0), Tipo(2), Status(9), Tamanho(10), Tara(11)
-        center_cols = {0, 2, 9, 10, 11}
+        # Centralizadas: ID Trans.(0), Data/Hora(1), Tipo(2), Status(9), Tamanho(10), Tara(11)
+        center_cols = {0, 1, 2, 9, 10, 11}
 
         _bsoft_style_excel(
             ws, report_title, stats_text, headers, data_rows, col_widths,
             center_cols=center_cols,
+            number_fmt_cols={1: 'dd/mm/yyyy hh:mm'},
             stats_text=stats_text,
             company_name=c['name'],
-            logo_buffer=download_logo(company)
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
         )
+
+        # Tipo e Status com a mesma cor usada no PDF (Entrada na cor da marca,
+        # Saída em âmbar, Cheio em destaque) - dados começam na linha 9.
+        entry_font = Font(name='Calibri', size=10, bold=True, color=PRIMARY_COLOR)
+        exit_font = Font(name='Calibri', size=10, bold=True, color='B45309')
+        full_font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
+        for offset, m in enumerate(movements):
+            row_num = 9 + offset
+            ws.cell(row=row_num, column=4).font = entry_font if m.get('operation_type') == 'ENTRADA' else exit_font
+            if m.get('status') == 'CHEIO':
+                ws.cell(row=row_num, column=11).font = full_font
 
         # ========== SAÍDAS POR BOOKING (resumo no final da planilha) ==========
         booking_counts = {}
@@ -1296,12 +1543,12 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
                 booking_counts[key] = booking_counts.get(key, 0) + 1
 
         if booking_counts:
-            from openpyxl.styles import Font as XLFont, Alignment as XLAlign, PatternFill as XLFill, Border as XLBorder, Side as XLSide
-
-            thin_side = XLSide(style='thin', color='000000')
-            thin_border = XLBorder(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
-            header_fill = XLFill(start_color='008B7B', end_color='008B7B', fill_type='solid')
-            total_fill = XLFill(start_color='E8F4F5', end_color='E8F4F5', fill_type='solid')
+            line_border = Border(bottom=Side(style='thin', color=BRAND_LINE))
+            header_border = Border(left=Side(style='thin', color='FFFFFF'), right=Side(style='thin', color='FFFFFF'))
+            total_border = Border(top=Side(style='medium', color=PRIMARY_COLOR), bottom=Side(style='thin', color=BRAND_LINE))
+            header_fill = _xl_fill(PRIMARY_COLOR)
+            total_fill = _xl_fill(BRAND_SOFT)
+            zebra_fill = _xl_fill(BRAND_ZEBRA)
 
             start_row = ws.max_row + 3  # deixa espaço da tabela principal
             # Alinhado embaixo das duas últimas colunas da tabela principal
@@ -1312,8 +1559,8 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
             # Título do bloco
             total_exits_summary = sum(booking_counts.values())
             ws.cell(row=start_row, column=col_a,
-                    value=f"Saídas por Booking ({total_exits_summary} container{'s' if total_exits_summary != 1 else ''})")
-            ws.cell(row=start_row, column=col_a).font = XLFont(name='Calibri', size=11, bold=True, color='008B7B')
+                    value=f"Saídas por Booking ({_fmt_int(total_exits_summary)} container{'s' if total_exits_summary != 1 else ''})")
+            ws.cell(row=start_row, column=col_a).font = Font(name='Calibri', size=11, bold=True, color=PRIMARY_COLOR)
             ws.merge_cells(start_row=start_row, start_column=col_a, end_row=start_row, end_column=col_b)
 
             # Cabeçalho da tabela
@@ -1322,23 +1569,26 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
             ws.cell(row=header_row, column=col_b, value='Quantidade (Saída)')
             for col_idx in (col_a, col_b):
                 cell = ws.cell(row=header_row, column=col_idx)
-                cell.font = XLFont(name='Calibri', size=10, bold=True, color='FFFFFF')
-                cell.alignment = XLAlign(horizontal='center', vertical='center')
+                cell.font = Font(name='Calibri', size=10, bold=True, color='FFFFFF')
+                cell.alignment = Alignment(horizontal='center', vertical='center')
                 cell.fill = header_fill
-                cell.border = thin_border
+                cell.border = header_border
+            ws.row_dimensions[header_row].height = 20
 
             # Linhas de dados (ordenado por quantidade desc, depois alfabético)
             sorted_bookings = sorted(booking_counts.items(), key=lambda x: (-x[1], x[0]))
             current_row = header_row + 1
-            for booking_name, qty in sorted_bookings:
+            for idx, (booking_name, qty) in enumerate(sorted_bookings):
                 ws.cell(row=current_row, column=col_a, value=booking_name)
                 ws.cell(row=current_row, column=col_b, value=qty)
-                ws.cell(row=current_row, column=col_a).alignment = XLAlign(horizontal='left', vertical='center')
-                ws.cell(row=current_row, column=col_b).alignment = XLAlign(horizontal='center', vertical='center')
-                ws.cell(row=current_row, column=col_a).border = thin_border
-                ws.cell(row=current_row, column=col_b).border = thin_border
-                ws.cell(row=current_row, column=col_a).font = XLFont(name='Calibri', size=10)
-                ws.cell(row=current_row, column=col_b).font = XLFont(name='Calibri', size=10)
+                ws.cell(row=current_row, column=col_a).alignment = Alignment(horizontal='left', vertical='center')
+                ws.cell(row=current_row, column=col_b).alignment = Alignment(horizontal='center', vertical='center')
+                for col_idx in (col_a, col_b):
+                    cell = ws.cell(row=current_row, column=col_idx)
+                    cell.border = line_border
+                    cell.font = Font(name='Calibri', size=10, color=BRAND_TEXT)
+                    if idx % 2 == 1:
+                        cell.fill = zebra_fill
                 current_row += 1
 
             # Linha de total
@@ -1346,12 +1596,12 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
             ws.cell(row=current_row, column=col_b, value=total_exits_summary)
             for col_idx in (col_a, col_b):
                 cell = ws.cell(row=current_row, column=col_idx)
-                cell.font = XLFont(name='Calibri', size=10, bold=True)
-                cell.alignment = XLAlign(
+                cell.font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
+                cell.alignment = Alignment(
                     horizontal='left' if col_idx == col_a else 'center', vertical='center'
                 )
                 cell.fill = total_fill
-                cell.border = thin_border
+                cell.border = total_border
 
             # O resumo de bookings fica abaixo da tabela principal — estende a área
             # de impressão pra ele não ficar de fora ao imprimir/exportar em PDF.

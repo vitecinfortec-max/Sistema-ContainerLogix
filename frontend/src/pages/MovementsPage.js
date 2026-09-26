@@ -1,14 +1,17 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton,
+  ToolbarDivider, ToolbarPrimary, StatusPill, PlateTag, UserTag, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Plus, Search, Trash2, Container as ContainerIcon, Eye, Edit, Wifi, WifiOff, Copy, Calendar, X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Download, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Container as ContainerIcon, Eye, Edit, Wifi, WifiOff, Copy, ChevronUp, ChevronDown, ChevronsUpDown, Download, Loader2, ClipboardList, ArrowDownToLine, ArrowUpFromLine, PackageCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -25,6 +28,9 @@ import {
 import { useWebSocket } from '../hooks/useWebSocket';
 
 const ITEMS_PER_PAGE = 15;
+const STATUS_LABELS = { CHEIO: 'Cheio', VAZIO: 'Vazio' };
+const formatCount = (n) => n.toLocaleString('pt-BR');
+const formatShare = (part, total) => `${total ? Math.round((part / total) * 100) : 0}%`;
 
 export default function MovementsPage() {
   const [movements, setMovements] = useState([]);
@@ -186,12 +192,18 @@ export default function MovementsPage() {
     }
   };
 
-  const getShortName = (fullName) => {
-    if (!fullName) return '-';
-    const parts = fullName.trim().split(' ');
-    if (parts.length >= 2) return `${parts[0]} ${parts[1]}`;
-    return parts[0];
-  };
+  // Indicadores do topo - refletem o filtro atual (sem filtro = todos os registros)
+  const stats = useMemo(() => {
+    let entries = 0;
+    let exits = 0;
+    let full = 0;
+    filteredMovements.forEach((m) => {
+      if (m.operation_type === 'ENTRADA') entries += 1;
+      else if (m.operation_type === 'SAIDA') exits += 1;
+      if (m.status === 'CHEIO') full += 1;
+    });
+    return { total: filteredMovements.length, entries, exits, full, empty: filteredMovements.length - full };
+  }, [filteredMovements]);
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -322,347 +334,175 @@ export default function MovementsPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="movements-page">
-        {/* Header */}
-        <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-            Gate
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
-            Histórico completo de entradas e saídas
-            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-              {isConnected ? 'Sincronizado' : 'Offline'}
-            </span>
-          </p>
-        </div>
-
-        {/* Filtros */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                Filtrar
-              </span>
-              {hasFilters && (
-                <button onClick={clearAllFilters} className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="clear-all-filters">
-                  <X className="w-3 h-3" />
-                  Limpar
-                </button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 space-y-2">
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
-                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-8 text-xs" data-testid="date-from-input" />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
-                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-8 text-xs" data-testid="date-to-input" />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Tipo</Label>
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="filter-type-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="ENTRADA">Entrada</SelectItem>
-                    <SelectItem value="SAIDA">Saída</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="filter-status-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="CHEIO">Cheio</SelectItem>
-                    <SelectItem value="VAZIO">Vazio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    value={searchClient}
-                    onChange={e => setSearchClient(e.target.value)}
-                    className="h-8 text-xs pl-6"
-                    data-testid="search-client-input"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Nº Container</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    value={searchContainer}
-                    onChange={e => setSearchContainer(e.target.value)}
-                    className="h-8 text-xs pl-6"
-                    data-testid="search-container-input"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Nº Registro</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    value={searchMovement}
-                    onChange={e => setSearchMovement(e.target.value)}
-                    className="h-8 text-xs pl-6"
-                    data-testid="search-movement-input"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Motorista</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    value={searchDriver}
-                    onChange={e => setSearchDriver(e.target.value)}
-                    className="h-8 text-xs pl-6"
-                    data-testid="search-driver-input"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Filter + Clear buttons */}
-            <div className="flex items-center gap-2 pt-0.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearAllFilters}
-                className="h-7 text-xs font-medium"
-                data-testid="filter-clear-button"
-              >
-                Limpar
-              </Button>
-              <Button
-                size="sm"
-                onClick={filterData}
-                className="h-7 text-xs font-medium bg-primary hover:bg-primary/90"
-                data-testid="filter-apply-button"
-              >
-                Filtrar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Barra de ações - marque um ou mais registros na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/movements/new')}
-            title="Adicionar"
-            data-testid="add-movement-button"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedId && navigate(`/movements/${singleSelectedId}`)}
-            disabled={!singleSelectedId}
-            title="Ver/Imprimir"
-            data-testid="view-movement-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedId && navigate(`/movements/${singleSelectedId}/edit`)}
-            disabled={!singleSelectedId}
-            title="Editar"
-            data-testid="edit-movement-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Edit className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedId && setCloneId(singleSelectedId)}
-            disabled={!singleSelectedId}
-            title="Clonar"
-            data-testid="clone-movement-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Copy className="w-4 h-4 text-green-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedId && setDeleteId(singleSelectedId)}
-            disabled={!singleSelectedId}
-            title="Excluir"
-            data-testid="delete-movement-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowViaDialog(true)}
-            disabled={selectedIds.size === 0}
-            title="Baixar PDF"
-            data-testid="download-pdf-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Download className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+      <div className="space-y-4" data-testid="movements-page">
+        <PageHeader
+          icon={ContainerIcon}
+          title="Gate"
+          subtitle="Histórico completo de entradas e saídas"
+          meta={isConnected ? (
+            <StatusPill tone="emerald" dot={false}><Wifi className="w-3 h-3" />Sincronizado</StatusPill>
+          ) : (
+            <StatusPill tone="red" dot={false}><WifiOff className="w-3 h-3" />Offline</StatusPill>
           )}
-        </div>
+        />
 
-        {/* Table */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <span>Lista de Registros ({filteredMovements.length})</span>
-              {totalPages > 1 && (
-                <span className="text-xs font-normal text-slate-400 dark:text-slate-500">Página {currentPage} de {totalPages}</span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {paginatedMovements.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="w-9 px-4 py-2.5">
-                        <Checkbox
-                          checked={paginatedMovements.length > 0 && paginatedMovements.every(m => selectedIds.has(m.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                          data-testid="select-all-checkbox"
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('transaction_id')}>Nº<SortIcon field="transaction_id" /></th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('operation_type')}>Tipo<SortIcon field="operation_type" /></th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('client_name')}>Cliente<SortIcon field="client_name" /></th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('driver_name')}>Motorista<SortIcon field="driver_name" /></th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('truck_plate')}>Placa<SortIcon field="truck_plate" /></th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('status')}>Status<SortIcon field="status" /></th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('created_at')}>Emissão<SortIcon field="created_at" /></th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 cursor-pointer select-none hover:text-slate-600 dark:hover:text-slate-300" onClick={() => handleSort('user_name')}>Usuário<SortIcon field="user_name" /></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedMovements.map((movement, idx) => (
+        <StatGrid>
+          <StatCard label="Registros" value={formatCount(stats.total)} icon={ClipboardList} tone="blue" hint={hasFilters ? 'no filtro atual' : 'todos os registros'} testId="stat-total" />
+          <StatCard label="Entradas" value={formatCount(stats.entries)} icon={ArrowDownToLine} tone="primary" hint={`${formatShare(stats.entries, stats.total)} dos registros`} testId="stat-entries" />
+          <StatCard label="Saídas" value={formatCount(stats.exits)} icon={ArrowUpFromLine} tone="amber" hint={`${formatShare(stats.exits, stats.total)} dos registros`} testId="stat-exits" />
+          <StatCard label="Cheios / Vazios" value={`${formatCount(stats.full)} / ${formatCount(stats.empty)}`} icon={PackageCheck} tone="emerald" hint={`${formatShare(stats.full, stats.total)} cheios`} testId="stat-status" />
+        </StatGrid>
+
+        <FilterCard hasFilters={hasFilters} onClear={clearAllFilters} onApply={filterData}>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+            <FilterField label="Data início">
+              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="date-from-input" />
+            </FilterField>
+            <FilterField label="Data fim">
+              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="date-to-input" />
+            </FilterField>
+            <FilterField label="Tipo">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="h-9 text-sm" data-testid="filter-type-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="ENTRADA">Entrada</SelectItem>
+                  <SelectItem value="SAIDA">Saída</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="h-9 text-sm" data-testid="filter-status-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="CHEIO">Cheio</SelectItem>
+                  <SelectItem value="VAZIO">Vazio</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Cliente">
+              <SearchInput value={searchClient} onChange={e => setSearchClient(e.target.value)} data-testid="search-client-input" />
+            </FilterField>
+            <FilterField label="Nº container">
+              <SearchInput value={searchContainer} onChange={e => setSearchContainer(e.target.value)} data-testid="search-container-input" />
+            </FilterField>
+            <FilterField label="Nº registro">
+              <SearchInput value={searchMovement} onChange={e => setSearchMovement(e.target.value)} data-testid="search-movement-input" />
+            </FilterField>
+            <FilterField label="Motorista">
+              <SearchInput value={searchDriver} onChange={e => setSearchDriver(e.target.value)} data-testid="search-driver-input" />
+            </FilterField>
+          </div>
+        </FilterCard>
+
+        {/* Lista - marque um ou mais registros pra habilitar as ações da barra */}
+        <DataCard
+          title="Registros"
+          count={formatCount(filteredMovements.length)}
+          testId="movements-list"
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Novo registro" onClick={() => navigate('/movements/new')} testId="add-movement-button" />}
+            >
+              <ToolbarButton icon={Eye} label="Ver/Imprimir" tone="primary" onClick={() => singleSelectedId && navigate(`/movements/${singleSelectedId}`)} disabled={!singleSelectedId} testId="view-movement-button" />
+              <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedId && navigate(`/movements/${singleSelectedId}/edit`)} disabled={!singleSelectedId} testId="edit-movement-button" />
+              <ToolbarButton icon={Copy} label="Clonar" tone="emerald" onClick={() => singleSelectedId && setCloneId(singleSelectedId)} disabled={!singleSelectedId} testId="clone-movement-button" />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedId && setDeleteId(singleSelectedId)} disabled={!singleSelectedId} testId="delete-movement-button" />
+              <ToolbarDivider />
+              <ToolbarButton icon={Download} label="Baixar PDF" onClick={() => setShowViaDialog(true)} disabled={selectedIds.size === 0} testId="download-pdf-button" />
+            </Toolbar>
+          )}
+          footer={(
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredMovements.length}
+              pageSize={ITEMS_PER_PAGE}
+              onPageChange={goToPage}
+            />
+          )}
+        >
+          {paginatedMovements.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={paginatedMovements.length > 0 && paginatedMovements.every(m => selectedIds.has(m.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </th>
+                    <th className="sortable" onClick={() => handleSort('transaction_id')}>Nº<SortIcon field="transaction_id" /></th>
+                    <th className="sortable" onClick={() => handleSort('operation_type')}>Tipo<SortIcon field="operation_type" /></th>
+                    <th className="sortable" onClick={() => handleSort('client_name')}>Cliente<SortIcon field="client_name" /></th>
+                    <th className="sortable" onClick={() => handleSort('driver_name')}>Motorista<SortIcon field="driver_name" /></th>
+                    <th className="sortable" onClick={() => handleSort('truck_plate')}>Placa<SortIcon field="truck_plate" /></th>
+                    <th className="sortable" onClick={() => handleSort('status')}>Status<SortIcon field="status" /></th>
+                    <th className="sortable" onClick={() => handleSort('created_at')}>Emissão<SortIcon field="created_at" /></th>
+                    {/* Usuário é a coluna menos usada - some em telas menores pra lista caber sem rolagem lateral */}
+                    <th className="sortable hidden min-[1400px]:table-cell" onClick={() => handleSort('user_name')}>Usuário<SortIcon field="user_name" /></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedMovements.map((movement) => {
+                    const createdAt = new Date(movement.created_at);
+                    return (
                       <tr
                         key={movement.id}
                         onClick={() => toggleSelect(movement.id)}
-                        className={`cursor-pointer transition-colors ${selectedIds.has(movement.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
+                        data-selected={selectedIds.has(movement.id)}
+                        className="cursor-pointer"
                         data-testid="movement-row"
                       >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedIds.has(movement.id)}
                             onCheckedChange={() => toggleSelect(movement.id)}
                             data-testid="movement-row-checkbox"
                           />
                         </td>
-                        <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{movement.transaction_id}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
-                            movement.operation_type === 'ENTRADA'
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {movement.operation_type}
-                          </span>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{movement.transaction_id}</td>
+                        <td>
+                          <StatusPill tone={movement.operation_type === 'ENTRADA' ? 'primary' : 'amber'}>
+                            {movement.operation_type === 'ENTRADA' ? 'Entrada' : 'Saída'}
+                          </StatusPill>
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.client_name || '-'}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.driver_name}</td>
-                        <td className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300">{movement.truck_plate}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            movement.status === 'CHEIO'
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-                          }`}>
-                            {movement.status}
-                          </span>
+                        <td><div className="max-w-[150px] min-[1400px]:max-w-[190px] 2xl:max-w-[300px] truncate" title={movement.client_name || ''}>{movement.client_name || '-'}</div></td>
+                        <td><div className="max-w-[170px] min-[1400px]:max-w-[210px] 2xl:max-w-[320px] truncate" title={movement.driver_name || ''}>{movement.driver_name}</div></td>
+                        <td><PlateTag>{movement.truck_plate}</PlateTag></td>
+                        <td>
+                          <StatusPill tone={movement.status === 'CHEIO' ? 'emerald' : 'slate'}>
+                            {STATUS_LABELS[movement.status] || movement.status}
+                          </StatusPill>
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                          {format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                        <td className="whitespace-nowrap tabular-nums">
+                          {format(createdAt, 'dd/MM/yyyy', { locale: ptBR })}{' '}
+                          <span className="text-slate-400 dark:text-slate-500">{format(createdAt, 'HH:mm', { locale: ptBR })}</span>
                         </td>
-                        <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">{getShortName(movement.user_name)}</td>
+                        <td className="hidden min-[1400px]:table-cell"><UserTag name={movement.user_name} /></td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-12 text-center text-muted-foreground" data-testid="no-movements">
-                <ContainerIcon className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                <p className="text-sm font-medium">Nenhum registro encontrado</p>
-                <p className="text-xs mt-1 text-slate-400 dark:text-slate-500">Tente ajustar os filtros ou adicione um novo registro</p>
-              </div>
-            )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
-                <div className="text-xs text-slate-400 dark:text-slate-500">
-                  {startIndex + 1}–{Math.min(endIndex, filteredMovements.length)} de {filteredMovements.length}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} className="hidden sm:flex h-7 text-xs">
-                    Primeira
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="h-7 text-xs">
-                    <ChevronLeft className="w-3 h-3 mr-0.5" /> Anterior
-                  </Button>
-                  <div className="hidden md:flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) pageNum = i + 1;
-                      else if (currentPage <= 3) pageNum = i + 1;
-                      else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-                      else pageNum = currentPage - 2 + i;
-                      return (
-                        <Button key={pageNum} variant={currentPage === pageNum ? "default" : "outline"} size="sm" onClick={() => goToPage(pageNum)} className="w-7 h-7 p-0 text-xs">
-                          {pageNum}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="h-7 text-xs">
-                    Próxima <ChevronRight className="w-3 h-3 ml-0.5" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} className="hidden sm:flex h-7 text-xs">
-                    Última
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={ContainerIcon}
+              title="Nenhum registro encontrado"
+              hint="Tente ajustar os filtros ou adicione um novo registro"
+              testId="no-movements"
+            />
+          )}
+        </DataCard>
       </div>
 
       {/* Delete Dialog */}

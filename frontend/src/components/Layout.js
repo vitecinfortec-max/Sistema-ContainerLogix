@@ -817,7 +817,7 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 flex flex-col">
+    <div className="min-h-screen bg-canvas flex flex-col">
       {/* Top Header Bar */}
       <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 right-0 z-30 transition-all duration-300 ${
         sidebarOpen ? 'left-[225px]' : 'left-16'
@@ -946,7 +946,7 @@ export default function Layout({ children }) {
       <div className="flex flex-1">
         {/* Sidebar - Desktop */}
         <aside 
-          className={`no-print hidden md:flex flex-col bg-[#F9FAFB] dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 transition-all duration-300 ${
+          className={`no-print hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 transition-all duration-300 ${
             sidebarOpen ? 'w-[225px]' : 'w-16'
           }`}
           data-testid="sidebar"
