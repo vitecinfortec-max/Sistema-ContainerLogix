@@ -155,7 +155,7 @@ export default function OdometerReadingsPage() {
 
   const toggleSelectAllOnPage = () => {
     setSelectedIds(prev => {
-      const pageIds = readings.map(r => r.id);
+      const pageIds = readings.filter(r => r.source === 'MANUAL').map(r => r.id);
       const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
       if (allSelected) {
         const next = new Set(prev);
@@ -279,7 +279,7 @@ export default function OdometerReadingsPage() {
                     <tr className="border-b border-slate-100 dark:border-slate-800">
                       <th className="px-4 py-2.5 text-left w-10">
                         <Checkbox
-                          checked={readings.length > 0 && readings.every(r => selectedIds.has(r.id))}
+                          checked={readings.some(r => r.source === 'MANUAL') && readings.filter(r => r.source === 'MANUAL').every(r => selectedIds.has(r.id))}
                           onCheckedChange={toggleSelectAllOnPage}
                         />
                       </th>
@@ -287,26 +287,33 @@ export default function OdometerReadingsPage() {
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
+                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Origem</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Observações</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado em</th>
                     </tr>
                   </thead>
                   <tbody>
                     {readings.map((r, idx) => {
-                      const isSelected = selectedIds.has(r.id);
+                      const isManual = r.source === 'MANUAL';
+                      const isSelected = isManual && selectedIds.has(r.id);
                       return (
                         <tr
                           key={r.id}
-                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          onClick={() => toggleSelect(r.id)}
+                          className={`transition-colors ${isManual ? 'cursor-pointer' : ''} ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `${isManual ? 'hover:bg-slate-50 dark:hover:bg-slate-800/80' : ''} ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
+                          onClick={() => isManual && toggleSelect(r.id)}
                         >
                           <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(r.id)} />
+                            {isManual && <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(r.id)} />}
                           </td>
                           <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{r.reading_number}</td>
                           <td className="px-4 py-2.5 text-sm font-mono text-slate-600 dark:text-slate-400">{r.vehicle_plate}</td>
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtKm(r.km)}</td>
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtDate(r.reading_date)}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${isManual ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' : 'bg-primary/10 text-primary'}`}>
+                              {isManual ? 'Manual' : 'Abastecimento'}
+                            </span>
+                          </td>
                           <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{r.observations || '-'}</td>
                           <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
                             {r.created_at && format(new Date(r.created_at), 'dd/MM/yyyy', { locale: ptBR })}

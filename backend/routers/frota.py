@@ -1008,18 +1008,49 @@ async def get_odometer_readings(
     per_page: int = 20,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Lista todos os lançamentos de hodômetro"""
+    """Lista os lançamentos de hodômetro - une os lançamentos manuais com os KMs
+    ("Leitura") já lançados em cada Abastecimento, pra não exigir digitação duplicada.
+    Entradas vindas do Abastecimento vêm marcadas com source=ABASTECIMENTO e não são
+    excluíveis por aqui (a exclusão é feita editando/removendo o Abastecimento em si)."""
     query = {}
     if vehicle_plate:
         query["vehicle_plate"] = {"$regex": re.escape(vehicle_plate.upper()), "$options": "i"}
 
-    skip = (page - 1) * per_page
+    manual = await db.odometer_readings.find(query, {"_id": 0}).to_list(None)
+    for r in manual:
+        r["source"] = "MANUAL"
 
-    total = await db.odometer_readings.count_documents(query)
-    readings = await db.odometer_readings.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    fuel_query = {"reading": {"$ne": None}, "equipment_id": {"$ne": None}}
+    if vehicle_plate:
+        fuel_query["equipment_plate"] = {"$regex": re.escape(vehicle_plate.upper()), "$options": "i"}
+    fuel_supplies = await db.fuel_supplies.find(
+        fuel_query,
+        {"_id": 0, "id": 1, "supply_number": 1, "equipment_id": 1, "equipment_plate": 1,
+         "reading": 1, "supply_date": 1, "created_at": 1}
+    ).to_list(None)
+    from_fuel = [{
+        "id": fs["id"],
+        "reading_number": fs.get("supply_number"),
+        "vehicle_id": fs.get("equipment_id"),
+        "vehicle_plate": fs.get("equipment_plate"),
+        "km": fs.get("reading"),
+        "reading_date": fs.get("supply_date"),
+        "observations": None,
+        "created_by": None,
+        "created_by_name": None,
+        "created_at": fs.get("created_at"),
+        "source": "ABASTECIMENTO",
+    } for fs in fuel_supplies]
+
+    combined = manual + from_fuel
+    combined.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+
+    total = len(combined)
+    skip = (page - 1) * per_page
+    page_items = combined[skip:skip + per_page]
 
     return {
-        "items": readings,
+        "items": page_items,
         "total": total,
         "page": page,
         "per_page": per_page,
