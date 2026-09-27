@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { StatCard, StatGrid, FilterCard, FilterField, DataCard, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { FileText, FileSpreadsheet, Calendar, X, BarChart3, ClipboardList, Wallet, Gauge, Clock } from 'lucide-react';
+import { FileText, FileSpreadsheet, BarChart3, ClipboardList, Wallet, Gauge, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -35,22 +35,6 @@ function ChartTooltip({ active, payload, label }) {
         </p>
       ))}
     </div>
-  );
-}
-
-function KpiCard({ icon: Icon, label, value, testid }) {
-  return (
-    <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid={testid}>
-      <CardContent className="p-3 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-          <Icon className="w-4.5 h-4.5 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wide font-semibold truncate">{label}</div>
-          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{value}</div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -171,114 +155,86 @@ export default function ReportsServiceOrdersPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="reports-service-orders-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Relatório de Serviços
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Acompanhe as Ordens de Serviço e o custo de manutenção da frota</p>
-        </div>
+      <div className="space-y-4" data-testid="reports-service-orders-page">
+        <PageHeader icon={ClipboardList} title="Relatório de Serviços" subtitle="Acompanhe as Ordens de Serviço e o custo de manutenção da frota" />
 
-        {/* Filters */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                Filtrar
-              </span>
-              {hasFilters && (
-                <button onClick={clearFilters} className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="report-service-orders-clear-filters">
-                  <X className="w-3 h-3" />
-                  Limpar
-                </button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" data-testid="report-service-orders-date-from" />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" data-testid="report-service-orders-date-to" />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Equipamento</Label>
-                <Autocomplete
-                  value={equipmentPlate}
-                  onChange={setEquipmentPlate}
-                  onSelect={(v) => setEquipmentPlate(v.plate)}
-                  options={vehicles}
-                  displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                  className="text-xs font-mono"
-                />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-service-orders-filter-status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
-                    {STATUS_OPTIONS.map(([v, l]) => (
-                      <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Categoria</Label>
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-service-orders-filter-category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[13px]">Todas</SelectItem>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.name} className="text-[13px]">{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="service-orders-summary-cards">
-          <KpiCard icon={ClipboardList} label="Ordens de Serviço" value={summary.count} testid="service-orders-kpi-count" />
-          <KpiCard icon={Wallet} label="Valor Total" value={fmtMoney(summary.total_value)} testid="service-orders-kpi-value" />
-          <KpiCard icon={Gauge} label="Valor Médio" value={fmtMoney(summary.avg_value)} testid="service-orders-kpi-avg" />
-          <KpiCard icon={Clock} label="Em Aberto" value={summary.open_count} testid="service-orders-kpi-open" />
-        </div>
-
-        {/* Barra de ações */}
-        <div>
-          <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wide font-semibold">Exportar</Label>
-          <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-            <Button variant="ghost" size="sm" onClick={downloadPDF} disabled={loading} title="Baixar PDF" data-testid="download-service-orders-pdf-button" className="h-9 w-9 p-0 disabled:opacity-30">
-              <FileText className="w-4 h-4 text-red-600" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={downloadExcel} disabled={loading} title="Baixar Excel" data-testid="download-service-orders-excel-button" className="h-9 w-9 p-0 disabled:opacity-30">
-              <FileSpreadsheet className="w-4 h-4 text-green-600" />
-            </Button>
+        <FilterCard
+          hasFilters={!!hasFilters}
+          onClear={clearFilters}
+          clearLinkTestId="report-service-orders-clear-filters"
+          actions={(
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={downloadPDF} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-service-orders-pdf-button">
+                <FileText className="w-4 h-4 text-red-600" /> Baixar PDF
+              </Button>
+              <Button type="button" size="sm" onClick={downloadExcel} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-service-orders-excel-button">
+                <FileSpreadsheet className="w-4 h-4" /> Baixar Excel
+              </Button>
+            </>
+          )}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <FilterField label="Data início">
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="report-service-orders-date-from" />
+            </FilterField>
+            <FilterField label="Data fim">
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="report-service-orders-date-to" />
+            </FilterField>
+            <FilterField label="Equipamento">
+              <Autocomplete
+                value={equipmentPlate}
+                onChange={setEquipmentPlate}
+                onSelect={(v) => setEquipmentPlate(v.plate)}
+                options={vehicles}
+                displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                className="h-9 text-sm font-mono"
+              />
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="h-9 text-sm" data-testid="report-service-orders-filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                  {STATUS_OPTIONS.map(([v, l]) => (
+                    <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Categoria">
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="h-9 text-sm" data-testid="report-service-orders-filter-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todas</SelectItem>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={c.name} className="text-[13px]">{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
           </div>
+        </FilterCard>
+
+        <div data-testid="service-orders-summary-cards">
+          <StatGrid>
+            <StatCard icon={ClipboardList} label="Ordens de serviço" value={summary.count} tone="blue" testId="service-orders-kpi-count" />
+            <StatCard icon={Wallet} label="Valor total" value={fmtMoney(summary.total_value)} tone="emerald" testId="service-orders-kpi-value" />
+            <StatCard icon={Gauge} label="Valor médio" value={fmtMoney(summary.avg_value)} tone="primary" testId="service-orders-kpi-avg" />
+            <StatCard icon={Clock} label="Em aberto" value={summary.open_count} tone="amber" testId="service-orders-kpi-open" />
+          </StatGrid>
         </div>
 
         {/* Dashboard: Ordens de Serviço por Dia */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-service-orders-chart-card">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-primary" />
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Ordens de Serviço por Dia</CardTitle>
-              <span className="text-xs text-slate-400 dark:text-slate-500">(últimos 14 dias)</span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
+        <DataCard
+          title={(<span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Ordens de serviço por dia</span>)}
+          meta={<span className="text-xs text-slate-400 dark:text-slate-500">últimos 14 dias</span>}
+          testId="daily-service-orders-chart-card"
+        >
+          <div className="p-4">
             {dailyChart.some((d) => d.total_value > 0) ? (
               <div className="h-72 w-full" data-testid="daily-service-orders-chart">
                 <ResponsiveContainer width="100%" height="100%">
@@ -295,13 +251,10 @@ export default function ReportsServiceOrdersPage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
-              </div>
+              <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </DataCard>
       </div>
     </Layout>
   );

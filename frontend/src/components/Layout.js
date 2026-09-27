@@ -86,6 +86,8 @@ const PAGE_TITLES = {
   '/fleet/rpa-terceiro': 'Contrato de Frete',
   '/fleet/rpa-terceiro/new': 'Novo Contrato de Frete',
   '/fleet/ordem-servico': 'Ordem de Serviço',
+  '/fleet/hodometro': 'Lançamento de Hodômetro',
+  '/fleet/controle-media': 'Controle de Média',
   '/fleet/ordem-abastecimento': 'Ordem de Abastecimento',
   '/fleet/abastecimento': 'Abastecimento',
   '/fleet/nivel-tanque': 'Nível do Tanque',
@@ -336,7 +338,7 @@ export default function Layout({ children }) {
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
-  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
+  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque';
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules' || location.pathname === '/tank-settings';

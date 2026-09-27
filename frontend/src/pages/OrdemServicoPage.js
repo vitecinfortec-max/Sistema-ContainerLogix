@@ -1,33 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, PlateTag, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../components/ui/select';
-import { ComboField } from '../components/ui/combo-field';
-import { Autocomplete } from '../components/Autocomplete';
+import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import { CityStateFields } from '../components/AddressFields';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Trash2, Download, Search, Save, X, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, FileText, Printer, Clock, Wrench, Wallet } from 'lucide-react';
 
-const STATUS_COLORS = {
-  ABERTO: 'bg-blue-100 text-blue-700',
-  ANDAMENTO: 'bg-amber-100 text-amber-700',
-  FECHADO: 'bg-emerald-100 text-emerald-700',
-  CANCELADO: 'bg-rose-100 text-rose-700',
+const STATUS_TONES = {
+  ABERTO: 'blue',
+  ANDAMENTO: 'amber',
+  FECHADO: 'emerald',
+  CANCELADO: 'red',
 };
+const STATUS_LABELS = { ABERTO: 'Aberto', ANDAMENTO: 'Em Andamento', FECHADO: 'Fechado', CANCELADO: 'Cancelado' };
 
 const fmtMoney = (v) =>
   Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -281,32 +284,32 @@ export default function OrdemServicoPage() {
   };
 
   const t = totals();
+  const categoryOptions = osCategories.map((c) => [c.name, c.name]);
   const singleSelectedOS = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="ordem-servico-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Ordem de Serviço</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gestão de OS para manutenção da frota</p>
-        </div>
+      <div className="space-y-4" data-testid="ordem-servico-page">
+        <PageHeader icon={FileText} title="Ordem de Serviço" subtitle="Gestão de OS para manutenção da frota" />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative max-w-md flex-1 min-w-[280px]">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-                <Input value={search}
-                  onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-[13px]" data-testid="os-search" />
-              </div>
+        <StatGrid>
+          <StatCard label="Ordens de serviço" value={list.length} icon={FileText} tone="primary" hint={search || statusFilter !== 'all' ? 'com os filtros atuais' : 'cadastradas'} />
+          <StatCard label="Abertas" value={list.filter((o) => o.status === 'ABERTO').length} icon={Clock} tone="blue" />
+          <StatCard label="Em andamento" value={list.filter((o) => o.status === 'ANDAMENTO').length} icon={Wrench} tone="amber" />
+          <StatCard label="Valor total" value={fmtMoney(list.reduce((acc, o) => acc + Number(o.grand_total || 0), 0))} icon={Wallet} tone="emerald" />
+        </StatGrid>
+
+        <FilterCard
+          hasFilters={!!search || statusFilter !== 'all'}
+          onClear={() => { setSearch(''); setStatusFilter('all'); }}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Pessoa, placa, descrição ou categoria" className="sm:col-span-1 lg:col-span-2">
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="os-search" />
+            </FilterField>
+            <FilterField label="Status">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 text-[13px] w-44" data-testid="os-filter-status">
+                <SelectTrigger className="h-9 text-sm" data-testid="os-filter-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -317,129 +320,95 @@ export default function OrdemServicoPage() {
                   <SelectItem value="CANCELADO">Cancelado</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </CardContent>
-        </Card>
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Barra de ações - marque uma OS na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreate}
-            title="Adicionar"
-            data-testid="os-new-btn"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedOS && openEdit(singleSelectedOS.id)}
-            disabled={!singleSelectedOS}
-            title="Editar"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedOS && downloadPDF(singleSelectedOS.id, singleSelectedOS.os_number)}
-            disabled={!singleSelectedOS}
-            title="Baixar PDF"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Download className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedOS && handleDelete(singleSelectedOS.id, singleSelectedOS.os_number)}
-            disabled={!singleSelectedOS}
-            title="Excluir"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        {/* Lista - marque uma OS pra habilitar as ações da barra */}
+        <DataCard
+          title="Ordens de serviço"
+          count={loading ? '...' : list.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova OS" onClick={openCreate} testId="os-new-btn" />}
+            >
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedOS && openEdit(singleSelectedOS.id)} disabled={!singleSelectedOS} />
+              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedOS && downloadPDF(singleSelectedOS.id, singleSelectedOS.os_number)} disabled={!singleSelectedOS} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOS && handleDelete(singleSelectedOS.id, singleSelectedOS.os_number)} disabled={!singleSelectedOS} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <FileText className="w-4 h-4" />
-              {loading ? 'Carregando...' : `${list.length} Ordem(s) de Serviço`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-800">
-                    <TableHead className="w-9">
+        >
+          {list.length === 0 && !loading ? (
+            <EmptyState
+              icon={FileText}
+              title={search || statusFilter !== 'all' ? 'Nenhuma OS encontrada' : 'Nenhuma OS cadastrada'}
+              hint={search || statusFilter !== 'all' ? 'Ajuste os filtros' : 'Cadastre a primeira pelo botão "Nova OS"'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
                       <Checkbox
                         checked={list.length > 0 && list.every((o) => selectedIds.has(o.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
-                    </TableHead>
-                    <TableHead className="text-[12px] font-semibold">Nº</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Abertura</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Pessoa</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Placa</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Categoria</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Status</TableHead>
-                    <TableHead className="text-[12px] font-semibold text-right">Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.length === 0 && !loading && (
-                    <TableRow><TableCell colSpan={8} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma OS cadastrada.</TableCell></TableRow>
-                  )}
+                    </th>
+                    <th>Nº</th>
+                    <th>Abertura</th>
+                    <th>Pessoa</th>
+                    <th>Placa</th>
+                    <th>Categoria</th>
+                    <th>Status</th>
+                    <th className="!text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {list.map((o) => (
-                    <TableRow
+                    <tr
                       key={o.id}
                       onClick={() => toggleSelect(o.id)}
-                      className={`cursor-pointer transition-colors ${selectedIds.has(o.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                      data-selected={selectedIds.has(o.id)}
+                      className="cursor-pointer"
                       data-testid={`os-row-${o.os_number}`}
                     >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(o.id)}
                           onCheckedChange={() => toggleSelect(o.id)}
                           data-testid={`os-row-checkbox-${o.os_number}`}
                         />
-                      </TableCell>
-                      <TableCell className="text-[13px] font-semibold text-emerald-700">Nº {o.os_number}</TableCell>
-                      <TableCell className="text-[12px]">{o.opened_at ? format(new Date(o.opened_at), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
-                      <TableCell className="text-[13px]">{o.person_name || '-'}</TableCell>
-                      <TableCell className="text-[12px] font-mono">{o.equipment_plate || '-'}</TableCell>
-                      <TableCell className="text-[12px]">{o.category || '-'}</TableCell>
-                      <TableCell><Badge variant="secondary" className={`text-[10px] ${STATUS_COLORS[o.status] || ''}`}>{o.status}</Badge></TableCell>
-                      <TableCell className="text-[13px] font-semibold text-right text-emerald-700">{fmtMoney(o.grand_total)}</TableCell>
-                    </TableRow>
+                      </td>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{o.os_number}</td>
+                      <td className="whitespace-nowrap tabular-nums">{o.opened_at ? format(new Date(o.opened_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
+                      <td><div className="max-w-[220px] truncate" title={o.person_name || ''}>{o.person_name || '-'}</div></td>
+                      <td><PlateTag>{o.equipment_plate}</PlateTag></td>
+                      <td><div className="max-w-[200px] truncate" title={o.category || ''}>{o.category || '-'}</div></td>
+                      <td>
+                        <StatusPill tone={STATUS_TONES[o.status] || 'slate'}>
+                          {STATUS_LABELS[o.status] || o.status}
+                        </StatusPill>
+                      </td>
+                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(o.grand_total)}</td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </DataCard>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto" data-testid="os-dialog">
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="flex items-center gap-2 text-base">
-              <FileText className="w-5 h-5 text-emerald-600" />
+              <FileText className="w-5 h-5 text-primary" />
               {editingId ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}
-              {nextNumber !== null && <Badge variant="outline" className="ml-2 text-emerald-700 border-emerald-300">Nº {nextNumber}</Badge>}
+              {nextNumber !== null && <Badge variant="outline" className="ml-2 text-primary border-primary/30">Nº {nextNumber}</Badge>}
             </DialogTitle>
           </DialogHeader>
 
@@ -457,13 +426,12 @@ export default function OrdemServicoPage() {
                 <SelectField label="Status *" value={form.status} onChange={(v) => onChange('status', v)} options={[['ABERTO', 'Aberto'], ['ANDAMENTO', 'Em Andamento'], ['FECHADO', 'Fechado'], ['CANCELADO', 'Cancelado']]} testid="os-status" />
                 <div>
                   <Label className="mb-1 block">Categoria *</Label>
-                  <ComboField
+                  <OptionAutocomplete
                     value={form.category}
                     onChange={(v) => onChange('category', v)}
-                    options={osCategories.map((c) => [c.name, c.name])}
-                    searchPlaceholder="Buscar categoria..."
-                    emptyLabel="Nenhuma categoria encontrada"
-                    testid="os-category"
+                    options={categoryOptions}
+                    className="text-sm"
+                    testId="os-category"
                   />
                 </div>
                 <div>
@@ -618,7 +586,7 @@ export default function OrdemServicoPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="os-cancel">Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="os-save">
+            <Button onClick={handleSave} disabled={saving} data-testid="os-save">
               <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar OS' : 'Salvar OS'}
             </Button>
           </DialogFooter>
@@ -650,7 +618,7 @@ function buildEmpty() {
 
 function SectionTitle({ children }) {
   return (
-    <h3 className="text-[12px] font-bold uppercase tracking-wider text-emerald-700 border-b-2 border-emerald-200 pb-1">
+    <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary border-b-2 border-primary/20 pb-1">
       {children}
     </h3>
   );
@@ -704,7 +672,7 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[12px] font-bold uppercase tracking-wider text-emerald-700">{title}</h3>
+        <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary">{title}</h3>
         <Button variant="outline" size="sm" type="button" onClick={onAdd} className="h-7 text-xs">
           <Plus className="w-3 h-3 mr-1" />Adicionar {title === 'Produtos' ? 'Produto' : 'Serviço'}
         </Button>
@@ -773,9 +741,9 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
 
 function TotalBox({ label, value, highlight }) {
   return (
-    <div className={`p-3 rounded-lg border-2 ${highlight ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>
-      <div className={`text-[10px] uppercase tracking-wider ${highlight ? 'text-emerald-700' : 'text-slate-500 dark:text-slate-400'} font-semibold`}>{label}</div>
-      <div className={`text-xl font-bold ${highlight ? 'text-emerald-700' : 'text-slate-800 dark:text-slate-200'}`}>{fmtMoney(value)}</div>
+    <div className={`p-3 rounded-lg border-2 ${highlight ? 'border-primary/40 bg-primary/5' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>
+      <div className={`text-[10px] uppercase tracking-wider ${highlight ? 'text-primary' : 'text-slate-500 dark:text-slate-400'} font-semibold`}>{label}</div>
+      <div className={`text-xl font-bold ${highlight ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`}>{fmtMoney(value)}</div>
     </div>
   );
 }

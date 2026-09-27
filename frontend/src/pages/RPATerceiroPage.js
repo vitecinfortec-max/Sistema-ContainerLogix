@@ -574,7 +574,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
 
         <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Número, motorista, CPF, cliente ou container">
+            <FilterField label="Motorista, cliente, container ou placa">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="rpa-search-input" />
             </FilterField>
           </div>

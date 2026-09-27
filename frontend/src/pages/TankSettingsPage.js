@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -7,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { api } from '../lib/api';
 import { sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
-import { Fuel } from 'lucide-react';
+import { Fuel, Settings } from 'lucide-react';
 
 const EMPTY_FORM = { capacity_liters: '', minimum_alert_liters: '' };
 
@@ -73,18 +74,17 @@ export default function TankSettingsPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="tank-settings-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Configuração de Tanque</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-            Define a capacidade do tanque próprio e o litro mínimo pra disparar o alerta em "Nível do Tanque"
-          </p>
-        </div>
+      <div className="space-y-4" data-testid="tank-settings-page">
+        <PageHeader
+          icon={Settings}
+          title="Configuração de Tanque"
+          subtitle='Define a capacidade do tanque próprio e o litro mínimo pra disparar o alerta em "Nível do Tanque"'
+        />
 
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none max-w-xl">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Fuel className="w-4 h-4" />
+              <Fuel className="w-4 h-4 text-primary" />
               Tanque Próprio
             </CardTitle>
           </CardHeader>

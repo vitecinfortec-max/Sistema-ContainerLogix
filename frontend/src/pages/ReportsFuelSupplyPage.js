@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { StatCard, StatGrid, FilterCard, FilterField, DataCard, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { FileText, FileSpreadsheet, Calendar, X, BarChart3, Fuel, Droplet, Wallet, Gauge } from 'lucide-react';
+import { FileText, FileSpreadsheet, BarChart3, Fuel, Droplet, Wallet, Gauge } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -40,22 +40,6 @@ function ChartTooltip({ active, payload, label }) {
         </p>
       ))}
     </div>
-  );
-}
-
-function KpiCard({ icon: Icon, label, value, testid }) {
-  return (
-    <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid={testid}>
-      <CardContent className="p-3 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-          <Icon className="w-4.5 h-4.5 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wide font-semibold truncate">{label}</div>
-          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{value}</div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -176,111 +160,83 @@ export default function ReportsFuelSupplyPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="reports-fuel-supply-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Relatório de Abastecimento
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Acompanhe o consumo e o custo de combustível/ARLA da frota</p>
-        </div>
+      <div className="space-y-4" data-testid="reports-fuel-supply-page">
+        <PageHeader icon={Fuel} title="Relatório de Abastecimento" subtitle="Acompanhe o consumo e o custo de combustível/ARLA da frota" />
 
-        {/* Filters */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                Filtrar
-              </span>
-              {hasFilters && (
-                <button onClick={clearFilters} className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="report-fuel-supply-clear-filters">
-                  <X className="w-3 h-3" />
-                  Limpar
-                </button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" data-testid="report-fuel-supply-date-from" />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" data-testid="report-fuel-supply-date-to" />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Equipamento</Label>
-                <Autocomplete
-                  value={equipmentPlate}
-                  onChange={setEquipmentPlate}
-                  onSelect={(v) => setEquipmentPlate(v.plate)}
-                  options={vehicles}
-                  displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                  className="text-xs font-mono"
-                />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Fornecedor</Label>
-                <Autocomplete
-                  value={supplierName}
-                  onChange={setSupplierName}
-                  onSelect={(s) => setSupplierName(s.name)}
-                  options={suppliers}
-                  displayField="name"
-                  className="text-xs"
-                />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Combustível/ARLA</Label>
-                <Select value={fuelType} onValueChange={setFuelType}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-fuel-supply-filter-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
-                    {FUEL_TYPE_OPTIONS.map(([v, l]) => (
-                      <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="fuel-supply-summary-cards">
-          <KpiCard icon={Fuel} label="Abastecimentos" value={summary.count} testid="fuel-supply-kpi-count" />
-          <KpiCard icon={Droplet} label="Litros" value={fmtLiters(summary.total_liters)} testid="fuel-supply-kpi-liters" />
-          <KpiCard icon={Wallet} label="Valor Total" value={fmtMoney(summary.total_value)} testid="fuel-supply-kpi-value" />
-          <KpiCard icon={Gauge} label="Preço Médio/Litro" value={fmtMoney(summary.avg_price_per_liter)} testid="fuel-supply-kpi-avg-price" />
-        </div>
-
-        {/* Barra de ações */}
-        <div>
-          <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wide font-semibold">Exportar</Label>
-          <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-            <Button variant="ghost" size="sm" onClick={downloadPDF} disabled={loading} title="Baixar PDF" data-testid="download-fuel-supply-pdf-button" className="h-9 w-9 p-0 disabled:opacity-30">
-              <FileText className="w-4 h-4 text-red-600" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={downloadExcel} disabled={loading} title="Baixar Excel" data-testid="download-fuel-supply-excel-button" className="h-9 w-9 p-0 disabled:opacity-30">
-              <FileSpreadsheet className="w-4 h-4 text-green-600" />
-            </Button>
+        <FilterCard
+          hasFilters={!!hasFilters}
+          onClear={clearFilters}
+          clearLinkTestId="report-fuel-supply-clear-filters"
+          actions={(
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={downloadPDF} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-fuel-supply-pdf-button">
+                <FileText className="w-4 h-4 text-red-600" /> Baixar PDF
+              </Button>
+              <Button type="button" size="sm" onClick={downloadExcel} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-fuel-supply-excel-button">
+                <FileSpreadsheet className="w-4 h-4" /> Baixar Excel
+              </Button>
+            </>
+          )}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <FilterField label="Data início">
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="report-fuel-supply-date-from" />
+            </FilterField>
+            <FilterField label="Data fim">
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="report-fuel-supply-date-to" />
+            </FilterField>
+            <FilterField label="Equipamento">
+              <Autocomplete
+                value={equipmentPlate}
+                onChange={setEquipmentPlate}
+                onSelect={(v) => setEquipmentPlate(v.plate)}
+                options={vehicles}
+                displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                className="h-9 text-sm font-mono"
+              />
+            </FilterField>
+            <FilterField label="Fornecedor">
+              <Autocomplete
+                value={supplierName}
+                onChange={setSupplierName}
+                onSelect={(s) => setSupplierName(s.name)}
+                options={suppliers}
+                displayField="name"
+                className="h-9 text-sm"
+              />
+            </FilterField>
+            <FilterField label="Combustível/ARLA">
+              <Select value={fuelType} onValueChange={setFuelType}>
+                <SelectTrigger className="h-9 text-sm" data-testid="report-fuel-supply-filter-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                  {FUEL_TYPE_OPTIONS.map(([v, l]) => (
+                    <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
           </div>
+        </FilterCard>
+
+        <div data-testid="fuel-supply-summary-cards">
+          <StatGrid>
+            <StatCard icon={Fuel} label="Abastecimentos" value={summary.count} tone="blue" testId="fuel-supply-kpi-count" />
+            <StatCard icon={Droplet} label="Litros" value={fmtLiters(summary.total_liters)} tone="primary" testId="fuel-supply-kpi-liters" />
+            <StatCard icon={Wallet} label="Valor total" value={fmtMoney(summary.total_value)} tone="emerald" testId="fuel-supply-kpi-value" />
+            <StatCard icon={Gauge} label="Preço médio/litro" value={fmtMoney(summary.avg_price_per_liter)} tone="amber" testId="fuel-supply-kpi-avg-price" />
+          </StatGrid>
         </div>
 
         {/* Dashboard: Abastecimento por Dia */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-fuel-supply-chart-card">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-primary" />
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Abastecimento por Dia</CardTitle>
-              <span className="text-xs text-slate-400 dark:text-slate-500">(últimos 14 dias)</span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
+        <DataCard
+          title={(<span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Abastecimento por dia</span>)}
+          meta={<span className="text-xs text-slate-400 dark:text-slate-500">últimos 14 dias</span>}
+          testId="daily-fuel-supply-chart-card"
+        >
+          <div className="p-4">
             {dailyChart.some((d) => d.total_value > 0) ? (
               <div className="h-72 w-full" data-testid="daily-fuel-supply-chart">
                 <ResponsiveContainer width="100%" height="100%">
@@ -297,13 +253,10 @@ export default function ReportsFuelSupplyPage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
-              </div>
+              <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </DataCard>
       </div>
     </Layout>
   );

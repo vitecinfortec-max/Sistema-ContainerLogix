@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -10,7 +13,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Trash2, Tag, Edit, Search } from 'lucide-react';
+import { Plus, Trash2, Tag, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -139,13 +142,8 @@ export default function OSCategoriesPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="os-categories-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Cadastro de Categoria
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Categorias usadas no campo "Categoria" da Ordem de Serviço</p>
-        </div>
+      <div className="space-y-4" data-testid="os-categories-page">
+        <PageHeader icon={Tag} title="Cadastro de Categoria" subtitle='Categorias usadas no campo "Categoria" da Ordem de Serviço' />
 
         <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
             <DialogContent data-testid="os-category-dialog">
@@ -189,130 +187,84 @@ export default function OSCategoriesPage() {
             </DialogContent>
           </Dialog>
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 text-[13px] pl-9"
-                data-testid="search-os-category-input"
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Nome">
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-os-category-input" />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Barra de ações - marque uma categoria na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreateDialog}
-            title="Adicionar"
-            data-testid="add-os-category-button"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedCategory && openEditDialog(singleSelectedCategory)}
-            disabled={!singleSelectedCategory}
-            title="Editar"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Edit className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedCategory && handleDelete(singleSelectedCategory.id)}
-            disabled={!singleSelectedCategory}
-            title="Excluir"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        {/* Lista - marque uma categoria pra habilitar as ações da barra */}
+        <DataCard
+          title="Categorias"
+          count={filteredCategories.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova categoria" onClick={openCreateDialog} testId="add-os-category-button" />}
+            >
+              <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedCategory && openEditDialog(singleSelectedCategory)} disabled={!singleSelectedCategory} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedCategory && handleDelete(singleSelectedCategory.id)} disabled={!singleSelectedCategory} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Tag className="w-4 h-4" />
-              Categorias Cadastradas ({filteredCategories.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {filteredCategories.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
-                    <tr>
-                      <th className="w-9 px-4 py-2.5">
+        >
+          {filteredCategories.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={filteredCategories.length > 0 && filteredCategories.every(c => selectedIds.has(c.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </th>
+                    <th>Nome</th>
+                    <th>Status</th>
+                    <th>Cadastrado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredCategories.map((category) => (
+                    <tr
+                      key={category.id}
+                      onClick={() => toggleSelect(category.id)}
+                      data-selected={selectedIds.has(category.id)}
+                      className="cursor-pointer"
+                      data-testid="os-category-row"
+                    >
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          checked={filteredCategories.length > 0 && filteredCategories.every(c => selectedIds.has(c.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                          data-testid="select-all-checkbox"
+                          checked={selectedIds.has(category.id)}
+                          onCheckedChange={() => toggleSelect(category.id)}
+                          data-testid="os-category-row-checkbox"
                         />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nome</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
+                      </td>
+                      <td className="cell-strong">{category.name}</td>
+                      <td>
+                        <StatusPill tone={category.active ? 'emerald' : 'slate'}>
+                          {category.active ? 'Ativo' : 'Inativo'}
+                        </StatusPill>
+                      </td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        {format(new Date(category.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredCategories.map((category) => (
-                      <tr
-                        key={category.id}
-                        onClick={() => toggleSelect(category.id)}
-                        className={`cursor-pointer transition-colors ${selectedIds.has(category.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                        data-testid="os-category-row"
-                      >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(category.id)}
-                            onCheckedChange={() => toggleSelect(category.id)}
-                            data-testid="os-category-row-checkbox"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px] font-medium">{category.name}</td>
-                        <td className="px-4 py-2.5 text-[13px]">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${category.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                            {category.active ? 'Ativo' : 'Inativo'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px]">
-                          {format(new Date(category.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-slate-500 dark:text-slate-400" data-testid="no-os-categories">
-                <Tag className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">
-                  {search ? 'Nenhuma categoria encontrada' : 'Nenhuma categoria cadastrada'}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={Tag}
+              title={search ? 'Nenhuma categoria encontrada' : 'Nenhuma categoria cadastrada'}
+              hint={search ? 'Ajuste a busca' : 'Cadastre a primeira pelo botão "Nova categoria"'}
+              testId="no-os-categories"
+            />
+          )}
+        </DataCard>
       </div>
       <ConfirmDialog />
     </Layout>

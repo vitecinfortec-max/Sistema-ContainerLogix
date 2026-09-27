@@ -373,7 +373,7 @@ export default function LoadingOrderPage() {
 
         <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Número, container, motorista ou transportadora">
+            <FilterField label="Container, motorista ou transportadora">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="loading-order-search" />
             </FilterField>
           </div>

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, PlateTag, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -15,7 +19,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings';
 import {
-  ClipboardCheck, Plus, Eye, Pencil, Trash2, Printer, Search, X, CheckCircle2, XCircle, AlertTriangle,
+  ClipboardCheck, Plus, Eye, Pencil, Trash2, Printer, X, CheckCircle2, XCircle, AlertTriangle,
   Camera, Upload
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -328,7 +332,7 @@ export default function VehicleChecklistPage() {
         api.getClients(),
         api.getCompanies(),
         api.getDrivers(),
-        api.getVehicles({ per_page: 200 }),
+        api.getVehicles({ per_page: 1000 }),
         api.getVehicleChecklistTemplate(),
       ]);
       setClients(clientsRes.data);
@@ -360,6 +364,12 @@ export default function VehicleChecklistPage() {
   const handleSearch = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
     loadChecklists(searchQuery);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadChecklists('');
   };
 
   const cavalos = vehicles.filter(v => v.vehicle_type === 'CAVALO' || v.vehicle_type === 'CAMINHÃO');
@@ -505,16 +515,9 @@ export default function VehicleChecklistPage() {
   };
 
   const statusBadge = (status) => {
-    const styles = {
-      APROVADO: 'bg-green-100 text-green-800',
-      REPROVADO: 'bg-red-100 text-red-800',
-      PENDENTE: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-    };
-    return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${styles[status]}`}>
-        {status}
-      </span>
-    );
+    const tones = { APROVADO: 'emerald', REPROVADO: 'red', PENDENTE: 'slate' };
+    const labels = { APROVADO: 'Aprovado', REPROVADO: 'Reprovado', PENDENTE: 'Pendente' };
+    return <StatusPill tone={tones[status] || 'slate'}>{labels[status] || status}</StatusPill>;
   };
 
   const renderItemsSection = (sectionKey, label) => {
@@ -735,189 +738,125 @@ export default function VehicleChecklistPage() {
     <Layout>
       {printChecklist && <SimpleChecklistPrintView checklist={printChecklist} company={company} />}
 
-      <div className="space-y-5 no-print">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <ClipboardCheck className="w-4 h-4" />
-            Checklist de Veículo
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Identificação do veículo e registro fotográfico antes da viagem</p>
-        </div>
+      <div className="space-y-4 no-print">
+        <PageHeader icon={ClipboardCheck} title="Checklist de Veículo" subtitle="Identificação do veículo e registro fotográfico antes da viagem" />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="flex gap-2">
-              <Input
+        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch} onApply={handleSearch}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Placa, motorista ou cliente">
+              <SearchInput
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="h-9"
               />
-              <Button variant="outline" onClick={handleSearch} className="h-9">
-                <Search className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Barra de ações - marque um checklist na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openNewSimpleModal}
-            title="Adicionar"
-            data-testid="new-checklist-button"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedChecklist && viewDetails(singleSelectedChecklist)}
-            disabled={!singleSelectedChecklist}
-            title="Ver Detalhes"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedChecklist && (singleSelectedChecklist.checklist_kind === 'simple' ? openEditSimpleModal(singleSelectedChecklist) : openEditModal(singleSelectedChecklist))}
-            disabled={!singleSelectedChecklist}
-            title="Editar"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedChecklist && (singleSelectedChecklist.checklist_kind === 'simple' ? handleSimplePrint(singleSelectedChecklist) : handlePrint(singleSelectedChecklist.id))}
-            disabled={!singleSelectedChecklist}
-            title="Imprimir"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Printer className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedChecklist && handleDelete(singleSelectedChecklist.id)}
-            disabled={!singleSelectedChecklist}
-            title="Excluir"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        {/* Lista - marque um checklist pra habilitar as ações da barra */}
+        <DataCard
+          title="Checklists"
+          count={loading ? '...' : pagination.total}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Novo checklist" onClick={openNewSimpleModal} testId="new-checklist-button" />}
+            >
+              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedChecklist && viewDetails(singleSelectedChecklist)} disabled={!singleSelectedChecklist} />
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedChecklist && (singleSelectedChecklist.checklist_kind === 'simple' ? openEditSimpleModal(singleSelectedChecklist) : openEditModal(singleSelectedChecklist))} disabled={!singleSelectedChecklist} />
+              <ToolbarButton icon={Printer} label="Imprimir" tone="emerald" onClick={() => singleSelectedChecklist && (singleSelectedChecklist.checklist_kind === 'simple' ? handleSimplePrint(singleSelectedChecklist) : handlePrint(singleSelectedChecklist.id))} disabled={!singleSelectedChecklist} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedChecklist && handleDelete(singleSelectedChecklist.id)} disabled={!singleSelectedChecklist} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <ClipboardCheck className="w-4 h-4" />
-              {loading ? 'Carregando...' : `${pagination.total} Checklist(s)`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
-            ) : checklists.length === 0 ? (
-              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Nenhum checklist encontrado</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="w-9 px-4 py-2.5">
-                        <Checkbox
-                          checked={checklists.length > 0 && checklists.every((c) => selectedIds.has(c.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                          data-testid="select-all-checkbox"
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motorista</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente / Tipo</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {checklists.map((c, idx) => {
-                      const isSimple = c.checklist_kind === 'simple';
-                      return (
-                        <tr
-                          key={c.id}
-                          onClick={() => toggleSelect(c.id)}
-                          className={`cursor-pointer transition-colors ${selectedIds.has(c.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                        >
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={selectedIds.has(c.id)}
-                              onCheckedChange={() => toggleSelect(c.id)}
-                              data-testid="checklist-row-checkbox"
-                            />
-                          </td>
-                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{c.checklist_number}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{c.driver_name || '-'}</td>
-                          <td className="px-4 py-2.5 text-sm font-mono text-slate-600 dark:text-slate-400">{(isSimple ? c.vehicle_plate : c.cavalo_plate) || '-'}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">
-                            {isSimple ? (VEHICLE_TYPE_LABELS[c.vehicle_type] || '-') : (
-                              <>
-                                {c.client_name || '-'}
-                                {c.template === 'petrobras_lvt' && (
-                                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold bg-green-100 text-green-800 align-middle">LVT</span>
-                                )}
-                              </>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                            {c.created_at ? format(new Date(c.created_at), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-2">
-                              {statusBadge(checklistStatus(c))}
-                              {isSimple && (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
-                                  <Camera className="w-3 h-3" /> {(c.photos || []).length}
-                                </span>
+          footer={(
+            <TablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              pageSize={15}
+              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+            />
+          )}
+        >
+          {loading ? (
+            <EmptyState title="Carregando..." />
+          ) : checklists.length === 0 ? (
+            <EmptyState
+              icon={ClipboardCheck}
+              title="Nenhum checklist encontrado"
+              hint={searchQuery ? 'Ajuste a busca' : 'Registre o primeiro pelo botão "Novo checklist"'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={checklists.length > 0 && checklists.every((c) => selectedIds.has(c.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </th>
+                    <th>Nº</th>
+                    <th>Motorista</th>
+                    <th>Placa</th>
+                    <th>Cliente / Tipo</th>
+                    <th>Data</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {checklists.map((c) => {
+                    const isSimple = c.checklist_kind === 'simple';
+                    return (
+                      <tr
+                        key={c.id}
+                        onClick={() => toggleSelect(c.id)}
+                        data-selected={selectedIds.has(c.id)}
+                        className="cursor-pointer"
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(c.id)}
+                            onCheckedChange={() => toggleSelect(c.id)}
+                            data-testid="checklist-row-checkbox"
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{c.checklist_number}</td>
+                        <td><div className="max-w-[220px] truncate" title={c.driver_name || ''}>{c.driver_name || '-'}</div></td>
+                        <td><PlateTag>{isSimple ? c.vehicle_plate : c.cavalo_plate}</PlateTag></td>
+                        <td>
+                          {isSimple ? (VEHICLE_TYPE_LABELS[c.vehicle_type] || '-') : (
+                            <span className="inline-flex items-center gap-2">
+                              <span className="max-w-[200px] truncate" title={c.client_name || ''}>{c.client_name || '-'}</span>
+                              {c.template === 'petrobras_lvt' && (
+                                <StatusPill tone="emerald" dot={false} className="text-[10px] px-1.5">LVT</StatusPill>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
-                <div className="text-xs text-slate-400 dark:text-slate-500">Página {pagination.page} de {pagination.pages}</div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>Anterior</Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page === pagination.pages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>Próximo</Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {c.created_at ? format(new Date(c.created_at), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                        </td>
+                        <td>
+                          <div className="flex items-center gap-2">
+                            {statusBadge(checklistStatus(c))}
+                            {isSimple && (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400" title="Fotos">
+                                <Camera className="w-3 h-3" /> {(c.photos || []).length}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
 
       {/* Modal Criar/Editar - checklist simplificado (modelo atual) */}

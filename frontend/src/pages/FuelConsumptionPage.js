@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Label } from '../components/ui/label';
+import PageHeader from '../components/PageHeader';
+import {
+  StatCard, StatGrid, FilterCard, FilterField, DataCard, PlateTag, EmptyState,
+} from '../components/DataPage';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Autocomplete } from '../components/Autocomplete';
-import { TrendingUp, Search } from 'lucide-react';
+import { TrendingUp, TrendingDown, Truck, Gauge } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -79,71 +81,68 @@ export default function FuelConsumptionPage() {
     loadHistory(val);
   };
 
+  // Indicadores do topo - só veículos que já têm média calculada
+  const averages = summary.filter((s) => s.current_average !== null && s.current_average !== undefined);
+  const fleetAverage = averages.length
+    ? averages.reduce((acc, s) => acc + Number(s.current_average), 0) / averages.length
+    : null;
+  const best = averages.reduce((acc, s) => (!acc || s.current_average > acc.current_average ? s : acc), null);
+  const worst = averages.reduce((acc, s) => (!acc || s.current_average < acc.current_average ? s : acc), null);
+
   return (
     <Layout>
-      <div className="space-y-5" data-testid="fuel-consumption-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Controle de Média</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Média de consumo (km/L) calculada automaticamente a partir do KM lançado em cada Abastecimento</p>
-        </div>
+      <div className="space-y-4" data-testid="fuel-consumption-page">
+        <PageHeader
+          icon={TrendingUp}
+          title="Controle de Média"
+          subtitle="Média de consumo (km/L) calculada automaticamente a partir do KM lançado em cada Abastecimento"
+        />
+
+        <StatGrid>
+          <StatCard label="Veículos com média" value={averages.length} icon={Truck} tone="blue" hint="com 2+ abastecimentos" />
+          <StatCard label="Média da frota" value={fmtAvg(fleetAverage)} icon={Gauge} tone="primary" hint="média entre os veículos" />
+          <StatCard label="Melhor média" value={fmtAvg(best?.current_average)} icon={TrendingUp} tone="emerald" hint={best?.vehicle_plate || '-'} />
+          <StatCard label="Menor média" value={fmtAvg(worst?.current_average)} icon={TrendingDown} tone="amber" hint={worst?.vehicle_plate || '-'} />
+        </StatGrid>
 
         {/* Média Atual por Veículo */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <TrendingUp className="w-4 h-4" />
-              Média Atual por Veículo
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loadingSummary ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : summary.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                Nenhum veículo com pelo menos 2 abastecimentos registrados ainda
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modelo</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Média Atual</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Último Abastecimento</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Qtd. de Cálculos</th>
+        <DataCard title="Média atual por veículo" count={loadingSummary ? '...' : summary.length}>
+          {loadingSummary ? (
+            <EmptyState title="Carregando..." />
+          ) : summary.length === 0 ? (
+            <EmptyState icon={TrendingUp} title="Nenhum veículo com pelo menos 2 abastecimentos registrados ainda" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Placa</th>
+                    <th>Modelo</th>
+                    <th className="!text-right">Média atual</th>
+                    <th>Último abastecimento</th>
+                    <th className="!text-right">Qtd. de cálculos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.map((s) => (
+                    <tr key={s.vehicle_id}>
+                      <td><PlateTag>{s.vehicle_plate}</PlateTag></td>
+                      <td>{s.vehicle_model || '-'}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums font-semibold text-primary">{fmtAvg(s.current_average)}</td>
+                      <td className="whitespace-nowrap tabular-nums">{fmtDate(s.last_supply_date)}</td>
+                      <td className="text-right tabular-nums">{s.pair_count}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {summary.map((s, idx) => (
-                      <tr key={s.vehicle_id} className={idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}>
-                        <td className="px-4 py-2.5 text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{s.vehicle_plate}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{s.vehicle_model || '-'}</td>
-                        <td className="px-4 py-2.5 text-sm font-semibold text-primary">{fmtAvg(s.current_average)}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtDate(s.last_supply_date)}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{s.pair_count}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
 
         {/* Filtrar histórico */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="max-w-sm">
-              <Label className="text-xs mb-1 block">Veículo</Label>
+        <FilterCard title="Filtrar histórico" hasFilters={!!vehiclePlateFilter} onClear={() => handleFilterChange('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Veículo">
               <Autocomplete
                 value={vehiclePlateFilter}
                 onChange={handleFilterChange}
@@ -152,61 +151,49 @@ export default function FuelConsumptionPage() {
                 valueField="id"
                 onSelect={(vehicle) => handleFilterChange(vehicle.plate)}
               />
-            </div>
-          </CardContent>
-        </Card>
+            </FilterField>
+          </div>
+        </FilterCard>
 
         {/* Histórico de Cálculos */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <TrendingUp className="w-4 h-4" />
-              Histórico de Cálculos ({history.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loadingHistory ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : history.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                Nenhum cálculo de média disponível ainda
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº Abastecimento</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM Anterior</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM Atual</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM Percorrido</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Litros</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Média</th>
+        <DataCard title="Histórico de cálculos" count={loadingHistory ? '...' : history.length}>
+          {loadingHistory ? (
+            <EmptyState title="Carregando..." />
+          ) : history.length === 0 ? (
+            <EmptyState icon={TrendingUp} title="Nenhum cálculo de média disponível ainda" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Nº abastecimento</th>
+                    <th>Placa</th>
+                    <th>Data</th>
+                    <th className="!text-right">KM anterior</th>
+                    <th className="!text-right">KM atual</th>
+                    <th className="!text-right">KM percorrido</th>
+                    <th className="!text-right">Litros</th>
+                    <th className="!text-right">Média</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((h) => (
+                    <tr key={h.supply_id}>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{h.supply_number}</td>
+                      <td><PlateTag>{h.vehicle_plate}</PlateTag></td>
+                      <td className="whitespace-nowrap tabular-nums">{fmtDate(h.supply_date)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(h.previous_reading)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(h.current_reading)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(h.km_traveled)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{fmtLiters(h.liters)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtAvg(h.average)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((h, idx) => (
-                      <tr key={h.supply_id} className={idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}>
-                        <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{h.supply_number}</td>
-                        <td className="px-4 py-2.5 text-sm font-mono text-slate-600 dark:text-slate-400">{h.vehicle_plate}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtDate(h.supply_date)}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtKm(h.previous_reading)}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtKm(h.current_reading)}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtKm(h.km_traveled)}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtLiters(h.liters)}</td>
-                        <td className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">{fmtAvg(h.average)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
     </Layout>
   );

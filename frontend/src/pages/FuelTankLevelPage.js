@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -138,164 +141,138 @@ export default function FuelTankLevelPage() {
     });
   };
 
-  const barColor = level?.status === 'LOW' ? 'bg-red-500' : 'bg-emerald-500';
+  const barColor = level?.status === 'LOW' ? 'bg-red-500' : 'bg-primary';
   const badge = level?.status === 'LOW'
-    ? { label: 'Baixo', color: 'bg-red-100 text-red-800' }
-    : { label: 'OK', color: 'bg-green-100 text-green-800' };
+    ? { label: 'Nível baixo', tone: 'red' }
+    : { label: 'Nível OK', tone: 'emerald' };
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="fuel-tank-level-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Nível do Tanque</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Combustível disponível no tanque próprio, descontado a cada Abastecimento vindo dele</p>
-        </div>
+      <div className="space-y-4" data-testid="fuel-tank-level-page">
+        <PageHeader
+          icon={Droplet}
+          title="Nível do Tanque"
+          subtitle="Combustível disponível no tanque próprio, descontado a cada Abastecimento vindo dele"
+        />
 
         {/* Medidor */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Droplet className="w-4 h-4" />
-              Medidor
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            {loadingLevel ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <DataCard
+          title="Medidor"
+          meta={level?.configured && !loadingLevel ? <StatusPill tone={badge.tone}>{badge.label}</StatusPill> : null}
+        >
+          {loadingLevel ? (
+            <EmptyState title="Carregando..." />
+          ) : !level?.configured ? (
+            <div className="px-6 py-10 text-center">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <Settings className="w-6 h-6 text-slate-400 dark:text-slate-500" />
               </div>
-            ) : !level?.configured ? (
-              <div className="p-6 text-center text-muted-foreground">
-                <Settings className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm font-medium">O tanque ainda não foi configurado</p>
-                <p className="text-xs mt-1 mb-3">Defina a capacidade e o alerta mínimo primeiro</p>
-                <Link to="/tank-settings">
-                  <Button size="sm" data-testid="go-to-tank-settings-button">Configurar Tanque</Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-end justify-between">
-                  <div>
-                    <span className="text-2xl font-bold text-slate-800 dark:text-slate-200">{fmtLiters(level.current_liters)}</span>
-                    <span className="text-sm text-slate-400 dark:text-slate-500"> / {fmtLiters(level.capacity_liters)}</span>
-                  </div>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${badge.color}`}>{badge.label}</span>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">O tanque ainda não foi configurado</p>
+              <p className="text-xs mt-1 mb-4 text-slate-400 dark:text-slate-500">Defina a capacidade e o alerta mínimo primeiro</p>
+              <Link to="/tank-settings">
+                <Button size="sm" data-testid="go-to-tank-settings-button">Configurar Tanque</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="p-5 space-y-3">
+              <div className="flex items-end justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Disponível agora</p>
+                  <span className="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{fmtLiters(level.current_liters)}</span>
+                  <span className="text-sm text-slate-400 dark:text-slate-500 tabular-nums"> / {fmtLiters(level.capacity_liters)}</span>
                 </div>
-                <div className="w-full h-8 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <span className="text-2xl font-semibold tabular-nums text-slate-700 dark:text-slate-200">{level.percentage}%</span>
+              </div>
+              <div className="relative w-full h-6 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div className={`h-full ${barColor} transition-all`} style={{ width: `${level.percentage}%` }} />
+                {level.capacity_liters > 0 && (
+                  // Marca do alerta mínimo em cima da barra
                   <div
-                    className={`h-full ${barColor} transition-all flex items-center justify-end`}
-                    style={{ width: `${level.percentage}%` }}
-                  >
-                    {level.percentage > 10 && (
-                      <span className="text-[11px] font-semibold text-white pr-2">{level.percentage}%</span>
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-slate-400 dark:text-slate-500">Alerta mínimo: {fmtLiters(level.minimum_alert_liters)}</p>
+                    className="absolute top-0 bottom-0 w-0.5 bg-red-500/70"
+                    style={{ left: `${Math.min(100, (level.minimum_alert_liters / level.capacity_liters) * 100)}%` }}
+                    title="Alerta mínimo"
+                  />
+                )}
               </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openNewModal}
-            className="h-9 px-3 gap-2 text-[13px] font-medium"
-            title="Reabastecer Tanque"
-            data-testid="new-tank-refill-btn"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-            Reabastecer Tanque
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            disabled={selectedIds.size === 0}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Excluir"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedIds.size} selecionado(s)
-            </span>
+              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <span className="inline-block w-2.5 h-0.5 bg-red-500/70" />
+                Alerta mínimo: <span className="tabular-nums font-medium text-slate-700 dark:text-slate-200">{fmtLiters(level.minimum_alert_liters)}</span>
+              </p>
+            </div>
           )}
-        </div>
+        </DataCard>
 
-        {/* Histórico */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Droplet className="w-4 h-4" />
-              Histórico ({ledger.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loadingLedger ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : ledger.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                Nenhuma movimentação de tanque registrada ainda
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left w-10">
-                        <Checkbox
-                          checked={ledger.some(l => l.type === 'ENTRADA') && ledger.filter(l => l.type === 'ENTRADA').every(l => selectedIds.has(l.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Litros</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Fornecedor/Veículo</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Observações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ledger.map((item, idx) => {
-                      const isEntrada = item.type === 'ENTRADA';
-                      const isSelected = isEntrada && selectedIds.has(item.id);
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`transition-colors ${isEntrada ? 'cursor-pointer' : ''} ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `${isEntrada ? 'hover:bg-slate-50 dark:hover:bg-slate-800/80' : ''} ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          onClick={() => toggleSelect(item)}
-                        >
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            {isEntrada && <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(item)} />}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${isEntrada ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {isEntrada ? 'Entrada' : 'Saída'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{item.reference_number}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtDate(item.date)}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtLiters(item.liters)}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{item.label}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{item.observations || '-'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Histórico - só as Entradas (reabastecimentos) podem ser selecionadas;
+            as Saídas vêm dos Abastecimentos e são excluídas por lá */}
+        <DataCard
+          title="Histórico"
+          count={loadingLedger ? '...' : ledger.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Reabastecer tanque" onClick={openNewModal} testId="new-tank-refill-btn" />}
+            >
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={handleDelete} disabled={selectedIds.size === 0} />
+            </Toolbar>
+          )}
+        >
+          {loadingLedger ? (
+            <EmptyState title="Carregando..." />
+          ) : ledger.length === 0 ? (
+            <EmptyState icon={Droplet} title="Nenhuma movimentação de tanque registrada ainda" hint='Registre a primeira entrega pelo botão "Reabastecer tanque"' />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={ledger.some(l => l.type === 'ENTRADA') && ledger.filter(l => l.type === 'ENTRADA').every(l => selectedIds.has(l.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Tipo</th>
+                    <th>Nº</th>
+                    <th>Data</th>
+                    <th className="!text-right">Litros</th>
+                    <th>Fornecedor/Veículo</th>
+                    <th>Observações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ledger.map((item) => {
+                    const isEntrada = item.type === 'ENTRADA';
+                    const isSelected = isEntrada && selectedIds.has(item.id);
+                    return (
+                      <tr
+                        key={item.id}
+                        data-selected={isSelected}
+                        className={isEntrada ? 'cursor-pointer' : ''}
+                        onClick={() => toggleSelect(item)}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          {isEntrada && <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(item)} />}
+                        </td>
+                        <td>
+                          <StatusPill tone={isEntrada ? 'primary' : 'amber'}>
+                            {isEntrada ? 'Entrada' : 'Saída'}
+                          </StatusPill>
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{item.reference_number}</td>
+                        <td className="whitespace-nowrap tabular-nums">{fmtDate(item.date)}</td>
+                        <td className={`text-right whitespace-nowrap tabular-nums font-medium ${isEntrada ? 'text-primary' : 'text-amber-600 dark:text-amber-400'}`}>
+                          {isEntrada ? '+' : '-'}{fmtLiters(item.liters)}
+                        </td>
+                        <td><div className="max-w-[240px] truncate" title={item.label || ''}>{item.label}</div></td>
+                        <td><div className="max-w-[260px] truncate" title={item.observations || ''}>{item.observations || '-'}</div></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
 
       {/* Modal Reabastecer Tanque */}

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  StatCard, StatGrid, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, PlateTag, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,7 +14,7 @@ import { sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
-import { Gauge, Plus, Trash2 } from 'lucide-react';
+import { Gauge, Plus, Trash2, Truck, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -27,9 +30,9 @@ const fmtDate = (d) => {
 };
 
 const STATUS_BADGES = {
-  OK: { label: 'OK', color: 'bg-green-100 text-green-800' },
-  DUE_SOON: { label: 'Próximo', color: 'bg-amber-100 text-amber-800' },
-  OVERDUE: { label: 'Vencido', color: 'bg-red-100 text-red-800' },
+  OK: { label: 'OK', tone: 'emerald' },
+  DUE_SOON: { label: 'Próximo', tone: 'amber' },
+  OVERDUE: { label: 'Vencido', tone: 'red' },
 };
 
 function createEmptyForm() {
@@ -154,6 +157,8 @@ export default function OdometerReadingsPage() {
     });
   };
 
+  const countByStatus = (status) => maintenanceStatus.filter((m) => m.status === status).length;
+
   const toggleSelectAllOnPage = () => {
     setSelectedIds(prev => {
       const pageIds = readings.filter(r => r.source === 'MANUAL').map(r => r.id);
@@ -169,177 +174,141 @@ export default function OdometerReadingsPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="odometer-readings-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Lançamento de Hodômetro</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Registre a quilometragem dos veículos e acompanhe quando a próxima manutenção está próxima</p>
-        </div>
+      <div className="space-y-4" data-testid="odometer-readings-page">
+        <PageHeader
+          icon={Gauge}
+          title="Lançamento de Hodômetro"
+          subtitle="Registre a quilometragem dos veículos e acompanhe quando a próxima manutenção está próxima"
+        />
+
+        <StatGrid>
+          <StatCard label="Veículos acompanhados" value={maintenanceStatus.length} icon={Truck} tone="blue" hint="com revisão registrada" />
+          <StatCard label="Em dia" value={countByStatus('OK')} icon={CheckCircle2} tone="emerald" />
+          <StatCard label="Manutenção próxima" value={countByStatus('DUE_SOON')} icon={Clock} tone="amber" />
+          <StatCard label="Manutenção vencida" value={countByStatus('OVERDUE')} icon={AlertTriangle} tone="red" />
+        </StatGrid>
 
         {/* Situação de Manutenção */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Gauge className="w-4 h-4" />
-              Situação de Manutenção
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loadingStatus ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : maintenanceStatus.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                Nenhum veículo com Revisão registrada ainda
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modelo</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM Atual</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Próxima Manutenção</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM Restante</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {maintenanceStatus.map((m, idx) => {
-                      const badge = STATUS_BADGES[m.status] || STATUS_BADGES.OK;
-                      return (
-                        <tr key={m.vehicle_id} className={idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}>
-                          <td className="px-4 py-2.5 text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{m.vehicle_plate}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{m.vehicle_model || '-'}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtKm(m.current_km)}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtKm(m.next_due_km)}</td>
-                          <td className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">{fmtKm(m.km_remaining)}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${badge.color}`}>{badge.label}</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openNewModal}
-            className="h-9 w-9 p-0"
-            title="Novo Lançamento"
-            data-testid="new-odometer-reading-btn"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            disabled={selectedIds.size === 0}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Excluir"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedIds.size} selecionado(s)
-            </span>
+        <DataCard title="Situação de manutenção" count={loadingStatus ? '...' : maintenanceStatus.length}>
+          {loadingStatus ? (
+            <EmptyState title="Carregando..." />
+          ) : maintenanceStatus.length === 0 ? (
+            <EmptyState icon={Gauge} title="Nenhum veículo com Revisão registrada ainda" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Placa</th>
+                    <th>Modelo</th>
+                    <th className="!text-right">KM atual</th>
+                    <th className="!text-right">Próxima manutenção</th>
+                    <th className="!text-right">KM restante</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {maintenanceStatus.map((m) => {
+                    const badge = STATUS_BADGES[m.status] || STATUS_BADGES.OK;
+                    return (
+                      <tr key={m.vehicle_id}>
+                        <td><PlateTag>{m.vehicle_plate}</PlateTag></td>
+                        <td>{m.vehicle_model || '-'}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(m.current_km)}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(m.next_due_km)}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtKm(m.km_remaining)}</td>
+                        <td><StatusPill tone={badge.tone}>{badge.label}</StatusPill></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
-        </div>
+        </DataCard>
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Gauge className="w-4 h-4" />
-              Lançamentos de Hodômetro ({pagination.total})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : readings.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                Nenhum lançamento de hodômetro registrado ainda
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left w-10">
-                        <Checkbox
-                          checked={readings.some(r => r.source === 'MANUAL') && readings.filter(r => r.source === 'MANUAL').every(r => selectedIds.has(r.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Origem</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Observações</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado em</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {readings.map((r, idx) => {
-                      const isManual = r.source === 'MANUAL';
-                      const isSelected = isManual && selectedIds.has(r.id);
-                      return (
-                        <tr
-                          key={r.id}
-                          className={`transition-colors ${isManual ? 'cursor-pointer' : ''} ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `${isManual ? 'hover:bg-slate-50 dark:hover:bg-slate-800/80' : ''} ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          onClick={() => isManual && toggleSelect(r.id)}
-                        >
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            {isManual && <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(r.id)} />}
-                          </td>
-                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{r.reading_number}</td>
-                          <td className="px-4 py-2.5 text-sm font-mono text-slate-600 dark:text-slate-400">{r.vehicle_plate}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtKm(r.km)}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtDate(r.reading_date)}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${isManual ? 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300' : 'bg-primary/10 text-primary'}`}>
-                              {isManual ? 'Manual' : 'Abastecimento'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{r.observations || '-'}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                            {r.created_at && format(new Date(r.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {pagination.pages > 1 && (
-              <div className="flex justify-center gap-2 mt-4 pb-4">
-                <Button variant="outline" size="sm" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
-                  Anterior
-                </Button>
-                <span className="px-4 py-2 text-sm">Página {pagination.page} de {pagination.pages}</span>
-                <Button variant="outline" size="sm" disabled={pagination.page === pagination.pages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>
-                  Próxima
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Lista - só lançamentos manuais podem ser selecionados (os de
+            Abastecimento são excluídos pela tela de Abastecimento) */}
+        <DataCard
+          title="Lançamentos de hodômetro"
+          count={pagination.total}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Novo lançamento" onClick={openNewModal} testId="new-odometer-reading-btn" />}
+            >
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={handleDelete} disabled={selectedIds.size === 0} />
+            </Toolbar>
+          )}
+          footer={(
+            <TablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              pageSize={20}
+              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+            />
+          )}
+        >
+          {loading ? (
+            <EmptyState title="Carregando..." />
+          ) : readings.length === 0 ? (
+            <EmptyState icon={Gauge} title="Nenhum lançamento de hodômetro registrado ainda" hint='Registre o primeiro pelo botão "Novo lançamento"' />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={readings.some(r => r.source === 'MANUAL') && readings.filter(r => r.source === 'MANUAL').every(r => selectedIds.has(r.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Nº</th>
+                    <th>Placa</th>
+                    <th className="!text-right">KM</th>
+                    <th>Data</th>
+                    <th>Origem</th>
+                    <th>Observações</th>
+                    <th>Criado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {readings.map((r) => {
+                    const isManual = r.source === 'MANUAL';
+                    const isSelected = isManual && selectedIds.has(r.id);
+                    return (
+                      <tr
+                        key={r.id}
+                        data-selected={isSelected}
+                        className={isManual ? 'cursor-pointer' : ''}
+                        onClick={() => isManual && toggleSelect(r.id)}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          {isManual && <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(r.id)} />}
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{r.reading_number}</td>
+                        <td><PlateTag>{r.vehicle_plate}</PlateTag></td>
+                        <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(r.km)}</td>
+                        <td className="whitespace-nowrap tabular-nums">{fmtDate(r.reading_date)}</td>
+                        <td>
+                          <StatusPill tone={isManual ? 'slate' : 'primary'} dot={false}>
+                            {isManual ? 'Manual' : 'Abastecimento'}
+                          </StatusPill>
+                        </td>
+                        <td><div className="max-w-[260px] truncate" title={r.observations || ''}>{r.observations || '-'}</div></td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {r.created_at && format(new Date(r.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
 
       {/* Modal Novo Lançamento */}
