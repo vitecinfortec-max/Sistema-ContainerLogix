@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,7 +14,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Trash2, Edit, Search, Wrench } from 'lucide-react';
+import { Plus, Trash2, Edit, Wrench } from 'lucide-react';
 
 const UNIT_OPTIONS = [['HORAS', 'Horas'], ['QUANTIDADE', 'Quantidade'], ['OUTROS', 'Outros']];
 const STATUS_OPTIONS = [['true', 'Ativo'], ['false', 'Inativo']];
@@ -161,134 +164,91 @@ export default function ServiceCatalogPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="service-catalog-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Cadastro de Serviço</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Catálogo de serviços do Estoque</p>
-        </div>
+      <div className="space-y-4" data-testid="service-catalog-page">
+        <PageHeader icon={Wrench} title="Cadastro de Serviço" subtitle="Catálogo de serviços do Estoque" />
 
-        {/* Filtrar */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 text-[13px] pl-9" data-testid="search-service-catalog-input" />
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Código, descrição ou família">
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-service-catalog-input" />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreateDialog}
-            className="h-9 w-9 p-0"
-            title="Novo Serviço"
-            data-testid="add-service-catalog-button"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedItem && openEditDialog(singleSelectedItem)}
-            disabled={!singleSelectedItem}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Editar"
-          >
-            <Edit className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)}
-            disabled={!singleSelectedItem}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Excluir"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedIds.size} selecionado(s)
-            </span>
+        {/* Lista - marque um serviço pra habilitar as ações da barra */}
+        <DataCard
+          title="Serviços cadastrados"
+          count={loading ? '...' : filteredItems.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Novo serviço" onClick={openCreateDialog} testId="add-service-catalog-button" />}
+            >
+              <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedItem && openEditDialog(singleSelectedItem)} disabled={!singleSelectedItem} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)} disabled={!singleSelectedItem} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Wrench className="w-4 h-4" />
-              {loading ? 'Carregando...' : `Serviços Cadastrados (${filteredItems.length})`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {filteredItems.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left w-10">
-                        <Checkbox
-                          checked={filteredItems.length > 0 && filteredItems.every(i => selectedIds.has(i.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Código</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Família</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Descrição</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Unidade</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Valor</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredItems.map((item, idx) => {
-                      const isSelected = selectedIds.has(item.id);
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          onClick={() => toggleSelect(item.id)}
-                          data-testid="service-catalog-row"
-                        >
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleSelect(item.id)}
-                            />
-                          </td>
-                          <td className="px-4 py-2.5 text-[13px] font-semibold text-primary">{item.code}</td>
-                          <td className="px-4 py-2.5 text-[13px]">{item.family_name || '-'}</td>
-                          <td className="px-4 py-2.5 text-[13px]">{item.description}</td>
-                          <td className="px-4 py-2.5 text-[13px]">{UNIT_OPTIONS.find(([v]) => v === item.unit)?.[1] || item.unit}</td>
-                          <td className="px-4 py-2.5 text-[13px]">{fmtMoney(item.value)}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${item.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                              {item.active ? 'Ativo' : 'Inativo'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-slate-500 dark:text-slate-400">
-                <Wrench className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">{search ? 'Nenhum serviço encontrado' : 'Nenhum serviço cadastrado'}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        >
+          {filteredItems.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={filteredItems.length > 0 && filteredItems.every(i => selectedIds.has(i.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Código</th>
+                    <th>Família</th>
+                    <th>Descrição</th>
+                    <th>Unidade</th>
+                    <th className="!text-right">Valor</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((item) => {
+                    const isSelected = selectedIds.has(item.id);
+                    return (
+                      <tr
+                        key={item.id}
+                        data-selected={isSelected}
+                        className="cursor-pointer"
+                        onClick={() => toggleSelect(item.id)}
+                        data-testid="service-catalog-row"
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelect(item.id)}
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">{item.code}</td>
+                        <td><div className="max-w-[180px] truncate" title={item.family_name || ''}>{item.family_name || '-'}</div></td>
+                        <td><div className="max-w-[360px] truncate" title={item.description || ''}>{item.description}</div></td>
+                        <td className="whitespace-nowrap">{UNIT_OPTIONS.find(([v]) => v === item.unit)?.[1] || item.unit}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(item.value)}</td>
+                        <td>
+                          <StatusPill tone={item.active ? 'emerald' : 'slate'}>
+                            {item.active ? 'Ativo' : 'Inativo'}
+                          </StatusPill>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={Wrench}
+              title={loading ? 'Carregando...' : (search ? 'Nenhum serviço encontrado' : 'Nenhum serviço cadastrado')}
+              hint={loading ? undefined : (search ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo serviço"')}
+            />
+          )}
+        </DataCard>
       </div>
 
       {/* Modal Cadastrar/Editar Serviço */}

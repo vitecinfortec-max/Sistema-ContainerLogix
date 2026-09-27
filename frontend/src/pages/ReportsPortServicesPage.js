@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { StatCard, StatGrid, FilterCard, FilterField, DataCard, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { FileText, FileSpreadsheet, Calendar, X, BarChart3, Anchor, Wallet, Gauge, Clock } from 'lucide-react';
+import { FileText, FileSpreadsheet, BarChart3, Anchor, Wallet, Gauge, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -33,22 +33,6 @@ function ChartTooltip({ active, payload, label }) {
         </p>
       ))}
     </div>
-  );
-}
-
-function KpiCard({ icon: Icon, label, value, testid }) {
-  return (
-    <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid={testid}>
-      <CardContent className="p-3 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-          <Icon className="w-4.5 h-4.5 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wide font-semibold truncate">{label}</div>
-          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{value}</div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -159,100 +143,73 @@ export default function ReportsPortServicesPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="reports-port-services-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Relatório de Serviço Portuário
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Acompanhe os serviços internos realizados dentro do porto</p>
-        </div>
+      <div className="space-y-4" data-testid="reports-port-services-page">
+        <PageHeader icon={BarChart3} title="Relatório de Serviço Portuário" subtitle="Acompanhe os serviços internos realizados dentro do porto" />
 
-        {/* Filters */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                Filtrar
-              </span>
-              {hasFilters && (
-                <button onClick={clearFilters} className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="report-port-services-clear-filters">
-                  <X className="w-3 h-3" />
-                  Limpar
-                </button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
-                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" data-testid="report-port-services-date-from" />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
-                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" data-testid="report-port-services-date-to" />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
-                <Autocomplete
-                  value={clientName}
-                  onChange={(val) => { setClientName(val); setClientId(''); }}
-                  onSelect={(c) => { setClientName(c.name); setClientId(c.id); }}
-                  options={clients}
-                  displayField="name"
-                  className="text-xs"
-                />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Turno</Label>
-                <Select value={turno} onValueChange={setTurno}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-port-services-filter-turno">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
-                    {TURNO_OPTIONS.map(([v, l]) => (
-                      <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="port-services-summary-cards">
-          <KpiCard icon={Anchor} label="Total de Serviços" value={summary.count} testid="port-services-kpi-count" />
-          <KpiCard icon={Wallet} label="Valor Total" value={fmtMoney(summary.total_value)} testid="port-services-kpi-value" />
-          <KpiCard icon={Gauge} label="Valor Médio" value={fmtMoney(summary.avg_value)} testid="port-services-kpi-avg" />
-          <KpiCard icon={Clock} label="Em Andamento" value={summary.in_progress_count} testid="port-services-kpi-in-progress" />
-        </div>
-
-        {/* Barra de ações */}
-        <div>
-          <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wide font-semibold">Exportar</Label>
-          <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-            <Button variant="ghost" size="sm" onClick={downloadPDF} disabled={loading} title="Baixar PDF" data-testid="download-port-services-pdf-button" className="h-9 w-9 p-0 disabled:opacity-30">
-              <FileText className="w-4 h-4 text-red-600" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={downloadExcel} disabled={loading} title="Baixar Excel" data-testid="download-port-services-excel-button" className="h-9 w-9 p-0 disabled:opacity-30">
-              <FileSpreadsheet className="w-4 h-4 text-green-600" />
-            </Button>
+        <FilterCard
+          hasFilters={!!hasFilters}
+          onClear={clearFilters}
+          clearLinkTestId="report-port-services-clear-filters"
+          actions={(
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={downloadPDF} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-port-services-pdf-button">
+                <FileText className="w-4 h-4 text-red-600" /> Baixar PDF
+              </Button>
+              <Button type="button" size="sm" onClick={downloadExcel} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-port-services-excel-button">
+                <FileSpreadsheet className="w-4 h-4" /> Baixar Excel
+              </Button>
+            </>
+          )}
+        >
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Data início">
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="report-port-services-date-from" />
+            </FilterField>
+            <FilterField label="Data fim">
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="report-port-services-date-to" />
+            </FilterField>
+            <FilterField label="Cliente">
+              <Autocomplete
+                value={clientName}
+                onChange={(val) => { setClientName(val); setClientId(''); }}
+                onSelect={(c) => { setClientName(c.name); setClientId(c.id); }}
+                options={clients}
+                displayField="name"
+                className="h-9 text-sm"
+              />
+            </FilterField>
+            <FilterField label="Turno">
+              <Select value={turno} onValueChange={setTurno}>
+                <SelectTrigger className="h-9 text-sm" data-testid="report-port-services-filter-turno">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                  {TURNO_OPTIONS.map(([v, l]) => (
+                    <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
           </div>
+        </FilterCard>
+
+        <div data-testid="port-services-summary-cards">
+          <StatGrid>
+            <StatCard icon={Anchor} label="Total de serviços" value={summary.count} tone="blue" testId="port-services-kpi-count" />
+            <StatCard icon={Wallet} label="Valor total" value={fmtMoney(summary.total_value)} tone="emerald" testId="port-services-kpi-value" />
+            <StatCard icon={Gauge} label="Valor médio" value={fmtMoney(summary.avg_value)} tone="primary" testId="port-services-kpi-avg" />
+            <StatCard icon={Clock} label="Em andamento" value={summary.in_progress_count} tone="amber" testId="port-services-kpi-in-progress" />
+          </StatGrid>
         </div>
 
         {/* Dashboard: Serviços Portuários por Dia */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-port-services-chart-card">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-primary" />
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Serviços Portuários por Dia</CardTitle>
-              <span className="text-xs text-slate-400 dark:text-slate-500">(últimos 14 dias)</span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
+        <DataCard
+          title={(<span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Serviços portuários por dia</span>)}
+          meta={<span className="text-xs text-slate-400 dark:text-slate-500">últimos 14 dias</span>}
+          testId="daily-port-services-chart-card"
+        >
+          <div className="p-4">
             {dailyChart.some((d) => d.total_value > 0) ? (
               <div className="h-72 w-full" data-testid="daily-port-services-chart">
                 <ResponsiveContainer width="100%" height="100%">
@@ -269,13 +226,10 @@ export default function ReportsPortServicesPage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
-              </div>
+              <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </DataCard>
       </div>
     </Layout>
   );

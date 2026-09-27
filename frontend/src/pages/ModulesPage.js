@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { DataCard, StatusPill } from '../components/DataPage';
 import { Switch } from '../components/ui/switch';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
@@ -83,52 +84,47 @@ export default function ModulesPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="modules-page">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <LayoutGrid className="w-5 h-5 text-primary" />
-              Módulos Contratados
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Controle o que este cliente pode usar. Desative um grupo inteiro ou só itens específicos —
-              o resto dos usuários deste sistema deixa de enxergar o que estiver desativado aqui.
-            </p>
-          </div>
-          <Button onClick={handleSave} disabled={saving} className="h-10 text-[13px] font-semibold" data-testid="save-modules-button">
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? 'Salvando...' : 'Salvar Alterações'}
-          </Button>
-        </div>
+      <div className="space-y-4" data-testid="modules-page">
+        <PageHeader
+          icon={LayoutGrid}
+          title="Módulos Contratados"
+          subtitle="Controle o que este cliente pode usar. Desative um grupo inteiro ou só itens específicos — o resto dos usuários deste sistema deixa de enxergar o que estiver desativado aqui."
+          actions={(
+            <Button onClick={handleSave} disabled={saving} className="h-9 gap-1.5 text-[13px]" data-testid="save-modules-button">
+              <Save className="w-4 h-4" />
+              {saving ? 'Salvando...' : 'Salvar alterações'}
+            </Button>
+          )}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {catalog.map((group) => (
-            <Card key={group.key}>
-              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                  <span>{group.label}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[11px] font-medium ${!isDisabled(group.key) ? 'text-green-600' : 'text-slate-400 dark:text-slate-500'}`}>
-                      {!isDisabled(group.key) ? 'Grupo liberado' : 'Grupo bloqueado'}
-                    </span>
-                    <Switch
-                      checked={!isDisabled(group.key)}
-                      onCheckedChange={() => toggleGroup(group.key, group.items)}
-                      data-testid={`module-group-switch-${group.key}`}
-                    />
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <table className="w-full">
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+          {catalog.map((group) => {
+            const groupBlocked = isDisabled(group.key);
+            return (
+              <DataCard
+                key={group.key}
+                title={group.label}
+                meta={(
+                  <StatusPill tone={groupBlocked ? 'slate' : 'emerald'}>
+                    {groupBlocked ? 'Grupo bloqueado' : 'Grupo liberado'}
+                  </StatusPill>
+                )}
+                toolbar={(
+                  <Switch
+                    checked={!groupBlocked}
+                    onCheckedChange={() => toggleGroup(group.key, group.items)}
+                    data-testid={`module-group-switch-${group.key}`}
+                  />
+                )}
+              >
+                <table className="data-table">
+                  <tbody>
                     {group.items.map((item) => {
-                      const groupBlocked = isDisabled(group.key);
                       const itemBlocked = groupBlocked || isDisabled(item.key);
                       return (
                         <tr key={item.key}>
-                          <td className="px-4 py-2.5 text-[13px]">{item.label}</td>
-                          <td className="px-4 py-2.5 w-24 text-right">
+                          <td className={itemBlocked ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}>{item.label}</td>
+                          <td className="w-24 text-right !py-1.5">
                             <Switch
                               checked={!itemBlocked}
                               onCheckedChange={() => toggleItem(group.key, item.key)}
@@ -141,9 +137,9 @@ export default function ModulesPage() {
                     })}
                   </tbody>
                 </table>
-              </CardContent>
-            </Card>
-          ))}
+              </DataCard>
+            );
+          })}
         </div>
       </div>
     </Layout>

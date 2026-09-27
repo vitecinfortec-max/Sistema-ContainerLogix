@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,7 +14,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Trash2, Users, Edit, Search } from 'lucide-react';
+import { Plus, Trash2, Users, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -20,9 +23,9 @@ const TIPO_OPTIONS = [
   ['PJ', 'Pessoa Jurídica'],
 ];
 
-const STATUS_BADGE_CLASS = {
-  ATIVO: 'bg-emerald-100 text-emerald-700',
-  INATIVO: 'bg-slate-100 text-slate-600',
+const STATUS_TONES = {
+  ATIVO: 'emerald',
+  INATIVO: 'slate',
 };
 
 const formatCPF = (value) => {
@@ -199,13 +202,8 @@ export default function ContainerRepresentativesPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="container-representatives-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Cadastro de Representantes
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Vendedores (PF ou PJ) usados no Registro de Venda de Container</p>
-        </div>
+      <div className="space-y-4" data-testid="container-representatives-page">
+        <PageHeader icon={Users} title="Cadastro de Representantes" subtitle="Vendedores (PF ou PJ) usados no Registro de Venda de Container" />
 
         <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
@@ -404,138 +402,94 @@ export default function ContainerRepresentativesPage() {
             </DialogContent>
           </Dialog>
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 text-[13px] pl-9"
-                data-testid="search-representative-input"
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Nome, nome fantasia, CPF ou CNPJ">
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-representative-input" />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Barra de ações - marque um representante na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreateDialog}
-            title="Adicionar"
-            data-testid="add-representative-button"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedRepresentative && openEditDialog(singleSelectedRepresentative)}
-            disabled={!singleSelectedRepresentative}
-            title="Editar"
-            data-testid="edit-representative-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Edit className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedRepresentative && handleDelete(singleSelectedRepresentative.id)}
-            disabled={!singleSelectedRepresentative}
-            title="Excluir"
-            data-testid="delete-representative-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        {/* Lista - marque um representante pra habilitar as ações da barra */}
+        <DataCard
+          title="Representantes"
+          count={filteredRepresentatives.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Novo representante" onClick={openCreateDialog} testId="add-representative-button" />}
+            >
+              <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedRepresentative && openEditDialog(singleSelectedRepresentative)} disabled={!singleSelectedRepresentative} testId="edit-representative-button" />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRepresentative && handleDelete(singleSelectedRepresentative.id)} disabled={!singleSelectedRepresentative} testId="delete-representative-button" />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Users className="w-4 h-4" />
-              Lista de Representantes ({filteredRepresentatives.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {filteredRepresentatives.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
-                    <tr>
-                      <th className="w-9 px-4 py-2.5">
+        >
+          {filteredRepresentatives.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={filteredRepresentatives.length > 0 && filteredRepresentatives.every(r => selectedIds.has(r.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </th>
+                    <th>Tipo</th>
+                    <th>Nome</th>
+                    <th>CPF/CNPJ</th>
+                    <th>Telefone</th>
+                    <th>Status</th>
+                    <th>Cadastrado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRepresentatives.map((r) => (
+                    <tr
+                      key={r.id}
+                      onClick={() => toggleSelect(r.id)}
+                      data-selected={selectedIds.has(r.id)}
+                      className="cursor-pointer"
+                      data-testid="representative-row"
+                    >
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          checked={filteredRepresentatives.length > 0 && filteredRepresentatives.every(r => selectedIds.has(r.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                          data-testid="select-all-checkbox"
+                          checked={selectedIds.has(r.id)}
+                          onCheckedChange={() => toggleSelect(r.id)}
+                          data-testid="representative-row-checkbox"
                         />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Tipo</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nome</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">CPF/CNPJ</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Telefone</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
+                      </td>
+                      <td>
+                        <StatusPill tone={r.tipo === 'PJ' ? 'violet' : 'blue'} dot={false}>
+                          {r.tipo === 'PJ' ? 'PJ' : 'PF'}
+                        </StatusPill>
+                      </td>
+                      <td><div className="max-w-[260px] truncate cell-strong" title={r.name || ''}>{r.name}</div></td>
+                      <td className="whitespace-nowrap tabular-nums">{r.tipo === 'PJ' ? (r.cnpj || '-') : (r.cpf || '-')}</td>
+                      <td className="whitespace-nowrap tabular-nums">{r.phone || '-'}</td>
+                      <td>
+                        <StatusPill tone={STATUS_TONES[r.status] || 'emerald'}>
+                          {r.status === 'INATIVO' ? 'Inativo' : 'Ativo'}
+                        </StatusPill>
+                      </td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        {format(new Date(r.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredRepresentatives.map((r) => (
-                      <tr
-                        key={r.id}
-                        onClick={() => toggleSelect(r.id)}
-                        className={`cursor-pointer transition-colors ${selectedIds.has(r.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                        data-testid="representative-row"
-                      >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(r.id)}
-                            onCheckedChange={() => toggleSelect(r.id)}
-                            data-testid="representative-row-checkbox"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px]">{r.tipo === 'PJ' ? 'PJ' : 'PF'}</td>
-                        <td className="px-4 py-2.5 text-[13px] font-medium">{r.name}</td>
-                        <td className="px-4 py-2.5 text-[13px] font-mono">{r.tipo === 'PJ' ? (r.cnpj || '-') : (r.cpf || '-')}</td>
-                        <td className="px-4 py-2.5 text-[13px]">{r.phone || '-'}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE_CLASS[r.status] || 'bg-slate-100 text-slate-600'}`}>
-                            {r.status === 'INATIVO' ? 'Inativo' : 'Ativo'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px]">
-                          {format(new Date(r.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-slate-500 dark:text-slate-400" data-testid="no-representatives">
-                <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">
-                  {search ? 'Nenhum representante encontrado' : 'Nenhum representante cadastrado'}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={Users}
+              title={search ? 'Nenhum representante encontrado' : 'Nenhum representante cadastrado'}
+              hint={search ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo representante"'}
+              testId="no-representatives"
+            />
+          )}
+        </DataCard>
       </div>
       <ConfirmDialog />
     </Layout>

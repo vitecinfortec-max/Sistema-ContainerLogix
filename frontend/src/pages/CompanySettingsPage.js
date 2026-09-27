@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -137,22 +138,21 @@ export default function CompanySettingsPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="company-settings-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Dados da Empresa</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-            Essas informações e o logo são usados nos PDFs e planilhas gerados pelo sistema
-          </p>
-        </div>
+      <div className="space-y-4" data-testid="company-settings-page">
+        <PageHeader
+          icon={Building2}
+          title="Dados da Empresa"
+          subtitle="Essas informações e o logo são usados nos PDFs e planilhas gerados pelo sistema"
+        />
 
         {!isAdmin && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          <div className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-[13px] text-amber-800 dark:text-amber-300">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>Apenas administradores podem editar os dados da empresa. Você pode visualizar as informações abaixo.</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
@@ -160,7 +160,7 @@ export default function CompanySettingsPage() {
                 Identificação
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-5 space-y-4">
+            <CardContent className="p-4 space-y-4">
               <div className="flex flex-col sm:flex-row gap-6">
                 <div className="shrink-0">
                   <Label className="text-[13px]">Logo</Label>
@@ -275,7 +275,7 @@ export default function CompanySettingsPage() {
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Contato</CardTitle>
             </CardHeader>
-            <CardContent className="pt-5">
+            <CardContent className="p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="phone" className="text-[13px]">Telefone</Label>
@@ -310,7 +310,7 @@ export default function CompanySettingsPage() {
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dados Bancários</CardTitle>
               <CardDescription className="text-[12px]">Exibidos nos relatórios e faturas de faturamento</CardDescription>
             </CardHeader>
-            <CardContent className="pt-5">
+            <CardContent className="p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="bank_name" className="text-[13px]">Banco</Label>
@@ -365,7 +365,7 @@ export default function CompanySettingsPage() {
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Ordem de Carregamento</CardTitle>
               <CardDescription className="text-[12px]">Controla o preenchimento automático do Booking/Ref. em ordens do tipo Entrega</CardDescription>
             </CardHeader>
-            <CardContent className="pt-5">
+            <CardContent className="p-4">
               <div className="max-w-sm space-y-1.5">
                 <Label htmlFor="auto_booking_prefix" className="text-[13px]">Prefixo de Booking Automático (Entrega)</Label>
                 <Input

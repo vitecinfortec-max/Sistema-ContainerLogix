@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, PlateTag, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,7 +15,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
-import { Anchor, Plus, Eye, Trash2, Search, Printer, Pencil } from 'lucide-react';
+import { Anchor, Plus, Eye, Trash2, Printer, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -102,6 +106,12 @@ export default function PortServicePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadServices('');
   };
 
   const handleSearch = () => {
@@ -230,9 +240,9 @@ export default function PortServicePage() {
   const getSituacaoBadge = (situacao) => {
     const isConcluido = situacao === 'CONCLUIDO';
     return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${isConcluido ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+      <StatusPill tone={isConcluido ? 'emerald' : 'amber'}>
         {isConcluido ? 'Concluído' : 'No Pátio'}
-      </span>
+      </StatusPill>
     );
   };
 
@@ -240,185 +250,114 @@ export default function PortServicePage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="port-service-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Serviço Portuário</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Registre os serviços internos realizados dentro do porto</p>
-        </div>
+      <div className="space-y-4" data-testid="port-service-page">
+        <PageHeader icon={Anchor} title="Serviço Portuário" subtitle="Registre os serviços internos realizados dentro do porto" />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 space-y-3">
-            <div className="grid grid-cols-1 sm:max-w-sm gap-3">
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente, motorista ou placa</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="h-9 text-sm pl-8"
-                    data-testid="search-port-service-input"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <Button size="sm" onClick={handleSearch} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
-                Filtrar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch} onApply={handleSearch}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Cliente, motorista ou placa">
+              <SearchInput
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                data-testid="search-port-service-input"
+              />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openNewModal}
-            className="h-9 w-9 p-0"
-            title="Novo Serviço Portuário"
-            data-testid="new-port-service-btn"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedService && openDetails(singleSelectedService)}
-            disabled={!singleSelectedService}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Ver Detalhes"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedService && openEditModal(singleSelectedService)}
-            disabled={!singleSelectedService}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Editar"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedService && handlePrintPDF(singleSelectedService.id)}
-            disabled={!singleSelectedService}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Baixar PDF"
-          >
-            <Printer className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedService && handleDelete(singleSelectedService.id)}
-            disabled={!singleSelectedService}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Excluir"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedIds.size} selecionado(s)
-            </span>
+        {/* Lista - marque um serviço pra habilitar as ações da barra */}
+        <DataCard
+          title="Serviços portuários"
+          count={pagination.total}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Novo serviço" onClick={openNewModal} testId="new-port-service-btn" />}
+            >
+              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedService && openDetails(singleSelectedService)} disabled={!singleSelectedService} />
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedService && openEditModal(singleSelectedService)} disabled={!singleSelectedService} />
+              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedService && handlePrintPDF(singleSelectedService.id)} disabled={!singleSelectedService} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedService && handleDelete(singleSelectedService.id)} disabled={!singleSelectedService} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Anchor className="w-4 h-4" />
-              Serviços Portuários ({pagination.total})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : services.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                Nenhum Serviço Portuário encontrado
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left w-10">
-                        <Checkbox
-                          checked={services.length > 0 && services.every(s => selectedIds.has(s.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motorista</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Turno</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Situação</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Valor</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {services.map((service, idx) => {
-                      const isSelected = selectedIds.has(service.id);
-                      return (
-                        <tr
-                          key={service.id}
-                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          onClick={() => toggleSelect(service.id)}
-                        >
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleSelect(service.id)}
-                            />
-                          </td>
-                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{service.service_number}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{service.client_name}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{service.driver_name}</td>
-                          <td className="px-4 py-2.5 text-sm font-mono text-slate-600 dark:text-slate-400">{service.cavalo_plate}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                            {service.service_date && format(new Date(service.service_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
-                          </td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{service.turno === 'NOITE' ? 'Noite' : 'Dia'}</td>
-                          <td className="px-4 py-2.5">{getSituacaoBadge(service.situacao)}</td>
-                          <td className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">{fmtMoney(service.operation_value)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {pagination.pages > 1 && (
-              <div className="flex justify-center gap-2 mt-4">
-                <Button variant="outline" size="sm" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
-                  Anterior
-                </Button>
-                <span className="px-4 py-2 text-sm">Página {pagination.page} de {pagination.pages}</span>
-                <Button variant="outline" size="sm" disabled={pagination.page === pagination.pages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>
-                  Próxima
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          footer={(
+            <TablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              pageSize={15}
+              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+            />
+          )}
+        >
+          {loading ? (
+            <EmptyState title="Carregando..." />
+          ) : services.length === 0 ? (
+            <EmptyState
+              icon={Anchor}
+              title="Nenhum Serviço Portuário encontrado"
+              hint={searchQuery ? 'Ajuste a busca' : 'Registre o primeiro pelo botão "Novo serviço"'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={services.length > 0 && services.every(s => selectedIds.has(s.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Nº</th>
+                    <th>Cliente</th>
+                    <th>Motorista</th>
+                    <th>Placa</th>
+                    <th>Data</th>
+                    <th>Turno</th>
+                    <th>Situação</th>
+                    <th className="!text-right">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {services.map((service) => {
+                    const isSelected = selectedIds.has(service.id);
+                    return (
+                      <tr
+                        key={service.id}
+                        data-selected={isSelected}
+                        className="cursor-pointer"
+                        onClick={() => toggleSelect(service.id)}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelect(service.id)}
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{service.service_number}</td>
+                        <td><div className="max-w-[220px] truncate" title={service.client_name || ''}>{service.client_name}</div></td>
+                        <td><div className="max-w-[200px] truncate" title={service.driver_name || ''}>{service.driver_name}</div></td>
+                        <td><PlateTag>{service.cavalo_plate}</PlateTag></td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {service.service_date && format(new Date(service.service_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
+                        </td>
+                        <td>
+                          <StatusPill tone={service.turno === 'NOITE' ? 'violet' : 'amber'} dot={false}>
+                            {service.turno === 'NOITE' ? 'Noite' : 'Dia'}
+                          </StatusPill>
+                        </td>
+                        <td>{getSituacaoBadge(service.situacao)}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(service.operation_value)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
 
       {/* Modal Novo/Editar Serviço Portuário */}

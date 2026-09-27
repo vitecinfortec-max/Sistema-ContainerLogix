@@ -326,7 +326,7 @@ export default function Layout({ children }) {
   }, []);
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname === '/unit-segregation';
-  const isCadastroActive = location.pathname === '/cadastro';
+  const isCadastroActive = location.pathname === '/cadastro' || location.pathname === '/company-settings';
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/port-services-billing';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
@@ -671,9 +671,12 @@ export default function Layout({ children }) {
     if (isCadastroActive) return 'Cadastro';
     if (isFinanceiroActive) return 'Financeiro';
     if (isOperacionalActive) return 'Operacional';
+    if (isEstoqueActive) return 'Estoque';
+    if (isComercialActive) return 'Comercial';
+    if (isGestaoContainerActive) return 'Gestão de Container';
     if (isOpcoesSistemaActive) return 'Opções do Sistema';
     return null;
-  }, [isTerminalActive, isManutencaoActive, isAbastecimentoActive, isTransporteActive, isCadastroActive, isFinanceiroActive, isOperacionalActive, isOpcoesSistemaActive]);
+  }, [isTerminalActive, isManutencaoActive, isAbastecimentoActive, isTransporteActive, isCadastroActive, isFinanceiroActive, isOperacionalActive, isEstoqueActive, isComercialActive, isGestaoContainerActive, isOpcoesSistemaActive]);
 
   // Expand sidebar when clicking a group while collapsed
   const handleGroupClickCollapsed = (toggleFn) => {

@@ -529,7 +529,7 @@ export default function DailyRateRequestPage() {
                           <td className="p-2">{item.driver_name}</td>
                           <td className="p-2 font-mono">{item.vehicle_plate}</td>
                           <td className="p-2">{item.client_name}</td>
-                          <td className="p-2">{item.departure_date ? format(new Date(item.departure_date), 'dd/MM/yyyy') : '-'}</td>
+                          <td className="p-2">{item.departure_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(item.departure_date) ? `${item.departure_date}T00:00:00` : item.departure_date), 'dd/MM/yyyy') : '-'}</td>
                           <td className="p-2 text-right">{formatMoney(item.others_value)}</td>
                           <td className="p-2 text-right">{formatMoney(item.commission_value)}</td>
                           <td className="p-2 text-right">{formatMoney(item.lunch_value)}</td>

@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -12,7 +16,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import { formatContainerNumber } from '../lib/containerNumber';
-import { Calendar, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText } from 'lucide-react';
+import { Calendar, Plus, Eye, Trash2, Printer, Pencil, X, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -83,7 +87,7 @@ export default function LoadingSchedulePage() {
       const [clientsRes, driversRes, vehiclesRes] = await Promise.all([
         api.getClients(),
         api.getDrivers(),
-        api.getVehicles({ per_page: 100 })
+        api.getVehicles({ per_page: 1000 })
       ]);
       setClients(clientsRes.data);
       setDrivers(driversRes.data);
@@ -112,6 +116,12 @@ export default function LoadingSchedulePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadSchedules('');
   };
 
   const handleSearch = () => {
@@ -308,21 +318,9 @@ export default function LoadingSchedulePage() {
   };
 
   const getStatusBadge = (status) => {
-    const styles = {
-      'ATIVO': 'bg-green-100 text-green-800',
-      'CONCLUIDO': 'bg-blue-100 text-blue-800',
-      'CANCELADO': 'bg-red-100 text-red-800'
-    };
-    const labels = {
-      'ATIVO': 'Ativo',
-      'CONCLUIDO': 'Concluído',
-      'CANCELADO': 'Cancelado'
-    };
-    return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${styles[status] || styles['ATIVO']}`}>
-        {labels[status] || status}
-      </span>
-    );
+    const tones = { ATIVO: 'emerald', CONCLUIDO: 'blue', CANCELADO: 'red' };
+    const labels = { ATIVO: 'Ativo', CONCLUIDO: 'Concluído', CANCELADO: 'Cancelado' };
+    return <StatusPill tone={tones[status] || 'emerald'}>{labels[status] || status}</StatusPill>;
   };
 
   const cavalos = vehicles.filter(v => v.vehicle_type === 'CAVALO' || v.vehicle_type === 'CAMINHÃO');
@@ -330,181 +328,106 @@ export default function LoadingSchedulePage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="loading-schedule-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Programação de Carregamento</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie as programações de carregamento</p>
-        </div>
+      <div className="space-y-4" data-testid="loading-schedule-page">
+        <PageHeader icon={Calendar} title="Programação de Carregamento" subtitle="Gerencie as programações de carregamento" />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 space-y-3">
-            <div className="grid grid-cols-1 sm:max-w-sm gap-3">
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Cliente, motorista ou container</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="h-9 text-sm pl-8"
-                    data-testid="search-schedule-input"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <Button size="sm" onClick={handleSearch} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
-                Filtrar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch} onApply={handleSearch}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Cliente, motorista ou container">
+              <SearchInput
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                data-testid="search-schedule-input"
+              />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openNewModal}
-            className="h-9 w-9 p-0"
-            title="Nova Programação"
-            data-testid="new-schedule-btn"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedSchedule && openDetails(singleSelectedSchedule)}
-            disabled={!singleSelectedSchedule}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Ver Detalhes"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedSchedule && openEditModal(singleSelectedSchedule)}
-            disabled={!singleSelectedSchedule}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Editar"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedSchedule && handlePrintPDF(singleSelectedSchedule.id)}
-            disabled={!singleSelectedSchedule}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Baixar PDF"
-          >
-            <Printer className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedSchedule && handleDelete(singleSelectedSchedule.id)}
-            disabled={!singleSelectedSchedule}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Excluir"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedIds.size} selecionado(s)
-            </span>
+        {/* Lista - marque uma programação pra habilitar as ações da barra */}
+        <DataCard
+          title="Programações"
+          count={pagination.total}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova programação" onClick={openNewModal} testId="new-schedule-btn" />}
+            >
+              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedSchedule && openDetails(singleSelectedSchedule)} disabled={!singleSelectedSchedule} />
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedSchedule && openEditModal(singleSelectedSchedule)} disabled={!singleSelectedSchedule} />
+              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedSchedule && handlePrintPDF(singleSelectedSchedule.id)} disabled={!singleSelectedSchedule} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedSchedule && handleDelete(singleSelectedSchedule.id)} disabled={!singleSelectedSchedule} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Calendar className="w-4 h-4" />
-              Programações ({pagination.total})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : schedules.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                Nenhuma programação encontrada
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left w-10">
-                        <Checkbox
-                          checked={schedules.length > 0 && schedules.every(s => selectedIds.has(s.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Contratante</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Destino</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Itens</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado em</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {schedules.map((schedule, idx) => {
-                      const isSelected = selectedIds.has(schedule.id);
-                      return (
-                        <tr
-                          key={schedule.id}
-                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          onClick={() => toggleSelect(schedule.id)}
-                        >
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleSelect(schedule.id)}
-                            />
-                          </td>
-                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{schedule.schedule_number}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.contracting_client_name}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.destination_client_name}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{schedule.items?.length || 0}</td>
-                          <td className="px-4 py-2.5">{getStatusBadge(schedule.status)}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                            {schedule.created_at && format(new Date(schedule.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {pagination.pages > 1 && (
-              <div className="flex justify-center gap-2 mt-4">
-                <Button variant="outline" size="sm" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
-                  Anterior
-                </Button>
-                <span className="px-4 py-2 text-sm">Página {pagination.page} de {pagination.pages}</span>
-                <Button variant="outline" size="sm" disabled={pagination.page === pagination.pages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>
-                  Próxima
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          footer={(
+            <TablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              pageSize={15}
+              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+            />
+          )}
+        >
+          {loading ? (
+            <EmptyState title="Carregando..." />
+          ) : schedules.length === 0 ? (
+            <EmptyState
+              icon={Calendar}
+              title="Nenhuma programação encontrada"
+              hint={searchQuery ? 'Ajuste a busca' : 'Cadastre a primeira pelo botão "Nova programação"'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={schedules.length > 0 && schedules.every(s => selectedIds.has(s.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Nº</th>
+                    <th>Cliente contratante</th>
+                    <th>Cliente destino</th>
+                    <th className="!text-right">Itens</th>
+                    <th>Status</th>
+                    <th>Criado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedules.map((schedule) => {
+                    const isSelected = selectedIds.has(schedule.id);
+                    return (
+                      <tr
+                        key={schedule.id}
+                        data-selected={isSelected}
+                        className="cursor-pointer"
+                        onClick={() => toggleSelect(schedule.id)}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelect(schedule.id)}
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{schedule.schedule_number}</td>
+                        <td><div className="max-w-[260px] truncate" title={schedule.contracting_client_name || ''}>{schedule.contracting_client_name}</div></td>
+                        <td><div className="max-w-[260px] truncate" title={schedule.destination_client_name || ''}>{schedule.destination_client_name}</div></td>
+                        <td className="text-right tabular-nums">{schedule.items?.length || 0}</td>
+                        <td>{getStatusBadge(schedule.status)}</td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {schedule.created_at && format(new Date(schedule.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
 
       {/* Modal Nova/Editar Programação */}
@@ -760,7 +683,7 @@ export default function LoadingSchedulePage() {
                           <td className="p-2 font-mono">{item.cavalo_plate}</td>
                           <td className="p-2 font-mono">{item.carreta_plate || '-'}</td>
                           <td className="p-2">{item.loading_location}</td>
-                          <td className="p-2">{item.loading_date ? format(new Date(item.loading_date), 'dd/MM/yyyy') : '-'}</td>
+                          <td className="p-2">{item.loading_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(item.loading_date) ? `${item.loading_date}T00:00:00` : item.loading_date), 'dd/MM/yyyy') : '-'}</td>
                           <td className="p-2 font-mono">{item.container_number || '-'}</td>
                           <td className="p-2 font-mono">{item.seal_number || '-'}</td>
                           {selectedSchedule.items?.some(i => i.bag_number) && (

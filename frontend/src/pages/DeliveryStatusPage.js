@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
+  StatusPill, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -14,6 +18,12 @@ import { ClipboardCheck, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// Status do registro (ATIVO/CONCLUIDO/CANCELADO) é derivado automaticamente
+// pelo backend a partir de items[].delivery_completed - ver
+// _compute_delivery_status em routers/delivery_status.py.
+const RECORD_STATUS_LABELS = { ATIVO: 'Ativo', CONCLUIDO: 'Concluído', CANCELADO: 'Cancelado' };
+const RECORD_STATUS_TONES = { ATIVO: 'blue', CONCLUIDO: 'emerald', CANCELADO: 'red' };
+
 // Cliente para o qual exibimos o campo "Nº da Bolsa" (flexitank)
 const BAG_NUMBER_CLIENT_NAME = 'MANUPORT LIQUIDS DO BRASIL LTDA';
 
@@ -22,6 +32,7 @@ export default function DeliveryStatusPage() {
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
 
   // Modal de novo status
@@ -54,9 +65,12 @@ export default function DeliveryStatusPage() {
     setSelectedIds(new Set());
   }, [pagination.page]);
 
-  const loadStatuses = async () => {
+  const loadStatuses = async (filters = { number: searchQuery, status: statusFilter }) => {
     try {
-      const response = await api.getDeliveryStatuses({ page: pagination.page, per_page: 20 });
+      const params = { page: pagination.page, per_page: 20 };
+      if (filters.number) params.schedule_number = filters.number;
+      if (filters.status) params.status = filters.status;
+      const response = await api.getDeliveryStatuses(params);
       setStatuses(response.data.items);
       setPagination(prev => ({ ...prev, pages: response.data.pages, total: response.data.total }));
     } catch (error) {
@@ -64,6 +78,18 @@ export default function DeliveryStatusPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSearch = () => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadStatuses();
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('');
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadStatuses({ number: '', status: '' });
   };
 
   const searchSchedule = async () => {
@@ -268,212 +294,131 @@ export default function DeliveryStatusPage() {
     return nomes[0] || parts[0] || '-';
   };
 
-  // Status do registro (ATIVO/CONCLUIDO/CANCELADO) é derivado automaticamente
-  // pelo backend a partir de items[].delivery_completed - ver
-  // _compute_delivery_status em routers/delivery_status.py.
-  const getRecordStatusBadgeClass = (status) => (
-    status === 'CONCLUIDO' ? 'bg-green-100 text-green-800' :
-    status === 'CANCELADO' ? 'bg-red-100 text-red-800' :
-    'bg-blue-100 text-blue-800'
-  );
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="delivery-status-page">
-        {/* Header */}
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Status de Entrega</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de horários de entrega por programação</p>
-        </div>
+      <div className="space-y-4" data-testid="delivery-status-page">
+        <PageHeader icon={ClipboardCheck} title="Status de Entrega" subtitle="Controle de horários de entrega por programação" />
 
-        {/* Filtros */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="flex gap-3 items-end">
-              <div className="flex-1 max-w-xs">
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Programação</Label>
-                <Input
-                  type="number"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-9 text-sm"
-                  data-testid="search-schedule-number"
-                />
-              </div>
-              <Button size="sm" className="h-9 text-xs font-medium" onClick={() => {
-                setPagination(prev => ({ ...prev, page: 1 }));
-                loadStatuses();
-              }}>
-                <Search className="w-4 h-4 mr-1" />
-                Buscar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearFilters} onApply={handleSearch}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Nº programação">
+              <Input
+                type="number"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                className="h-9 text-sm"
+                data-testid="search-schedule-number"
+              />
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter || 'ALL'} onValueChange={(v) => setStatusFilter(v === 'ALL' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="filter-delivery-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos</SelectItem>
+                  {Object.entries(RECORD_STATUS_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => { resetForm(); setModalOpen(true); }}
-            className="h-9 w-9 p-0"
-            title="Novo Status"
-            data-testid="new-delivery-status-btn"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedStatus && viewDetails(singleSelectedStatus)}
-            disabled={!singleSelectedStatus}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Ver Detalhes"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedStatus && openEditModal(singleSelectedStatus)}
-            disabled={!singleSelectedStatus}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Editar"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedStatus && handlePrint(singleSelectedStatus.id)}
-            disabled={!singleSelectedStatus}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Imprimir PDF"
-          >
-            <Printer className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedStatus && handleExcel(singleSelectedStatus.id)}
-            disabled={!singleSelectedStatus}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Baixar Excel"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-green-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedStatus && handleDelete(singleSelectedStatus.id)}
-            disabled={!singleSelectedStatus}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Excluir"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedIds.size} selecionado(s)
-            </span>
+        {/* Lista - marque um status pra habilitar as ações da barra */}
+        <DataCard
+          title="Status de entrega"
+          count={pagination.total}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Novo status" onClick={() => { resetForm(); setModalOpen(true); }} testId="new-delivery-status-btn" />}
+            >
+              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedStatus && viewDetails(singleSelectedStatus)} disabled={!singleSelectedStatus} />
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedStatus && openEditModal(singleSelectedStatus)} disabled={!singleSelectedStatus} />
+              <ToolbarDivider />
+              <ToolbarButton icon={FileText} label="Imprimir PDF" tone="red" onClick={() => singleSelectedStatus && handlePrint(singleSelectedStatus.id)} disabled={!singleSelectedStatus} />
+              <ToolbarButton icon={FileSpreadsheet} label="Baixar Excel" tone="emerald" onClick={() => singleSelectedStatus && handleExcel(singleSelectedStatus.id)} disabled={!singleSelectedStatus} />
+              <ToolbarDivider />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedStatus && handleDelete(singleSelectedStatus.id)} disabled={!singleSelectedStatus} />
+            </Toolbar>
           )}
-        </div>
-
-        {/* Lista */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <span className="flex items-center gap-2">
-                <ClipboardCheck className="w-4 h-4" />
-                Status de Entrega ({pagination.total})
-              </span>
-              {pagination.pages > 1 && (
-                <span className="text-xs font-normal text-slate-400 dark:text-slate-500">Página {pagination.page} de {pagination.pages}</span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
-            ) : statuses.length === 0 ? (
-              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Nenhum status de entrega encontrado</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left w-10">
-                        <Checkbox
-                          checked={statuses.length > 0 && statuses.every(s => selectedIds.has(s.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Prog. Ref.</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente Destino</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motoristas</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {statuses.map((status, idx) => {
-                      const isSelected = selectedIds.has(status.id);
-                      return (
-                        <tr
-                          key={status.id}
-                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          onClick={() => toggleSelect(status.id)}
-                        >
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleSelect(status.id)}
-                            />
-                          </td>
-                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{status.status_number}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">Prog. #{status.schedule_number}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                            {status.status_date ? format(new Date(status.status_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                          </td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{status.destination_client_name}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{status.items?.length || 0}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${getRecordStatusBadgeClass(status.status)}`}>
-                              {status.status}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Paginação */}
-            {pagination.pages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
-                <div className="text-xs text-slate-400 dark:text-slate-500">Página {pagination.page} de {pagination.pages}</div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
-                    Anterior
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page === pagination.pages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>
-                    Próximo
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          footer={(
+            <TablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              pageSize={20}
+              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+            />
+          )}
+        >
+          {loading ? (
+            <EmptyState title="Carregando..." />
+          ) : statuses.length === 0 ? (
+            <EmptyState
+              icon={ClipboardCheck}
+              title="Nenhum status de entrega encontrado"
+              hint={searchQuery || statusFilter ? 'Ajuste os filtros' : 'Registre o primeiro pelo botão "Novo status"'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={statuses.length > 0 && statuses.every(s => selectedIds.has(s.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Nº</th>
+                    <th>Prog. ref.</th>
+                    <th>Data</th>
+                    <th>Cliente destino</th>
+                    <th className="!text-right">Motoristas</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {statuses.map((status) => {
+                    const isSelected = selectedIds.has(status.id);
+                    return (
+                      <tr
+                        key={status.id}
+                        data-selected={isSelected}
+                        className="cursor-pointer"
+                        onClick={() => toggleSelect(status.id)}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelect(status.id)}
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{status.status_number}</td>
+                        <td className="whitespace-nowrap tabular-nums">Prog. #{status.schedule_number}</td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {status.status_date ? format(new Date(status.status_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                        </td>
+                        <td><div className="max-w-[260px] truncate" title={status.destination_client_name || ''}>{status.destination_client_name}</div></td>
+                        <td className="text-right tabular-nums">{status.items?.length || 0}</td>
+                        <td>
+                          <StatusPill tone={RECORD_STATUS_TONES[status.status] || 'blue'}>
+                            {RECORD_STATUS_LABELS[status.status] || status.status}
+                          </StatusPill>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
 
       {/* Modal Criar/Editar */}
@@ -705,9 +650,9 @@ export default function DeliveryStatusPage() {
               <ClipboardCheck className="w-5 h-5" />
               Status de Entrega #{selectedStatus?.status_number}
               {selectedStatus && (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${getRecordStatusBadgeClass(selectedStatus.status)}`}>
-                  {selectedStatus.status}
-                </span>
+                <StatusPill tone={RECORD_STATUS_TONES[selectedStatus.status] || 'blue'}>
+                  {RECORD_STATUS_LABELS[selectedStatus.status] || selectedStatus.status}
+                </StatusPill>
               )}
             </DialogTitle>
           </DialogHeader>

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import {
-  FileText, FileSpreadsheet, Search, X, BarChart3, Package, Boxes, Wallet, AlertTriangle,
+  FileText, FileSpreadsheet, BarChart3, Package, Boxes, Wallet, AlertTriangle,
   ArrowDownCircle, ArrowUpCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -54,22 +54,6 @@ function ChartTooltip({ active, payload, label }) {
         </p>
       ))}
     </div>
-  );
-}
-
-function KpiCard({ icon: Icon, label, value, testid }) {
-  return (
-    <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid={testid}>
-      <CardContent className="p-3 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-          <Icon className="w-4.5 h-4.5 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <div className="text-[10px] text-slate-400 dark:text-slate-500 uppercase tracking-wide font-semibold truncate">{label}</div>
-          <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{value}</div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -248,34 +232,29 @@ export default function StockReportPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="stock-reports-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Relatórios do Estoque</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Inventário atual, entradas e saídas de produtos</p>
-        </div>
+      <div className="space-y-4" data-testid="stock-reports-page">
+        <PageHeader icon={BarChart3} title="Relatórios do Estoque" subtitle="Inventário atual, entradas e saídas de produtos" />
 
-        {/* Filters */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Search className="w-3.5 h-3.5" />
-                Filtrar
-              </span>
-              {hasFilters && (
-                <button onClick={clearFilters} className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="report-stock-clear-filters">
-                  <X className="w-3 h-3" />
-                  Limpar
-                </button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 space-y-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Modelo</Label>
+        <FilterCard
+          hasFilters={!!hasFilters}
+          onClear={clearFilters}
+          clearLinkTestId="report-stock-clear-filters"
+          actions={(
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={downloadPDF} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-stock-report-pdf-button">
+                <FileText className="w-4 h-4 text-red-600" /> Baixar PDF
+              </Button>
+              <Button type="button" size="sm" onClick={downloadExcel} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-stock-report-button">
+                <FileSpreadsheet className="w-4 h-4" /> Baixar Excel
+              </Button>
+            </>
+          )}
+        >
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <FilterField label="Modelo">
                 <Select value={modelo} onValueChange={setModelo}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-stock-modelo">
+                  <SelectTrigger className="h-9 text-sm" data-testid="report-stock-modelo">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -284,19 +263,17 @@ export default function StockReportPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </FilterField>
             </div>
 
             {modelo === 'INVENTARIO' ? (
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                <div>
-                  <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Produto</Label>
-                  <Input value={invSearch} onChange={(e) => setInvSearch(e.target.value)} className="h-8 text-xs" data-testid="report-stock-search" />
-                </div>
-                <div>
-                  <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Almoxarifado</Label>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <FilterField label="Produto">
+                  <SearchInput value={invSearch} onChange={(e) => setInvSearch(e.target.value)} data-testid="report-stock-search" />
+                </FilterField>
+                <FilterField label="Almoxarifado">
                   <Select value={warehouseId} onValueChange={setWarehouseId}>
-                    <SelectTrigger className="h-8 text-xs" data-testid="report-stock-filter-warehouse">
+                    <SelectTrigger className="h-9 text-sm" data-testid="report-stock-filter-warehouse">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -306,11 +283,10 @@ export default function StockReportPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Família</Label>
+                </FilterField>
+                <FilterField label="Família">
                   <Select value={familyId} onValueChange={setFamilyId}>
-                    <SelectTrigger className="h-8 text-xs" data-testid="report-stock-filter-family">
+                    <SelectTrigger className="h-9 text-sm" data-testid="report-stock-filter-family">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -320,11 +296,10 @@ export default function StockReportPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
+                </FilterField>
+                <FilterField label="Status">
                   <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger className="h-8 text-xs" data-testid="report-stock-filter-status">
+                    <SelectTrigger className="h-9 text-sm" data-testid="report-stock-filter-status">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -334,26 +309,22 @@ export default function StockReportPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </FilterField>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                <div>
-                  <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
-                  <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs" data-testid="report-stock-ledger-date-from" />
-                </div>
-                <div>
-                  <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
-                  <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs" data-testid="report-stock-ledger-date-to" />
-                </div>
-                <div>
-                  <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Produto</Label>
-                  <Input value={ledgerSearch} onChange={(e) => setLedgerSearch(e.target.value)} className="h-8 text-xs" data-testid="report-stock-ledger-search" />
-                </div>
-                <div>
-                  <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Tipo</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <FilterField label="Data início">
+                  <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="report-stock-ledger-date-from" />
+                </FilterField>
+                <FilterField label="Data fim">
+                  <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="report-stock-ledger-date-to" />
+                </FilterField>
+                <FilterField label="Produto">
+                  <SearchInput value={ledgerSearch} onChange={(e) => setLedgerSearch(e.target.value)} data-testid="report-stock-ledger-search" />
+                </FilterField>
+                <FilterField label="Tipo">
                   <Select value={operationType} onValueChange={setOperationType}>
-                    <SelectTrigger className="h-8 text-xs" data-testid="report-stock-ledger-filter-type">
+                    <SelectTrigger className="h-9 text-sm" data-testid="report-stock-ledger-filter-type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -363,11 +334,10 @@ export default function StockReportPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div>
-                  <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Referência</Label>
+                </FilterField>
+                <FilterField label="Referência">
                   <Select value={referenceType} onValueChange={setReferenceType}>
-                    <SelectTrigger className="h-8 text-xs" data-testid="report-stock-ledger-filter-reference">
+                    <SelectTrigger className="h-9 text-sm" data-testid="report-stock-ledger-filter-reference">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -377,52 +347,40 @@ export default function StockReportPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </FilterField>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </FilterCard>
 
         {/* KPIs */}
         {modelo === 'INVENTARIO' ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="stock-summary-cards">
-            <KpiCard icon={Package} label="Total de Produtos" value={invSummary.count} testid="stock-kpi-count" />
-            <KpiCard icon={Boxes} label="Quantidade Total" value={fmtQty(invSummary.total_quantity)} testid="stock-kpi-quantity" />
-            <KpiCard icon={Wallet} label="Valor Total em Estoque" value={fmtMoney(invSummary.total_value)} testid="stock-kpi-value" />
-            <KpiCard icon={AlertTriangle} label="Sem Estoque" value={invSummary.zero_stock_count} testid="stock-kpi-zero" />
+          <div data-testid="stock-summary-cards">
+            <StatGrid>
+              <StatCard icon={Package} label="Total de produtos" value={invSummary.count} tone="blue" testId="stock-kpi-count" />
+              <StatCard icon={Boxes} label="Quantidade total" value={fmtQty(invSummary.total_quantity)} tone="primary" testId="stock-kpi-quantity" />
+              <StatCard icon={Wallet} label="Valor total em estoque" value={fmtMoney(invSummary.total_value)} tone="emerald" testId="stock-kpi-value" />
+              <StatCard icon={AlertTriangle} label="Sem estoque" value={invSummary.zero_stock_count} tone={invSummary.zero_stock_count > 0 ? 'amber' : 'slate'} testId="stock-kpi-zero" />
+            </StatGrid>
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="stock-ledger-summary-cards">
-            <KpiCard icon={ArrowDownCircle} label="Entradas" value={ledgerSummary.entrada_count} testid="stock-ledger-kpi-entrada-count" />
-            <KpiCard icon={Wallet} label="Valor de Entradas" value={fmtMoney(ledgerSummary.entrada_value)} testid="stock-ledger-kpi-entrada-value" />
-            <KpiCard icon={ArrowUpCircle} label="Saídas" value={ledgerSummary.saida_count} testid="stock-ledger-kpi-saida-count" />
-            <KpiCard icon={Wallet} label="Valor de Saídas" value={fmtMoney(ledgerSummary.saida_value)} testid="stock-ledger-kpi-saida-value" />
+          <div data-testid="stock-ledger-summary-cards">
+            <StatGrid>
+              <StatCard icon={ArrowDownCircle} label="Entradas" value={ledgerSummary.entrada_count} tone="primary" testId="stock-ledger-kpi-entrada-count" />
+              <StatCard icon={Wallet} label="Valor de entradas" value={fmtMoney(ledgerSummary.entrada_value)} tone="emerald" testId="stock-ledger-kpi-entrada-value" />
+              <StatCard icon={ArrowUpCircle} label="Saídas" value={ledgerSummary.saida_count} tone="amber" testId="stock-ledger-kpi-saida-count" />
+              <StatCard icon={Wallet} label="Valor de saídas" value={fmtMoney(ledgerSummary.saida_value)} tone="red" testId="stock-ledger-kpi-saida-value" />
+            </StatGrid>
           </div>
         )}
 
-        {/* Barra de ações */}
-        <div>
-          <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wide font-semibold">Exportar</Label>
-          <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-            <Button variant="ghost" size="sm" onClick={downloadPDF} disabled={loading} title="Baixar PDF" data-testid="download-stock-report-pdf-button" className="h-9 w-9 p-0 disabled:opacity-30">
-              <FileText className="w-4 h-4 text-red-600" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={downloadExcel} disabled={loading} title="Baixar Excel" data-testid="download-stock-report-button" className="h-9 w-9 p-0 disabled:opacity-30">
-              <FileSpreadsheet className="w-4 h-4 text-green-600" />
-            </Button>
-          </div>
-        </div>
-
         {/* Dashboard */}
         {modelo === 'INVENTARIO' ? (
-          <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="stock-by-warehouse-chart-card">
-            <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-primary" />
-                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Valor em Estoque por Almoxarifado</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4">
+          <DataCard
+            title={(<span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Valor em estoque por almoxarifado</span>)}
+            testId="stock-by-warehouse-chart-card"
+          >
+            <div className="p-4">
               {byWarehouseChart.some((d) => d.total_value > 0) ? (
                 <div className="h-72 w-full" data-testid="stock-by-warehouse-chart">
                   <ResponsiveContainer width="100%" height="100%">
@@ -436,23 +394,17 @@ export default function StockReportPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                  <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
-                </div>
+                <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </DataCard>
         ) : (
-          <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="stock-ledger-daily-chart-card">
-            <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-primary" />
-                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Entradas e Saídas por Dia</CardTitle>
-                <span className="text-xs text-slate-400 dark:text-slate-500">(últimos 14 dias)</span>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4">
+          <DataCard
+            title={(<span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Entradas e saídas por dia</span>)}
+            meta={<span className="text-xs text-slate-400 dark:text-slate-500">últimos 14 dias</span>}
+            testId="stock-ledger-daily-chart-card"
+          >
+            <div className="p-4">
               {dailyChart.some((d) => d.entrada_value > 0 || d.saida_value > 0) ? (
                 <div className="h-72 w-full" data-testid="stock-ledger-daily-chart">
                   <ResponsiveContainer width="100%" height="100%">
@@ -471,13 +423,10 @@ export default function StockReportPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                  <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                  <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
-                </div>
+                <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </DataCard>
         )}
       </div>
     </Layout>

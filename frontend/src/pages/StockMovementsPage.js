@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -10,25 +13,25 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { ComboField } from '../components/ui/combo-field';
-import { Autocomplete } from '../components/Autocomplete';
+import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Plus, Trash2, Save, Search, ArrowLeftRight, Car, ClipboardList, Pencil, Download } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeftRight, Car, ClipboardList, Pencil, Printer } from 'lucide-react';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const OPERATION_LABELS = { ENTRADA: 'Entrada', SAIDA: 'Saída' };
-const OPERATION_COLORS = {
-  ENTRADA: 'bg-emerald-100 text-emerald-700',
-  SAIDA: 'bg-rose-100 text-rose-700',
+const OPERATION_TONES = {
+  ENTRADA: 'emerald',
+  SAIDA: 'red',
 };
 
 export default function StockMovementsPage() {
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [operationFilter, setOperationFilter] = useState('');
 
   const [warehouses, setWarehouses] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -48,10 +51,13 @@ export default function StockMovementsPage() {
     loadVehicles(); loadOrdensServico();
   }, []);
 
-  const loadMovements = async () => {
+  const loadMovements = async (term = search, operation = operationFilter) => {
     setLoading(true);
     try {
-      const r = await api.getStockMovements(search ? { search } : {});
+      const params = {};
+      if (term) params.search = term;
+      if (operation) params.operation_type = operation;
+      const r = await api.getStockMovements(params);
       setMovements(r.data || []);
     } catch (e) {
       toast.error('Erro ao carregar movimentações de estoque');
@@ -297,149 +303,135 @@ export default function StockMovementsPage() {
     } finally { setSaving(false); }
   };
 
+  const warehouseOptions = warehouses.map((w) => [w.id, w.name]);
+  const supplierOptions = suppliers.map((s) => [s.id, s.name]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setOperationFilter('');
+    loadMovements('', '');
+  };
+
   const singleSelectedMovement = selectedIds.size === 1 ? movements.find((m) => m.id === [...selectedIds][0]) : null;
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="stock-movements-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Movimentação de Estoque</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Lançamentos manuais de Entrada e Saída de estoque</p>
-        </div>
+      <div className="space-y-4" data-testid="stock-movements-page">
+        <PageHeader icon={ArrowLeftRight} title="Movimentação de Estoque" subtitle="Lançamentos manuais de Entrada e Saída de estoque" />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-              <Input
+        <FilterCard hasFilters={!!(search || operationFilter)} onClear={clearFilters} onApply={() => loadMovements()}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Finalidade, placa, nota fiscal ou almoxarifado" className="col-span-2">
+              <SearchInput
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && loadMovements()}
-                onBlur={loadMovements}
-                className="h-9 text-[13px] pl-9"
                 data-testid="search-stock-movements-input"
               />
-            </div>
-          </CardContent>
-        </Card>
+            </FilterField>
+            <FilterField label="Operação">
+              <Select value={operationFilter || 'ALL'} onValueChange={(v) => setOperationFilter(v === 'ALL' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="filter-stock-movement-operation"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todas</SelectItem>
+                  <SelectItem value="ENTRADA">Entrada</SelectItem>
+                  <SelectItem value="SAIDA">Saída</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button variant="ghost" size="sm" onClick={openCreate} title="Nova Movimentação" data-testid="stock-movement-new-btn" className="h-9 w-9 p-0">
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedMovement && openEdit(singleSelectedMovement.id)}
-            disabled={!singleSelectedMovement}
-            title="Editar"
-            data-testid="stock-movement-edit-btn"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedMovement && downloadPDF(singleSelectedMovement.id, singleSelectedMovement.movement_number)}
-            disabled={!singleSelectedMovement}
-            title="Baixar PDF"
-            data-testid="stock-movement-pdf-btn"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Download className="w-4 h-4 text-emerald-600" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        {/* Lista - marque uma movimentação pra habilitar as ações da barra */}
+        <DataCard
+          title="Movimentações"
+          count={loading ? '...' : movements.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova movimentação" onClick={openCreate} testId="stock-movement-new-btn" />}
+            >
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedMovement && openEdit(singleSelectedMovement.id)} disabled={!singleSelectedMovement} testId="stock-movement-edit-btn" />
+              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedMovement && downloadPDF(singleSelectedMovement.id, singleSelectedMovement.movement_number)} disabled={!singleSelectedMovement} testId="stock-movement-pdf-btn" />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <ArrowLeftRight className="w-4 h-4" />
-              {loading ? 'Carregando...' : `${movements.length} Movimentação(ões)`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {movements.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="w-9 px-4 py-2.5">
+        >
+          {movements.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={movements.length > 0 && movements.every((m) => selectedIds.has(m.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="stock-movement-select-all"
+                      />
+                    </th>
+                    <th>Nº</th>
+                    <th>Data</th>
+                    <th>Operação</th>
+                    <th>Almoxarifado</th>
+                    <th>Finalidade</th>
+                    <th className="!text-right">Itens</th>
+                    <th className="!text-right">Valor total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movements.map((m) => (
+                    <tr
+                      key={m.id}
+                      onClick={() => toggleSelect(m.id)}
+                      data-selected={selectedIds.has(m.id)}
+                      className="cursor-pointer"
+                      data-testid="stock-movement-row"
+                    >
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          checked={movements.length > 0 && movements.every((m) => selectedIds.has(m.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                          data-testid="stock-movement-select-all"
+                          checked={selectedIds.has(m.id)}
+                          onCheckedChange={() => toggleSelect(m.id)}
+                          data-testid={`stock-movement-row-checkbox-${m.movement_number}`}
                         />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Operação</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Almoxarifado</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Finalidade</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Itens</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Valor Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {movements.map((m, idx) => (
-                      <tr
-                        key={m.id}
-                        onClick={() => toggleSelect(m.id)}
-                        className={`cursor-pointer transition-colors ${selectedIds.has(m.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                        data-testid="stock-movement-row"
-                      >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(m.id)}
-                            onCheckedChange={() => toggleSelect(m.id)}
-                            data-testid={`stock-movement-row-checkbox-${m.movement_number}`}
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px] font-semibold text-emerald-700">Nº {m.movement_number}</td>
-                        <td className="px-4 py-2.5 text-[12px] text-slate-500 dark:text-slate-400">{m.movement_date ? format(new Date(m.movement_date + 'T00:00:00'), 'dd/MM/yyyy') : '-'}</td>
-                        <td className="px-4 py-2.5"><Badge variant="secondary" className={`text-[10px] ${OPERATION_COLORS[m.operation_type] || ''}`}>{OPERATION_LABELS[m.operation_type] || m.operation_type}</Badge></td>
-                        <td className="px-4 py-2.5 text-[13px]">{m.warehouse_name || '-'}</td>
-                        <td className="px-4 py-2.5 text-[13px]">
+                      </td>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{m.movement_number}</td>
+                      <td className="whitespace-nowrap tabular-nums">{m.movement_date ? format(new Date(m.movement_date + 'T00:00:00'), 'dd/MM/yyyy') : '-'}</td>
+                      <td>
+                        <StatusPill tone={OPERATION_TONES[m.operation_type] || 'slate'}>
+                          {OPERATION_LABELS[m.operation_type] || m.operation_type}
+                        </StatusPill>
+                      </td>
+                      <td><div className="max-w-[180px] truncate" title={m.warehouse_name || ''}>{m.warehouse_name || '-'}</div></td>
+                      <td>
+                        <div className="max-w-[240px] truncate" title={m.purpose_text || ''}>
                           {m.purpose_type === 'VEICULO' && <span className="inline-flex items-center gap-1"><Car className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
                           {m.purpose_type === 'OS' && <span className="inline-flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
                           {(!m.purpose_type || m.purpose_type === 'OUTRO') && (m.purpose_text || '-')}
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px]">{(m.items || []).length}</td>
-                        <td className="px-4 py-2.5 text-[13px] font-semibold">{fmtMoney(m.total_value)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-slate-500 dark:text-slate-400">
-                <ArrowLeftRight className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">{search ? 'Nenhuma movimentação encontrada' : 'Nenhuma movimentação de estoque registrada'}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        </div>
+                      </td>
+                      <td className="text-right tabular-nums">{(m.items || []).length}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(m.total_value)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={ArrowLeftRight}
+              title={loading ? 'Carregando...' : (search || operationFilter ? 'Nenhuma movimentação encontrada' : 'Nenhuma movimentação de estoque registrada')}
+              hint={loading ? undefined : (search || operationFilter ? 'Ajuste os filtros' : 'Registre a primeira pelo botão "Nova movimentação"')}
+            />
+          )}
+        </DataCard>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto" data-testid="stock-movement-dialog">
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="flex items-center gap-2 text-base">
-              <ArrowLeftRight className="w-5 h-5 text-emerald-600" />
+              <ArrowLeftRight className="w-5 h-5 text-primary" />
               {editingId ? 'Editar Movimentação de Estoque' : 'Movimentação de Estoque - Inclusão'}
-              {nextNumber !== null && <Badge variant="outline" className="ml-2 text-emerald-700 border-emerald-300">Nº {nextNumber}</Badge>}
+              {nextNumber !== null && <Badge variant="outline" className="ml-2 text-primary border-primary/30">Nº {nextNumber}</Badge>}
             </DialogTitle>
           </DialogHeader>
 
@@ -458,28 +450,28 @@ export default function StockMovementsPage() {
                 <Field type="number" label="Valor Nota Fiscal" value={form.nfe_value} onChange={(v) => onChange('nfe_value', v)} testid="stock-movement-nfe-value" />
                 <div>
                   <Label className="mb-1 block">Almoxarifado *</Label>
-                  <ComboField
+                  <OptionAutocomplete
                     value={form.warehouse_id}
                     onChange={(v) => {
                       onChange('warehouse_id', v);
                       onChange('warehouse_name', warehouses.find((w) => w.id === v)?.name || '');
                     }}
-                    options={warehouses.map((w) => [w.id, w.name])}
-                    emptyLabel="Nenhum almoxarifado encontrado"
-                    testid="stock-movement-warehouse"
+                    options={warehouseOptions}
+                    className="text-sm"
+                    testId="stock-movement-warehouse"
                   />
                 </div>
                 <div>
                   <Label className="mb-1 block">Fornecedor</Label>
-                  <ComboField
+                  <OptionAutocomplete
                     value={form.supplier_id}
                     onChange={(v) => {
                       onChange('supplier_id', v);
                       onChange('supplier_name', suppliers.find((s) => s.id === v)?.name || '');
                     }}
-                    options={suppliers.map((s) => [s.id, s.name])}
-                    emptyLabel="Nenhum fornecedor encontrado"
-                    testid="stock-movement-supplier"
+                    options={supplierOptions}
+                    className="text-sm"
+                    testId="stock-movement-supplier"
                   />
                 </div>
                 <div>
@@ -506,7 +498,7 @@ export default function StockMovementsPage() {
 
             <TabsContent value="itens" className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-[12px] font-bold uppercase tracking-wider text-emerald-700">Itens</h3>
+                <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary">Itens</h3>
                 <Button variant="outline" size="sm" type="button" onClick={addItem} className="h-7 text-xs">
                   <Plus className="w-3 h-3 mr-1" />Adicionar Item
                 </Button>
@@ -551,9 +543,9 @@ export default function StockMovementsPage() {
                 ))}
               </div>
               <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-700">
-                <div className="p-3 rounded-lg border-2 border-emerald-400 bg-emerald-50 min-w-[220px] text-right">
-                  <div className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">Valor Total</div>
-                  <div className="text-xl font-bold text-emerald-700">{fmtMoney(total)}</div>
+                <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 min-w-[220px] text-right">
+                  <div className="text-[10px] uppercase tracking-wider text-primary font-semibold">Valor Total</div>
+                  <div className="text-xl font-bold text-primary tabular-nums">{fmtMoney(total)}</div>
                 </div>
               </div>
             </TabsContent>
@@ -561,7 +553,7 @@ export default function StockMovementsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="stock-movement-cancel">Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white" data-testid="stock-movement-save">
+            <Button onClick={handleSave} disabled={saving} data-testid="stock-movement-save">
               <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar Movimentação' : 'Salvar Movimentação'}
             </Button>
           </DialogFooter>

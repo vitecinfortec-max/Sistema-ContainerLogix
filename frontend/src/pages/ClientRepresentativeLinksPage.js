@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { FilterField, DataCard, StatusPill, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
@@ -134,82 +134,78 @@ export default function ClientRepresentativeLinksPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="client-representative-links-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Vínculo de Clientes</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Vincule clientes a representantes comerciais com o percentual de comissão de cada um</p>
-        </div>
+      <div className="space-y-4" data-testid="client-representative-links-page">
+        <PageHeader
+          icon={Link2}
+          title="Vínculo de Clientes"
+          subtitle="Vincule clientes a representantes comerciais com o percentual de comissão de cada um"
+        />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Link2 className="w-4 h-4" />
-              Vínculos ({links.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            <form onSubmit={handleSubmit} className="flex items-end gap-2 flex-wrap">
-              <div className="w-56">
-                <Label>Cliente</Label>
-                <Autocomplete
-                  value={clientNameInput}
-                  onChange={setClientNameInput}
-                  options={clients}
-                  displayField="name"
-                  onSelect={(c) => { setSelectedClient(c); setClientNameInput(c.name); }}
-                  className="w-full"
-                />
-              </div>
-              <div className="w-56">
-                <Label>Representante</Label>
-                <Autocomplete
-                  value={repNameInput}
-                  onChange={setRepNameInput}
-                  options={representatives}
-                  displayField="name"
-                  onSelect={(r) => { setSelectedRep(r); setRepNameInput(r.name); }}
-                  className="w-full"
-                />
-              </div>
-              <div className="w-36">
-                <Label>Comissão (%)</Label>
-                <Input type="number" step="0.01" min="0" value={percentageInput} onChange={(e) => setPercentageInput(e.target.value)} className="h-9" />
-              </div>
-              <Button type="submit" disabled={submitting} data-testid="submit-client-rep-link">
-                <Plus className="w-4 h-4 mr-2" />
+        <DataCard title={editId ? 'Editar vínculo' : 'Novo vínculo'}>
+          <form onSubmit={handleSubmit} className="p-4 flex items-end gap-3 flex-wrap">
+            <FilterField label="Cliente" className="w-64">
+              <Autocomplete
+                value={clientNameInput}
+                onChange={setClientNameInput}
+                options={clients}
+                displayField="name"
+                onSelect={(c) => { setSelectedClient(c); setClientNameInput(c.name); }}
+                className="w-full text-sm"
+              />
+            </FilterField>
+            <FilterField label="Representante" className="w-64">
+              <Autocomplete
+                value={repNameInput}
+                onChange={setRepNameInput}
+                options={representatives}
+                displayField="name"
+                onSelect={(r) => { setSelectedRep(r); setRepNameInput(r.name); }}
+                className="w-full text-sm"
+              />
+            </FilterField>
+            <FilterField label="Comissão (%)" className="w-36">
+              <Input type="number" step="0.01" min="0" value={percentageInput} onChange={(e) => setPercentageInput(e.target.value)} className="h-9 text-sm" />
+            </FilterField>
+            <div className="flex items-center gap-2">
+              <Button type="submit" disabled={submitting} className="h-9 gap-1.5" data-testid="submit-client-rep-link">
+                <Plus className="w-4 h-4" />
                 {editId ? 'Atualizar' : 'Vincular'}
               </Button>
-              {editId && <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>}
-            </form>
+              {editId && <Button type="button" variant="outline" className="h-9" onClick={resetForm}>Cancelar</Button>}
+            </div>
+          </form>
+        </DataCard>
 
+        <DataCard title="Vínculos" count={loading ? '...' : links.length}>
+          {loading ? (
+            <EmptyState title="Carregando..." />
+          ) : links.length === 0 ? (
+            <EmptyState icon={Link2} title="Nenhum vínculo cadastrado" hint="Use o card acima para vincular um cliente a um representante" />
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="data-table">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800">
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Representante</th>
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Comissão</th>
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                    <th className="px-4 py-2.5"></th>
+                  <tr>
+                    <th>Cliente</th>
+                    <th>Representante</th>
+                    <th className="!text-right">Comissão</th>
+                    <th>Status</th>
+                    <th className="w-24"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
-                    <tr><td colSpan={5} className="text-center py-6 text-sm text-slate-500">Carregando...</td></tr>
-                  ) : links.length === 0 ? (
-                    <tr><td colSpan={5} className="text-center py-6 text-sm text-slate-500">Nenhum vínculo cadastrado</td></tr>
-                  ) : links.map((link, idx) => (
-                    <tr key={link.id} className={idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}>
-                      <td className="px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200">{link.client_name}</td>
-                      <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{link.representative_name}</td>
-                      <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{link.commission_percentage}%</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${link.status === 'ATIVO' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'}`}>
+                  {links.map((link) => (
+                    <tr key={link.id} data-selected={editId === link.id}>
+                      <td className="cell-strong"><div className="max-w-[300px] truncate" title={link.client_name}>{link.client_name}</div></td>
+                      <td><div className="max-w-[240px] truncate" title={link.representative_name}>{link.representative_name}</div></td>
+                      <td className="text-right tabular-nums">{link.commission_percentage}%</td>
+                      <td>
+                        <StatusPill tone={link.status === 'ATIVO' ? 'emerald' : 'slate'}>
                           {link.status === 'ATIVO' ? 'Ativo' : 'Inativo'}
-                        </span>
+                        </StatusPill>
                       </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-1">
+                      <td className="!py-1">
+                        <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => startEdit(link)} title="Editar">
                             <Edit className="w-3.5 h-3.5 text-blue-600" />
                           </Button>
@@ -223,44 +219,38 @@ export default function ClientRepresentativeLinksPage() {
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </DataCard>
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Relatório de Comissão</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="flex items-end gap-2 flex-wrap">
-              <div className="w-56">
-                <Label>Representante (opcional)</Label>
+        <DataCard title={(<span className="flex items-center gap-2"><FileDown className="w-4 h-4 text-primary" />Relatório de comissão</span>)}>
+          <div className="p-4">
+            <div className="flex items-end gap-3 flex-wrap">
+              <FilterField label="Representante (opcional)" className="w-64">
                 <Autocomplete
                   value={reportRepNameInput}
                   onChange={(v) => { setReportRepNameInput(v); if (!v) setReportRep(null); }}
                   options={representatives}
                   displayField="name"
                   onSelect={(r) => { setReportRep(r); setReportRepNameInput(r.name); }}
-                  className="w-full"
+                  className="w-full text-sm"
                 />
-              </div>
-              <div>
-                <Label>Data Inicial</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9" />
-              </div>
-              <div>
-                <Label>Data Final</Label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9" />
-              </div>
-              <Button onClick={handleDownloadReport} disabled={generatingReport} data-testid="download-commission-report-btn">
-                <FileDown className="w-4 h-4 mr-2" />
+              </FilterField>
+              <FilterField label="Data inicial">
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 text-sm" />
+              </FilterField>
+              <FilterField label="Data final">
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 text-sm" />
+              </FilterField>
+              <Button variant="outline" onClick={handleDownloadReport} disabled={generatingReport} className="h-9 gap-1.5" data-testid="download-commission-report-btn">
+                <FileDown className="w-4 h-4 text-red-600" />
                 Baixar PDF
               </Button>
             </div>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-3">
+            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-3">
               A comissão é calculada apenas sobre movimentações já faturadas dentro do período informado.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </DataCard>
       </div>
       <ConfirmDialog />
     </Layout>

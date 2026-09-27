@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -13,7 +16,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { useModuleConfig } from '../context/ModuleConfigContext';
-import { Plus, Trash2, Edit, Search, UserCog } from 'lucide-react';
+import { Plus, Trash2, Edit, UserCog } from 'lucide-react';
 
 const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 
@@ -197,37 +200,34 @@ export default function ComercialCadastrosPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="comercial-cadastros-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Cadastro</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Cadastros de apoio do módulo Comercial</p>
-        </div>
+      <div className="space-y-4" data-testid="comercial-cadastros-page">
+        <PageHeader icon={activeType.icon} title={`Cadastro de ${activeType.label}`} subtitle="Cadastros de apoio do módulo Comercial" />
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-          {availableTypes.map((t) => {
-            const Icon = t.icon;
-            const active = t.key === activeTypeKey;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setActiveTypeKey(t.key)}
-                data-testid={`comercial-cadastro-type-${t.key}`}
-                className={`flex flex-col items-center justify-center gap-2 rounded-lg border p-4 text-sm font-medium transition-colors ${
-                  active
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-              >
-                <Icon className="w-5 h-5" />
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div>
-          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200">Cadastro de {activeType.label}</h2>
-        </div>
+        {/* Troca de cadastro (os mesmos itens do menu Comercial) */}
+        {availableTypes.length > 1 && (
+          <div className="inline-flex flex-wrap gap-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1">
+            {availableTypes.map((t) => {
+              const Icon = t.icon;
+              const active = t.key === activeTypeKey;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setActiveTypeKey(t.key)}
+                  data-testid={`comercial-cadastro-type-${t.key}`}
+                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                    active
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
           <DialogContent data-testid="comercial-cadastro-dialog">
@@ -267,105 +267,86 @@ export default function ComercialCadastrosPage() {
           </DialogContent>
         </Dialog>
 
-        <div className="relative max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 text-[13px] pl-9" data-testid="search-comercial-cadastro-input" />
-        </div>
+        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label={activeType.listColumns.filter(([f]) => f !== 'status').map(([, l]) => l).join(', ')}>
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-comercial-cadastro-input" />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Barra de ações - marque um registro na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreateDialog}
-            title="Adicionar"
-            data-testid="add-comercial-cadastro-button"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedItem && openEditDialog(singleSelectedItem)}
-            disabled={!singleSelectedItem}
-            title="Editar"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Edit className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)}
-            disabled={!singleSelectedItem}
-            title="Excluir"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        {/* Lista - marque um registro pra habilitar as ações da barra */}
+        <DataCard
+          title={activeType.plural}
+          count={loading ? '...' : filteredItems.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label={`${activeType.feminine ? 'Nova' : 'Novo'} ${activeType.label.toLowerCase()}`} onClick={openCreateDialog} testId="add-comercial-cadastro-button" />}
+            >
+              <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedItem && openEditDialog(singleSelectedItem)} disabled={!singleSelectedItem} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)} disabled={!singleSelectedItem} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-              {loading ? 'Carregando...' : `Lista de ${activeType.plural} (${filteredItems.length})`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {filteredItems.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
-                    <tr>
-                      <th className="w-9 px-4 py-2.5">
-                        <Checkbox
-                          checked={filteredItems.length > 0 && filteredItems.every((item) => selectedIds.has(item.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                          data-testid="select-all-checkbox"
-                        />
-                      </th>
-                      {activeType.listColumns.map(([field, label]) => (
-                        <th key={field} className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredItems.map((item) => (
+        >
+          {filteredItems.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={filteredItems.length > 0 && filteredItems.every(i => selectedIds.has(i.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </th>
+                    {activeType.listColumns.map(([field, label]) => (
+                      <th key={field}>{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((item) => {
+                    const isSelected = selectedIds.has(item.id);
+                    return (
                       <tr
                         key={item.id}
+                        data-selected={isSelected}
+                        className="cursor-pointer"
                         onClick={() => toggleSelect(item.id)}
-                        className={`cursor-pointer transition-colors ${selectedIds.has(item.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                         data-testid="comercial-cadastro-row"
                       >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                           <Checkbox
-                            checked={selectedIds.has(item.id)}
+                            checked={isSelected}
                             onCheckedChange={() => toggleSelect(item.id)}
                             data-testid="comercial-cadastro-row-checkbox"
                           />
                         </td>
-                        {activeType.listColumns.map(([field]) => (
-                          <td key={field} className="px-4 py-2.5 text-[13px]">{item[field] || '-'}</td>
+                        {activeType.listColumns.map(([field], colIdx) => (
+                          <td key={field} className={colIdx === 0 ? 'cell-strong' : ''}>
+                            {field === 'status' ? (
+                              <StatusPill tone={item.status === 'INATIVO' ? 'slate' : 'emerald'}>
+                                {item.status === 'INATIVO' ? 'Inativo' : 'Ativo'}
+                              </StatusPill>
+                            ) : (item[field] || '-')}
+                          </td>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-slate-500 dark:text-slate-400">
-                <p className="text-[13px] font-medium">{search ? 'Nenhum registro encontrado' : 'Nenhum registro cadastrado'}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={activeType.icon}
+              title={loading ? 'Carregando...' : (search ? 'Nenhum registro encontrado' : 'Nenhum registro cadastrado')}
+              hint={loading ? undefined : (search ? 'Ajuste a busca' : `Cadastre pelo botão "${activeType.feminine ? 'Nova' : 'Novo'} ${activeType.label.toLowerCase()}"`)}
+            />
+          )}
+        </DataCard>
       </div>
       <ConfirmDialog />
     </Layout>

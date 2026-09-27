@@ -644,7 +644,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                       <td><div className="max-w-[220px] truncate" title={r.client_name || ''}>{r.client_name || '-'}</div></td>
                       <td className="font-mono whitespace-nowrap text-slate-700 dark:text-slate-200">{r.container_number || '-'}</td>
                       <td className="whitespace-nowrap tabular-nums">
-                        {r.service_date ? format(new Date(r.service_date), 'dd/MM/yyyy') : '-'}
+                        {r.service_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(r.service_date) ? `${r.service_date}T00:00:00` : r.service_date), 'dd/MM/yyyy') : '-'}
                       </td>
                       <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(r.balance)}</td>
                     </tr>

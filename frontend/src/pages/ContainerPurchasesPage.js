@@ -1,24 +1,27 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Trash2, Search, ShoppingCart } from 'lucide-react';
+import { Plus, Pencil, Trash2, ShoppingCart, Package, CheckCircle2, Wallet } from 'lucide-react';
 
 const STATUS_LABELS = { DISPONIVEL: 'Disponível', VENDIDO: 'Vendido' };
-const STATUS_BADGE_CLASS = {
-  DISPONIVEL: 'bg-emerald-100 text-emerald-700',
-  VENDIDO: 'bg-slate-100 text-slate-600',
+const STATUS_TONES = {
+  DISPONIVEL: 'emerald',
+  VENDIDO: 'slate',
 };
 
 const formatMoney = (value) => (value == null ? '-' : value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
@@ -166,149 +169,120 @@ export default function ContainerPurchasesPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="container-purchases-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <ShoppingCart className="w-4 h-4" />
-            Compra de Container
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Lançamentos gerados a partir das Ordens de Coleta aprovadas, ou cadastrados manualmente</p>
-        </div>
+      <div className="space-y-4" data-testid="container-purchases-page">
+        <PageHeader
+          icon={ShoppingCart}
+          title="Compra de Container"
+          subtitle="Lançamentos gerados a partir das Ordens de Coleta aprovadas, ou cadastrados manualmente"
+        />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label className="mb-1 block text-xs">Container</Label>
-                <Input className="h-9 text-sm font-mono" value={containerFilter} onChange={(e) => setContainerFilter(e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1 block text-xs">Status</Label>
-                <Select value={statusFilter || '_all'} onValueChange={(v) => setStatusFilter(v === '_all' ? '' : v)}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_all">Todos</SelectItem>
-                    <SelectItem value="DISPONIVEL">Disponível</SelectItem>
-                    <SelectItem value="VENDIDO">Vendido</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatGrid className="lg:grid-cols-3">
+          <StatCard label="Disponíveis" value={filteredList.filter((p) => p.status === 'DISPONIVEL').length} icon={Package} tone="emerald" hint="ainda não vendidos" />
+          <StatCard label="Vendidos" value={filteredList.filter((p) => p.status === 'VENDIDO').length} icon={CheckCircle2} tone="slate" />
+          <StatCard label="Valor de compra" value={formatMoney(filteredList.reduce((acc, p) => acc + Number(p.purchase_value || 0), 0))} icon={Wallet} tone="blue" hint="soma dos listados" />
+        </StatGrid>
 
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreate}
-            title="Adicionar"
-            data-testid="add-container-purchase-button"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelected && openEdit(singleSelected)}
-            disabled={!singleSelected}
-            title="Editar"
-            data-testid="edit-container-purchase-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelected && handleDelete(singleSelected)}
-            disabled={!singleSelected}
-            title="Excluir"
-            data-testid="delete-container-purchase-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        <FilterCard
+          hasFilters={!!(containerFilter || statusFilter)}
+          onClear={() => { setContainerFilter(''); setStatusFilter(''); }}
+        >
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Container">
+              <SearchInput className="font-mono" value={containerFilter} onChange={(e) => setContainerFilter(e.target.value)} />
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter || '_all'} onValueChange={(v) => setStatusFilter(v === '_all' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  <SelectItem value="DISPONIVEL">Disponível</SelectItem>
+                  <SelectItem value="VENDIDO">Vendido</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+          </div>
+        </FilterCard>
+
+        {/* Lista - marque uma compra pra habilitar as ações da barra */}
+        <DataCard
+          title="Compras"
+          count={loading ? '...' : filteredList.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova compra" onClick={openCreate} testId="add-container-purchase-button" />}
+            >
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelected && openEdit(singleSelected)} disabled={!singleSelected} testId="edit-container-purchase-button" />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelected && handleDelete(singleSelected)} disabled={!singleSelected} testId="delete-container-purchase-button" />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <ShoppingCart className="w-4 h-4" />
-              {loading ? 'Carregando...' : `Compras (${filteredList.length})`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+        >
+          {filteredList.length === 0 && !loading ? (
+            <EmptyState
+              icon={ShoppingCart}
+              title="Nenhuma compra encontrada"
+              hint={containerFilter || statusFilter ? 'Ajuste os filtros' : 'As compras aparecem aqui quando uma Ordem de Coleta é aprovada, ou pelo botão "Nova compra"'}
+            />
+          ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-800">
-                    <TableHead className="w-9">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
                       <Checkbox
                         checked={filteredList.length > 0 && filteredList.every((p) => selectedIds.has(p.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
-                    </TableHead>
-                    <TableHead className="text-[12px] font-semibold">Container</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Booking</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Terminal</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Data Entrada</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Valor Compra</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Valor Venda</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Status</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Origem</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredList.length === 0 && !loading && (
-                    <TableRow><TableCell colSpan={9} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma compra encontrada.</TableCell></TableRow>
-                  )}
+                    </th>
+                    <th>Container</th>
+                    <th>Booking</th>
+                    <th>Terminal</th>
+                    <th>Data entrada</th>
+                    <th className="!text-right">Valor compra</th>
+                    <th className="!text-right">Valor venda</th>
+                    <th>Status</th>
+                    <th>Origem</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {filteredList.map((p) => (
-                    <TableRow
+                    <tr
                       key={p.id}
                       onClick={() => toggleSelect(p.id)}
-                      className={`cursor-pointer transition-colors ${selectedIds.has(p.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                      data-selected={selectedIds.has(p.id)}
+                      className="cursor-pointer"
                       data-testid="container-purchase-row"
                     >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(p.id)}
                           onCheckedChange={() => toggleSelect(p.id)}
                         />
-                      </TableCell>
-                      <TableCell className="text-[13px] font-mono font-semibold">{p.container_number}</TableCell>
-                      <TableCell className="text-[13px]">{p.booking || '-'}</TableCell>
-                      <TableCell className="text-[13px]">{p.origin_terminal || '-'}</TableCell>
-                      <TableCell className="text-[12px]">{p.entry_date ? format(new Date(p.entry_date), 'dd/MM/yyyy') : '-'}</TableCell>
-                      <TableCell className="text-[13px]">{formatMoney(p.purchase_value)}</TableCell>
-                      <TableCell className="text-[13px]">{formatMoney(p.sale_value)}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE_CLASS[p.status] || 'bg-slate-100 text-slate-600'}`}>
+                      </td>
+                      <td className="font-mono whitespace-nowrap cell-strong">{p.container_number}</td>
+                      <td className="whitespace-nowrap">{p.booking || '-'}</td>
+                      <td><div className="max-w-[200px] truncate" title={p.origin_terminal || ''}>{p.origin_terminal || '-'}</div></td>
+                      <td className="whitespace-nowrap tabular-nums">{p.entry_date ? format(new Date(p.entry_date), 'dd/MM/yyyy') : '-'}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(p.purchase_value)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(p.sale_value)}</td>
+                      <td>
+                        <StatusPill tone={STATUS_TONES[p.status] || 'slate'}>
                           {STATUS_LABELS[p.status] || p.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-[12px]">{p.loading_order_id ? `Ordem Nº ${p.order_number}` : 'Manual'}</TableCell>
-                    </TableRow>
+                        </StatusPill>
+                      </td>
+                      <td className="whitespace-nowrap">
+                        {p.loading_order_id
+                          ? <StatusPill tone="blue" dot={false}>Ordem #{p.order_number}</StatusPill>
+                          : <StatusPill tone="slate" dot={false}>Manual</StatusPill>}
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </DataCard>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

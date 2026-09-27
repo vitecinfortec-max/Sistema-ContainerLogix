@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { FilterField, DataCard, StatusPill, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
@@ -174,130 +174,129 @@ export default function ServicePriceTableClientPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="service-price-table-client-page">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate('/comercial/tabela-servicos')}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{clientName || 'Cliente'}</h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Tabela de Serviços</p>
-          </div>
-        </div>
+      <div className="space-y-4" data-testid="service-price-table-client-page">
+        <PageHeader
+          icon={Tags}
+          title={clientName || 'Cliente'}
+          subtitle="Tabela de Serviços"
+          actions={(
+            <>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => navigate('/comercial/tabela-servicos')}>
+                <ArrowLeft className="w-4 h-4" /> Voltar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5"
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf || entries.length === 0}
+                data-testid="download-service-price-table-pdf-btn"
+              >
+                <FileDown className="w-4 h-4 text-red-600" /> Baixar PDF
+              </Button>
+            </>
+          )}
+        />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Tags className="w-4 h-4" />
-              Serviços de {clientName}
-            </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownloadPdf}
-              disabled={downloadingPdf || entries.length === 0}
-              data-testid="download-service-price-table-pdf-btn"
-            >
-              <FileDown className="w-4 h-4 mr-2" />
-              Baixar PDF
-            </Button>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            <form onSubmit={handleSubmitEntry} className="flex items-end gap-2 flex-wrap">
-              <div className="w-56">
-                <Label>Serviço</Label>
-                <Autocomplete
-                  value={serviceNameInput}
-                  onChange={setServiceNameInput}
-                  options={serviceTypes}
-                  displayField="name"
-                  onSelect={(st) => { setSelectedServiceType(st); setServiceNameInput(st.name); }}
-                  className="w-full"
-                />
-              </div>
-              <div className="w-32">
-                <Label>{billingType === 'DIARIA' ? 'Valor da Diária' : 'Valor'} ({CURRENCY_SYMBOL[currency]})</Label>
-                <Input type="number" step="0.01" min="0" value={valueInput} onChange={(e) => setValueInput(e.target.value)} className="h-9" />
-              </div>
-              <div className="w-36">
-                <Label>Moeda</Label>
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CURRENCY_OPTIONS.map(([value, label]) => (
-                      <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="w-48">
-                <Label>Tipo de Cobrança</Label>
-                <Select value={billingType} onValueChange={setBillingType}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {BILLING_TYPE_OPTIONS.map(([value, label]) => (
-                      <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {billingType === 'DIARIA' && (
-                <>
-                  <div className="w-32">
-                    <Label>Free Time (dias)</Label>
-                    <Input type="number" step="1" min="0" value={freeTimeDays} onChange={(e) => setFreeTimeDays(e.target.value)} className="h-9" />
-                  </div>
-                  <div className="w-40">
-                    <Label>Tamanho do Container</Label>
-                    <Select value={sizeGroup} onValueChange={setSizeGroup}>
-                      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {SIZE_GROUP_OPTIONS.map(([value, label]) => (
-                          <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
-              <Button type="submit" disabled={submitting} data-testid="submit-service-price-entry">
-                <Plus className="w-4 h-4 mr-2" />
+        <DataCard title={editId ? 'Editar serviço' : 'Adicionar serviço'}>
+          <form onSubmit={handleSubmitEntry} className="p-4 flex items-end gap-3 flex-wrap">
+            <FilterField label="Serviço" className="w-56">
+              <Autocomplete
+                value={serviceNameInput}
+                onChange={setServiceNameInput}
+                options={serviceTypes}
+                displayField="name"
+                onSelect={(st) => { setSelectedServiceType(st); setServiceNameInput(st.name); }}
+                className="w-full text-sm"
+              />
+            </FilterField>
+            <FilterField label={`${billingType === 'DIARIA' ? 'Valor da diária' : 'Valor'} (${CURRENCY_SYMBOL[currency]})`} className="w-32">
+              <Input type="number" step="0.01" min="0" value={valueInput} onChange={(e) => setValueInput(e.target.value)} className="h-9 text-sm" />
+            </FilterField>
+            <FilterField label="Moeda" className="w-36">
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CURRENCY_OPTIONS.map(([value, label]) => (
+                    <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Tipo de cobrança" className="w-48">
+              <Select value={billingType} onValueChange={setBillingType}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {BILLING_TYPE_OPTIONS.map(([value, label]) => (
+                    <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            {billingType === 'DIARIA' && (
+              <>
+                <FilterField label="Free time (dias)" className="w-32">
+                  <Input type="number" step="1" min="0" value={freeTimeDays} onChange={(e) => setFreeTimeDays(e.target.value)} className="h-9 text-sm" />
+                </FilterField>
+                <FilterField label="Tamanho do container" className="w-40">
+                  <Select value={sizeGroup} onValueChange={setSizeGroup}>
+                    <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SIZE_GROUP_OPTIONS.map(([value, label]) => (
+                        <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilterField>
+              </>
+            )}
+            <div className="flex items-center gap-2">
+              <Button type="submit" disabled={submitting} className="h-9 gap-1.5" data-testid="submit-service-price-entry">
+                <Plus className="w-4 h-4" />
                 {editId ? 'Atualizar' : 'Adicionar'}
               </Button>
               {editId && (
-                <Button type="button" variant="outline" onClick={resetEntryForm}>Cancelar</Button>
+                <Button type="button" variant="outline" className="h-9" onClick={resetEntryForm}>Cancelar</Button>
               )}
-            </form>
+            </div>
+          </form>
+        </DataCard>
 
+        <DataCard title={`Serviços de ${clientName || 'cliente'}`} count={entries.length}>
+          {entries.length === 0 ? (
+            <EmptyState icon={Tags} title="Nenhum serviço cadastrado para este cliente" hint="Use o card acima para adicionar o primeiro preço" />
+          ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="data-table">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800">
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Serviço</th>
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Valor</th>
-                    <th className="px-4 py-2.5"></th>
+                  <tr>
+                    <th>Serviço</th>
+                    <th>Cobrança</th>
+                    <th className="!text-right">Valor</th>
+                    <th className="w-24"></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.length === 0 ? (
-                    <tr><td colSpan={3} className="text-center py-6 text-sm text-slate-500">Nenhum serviço cadastrado para este cliente</td></tr>
-                  ) : entries.map((entry, idx) => (
-                    <tr key={entry.id} className={idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}>
-                      <td className="px-4 py-2.5 text-sm text-slate-800 dark:text-slate-200">{entry.service_type_name}</td>
-                      <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">
+                  {entries.map((entry) => (
+                    <tr key={entry.id} data-selected={editId === entry.id}>
+                      <td className="cell-strong"><div className="max-w-[360px] truncate" title={entry.service_type_name}>{entry.service_type_name}</div></td>
+                      <td>
                         {entry.billing_type === 'DIARIA' ? (
-                          <div>
-                            <div>{formatMoney(entry.value, entry.currency || 'BRL')}/dia</div>
-                            <div className="text-xs text-slate-400 dark:text-slate-500">
+                          <div className="flex flex-col gap-0.5">
+                            <StatusPill tone="violet" dot={false} className="w-fit">Diária de armazenagem</StatusPill>
+                            <span className="text-[11px] text-slate-400 dark:text-slate-500">
                               Free time {entry.free_time_days} dias · {entry.container_size_group ? `${entry.container_size_group} pés` : 'qualquer tamanho'}
-                            </div>
+                            </span>
                           </div>
                         ) : (
-                          formatMoney(entry.value, entry.currency || 'BRL')
+                          <StatusPill tone="slate" dot={false}>Único</StatusPill>
                         )}
                       </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-1">
+                      <td className="text-right whitespace-nowrap tabular-nums">
+                        {formatMoney(entry.value, entry.currency || 'BRL')}{entry.billing_type === 'DIARIA' ? '/dia' : ''}
+                      </td>
+                      <td className="!py-1">
+                        <div className="flex items-center justify-end gap-1">
                           <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => startEdit(entry)} title="Editar">
                             <Edit className="w-3.5 h-3.5 text-blue-600" />
                           </Button>
@@ -311,8 +310,8 @@ export default function ServicePriceTableClientPage() {
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </DataCard>
       </div>
       <ConfirmDialog />
     </Layout>

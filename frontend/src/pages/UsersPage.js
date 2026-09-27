@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { StatCard, StatGrid, DataCard, StatusPill, UserTag, EmptyState } from '../components/DataPage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../hooks/useConfirm';
-import { Users, ShieldCheck } from 'lucide-react';
+import { Users, ShieldCheck, User as UserIcon, UserX } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -91,90 +92,87 @@ export default function UsersPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="users-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-primary" />
-            Gestão de Usuários
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-            Controle quem tem acesso ao sistema e quem pode editar áreas restritas, como Dados da Empresa e o módulo Financeiro
-          </p>
-        </div>
+      <div className="space-y-4" data-testid="users-page">
+        <PageHeader
+          icon={ShieldCheck}
+          title="Gestão de Usuários"
+          subtitle="Controle quem tem acesso ao sistema e quem pode editar áreas restritas, como Dados da Empresa e o módulo Financeiro"
+        />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Usuários Cadastrados ({users.length})</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {users.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nome</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Email</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nível de Acesso</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Acesso Ativo</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {users.map((u) => {
-                      const isSelf = u.id === currentUser?.id;
-                      const isSaving = savingId === u.id;
-                      return (
-                        <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors" data-testid="user-row">
-                          <td className="px-4 py-2.5 text-[13px] font-medium">
-                            {u.name}
-                            {isSelf && <span className="ml-2 text-[11px] text-slate-400 dark:text-slate-500">(você)</span>}
-                          </td>
-                          <td className="px-4 py-2.5 text-[13px] text-slate-500 dark:text-slate-400">{u.email}</td>
-                          <td className="px-4 py-2.5">
-                            <Select
-                              value={u.role}
-                              onValueChange={(value) => handleRoleChange(u, value)}
+        <StatGrid>
+          <StatCard label="Usuários" value={users.length} icon={Users} tone="blue" />
+          <StatCard label="Administradores" value={users.filter((u) => u.role === 'admin').length} icon={ShieldCheck} tone="primary" />
+          <StatCard label="Operadores" value={users.filter((u) => u.role !== 'admin').length} icon={UserIcon} tone="slate" />
+          <StatCard label="Acessos desativados" value={users.filter((u) => u.active === false).length} icon={UserX} tone="red" />
+        </StatGrid>
+
+        <DataCard title="Usuários cadastrados" count={users.length}>
+          {users.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Email</th>
+                    <th>Nível de acesso</th>
+                    <th>Cadastrado em</th>
+                    <th>Acesso ativo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => {
+                    const isSelf = u.id === currentUser?.id;
+                    const isSaving = savingId === u.id;
+                    return (
+                      <tr key={u.id} data-testid="user-row">
+                        <td>
+                          <span className="inline-flex items-center gap-2">
+                            <UserTag name={u.name} />
+                            {isSelf && <StatusPill tone="primary" dot={false} className="text-[10px] px-1.5">você</StatusPill>}
+                          </span>
+                        </td>
+                        <td className="text-slate-500 dark:text-slate-400">{u.email}</td>
+                        <td className="!py-1.5">
+                          <Select
+                            value={u.role}
+                            onValueChange={(value) => handleRoleChange(u, value)}
+                            disabled={isSelf || isSaving}
+                          >
+                            <SelectTrigger className="h-8 w-[160px] text-[13px]" data-testid="user-role-select">
+                              <SelectValue>{ROLE_LABELS[u.role] || u.role}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Administrador</SelectItem>
+                              <SelectItem value="operator">Operador</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {format(new Date(u.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                        </td>
+                        <td className="!py-1.5">
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={u.active !== false}
+                              onCheckedChange={(checked) => handleStatusToggle(u, checked)}
                               disabled={isSelf || isSaving}
-                            >
-                              <SelectTrigger className="h-8 w-[160px] text-[13px]" data-testid="user-role-select">
-                                <SelectValue>{ROLE_LABELS[u.role] || u.role}</SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="admin">Administrador</SelectItem>
-                                <SelectItem value="operator">Operador</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </td>
-                          <td className="px-4 py-2.5 text-[13px]">
-                            {format(new Date(u.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={u.active !== false}
-                                onCheckedChange={(checked) => handleStatusToggle(u, checked)}
-                                disabled={isSelf || isSaving}
-                                data-testid="user-active-switch"
-                              />
-                              <span className={`text-[12px] font-medium ${u.active !== false ? 'text-green-600' : 'text-slate-400 dark:text-slate-500'}`}>
-                                {u.active !== false ? 'Ativo' : 'Desativado'}
-                              </span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-slate-500 dark:text-slate-400" data-testid="no-users">
-                <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">Nenhum usuário cadastrado</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                              data-testid="user-active-switch"
+                            />
+                            <StatusPill tone={u.active !== false ? 'emerald' : 'slate'}>
+                              {u.active !== false ? 'Ativo' : 'Desativado'}
+                            </StatusPill>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState icon={Users} title="Nenhum usuário cadastrado" testId="no-users" />
+          )}
+        </DataCard>
       </div>
       <ConfirmDialog />
     </Layout>

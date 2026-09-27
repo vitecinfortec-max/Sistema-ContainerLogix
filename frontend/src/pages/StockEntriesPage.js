@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarPrimary, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -161,86 +162,61 @@ export default function StockEntriesPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="stock-entries-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Entradas de Estoque</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Histórico de entradas geradas por importação de XML de Nota Fiscal</p>
-        </div>
+      <div className="space-y-4" data-testid="stock-entries-page">
+        <PageHeader icon={PackagePlus} title="Entradas de Estoque" subtitle="Histórico de entradas geradas por importação de XML de Nota Fiscal" />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 text-[13px] pl-9" data-testid="search-stock-entries-input" />
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Produto, fornecedor ou Nº da NF-e">
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-stock-entries-input" />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openImportDialog}
-            className="h-9 px-3 gap-2 text-[13px] font-medium"
-            data-testid="import-nfe-button"
-          >
-            <FileUp className="w-4 h-4 text-primary" />
-            Importar XML de NF-e
-          </Button>
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <PackagePlus className="w-4 h-4" />
-              {loading ? 'Carregando...' : `Entradas Registradas (${filteredEntries.length})`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {filteredEntries.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Produto</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Fornecedor</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">NF-e Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Quantidade</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Valor Unit.</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Valor Total</th>
+        <DataCard
+          title="Entradas registradas"
+          count={loading ? '...' : filteredEntries.length}
+          toolbar={(
+            <Toolbar primary={<ToolbarPrimary icon={FileUp} label="Importar XML de NF-e" onClick={openImportDialog} testId="import-nfe-button" />} />
+          )}
+        >
+          {filteredEntries.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Produto</th>
+                    <th>Fornecedor</th>
+                    <th>NF-e Nº</th>
+                    <th className="!text-right">Quantidade</th>
+                    <th className="!text-right">Valor unit.</th>
+                    <th className="!text-right">Valor total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEntries.map((e) => (
+                    <tr key={e.id} data-testid="stock-entry-row">
+                      <td className="whitespace-nowrap tabular-nums">{fmtDate(e.created_at)}</td>
+                      <td><div className="max-w-[320px] truncate cell-strong" title={e.product_name || ''}>{e.product_name}</div></td>
+                      <td><div className="max-w-[220px] truncate" title={e.supplier_name || ''}>{e.supplier_name || '-'}</div></td>
+                      <td className="whitespace-nowrap tabular-nums">{e.nfe_number || '-'}</td>
+                      <td className="text-right tabular-nums">{e.quantity}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(e.unit_value)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(e.total_value)}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredEntries.map((e, idx) => (
-                      <tr key={e.id} className={`transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`} data-testid="stock-entry-row">
-                        <td className="px-4 py-2.5 text-[12px] text-slate-500 dark:text-slate-400">{fmtDate(e.created_at)}</td>
-                        <td className="px-4 py-2.5 text-[13px] font-medium">{e.product_name}</td>
-                        <td className="px-4 py-2.5 text-[13px]">{e.supplier_name || '-'}</td>
-                        <td className="px-4 py-2.5 text-[13px] font-mono">{e.nfe_number || '-'}</td>
-                        <td className="px-4 py-2.5 text-[13px]">{e.quantity}</td>
-                        <td className="px-4 py-2.5 text-[13px]">{fmtMoney(e.unit_value)}</td>
-                        <td className="px-4 py-2.5 text-[13px] font-semibold">{fmtMoney(e.total_value)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-slate-500 dark:text-slate-400">
-                <PackagePlus className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">{search ? 'Nenhuma entrada encontrada' : 'Nenhuma entrada de estoque registrada'}</p>
-                <p className="text-[12px] mt-1">Use "Importar XML de NF-e" para lançar entradas automaticamente</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={PackagePlus}
+              title={loading ? 'Carregando...' : (search ? 'Nenhuma entrada encontrada' : 'Nenhuma entrada de estoque registrada')}
+              hint={loading ? undefined : 'Use "Importar XML de NF-e" para lançar entradas automaticamente'}
+            />
+          )}
+        </DataCard>
       </div>
 
       <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetImport(); }}>

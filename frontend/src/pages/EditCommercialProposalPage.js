@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Plus, Trash2, Loader2, Download } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Loader2, Download, FileText } from 'lucide-react';
 
 const CURRENCY_OPTIONS = [['BRL', 'R$ - Real'], ['USD', '$ - Dólar']];
 const CURRENCY_SYMBOL = { BRL: 'R$', USD: '$' };
@@ -128,24 +129,24 @@ export default function EditCommercialProposalPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="edit-commercial-proposal-page">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate('/comercial/proposta')}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 font-mono">{proposalNumber}</h1>
-              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Editar proposta comercial</p>
-            </div>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleDownloadPdf} disabled={downloading}>
-            <Download className="w-4 h-4 mr-2" />
-            Baixar PDF
-          </Button>
-        </div>
+      <div className="space-y-4" data-testid="edit-commercial-proposal-page">
+        <PageHeader
+          icon={FileText}
+          title={proposalNumber ? `Proposta ${proposalNumber}` : 'Proposta Comercial'}
+          subtitle="Editar proposta comercial"
+          actions={(
+            <>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => navigate('/comercial/proposta')}>
+                <ArrowLeft className="w-4 h-4" /> Voltar
+              </Button>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={handleDownloadPdf} disabled={downloading}>
+                <Download className="w-4 h-4 text-red-600" /> Baixar PDF
+              </Button>
+            </>
+          )}
+        />
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dados Gerais</CardTitle>

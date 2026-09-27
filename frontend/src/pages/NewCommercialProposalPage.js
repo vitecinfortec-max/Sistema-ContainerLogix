@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Loader2, FileText } from 'lucide-react';
 
 const DEFAULT_FREE_TIME_TEXT = '30 (trinta) dias de free time de armazenagem, contados a partir da entrada do contêiner no pátio. Após esse período, incidem as diárias de armazenagem informadas na tabela acima.';
 const DEFAULT_PAYMENT_TERMS_TEXT = 'Pagamento de forma quinzenal, com faturamento gerado a cada 15 dias, sempre às segundas-feiras. Pagamento via Pix.';
@@ -79,18 +80,19 @@ export default function NewCommercialProposalPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="new-commercial-proposal-page">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate('/comercial/proposta')}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Nova Proposta Comercial</h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Preencha os dados para gerar a proposta</p>
-          </div>
-        </div>
+      <div className="space-y-4" data-testid="new-commercial-proposal-page">
+        <PageHeader
+          icon={FileText}
+          title="Nova Proposta Comercial"
+          subtitle="Preencha os dados para gerar a proposta"
+          actions={(
+            <Button variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => navigate('/comercial/proposta')}>
+              <ArrowLeft className="w-4 h-4" /> Voltar
+            </Button>
+          )}
+        />
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dados Gerais</CardTitle>
