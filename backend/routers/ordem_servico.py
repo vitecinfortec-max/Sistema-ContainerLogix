@@ -222,12 +222,13 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.graphics.barcode import code128
     from xml.sax.saxutils import escape as xml_escape
     from reports import (
         download_logo, _build_pdf_header, _voucher_field_row, _voucher_boxed_section,
-        PRIMARY_COLOR, HEADER_BG_COLOR,
+        _pdf_table_style, _pdf_header_cells, _pdf_totals_box, _pdf_signatures,
+        _hex, BRAND_LINE, BRAND_DARK, BRAND_MUTED, BRAND_TEXT,
     )
 
     os_doc = await db.ordem_servico.find_one({"id": os_id}, {"_id": 0})
@@ -288,10 +289,8 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
 
     label_value_style = styles['Normal']
     box_title_style = ParagraphStyle('OSBoxTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
-    title_style = ParagraphStyle('OSTitle', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER)
-    subtitle_style = ParagraphStyle('OSSubtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)
-    footer_style = ParagraphStyle('OSFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=colors.HexColor('#555555'))
-    text_block_style = ParagraphStyle('OSTextBlock', parent=styles['Normal'], fontSize=8.5, leading=10.5)
+    footer_style = ParagraphStyle('OSFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=_hex(BRAND_MUTED))
+    text_block_style = ParagraphStyle('OSTextBlock', parent=styles['Normal'], fontSize=8.5, leading=10.5, textColor=_hex(BRAND_TEXT))
 
     def field_row(pairs, n_cols=4):
         return _voucher_field_row(pairs, width, label_value_style, n_cols=n_cols)
@@ -301,23 +300,13 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
 
     elements = []
 
-    # Header padrão (logo + dados da empresa), sem a linha/título default - o
-    # título aqui é a caixa "ORDEM DE SERVIÇO" abaixo, mesmo truque do
-    # comprovante de movimentação/Ordem de Carregamento.
-    elements.extend(_build_pdf_header(styles, logo_buffer, '', company=company, content_width=width)[:2])
-
-    # Título
-    title_tbl = Table([
-        [Paragraph('ORDEM DE SERVIÇO', title_style)],
-        [Paragraph(f"O.S. Nº {os_doc['os_number']} - {os_doc.get('category') or 'Sem categoria'}", subtitle_style)],
-    ], colWidths=[width])
-    title_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    elements.append(title_tbl)
-    elements.append(Spacer(1, 6))
+    # Cabeçalho padrão dos documentos: logo + empresa à esquerda, título
+    # "Ordem de Serviço" + número/categoria no bloco da direita.
+    elements.extend(_build_pdf_header(
+        styles, logo_buffer,
+        f"Ordem de Serviço - O.S. Nº {os_doc['os_number']}  ·  {os_doc.get('category') or 'Sem categoria'}",
+        company=company, content_width=width,
+    ))
 
     status_label = STATUS_LABELS.get(os_doc.get('status'), os_doc.get('status'))
     priority_label = PRIORITY_LABELS.get(os_doc.get('priority'), os_doc.get('priority'))
@@ -403,7 +392,7 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     item_table_width = width - 20
 
     prod_header = ['Código', 'Descrição', 'Qtd', 'Un', 'V. Unit.', 'V. Total', 'Desc.', 'V. c/ Desc.']
-    prod_rows = [prod_header]
+    prod_rows = [_pdf_header_cells(prod_header, font_size=7.5)]
     products = os_doc.get('products') or []
     for p in products:
         qty = float(p.get('quantity') or 0)
@@ -427,36 +416,21 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
         money(sum(float(p.get('discount') or 0) for p in products)),
         money(os_doc.get('products_total')),
     ])
-    prod_base_widths = [35, 250, 30, 28, 48, 48, 38, 55]
+    prod_base_widths = [40, 245, 30, 28, 48, 48, 38, 55]
     prod_scale = item_table_width / sum(prod_base_widths)
     prod_t = Table(prod_rows, colWidths=[w * prod_scale for w in prod_base_widths], repeatRows=1)
-    prod_style = [
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    # Estilo padrão das tabelas + linha de total; a listra só existe com pelo
+    # menos 1 item (tabela vazia = só cabeçalho + Total).
+    prod_t.setStyle(TableStyle(_pdf_table_style(total_row=True, zebra=bool(products)) + [
         ('FONTSIZE', (0, 0), (-1, -1), 7.5),
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
         ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-    ]
-    if products:
-        # Zebra striping só faz sentido com pelo menos 1 linha de item entre o
-        # cabeçalho e o total - com a tabela vazia (só cabeçalho + Total), o
-        # range (0,1)-(-1,-2) apontaria pra trás (linha 1 até a linha 0).
-        prod_style.append(('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#FAFAFA')]))
-    prod_t.setStyle(TableStyle(prod_style))
+    ]))
     elements.append(boxed_section('Produtos', [], extra=[prod_t]))
     elements.append(Spacer(1, 6))
 
     # ===== Serviços =====
     serv_header = ['Código', 'Descrição', 'Qtd', 'Unidade', 'V. Unit.', 'V. Total']
-    serv_rows = [serv_header]
+    serv_rows = [_pdf_header_cells(serv_header, font_size=7.5)]
     services = os_doc.get('services') or []
     for s in services:
         serv_rows.append([
@@ -468,44 +442,22 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
             money(s.get('total')),
         ])
     serv_rows.append(['', 'Total', '', '', '', money(os_doc.get('services_total'))])
-    serv_base_widths = [35, 330, 30, 48, 48, 48]
+    serv_base_widths = [40, 325, 30, 48, 48, 48]
     serv_scale = item_table_width / sum(serv_base_widths)
     serv_t = Table(serv_rows, colWidths=[w * serv_scale for w in serv_base_widths], repeatRows=1)
-    serv_style = [
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    serv_t.setStyle(TableStyle(_pdf_table_style(total_row=True, zebra=bool(services)) + [
         ('FONTSIZE', (0, 0), (-1, -1), 7.5),
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
         ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-    ]
-    if services:
-        serv_style.append(('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#FAFAFA')]))
-    serv_t.setStyle(TableStyle(serv_style))
+    ]))
     elements.append(boxed_section('Serviços', [], extra=[serv_t]))
     elements.append(Spacer(1, 6))
 
     # ===== Total Geral =====
-    grand_total_style = ParagraphStyle('OSGrandTotal', parent=styles['Normal'], fontSize=11,
-                                       fontName='Helvetica-Bold', alignment=TA_CENTER,
-                                       textColor=colors.HexColor(f'#{PRIMARY_COLOR}'))
-    total_tbl = Table([[Paragraph(
-        f"TOTAL GERAL (Produtos + Serviços): {money(os_doc.get('grand_total'))}", grand_total_style
-    )]], colWidths=[width])
-    total_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
-    elements.append(total_tbl)
+    elements.append(_pdf_totals_box([
+        ("Produtos", f"R$ {money(os_doc.get('products_total'))}"),
+        ("Serviços", f"R$ {money(os_doc.get('services_total'))}"),
+        ("Total geral", f"R$ {money(os_doc.get('grand_total'))}"),
+    ], width, width=250))
     elements.append(Spacer(1, 6))
 
     # ===== Parecer de Encerramento =====
@@ -542,36 +494,15 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
     elements.append(Spacer(1, 6))
 
     # ===== Área de assinaturas - mesmo padrão do comprovante de movimentação/Ordem de Carregamento =====
-    sig_title_style = ParagraphStyle('OSSigTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', alignment=TA_CENTER)
-    sig_info_style = ParagraphStyle('OSSigInfo', parent=styles['Normal'], fontSize=8)
-    sig_data = [[
-        [
-            Paragraph('Assinatura do Técnico', sig_title_style),
-            Spacer(1, 20),
-            HRFlowable(width='100%', thickness=0.8, color=colors.black),
-            Paragraph(f"Nome: {os_doc.get('technician_name') or '-'}", sig_info_style),
-        ],
-        [
-            Paragraph('Assinatura do Cliente', sig_title_style),
-            Spacer(1, 20),
-            HRFlowable(width='100%', thickness=0.8, color=colors.black),
-            Paragraph(f"Nome: {os_doc.get('person_name') or '-'}", sig_info_style),
-        ],
-    ]]
-    sig_tbl = Table(sig_data, colWidths=[width / 2] * 2)
-    sig_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 15),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 15),
-    ]))
-    elements.append(sig_tbl)
-    elements.append(Spacer(1, 6))
+    elements.append(_pdf_signatures([
+        ('Assinatura do Técnico', os_doc.get('technician_name') or '-'),
+        ('Assinatura do Cliente', os_doc.get('person_name') or '-'),
+    ], width, space_above=30))
+    elements.append(Spacer(1, 8))
 
     # ===== Declarações (termo de aceite) =====
     decl_style = ParagraphStyle('OSDecl', parent=styles['Normal'], fontSize=7.5, leading=10,
-                                fontName='Helvetica-Oblique')
+                                fontName='Helvetica-Oblique', textColor=_hex(BRAND_TEXT))
     decl_t = Table([
         [Paragraph("O serviço foi realizado e o cliente declara ter realizado os devidos testes de "
                   "funcionamento do equipamento.", decl_style),
@@ -579,8 +510,9 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
                   "responsabilizando-se pelas implicações que esta ação pode gerar.", decl_style)]
     ], colWidths=[width / 2, width / 2])
     decl_t.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
+        ('INNERGRID', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
@@ -596,23 +528,25 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
         bc = code128.Code128(barcode_value, barWidth=1.0, barHeight=28)
     except Exception:
         bc = None
-    bc_num = Paragraph(f"<b>{os_doc['os_number']}</b>", ParagraphStyle('OSBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER))
+    bc_num = Paragraph(f"<b>{os_doc['os_number']}</b>", ParagraphStyle('OSBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=_hex(BRAND_DARK)))
     left_cell = [bc, bc_num] if bc else [bc_num]
+    info_text_style = ParagraphStyle('OSInfoText', parent=styles['Normal'], fontSize=9, leading=12, textColor=_hex(BRAND_DARK))
     right_info = [
-        Paragraph(f"<b>Usuário: {current_user.get('name') or '-'}</b>", styles['Normal']),
-        Paragraph(f"<b>Data e hora da impressão: {now_brt().strftime('%d/%m/%Y %H:%M')}</b>", styles['Normal']),
+        Paragraph(f"<font color='#{BRAND_MUTED}'>Usuário:</font> <b>{safe_text(current_user.get('name')) or '-'}</b>", info_text_style),
+        Paragraph(f"<font color='#{BRAND_MUTED}'>Data e hora da impressão:</font> <b>{now_brt().strftime('%d/%m/%Y %H:%M')}</b>", info_text_style),
     ]
     info_tbl = Table([[left_cell, right_info]], colWidths=[100, width - 100])
     info_tbl.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (1, 0), (1, 0), 12),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.75, _hex(BRAND_LINE)),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
     ]))
     elements.append(info_tbl)
     elements.append(Spacer(1, 6))
 
     elements.append(Paragraph(
-        f"{company['name']} | Este documento é válido como Ordem de Serviço",
+        f"{company['name']}  ·  Este documento é válido como Ordem de Serviço",
         footer_style
     ))
 

@@ -199,9 +199,12 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_RIGHT
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.graphics.barcode import code128
-    from reports import download_logo, _build_pdf_header, _voucher_field, _voucher_field_row, _voucher_boxed_section
+    from reports import (
+        download_logo, _build_pdf_header, _voucher_field, _voucher_field_row, _voucher_boxed_section,
+        _pdf_table_style, _pdf_header_cells, _pdf_signatures, _hex, BRAND_LINE, BRAND_DARK, BRAND_MUTED,
+    )
 
     order = await db.loading_orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
@@ -233,9 +236,7 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
 
     label_value_style = styles['Normal']
     box_title_style = ParagraphStyle('LOBoxTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
-    title_style = ParagraphStyle('LOTitle', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER)
-    subtitle_style = ParagraphStyle('LOSubtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)
-    footer_style = ParagraphStyle('LOFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=colors.HexColor('#555555'))
+    footer_style = ParagraphStyle('LOFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=_hex(BRAND_MUTED))
 
     def field(label, value):
         return _voucher_field(label, value, label_value_style)
@@ -248,24 +249,13 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
 
     elements = []
 
-    # Header: logo + dados completos da empresa - mesmo bloco compartilhado
-    # com os demais documentos (_build_pdf_header), sem a linha/título padrão
-    # já que o título aqui é o box abaixo (mesmo truque do comprovante).
-    elements.extend(_build_pdf_header(styles, logo_buffer, '', company=company, content_width=width)[:2])
-
-    # Título
+    # Cabeçalho padrão dos documentos: logo + empresa à esquerda, título
+    # "Ordem de Carregamento" + número/tipo no bloco da direita.
     order_type_label = _ORDER_TYPE_LABELS.get(order.get('order_type'), order.get('order_type'))
-    title_tbl = Table([
-        [Paragraph('ORDEM DE CARREGAMENTO', title_style)],
-        [Paragraph(f"Nº {order['order_number']} - {order_type_label}", subtitle_style)],
-    ], colWidths=[width])
-    title_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-    ]))
-    elements.append(title_tbl)
-    elements.append(Spacer(1, 2))
+    elements.extend(_build_pdf_header(
+        styles, logo_buffer, f"Ordem de Carregamento - Nº {order['order_number']}  ·  {order_type_label}",
+        company=company, content_width=width,
+    ))
 
     status_label = _STATUS_LABELS.get(order.get('status'), order.get('status'))
     elements.append(boxed_section('Dados do Agendamento, Controle e Destino', [
@@ -293,7 +283,7 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
 
     if items:
         item_header = ["#", "ID do Container", "Tipo/Tamanho", "Peso Bruto", "Armador", "Lacre (Seal)"]
-        item_rows = [item_header]
+        item_rows = [_pdf_header_cells(item_header, font_size=7.5)]
         for idx, it in enumerate(items, 1):
             item_rows.append([
                 str(idx),
@@ -307,21 +297,15 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         scale = width / sum(base_widths)
         item_col_widths = [w * scale for w in base_widths]
         items_table = Table(item_rows, colWidths=item_col_widths, repeatRows=1)
-        items_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        items_table.setStyle(TableStyle(_pdf_table_style() + [
             ('FONTSIZE', (0, 0), (-1, -1), 7.5),
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-            ('ALIGN', (2, 0), (3, -1), 'CENTER'),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('BOX', (0, 0), (-1, -1), 1, colors.black),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (1, 1), (1, -1), 'Helvetica-Bold'),
+            ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+            ('ALIGN', (2, 1), (3, -1), 'CENTER'),
             ('TOPPADDING', (0, 0), (-1, -1), 2.5),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
             ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
         ]))
         elements.append(items_table)
     else:
@@ -384,8 +368,9 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
     check_item_width = width - 20 - 80
     check_t = Table(check_rows, colWidths=[check_item_width, 40, 40])
     check_t.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.3, colors.grey),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+        ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
+        ('INNERGRID', (0, 0), (-1, -1), 0.4, _hex(BRAND_LINE)),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('TOPPADDING', (0, 0), (-1, -1), 1.5),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 1.5),
@@ -395,34 +380,11 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
     elements.append(Spacer(1, 2))
 
     # Área de assinaturas - mesmo padrão do comprovante de movimentação
-    sig_title_style = ParagraphStyle('LOSigTitle', parent=styles['Normal'], fontSize=8.5, fontName='Helvetica-Bold', alignment=TA_CENTER)
-    sig_info_style = ParagraphStyle('LOSigInfo', parent=styles['Normal'], fontSize=7.5)
-    sig_data = [[
-        [
-            Paragraph('Assinatura do Motorista', sig_title_style),
-            Spacer(1, 9),
-            HRFlowable(width='100%', thickness=0.8, color=colors.black),
-            Paragraph(f"Nome: {order.get('driver_name') or '-'}", sig_info_style),
-            Paragraph(f"CPF: {order.get('driver_cpf') or '-'}", sig_info_style),
-        ],
-        [
-            Paragraph('Assinatura do Responsável', sig_title_style),
-            Spacer(1, 9),
-            HRFlowable(width='100%', thickness=0.8, color=colors.black),
-            Paragraph(f"Nome: {order.get('created_by_name') or '-'}", sig_info_style),
-            Paragraph(f"Data: {now_brt().strftime('%d/%m/%Y')}", sig_info_style),
-        ],
-    ]]
-    sig_tbl = Table(sig_data, colWidths=[width / 2] * 2)
-    sig_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 15),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 15),
-    ]))
-    elements.append(sig_tbl)
-    elements.append(Spacer(1, 2))
+    elements.append(_pdf_signatures([
+        ('Assinatura do Motorista', f"{order.get('driver_name') or '-'}  ·  CPF {order.get('driver_cpf') or '-'}"),
+        ('Assinatura do Responsável', f"{order.get('created_by_name') or '-'}  ·  {now_brt().strftime('%d/%m/%Y')}"),
+    ], width, space_above=24))
+    elements.append(Spacer(1, 6))
 
     # Código de barras + usuário + data/hora de impressão
     barcode_value = str(order.get('order_number') or 0).zfill(6)
@@ -430,24 +392,25 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         bc = code128.Code128(barcode_value, barWidth=1.0, barHeight=20)
     except Exception:
         bc = None
-    bc_num = Paragraph(f"<b>{order['order_number']}</b>", ParagraphStyle('LOBcNum', parent=styles['Normal'], fontSize=7.5, alignment=TA_CENTER))
+    bc_num = Paragraph(f"<b>{order['order_number']}</b>", ParagraphStyle('LOBcNum', parent=styles['Normal'], fontSize=7.5, alignment=TA_CENTER, textColor=_hex(BRAND_DARK)))
     left_cell = [bc, bc_num] if bc else [bc_num]
-    info_text_style = ParagraphStyle('LOInfoText', parent=styles['Normal'], fontSize=8.5)
+    info_text_style = ParagraphStyle('LOInfoText', parent=styles['Normal'], fontSize=8.5, textColor=_hex(BRAND_DARK))
     right_info = [
-        Paragraph(f"<b>Usuário: {order.get('created_by_name') or '-'}</b>", info_text_style),
-        Paragraph(f"<b>Data e hora da impressão: {now_brt().strftime('%d/%m/%Y %H:%M')}</b>", info_text_style),
+        Paragraph(f"<font color='#{BRAND_MUTED}'>Usuário:</font> <b>{order.get('created_by_name') or '-'}</b>", info_text_style),
+        Paragraph(f"<font color='#{BRAND_MUTED}'>Data e hora da impressão:</font> <b>{now_brt().strftime('%d/%m/%Y %H:%M')}</b>", info_text_style),
     ]
     info_tbl = Table([[left_cell, right_info]], colWidths=[100, width - 100])
     info_tbl.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (1, 0), (1, 0), 12),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.75, _hex(BRAND_LINE)),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ]))
     elements.append(info_tbl)
     elements.append(Spacer(1, 2))
 
     elements.append(Paragraph(
-        f"{company['name']} | Este documento é válido como Ordem de Carregamento",
+        f"{company['name']}  ·  Este documento é válido como Ordem de Carregamento",
         footer_style
     ))
 

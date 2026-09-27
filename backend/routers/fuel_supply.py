@@ -465,26 +465,24 @@ def _valor_por_extenso(value):
 
 @api_router.get("/fuel-supply-orders/{order_id}/pdf")
 async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Gera PDF da Ordem de Abastecimento (2 vias) - mesmo layout visual do
-    Controle de Revisão (backend/routers/frota.py: generate_revision_pdf),
-    pra manter os comprovantes de Manutenção com a mesma identidade visual."""
+    """Gera PDF da Ordem de Abastecimento (2 vias na mesma página, com linha
+    de corte) no padrão visual dos documentos do sistema - cabeçalho padrão
+    na versão compacta pra as duas vias caberem numa folha."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-    from reportlab.platypus import Image as RLImage
-    from reports import download_logo
+    from reports import (
+        download_logo, _build_pdf_header, _pdf_info_grid, _pdf_header_cells, _pdf_table_style,
+        _pdf_signatures, _hex, BRAND_LINE, BRAND_MUTED, BRAND_TEXT,
+    )
 
     order = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Ordem de Abastecimento não encontrada")
     company = merge_company(await get_company_settings())
-
-    # Cores corporativas (iguais ao Controle de Revisão)
-    PRIMARY_COLOR = "008B7B"
-    HEADER_BG_COLOR = "E8F4F5"
 
     def fmt_dt(s):
         if not s:
@@ -517,224 +515,107 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
         rightMargin=15 * mm, leftMargin=15 * mm,
-        topMargin=15 * mm, bottomMargin=15 * mm
+        topMargin=12 * mm, bottomMargin=10 * mm
     )
     styles = getSampleStyleSheet()
-
-    logo_buffer = download_logo(company)
-    WIDTH = 520
+    WIDTH = doc.width
 
     def build_via():
         elems = []
 
-        # ========== CABEÇALHO ==========
-        company_style = ParagraphStyle('CompanyName', parent=styles['Normal'], fontSize=12,
-                                       textColor=colors.black, alignment=TA_CENTER,
-                                       fontName='Helvetica-Bold', leading=14)
-        address_style = ParagraphStyle('Address', parent=styles['Normal'], fontSize=7,
-                                       textColor=colors.black, alignment=TA_CENTER, leading=9)
-
-        logo_cell = ""
-        if logo_buffer:
-            try:
-                logo_cell = RLImage(logo_buffer, width=36, height=36)
-            except Exception:
-                pass
-
-        address_lines = [line.strip() for line in (company['address'] or '').split('\n') if line.strip()]
-        company_info = [
-            Paragraph(company['name'], company_style),
-            Paragraph(f"CNPJ: {company['cnpj']}", address_style),
-        ] + [
-            Paragraph(line, address_style) for line in address_lines
-        ] + [
-            Paragraph(f"{company['email']} | {company['phone']}", address_style),
-        ]
-
-        header_table = Table([[logo_cell, company_info, ""]], colWidths=[60, 400, 60])
-        header_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-        ]))
-        elems.append(header_table)
-        elems.append(Spacer(1, 2))
-
-        line_table = Table([[""]], colWidths=[WIDTH])
-        line_table.setStyle(TableStyle([
-            ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ]))
-        elems.append(line_table)
-        elems.append(Spacer(1, 5))
-
-        # ========== TÍTULO ==========
-        title_style = ParagraphStyle('Title', parent=styles['Normal'], fontSize=14,
-                                     textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER,
-                                     fontName='Helvetica-Bold', spaceAfter=6)
-        elems.append(Paragraph("ORDEM DE ABASTECIMENTO", title_style))
-
-        # ========== INFO BAR ==========
-        order_date_str = fmt_date(order.get('order_date')) or fmt_dt(order.get('created_at'))
-        info_text = (f"Ordem Nº {order['order_number']}  |  Equipamento: {order.get('equipment_plate') or '-'}  |  "
-                    f"Data: {order_date_str}")
-        info_style = ParagraphStyle('InfoBar', parent=styles['Normal'], fontSize=10,
-                                    textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER,
-                                    fontName='Helvetica-Bold')
-        info_table = Table([[Paragraph(info_text, info_style)]], colWidths=[WIDTH])
-        info_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ]))
-        elems.append(info_table)
-        elems.append(Spacer(1, 6))
+        # ========== CABEÇALHO (padrão, versão compacta) ==========
+        elems.extend(_build_pdf_header(
+            styles, download_logo(company), f"Ordem de Abastecimento Nº {order['order_number']}",
+            company=company, content_width=WIDTH, compact=True,
+        ))
 
         # ========== DADOS DO ABASTECIMENTO ==========
-        label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
-        value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=9, fontName='Helvetica')
+        order_date_str = fmt_date(order.get('order_date')) or fmt_dt(order.get('created_at'))
+        elems.append(_pdf_info_grid([
+            ("Data", order_date_str or '-'),
+            ("Equipamento", order.get('equipment_plate') or '-'),
+            ("Produto", _FUEL_TYPE_LABELS.get(order.get('fuel_type'), order.get('fuel_type')) or '-'),
+            ("Solicitante", order.get('requester') or '-'),
+            ("Fornecedor", order.get('supplier_name') or '-', 4),
+        ], WIDTH, cols=4))
+        elems.append(Spacer(1, 5))
 
-        dados_data = [
-            [Paragraph("FORNECEDOR:", label_style), Paragraph(order.get('supplier_name') or '-', value_style),
-             Paragraph("SOLICITANTE:", label_style), Paragraph(order.get('requester') or '-', value_style)],
-            [Paragraph("EQUIPAMENTO:", label_style), Paragraph(order.get('equipment_plate') or '-', value_style),
-             Paragraph("PRODUTO:", label_style),
-             Paragraph(_FUEL_TYPE_LABELS.get(order.get('fuel_type'), order.get('fuel_type')) or '-', value_style)],
-        ]
-        dados_table = Table(dados_data, colWidths=[100, 160, 100, 160])
-        dados_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F5F5F5')),
-            ('BACKGROUND', (2, 0), (2, -1), colors.HexColor('#F5F5F5')),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ]))
-        elems.append(dados_table)
-        elems.append(Spacer(1, 4))
-
-        # ========== QUANTIDADE E VALOR - TÍTULO ==========
-        section_title_style = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=10,
-                                             textColor=colors.white, alignment=TA_CENTER,
-                                             fontName='Helvetica-Bold')
-        section_table = Table([[Paragraph("QUANTIDADE E VALOR", section_title_style)]], colWidths=[WIDTH])
-        section_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        elems.append(section_table)
-
-        items_header = ['QUANTIDADE (L)', 'PREÇO UNIT.', 'TOTAL']
-        items_row = [
-            f"{liters:.2f}".replace('.', ',') if liters is not None else '-',
-            money(estimated_value) if estimated_value is not None else '-',
-            money(total_value) if has_total else '-',
-        ]
-        items_table = Table([items_header, items_row], colWidths=[WIDTH / 3] * 3)
-        items_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('FONTNAME', (0, 1), (-1, 1), 'Helvetica'),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        # ========== QUANTIDADE E VALOR ==========
+        value_style = ParagraphStyle('FSOValue', parent=styles['Normal'], fontSize=9.5, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=_hex(BRAND_TEXT))
+        items_table = Table([
+            _pdf_header_cells(['Quantidade (L)', 'Preço unit.', 'Total'], font_size=7.5),
+            [
+                Paragraph(f"{liters:.2f}".replace('.', ',') if liters is not None else '-', value_style),
+                Paragraph(f"R$ {money(estimated_value)}" if estimated_value is not None else '-', value_style),
+                Paragraph(f"R$ {money(total_value)}" if has_total else '-', value_style),
+            ],
+        ], colWidths=[WIDTH / 3] * 3)
+        items_table.setStyle(TableStyle(_pdf_table_style(zebra=False) + [
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('LINEBELOW', (0, -1), (-1, -1), 0.6, _hex(BRAND_LINE)),
         ]))
         elems.append(items_table)
-        elems.append(Spacer(1, 3))
 
         extenso = _valor_por_extenso(total_value) if has_total and total_value else ''
         if extenso:
-            extenso_style = ParagraphStyle('Extenso', parent=styles['Normal'], fontSize=8,
-                                           fontName='Helvetica-Bold', alignment=TA_CENTER)
-            extenso_table = Table([[Paragraph(f"Valor por extenso: {extenso}", extenso_style)]], colWidths=[WIDTH])
-            extenso_table.setStyle(TableStyle([
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ]))
-            elems.append(extenso_table)
-            elems.append(Spacer(1, 5))
+            elems.append(Paragraph(
+                f"<font color='#{BRAND_MUTED}'>Valor por extenso:</font> <b>{extenso}</b>",
+                ParagraphStyle('Extenso', parent=styles['Normal'], fontSize=7.5, alignment=TA_CENTER, textColor=_hex(BRAND_TEXT), spaceBefore=3, spaceAfter=4),
+            ))
         else:
-            elems.append(Spacer(1, 2))
+            elems.append(Spacer(1, 5))
 
         # ========== DADOS PARA CONFERÊNCIA (preenchimento manual) + OBSERVAÇÃO ==========
-        manual_style = ParagraphStyle('Manual', parent=styles['Normal'], fontSize=7.5, leading=9.5,
-                                      fontName='Helvetica')
-        obs_style = ParagraphStyle('ObsCell', parent=styles['Normal'], fontSize=7.5, fontName='Helvetica')
+        manual_style = ParagraphStyle('Manual', parent=styles['Normal'], fontSize=7.5, leading=10, fontName='Helvetica', textColor=_hex(BRAND_TEXT))
+        obs_style = ParagraphStyle('ObsCell', parent=styles['Normal'], fontSize=7.5, leading=9.5, fontName='Helvetica', textColor=_hex(BRAND_TEXT))
         obs_block = Table([[
             Paragraph("Data abastecimento:<br/>Km de abastecimento:<br/>Quantidade em litros:<br/>"
-                     "Km último abastecimento:<br/>Média:", manual_style),
-            Paragraph(f"OBS: {(order.get('observations') or '').replace(chr(10), '<br/>')}", obs_style),
-        ]], colWidths=[260, 260])
+                      "Km último abastecimento:<br/>Média:", manual_style),
+            Paragraph(f"<b>OBS:</b> {(order.get('observations') or '').replace(chr(10), '<br/>')}", obs_style),
+        ]], colWidths=[WIDTH / 2, WIDTH / 2])
         obs_block.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
+            ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
+            ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
+            ('INNERGRID', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('TOPPADDING', (0, 0), (-1, -1), 2),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
         ]))
         elems.append(obs_block)
-        elems.append(Spacer(1, 1))
-
         elems.append(Paragraph(
             "Favor anexar esta via junto com a nota fiscal que será enviada para cobrança. Obrigado.",
             ParagraphStyle('Note', parent=styles['Normal'], fontSize=6.5, fontName='Helvetica-Oblique',
-                          textColor=colors.grey, leading=8)
+                           textColor=_hex(BRAND_MUTED), leading=8, spaceBefore=2)
         ))
-        elems.append(Spacer(1, 2))
 
         # ========== ASSINATURAS ==========
-        sig_data = [
-            ["_" * 45, "_" * 45],
-            ["Assinatura do Solicitante", "Assinatura do Solicitado"],
-        ]
-        sig_table = Table(sig_data, colWidths=[260, 260])
-        sig_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 1), (-1, 1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 7),
-            ('TOPPADDING', (0, 0), (-1, -1), 1),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
-        ]))
-        elems.append(sig_table)
+        elems.append(_pdf_signatures(["Assinatura do Solicitante", "Assinatura do Solicitado"], WIDTH, space_above=18))
 
         # ========== RODAPÉ ==========
         footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=6.5,
-                                      textColor=colors.grey, alignment=TA_CENTER, leading=7.5)
-        elems.append(Spacer(1, 1))
+                                      textColor=_hex(BRAND_MUTED), alignment=TA_CENTER, leading=8)
+        elems.append(Spacer(1, 3))
         elems.append(Paragraph(
-            f"Criado por: {order.get('created_by_name') or '-'} em {fmt_dt(order.get('created_at'))}", footer_style
+            f"Criado por {order.get('created_by_name') or '-'} em {fmt_dt(order.get('created_at'))}  ·  "
+            f"Impresso por {current_user.get('name') or '-'} em {now_brt().strftime('%d/%m/%Y %H:%M')}  ·  "
+            f"ContainerLogix - {company['name']}", footer_style
         ))
-        elems.append(Paragraph(
-            f"Impresso por: {current_user.get('name') or '-'} em {now_brt().strftime('%d/%m/%Y %H:%M')}", footer_style
-        ))
-        elems.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
         return elems
 
     elements = build_via()
-    elements.append(Spacer(1, 5))
-    elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#999999'),
+    elements.append(Spacer(1, 6))
+    elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#94A3B8'),
                                dash=(4, 3), spaceBefore=0, spaceAfter=0))
     elements.append(Paragraph(
         "&#9986;  corte aqui  &#9986;",
-        ParagraphStyle('CutLine', parent=styles['Normal'], fontSize=6.5, textColor=colors.HexColor('#999999'),
-                      alignment=TA_CENTER, spaceBefore=1, spaceAfter=1)
+        ParagraphStyle('CutLine', parent=styles['Normal'], fontSize=6.5, textColor=colors.HexColor('#94A3B8'),
+                       alignment=TA_CENTER, spaceBefore=1, spaceAfter=1)
     ))
-    elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#999999'),
+    elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#94A3B8'),
                                dash=(4, 3), spaceBefore=0, spaceAfter=0))
-    elements.append(Spacer(1, 5))
+    elements.append(Spacer(1, 8))
     elements += build_via()
 
     doc.build(elements)

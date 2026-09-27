@@ -216,15 +216,18 @@ async def update_daily_rate_request_status(request_id: str, new_status: str, cur
 
 @api_router.get("/daily-rate-requests/{request_id}/pdf")
 async def generate_daily_rate_request_pdf(request_id: str, current_user: dict = Depends(get_current_admin_user)):
-    """Gera PDF da solicitação de diária - Layout similar ao comprovante de programação de carregamento"""
+    """Gera PDF da solicitação de diária no padrão visual dos documentos do
+    sistema: cabeçalho, quadro de dados, tabela de itens com total, código de
+    barras de controle e rodapé com páginas."""
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib import colors
     from reportlab.lib.units import mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-    from reportlab.graphics.barcode import code128
-    import requests
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reports import (
+        _build_pdf_header, _make_pdf_footer, format_currency, _fmt_int,
+        _pdf_info_grid, _pdf_section_title, _pdf_header_cells, _pdf_cell_factory,
+        _pdf_table_style, _pdf_note_box, _pdf_barcode_block, _pdf_empty_state,
+    )
 
     daily_request = await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0})
     if not daily_request:
@@ -233,58 +236,27 @@ async def generate_daily_rate_request_pdf(request_id: str, current_user: dict = 
     company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
 
-    BLACK = colors.black
-    BORDER_COLOR = colors.black
-    HEADER_BG = colors.HexColor('#F5F5F5')
-    PRIMARY_GREEN = colors.HexColor('#008B7B')
-
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
         rightMargin=12*mm,
         leftMargin=12*mm,
         topMargin=10*mm,
-        bottomMargin=10*mm
+        bottomMargin=14*mm
     )
+    CONTENT_WIDTH = doc.width
 
     elements = []
     styles = getSampleStyleSheet()
 
-    logo_buffer = load_logo_buffer(company)
-
-    company_style = ParagraphStyle('Company', parent=styles['Normal'], fontSize=18, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=20)
-    slogan_style = ParagraphStyle('Slogan', parent=styles['Normal'], fontSize=9, fontName='Helvetica', alignment=TA_CENTER, textColor=PRIMARY_GREEN, leading=11)
-    address_style = ParagraphStyle('Address', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_CENTER, textColor=BLACK, leading=10)
-    info_right_style = ParagraphStyle('InfoRight', parent=styles['Normal'], fontSize=8, fontName='Helvetica', alignment=TA_RIGHT, textColor=BLACK)
-
-    logo_cell = ""
-    if logo_buffer:
-        try:
-            logo_cell = Image(logo_buffer, width=45, height=45)
-        except:
-            pass
-
-    company_text = Paragraph(company['name'], company_style)
-    address_text = Paragraph(company['address'].replace('\n', ' - '), address_style)
-
-    center_content = [[company_text], [address_text]]
-    center_table = Table(center_content, colWidths=[400])
-    center_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
-    ]))
-
-    barcode_value = f"DIAR{daily_request['request_number']:06d}"
-    barcode = code128.Code128(barcode_value, barWidth=1.2, barHeight=30)
+    elements.extend(_build_pdf_header(
+        styles, load_logo_buffer(company), f"Solicitação de Diária Nº {daily_request['request_number']}",
+        company=company, content_width=CONTENT_WIDTH,
+    ))
 
     from zoneinfo import ZoneInfo
     created_at = parse_datetime_value(daily_request['created_at'])
-    brasilia_tz = ZoneInfo('America/Sao_Paulo')
-    created_at_brasilia = created_at.astimezone(brasilia_tz)
-    date_str = created_at_brasilia.strftime('%d/%m/%Y')
-    time_str = created_at_brasilia.strftime('%H:%M')
+    created_at_brasilia = created_at.astimezone(ZoneInfo('America/Sao_Paulo'))
 
     full_creator_name = daily_request.get('created_by_name', 'Sistema')
     if full_creator_name:
@@ -300,152 +272,66 @@ async def generate_daily_rate_request_pdf(request_id: str, current_user: dict = 
     else:
         creator_short_name = 'Sistema'
 
-    barcode_info = Paragraph(f"<b>Nº {daily_request['request_number']}</b>", ParagraphStyle('BarcodeNum', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', alignment=TA_CENTER))
-    date_info = Paragraph(f"Data: {date_str}", info_right_style)
-    user_info = Paragraph(f"Criado por: {creator_short_name}", info_right_style)
+    items = daily_request.get('items') or []
+    elements.append(_pdf_info_grid([
+        ("Data de criação", created_at_brasilia.strftime('%d/%m/%Y %H:%M')),
+        ("Criado por", creator_short_name),
+        ("Itens", _fmt_int(len(items))),
+        ("Total geral", format_currency(daily_request.get('total_value', 0), 'BRL')),
+    ], CONTENT_WIDTH, cols=4))
 
-    right_content = [[barcode], [barcode_info], [date_info], [user_info]]
-    right_table = Table(right_content, colWidths=[150])
-    right_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-    ]))
+    # ========== ITENS ==========
+    elements.extend(_pdf_section_title("Itens da solicitação", CONTENT_WIDTH))
+    cell = _pdf_cell_factory(styles, font_size=7.5)
+    table_data = [_pdf_header_cells(["#", "Motorista", "Placa", "Cliente", "Data Saída", "Outros", "Comissão", "Almoço", "Qtd. Diária", "Diária", "Total"], font_size=7.5)]
 
-    header_data = [[logo_cell, center_table, right_table]]
-    header_table = Table(header_data, colWidths=[55, 450, 160])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
-    ]))
-    elements.append(header_table)
-
-    elements.append(Spacer(1, 5))
-    line_data = [[""]]
-    line_table = Table(line_data, colWidths=[700])
-    line_table.setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -1), 2, PRIMARY_GREEN),
-    ]))
-    elements.append(line_table)
-    elements.append(Spacer(1, 10))
-
-    title_style = ParagraphStyle('Title', parent=styles['Normal'], fontSize=12, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=PRIMARY_GREEN)
-
-    title_content = [[Paragraph("SOLICITAÇÃO DE DIÁRIA", title_style)]]
-    title_table = Table(title_content, colWidths=[700])
-    title_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 2, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(title_table)
-    elements.append(Spacer(1, 10))
-
-    section_title = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
-
-    items_header = [[Paragraph("Itens da Solicitação", section_title)]]
-    items_header_table = Table(items_header, colWidths=[700])
-    items_header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    elements.append(items_header_table)
-
-    table_header = ["#", "MOTORISTA", "PLACA", "CLIENTE", "DATA SAÍDA", "OUTROS", "COMISSÃO", "ALMOÇO", "QTD. DIÁRIA", "DIÁRIA", "TOTAL"]
-    table_data = [table_header]
-
-    for idx, item in enumerate(daily_request['items'], 1):
+    for idx, item in enumerate(items, 1):
         departure_date = item.get('departure_date', '')
         if departure_date:
             try:
                 dt = datetime.fromisoformat(departure_date.replace('Z', '+00:00'))
                 departure_date = dt.strftime('%d/%m/%Y')
-            except:
+            except Exception:
                 pass
+        table_data.append([
+            cell(idx, 'center'),
+            cell(item.get('driver_name', '-'), bold=True),
+            cell(item.get('vehicle_plate', '-'), 'center'),
+            cell(item.get('client_name', '-')),
+            cell(departure_date or '-', 'center'),
+            cell(format_currency(item.get('others_value', 0), 'BRL'), 'right'),
+            cell(format_currency(item.get('commission_value', 0), 'BRL'), 'right'),
+            cell(format_currency(item.get('lunch_value', 0), 'BRL'), 'right'),
+            cell(f"{item.get('daily_rate_quantity', 0):.0f}", 'center'),
+            cell(format_currency(item.get('daily_rate_value', 0), 'BRL'), 'right'),
+            cell(format_currency(item.get('total', 0), 'BRL'), 'right', bold=True),
+        ])
+    table_data.append([''] * 9 + [cell('TOTAL GERAL', 'right', bold=True), cell(format_currency(daily_request.get('total_value', 0), 'BRL'), 'right', bold=True)])
 
-        row = [
-            str(idx),
-            item.get('driver_name', '-'),
-            item.get('vehicle_plate', '-'),
-            item.get('client_name', '-'),
-            departure_date or '-',
-            f"R$ {item.get('others_value', 0):.2f}",
-            f"R$ {item.get('commission_value', 0):.2f}",
-            f"R$ {item.get('lunch_value', 0):.2f}",
-            f"{item.get('daily_rate_quantity', 0):.0f}",
-            f"R$ {item.get('daily_rate_value', 0):.2f}",
-            f"R$ {item.get('total', 0):.2f}",
-        ]
-        table_data.append(row)
-
-    total_row = ["", "", "", "", "", "", "", "", "", "TOTAL GERAL", f"R$ {daily_request.get('total_value', 0):.2f}"]
-    table_data.append(total_row)
-
-    col_widths = [20, 105, 60, 90, 60, 60, 60, 55, 60, 60, 70]  # Total = 700 para alinhar com cabeçalho
-    main_table = Table(table_data, colWidths=col_widths)
-    main_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_GREEN),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 7),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 1), (-1, -2), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 7),
-        ('ALIGN', (0, 1), (0, -1), 'CENTER'),
-        ('ALIGN', (4, 1), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-        ('SPAN', (0, -1), (8, -1)),
-        ('ALIGN', (9, -1), (9, -1), 'RIGHT'),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F9F9F9')]),
-        ('BACKGROUND', (0, -1), (-1, -1), HEADER_BG),
-    ]))
-    elements.append(main_table)
-    elements.append(Spacer(1, 12))
+    base_widths = [20, 105, 60, 90, 60, 60, 60, 55, 60, 60, 70]
+    scale = CONTENT_WIDTH / sum(base_widths)
+    if items:
+        main_table = Table(table_data, colWidths=[w * scale for w in base_widths], repeatRows=1)
+        main_table.setStyle(TableStyle(_pdf_table_style(total_row=True) + [
+            ('TOPPADDING', (0, 1), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+        ]))
+        elements.append(main_table)
+    else:
+        elements.append(_pdf_empty_state("Nenhum item nesta solicitação.", CONTENT_WIDTH))
 
     if daily_request.get('observations'):
-        obs_header = [[Paragraph("Observações", section_title)]]
-        obs_header_table = Table(obs_header, colWidths=[700])
-        obs_header_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        elements.append(obs_header_table)
+        elements.append(Spacer(1, 10))
+        elements.append(_pdf_note_box("Observações", daily_request['observations'], CONTENT_WIDTH))
 
-        obs_content_style = ParagraphStyle('ObsContent', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK)
-        obs_content = [[Paragraph(daily_request['observations'], obs_content_style)]]
-        obs_table = Table(obs_content, colWidths=[700])
-        obs_table.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        elements.append(obs_table)
-        elements.append(Spacer(1, 12))
+    # Código de barras de controle (mesmo valor do layout anterior: DIAR + nº)
+    elements.append(Spacer(1, 16))
+    elements.append(_pdf_barcode_block(
+        f"DIAR{daily_request['request_number']:06d}", creator_short_name, CONTENT_WIDTH, barcode_width=150,
+    ))
 
-    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
-    elements.append(Spacer(1, 15))
-    elements.append(Paragraph(f"Gerado em {now_brt().strftime('%d/%m/%Y %H:%M')} - ContainerLogix - {company['name']}", footer_style))
-
-    doc.build(elements)
+    footer = _make_pdf_footer(company['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     buffer.seek(0)
 
     filename = f"solicitacao_diaria_{daily_request['request_number']}.pdf"

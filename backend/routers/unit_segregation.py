@@ -272,77 +272,38 @@ async def release_unit_segregation(segregation_id: str, current_user: dict = Dep
 
 @api_router.get("/unit-segregations/{segregation_id}/pdf")
 async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Gera PDF da segregação de unidade - Formato Horizontal (Landscape)"""
+    """Gera PDF da segregação de unidade (paisagem) no padrão visual dos
+    documentos do sistema: cabeçalho, quadro de dados, tabela de unidades,
+    observações, código de barras de controle e rodapé com páginas."""
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT
-    from reportlab.graphics.barcode import code128
-    
+    from reports import (
+        _build_pdf_header, _make_pdf_footer, _fmt_int, _pdf_info_grid, _pdf_section_title,
+        _pdf_header_cells, _pdf_cell_factory, _pdf_table_style, _pdf_note_box, _pdf_barcode_block,
+        _pdf_empty_state, _pdf_tone_markup,
+    )
+
     segregation = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
     if not segregation:
         raise HTTPException(status_code=404, detail="Segregação não encontrada")
 
     company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
-    # Usar landscape para orientação horizontal
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=40, rightMargin=40, topMargin=30, bottomMargin=30)
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), leftMargin=34, rightMargin=34, topMargin=30, bottomMargin=40)
     elements = []
     styles = getSampleStyleSheet()
-    
-    # Largura total disponível em landscape (A4 landscape = 842 x 595 pontos)
-    PAGE_WIDTH = landscape(A4)[0] - 80  # 842 - 80 = 762
-    SECTION_WIDTH = PAGE_WIDTH
-    
-    # Cores
-    PRIMARY_GREEN = colors.HexColor('#047857')
-    HEADER_BG = colors.HexColor('#F3F4F6')
-    BORDER_COLOR = colors.HexColor('#E5E7EB')
-    BLACK = colors.HexColor('#1F2937')
-    
-    # ========== CABEÇALHO ==========
-    # Logo
-    # ========== DOWNLOAD LOGO ==========
-    import requests
-    logo_buffer = load_logo_buffer(company)
+    SECTION_WIDTH = doc.width
 
-    # Logo
-    logo_cell = ""
-    if logo_buffer:
-        try:
-            logo_cell = Image(logo_buffer, width=50, height=50)
-        except:
-            logo_cell = Paragraph("", styles['Normal'])
-    else:
-        logo_cell = Paragraph("", styles['Normal'])
+    elements.extend(_build_pdf_header(
+        styles, load_logo_buffer(company), f"Segregação de Unidade Nº {segregation['segregation_number']}",
+        company=company, content_width=SECTION_WIDTH,
+    ))
 
-    # Informações centrais
-    company_style = ParagraphStyle('Company', parent=styles['Normal'], fontSize=12, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
-    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK, alignment=TA_CENTER)
-
-    center_content = [
-        [Paragraph(company['name'], company_style)],
-        [Paragraph(company['address'].replace('\n', ' - '), subtitle_style)]
-    ]
-    center_table = Table(center_content, colWidths=[450])
-    center_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    
-    # Informações direita (código de barras)
-    info_right_style = ParagraphStyle('InfoRight', parent=styles['Normal'], fontSize=8, textColor=BLACK, alignment=TA_CENTER)
-    
-    barcode_value = f"SEG{segregation['segregation_number']:06d}"
-    barcode = code128.Code128(barcode_value, barWidth=1.2, barHeight=30)
-    
     from zoneinfo import ZoneInfo
     created_at = parse_datetime_value(segregation['created_at'])
-    brasilia_tz = ZoneInfo('America/Sao_Paulo')
-    created_at_brasilia = created_at.astimezone(brasilia_tz)
-    date_str = created_at_brasilia.strftime('%d/%m/%Y')
-    
+    date_str = created_at.astimezone(ZoneInfo('America/Sao_Paulo')).strftime('%d/%m/%Y')
+
     # Abreviar nome do criador
     full_creator_name = segregation.get('created_by_name', 'Sistema')
     if full_creator_name:
@@ -357,185 +318,56 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
             creator_short_name = ' '.join(name_parts[:2]) if len(name_parts) >= 2 else name_parts[0] if name_parts else 'Sistema'
     else:
         creator_short_name = 'Sistema'
-    
-    barcode_info = Paragraph(f"<b>Nº {segregation['segregation_number']}</b>", ParagraphStyle('BarcodeNum', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', alignment=TA_CENTER))
-    date_info = Paragraph(f"Data: {date_str}", info_right_style)
-    user_info = Paragraph(f"Criado por: {creator_short_name}", info_right_style)
-    
-    right_content = [[barcode], [barcode_info], [date_info], [user_info]]
-    right_table = Table(right_content, colWidths=[150])
-    right_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 2),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-    ]))
-    
-    # Montar header completo
-    header_data = [[logo_cell, center_table, right_table]]
-    header_table = Table(header_data, colWidths=[55, SECTION_WIDTH - 215, 160])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
-    ]))
-    elements.append(header_table)
-    
-    # Linha separadora verde
-    elements.append(Spacer(1, 5))
-    line_data = [[""]]
-    line_table = Table(line_data, colWidths=[SECTION_WIDTH])
-    line_table.setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, -1), 2, PRIMARY_GREEN),
-    ]))
-    elements.append(line_table)
-    elements.append(Spacer(1, 10))
-    
-    # ========== TÍTULO ==========
-    title_style = ParagraphStyle('Title', parent=styles['Normal'], fontSize=12, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=PRIMARY_GREEN)
-    
-    title_content = [[Paragraph("SEGREGAÇÃO DE UNIDADE", title_style)]]
-    title_table = Table(title_content, colWidths=[SECTION_WIDTH])
-    title_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 2, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(title_table)
-    elements.append(Spacer(1, 10))
-    
+
     # ========== INFORMAÇÕES DA SEGREGAÇÃO ==========
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8, fontName='Helvetica', textColor=BLACK)
-    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
-    section_title = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
-    
-    
-    # Header da seção
-    info_header = [[Paragraph("Informações da Segregação", section_title)]]
-    info_header_table = Table(info_header, colWidths=[SECTION_WIDTH])
-    info_header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    elements.append(info_header_table)
-    
-    # Linha 1: Cliente Reservado e Status
     status_value = segregation.get('status', 'ATIVO')
-    items_count = len(segregation.get('items', []))
-    info_row1 = [
-        [Paragraph("Cliente Reservado", label_style), Paragraph(segregation['client_name'], value_style)],
-        [Paragraph("Status", label_style), Paragraph(status_value, value_style)]
-    ]
-    # Linha 2: Quantidade de containers
-    info_row2 = [
-        [Paragraph("Qtd. de Containers", label_style), Paragraph(str(items_count), value_style)],
-        [Paragraph("", label_style), Paragraph("", value_style)]
-    ]
-    
-    info_content = [info_row1, info_row2]
-    info_table = Table(info_content, colWidths=[SECTION_WIDTH/2, SECTION_WIDTH/2])
-    info_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('LINEAFTER', (0, 0), (0, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor('#CCCCCC')),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 10))
-    
-    # ========== TABELA DE CONTAINERS ==========
-    items_header = [[Paragraph("Unidades Segregadas", section_title)]]
-    items_header_table = Table(items_header, colWidths=[SECTION_WIDTH])
-    items_header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    elements.append(items_header_table)
-    
-    # Cabeçalho da tabela
-    table_data = [["#", "CONTAINER", "TARA", "ARMADOR"]]
-    
-    for idx, item in enumerate(segregation.get('items', []), 1):
-        table_data.append([
-            str(idx),
-            item.get('container_number', '-'),
-            item.get('tare', '-') or '-',
-            item.get('shipping_line_name', '') or item.get('shipping_line', '-')
-        ])
-    
-    # Se não houver itens, mostrar mensagem
-    if len(table_data) == 1:
-        table_data.append(['', 'Nenhum container cadastrado', '', ''])
-    
-    col_widths = [40, 250, 120, SECTION_WIDTH - 410]  # Ajustado para landscape
-    data_table = Table(table_data, colWidths=col_widths)
-    data_table.setStyle(TableStyle([
-        # Header
-        ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_GREEN),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        # Body
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('ALIGN', (0, 1), (0, -1), 'CENTER'),
-        # Borders
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        # Alternating row colors
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F9F9F9')]),
-    ]))
-    elements.append(data_table)
-    elements.append(Spacer(1, 10))
-    
+    items = segregation.get('items', []) or []
+    status_par = Paragraph(
+        _pdf_tone_markup(status_value, 'emerald' if status_value == 'ATIVO' else 'slate'),
+        ParagraphStyle('SegStatus', fontName='Helvetica-Bold', fontSize=8.5, leading=10.5),
+    )
+    elements.append(_pdf_info_grid([
+        ("Cliente reservado", segregation['client_name'], 2),
+        ("Status", status_par),
+        ("Qtd. de containers", _fmt_int(len(items))),
+        ("Data", date_str),
+        ("Criado por", creator_short_name),
+    ], SECTION_WIDTH, cols=6))
+
+    # ========== UNIDADES SEGREGADAS ==========
+    elements.extend(_pdf_section_title("Unidades segregadas", SECTION_WIDTH))
+    if items:
+        cell = _pdf_cell_factory(styles, font_size=9)
+        table_data = [_pdf_header_cells(["#", "Container", "Tara", "Armador"], font_size=8.5)]
+        for idx, item in enumerate(items, 1):
+            table_data.append([
+                cell(idx, 'center'),
+                cell(item.get('container_number', '-'), bold=True),
+                cell(item.get('tare', '-') or '-', 'center'),
+                cell(item.get('shipping_line_name', '') or item.get('shipping_line', '-')),
+            ])
+        data_table = Table(table_data, colWidths=[40, 250, 120, SECTION_WIDTH - 410], repeatRows=1)
+        data_table.setStyle(TableStyle(_pdf_table_style() + [
+            ('TOPPADDING', (0, 1), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+        ]))
+        elements.append(data_table)
+    else:
+        elements.append(_pdf_empty_state("Nenhum container cadastrado.", SECTION_WIDTH))
+
     # ========== Observações ==========
     if segregation.get('observations'):
-        obs_header = [[Paragraph("Observações", section_title)]]
-        obs_header_table = Table(obs_header, colWidths=[SECTION_WIDTH])
-        obs_header_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        elements.append(obs_header_table)
-        
-        obs_content_style = ParagraphStyle('ObsContent', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK)
-        obs_content = [[Paragraph(segregation['observations'], obs_content_style)]]
-        obs_table = Table(obs_content, colWidths=[SECTION_WIDTH])
-        obs_table.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        elements.append(obs_table)
-        elements.append(Spacer(1, 12))
-    
-    # ========== Rodapé ==========
-    footer_style = ParagraphStyle('Footer', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
-    elements.append(Spacer(1, 15))
-    elements.append(Paragraph(f"Gerado em {now_brt().strftime('%d/%m/%Y %H:%M')} - ContainerLogix - {company['name']}", footer_style))
+        elements.append(Spacer(1, 10))
+        elements.append(_pdf_note_box("Observações", segregation['observations'], SECTION_WIDTH))
 
-    doc.build(elements)
+    # Código de barras de controle (mesmo valor do layout anterior: SEG + nº)
+    elements.append(Spacer(1, 16))
+    elements.append(_pdf_barcode_block(
+        f"SEG{segregation['segregation_number']:06d}", creator_short_name, SECTION_WIDTH, barcode_width=150,
+    ))
+
+    footer = _make_pdf_footer(company['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     buffer.seek(0)
 
     filename = f"segregacao_unidade_{segregation['segregation_number']}.pdf"

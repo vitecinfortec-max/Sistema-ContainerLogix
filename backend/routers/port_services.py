@@ -174,15 +174,12 @@ async def delete_port_service(service_id: str, current_user: dict = Depends(get_
 @api_router.get("/port-services/{service_id}/pdf")
 async def generate_port_service_pdf(service_id: str, current_user: dict = Depends(get_current_active_user)):
     """Gera o voucher em PDF de um único Serviço Portuário - mesmo padrão
-    visual do Status de Entrega (cabeçalho/rodapé via
-    _build_pdf_header/_make_pdf_footer), só que com uma caixa simples de
-    label/valor no lugar da tabela de itens (aqui é 1 registro só)."""
+    visual dos demais documentos (cabeçalho, quadro de dados e rodapé)."""
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
     from reportlab.lib.units import mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, KeepTogether
+    from reportlab.platypus import SimpleDocTemplate, Spacer, Paragraph
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
+    from reports import _pdf_info_grid, _pdf_note_box, _pdf_totals_box, _pdf_tone_markup
 
     service = await db.port_services.find_one({"id": service_id}, {"_id": 0})
     if not service:
@@ -192,18 +189,13 @@ async def generate_port_service_pdf(service_id: str, current_user: dict = Depend
     company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
 
-    BLACK = colors.black
-    BORDER_COLOR = colors.black
-    HEADER_BG = colors.HexColor('#F5F5F5')
-    PRIMARY_GREEN = colors.HexColor('#008B7B')
-
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
         rightMargin=15*mm,
         leftMargin=15*mm,
         topMargin=12*mm,
-        bottomMargin=12*mm
+        bottomMargin=15*mm
     )
     CONTENT_WIDTH = doc.width
 
@@ -211,28 +203,10 @@ async def generate_port_service_pdf(service_id: str, current_user: dict = Depend
     styles = getSampleStyleSheet()
 
     logo_buffer = load_logo_buffer(company)
-    elements.extend(_build_pdf_header(styles, logo_buffer, "Serviço Portuário", company=company, content_width=CONTENT_WIDTH))
-
-    stats_style = ParagraphStyle('StatsLine', parent=styles['Normal'], fontSize=11, textColor=PRIMARY_GREEN, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceBefore=6, spaceAfter=8)
-    elements.append(Paragraph(f"Nº {service['service_number']}", stats_style))
-
-    gen_info_style = ParagraphStyle('GenInfo', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12)
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
-
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8, fontName='Helvetica', textColor=BLACK)
-    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
-    section_title = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
-
-    info_header = [[Paragraph("Informações do Serviço", section_title)]]
-    info_header_table = Table(info_header, colWidths=[CONTENT_WIDTH])
-    info_header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    elements.append(info_header_table)
+    elements.extend(_build_pdf_header(
+        styles, logo_buffer, f"Serviço Portuário Nº {service['service_number']}",
+        company=company, content_width=CONTENT_WIDTH,
+    ))
 
     date_display = service.get('service_date') or '-'
     try:
@@ -240,51 +214,26 @@ async def generate_port_service_pdf(service_id: str, current_user: dict = Depend
     except Exception:
         pass
 
-    situacao_label = 'Concluído' if service['situacao'] == 'CONCLUIDO' else 'Em Andamento (No Pátio)'
-
-    info_rows = [
-        [Paragraph("Cliente", label_style), Paragraph(service['client_name'], value_style)],
-        [Paragraph("Motorista", label_style), Paragraph(service['driver_name'], value_style)],
-        [Paragraph("Placa do Cavalo", label_style), Paragraph(service['cavalo_plate'], value_style)],
-        [Paragraph("Data do Serviço", label_style), Paragraph(date_display, value_style)],
-        [Paragraph("Turno", label_style), Paragraph(_TURNO_LABELS.get(service['turno'], service['turno']), value_style)],
-        [Paragraph("Horário de Entrada", label_style), Paragraph(service.get('entry_time') or '-', value_style)],
-        [Paragraph("Horário de Saída", label_style), Paragraph(service.get('exit_time') or '-', value_style)],
-        [Paragraph("Situação", label_style), Paragraph(situacao_label, value_style)],
-        [Paragraph("Valor da Operação", label_style), Paragraph(format_currency(service['operation_value']), value_style)],
-    ]
-
-    info_table = Table(info_rows, colWidths=[CONTENT_WIDTH * 0.35, CONTENT_WIDTH * 0.65])
-    info_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('LINEBELOW', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 6))
+    done = service['situacao'] == 'CONCLUIDO'
+    situacao_value = Paragraph(
+        _pdf_tone_markup('Concluído' if done else 'Em Andamento (No Pátio)', 'emerald' if done else 'amber'),
+        ParagraphStyle('PortServiceStatus', fontName='Helvetica-Bold', fontSize=8.5, leading=10.5),
+    )
+    elements.append(_pdf_info_grid([
+        ("Cliente", service['client_name'], 2),
+        ("Situação", situacao_value),
+        ("Motorista", service['driver_name'], 2),
+        ("Placa do Cavalo", service['cavalo_plate']),
+        ("Data do Serviço", date_display),
+        ("Turno", _TURNO_LABELS.get(service['turno'], service['turno'])),
+        ("Entrada / Saída", f"{service.get('entry_time') or '-'}  /  {service.get('exit_time') or '-'}"),
+    ], CONTENT_WIDTH, cols=3))
+    elements.append(Spacer(1, 10))
+    elements.append(_pdf_totals_box([("Valor da operação", format_currency(service['operation_value']))], CONTENT_WIDTH, width=240))
 
     if service.get('observations'):
-        obs_header = [[Paragraph("Observações", section_title)]]
-        obs_header_table = Table(obs_header, colWidths=[CONTENT_WIDTH])
-        obs_header_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        obs_content_style = ParagraphStyle('ObsContent', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK)
-        obs_table = Table([[Paragraph(service['observations'], obs_content_style)]], colWidths=[CONTENT_WIDTH])
-        obs_table.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        elements.append(KeepTogether([obs_header_table, obs_table]))
+        elements.append(Spacer(1, 10))
+        elements.append(_pdf_note_box("Observações", service['observations'], CONTENT_WIDTH))
 
     footer = _make_pdf_footer(company['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)

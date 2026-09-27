@@ -203,14 +203,16 @@ async def update_loading_schedule_status(schedule_id: str, new_status: str, curr
 
 @api_router.get("/loading-schedules/{schedule_id}/pdf")
 async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Gera PDF da programação de carregamento - mesmo layout padrão dos demais
-    relatórios do sistema (cabeçalho/rodapé via _build_pdf_header/_make_pdf_footer)"""
+    """Gera PDF da programação de carregamento - mesmo padrão visual dos
+    demais documentos do sistema (cabeçalho, quadro de dados, tabela e rodapé)."""
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib import colors
     from reportlab.lib.units import mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reports import (
+        _pdf_info_grid, _pdf_section_title, _pdf_header_cells, _pdf_cell_factory,
+        _pdf_table_style, _pdf_note_box, _pdf_empty_state, _pdf_tone_markup,
+    )
 
     schedule = await db.loading_schedules.find_one({"id": schedule_id}, {"_id": 0})
     if not schedule:
@@ -219,128 +221,64 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
     company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
 
-    # Cores (usadas nas seções em caixa abaixo do cabeçalho)
-    BLACK = colors.black
-    BORDER_COLOR = colors.black
-    HEADER_BG = colors.HexColor('#F5F5F5')
-    PRIMARY_GREEN = colors.HexColor('#008B7B')
-
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
         rightMargin=12*mm,
         leftMargin=12*mm,
         topMargin=10*mm,
-        bottomMargin=10*mm
+        bottomMargin=12*mm
     )
-    # Largura útil real da página - usada em todas as tabelas/caixas abaixo pra
-    # que elas se alinhem exatamente com o cabeçalho padrão (antes usavam um
-    # valor fixo de 700pt, mais estreito que a área útil real em A4 paisagem
-    # com essas margens, deixando uma sobra visível à direita).
+    # Largura útil real da página - todas as tabelas/quadros abaixo usam ela
+    # pra alinhar exatamente com o cabeçalho padrão.
     CONTENT_WIDTH = doc.width
 
     elements = []
     styles = getSampleStyleSheet()
 
-    # Download logo
     logo_buffer = load_logo_buffer(company)
-
-    # ========== HEADER padrão do sistema (logo + dados da empresa + linha + título) ==========
-    elements.extend(_build_pdf_header(styles, logo_buffer, "Programação de Carregamento", company=company, content_width=CONTENT_WIDTH))
+    elements.extend(_build_pdf_header(
+        styles, logo_buffer, f"Programação de Carregamento Nº {schedule['schedule_number']}",
+        company=company, content_width=CONTENT_WIDTH,
+    ))
 
     # Converter para horário de Brasília (UTC-3)
     from zoneinfo import ZoneInfo
     created_at = parse_datetime_value(schedule['created_at'])
-    brasilia_tz = ZoneInfo('America/Sao_Paulo')
-    created_at_brasilia = created_at.astimezone(brasilia_tz)
+    created_at_brasilia = created_at.astimezone(ZoneInfo('America/Sao_Paulo'))
     date_str = created_at_brasilia.strftime('%d/%m/%Y')
 
-    # Abreviar nome do criador (primeiro e segundo nome, ignorando preposições)
-    full_creator_name = schedule.get('created_by_name', 'Sistema')
-    if full_creator_name:
-        name_parts = full_creator_name.strip().split()
+    def short_name(full_name, fallback):
+        """Primeiro + segundo nome, ignorando preposições (DE, DA, DOS...)."""
+        if not full_name or full_name == '-':
+            return fallback
+        name_parts = full_name.strip().split()
         preposicoes = ['DE', 'DA', 'DO', 'DOS', 'DAS', 'E']
         nomes_filtrados = [p for p in name_parts if p.upper() not in preposicoes]
         if len(nomes_filtrados) >= 2:
-            creator_short_name = f"{nomes_filtrados[0]} {nomes_filtrados[1]}"
-        elif len(nomes_filtrados) == 1:
-            creator_short_name = nomes_filtrados[0]
-        else:
-            creator_short_name = ' '.join(name_parts[:2]) if len(name_parts) >= 2 else name_parts[0] if name_parts else 'Sistema'
-    else:
-        creator_short_name = 'Sistema'
+            return f"{nomes_filtrados[0]} {nomes_filtrados[1]}"
+        if len(nomes_filtrados) == 1:
+            return nomes_filtrados[0]
+        return ' '.join(name_parts[:2]) if name_parts else fallback
 
-    # ========== LINHA DE ESTATÍSTICAS + DATA DE GERAÇÃO (mesmo padrão dos demais relatórios) ==========
-    stats_style = ParagraphStyle('StatsLine', parent=styles['Normal'], fontSize=11, textColor=PRIMARY_GREEN, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceBefore=6, spaceAfter=8)
-    elements.append(Paragraph(f"Nº {schedule['schedule_number']}  |  Data de Criação: {date_str}  |  Criado por: {creator_short_name}", stats_style))
+    # ========== DADOS DA PROGRAMAÇÃO ==========
+    elements.append(_pdf_info_grid([
+        ("Cliente Contratante", schedule['contracting_client_name'], 2),
+        ("Criado em", date_str),
+        ("Criado por", short_name(schedule.get('created_by_name'), 'Sistema')),
+        ("Cliente Destino", schedule['destination_client_name'], 2),
+        ("Booking", schedule.get('booking') or '-'),
+        ("Viagem", schedule.get('voyage') or '-'),
+    ], CONTENT_WIDTH, cols=4))
 
-    gen_info_style = ParagraphStyle('GenInfo', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12)
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
-
-    # ========== BOX 1: Informações dos Clientes ==========
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8, fontName='Helvetica', textColor=BLACK)
-    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
-    section_title = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
-    
-    # Header da seção
-    client_header = [[Paragraph("Informações dos Clientes", section_title)]]
-    client_header_table = Table(client_header, colWidths=[CONTENT_WIDTH])
-    client_header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    elements.append(client_header_table)
-    
-    # Conteúdo - Linha 1: Clientes
-    client_row1 = [
-        [Paragraph("Cliente Contratante", label_style), Paragraph(schedule['contracting_client_name'], value_style)],
-        [Paragraph("Cliente Destino", label_style), Paragraph(schedule['destination_client_name'], value_style)]
-    ]
-    # Conteúdo - Linha 2: Booking e Viagem
-    booking_value = schedule.get('booking') or '-'
-    voyage_value = schedule.get('voyage') or '-'
-    client_row2 = [
-        [Paragraph("Booking", label_style), Paragraph(booking_value, value_style)],
-        [Paragraph("Viagem", label_style), Paragraph(voyage_value, value_style)]
-    ]
-
-    client_content = [client_row1, client_row2]
-
-    client_table = Table(client_content, colWidths=[CONTENT_WIDTH / 2, CONTENT_WIDTH / 2])
-    client_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('LINEAFTER', (0, 0), (0, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor('#CCCCCC')),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    elements.append(client_table)
-    elements.append(Spacer(1, 10))
-    
-    # ========== BOX 2: Tabela de Programações ==========
-    prog_header = [[Paragraph("Itens da Programação", section_title)]]
-    prog_header_table = Table(prog_header, colWidths=[CONTENT_WIDTH])
-    prog_header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    elements.append(prog_header_table)
-    
-    # Tabela de dados
-    cell_wrap_style = ParagraphStyle('CellWrap', parent=styles['Normal'], fontSize=7.5, fontName='Helvetica', leading=9)
+    # ========== ITENS DA PROGRAMAÇÃO ==========
+    elements.extend(_pdf_section_title("Itens da programação", CONTENT_WIDTH))
+    cell = _pdf_cell_factory(styles, font_size=8)
     has_bag_numbers = any((item.get('bag_number') or '').strip() for item in schedule['items'])
-    table_header = ["#", "TIPO", "MOTORISTA", "CPF", "CAVALO", "CARRETA", "LOCAL DE CARREG.", "DATA", "CONTAINER", "LACRE"]
+    table_header = ["#", "Tipo", "Motorista", "CPF", "Cavalo", "Carreta", "Local de Carreg.", "Data", "Container", "Lacre"]
     if has_bag_numbers:
-        table_header.append("Nº DA BOLSA")
-    table_data = [table_header]
+        table_header.append("Nº da Bolsa")
+    table_data = [_pdf_header_cells(table_header, font_size=8)]
 
     for idx, item in enumerate(schedule['items'], 1):
         loading_date = item.get('loading_date', '')
@@ -348,106 +286,48 @@ async def generate_loading_schedule_pdf(schedule_id: str, current_user: dict = D
             try:
                 dt = datetime.fromisoformat(loading_date.replace('Z', '+00:00'))
                 loading_date = dt.strftime('%d/%m/%Y')
-            except:
+            except Exception:
                 pass
-        
-        # Pegar primeiro e segundo nome do motorista (ignorando preposições)
-        driver_full_name = item.get('driver_name', '-')
-        if driver_full_name and driver_full_name != '-':
-            name_parts = driver_full_name.strip().split()
-            # Filtrar preposições comuns
-            preposicoes = ['DE', 'DA', 'DO', 'DOS', 'DAS', 'E']
-            nomes_filtrados = [p for p in name_parts if p.upper() not in preposicoes]
-            
-            if len(nomes_filtrados) >= 2:
-                driver_display_name = f"{nomes_filtrados[0]} {nomes_filtrados[1]}"
-            elif len(nomes_filtrados) == 1:
-                driver_display_name = nomes_filtrados[0]
-            else:
-                # Se só tem preposições, usa os dois primeiros
-                driver_display_name = ' '.join(name_parts[:2]) if len(name_parts) >= 2 else name_parts[0] if name_parts else '-'
-        else:
-            driver_display_name = '-'
-        
+
+        op_type = item.get('operation_type') or '-'
         row = [
-            str(idx),
-            item.get('operation_type') or '-',
-            driver_display_name,
-            item.get('driver_cpf', '-') or '-',
-            item.get('cavalo_plate', '-'),
-            item.get('carreta_plate', '-') or '-',
-            Paragraph(item.get('loading_location', '-') or '-', cell_wrap_style),
-            loading_date or '-',
-            Paragraph(item.get('container_number', '-') or '-', cell_wrap_style),
-            item.get('seal_number', '-') or '-'
+            cell(idx, 'center'),
+            cell(None, 'center', markup=_pdf_tone_markup(op_type, 'primary' if op_type == 'COLETA' else 'amber' if op_type == 'ENTREGA' else 'dark')),
+            cell(short_name(item.get('driver_name', '-'), '-'), bold=True),
+            cell(item.get('driver_cpf', '-') or '-'),
+            cell(item.get('cavalo_plate', '-'), 'center'),
+            cell(item.get('carreta_plate', '-') or '-', 'center'),
+            cell(item.get('loading_location', '-') or '-'),
+            cell(loading_date or '-', 'center'),
+            cell(item.get('container_number', '-') or '-'),
+            cell(item.get('seal_number', '-') or '-', 'center'),
         ]
         if has_bag_numbers:
-            row.append(item.get('bag_number') or '-')
+            row.append(cell(item.get('bag_number') or '-', 'center'))
         table_data.append(row)
 
-    # Larguras-base somam 700pt (proporções pensadas pro conteúdo de cada
-    # coluna); escaladas pra CONTENT_WIDTH pra ocupar a área útil real da
-    # página em vez de deixar sobra à direita.
+    # Larguras-base escaladas pra CONTENT_WIDTH (área útil real da página).
     if has_bag_numbers:
         base_widths = [20, 45, 95, 60, 50, 50, 110, 55, 70, 55, 90]
     else:
         base_widths = [20, 55, 100, 70, 55, 55, 130, 60, 90, 65]
     scale = CONTENT_WIDTH / sum(base_widths)
     col_widths = [w * scale for w in base_widths]
-    main_table = Table(table_data, colWidths=col_widths)
-    main_table_style = [
-        # Header row - verde padrão
-        ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_GREEN),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        # Body
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # # column
-        ('ALIGN', (6, 1), (6, -1), 'CENTER'),  # Data column
-        # Borders
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        # Alternating row colors
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F9F9F9')]),
-    ]
-    if has_bag_numbers:
-        main_table_style.append(('ALIGN', (10, 1), (10, -1), 'CENTER'))  # Nº da Bolsa
-    main_table.setStyle(TableStyle(main_table_style))
-    elements.append(main_table)
-    elements.append(Spacer(1, 12))
-    
-    # ========== BOX 3: Observações (se houver) ==========
+
+    if schedule['items']:
+        main_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        main_table.setStyle(TableStyle(_pdf_table_style() + [
+            ('TOPPADDING', (0, 1), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+        ]))
+        elements.append(main_table)
+    else:
+        elements.append(_pdf_empty_state("Nenhum item nesta programação.", CONTENT_WIDTH))
+
+    # ========== OBSERVAÇÕES (se houver) ==========
     if schedule.get('observations'):
-        obs_header = [[Paragraph("Observações", section_title)]]
-        obs_header_table = Table(obs_header, colWidths=[CONTENT_WIDTH])
-        obs_header_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        elements.append(obs_header_table)
-        
-        obs_content_style = ParagraphStyle('ObsContent', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK)
-        obs_content = [[Paragraph(schedule['observations'], obs_content_style)]]
-        obs_table = Table(obs_content, colWidths=[CONTENT_WIDTH])
-        obs_table.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        elements.append(obs_table)
-        elements.append(Spacer(1, 12))
+        elements.append(Spacer(1, 10))
+        elements.append(_pdf_note_box("Observações", schedule['observations'], CONTENT_WIDTH))
 
     footer = _make_pdf_footer(company['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)

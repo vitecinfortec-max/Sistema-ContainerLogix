@@ -268,14 +268,16 @@ async def update_delivery_status_status(status_id: str, new_status: str, current
 
 @api_router.get("/delivery-status/{status_id}/pdf")
 async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Gera PDF do status de entrega - mesmo layout padrão dos demais
-    relatórios do sistema (cabeçalho/rodapé via _build_pdf_header/_make_pdf_footer)"""
+    """Gera PDF do status de entrega - mesmo padrão visual dos demais
+    documentos do sistema (cabeçalho, quadro de dados, tabela e rodapé)."""
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib import colors
     from reportlab.lib.units import mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, KeepTogether
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reports import (
+        _pdf_info_grid, _pdf_section_title, _pdf_header_cells, _pdf_cell_factory,
+        _pdf_table_style, _pdf_note_box, _pdf_empty_state,
+    )
 
     delivery_status = await db.delivery_statuses.find_one({"id": status_id}, {"_id": 0})
     if not delivery_status:
@@ -284,246 +286,118 @@ async def generate_delivery_status_pdf(status_id: str, current_user: dict = Depe
     company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
 
-    # Cores (usadas nas seções em caixa abaixo do cabeçalho)
-    BLACK = colors.black
-    BORDER_COLOR = colors.black
-    HEADER_BG = colors.HexColor('#F5F5F5')
-    PRIMARY_GREEN = colors.HexColor('#008B7B')
-
     doc = SimpleDocTemplate(
         buffer,
         pagesize=landscape(A4),
         rightMargin=12*mm,
         leftMargin=12*mm,
         topMargin=10*mm,
-        bottomMargin=10*mm
+        bottomMargin=12*mm
     )
-    # Largura útil real da página - usada em todas as tabelas/caixas abaixo pra
-    # que elas se alinhem exatamente com o cabeçalho padrão (antes usavam um
-    # valor fixo de 700pt, mais estreito que a área útil real em A4 paisagem
-    # com essas margens, deixando uma sobra visível à direita).
+    # Largura útil real da página - todas as tabelas/quadros abaixo usam ela
+    # pra alinhar exatamente com o cabeçalho padrão.
     CONTENT_WIDTH = doc.width
 
     elements = []
     styles = getSampleStyleSheet()
 
-    # Download logo
     logo_buffer = load_logo_buffer(company)
-
-    # ========== HEADER padrão do sistema (logo + dados da empresa + linha + título) ==========
-    elements.extend(_build_pdf_header(styles, logo_buffer, "Status de Entrega", company=company, content_width=CONTENT_WIDTH))
+    elements.extend(_build_pdf_header(
+        styles, logo_buffer, f"Status de Entrega Nº {delivery_status['status_number']}",
+        company=company, content_width=CONTENT_WIDTH,
+    ))
 
     # Converter para horário de Brasília
     from zoneinfo import ZoneInfo
     created_at = parse_datetime_value(delivery_status['created_at'])
-    brasilia_tz = ZoneInfo('America/Sao_Paulo')
-    created_at_brasilia = created_at.astimezone(brasilia_tz)
+    created_at_brasilia = created_at.astimezone(ZoneInfo('America/Sao_Paulo'))
     date_str = created_at_brasilia.strftime('%d/%m/%Y')
 
-    # Abreviar nome do criador
-    full_creator_name = delivery_status.get('created_by_name', 'Sistema')
-    if full_creator_name:
-        name_parts = full_creator_name.strip().split()
+    def short_name(full_name, fallback):
+        """Primeiro + segundo nome, ignorando preposições (DE, DA, DOS...)."""
+        if not full_name or full_name == '-':
+            return fallback
+        name_parts = full_name.strip().split()
         preposicoes = ['DE', 'DA', 'DO', 'DOS', 'DAS', 'E']
         nomes_filtrados = [p for p in name_parts if p.upper() not in preposicoes]
         if len(nomes_filtrados) >= 2:
-            creator_short_name = f"{nomes_filtrados[0]} {nomes_filtrados[1]}"
-        elif len(nomes_filtrados) == 1:
-            creator_short_name = nomes_filtrados[0]
-        else:
-            creator_short_name = ' '.join(name_parts[:2]) if len(name_parts) >= 2 else name_parts[0] if name_parts else 'Sistema'
-    else:
-        creator_short_name = 'Sistema'
+            return f"{nomes_filtrados[0]} {nomes_filtrados[1]}"
+        if len(nomes_filtrados) == 1:
+            return nomes_filtrados[0]
+        return ' '.join(name_parts[:2]) if name_parts else fallback
 
-    # ========== LINHA DE ESTATÍSTICAS + DATA DE GERAÇÃO (mesmo padrão dos demais relatórios) ==========
-    stats_style = ParagraphStyle('StatsLine', parent=styles['Normal'], fontSize=11, textColor=PRIMARY_GREEN, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceBefore=6, spaceAfter=8)
-    elements.append(Paragraph(f"Nº {delivery_status['status_number']}  |  Data de Criação: {date_str}  |  Criado por: {creator_short_name}", stats_style))
-
-    gen_info_style = ParagraphStyle('GenInfo', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12)
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
-
-    # ========== BOX 1: Informações da Programação ==========
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=8, fontName='Helvetica', textColor=BLACK)
-    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
-    section_title = ParagraphStyle('SectionTitle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=BLACK)
-    
-    # Largura padrão para todas as seções (mesma largura útil da página, pra
-    # alinhar exatamente com o cabeçalho/título)
-    SECTION_WIDTH = CONTENT_WIDTH
-    
-    # Header da seção
-    info_header = [[Paragraph("Informações da Programação", section_title)]]
-    info_header_table = Table(info_header, colWidths=[SECTION_WIDTH])
-    info_header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    elements.append(info_header_table)
-    
-    # Linha 1: Programação Ref e Data do Status
     status_date_value = delivery_status.get('status_date', '')
     if status_date_value:
         try:
             dt = datetime.fromisoformat(status_date_value.replace('Z', '+00:00'))
             status_date_value = dt.strftime('%d/%m/%Y')
-        except:
+        except Exception:
             pass
-    
-    info_row1 = [
-        [Paragraph("Programação Ref.", label_style), Paragraph(f"Nº {delivery_status['schedule_number']}", value_style)],
-        [Paragraph("Data do Status", label_style), Paragraph(status_date_value, value_style)]
-    ]
-    # Linha 2: Clientes
-    info_row2 = [
-        [Paragraph("Cliente Contratante", label_style), Paragraph(delivery_status['contracting_client_name'], value_style)],
-        [Paragraph("Cliente Destino", label_style), Paragraph(delivery_status['destination_client_name'], value_style)]
-    ]
-    # Linha 3: Booking e Viagem
-    booking_value = delivery_status.get('booking') or '-'
-    voyage_value = delivery_status.get('voyage') or '-'
-    info_row3 = [
-        [Paragraph("Booking", label_style), Paragraph(booking_value, value_style)],
-        [Paragraph("Viagem", label_style), Paragraph(voyage_value, value_style)]
-    ]
 
-    info_content = [info_row1, info_row2, info_row3]
+    # ========== DADOS DA PROGRAMAÇÃO ==========
+    elements.append(_pdf_info_grid([
+        ("Programação Ref.", f"Nº {delivery_status['schedule_number']}"),
+        ("Data do Status", status_date_value or '-'),
+        ("Criado em", date_str),
+        ("Criado por", short_name(delivery_status.get('created_by_name'), 'Sistema')),
+        ("Cliente Contratante", delivery_status['contracting_client_name'], 2),
+        ("Cliente Destino", delivery_status['destination_client_name'], 2),
+        ("Booking", delivery_status.get('booking') or '-'),
+        ("Viagem", delivery_status.get('voyage') or '-'),
+    ], CONTENT_WIDTH, cols=4))
 
-    info_table = Table(info_content, colWidths=[SECTION_WIDTH/2, SECTION_WIDTH/2])
-    info_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('LINEAFTER', (0, 0), (0, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('LINEBELOW', (0, 0), (-1, 1), 0.5, colors.HexColor('#CCCCCC')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 6))
-    
-    # ========== BOX 2: Tabela de Status de Entrega ==========
-    status_header = [[Paragraph("Status de Entrega por Motorista", section_title)]]
-    status_header_table = Table(status_header, colWidths=[SECTION_WIDTH])
-    status_header_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
-    ]))
-    elements.append(status_header_table)
-    
-    # Tabela de dados - headers como strings simples (igual ao PDF de referência)
-    cell_wrap_style = ParagraphStyle('CellWrap', parent=styles['Normal'], fontSize=7.5, fontName='Helvetica', leading=9)
+    # ========== STATUS POR MOTORISTA ==========
+    elements.extend(_pdf_section_title("Status de entrega por motorista", CONTENT_WIDTH))
+    cell = _pdf_cell_factory(styles, font_size=7.5)
     has_bag_numbers = any((item.get('bag_number') or '').strip() for item in delivery_status['items'])
-    table_header = ["#", "MOTORISTA", "CPF", "CAVALO", "CONTAINER", "LOCAL", "CHEGADA", "INÍCIO", "TÉRMINO", "SAÍDA", "AGEND.", "ENTREGA"]
+    table_header = ["#", "Motorista", "CPF", "Cavalo", "Container", "Local", "Chegada", "Início", "Término", "Saída", "Agend.", "Entrega"]
     if has_bag_numbers:
-        table_header.append("Nº DA BOLSA")
-    table_data = [table_header]
+        table_header.append("Nº da Bolsa")
+    table_data = [_pdf_header_cells(table_header, font_size=7.5)]
 
     for idx, item in enumerate(delivery_status['items'], 1):
-        # Abreviar nome do motorista
-        driver_full_name = item.get('driver_name', '-')
-        if driver_full_name and driver_full_name != '-':
-            name_parts = driver_full_name.strip().split()
-            preposicoes = ['DE', 'DA', 'DO', 'DOS', 'DAS', 'E']
-            nomes_filtrados = [p for p in name_parts if p.upper() not in preposicoes]
-            if len(nomes_filtrados) >= 2:
-                driver_display_name = f"{nomes_filtrados[0]} {nomes_filtrados[1]}"
-            elif len(nomes_filtrados) == 1:
-                driver_display_name = nomes_filtrados[0]
-            else:
-                driver_display_name = ' '.join(name_parts[:2]) if len(name_parts) >= 2 else name_parts[0] if name_parts else '-'
-        else:
-            driver_display_name = '-'
-        
         row = [
-            str(idx),
-            driver_display_name,
-            item.get('driver_cpf', '-') or '-',
-            item.get('cavalo_plate', '-') or '-',
-            Paragraph(item.get('container_number', '-') or '-', cell_wrap_style),
-            Paragraph(item.get('loading_location', '-') or '-', cell_wrap_style),
-            item.get('arrival_time', '-') or '-',
-            item.get('loading_start_time', '-') or '-',
-            item.get('loading_end_time', '-') or '-',
-            item.get('departure_time', '-') or '-',
-            item.get('port_schedule_time', '-') or '-',
-            item.get('delivery_completed', '-') or '-'
+            cell(idx, 'center'),
+            cell(short_name(item.get('driver_name', '-'), '-'), bold=True),
+            cell(item.get('driver_cpf', '-') or '-'),
+            cell(item.get('cavalo_plate', '-') or '-', 'center'),
+            cell(item.get('container_number', '-') or '-'),
+            cell(item.get('loading_location', '-') or '-'),
+            cell(item.get('arrival_time', '-') or '-', 'center'),
+            cell(item.get('loading_start_time', '-') or '-', 'center'),
+            cell(item.get('loading_end_time', '-') or '-', 'center'),
+            cell(item.get('departure_time', '-') or '-', 'center'),
+            cell(item.get('port_schedule_time', '-') or '-', 'center'),
+            cell(item.get('delivery_completed', '-') or '-', 'center'),
         ]
         if has_bag_numbers:
-            row.append(item.get('bag_number') or '-')
+            row.append(cell(item.get('bag_number') or '-', 'center'))
         table_data.append(row)
 
-    # Larguras-base somam ~700pt (proporções pensadas pro conteúdo de cada
-    # coluna); escaladas pra CONTENT_WIDTH pra ocupar a área útil real da
-    # página em vez de deixar sobra à direita. LOCAL mais larga (e as 6
-    # colunas de horário um pouco mais estreitas, que só têm "HH:MM") reduz
-    # quantas linhas o nome do local quebra - cada linha a menos evita
-    # transbordar pra uma 2ª página com poucos motoristas na lista.
+    # Larguras-base escaladas pra CONTENT_WIDTH; LOCAL mais larga (e as 6
+    # colunas de horário, que só têm "HH:MM", mais estreitas) reduz quantas
+    # linhas o nome do local quebra - cada linha a menos evita transbordar pra
+    # uma 2ª página com poucos motoristas na lista.
     if has_bag_numbers:
         base_widths = [20, 65, 60, 40, 65, 85, 48, 48, 48, 48, 48, 50, 80]
     else:
         base_widths = [20, 85, 70, 50, 80, 115, 47, 47, 47, 47, 47, 50]
     scale = CONTENT_WIDTH / sum(base_widths)
     col_widths = [w * scale for w in base_widths]
-    data_table = Table(table_data, colWidths=col_widths)
-    data_table.setStyle(TableStyle([
-        # Header row - verde padrão (igual ao PDF de referência)
-        ('BACKGROUND', (0, 0), (-1, 0), PRIMARY_GREEN),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        # Body
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
-        ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # # column
-        ('ALIGN', (6, 1), (-1, -1), 'CENTER'),  # Horários columns
-        # Borders
-        ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-        # Alternating row colors
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F9F9F9')]),
-    ]))
-    elements.append(data_table)
-    elements.append(Spacer(1, 5))
 
-    # ========== Observações ==========
+    if delivery_status['items']:
+        data_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        data_table.setStyle(TableStyle(_pdf_table_style()))
+        elements.append(data_table)
+    else:
+        elements.append(_pdf_empty_state("Nenhum motorista neste status de entrega.", CONTENT_WIDTH))
+
+    # ========== OBSERVAÇÕES ==========
+    # Caixa única (título + texto no mesmo flowable) - nunca fica um título
+    # órfão numa página e o texto na seguinte.
     if delivery_status.get('observations'):
-        obs_header = [[Paragraph("Observações", section_title)]]
-        obs_header_table = Table(obs_header, colWidths=[SECTION_WIDTH])
-        obs_header_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), HEADER_BG),
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-
-        obs_content_style = ParagraphStyle('ObsContent', parent=styles['Normal'], fontSize=9, fontName='Helvetica', textColor=BLACK)
-        obs_content = [[Paragraph(delivery_status['observations'], obs_content_style)]]
-        obs_table = Table(obs_content, colWidths=[SECTION_WIDTH])
-        obs_table.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, BORDER_COLOR),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 10),
-        ]))
-        # Header + conteúdo da seção viajam juntos - antes eram 2 flowables
-        # soltos e o ReportLab podia decidir que só o header cabia na página
-        # atual, deixando a caixa "Observações" órfã (vazia) na página 1 e o
-        # texto de verdade sozinho na página 2.
-        elements.append(KeepTogether([obs_header_table, obs_table]))
-        elements.append(Spacer(1, 12))
+        elements.append(Spacer(1, 10))
+        elements.append(_pdf_note_box("Observações", delivery_status['observations'], CONTENT_WIDTH))
 
     footer = _make_pdf_footer(company['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)

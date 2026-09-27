@@ -609,160 +609,57 @@ async def generate_revision_pdf(
     revision_id: str,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Gera PDF da revisão - Layout profissional igual ao comprovante de movimentação"""
+    """Gera PDF da revisão no padrão visual dos documentos do sistema
+    (cabeçalho, quadro de dados, foto do hodômetro, tabela de próximas trocas,
+    observações, assinaturas e rodapé com páginas)."""
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib import colors
     from reportlab.lib.units import mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT
-    import requests
-    
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reports import (
+        _build_pdf_header, _make_pdf_footer, _pdf_info_grid, _pdf_section_title,
+        _pdf_header_cells, _pdf_cell_factory, _pdf_table_style, _pdf_note_box, _pdf_signatures,
+    )
+
     revision = await db.vehicle_revisions.find_one({"id": revision_id}, {"_id": 0})
     if not revision:
         raise HTTPException(status_code=404, detail="Revisão não encontrada")
 
     company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
-    
-    # Cores corporativas (igual aos outros relatórios)
-    PRIMARY_COLOR = "008B7B"
-    HEADER_BG_COLOR = "E8F4F5"
-    
+
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
         rightMargin=15*mm,
         leftMargin=15*mm,
-        topMargin=15*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
-    
+    width = doc.width
+
     elements = []
     styles = getSampleStyleSheet()
-    
-    # ========== DOWNLOAD LOGO ==========
-    logo_buffer = load_logo_buffer(company)
 
-    # ========== HEADER SECTION ==========
-    company_style = ParagraphStyle(
-        'CompanyName',
-        parent=styles['Normal'],
-        fontSize=14,
-        textColor=colors.black,
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold',
-        leading=16
-    )
-    address_style = ParagraphStyle(
-        'Address',
-        parent=styles['Normal'],
-        fontSize=8,
-        textColor=colors.black,
-        alignment=TA_CENTER,
-        leading=10
-    )
+    elements.extend(_build_pdf_header(
+        styles, load_logo_buffer(company), f"Controle de Revisão Nº {revision['revision_number']}",
+        company=company, content_width=width,
+    ))
 
-    logo_cell = ""
-    if logo_buffer:
-        try:
-            logo_cell = Image(logo_buffer, width=50, height=50)
-        except:
-            pass
-
-    address_lines = [line.strip() for line in company['address'].split('\n') if line.strip()]
-    company_info = [
-        Paragraph(company['name'], company_style),
-        Paragraph(f"CNPJ: {company['cnpj']}", address_style),
-    ] + [
-        Paragraph(line, address_style) for line in address_lines
-    ] + [
-        Paragraph(f"{company['email']} | {company['phone']}", address_style),
-    ]
-    
-    header_data = [[logo_cell, company_info, ""]]
-    header_table = Table(header_data, colWidths=[60, 400, 60])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
-    ]))
-    elements.append(header_table)
-    elements.append(Spacer(1, 5))
-    
-    # Linha separadora
-    line_table = Table([[""]], colWidths=[520])
-    line_table.setStyle(TableStyle([
-        ('LINEABOVE', (0, 0), (-1, 0), 2, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(line_table)
-    elements.append(Spacer(1, 10))
-    
-    # ========== TÍTULO ==========
-    title_style = ParagraphStyle(
-        'Title',
-        parent=styles['Normal'],
-        fontSize=16,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold',
-        spaceAfter=15
-    )
-    elements.append(Paragraph("CONTROLE DE REVISÃO", title_style))
-    
-    # ========== INFO BAR ==========
+    # ========== DADOS DA REVISÃO ==========
     rev_date = parse_datetime_value(revision['revision_date'])
-    info_text = f"Revisão Nº {revision['revision_number']}  |  Veículo: {revision['vehicle_plate']}  |  Data: {rev_date.strftime('%d/%m/%Y')}"
-    
-    info_style = ParagraphStyle(
-        'InfoBar',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
-    )
-    
-    info_data = [[Paragraph(info_text, info_style)]]
-    info_table = Table(info_data, colWidths=[520])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 15))
-    
-    # ========== DADOS DO VEÍCULO ==========
-    label_style = ParagraphStyle('Label', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
-    value_style = ParagraphStyle('Value', parent=styles['Normal'], fontSize=9, fontName='Helvetica')
-    
+    created_at = parse_datetime_value(revision['created_at']).astimezone(timezone(timedelta(hours=-3)))
     km = f"{revision['current_km']:,}".replace(",", ".")
-    
-    vehicle_data = [
-        [Paragraph("VEÍCULO:", label_style), Paragraph(revision['vehicle_plate'], value_style),
-         Paragraph("MODELO:", label_style), Paragraph(revision.get('vehicle_model') or '-', value_style)],
-        [Paragraph("ÓLEO UTILIZADO:", label_style), Paragraph(revision['oil_used'], value_style),
-         Paragraph("KM ATUAL:", label_style), Paragraph(f"{km} KM", value_style)],
-        [Paragraph("MECÂNICO:", label_style), Paragraph(revision['mechanic_name'], value_style),
-         Paragraph("REALIZADO POR:", label_style), Paragraph(revision.get('performed_by') or '-', value_style)],
-    ]
-    
-    vehicle_table = Table(vehicle_data, colWidths=[100, 160, 100, 160])
-    vehicle_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#F5F5F5')),
-        ('BACKGROUND', (2, 0), (2, -1), colors.HexColor('#F5F5F5')),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-    ]))
-    elements.append(vehicle_table)
-    elements.append(Spacer(1, 10))
+    elements.append(_pdf_info_grid([
+        ("Veículo", revision['vehicle_plate']),
+        ("Modelo", revision.get('vehicle_model') or '-'),
+        ("Data da revisão", rev_date.strftime('%d/%m/%Y')),
+        ("KM atual", f"{km} KM"),
+        ("Óleo utilizado", revision['oil_used'], 2),
+        ("Mecânico", revision['mechanic_name']),
+        ("Realizado por", revision.get('performed_by') or '-'),
+        ("Registrado por", f"{revision['created_by_name']} em {created_at.strftime('%d/%m/%Y às %H:%M')}", 4),
+    ], width, cols=4))
 
     # ========== FOTO DO HODÔMETRO (KM) ==========
     km_photo_url = revision.get('current_km_photo_url')
@@ -771,138 +668,58 @@ async def generate_revision_pdf(
             relative = km_photo_url.split('/api/uploads/', 1)[1]
             km_photo_path = UPLOADS_DIR / relative
             if km_photo_path.exists():
-                km_photo_title_style = ParagraphStyle(
-                    'KmPhotoTitle', parent=styles['Normal'], fontSize=9,
-                    fontName='Helvetica-Bold', textColor=colors.HexColor(f'#{PRIMARY_COLOR}')
-                )
-                elements.append(Paragraph("FOTO DO HODÔMETRO (KM):", km_photo_title_style))
-                elements.append(Spacer(1, 4))
-                elements.append(Image(str(km_photo_path), width=190, height=130, kind='proportional'))
-                elements.append(Spacer(1, 10))
+                elements.extend(_pdf_section_title("Foto do hodômetro (KM)", width))
+                photo = Image(str(km_photo_path), width=190, height=130, kind='proportional')
+                photo.hAlign = 'LEFT'
+                elements.append(photo)
         except Exception:
             pass
 
-    # ========== PRÓXIMA REVISÃO - TÍTULO ==========
-    section_title_style = ParagraphStyle(
-        'SectionTitle',
-        parent=styles['Normal'],
-        fontSize=11,
-        textColor=colors.white,
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
-    )
-    
-    section_data = [[Paragraph("PRÓXIMA REVISÃO - QUILOMETRAGEM", section_title_style)]]
-    section_table = Table(section_data, colWidths=[520])
-    section_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
-    elements.append(section_table)
-    
-    # ========== TABELA DE PRÓXIMAS REVISÕES ==========
+    # ========== PRÓXIMA REVISÃO ==========
     def format_km(value):
         if value:
             return f"{value:,} KM".replace(",", ".")
         return "-"
-    
-    next_rev_data = [
-        ["ITEM", "PRÓXIMA TROCA (KM)"],
-        ["Óleo Motor", format_km(revision.get('next_oil_motor_km'))],
-        ["Filtro de Óleo", format_km(revision.get('next_oil_filter_km'))],
-        ["Filtro de Ar", format_km(revision.get('next_air_filter_km'))],
-        ["Filtro Ar Condicionado", format_km(revision.get('next_ac_filter_km'))],
-        ["Filtro de Combustível", format_km(revision.get('next_fuel_filter_km'))],
-        ["Filtro Racor", format_km(revision.get('next_racor_filter_km'))],
-        ["Filtro APU", format_km(revision.get('next_apu_filter_km'))],
-        ["Filtro Hidráulico", format_km(revision.get('next_hydraulic_filter_km'))],
-        ["Óleo Caixa de Marcha", format_km(revision.get('next_gearbox_oil_km'))],
-        ["Óleo Diferencial", format_km(revision.get('next_differential_oil_km'))],
-        ["Lubrificação", format_km(revision.get('next_lubrication_km'))],
-        ["Lavagem", format_km(revision.get('next_washing_km'))],
+
+    elements.extend(_pdf_section_title("Próxima revisão — quilometragem", width))
+    cell = _pdf_cell_factory(styles, font_size=9)
+    next_items = [
+        ("Óleo Motor", 'next_oil_motor_km'),
+        ("Filtro de Óleo", 'next_oil_filter_km'),
+        ("Filtro de Ar", 'next_air_filter_km'),
+        ("Filtro Ar Condicionado", 'next_ac_filter_km'),
+        ("Filtro de Combustível", 'next_fuel_filter_km'),
+        ("Filtro Racor", 'next_racor_filter_km'),
+        ("Filtro APU", 'next_apu_filter_km'),
+        ("Filtro Hidráulico", 'next_hydraulic_filter_km'),
+        ("Óleo Caixa de Marcha", 'next_gearbox_oil_km'),
+        ("Óleo Diferencial", 'next_differential_oil_km'),
+        ("Lubrificação", 'next_lubrication_km'),
+        ("Lavagem", 'next_washing_km'),
     ]
-    
-    next_table = Table(next_rev_data, colWidths=[300, 220])
-    next_table.setStyle(TableStyle([
-        # Header
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        # Body
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('ALIGN', (1, 1), (1, -1), 'CENTER'),
-        # Borders and padding
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        # Alternating rows
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F8F8')]),
+    next_rev_data = [_pdf_header_cells(["Item", "Próxima troca (KM)"], font_size=8.5)]
+    for label, key in next_items:
+        next_rev_data.append([cell(label), cell(format_km(revision.get(key)), 'center', bold=bool(revision.get(key)))])
+    next_table = Table(next_rev_data, colWidths=[width * 0.6, width * 0.4], repeatRows=1)
+    next_table.setStyle(TableStyle(_pdf_table_style() + [
+        ('TOPPADDING', (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
     ]))
     elements.append(next_table)
-    elements.append(Spacer(1, 12))
-    
+
     # ========== OBSERVAÇÕES ==========
     if revision.get('observations'):
-        obs_title_style = ParagraphStyle(
-            'ObsTitle',
-            parent=styles['Normal'],
-            fontSize=10,
-            fontName='Helvetica-Bold',
-            textColor=colors.HexColor(f'#{PRIMARY_COLOR}')
-        )
-        obs_style = ParagraphStyle(
-            'Obs',
-            parent=styles['Normal'],
-            fontSize=9,
-            fontName='Helvetica'
-        )
-        elements.append(Paragraph("OBSERVAÇÕES:", obs_title_style))
-        elements.append(Spacer(1, 4))
-        elements.append(Paragraph(revision.get('observations', ''), obs_style))
-        elements.append(Spacer(1, 8))
-    
-    # ========== RODAPÉ COM ASSINATURA ==========
-    footer_style = ParagraphStyle(
-        'Footer',
-        parent=styles['Normal'],
-        fontSize=8,
-        textColor=colors.grey,
-        alignment=TA_CENTER
-    )
-    
-    created_at = parse_datetime_value(revision['created_at']).astimezone(timezone(timedelta(hours=-3)))
-    elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 10))
+        elements.append(_pdf_note_box("Observações", revision.get('observations', ''), width))
 
-    # Linha de assinatura
-    sig_data = [
-        ["_" * 50, "_" * 50],
-        ["Responsável pela Revisão", "Conferido por"]
-    ]
-    sig_table = Table(sig_data, colWidths=[260, 260])
-    sig_table.setStyle(TableStyle([
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 1), (-1, 1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('TOPPADDING', (0, 1), (-1, 1), 5),
-    ]))
-    elements.append(sig_table)
-    elements.append(Spacer(1, 10))
-    
-    elements.append(Paragraph(f"Registrado por: {revision['created_by_name']} em {created_at.strftime('%d/%m/%Y às %H:%M')}", footer_style))
-    elements.append(Paragraph(f"ContainerLogix - {company['name']}", footer_style))
-    
-    doc.build(elements)
+    # ========== ASSINATURAS ==========
+    elements.append(Spacer(1, 14))
+    elements.append(_pdf_signatures(["Responsável pela Revisão", "Conferido por"], width, space_above=34))
+
+    footer = _make_pdf_footer(company['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     buffer.seek(0)
-    
+
     filename = f"revisao_{revision['vehicle_plate']}_{revision['revision_number']}.pdf"
     return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
 

@@ -192,7 +192,7 @@ def _split_report_title(report_title):
     return main.strip(), rest.strip()
 
 
-def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, company=None, content_width=540):
+def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, company=None, content_width=540, compact=False):
     """
     Cabeçalho padrão dos PDFs: logo + dados da empresa à esquerda, título do
     documento à direita (com o complemento do título e `generation_info`,
@@ -201,9 +201,12 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
     começa na margem - nada de coluna vazia empurrando o texto.
     `content_width` deve ser a largura útil real do documento (doc.width) para
     que o cabeçalho nunca ultrapasse a margem nem fique desalinhado do resto do conteúdo.
+    `compact=True` reduz logo, fontes e espaçamentos - pra documentos que
+    precisam caber inteiros numa página (ex.: Ordem de Abastecimento em 2 vias).
     """
     c = merge_company(company)
     elements = []
+    scale_f = 0.72 if compact else 1.0
 
     # ========== LOGO ==========
     # Redimensiona mantendo a proporção original (evita esticar/achatar a logo).
@@ -211,7 +214,7 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
     logo_w = 0
     if logo_buffer:
         try:
-            max_w, max_h = 120, 58
+            max_w, max_h = 120 * scale_f, 58 * scale_f
             logo_buffer.seek(0)
             with PILImage.open(logo_buffer) as pil_img:
                 orig_w, orig_h = pil_img.size
@@ -229,11 +232,11 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
     # ========== EMPRESA ==========
     name_style = ParagraphStyle(
         'HeaderCompanyName', parent=styles['Normal'], fontName='Helvetica-Bold',
-        fontSize=12, leading=14.5, textColor=_hex(BRAND_DARK),
+        fontSize=12 if not compact else 10, leading=14.5 if not compact else 12, textColor=_hex(BRAND_DARK),
     )
     info_style = ParagraphStyle(
-        'HeaderCompanyInfo', parent=styles['Normal'], fontSize=7.5, leading=9.5,
-        textColor=_hex(BRAND_MUTED),
+        'HeaderCompanyInfo', parent=styles['Normal'], fontSize=7.5 if not compact else 6.5,
+        leading=9.5 if not compact else 8, textColor=_hex(BRAND_MUTED),
     )
     address = '  ·  '.join(line.strip() for line in c['address'].split('\n') if line.strip())
     company_block = [
@@ -243,11 +246,18 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
     if address:
         company_block.append(Paragraph(xml_escape(address), info_style))
     company_block.append(Paragraph(f"{xml_escape(c['email'])}  ·  {xml_escape(c['phone'])}", info_style))
+    if compact:
+        # Versão compacta: CNPJ, endereço e contato numa linha só
+        company_block = [
+            Paragraph(xml_escape(c['name']), name_style),
+            Paragraph('  ·  '.join(xml_escape(p) for p in [f"CNPJ {c['cnpj']}", address, c['email'], c['phone']] if p), info_style),
+        ]
 
     # ========== TÍTULO ==========
     title_style = ParagraphStyle(
         'HeaderReportTitle', parent=styles['Normal'], fontName='Helvetica-Bold',
-        fontSize=13, leading=16, textColor=_hex(PRIMARY_COLOR), alignment=TA_RIGHT,
+        fontSize=13 if not compact else 11, leading=16 if not compact else 13.5,
+        textColor=_hex(PRIMARY_COLOR), alignment=TA_RIGHT,
     )
     subtitle_style = ParagraphStyle(
         'HeaderReportSubtitle', parent=styles['Normal'], fontName='Helvetica-Bold',
@@ -285,13 +295,13 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
         ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
     ]))
     elements.append(header_table)
-    elements.append(Spacer(1, 8))
+    elements.append(Spacer(1, 8 if not compact else 4))
     # Faixa na cor da marca como tabela de 1 célula (e não HRFlowable, que
     # limita a largura à área do Frame e ficaria mais curta que as tabelas).
-    rule = Table([['']], colWidths=[content_width], rowHeights=[2])
+    rule = Table([['']], colWidths=[content_width], rowHeights=[2 if not compact else 1.5])
     rule.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), _hex(PRIMARY_COLOR))]))
     elements.append(rule)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 10 if not compact else 5))
 
     return elements
 
@@ -503,6 +513,199 @@ def _pdf_narrow_table(data, col_widths, content_width, extra_style=None, header_
     ))
     return table
 
+# Cores de destaque pra texto de status nas tabelas (ENTRADA/SAÍDA, PAGO,
+# PENDENTE, VENCIDO...) e fundos suaves correspondentes pra alertas em célula.
+PDF_TONES = {
+    'primary': PRIMARY_COLOR,
+    'amber': 'B45309',
+    'red': 'B91C1C',
+    'emerald': '047857',
+    'blue': '1D4ED8',
+    'slate': BRAND_MUTED,
+    'dark': BRAND_DARK,
+}
+PDF_SOFT_FILLS = {
+    'primary': BRAND_SOFT,
+    'amber': 'FEF3C7',
+    'red': 'FEE2E2',
+    'emerald': 'D1FAE5',
+    'blue': 'DBEAFE',
+    'slate': 'F1F5F9',
+}
+
+
+def _pdf_tone_markup(text, tone='dark', bold=True):
+    """Texto colorido (markup de Paragraph) pra status dentro de uma célula."""
+    t = xml_escape(str(text)) if text not in (None, '') else '-'
+    if bold:
+        t = f'<b>{t}</b>'
+    return f'<font color="#{PDF_TONES.get(tone, BRAND_DARK)}">{t}</font>'
+
+
+def _pdf_cell_factory(styles, font_size=7):
+    """Retorna cell(texto, align='left'|'center'|'right', markup=None, bold=False):
+    células de tabela em Paragraph (quebram linha dentro da própria célula),
+    com o texto escapado e na cor padrão das tabelas."""
+    base = ParagraphStyle(
+        f'StdCellL{font_size}', parent=styles['Normal'], fontSize=font_size,
+        leading=font_size + 1.5, textColor=_hex(BRAND_TEXT), alignment=TA_LEFT,
+    )
+    by_align = {
+        'left': base,
+        'center': ParagraphStyle(f'StdCellC{font_size}', parent=base, alignment=TA_CENTER),
+        'right': ParagraphStyle(f'StdCellR{font_size}', parent=base, alignment=TA_RIGHT),
+    }
+
+    def cell(text, align='left', markup=None, bold=False):
+        if markup is None:
+            markup = xml_escape(str(text)) if text not in (None, '') else '-'
+            if bold:
+                markup = f'<b>{markup}</b>'
+        return Paragraph(markup, by_align[align])
+    return cell
+
+
+def _pdf_info_grid(pairs, content_width, cols=4):
+    """Quadro de informações de um registro (fatura, ordem, comprovante...):
+    pares (rótulo, valor) em grade, rótulo pequeno em cima e valor em negrito
+    embaixo, sobre fundo suave. Um item (rótulo, valor, n) ocupa n colunas.
+    `valor` pode ser um Paragraph pronto (ex.: com cor de status)."""
+    label_style = ParagraphStyle(
+        'InfoGridLabel', fontName='Helvetica', fontSize=6.5, leading=8,
+        textColor=_hex(BRAND_MUTED),
+    )
+    value_style = ParagraphStyle(
+        'InfoGridValue', fontName='Helvetica-Bold', fontSize=8.5, leading=10.5,
+        textColor=_hex(BRAND_DARK),
+    )
+    grid, cmds = [], []
+    r, c = -1, cols
+    for item in pairs:
+        label, value = item[0], item[1]
+        span = max(1, min(item[2] if len(item) > 2 else 1, cols))
+        if c + span > cols:
+            grid.append([''] * cols)
+            r += 1
+            c = 0
+        if isinstance(value, Paragraph):
+            val = value
+        else:
+            val = Paragraph(xml_escape(str(value)) if value not in (None, '') else '-', value_style)
+        grid[r][c] = [Paragraph(xml_escape(str(label).upper()), label_style), val]
+        if span > 1:
+            cmds.append(('SPAN', (c, r), (c + span - 1, r)))
+        c += span
+    table = Table(grid, colWidths=[content_width / cols] * cols)
+    cmds += [
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
+        ('LINEBELOW', (0, 0), (-1, -2), 0.4, _hex(BRAND_LINE)),
+        ('LEFTPADDING', (0, 0), (-1, -1), 7),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]
+    table.setStyle(TableStyle(cmds))
+    return table
+
+
+def _pdf_totals_box(rows, content_width, width=230, highlight_last=True):
+    """Quadro de totais encostado à direita: [(rótulo, valor), ...]. A última
+    linha (total geral) vai em destaque na cor da marca."""
+    label_style = ParagraphStyle('TotalsLabel', fontName='Helvetica', fontSize=8, leading=10, textColor=_hex(BRAND_TEXT))
+    value_style = ParagraphStyle('TotalsValue', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=_hex(BRAND_DARK), alignment=TA_RIGHT)
+    grand_label = ParagraphStyle('TotalsGrandLabel', parent=label_style, fontName='Helvetica-Bold', fontSize=9.5, leading=12, textColor=colors.white)
+    grand_value = ParagraphStyle('TotalsGrandValue', parent=value_style, fontSize=10.5, leading=13, textColor=colors.white)
+    filler = max(content_width - width, 0)
+    data = []
+    for i, (label, value) in enumerate(rows):
+        is_grand = highlight_last and i == len(rows) - 1
+        data.append(['', Paragraph(xml_escape(str(label)), grand_label if is_grand else label_style),
+                     Paragraph(xml_escape(str(value)), grand_value if is_grand else value_style)])
+    table = Table(data, colWidths=[filler, width * 0.55, width * 0.45])
+    cmds = [
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (1, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (1, 0), (-1, -1), 8),
+        ('TOPPADDING', (1, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (1, 0), (-1, -1), 4),
+        ('LEFTPADDING', (0, 0), (0, -1), 0),
+        ('RIGHTPADDING', (0, 0), (0, -1), 0),
+        ('LINEBELOW', (1, 0), (-1, -2), 0.4, _hex(BRAND_LINE)),
+    ]
+    if highlight_last:
+        cmds.append(('BACKGROUND', (1, -1), (-1, -1), _hex(PRIMARY_COLOR)))
+    table.setStyle(TableStyle(cmds))
+    return table
+
+
+def _pdf_note_box(title, text, content_width):
+    """Caixa de observações/notas: título pequeno na cor da marca + texto
+    (quebras de linha preservadas) sobre fundo suave."""
+    title_style = ParagraphStyle('NoteTitle', fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=_hex(PRIMARY_COLOR))
+    text_style = ParagraphStyle('NoteText', fontName='Helvetica', fontSize=8, leading=10.5, textColor=_hex(BRAND_TEXT))
+    body = xml_escape(str(text or '-')).replace('\n', '<br/>')
+    table = Table([[[Paragraph(xml_escape(title.upper()), title_style), Spacer(1, 2), Paragraph(body, text_style)]]], colWidths=[content_width])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
+        ('LINEBEFORE', (0, 0), (0, -1), 2.5, _hex(PRIMARY_COLOR)),
+        ('LEFTPADDING', (0, 0), (-1, -1), 9),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    return table
+
+
+def _pdf_signatures(signers, content_width, space_above=30):
+    """Linhas de assinatura lado a lado. `signers`: lista de títulos ou de
+    (título, linha de apoio) - ex.: ("Motorista", "Nome: Fulano")."""
+    n = max(len(signers), 1)
+    gap = 28
+    w = (content_width - gap * (n - 1)) / n
+    title_style = ParagraphStyle('SignTitle', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=_hex(BRAND_DARK), alignment=TA_CENTER)
+    sub_style = ParagraphStyle('SignSub', fontName='Helvetica', fontSize=7, leading=9, textColor=_hex(BRAND_MUTED), alignment=TA_CENTER)
+    top, bottom, widths, sign_cols = [], [], [], []
+    for i, s in enumerate(signers):
+        title, sub = (s[0], s[1]) if isinstance(s, (tuple, list)) else (s, None)
+        if i:
+            top.append('')
+            bottom.append('')
+            widths.append(gap)
+        sign_cols.append(len(top))
+        top.append('')
+        cell = [Paragraph(xml_escape(str(title)), title_style)]
+        if sub:
+            cell.append(Paragraph(xml_escape(str(sub)), sub_style))
+        bottom.append(cell)
+        widths.append(w)
+    table = Table([top, bottom], colWidths=widths, rowHeights=[space_above, None])
+    cmds = [
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 1), (-1, 1), 3),
+    ]
+    for ci in sign_cols:
+        cmds.append(('LINEBELOW', (ci, 0), (ci, 0), 0.8, _hex(BRAND_TEXT)))
+    table.setStyle(TableStyle(cmds))
+    return table
+
+
+def _pdf_empty_state(text, content_width):
+    """Aviso de "nenhum registro" no lugar da tabela, numa caixa suave."""
+    style = ParagraphStyle('EmptyState', fontName='Helvetica', fontSize=9, leading=12, textColor=_hex(BRAND_MUTED), alignment=TA_CENTER)
+    table = Table([[Paragraph(xml_escape(text), style)]], colWidths=[content_width])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
+        ('TOPPADDING', (0, 0), (-1, -1), 18),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 18),
+    ]))
+    return table
+
 
 def generate_pdf_report(movements: list, report_title: str = "Relatório de Movimentações", company: dict = None) -> bytes:
     """
@@ -652,9 +855,8 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
 def generate_yard_control_pdf(containers: list, stats: dict, company: dict = None) -> bytes:
     """
     Gera o PDF do Controle de Pátio - mesmo padrão visual de generate_pdf_report
-    (header + estatísticas + tabela + rodapé), mas com as colunas específicas do
-    Controle de Pátio (entrada/saída/dias no pátio) em vez das colunas de uma
-    movimentação bruta.
+    (cabeçalho + indicadores + tabela + rodapé), com as colunas específicas do
+    Controle de Pátio (entrada/saída/dias no pátio).
     """
     c = merge_company(company)
     buffer = io.BytesIO()
@@ -664,7 +866,7 @@ def generate_yard_control_pdf(containers: list, stats: dict, company: dict = Non
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=15*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -674,43 +876,19 @@ def generate_yard_control_pdf(containers: list, stats: dict, company: dict = Non
     logo_buffer = download_logo(company)
     elements.extend(_build_pdf_header(styles, logo_buffer, "Controle de Pátio", company=company, content_width=doc.width))
 
-    # ========== STATISTICS LINE ==========
-    stats_style = ParagraphStyle(
-        'YardStatsLine',
-        parent=styles['Normal'],
-        fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold',
-        spaceBefore=6,
-        spaceAfter=4
-    )
-    elements.append(Paragraph(
-        f"Total: {stats['total']}  |  Vazios: {stats['empty']}  |  Cheios: {stats['full']}  |  "
-        f"Média de Dias: {stats['avg_days']}  |  Máximo de Dias: {stats['max_days']}",
-        stats_style
-    ))
-    elements.append(Paragraph(
-        f"&gt;30 dias: {stats['over_30_days']}  |  &gt;60 dias: {stats['over_60_days']}  |  &gt;90 dias: {stats['over_90_days']}",
-        stats_style
-    ))
+    # ========== INDICADORES ==========
+    elements.extend(_build_pdf_summary([
+        ("Containers", _fmt_int(stats['total'])),
+        ("Cheios / Vazios", f"{_fmt_int(stats['full'])} / {_fmt_int(stats['empty'])}"),
+        ("Média de dias", stats['avg_days']),
+        ("Máximo de dias", _fmt_int(stats['max_days'])),
+        ("Mais de 30 dias", _fmt_int(stats['over_30_days'])),
+        ("Mais de 60 dias", _fmt_int(stats['over_60_days'])),
+        ("Mais de 90 dias", _fmt_int(stats['over_90_days'])),
+    ], doc.width))
 
-    gen_info_style = ParagraphStyle(
-        'GenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER,
-        spaceAfter=12
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
-
-    # ========== TABLE SECTION ==========
-    cell_style_l = ParagraphStyle('YardCellL', parent=styles['Normal'], fontSize=7, leading=8.5, alignment=TA_LEFT)
-    cell_style_c = ParagraphStyle('YardCellC', parent=cell_style_l, alignment=TA_CENTER)
-
-    def cell(text, centered=False):
-        return Paragraph(str(text) if text not in (None, '') else '-', cell_style_c if centered else cell_style_l)
-
-    headers = ["Nº Container", "Tipo", "Status", "Tamanho", "Armador", "Cliente", "Data Entrada", "Data Saída", "Dias no Pátio", "Booking"]
-    data = [headers]
+    # ========== TABELA ==========
+    cell = _pdf_cell_factory(styles)
 
     def fmt_date_iso(value):
         if not value:
@@ -720,59 +898,31 @@ def generate_yard_control_pdf(containers: list, stats: dict, company: dict = Non
         except Exception:
             return '-'
 
-    for item in containers:
+    data = [_pdf_header_cells(["Nº Container", "Tipo", "Status", "Tamanho", "Armador", "Cliente", "Data Entrada", "Data Saída", "Dias no Pátio", "Booking"])]
+    alert_cmds = []
+    for row, item in enumerate(containers, 1):
+        in_stock = item.get('in_stock', True)
+        days = item.get('days_in_yard', 0) or 0
+        days_tone = 'red' if days > 90 else 'amber' if days > 30 else 'dark'
         data.append([
-            cell(item['container_number']),
-            cell('ENTRADA' if item.get('in_stock', True) else 'SAÍDA', centered=True),
-            cell(item.get('status', '-'), centered=True),
-            cell(item.get('size_type', '-'), centered=True),
+            cell(item['container_number'], bold=True),
+            cell(None, 'center', markup=_pdf_tone_markup('ENTRADA' if in_stock else 'SAÍDA', 'primary' if in_stock else 'amber')),
+            cell(item.get('status', '-'), 'center'),
+            cell(item.get('size_type', '-'), 'center'),
             cell(item.get('shipping_line', '-')),
             cell(item.get('client_name') or '-'),
-            cell(fmt_date_iso(item.get('entry_date')), centered=True),
-            cell(fmt_date_iso(item.get('exit_date')), centered=True),
-            cell(item.get('days_in_yard', 0), centered=True),
+            cell(fmt_date_iso(item.get('entry_date')), 'center'),
+            cell(fmt_date_iso(item.get('exit_date')), 'center'),
+            cell(None, 'center', markup=_pdf_tone_markup(days, days_tone, bold=days > 30)),
             cell(item.get('booking') or '-'),
         ])
+        # Alerta de permanência: fundo suave na célula de dias (>30 âmbar, >90 vermelho)
+        if days > 30:
+            alert_cmds.append(('BACKGROUND', (8, row), (8, row), _hex(PDF_SOFT_FILLS['red' if days > 90 else 'amber'])))
 
-    col_widths = [95, 55, 55, 60, 90, 150, 65, 65, 65, 75]
+    col_widths = [100, 58, 55, 58, 95, 165, 68, 68, 58, 60]
     table = Table(data, colWidths=col_widths, repeatRows=1)
-
-    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
-    border_gray = colors.HexColor('#CCCCCC')
-    zebra_gray = colors.HexColor('#F8F8F8')
-    entrada_fill = colors.HexColor('#C6EFCE')
-    saida_fill = colors.HexColor('#BDD7EE')
-    warning_fill = colors.HexColor('#FFEB9C')
-    danger_fill = colors.HexColor('#FF6B6B')
-
-    style_commands = [
-        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 7),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
-        ('TOPPADDING', (0, 0), (-1, 0), 5),
-
-        ('TOPPADDING', (0, 1), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-
-        ('GRID', (0, 0), (-1, -1), 0.5, border_gray),
-        ('BOX', (0, 0), (-1, -1), 1, header_bg),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, zebra_gray]),
-    ]
-    for row, item in enumerate(containers, 1):
-        style_commands.append(('BACKGROUND', (1, row), (1, row), entrada_fill if item.get('in_stock', True) else saida_fill))
-        days = item.get('days_in_yard', 0)
-        if days > 90:
-            style_commands.append(('BACKGROUND', (8, row), (8, row), danger_fill))
-        elif days > 30:
-            style_commands.append(('BACKGROUND', (8, row), (8, row), warning_fill))
-
-    table.setStyle(TableStyle(style_commands))
+    table.setStyle(TableStyle(_pdf_table_style() + alert_cmds))
     elements.append(table)
 
     footer = _make_pdf_footer(c['name'])
@@ -1054,9 +1204,8 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
 
 
 def generate_stock_report_pdf(products: list, company: dict = None) -> bytes:
-    """Gera PDF do Relatório de Estoque, mesmo padrão visual do Relatório de
-    Movimentações (_build_pdf_header + linha de estatísticas + linha "Gerado
-    em" + tabela com células em Paragraph pra evitar sobreposição de texto)."""
+    """Gera PDF do Relatório de Estoque no padrão visual dos relatórios
+    (cabeçalho + indicadores + tabela + rodapé com páginas)."""
     c = merge_company(company)
     buffer = io.BytesIO()
 
@@ -1065,7 +1214,7 @@ def generate_stock_report_pdf(products: list, company: dict = None) -> bytes:
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=15*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -1075,74 +1224,35 @@ def generate_stock_report_pdf(products: list, company: dict = None) -> bytes:
     logo_buffer = download_logo(company)
     elements.extend(_build_pdf_header(styles, logo_buffer, "Relatório de Estoque", company=company, content_width=doc.width))
 
-    # ========== STATISTICS LINE ==========
+    # ========== INDICADORES ==========
     total_value = sum((p.get('stock_quantity') or 0) * (p.get('reference_value') or 0) for p in products)
-    total_str = f"R$ {total_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    stats_text = f"Total de Produtos: {len(products)}  |  Valor Total em Estoque: {total_str}"
+    zero_stock = sum(1 for p in products if not (p.get('stock_quantity') or 0))
+    elements.extend(_build_pdf_summary([
+        ("Produtos", _fmt_int(len(products))),
+        ("Sem saldo", _fmt_int(zero_stock)),
+        ("Valor total em estoque", format_currency(total_value, 'BRL')),
+    ], doc.width, max_box_width=200))
 
-    stats_style = ParagraphStyle(
-        'StockStatsLine', parent=styles['Normal'], fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER,
-        fontName='Helvetica-Bold', spaceBefore=6, spaceAfter=8
-    )
-    elements.append(Paragraph(stats_text, stats_style))
+    # ========== TABELA ==========
+    if products:
+        cell = _pdf_cell_factory(styles, font_size=8)
+        data = [_pdf_header_cells(['Cód. Produto', 'Almoxarifado', 'Produto', 'Quantidade', 'Valor do Produto'], font_size=8)]
+        for p in products:
+            qty = p.get('stock_quantity') or 0
+            data.append([
+                cell(p.get('code', '-'), 'center'),
+                cell(p.get('warehouse_name') or '-'),
+                cell(p.get('description', '-')),
+                cell(None, 'center', markup=_pdf_tone_markup(qty, 'dark' if qty else 'red')),
+                cell(format_currency(p.get('reference_value') or 0, 'BRL'), 'right'),
+            ])
 
-    # ========== GENERATION INFO ==========
-    gen_info_style = ParagraphStyle(
-        'StockGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
-
-    # ========== TABLE SECTION ==========
-    cell_style_l = ParagraphStyle('StockCellL', parent=styles['Normal'], fontSize=8, leading=9.5, alignment=TA_LEFT)
-    cell_style_c = ParagraphStyle('StockCellC', parent=cell_style_l, alignment=TA_CENTER)
-    cell_style_r = ParagraphStyle('StockCellR', parent=cell_style_l, alignment=TA_RIGHT)
-
-    def cell(text, align='left'):
-        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
-        return Paragraph(str(text) if text not in (None, '') else '-', style)
-
-    data = [['Cód. Produto', 'Almoxarifado', 'Produto', 'Quantidade', 'Valor do Produto']]
-    for p in products:
-        value_str = f"R$ {(p.get('reference_value') or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        data.append([
-            cell(p.get('code', '-'), align='center'),
-            cell(p.get('warehouse_name') or '-'),
-            cell(p.get('description', '-')),
-            cell(p.get('stock_quantity') or 0, align='center'),
-            cell(value_str, align='right'),
-        ])
-
-    col_widths = [70, 150, 350, 80, 100]
-    table = Table(data, colWidths=col_widths, repeatRows=1)
-
-    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
-    border_gray = colors.HexColor('#CCCCCC')
-    zebra_gray = colors.HexColor('#F8F8F8')
-
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
-        ('TOPPADDING', (0, 0), (-1, 0), 5),
-
-        ('TOPPADDING', (0, 1), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-
-        ('GRID', (0, 0), (-1, -1), 0.5, border_gray),
-        ('BOX', (0, 0), (-1, -1), 1, header_bg),
-
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, zebra_gray]),
-    ]))
-
-    elements.append(table)
+        col_widths = [75, 170, 360, 80, 100]
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style()))
+        elements.append(table)
+    else:
+        elements.append(_pdf_empty_state("Nenhum produto cadastrado.", doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -1208,8 +1318,8 @@ def generate_stock_report_excel(products: list, company: dict = None) -> bytes:
 
 def generate_stock_ledger_report_pdf(rows: list, company: dict = None, report_title: str = "Relatório de Movimentações de Estoque") -> bytes:
     """Extrato de Entradas e Saídas de estoque (StockEntry de NF-e + StockMovement
-    manual, já unidos em `rows` por _build_stock_ledger) - mesmo padrão visual do
-    Relatório de Serviços, com a Referência (NF/OS/Veículo) na última coluna."""
+    manual, já unidos em `rows` por _build_stock_ledger), com a Referência
+    (NF/OS/Veículo) na última coluna."""
     c = merge_company(company)
     buffer = io.BytesIO()
 
@@ -1218,7 +1328,7 @@ def generate_stock_ledger_report_pdf(rows: list, company: dict = None, report_ti
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=10*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -1232,69 +1342,35 @@ def generate_stock_ledger_report_pdf(rows: list, company: dict = None, report_ti
     saida_rows = [r for r in rows if r.get('operation_type') == 'SAIDA']
     entrada_total = round(sum(r.get('total_value') or 0 for r in entrada_rows), 2)
     saida_total = round(sum(r.get('total_value') or 0 for r in saida_rows), 2)
-    stats_text = (
-        f"Entradas: {len(entrada_rows)} ({format_currency(entrada_total, 'BRL')})  |  "
-        f"Saídas: {len(saida_rows)} ({format_currency(saida_total, 'BRL')})"
-    )
-    stats_style = ParagraphStyle(
-        'StockLedgerStatsBar', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    stats_table = Table([[Paragraph(stats_text, stats_style)]], colWidths=[doc.width])
-    stats_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(stats_table)
-
-    gen_info_style = ParagraphStyle(
-        'StockLedgerGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+    elements.extend(_build_pdf_summary([
+        ("Entradas", _fmt_int(len(entrada_rows))),
+        ("Valor das entradas", format_currency(entrada_total, 'BRL')),
+        ("Saídas", _fmt_int(len(saida_rows))),
+        ("Valor das saídas", format_currency(saida_total, 'BRL')),
+    ], doc.width))
 
     if rows:
-        cell_style = ParagraphStyle('StockLedgerCell', parent=styles['Normal'], fontSize=7.5, leading=9)
-        table_rows = [['Data', 'Tipo', 'Produto', 'Almoxarifado', 'Qtd', 'V. Unit.', 'V. Total', 'Referência']]
+        cell = _pdf_cell_factory(styles, font_size=7.5)
+        table_rows = [_pdf_header_cells(['Data', 'Tipo', 'Produto', 'Almoxarifado', 'Qtd', 'V. Unit.', 'V. Total', 'Referência'], font_size=7.5)]
         for r in rows:
+            is_entry = r.get('operation_type') == 'ENTRADA'
             table_rows.append([
-                fmt_date(r.get('date')),
-                'Entrada' if r.get('operation_type') == 'ENTRADA' else 'Saída',
-                Paragraph(r.get('product_name') or '-', cell_style),
-                Paragraph(r.get('warehouse_name') or '-', cell_style),
-                f"{r.get('quantity', 0):.2f}".replace('.', ','),
-                format_currency(r.get('unit_value') or 0),
-                format_currency(r.get('total_value') or 0),
-                Paragraph(r.get('reference_label') or '-', cell_style),
+                cell(fmt_date(r.get('date')), 'center'),
+                cell(None, 'center', markup=_pdf_tone_markup('Entrada' if is_entry else 'Saída', 'primary' if is_entry else 'amber')),
+                cell(r.get('product_name') or '-'),
+                cell(r.get('warehouse_name') or '-'),
+                cell(f"{r.get('quantity', 0):.2f}".replace('.', ','), 'right'),
+                cell(format_currency(r.get('unit_value') or 0), 'right'),
+                cell(format_currency(r.get('total_value') or 0), 'right'),
+                cell(r.get('reference_label') or '-'),
             ])
 
         col_widths = [doc.width*0.07, doc.width*0.08, doc.width*0.23, doc.width*0.16, doc.width*0.07, doc.width*0.12, doc.width*0.12, doc.width*0.15]
         table = Table(table_rows, colWidths=col_widths, repeatRows=1)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 7.5),
-            ('ALIGN', (0, 0), (1, -1), 'CENTER'),
-            ('ALIGN', (4, 0), (6, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F8F8')]),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
+        table.setStyle(TableStyle(_pdf_table_style()))
         elements.append(table)
     else:
-        empty_style = ParagraphStyle(
-            'StockLedgerEmpty', parent=styles['Normal'], fontSize=10,
-            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
-        )
-        elements.append(Paragraph("Nenhuma movimentação encontrada para os filtros selecionados.", empty_style))
+        elements.append(_pdf_empty_state("Nenhuma movimentação encontrada para os filtros selecionados.", doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -2480,9 +2556,9 @@ def generate_billing_excel(movements: list, company: dict = None, storage_charge
 
 def generate_billing_pdf_report(movements: list, report_title: str = "Relatório de Faturamento", company: dict = None, storage_charges: list = None) -> bytes:
     """
-    Generate PDF billing report following Bsoft layout style.
-    Header: Logo left, company name + address center, generation info right
-    Table with financial columns and total row
+    Relatório de Faturamento no padrão visual dos relatórios: cabeçalho,
+    indicadores, tabela com colunas financeiras + linha de total e, se houver,
+    a seção de Diárias de Armazenagem em aberto.
     """
     buffer = io.BytesIO()
 
@@ -2491,7 +2567,7 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=10*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -2499,12 +2575,11 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
     elements = []
     styles = getSampleStyleSheet()
 
-    # ========== HEADER ==========
+    # ========== CABEÇALHO ==========
     logo_buffer = download_logo(company)
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
-    # ========== STATISTICS BAR ==========
+    # ========== INDICADORES ==========
     # Cada movimentação carrega sua própria moeda (campo "currency", BRL por
     # padrão) - clientes do exterior podem ter sido cadastrados em USD (ver
     # Tabela de Serviços). Soma-se por moeda em vez de tratar tudo como R$,
@@ -2522,54 +2597,23 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
     total_billed = sum(1 for m in movements if m.get('billed'))
     total_unbilled = total_records - total_billed
 
-    stats_text = f"Total: {total_records}  |  Faturadas: {total_billed}  |  Não Faturadas: {total_unbilled}  |  Valor Total: {value_str}"
+    elements.extend(_build_pdf_summary([
+        ("Movimentações", _fmt_int(total_records)),
+        ("Faturadas", _fmt_int(total_billed)),
+        ("Não faturadas", _fmt_int(total_unbilled)),
+        ("Valor total", value_str),
+    ], doc.width, max_box_width=190))
 
-    stats_style = ParagraphStyle(
-        'BillingStatsBar',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
-    )
+    # ========== TABELA ==========
+    # Células em Paragraph pra quebrar linha dentro da própria célula em vez
+    # de vazar pra vizinha (Cliente, Transportadora) - mesma técnica da Fatura.
+    cell = _pdf_cell_factory(styles)
 
-    stats_data = [[Paragraph(stats_text, stats_style)]]
-    stats_table = Table(stats_data, colWidths=[doc.width])
-    stats_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(stats_table)
-
-    # ========== GENERATION INFO ==========
-    gen_info_style = ParagraphStyle(
-        'BillingGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER,
-        spaceBefore=8, spaceAfter=10
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
-
-    # ========== TABLE ==========
-    # Células usam Paragraph (não string pura) pra quebrar linha dentro da
-    # própria célula em vez de vazar pra célula vizinha quando o conteúdo é
-    # mais largo que a coluna (Cliente, Transportadora) - mesma técnica da Fatura.
-    cell_style_l = ParagraphStyle('BillingCellL', parent=styles['Normal'], fontSize=7, leading=8.5, alignment=TA_LEFT)
-    cell_style_c = ParagraphStyle('BillingCellC', parent=cell_style_l, alignment=TA_CENTER)
-    cell_style_r = ParagraphStyle('BillingCellR', parent=cell_style_l, alignment=TA_RIGHT)
-
-    def cell(text, align='left'):
-        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
-        return Paragraph(str(text) if text not in (None, '') else '-', style)
-
-    data = [[
+    data = [_pdf_header_cells([
         'ID', 'Data/Hora', 'Tipo', 'Nº Container', 'Cliente', 'Placa',
         'Transportadora', 'Armador', 'Status', 'Tamanho',
         'Tipo Serviço', 'Nota Fiscal', 'Valor'
-    ]]
+    ])]
 
     for m in movements:
         dt_brt = to_brt(m.get('created_at'))
@@ -2577,64 +2621,32 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
 
         service_value = m.get('service_value')
         val_str = format_currency(service_value, m.get('currency') or 'BRL') if service_value else '-'
+        is_entry = m.get('operation_type') == 'ENTRADA'
 
         data.append([
-            cell(m.get('transaction_id', '-'), align='center'),
+            cell(m.get('transaction_id', '-'), 'center'),
             cell(created_at),
-            cell("ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA", align='center'),
+            cell(None, 'center', markup=_pdf_tone_markup('ENTRADA' if is_entry else 'SAÍDA', 'primary' if is_entry else 'amber')),
             cell(m.get('container_number', '-')),
             cell(m.get('client_name', '-') or '-'),
             cell(m.get('truck_plate', '-') or '-'),
             cell(m.get('transport_company', '-') or '-'),
             cell(m.get('shipping_line', '-') or '-'),
-            cell(m.get('status', '-') or '-', align='center'),
-            cell(m.get('size_type', '-') or '-', align='center'),
+            cell(m.get('status', '-') or '-', 'center'),
+            cell(m.get('size_type', '-') or '-', 'center'),
             cell(m.get('service_type', '-') or '-'),
             cell(m.get('invoice_number', '-') or '-'),
-            cell(val_str, align='right')
+            cell(val_str, 'right'),
         ])
 
-    # Total row (fora do padrão de célula normal - fica em negrito/tamanho maior)
-    data.append(['', '', '', '', '', '', '', '', '', '', '', 'TOTAL:', value_str])
+    data.append([''] * 11 + [cell('TOTAL', 'right', bold=True), cell(value_str, 'right', bold=True)])
 
-    # Larguras redistribuídas pra usar a área útil real da página (doc.width),
-    # mesmas colunas/proporções da Fatura já que o conjunto de campos é idêntico.
-    col_widths = [28, 60, 40, 62, 100, 50, 90, 60, 40, 38, 80, 52, 65]
-
+    col_widths = [28, 68, 46, 62, 104, 50, 84, 60, 38, 42, 80, 52, 71]
     table = Table(data, colWidths=col_widths, repeatRows=1)
-    table.setStyle(TableStyle([
-        # Header styling
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 7),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
-        ('TOPPADDING', (0, 0), (-1, 0), 5),
-
-        # Body styling - alinhamento e fonte já vêm do Paragraph de cada célula
-        ('TOPPADDING', (0, 1), (-1, -2), 3),
-        ('BOTTOMPADDING', (0, 1), (-1, -2), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-
-        # Borders
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-
-        # Total row styling
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('FONTNAME', (11, -1), (12, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (11, -1), (12, -1), 9),
-        ('ALIGN', (11, -1), (11, -1), 'RIGHT'),
-        ('ALIGN', (12, -1), (12, -1), 'RIGHT'),
+    table.setStyle(TableStyle(_pdf_table_style(total_row=True) + [
         ('TOPPADDING', (0, -1), (-1, -1), 6),
         ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
-        ('BOX', (11, -1), (12, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
     ]))
-
     elements.append(table)
 
     # ========== DIÁRIAS DE ARMAZENAGEM EM ABERTO ==========
@@ -2644,7 +2656,6 @@ def generate_billing_pdf_report(movements: list, report_title: str = "Relatório
     # sua própria subtabela/subtotal, nunca um total único misturando moedas.
     elements.extend(_build_storage_charges_pdf_elements(styles, doc.width, storage_charges))
 
-    # Build with footer
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     pdf_bytes = buffer.getvalue()
@@ -2661,51 +2672,30 @@ def _build_storage_charges_pdf_elements(styles, doc_width, storage_charges: list
     if not storage_charges:
         return []
 
-    elements = []
-    section_title_style = ParagraphStyle(
-        'StorageSectionTitle', parent=styles['Normal'], fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceBefore=14, spaceAfter=6
-    )
-    elements.append(Paragraph("COBRANÇA DE DIÁRIA DE ARMAZENAGEM — CONTAINERS ACIMA DO FREE TIME", section_title_style))
-
-    storage_cell_style = ParagraphStyle('StorageCell', parent=styles['Normal'], fontSize=8, leading=10)
+    elements = _pdf_section_title("Cobrança de Diária de Armazenagem — containers acima do free time", doc_width)
+    cell = _pdf_cell_factory(styles, font_size=7.5)
 
     by_currency = {}
     for charge in storage_charges:
         by_currency.setdefault(charge.get('currency') or 'BRL', []).append(charge)
 
     for currency, group in by_currency.items():
-        rows = [['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor']]
+        rows = [_pdf_header_cells(['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor'], font_size=7.5)]
         for charge in group:
             rows.append([
-                Paragraph(charge['container_number'], storage_cell_style),
-                Paragraph(charge['client_name'], storage_cell_style),
-                charge['entry_date'].strftime('%d/%m/%Y'),
-                str(charge['days_in_yard']),
-                str(charge['free_time_days']),
-                str(charge['extra_days']),
-                format_currency(charge['service_value'], currency),
+                cell(charge['container_number'], bold=True),
+                cell(charge['client_name']),
+                cell(charge['entry_date'].strftime('%d/%m/%Y'), 'center'),
+                cell(charge['days_in_yard'], 'center'),
+                cell(charge['free_time_days'], 'center'),
+                cell(None, 'center', markup=_pdf_tone_markup(charge['extra_days'], 'red')),
+                cell(format_currency(charge['service_value'], currency), 'right'),
             ])
         subtotal = round(sum(charge['service_value'] for charge in group), 2)
-        rows.append(['', '', '', '', '', 'SUBTOTAL:', format_currency(subtotal, currency)])
+        rows.append([''] * 5 + [cell('SUBTOTAL', 'right', bold=True), cell(format_currency(subtotal, currency), 'right', bold=True)])
 
-        storage_table = Table(rows, colWidths=[doc_width*0.14, doc_width*0.26, doc_width*0.12, doc_width*0.14, doc_width*0.1, doc_width*0.12, doc_width*0.12], repeatRows=1)
-        storage_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('ALIGN', (2, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (-1, 0), (-1, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
+        storage_table = Table(rows, colWidths=[doc_width*0.14, doc_width*0.26, doc_width*0.12, doc_width*0.12, doc_width*0.1, doc_width*0.12, doc_width*0.14], repeatRows=1)
+        storage_table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(storage_table)
         elements.append(Spacer(1, 10))
 
@@ -2736,7 +2726,7 @@ def generate_storage_overage_pdf_report(storage_charges: list, company: dict = N
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=10*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -2744,39 +2734,19 @@ def generate_storage_overage_pdf_report(storage_charges: list, company: dict = N
     styles = getSampleStyleSheet()
 
     logo_buffer = download_logo(company)
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
-    stats_text = f"Containers em Aberto: {len(storage_charges)}  |  Valor Total: {_storage_charges_totals_text(storage_charges)}"
-    stats_style = ParagraphStyle(
-        'StorageOverageStatsBar', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    stats_table = Table([[Paragraph(stats_text, stats_style)]], colWidths=[doc.width])
-    stats_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(stats_table)
-
-    gen_info_style = ParagraphStyle(
-        'StorageOverageGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+    extra_days_total = sum(charge.get('extra_days') or 0 for charge in storage_charges)
+    elements.extend(_build_pdf_summary([
+        ("Containers em aberto", _fmt_int(len(storage_charges))),
+        ("Diárias excedentes", _fmt_int(extra_days_total)),
+        ("Valor total", _storage_charges_totals_text(storage_charges)),
+    ], doc.width, max_box_width=200))
 
     if storage_charges:
         elements.extend(_build_storage_charges_pdf_elements(styles, doc.width, storage_charges))
     else:
-        empty_style = ParagraphStyle(
-            'StorageOverageEmpty', parent=styles['Normal'], fontSize=10,
-            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
-        )
-        elements.append(Paragraph("Nenhum container em estoque passou do free time configurado na Tabela de Serviços.", empty_style))
+        elements.append(_pdf_empty_state("Nenhum container em estoque passou do free time configurado na Tabela de Serviços.", doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -2784,9 +2754,9 @@ def generate_storage_overage_pdf_report(storage_charges: list, company: dict = N
 
 
 def generate_fuel_supply_report_pdf(supplies: list, company: dict = None, report_title: str = "Relatório de Abastecimento") -> bytes:
-    """Relatório standalone dos Abastecimentos (fuel supply) - mesmo padrão
-    visual do Relatório de Diárias de Armazenagem (generate_storage_overage_pdf_report):
-    stats bar (contagem/litros/valor) + uma linha de tabela por abastecimento."""
+    """Relatório standalone dos Abastecimentos (fuel supply) no padrão visual
+    dos relatórios: indicadores (contagem/litros/valor) + uma linha por
+    abastecimento + total."""
     c = merge_company(company)
     buffer = io.BytesIO()
 
@@ -2795,7 +2765,7 @@ def generate_fuel_supply_report_pdf(supplies: list, company: dict = None, report
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=10*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -2803,75 +2773,43 @@ def generate_fuel_supply_report_pdf(supplies: list, company: dict = None, report
     styles = getSampleStyleSheet()
 
     logo_buffer = download_logo(company)
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
+
+    def fmt_liters(value):
+        return f"{(value or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
     total_liters = round(sum(s.get('liters') or 0 for s in supplies), 2)
     total_value = round(sum(s.get('total_value') or 0 for s in supplies), 2)
-    liters_text = f"{total_liters:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    stats_text = f"Abastecimentos: {len(supplies)}  |  Litros: {liters_text}  |  Valor Total: {format_currency(total_value, 'BRL')}"
-    stats_style = ParagraphStyle(
-        'FuelSupplyStatsBar', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    stats_table = Table([[Paragraph(stats_text, stats_style)]], colWidths=[doc.width])
-    stats_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(stats_table)
-
-    gen_info_style = ParagraphStyle(
-        'FuelSupplyGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+    avg_price = total_value / total_liters if total_liters else 0
+    elements.extend(_build_pdf_summary([
+        ("Abastecimentos", _fmt_int(len(supplies))),
+        ("Litros", fmt_liters(total_liters)),
+        ("Preço médio / litro", format_currency(avg_price, 'BRL')),
+        ("Valor total", format_currency(total_value, 'BRL')),
+    ], doc.width))
 
     if supplies:
-        cell_style = ParagraphStyle('FuelSupplyCell', parent=styles['Normal'], fontSize=8, leading=10)
-        rows = [['Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total']]
+        cell = _pdf_cell_factory(styles, font_size=8)
+        rows = [_pdf_header_cells(['Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total'], font_size=8)]
         for s in supplies:
             rows.append([
-                fmt_date(s.get('supply_date')),
-                Paragraph(s.get('equipment_plate') or '-', cell_style),
-                Paragraph(s.get('driver_name') or '-', cell_style),
-                Paragraph(s.get('supplier_name') or '-', cell_style),
-                Paragraph(s.get('fuel_type_label') or '-', cell_style),
-                f"{(s.get('liters') or 0):,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
-                format_currency(s.get('unit_price') or 0),
-                format_currency(s.get('total_value') or 0),
+                cell(fmt_date(s.get('supply_date')), 'center'),
+                cell(s.get('equipment_plate') or '-', bold=True),
+                cell(s.get('driver_name') or '-'),
+                cell(s.get('supplier_name') or '-'),
+                cell(s.get('fuel_type_label') or '-'),
+                cell(fmt_liters(s.get('liters')), 'right'),
+                cell(format_currency(s.get('unit_price') or 0), 'right'),
+                cell(format_currency(s.get('total_value') or 0), 'right'),
             ])
-        rows.append(['', '', '', '', '', '', 'TOTAL:', format_currency(total_value)])
+        rows.append([''] * 4 + [cell('TOTAL', 'right', bold=True), cell(fmt_liters(total_liters), 'right', bold=True), '', cell(format_currency(total_value), 'right', bold=True)])
 
         col_widths = [doc.width*0.09, doc.width*0.12, doc.width*0.16, doc.width*0.18, doc.width*0.13, doc.width*0.1, doc.width*0.11, doc.width*0.11]
         table = Table(rows, colWidths=col_widths, repeatRows=1)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-            ('ALIGN', (5, 0), (-1, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
+        table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(table)
     else:
-        empty_style = ParagraphStyle(
-            'FuelSupplyEmpty', parent=styles['Normal'], fontSize=10,
-            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
-        )
-        elements.append(Paragraph("Nenhum abastecimento encontrado para os filtros selecionados.", empty_style))
+        elements.append(_pdf_empty_state("Nenhum abastecimento encontrado para os filtros selecionados.", doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -2884,9 +2822,8 @@ _OS_STATUS_LABELS_PDF = {
 
 
 def generate_service_orders_report_pdf(orders: list, company: dict = None, report_title: str = "Relatório de Serviços") -> bytes:
-    """Relatório standalone das Ordens de Serviço - mesmo padrão visual do
-    Relatório de Abastecimento (generate_fuel_supply_report_pdf): stats bar
-    (contagem/valor) + uma linha de tabela por OS."""
+    """Relatório standalone das Ordens de Serviço no padrão visual dos
+    relatórios: indicadores (contagem por situação/valor) + uma linha por OS."""
     c = merge_company(company)
     buffer = io.BytesIO()
 
@@ -2895,7 +2832,7 @@ def generate_service_orders_report_pdf(orders: list, company: dict = None, repor
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=10*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -2903,71 +2840,41 @@ def generate_service_orders_report_pdf(orders: list, company: dict = None, repor
     styles = getSampleStyleSheet()
 
     logo_buffer = download_logo(company)
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
     total_value = round(sum(o.get('grand_total') or 0 for o in orders), 2)
-    stats_text = f"Ordens de Serviço: {len(orders)}  |  Valor Total: {format_currency(total_value, 'BRL')}"
-    stats_style = ParagraphStyle(
-        'ServiceOrdersStatsBar', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    stats_table = Table([[Paragraph(stats_text, stats_style)]], colWidths=[doc.width])
-    stats_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(stats_table)
+    open_count = sum(1 for o in orders if o.get('status') in ('ABERTO', 'ANDAMENTO'))
+    closed_count = sum(1 for o in orders if o.get('status') == 'FECHADO')
+    elements.extend(_build_pdf_summary([
+        ("Ordens de serviço", _fmt_int(len(orders))),
+        ("Em aberto / andamento", _fmt_int(open_count)),
+        ("Fechadas", _fmt_int(closed_count)),
+        ("Valor total", format_currency(total_value, 'BRL')),
+    ], doc.width))
 
-    gen_info_style = ParagraphStyle(
-        'ServiceOrdersGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+    status_tones = {"ABERTO": 'blue', "ANDAMENTO": 'amber', "FECHADO": 'emerald', "CANCELADO": 'red'}
 
     if orders:
-        cell_style = ParagraphStyle('ServiceOrdersCell', parent=styles['Normal'], fontSize=8, leading=10)
-        rows = [['Nº OS', 'Data Abertura', 'Equipamento', 'Categoria', 'Status', 'Valor Total']]
+        cell = _pdf_cell_factory(styles, font_size=8)
+        rows = [_pdf_header_cells(['Nº OS', 'Data Abertura', 'Equipamento', 'Categoria', 'Status', 'Valor Total'], font_size=8)]
         for o in orders:
+            status = o.get('status')
             rows.append([
-                str(o.get('os_number') or '-'),
-                fmt_datetime(o.get('opened_at')),
-                Paragraph(o.get('equipment_plate') or '-', cell_style),
-                Paragraph(o.get('category') or '-', cell_style),
-                _OS_STATUS_LABELS_PDF.get(o.get('status'), o.get('status') or '-'),
-                format_currency(o.get('grand_total') or 0),
+                cell(o.get('os_number') or '-', 'center', bold=True),
+                cell(fmt_datetime(o.get('opened_at')), 'center'),
+                cell(o.get('equipment_plate') or '-'),
+                cell(o.get('category') or '-'),
+                cell(None, 'center', markup=_pdf_tone_markup(_OS_STATUS_LABELS_PDF.get(status, status or '-'), status_tones.get(status, 'slate'))),
+                cell(format_currency(o.get('grand_total') or 0), 'right'),
             ])
-        rows.append(['', '', '', '', 'TOTAL:', format_currency(total_value)])
+        rows.append([''] * 4 + [cell('TOTAL', 'right', bold=True), cell(format_currency(total_value), 'right', bold=True)])
 
         col_widths = [doc.width*0.1, doc.width*0.18, doc.width*0.18, doc.width*0.26, doc.width*0.14, doc.width*0.14]
         table = Table(rows, colWidths=col_widths, repeatRows=1)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
-            ('ALIGN', (4, 0), (-1, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
+        table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(table)
     else:
-        empty_style = ParagraphStyle(
-            'ServiceOrdersEmpty', parent=styles['Normal'], fontSize=10,
-            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
-        )
-        elements.append(Paragraph("Nenhuma ordem de serviço encontrada para os filtros selecionados.", empty_style))
+        elements.append(_pdf_empty_state("Nenhuma ordem de serviço encontrada para os filtros selecionados.", doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -2977,10 +2884,35 @@ def generate_service_orders_report_pdf(orders: list, company: dict = None, repor
 _TURNO_LABELS_PDF = {"DIA": "Dia", "NOITE": "Noite"}
 
 
+def _port_service_rows(services, cell):
+    """Linhas da tabela de Serviço Portuário (relatório e fatura usam as mesmas colunas)."""
+    rows = []
+    for s in services:
+        date_display = s.get('service_date') or '-'
+        try:
+            date_display = datetime.strptime(s['service_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
+        except Exception:
+            pass
+        rows.append([
+            cell(s.get('service_number') or '-', 'center', bold=True),
+            cell(date_display, 'center'),
+            cell(s.get('client_name') or '-'),
+            cell(s.get('driver_name') or '-'),
+            cell(s.get('cavalo_plate') or '-', 'center'),
+            cell(_TURNO_LABELS_PDF.get(s.get('turno'), s.get('turno') or '-'), 'center'),
+            cell(s.get('entry_time') or '-', 'center'),
+            cell(s.get('exit_time') or '-', 'center'),
+            cell(format_currency(s.get('operation_value') or 0), 'right'),
+        ])
+    return rows
+
+
+_PORT_SERVICE_HEADERS = ['Nº', 'Data', 'Cliente', 'Motorista', 'Placa', 'Turno', 'Entrada', 'Saída', 'Valor']
+
+
 def generate_port_services_report_pdf(services: list, company: dict = None, report_title: str = "Relatório de Serviço Portuário") -> bytes:
-    """Relatório standalone de Serviço Portuário - mesmo padrão visual do
-    Relatório de Serviços (generate_service_orders_report_pdf): stats bar
-    (contagem/valor) + uma linha de tabela por serviço."""
+    """Relatório standalone de Serviço Portuário no padrão visual dos
+    relatórios: indicadores (contagem/turnos/valor) + uma linha por serviço."""
     c = merge_company(company)
     buffer = io.BytesIO()
 
@@ -2989,7 +2921,7 @@ def generate_port_services_report_pdf(services: list, company: dict = None, repo
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=10*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -2997,80 +2929,29 @@ def generate_port_services_report_pdf(services: list, company: dict = None, repo
     styles = getSampleStyleSheet()
 
     logo_buffer = download_logo(company)
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
     total_value = round(sum(s.get('operation_value') or 0 for s in services), 2)
-    stats_text = f"Serviços: {len(services)}  |  Valor Total: {format_currency(total_value, 'BRL')}"
-    stats_style = ParagraphStyle(
-        'PortServicesStatsBar', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    stats_table = Table([[Paragraph(stats_text, stats_style)]], colWidths=[doc.width])
-    stats_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(stats_table)
-
-    gen_info_style = ParagraphStyle(
-        'PortServicesGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+    day_count = sum(1 for s in services if s.get('turno') == 'DIA')
+    night_count = sum(1 for s in services if s.get('turno') == 'NOITE')
+    elements.extend(_build_pdf_summary([
+        ("Serviços", _fmt_int(len(services))),
+        ("Turno dia", _fmt_int(day_count)),
+        ("Turno noite", _fmt_int(night_count)),
+        ("Valor total", format_currency(total_value, 'BRL')),
+    ], doc.width))
 
     if services:
-        cell_style = ParagraphStyle('PortServicesCell', parent=styles['Normal'], fontSize=8, leading=10)
-        rows = [['Nº', 'Data', 'Cliente', 'Motorista', 'Placa', 'Turno', 'Entrada', 'Saída', 'Valor']]
-        for s in services:
-            date_display = s.get('service_date') or '-'
-            try:
-                date_display = datetime.strptime(s['service_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
-            except Exception:
-                pass
-            rows.append([
-                str(s.get('service_number') or '-'),
-                date_display,
-                Paragraph(s.get('client_name') or '-', cell_style),
-                Paragraph(s.get('driver_name') or '-', cell_style),
-                s.get('cavalo_plate') or '-',
-                _TURNO_LABELS_PDF.get(s.get('turno'), s.get('turno') or '-'),
-                s.get('entry_time') or '-',
-                s.get('exit_time') or '-',
-                format_currency(s.get('operation_value') or 0),
-            ])
-        rows.append(['', '', '', '', '', '', '', 'TOTAL:', format_currency(total_value)])
+        cell = _pdf_cell_factory(styles, font_size=8)
+        rows = [_pdf_header_cells(_PORT_SERVICE_HEADERS, font_size=8)] + _port_service_rows(services, cell)
+        rows.append([''] * 7 + [cell('TOTAL', 'right', bold=True), cell(format_currency(total_value), 'right', bold=True)])
 
-        col_widths = [doc.width*0.06, doc.width*0.1, doc.width*0.2, doc.width*0.2, doc.width*0.1, doc.width*0.08, doc.width*0.09, doc.width*0.09, doc.width*0.08]
+        col_widths = [doc.width*0.06, doc.width*0.1, doc.width*0.2, doc.width*0.2, doc.width*0.1, doc.width*0.08, doc.width*0.08, doc.width*0.08, doc.width*0.1]
         table = Table(rows, colWidths=col_widths, repeatRows=1)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('ALIGN', (0, 0), (1, -1), 'CENTER'),
-            ('ALIGN', (4, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (8, 0), (-1, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('FONTNAME', (-2, -1), (-1, -1), 'Helvetica-Bold'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
+        table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(table)
     else:
-        empty_style = ParagraphStyle(
-            'PortServicesEmpty', parent=styles['Normal'], fontSize=10,
-            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
-        )
-        elements.append(Paragraph("Nenhum serviço portuário encontrado para os filtros selecionados.", empty_style))
+        elements.append(_pdf_empty_state("Nenhum serviço portuário encontrado para os filtros selecionados.", doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -3078,11 +2959,9 @@ def generate_port_services_report_pdf(services: list, company: dict = None, repo
 
 
 def generate_port_service_invoice_pdf(batch: dict, services: list, company: dict = None) -> bytes:
-    """Fatura de Serviço Portuário (Financeiro) - mesma estrutura visual do
-    Relatório de Serviço Portuário (generate_port_services_report_pdf), com
-    a barra de estatísticas trocada pelos dados da fatura (Cliente,
-    Período, Valor Total), mesmo espírito da barra "Cliente: ... | Valor
-    Total: ..." já usada em generate_invoice_pdf pra Fatura de Movimentação."""
+    """Fatura de Serviço Portuário (Financeiro): quadro com os dados da fatura
+    (cliente, período, serviços), tabela dos serviços faturados, quadro de
+    totais (valor, desconto, total) e observações."""
     c = merge_company(company)
     buffer = io.BytesIO()
 
@@ -3091,7 +2970,7 @@ def generate_port_service_invoice_pdf(batch: dict, services: list, company: dict
         pagesize=landscape(A4),
         rightMargin=10*mm,
         leftMargin=10*mm,
-        topMargin=10*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
 
@@ -3099,101 +2978,41 @@ def generate_port_service_invoice_pdf(batch: dict, services: list, company: dict
     styles = getSampleStyleSheet()
 
     logo_buffer = download_logo(company)
-    report_title = f"FATURA DE SERVIÇO PORTUÁRIO Nº {batch.get('batch_number', '-')}"
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    report_title = f"Fatura de Serviço Portuário Nº {batch.get('batch_number', '-')}"
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
     total_value = batch.get('total_value') or 0
     discount_value = batch.get('discount_value') or 0
     net_total = batch.get('net_total')
     if net_total is None:
         net_total = total_value
-    info_text = (
-        f"Cliente: {batch.get('client_name') or '-'}  |  Período: {_format_port_service_period(batch)}  |  "
-        f"Serviços: {batch.get('item_count', len(services))}  |  Valor Total: {format_currency(net_total, 'BRL')}"
-    )
-    info_style = ParagraphStyle(
-        'PortServiceInvoiceInfo', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    info_table = Table([[Paragraph(info_text, info_style)]], colWidths=[doc.width])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(info_table)
 
-    gen_info_style = ParagraphStyle(
-        'PortServiceInvoiceGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=8, spaceAfter=10
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+    elements.append(_pdf_info_grid([
+        ("Cliente", batch.get('client_name') or '-', 2),
+        ("Período", _format_port_service_period(batch)),
+        ("Serviços", _fmt_int(batch.get('item_count', len(services)))),
+    ], doc.width, cols=4))
+    elements.append(Spacer(1, 10))
 
     if services:
-        cell_style = ParagraphStyle('PortServiceInvoiceCell', parent=styles['Normal'], fontSize=8, leading=10)
-        rows = [['Nº', 'Data', 'Cliente', 'Motorista', 'Placa', 'Turno', 'Entrada', 'Saída', 'Valor']]
-        for s in services:
-            date_display = s.get('service_date') or '-'
-            try:
-                date_display = datetime.strptime(s['service_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
-            except Exception:
-                pass
-            rows.append([
-                str(s.get('service_number') or '-'),
-                date_display,
-                Paragraph(s.get('client_name') or '-', cell_style),
-                Paragraph(s.get('driver_name') or '-', cell_style),
-                s.get('cavalo_plate') or '-',
-                _TURNO_LABELS_PDF.get(s.get('turno'), s.get('turno') or '-'),
-                s.get('entry_time') or '-',
-                s.get('exit_time') or '-',
-                format_currency(s.get('operation_value') or 0),
-            ])
-        rows.append(['', '', '', '', '', '', '', 'Valor dos Serviços:', format_currency(total_value)])
-        rows.append(['', '', '', '', '', '', '', 'Desconto:', format_currency(discount_value)])
-        rows.append(['', '', '', '', '', '', '', 'VALOR TOTAL:', format_currency(net_total)])
-
-        col_widths = [doc.width*0.06, doc.width*0.1, doc.width*0.2, doc.width*0.2, doc.width*0.1, doc.width*0.08, doc.width*0.09, doc.width*0.09, doc.width*0.08]
+        cell = _pdf_cell_factory(styles, font_size=8)
+        rows = [_pdf_header_cells(_PORT_SERVICE_HEADERS, font_size=8)] + _port_service_rows(services, cell)
+        col_widths = [doc.width*0.06, doc.width*0.1, doc.width*0.2, doc.width*0.2, doc.width*0.1, doc.width*0.08, doc.width*0.08, doc.width*0.08, doc.width*0.1]
         table = Table(rows, colWidths=col_widths, repeatRows=1)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('ALIGN', (0, 0), (1, -1), 'CENTER'),
-            ('ALIGN', (4, 0), (-1, -1), 'CENTER'),
-            ('ALIGN', (8, 0), (-1, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -4), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -4), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -4), [colors.white, colors.HexColor('#F8F8F8')]),
-            ('BACKGROUND', (0, -3), (-1, -2), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TEXTCOLOR', (0, -1), (-1, -1), colors.white),
-            ('FONTNAME', (-2, -3), (-1, -1), 'Helvetica-Bold'),
-            ('FONTSIZE', (-2, -1), (-1, -1), 10),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
+        table.setStyle(TableStyle(_pdf_table_style()))
         elements.append(table)
+        elements.append(Spacer(1, 8))
+        elements.append(_pdf_totals_box([
+            ("Valor dos serviços", format_currency(total_value, 'BRL')),
+            ("Desconto", format_currency(discount_value, 'BRL')),
+            ("Valor total", format_currency(net_total, 'BRL')),
+        ], doc.width))
 
         if batch.get('observations'):
             elements.append(Spacer(1, 10))
-            obs_style = ParagraphStyle(
-                'PortServiceInvoiceObs', parent=styles['Normal'], fontSize=9, fontName='Helvetica',
-                textColor=colors.black
-            )
-            elements.append(Paragraph(f"<b>Observações:</b> {batch['observations']}", obs_style))
+            elements.append(_pdf_note_box("Observações", batch['observations'], doc.width))
     else:
-        empty_style = ParagraphStyle(
-            'PortServiceInvoiceEmpty', parent=styles['Normal'], fontSize=10,
-            textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceBefore=20
-        )
-        elements.append(Paragraph("Nenhum serviço nesta fatura.", empty_style))
+        elements.append(_pdf_empty_state("Nenhum serviço nesta fatura.", doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -3202,230 +3021,108 @@ def generate_port_service_invoice_pdf(batch: dict, services: list, company: dict
 
 def generate_invoice_pdf(invoice: dict, movements: list, company: dict = None) -> bytes:
     """
-    Generate PDF for a specific invoice following Bsoft layout style.
-    Format: Landscape with header, client info, movements table, and total.
+    Fatura (movimentações) no padrão visual dos documentos: cabeçalho, quadro
+    com os dados do cliente, tabela das movimentações, quadro de totais,
+    observações e dados bancários pra pagamento.
     """
     buffer = io.BytesIO()
-    
+
     doc = SimpleDocTemplate(
-        buffer, 
-        pagesize=landscape(A4), 
-        rightMargin=10*mm, 
-        leftMargin=10*mm, 
-        topMargin=10*mm, 
+        buffer,
+        pagesize=landscape(A4),
+        rightMargin=10*mm,
+        leftMargin=10*mm,
+        topMargin=12*mm,
         bottomMargin=15*mm
     )
-    
+
     c = merge_company(company)
     elements = []
     styles = getSampleStyleSheet()
 
-    # ========== HEADER SECTION ==========
+    # ========== CABEÇALHO ==========
     logo_buffer = download_logo(company)
-    report_title = f"FATURA Nº {invoice.get('invoice_number', '-')}"
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
-    
-    # ========== CLIENT INFO BAR ==========
+    report_title = f"Fatura Nº {invoice.get('invoice_number', '-')}"
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
+
+    # ========== DADOS DO CLIENTE ==========
     total_value = sum(m.get('service_value', 0) or 0 for m in movements)
-    total_str = f"R$ {total_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    total_str = format_currency(total_value, 'BRL')
 
     # Movimentações com Valor da Operação zerado/vazio não aparecem na fatura
     # impressa - não somam nada ao total, então ocultá-las não afeta o valor.
     visible_movements = [m for m in movements if (m.get('service_value') or 0) != 0]
 
-    client_info_text = f"Cliente: {invoice.get('client_name', '-')}  |  CNPJ: {invoice.get('client_cnpj', '-') or '-'}  |  Movimentações: {len(visible_movements)}  |  Valor Total: {total_str}"
-    
-    client_style = ParagraphStyle(
-        'ClientInfo',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
-    )
-    
-    client_data = [[Paragraph(client_info_text, client_style)]]
-    client_table = Table(client_data, colWidths=[doc.width])
-    client_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(client_table)
+    issued = to_brt(invoice.get('created_at'))
+    elements.append(_pdf_info_grid([
+        ("Cliente", invoice.get('client_name', '-'), 2),
+        ("CNPJ", invoice.get('client_cnpj', '-') or '-'),
+        ("Data de emissão", issued.strftime('%d/%m/%Y') if issued else '-'),
+    ], doc.width, cols=4))
+    elements.append(Spacer(1, 10))
 
-    # ========== GENERATION INFO ==========
-    # Mesmo padrão do Relatório de Movimentações (_build_pdf_header + linha
-    # "Gerado em") pra manter os dois PDFs com layout consistente.
-    gen_info_style = ParagraphStyle(
-        'InvoiceGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER,
-        spaceBefore=8, spaceAfter=10
-    )
-    gen_date = now_brt().strftime('%d/%m/%Y %H:%M')
-    elements.append(Paragraph(f"Gerado em: {gen_date}", gen_info_style))
+    # ========== MOVIMENTAÇÕES ==========
+    # Células em Paragraph pra quebrar linha dentro da própria célula em vez
+    # de vazar pra vizinha (Cliente, Transportadora).
+    cell = _pdf_cell_factory(styles)
 
-    # ========== MOVEMENTS TABLE ==========
-    # Células de texto usam Paragraph (não string pura) pra quebrar linha
-    # dentro da própria célula em vez de vazar visualmente pra célula vizinha
-    # quando o conteúdo é mais largo que a coluna (Cliente, Transportadora) -
-    # mesma técnica usada no Relatório de Movimentações.
-    cell_style_l = ParagraphStyle('InvoiceCellL', parent=styles['Normal'], fontSize=7, leading=8.5, alignment=TA_LEFT)
-    cell_style_c = ParagraphStyle('InvoiceCellC', parent=cell_style_l, alignment=TA_CENTER)
-    cell_style_r = ParagraphStyle('InvoiceCellR', parent=cell_style_l, alignment=TA_RIGHT)
-
-    def cell(text, align='left'):
-        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
-        return Paragraph(str(text) if text not in (None, '') else '-', style)
-
-    table_data = [[
+    table_data = [_pdf_header_cells([
         'ID', 'Data/Hora', 'Tipo', 'Nº Container', 'Cliente', 'Placa',
         'Transportadora', 'Armador', 'Status', 'Tamanho',
         'Tipo de Serviço', 'Nota Fiscal', 'Valor da Operação'
-    ]]
+    ])]
 
     for m in visible_movements:
         _m_dt = to_brt(m.get('created_at'))
         mov_date = _m_dt.strftime('%d/%m/%Y %H:%M') if _m_dt else '-'
-
         service_value = m.get('service_value')
-        value_str = f"R$ {service_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.') if service_value else '-'
+        value_str = format_currency(service_value, 'BRL') if service_value else '-'
+        is_entry = m.get('operation_type') == 'ENTRADA'
 
         table_data.append([
-            cell(m.get('transaction_id', '-'), align='center'),
+            cell(m.get('transaction_id', '-'), 'center'),
             cell(mov_date),
-            cell("ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA", align='center'),
+            cell(None, 'center', markup=_pdf_tone_markup('ENTRADA' if is_entry else 'SAÍDA', 'primary' if is_entry else 'amber')),
             cell(m.get('container_number', '-')),
             cell(m.get('client_name', '-') or '-'),
             cell(m.get('truck_plate', '-') or '-'),
             cell(m.get('transport_company', '-') or '-'),
             cell(m.get('shipping_line', '-') or '-'),
-            cell(m.get('status', '-') or '-', align='center'),
-            cell(m.get('size_type', '-') or '-', align='center'),
+            cell(m.get('status', '-') or '-', 'center'),
+            cell(m.get('size_type', '-') or '-', 'center'),
             cell(m.get('service_type', '-') or '-'),
             cell(m.get('invoice_number', '-') or '-'),
-            cell(value_str, align='right')
+            cell(value_str, 'right'),
         ])
 
-    # Total row (não usa Paragraph - fica em negrito/tamanho maior, fora do
-    # padrão de célula normal)
-    table_data.append(['', '', '', '', '', '', '', '', '', '', '', 'TOTAL:', total_str])
-
-    # Larguras redistribuídas pra usar a área útil real da página (doc.width),
-    # mesma estratégia do Relatório de Movimentações.
-    col_widths = [28, 60, 40, 62, 100, 50, 90, 60, 40, 38, 80, 52, 65]
-
+    col_widths = [28, 68, 46, 62, 104, 50, 84, 60, 38, 42, 80, 52, 71]
     table = Table(table_data, colWidths=col_widths, repeatRows=1)
-
-    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
-    border_gray = colors.HexColor('#CCCCCC')
-    zebra_gray = colors.HexColor('#F8F8F8')
-
-    table.setStyle(TableStyle([
-        # Header styling - mesmo teal + texto branco usado nos demais relatórios
-        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 7),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
-        ('TOPPADDING', (0, 0), (-1, 0), 5),
-
-        # Body styling - alinhamento e fonte já vêm do Paragraph de cada célula
-        ('TOPPADDING', (0, 1), (-1, -2), 3),
-        ('BOTTOMPADDING', (0, 1), (-1, -2), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 3),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-
-        # Bordas finas cinza, mesmo peso usado nos demais relatórios
-        ('GRID', (0, 0), (-1, -2), 0.5, border_gray),
-        ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        # Zebra striping
-        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, zebra_gray]),
-
-        # Total row
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('FONTNAME', (11, -1), (12, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (11, -1), (12, -1), 9),
-        ('ALIGN', (11, -1), (11, -1), 'RIGHT'),
-        ('ALIGN', (12, -1), (12, -1), 'RIGHT'),
-        ('TOPPADDING', (0, -1), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
-        ('BOX', (11, -1), (12, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-
+    table.setStyle(TableStyle(_pdf_table_style()))
     elements.append(table)
-    
-    # ========== NOTES SECTION ==========
+    elements.append(Spacer(1, 8))
+    elements.append(_pdf_totals_box([
+        ("Movimentações", _fmt_int(len(visible_movements))),
+        ("Valor total", total_str),
+    ], doc.width))
+
+    # ========== OBSERVAÇÕES ==========
     if invoice.get('notes'):
         elements.append(Spacer(1, 10))
-        section_style = ParagraphStyle(
-            'SectionTitle',
-            parent=styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-            fontName='Helvetica-Bold',
-            spaceAfter=5
-        )
-        elements.append(Paragraph("OBSERVAÇÕES:", section_style))
-        notes_style = ParagraphStyle(
-            'NotesStyle',
-            parent=styles['Normal'],
-            fontSize=8,
-            textColor=colors.black,
-        )
-        notes_data = [[Paragraph(invoice.get('notes', ''), notes_style)]]
-        notes_table = Table(notes_data, colWidths=[760])
-        notes_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FFF9E6')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#FFD700')),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(notes_table)
+        elements.append(_pdf_note_box("Observações", invoice.get('notes', ''), doc.width))
 
     # ========== DADOS BANCÁRIOS ==========
     # A versão Excel desta mesma fatura já traz os dados de pagamento — o PDF
     # (o formato que de fato vai pro cliente) precisa da mesma informação.
-    elements.append(Spacer(1, 12))
-    bank_title_style = ParagraphStyle(
-        'BankTitle',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        fontName='Helvetica-Bold',
-        spaceAfter=4
-    )
-    elements.append(Paragraph("DADOS BANCÁRIOS PARA PAGAMENTO", bank_title_style))
+    elements.extend(_pdf_section_title("Dados bancários para pagamento", doc.width))
+    elements.append(_pdf_info_grid([
+        ("Banco", c['bank_name']),
+        ("Agência", c['bank_agency']),
+        ("Conta corrente", c['bank_account']),
+        ("Chave PIX", c['pix_key']),
+        ("Beneficiário", c['name'], 2),
+        ("CNPJ", c['cnpj'], 2),
+    ], doc.width, cols=4))
 
-    bank_rows = [
-        ['Banco:', c['bank_name'], 'Agência:', c['bank_agency'], 'Conta Corrente:', c['bank_account']],
-        ['CNPJ:', c['cnpj'], 'Beneficiário:', c['name'], 'Chave PIX:', c['pix_key']],
-    ]
-    bank_table = Table(bank_rows, colWidths=[55, 165, 65, 130, 75, 205])
-    bank_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-    ]))
-    # Colunas de valor (1, 3, 5) ficam com peso normal, só os rótulos são negrito
-    bank_table.setStyle(TableStyle([('FONTNAME', (c, 0), (c, -1), 'Helvetica') for c in (1, 3, 5)]))
-    elements.append(bank_table)
-
-    # Build with footer
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     pdf_bytes = buffer.getvalue()
@@ -3579,63 +3276,43 @@ FREIGHT_PAYMENT_STATUS_LABELS = {"PENDENTE": "Pendente", "PAGO": "Pago", "CANCEL
 def generate_freight_payment_report_pdf(driver_info: dict, payments: list, period: dict, company: dict = None) -> bytes:
     """Gera a 'Prestação de Contas' de Pagamento Frete de um motorista: lista
     itemizada de cada Ordem de Carregamento aprovada numa Rota cadastrada,
-    com status de pagamento e totais - layout espelha o Relatório de
-    Movimentações (paisagem, cabeçalho + linha de estatísticas + tabela teal
-    com zebra striping), incluindo Nº do Container/Tamanho/Placas lidos da
-    Ordem de Carregamento de origem. Quando a ordem levou mais de um
+    com status de pagamento e totais, incluindo Nº do Container/Tamanho/Placas
+    lidos da Ordem de Carregamento de origem. Quando a ordem levou mais de um
     container na mesma viagem, os valores de Nº do Container/Tamanho ficam
     empilhados (um abaixo do outro) dentro da mesma linha/célula."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=landscape(A4),
-        rightMargin=10 * mm, leftMargin=10 * mm, topMargin=15 * mm, bottomMargin=15 * mm
+        rightMargin=10 * mm, leftMargin=10 * mm, topMargin=12 * mm, bottomMargin=15 * mm
     )
     c = merge_company(company)
     elements = []
     styles = getSampleStyleSheet()
 
     logo_buffer = download_logo(company)
-    report_title = "PRESTAÇÃO DE CONTAS - PAGAMENTO FRETE"
+    report_title = "Prestação de Contas — Pagamento Frete"
     elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
     period_str = f"{period.get('date_from') or '-'} a {period.get('date_to') or '-'}"
-    stats_text = (
-        f"Motorista: {driver_info.get('name', '-')}  |  CPF: {driver_info.get('cpf', '-') or '-'}  |  "
-        f"Período: {period_str}  |  Lançamentos: {len(payments)}"
-    )
-    stats_style = ParagraphStyle(
-        'FPStatsLine', parent=styles['Normal'], fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER,
-        fontName='Helvetica-Bold', spaceBefore=6, spaceAfter=8
-    )
-    elements.append(Paragraph(stats_text, stats_style))
+    elements.append(_pdf_info_grid([
+        ("Motorista", driver_info.get('name', '-'), 2),
+        ("CPF", driver_info.get('cpf', '-') or '-'),
+        ("Período", period_str),
+    ], doc.width, cols=4))
+    elements.append(Spacer(1, 10))
 
-    gen_info_style = ParagraphStyle(
-        'FPGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
-
-    cell_style_l = ParagraphStyle('FPCellL', parent=styles['Normal'], fontSize=8, leading=9.5, alignment=TA_LEFT)
-    cell_style_c = ParagraphStyle('FPCellC', parent=cell_style_l, alignment=TA_CENTER)
-    cell_style_r = ParagraphStyle('FPCellR', parent=cell_style_l, alignment=TA_RIGHT)
-
-    def cell(text, align='left'):
-        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
-        return Paragraph(str(text) if text not in (None, '') else '-', style)
+    cell = _pdf_cell_factory(styles, font_size=8)
 
     def multiline_cell(values, align='left'):
         values = [xml_escape(str(v)) if v not in (None, '') else '-' for v in values] or ['-']
-        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
-        return Paragraph('<br/>'.join(values), style)
+        return cell(None, align, markup='<br/>'.join(values))
 
-    def money(v):
-        return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+    status_tones = {'PAGO': 'emerald', 'PENDENTE': 'amber', 'CANCELADO': 'red'}
 
-    table_data = [[
+    table_data = [_pdf_header_cells([
         'Ordem Nº', 'Nº Pgto', 'Rota', 'Data Aprovação', 'Nº do Container',
         'Tamanho', 'Placa Cavalo', 'Placa Carreta', 'Valor do Frete', 'Status', 'Data Pagamento'
-    ]]
+    ], font_size=8)]
 
     total_pago = 0.0
     total_pendente = 0.0
@@ -3649,78 +3326,39 @@ def generate_freight_payment_report_pdf(driver_info: dict, payments: list, perio
         created = to_brt(p.get('created_at'))
         paid = to_brt(p.get('paid_at')) if p.get('paid_at') else None
         items = p.get('container_items') or []
-        container_numbers = [it.get('container_number') for it in items]
-        sizes = [it.get('size_type') for it in items]
 
         table_data.append([
-            cell(p.get('order_number'), align='center'),
-            cell(p.get('payment_number'), align='center'),
-            cell(p.get('route_name'), align='left'),
-            cell(created.strftime('%d/%m/%Y %H:%M') if created else '-', align='left'),
-            multiline_cell(container_numbers, align='left'),
-            multiline_cell(sizes, align='center'),
-            cell(p.get('truck_plate'), align='left'),
-            cell(p.get('trailer_plate'), align='left'),
-            cell(money(value), align='right'),
-            cell(FREIGHT_PAYMENT_STATUS_LABELS.get(status_p, status_p), align='center'),
-            cell(paid.strftime('%d/%m/%Y %H:%M') if paid else '-', align='left'),
+            cell(p.get('order_number'), 'center', bold=True),
+            cell(p.get('payment_number'), 'center'),
+            cell(p.get('route_name')),
+            cell(created.strftime('%d/%m/%Y %H:%M') if created else '-'),
+            multiline_cell([it.get('container_number') for it in items]),
+            multiline_cell([it.get('size_type') for it in items], 'center'),
+            cell(p.get('truck_plate')),
+            cell(p.get('trailer_plate')),
+            cell(format_currency(value, 'BRL'), 'right'),
+            cell(None, 'center', markup=_pdf_tone_markup(FREIGHT_PAYMENT_STATUS_LABELS.get(status_p, status_p), status_tones.get(status_p, 'slate'))),
+            cell(paid.strftime('%d/%m/%Y %H:%M') if paid else '-'),
         ])
-
-    total_geral = total_pago + total_pendente
-    # Rótulo e valor ficam em células mescladas (SPAN) em vez de espremidos
-    # numa única coluna estreita (Placa Carreta) - "TOTAL PENDENTE:" sozinho
-    # já não cabia em ~60pt e vazava pra fora da caixa.
-    table_data.append(['', '', '', '', '', '', 'TOTAL PAGO:', '', money(total_pago), '', ''])
-    table_data.append(['', '', '', '', '', '', 'TOTAL PENDENTE:', '', money(total_pendente), '', ''])
-    table_data.append(['', '', '', '', '', '', 'TOTAL GERAL:', '', money(total_geral), '', ''])
 
     base_widths = [45, 45, 120, 65, 85, 50, 60, 60, 70, 55, 65]
     scale = doc.width / sum(base_widths)
     col_widths = [w * scale for w in base_widths]
 
-    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    if payments:
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style()))
+        elements.append(table)
+    else:
+        elements.append(_pdf_empty_state("Nenhum lançamento no período.", doc.width))
 
-    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
-    border_gray = colors.HexColor('#CCCCCC')
-    zebra_gray = colors.HexColor('#F8F8F8')
-    n_data_rows = len(payments)
-    totals_start = 1 + n_data_rows
-
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
-        ('TOPPADDING', (0, 0), (-1, 0), 5),
-
-        ('TOPPADDING', (0, 1), (-1, totals_start - 1), 3),
-        ('BOTTOMPADDING', (0, 1), (-1, totals_start - 1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-
-        ('GRID', (0, 0), (-1, totals_start - 1), 0.5, border_gray),
-        ('BOX', (0, 0), (-1, totals_start - 1), 1, header_bg),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, totals_start - 1), [colors.white, zebra_gray]),
-
-        ('FONTNAME', (6, totals_start), (8, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (6, totals_start), (8, -1), 9),
-        ('ALIGN', (6, totals_start), (6, -1), 'RIGHT'),
-        ('ALIGN', (8, totals_start), (8, -1), 'RIGHT'),
-        ('TOPPADDING', (0, totals_start), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, totals_start), (-1, -1), 4),
-        ('BACKGROUND', (6, -1), (9, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('BOX', (6, totals_start), (9, -1), 1, header_bg),
-        ('SPAN', (6, totals_start), (7, totals_start)),
-        ('SPAN', (6, totals_start + 1), (7, totals_start + 1)),
-        ('SPAN', (6, totals_start + 2), (7, totals_start + 2)),
-        ('SPAN', (8, totals_start), (9, totals_start)),
-        ('SPAN', (8, totals_start + 1), (9, totals_start + 1)),
-        ('SPAN', (8, totals_start + 2), (9, totals_start + 2)),
-    ]))
-    elements.append(table)
+    elements.append(Spacer(1, 8))
+    elements.append(_pdf_totals_box([
+        ("Lançamentos", _fmt_int(len(payments))),
+        ("Total pago", format_currency(total_pago, 'BRL')),
+        ("Total pendente", format_currency(total_pendente, 'BRL')),
+        ("Total geral", format_currency(total_pago + total_pendente, 'BRL')),
+    ], doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -3847,138 +3485,72 @@ def generate_freight_payment_receipt_pdf(batch: dict, payments: list, company: d
     """Gera o Recibo de Pagamento de uma Ordem de Pagamento (FreightPaymentBatch):
     documento enxuto de comprovação (não a Prestação de Contas detalhada em
     generate_freight_payment_report_pdf), com declaração de quitação e linhas
-    de assinatura do motorista/responsável, no mesmo padrão de assinatura já
-    usado em generate_petrobras_lvt_pdf."""
+    de assinatura do motorista/responsável."""
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
-        rightMargin=15 * mm, leftMargin=15 * mm, topMargin=15 * mm, bottomMargin=15 * mm
+        rightMargin=15 * mm, leftMargin=15 * mm, topMargin=12 * mm, bottomMargin=15 * mm
     )
     c = merge_company(company)
     elements = []
     styles = getSampleStyleSheet()
 
     logo_buffer = download_logo(company)
-    report_title = "RECIBO DE PAGAMENTO - FRETE"
+    report_title = "Recibo de Pagamento — Frete"
     elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
     paid_at = to_brt(batch.get('created_at'))
     paid_at_str = paid_at.strftime('%d/%m/%Y %H:%M') if paid_at else '-'
+    elements.append(_pdf_info_grid([
+        ("Ordem de pagamento", f"Nº {batch.get('batch_number')}"),
+        ("Data do pagamento", paid_at_str),
+        ("Lançamentos", _fmt_int(batch.get('item_count') or len(payments))),
+        ("Motorista", batch.get('driver_name') or '-', 2),
+        ("CPF", batch.get('driver_cpf') or '-'),
+    ], doc.width, cols=3))
+    elements.append(Spacer(1, 10))
 
-    info_text = (
-        f"Ordem de Pagamento Nº {batch.get('batch_number')}  |  Motorista: {batch.get('driver_name') or '-'}  |  "
-        f"CPF: {batch.get('driver_cpf') or '-'}  |  Data do Pagamento: {paid_at_str}"
-    )
-    info_style = ParagraphStyle(
-        'ReceiptInfo', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold',
-        spaceBefore=6, spaceAfter=10
-    )
-    elements.append(Paragraph(info_text, info_style))
+    cell = _pdf_cell_factory(styles, font_size=8.5)
+    total_str = format_currency(batch.get('total_value') or 0, 'BRL')
 
-    cell_style_l = ParagraphStyle('ReceiptCellL', parent=styles['Normal'], fontSize=9, leading=10.5, alignment=TA_LEFT)
-    cell_style_c = ParagraphStyle('ReceiptCellC', parent=cell_style_l, alignment=TA_CENTER)
-    cell_style_r = ParagraphStyle('ReceiptCellR', parent=cell_style_l, alignment=TA_RIGHT)
-
-    def cell(text, align='left'):
-        style = cell_style_c if align == 'center' else cell_style_r if align == 'right' else cell_style_l
-        return Paragraph(str(text) if text not in (None, '') else '-', style)
-
-    def money(v):
-        return f"R$ {v:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-
-    table_data = [['Ordem Nº', 'Rota', 'Data Aprovação', 'Valor do Frete']]
+    table_data = [_pdf_header_cells(['Ordem Nº', 'Rota', 'Data Aprovação', 'Valor do Frete'], font_size=8.5)]
     for p in payments:
         approved = to_brt(p.get('created_at'))
         table_data.append([
-            cell(p.get('order_number'), align='center'),
-            cell(p.get('route_name'), align='left'),
-            cell(approved.strftime('%d/%m/%Y') if approved else '-', align='left'),
-            cell(money(p.get('freight_value') or 0), align='right'),
+            cell(p.get('order_number'), 'center', bold=True),
+            cell(p.get('route_name')),
+            cell(approved.strftime('%d/%m/%Y') if approved else '-', 'center'),
+            cell(format_currency(p.get('freight_value') or 0, 'BRL'), 'right'),
         ])
-    table_data.append(['', '', 'VALOR TOTAL:', money(batch.get('total_value') or 0)])
 
     base_widths = [70, 220, 100, 100]
     scale = doc.width / sum(base_widths)
     col_widths = [w * scale for w in base_widths]
-
     table = Table(table_data, colWidths=col_widths, repeatRows=1)
-    header_bg = colors.HexColor(f'#{PRIMARY_COLOR}')
-    border_gray = colors.HexColor('#CCCCCC')
-    zebra_gray = colors.HexColor('#F8F8F8')
-    n_data_rows = len(payments)
-
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), header_bg),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 5),
-        ('TOPPADDING', (0, 0), (-1, 0), 5),
-
-        ('TOPPADDING', (0, 1), (-1, n_data_rows), 4),
-        ('BOTTOMPADDING', (0, 1), (-1, n_data_rows), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-
-        ('GRID', (0, 0), (-1, n_data_rows), 0.5, border_gray),
-        ('BOX', (0, 0), (-1, n_data_rows), 1, header_bg),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, n_data_rows), [colors.white, zebra_gray]),
-
-        ('FONTNAME', (2, -1), (3, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (2, -1), (3, -1), 10),
-        ('ALIGN', (2, -1), (3, -1), 'RIGHT'),
-        ('TOPPADDING', (0, -1), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, -1), (-1, -1), 6),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('BOX', (2, -1), (3, -1), 1, header_bg),
-    ]))
+    table.setStyle(TableStyle(_pdf_table_style() + [('FONTSIZE', (0, 0), (-1, -1), 8.5)]))
     elements.append(table)
+    elements.append(Spacer(1, 8))
+    elements.append(_pdf_totals_box([("Valor total", total_str)], doc.width))
     elements.append(Spacer(1, 16))
 
     declaration_style = ParagraphStyle(
-        'ReceiptDeclaration', parent=styles['Normal'], fontSize=10, alignment=TA_LEFT, leading=14
+        'ReceiptDeclaration', parent=styles['Normal'], fontSize=10, alignment=TA_LEFT, leading=15,
+        textColor=_hex(BRAND_TEXT),
     )
-    total_str = money(batch.get('total_value') or 0)
     item_word = 'lançamento' if (batch.get('item_count') or 0) == 1 else 'lançamentos'
     declaration = (
-        f"Eu, <b>{batch.get('driver_name') or '-'}</b>, portador do CPF <b>{batch.get('driver_cpf') or '-'}</b>, "
-        f"declaro ter recebido de <b>{c['name']}</b> a quantia de <b>{total_str}</b>, referente aos "
+        f"Eu, <b>{xml_escape(batch.get('driver_name') or '-')}</b>, portador do CPF <b>{xml_escape(batch.get('driver_cpf') or '-')}</b>, "
+        f"declaro ter recebido de <b>{xml_escape(c['name'])}</b> a quantia de <b>{total_str}</b>, referente aos "
         f"{batch.get('item_count') or 0} {item_word} de frete discriminados acima, dando plena quitação "
         f"do valor recebido."
     )
     elements.append(Paragraph(declaration, declaration_style))
-    elements.append(Spacer(1, 28))
+    elements.append(Spacer(1, 16))
 
-    sig_title_style = ParagraphStyle('ReceiptSigTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', alignment=TA_CENTER)
-    sig_info_style = ParagraphStyle('ReceiptSigInfo', parent=styles['Normal'], fontSize=8)
-    sig_data = [[
-        [
-            Paragraph('Assinatura do Motorista', sig_title_style),
-            Spacer(1, 24),
-            HRFlowable(width='100%', thickness=0.8, color=colors.black),
-            Paragraph(f"Nome: {batch.get('driver_name') or '-'}", sig_info_style),
-            Paragraph(f"CPF: {batch.get('driver_cpf') or '-'}", sig_info_style),
-        ],
-        [
-            Paragraph('Assinatura do Responsável', sig_title_style),
-            Spacer(1, 24),
-            HRFlowable(width='100%', thickness=0.8, color=colors.black),
-            Paragraph(f"Nome: {batch.get('created_by_name') or '-'}", sig_info_style),
-            Paragraph(f"Data: {now_brt().strftime('%d/%m/%Y')}", sig_info_style),
-        ],
-    ]]
-    sig_tbl = Table(sig_data, colWidths=[doc.width / 2] * 2)
-    sig_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 15),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 15),
-    ]))
-    elements.append(sig_tbl)
+    elements.append(_pdf_signatures([
+        ("Assinatura do Motorista", f"{batch.get('driver_name') or '-'}  ·  CPF {batch.get('driver_cpf') or '-'}"),
+        ("Assinatura do Responsável", f"{batch.get('created_by_name') or '-'}  ·  {now_brt().strftime('%d/%m/%Y')}"),
+    ], doc.width, space_above=40))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -3987,214 +3559,17 @@ def generate_freight_payment_receipt_pdf(batch: dict, payments: list, company: d
     return pdf_bytes
 
 
-def generate_intl_invoice_pdf(invoice: dict, company: dict = None) -> bytes:
-    """
-    Generate International Invoice PDF.
-    Same style as movement reports but for international invoices.
-    """
-    c = merge_company(company)
-    buffer = io.BytesIO()
-    
-    doc = SimpleDocTemplate(
-        buffer, 
-        pagesize=A4, 
-        rightMargin=15*mm, 
-        leftMargin=15*mm, 
-        topMargin=15*mm, 
-        bottomMargin=20*mm
-    )
-    
-    elements = []
-    styles = getSampleStyleSheet()
-
-    currency = invoice.get('currency', 'USD')
-
-    # ========== HEADER SECTION ==========
-    logo_buffer = download_logo(company)
-    report_title = f"INVOICE Nº {invoice.get('invoice_number', '-')}"
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
-
-    # ========== INVOICE INFO BAR ==========
-    total_str = format_currency(invoice.get('total', 0), currency)
-    info_text = f"Moeda: {invoice.get('currency', '-')}  |  Emissão: {invoice.get('issue_date', '-')}  |  Vencimento: {invoice.get('due_date', '-')}  |  Total: {total_str}"
-    
-    info_bar_style = ParagraphStyle(
-        'InfoBar',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        alignment=TA_CENTER,
-        fontName='Helvetica-Bold'
-    )
-    
-    info_bar_data = [[Paragraph(info_text, info_bar_style)]]
-    info_bar_table = Table(info_bar_data, colWidths=[510])
-    info_bar_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(info_bar_table)
-    elements.append(Spacer(1, 15))
-    
-    # ========== PAYER INFO (Apenas Pagador) ==========
-    section_title_style = ParagraphStyle(
-        'SectionTitle',
-        parent=styles['Heading2'],
-        fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'),
-        fontName='Helvetica-Bold',
-        spaceBefore=5,
-        spaceAfter=5
-    )
-    
-    info_style = ParagraphStyle(
-        'InfoText',
-        parent=styles['Normal'],
-        fontSize=9,
-        leading=12,
-        textColor=colors.black
-    )
-    
-    payer_text = f"""
-    <b>{invoice.get('payer_company', '-')}</b><br/>
-    CNPJ: {invoice.get('payer_cnpj', '-') or '-'}<br/>
-    Contato: {invoice.get('payer_contact', '-') or '-'}<br/>
-    E-mail: {invoice.get('payer_email', '-') or '-'}<br/>
-    {invoice.get('payer_address', '-')}
-    """
-    
-    parties_data = [
-        [Paragraph("PAGADOR / PAYER", section_title_style)],
-        [Paragraph(payer_text, info_style)]
-    ]
-    
-    parties_table = Table(parties_data, colWidths=[510])
-    parties_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-    ]))
-    elements.append(parties_table)
-    elements.append(Spacer(1, 15))
-    
-    # ========== ITEMS TABLE ==========
-    elements.append(Paragraph("SERVIÇOS / SERVICES", section_title_style))
-    elements.append(Spacer(1, 5))
-    
-    items_header = ['Descrição / Description', 'Qtd', 'Valor Unitário', 'Total']
-    items_data = [items_header]
-
-    item_desc_style = ParagraphStyle('ItemDesc', parent=styles['Normal'], fontSize=9, leading=12)
-
-    for item in invoice.get('items', []):
-        items_data.append([
-            Paragraph(item.get('description', '-') or '-', item_desc_style),
-            str(item.get('quantity', 1)),
-            format_currency(item.get('unit_price', 0), currency),
-            format_currency(item.get('total', 0), currency)
-        ])
-    
-    # Total row
-    items_data.append(['', '', 'TOTAL:', total_str])
-    
-    col_widths = [260, 50, 100, 100]
-    
-    items_table = Table(items_data, colWidths=col_widths, repeatRows=1)
-    items_table.setStyle(TableStyle([
-        # Header
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-        ('TOPPADDING', (0, 0), (-1, 0), 6),
-        
-        # Body
-        ('BACKGROUND', (0, 1), (-1, -2), colors.white),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('TOPPADDING', (0, 1), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        
-        # Alignments
-        ('ALIGN', (0, 1), (0, -1), 'LEFT'),    # Description
-        ('ALIGN', (1, 1), (1, -1), 'CENTER'),  # Qty
-        ('ALIGN', (2, 1), (2, -1), 'RIGHT'),   # Unit price
-        ('ALIGN', (3, 1), (3, -1), 'RIGHT'),   # Total
-        
-        # Borders
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-        
-        # Total row
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('FONTNAME', (2, -1), (3, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (2, -1), (3, -1), 11),
-        ('ALIGN', (2, -1), (2, -1), 'RIGHT'),
-        ('ALIGN', (3, -1), (3, -1), 'RIGHT'),
-        ('TOPPADDING', (0, -1), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, -1), (-1, -1), 8),
-        ('BOX', (2, -1), (3, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    
-    elements.append(items_table)
-    
-    # ========== NOTES SECTION ==========
-    if invoice.get('notes'):
-        elements.append(Spacer(1, 15))
-        elements.append(Paragraph("OBSERVAÇÕES / NOTES", section_title_style))
-        elements.append(Spacer(1, 5))
-        
-        notes_style = ParagraphStyle(
-            'Notes',
-            parent=styles['Normal'],
-            fontSize=9,
-            leading=12,
-            textColor=colors.HexColor('#333333'),
-            borderColor=colors.HexColor('#CCCCCC'),
-            borderWidth=1,
-            borderPadding=8
-        )
-        
-        notes_data = [[Paragraph(invoice['notes'], notes_style)]]
-        notes_table = Table(notes_data, colWidths=[510])
-        notes_table.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CCCCCC')),
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FAFAFA')),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(notes_table)
-    
-    # ========== BARCODE SECTION ==========
-    elements.append(Spacer(1, 25))
-    
-    # Generate barcode for invoice number
+def _pdf_barcode_block(code, issued_by, content_width, barcode_width=130, print_datetime=False):
+    """Código de barras (Code128) do número do documento + "Emitido por" e
+    data de impressão ao lado - bloco de controle usado nos documentos que
+    são conferidos fisicamente (invoice, prestação de contas)."""
     import barcode
     from barcode.writer import ImageWriter
-    
+
     barcode_buffer = io.BytesIO()
     try:
-        invoice_num_str = str(invoice.get('invoice_number', '0')).zfill(3)
         code128 = barcode.get_barcode_class('code128')
-        barcode_obj = code128(invoice_num_str, writer=ImageWriter())
+        barcode_obj = code128(str(code), writer=ImageWriter())
         barcode_obj.write(barcode_buffer, options={
             'module_width': 0.3,
             'module_height': 12,
@@ -4203,55 +3578,110 @@ def generate_intl_invoice_pdf(invoice: dict, company: dict = None) -> bytes:
             'quiet_zone': 2
         })
         barcode_buffer.seek(0)
-        barcode_image = Image(barcode_buffer, width=120, height=50)
+        barcode_image = Image(barcode_buffer, width=barcode_width, height=50)
     except Exception as e:
         logger.error(f"Error generating barcode: {e}")
-        barcode_image = Paragraph(f"[{invoice.get('invoice_number', '-')}]", styles['Normal'])
-    
-    # User and timestamp info
-    created_by = invoice.get('created_by_name', 'Sistema')
-    print_date = now_brt().strftime('%d/%m/%Y')
-    
-    user_info_style = ParagraphStyle(
-        'UserInfo',
-        parent=styles['Normal'],
-        fontSize=10,
-        textColor=colors.black,
-        fontName='Helvetica-Bold',
-        leading=14
-    )
-    
-    user_info = [
-        Paragraph(f"Usuário: {created_by}", user_info_style),
-        Spacer(1, 8),
-        Paragraph(f"Data da impressão: {print_date}", user_info_style),
-    ]
-    
-    # Barcode section table: Barcode | User Info
-    barcode_section_data = [[barcode_image, user_info]]
-    barcode_section_table = Table(barcode_section_data, colWidths=[150, 360])
-    barcode_section_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
-        ('ALIGN', (1, 0), (1, 0), 'LEFT'),
-        ('LEFTPADDING', (1, 0), (1, 0), 20),
-    ]))
-    elements.append(barcode_section_table)
-    
-    # ========== FOOTER INFO ==========
-    elements.append(Spacer(1, 15))
-    
-    footer_style = ParagraphStyle(
-        'FooterInfo',
-        parent=styles['Normal'],
-        fontSize=8,
-        textColor=colors.HexColor('#666666'),
-        alignment=TA_CENTER
-    )
-    
-    elements.append(Paragraph(f"Documento gerado em {now_brt().strftime('%d/%m/%Y')} | ContainerLogix - {c['name']}", footer_style))
+        barcode_image = Paragraph(f"[{xml_escape(str(code))}]", ParagraphStyle('BarcodeFallback', fontSize=9))
 
-    # Build PDF
+    label = ParagraphStyle('BarcodeUserLabel', fontName='Helvetica', fontSize=7, leading=9, textColor=_hex(BRAND_MUTED))
+    value = ParagraphStyle('BarcodeUserValue', fontName='Helvetica-Bold', fontSize=9, leading=11, textColor=_hex(BRAND_DARK))
+    stamp = now_brt().strftime('%d/%m/%Y %H:%M' if print_datetime else '%d/%m/%Y')
+    user_info = [
+        Paragraph("EMITIDO POR", label),
+        Paragraph(xml_escape(str(issued_by or 'Sistema')), value),
+        Spacer(1, 5),
+        Paragraph("DATA DA IMPRESSÃO", label),
+        Paragraph(stamp, value),
+    ]
+    table = Table([[barcode_image, user_info]], colWidths=[barcode_width + 20, content_width - barcode_width - 20])
+    table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (0, 0), 0),
+        ('LEFTPADDING', (1, 0), (1, 0), 16),
+    ]))
+    return table
+
+
+def generate_intl_invoice_pdf(invoice: dict, company: dict = None) -> bytes:
+    """
+    Invoice internacional no padrão visual dos documentos: quadro com os dados
+    da invoice e do pagador, tabela de serviços, quadro de totais, observações
+    e código de barras do número da invoice.
+    """
+    c = merge_company(company)
+    buffer = io.BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=15*mm,
+        leftMargin=15*mm,
+        topMargin=12*mm,
+        bottomMargin=20*mm
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    currency = invoice.get('currency', 'USD')
+
+    # ========== CABEÇALHO ==========
+    logo_buffer = download_logo(company)
+    report_title = f"Invoice Nº {invoice.get('invoice_number', '-')}"
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
+
+    # ========== DADOS DA INVOICE ==========
+    total_str = format_currency(invoice.get('total', 0), currency)
+    elements.append(_pdf_info_grid([
+        ("Moeda / Currency", invoice.get('currency', '-')),
+        ("Emissão / Issue date", invoice.get('issue_date', '-')),
+        ("Vencimento / Due date", invoice.get('due_date', '-')),
+    ], doc.width, cols=3))
+
+    # ========== PAGADOR ==========
+    elements.extend(_pdf_section_title("Pagador / Payer", doc.width))
+    elements.append(_pdf_info_grid([
+        ("Empresa / Company", invoice.get('payer_company', '-'), 2),
+        ("CNPJ / Tax ID", invoice.get('payer_cnpj', '-') or '-'),
+        ("Contato / Contact", invoice.get('payer_contact', '-') or '-'),
+        ("E-mail", invoice.get('payer_email', '-') or '-', 2),
+        ("Endereço / Address", invoice.get('payer_address', '-') or '-', 3),
+    ], doc.width, cols=3))
+
+    # ========== SERVIÇOS ==========
+    elements.extend(_pdf_section_title("Serviços / Services", doc.width))
+    cell = _pdf_cell_factory(styles, font_size=9)
+    items_data = [_pdf_header_cells(['Descrição / Description', 'Qtd', 'Valor Unitário', 'Total'], font_size=8.5)]
+    for item in invoice.get('items', []):
+        items_data.append([
+            cell(item.get('description', '-') or '-'),
+            cell(item.get('quantity', 1), 'center'),
+            cell(format_currency(item.get('unit_price', 0), currency), 'right'),
+            cell(format_currency(item.get('total', 0), currency), 'right'),
+        ])
+
+    base_widths = [260, 50, 100, 100]
+    scale = doc.width / sum(base_widths)
+    items_table = Table(items_data, colWidths=[w * scale for w in base_widths], repeatRows=1)
+    items_table.setStyle(TableStyle(_pdf_table_style() + [
+        ('TOPPADDING', (0, 1), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 8))
+    elements.append(_pdf_totals_box([("Total", total_str)], doc.width, width=210))
+
+    # ========== OBSERVAÇÕES ==========
+    if invoice.get('notes'):
+        elements.append(Spacer(1, 12))
+        elements.append(_pdf_note_box("Observações / Notes", invoice['notes'], doc.width))
+
+    # ========== CÓDIGO DE BARRAS ==========
+    elements.append(Spacer(1, 22))
+    elements.append(_pdf_barcode_block(
+        str(invoice.get('invoice_number', '0')).zfill(3), invoice.get('created_by_name', 'Sistema'), doc.width, barcode_width=120,
+    ))
+
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
@@ -4271,7 +3701,7 @@ def generate_expense_report_pdf(report: dict, company: dict = None) -> bytes:
         pagesize=A4,
         rightMargin=15*mm,
         leftMargin=15*mm,
-        topMargin=15*mm,
+        topMargin=12*mm,
         bottomMargin=20*mm
     )
 
@@ -4281,195 +3711,86 @@ def generate_expense_report_pdf(report: dict, company: dict = None) -> bytes:
     def money(value):
         return format_currency(value)
 
-    # ========== HEADER SECTION ==========
+    # ========== CABEÇALHO ==========
     logo_buffer = download_logo(company)
-    report_title = f"PRESTAÇÃO DE CONTAS Nº {report.get('report_number_formatted', '-')}"
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    report_title = f"Prestação de Contas Nº {report.get('report_number_formatted', '-')}"
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
-    # ========== INFO BAR: período / responsável / status ==========
-    status_label = 'Concluída' if report.get('status') == 'CONCLUIDA' else 'Em Andamento'
-    info_text = (
-        f"Período: {fmt_date(report.get('period_start'))} a {fmt_date(report.get('period_end'))}"
-        f"  |  Responsável: {report.get('created_by_name', '-')}"
-        f"  |  Status: {status_label}"
+    # ========== DADOS: período / responsável / status ==========
+    is_done = report.get('status') == 'CONCLUIDA'
+    status_value = Paragraph(
+        _pdf_tone_markup('Concluída' if is_done else 'Em Andamento', 'emerald' if is_done else 'amber'),
+        ParagraphStyle('ExpenseStatus', fontName='Helvetica-Bold', fontSize=8.5, leading=10.5),
     )
-    info_style = ParagraphStyle(
-        'ExpenseInfoBar', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    info_data = [[Paragraph(info_text, info_style)]]
-    info_table = Table(info_data, colWidths=[510])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 15))
+    elements.append(_pdf_info_grid([
+        ("Período", f"{fmt_date(report.get('period_start'))} a {fmt_date(report.get('period_end'))}"),
+        ("Responsável", report.get('created_by_name', '-')),
+        ("Status", status_value),
+    ], doc.width, cols=3))
 
-    section_title_style = ParagraphStyle(
-        'ExpenseSectionTitle', parent=styles['Normal'], fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceAfter=5
-    )
-    # Texto livre (nomes, observações) precisa quebrar linha dentro da célula —
-    # string simples não quebra e pode vazar da coluna.
-    obs_style = ParagraphStyle('ExpenseObsCell', parent=styles['Normal'], fontSize=8, leading=10)
+    cell = _pdf_cell_factory(styles, font_size=8.5)
 
     # ========== DEPÓSITOS RECEBIDOS (antes dos lançamentos de compra) ==========
-    elements.append(Paragraph("DEPÓSITOS RECEBIDOS", section_title_style))
+    elements.extend(_pdf_section_title("Depósitos recebidos", doc.width))
     deposits = report.get('deposits', []) or []
-    deposits_data = [['Data', 'Enviado Por', 'Valor']]
+    deposits_data = [_pdf_header_cells(['Data', 'Enviado Por', 'Valor'], font_size=8.5)]
     for d in deposits:
-        deposits_data.append([fmt_date(d.get('date')), Paragraph(d.get('sent_by', '-') or '-', obs_style), money(d.get('amount'))])
-    deposits_data.append(['', 'TOTAL DEPÓSITOS:', money(report.get('total_deposits'))])
+        deposits_data.append([cell(fmt_date(d.get('date')), 'center'), cell(d.get('sent_by', '-') or '-'), cell(money(d.get('amount')), 'right')])
+    deposits_data.append(['', cell('TOTAL DEPÓSITOS', 'right', bold=True), cell(money(report.get('total_deposits')), 'right', bold=True)])
 
-    deposits_table = Table(deposits_data, colWidths=[100, 300, 110], repeatRows=1)
-    deposits_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (0, 1), (0, -1), 'CENTER'),
-        ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('FONTNAME', (1, -1), (2, -1), 'Helvetica-Bold'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
+    deposits_table = Table(deposits_data, colWidths=[doc.width * 0.2, doc.width * 0.58, doc.width * 0.22], repeatRows=1)
+    deposits_table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
     elements.append(deposits_table)
-    elements.append(Spacer(1, 15))
 
     # ========== LANÇAMENTOS DE COMPRAS ==========
-    elements.append(Paragraph("LANÇAMENTOS DE COMPRAS", section_title_style))
+    elements.extend(_pdf_section_title("Lançamentos de compras", doc.width))
     purchases = report.get('purchases', []) or []
     purchases = sorted(purchases, key=lambda p: p.get('purchase_date') or '')
-    purchases_data = [['Local de Compra', 'Data', 'Valor', 'Observação']]
+    purchases_data = [_pdf_header_cells(['Local de Compra', 'Data', 'Valor', 'Observação'], font_size=8.5)]
     for p in purchases:
         purchases_data.append([
-            Paragraph(p.get('supplier_name') or '-', obs_style),
-            fmt_date(p.get('purchase_date')),
-            money(p.get('amount')),
-            Paragraph(p.get('observation') or '-', obs_style)
+            cell(p.get('supplier_name') or '-'),
+            cell(fmt_date(p.get('purchase_date')), 'center'),
+            cell(money(p.get('amount')), 'right'),
+            cell(p.get('observation') or '-'),
         ])
-    purchases_data.append(['', 'TOTAL COMPRAS:', money(report.get('total_purchases')), ''])
+    purchases_data.append(['', cell('TOTAL COMPRAS', 'right', bold=True), cell(money(report.get('total_purchases')), 'right', bold=True), ''])
 
-    purchases_table = Table(purchases_data, colWidths=[160, 80, 90, 180], repeatRows=1)
-    purchases_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (1, 1), (1, -1), 'CENTER'),
-        ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('FONTNAME', (1, -1), (2, -1), 'Helvetica-Bold'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
+    purchases_table = Table(purchases_data, colWidths=[doc.width * 0.32, doc.width * 0.16, doc.width * 0.17, doc.width * 0.35], repeatRows=1)
+    purchases_table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
     elements.append(purchases_table)
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 12))
 
     # ========== TOTAIS / SALDO ==========
     balance = report.get('balance', 0) or 0
     if balance > 0:
-        balance_label = 'VALOR A RESSARCIR AO FUNCIONÁRIO'
-        balance_color = '#B45309'
+        balance_label = 'Valor a ressarcir ao funcionário'
     elif balance < 0:
-        balance_label = 'SALDO A DEVOLVER PELO FUNCIONÁRIO'
-        balance_color = '#B91C1C'
+        balance_label = 'Saldo a devolver pelo funcionário'
     else:
-        balance_label = 'QUITADO'
-        balance_color = f'#{PRIMARY_COLOR}'
+        balance_label = 'Quitado'
+    elements.append(_pdf_totals_box([
+        ('Total de compras', money(report.get('total_purchases'))),
+        ('Total de depósitos', money(report.get('total_deposits'))),
+        (balance_label, money(abs(balance))),
+    ], doc.width, width=280))
 
-    totals_data = [
-        ['Total de Compras:', money(report.get('total_purchases'))],
-        ['Total de Depósitos:', money(report.get('total_deposits'))],
-        [balance_label + ':', money(abs(balance))],
-    ]
-    totals_table = Table(totals_data, colWidths=[300, 210])
-    totals_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (-1, 1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, 1), 10),
-        ('FONTSIZE', (0, 2), (-1, 2), 12),
-        ('FONTNAME', (0, 2), (-1, 2), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (0, 2), (-1, 2), colors.HexColor(balance_color)),
-        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-        ('LINEABOVE', (0, 2), (-1, 2), 1, colors.HexColor(balance_color)),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-    ]))
-    elements.append(totals_table)
-
-    # ========== BARCODE SECTION ==========
+    # ========== CÓDIGO DE BARRAS ==========
     elements.append(Spacer(1, 20))
-
-    import barcode
-    from barcode.writer import ImageWriter
-
-    barcode_buffer = io.BytesIO()
-    try:
-        barcode_str = str(report.get('report_number_formatted', '0'))
-        code128 = barcode.get_barcode_class('code128')
-        barcode_obj = code128(barcode_str, writer=ImageWriter())
-        barcode_obj.write(barcode_buffer, options={
-            'module_width': 0.3,
-            'module_height': 12,
-            'font_size': 10,
-            'text_distance': 5,
-            'quiet_zone': 2
-        })
-        barcode_buffer.seek(0)
-        barcode_image = Image(barcode_buffer, width=140, height=50)
-    except Exception as e:
-        logger.error(f"Error generating barcode: {e}")
-        barcode_image = Paragraph(f"[{report.get('report_number_formatted', '-')}]", styles['Normal'])
-
-    created_by = report.get('created_by_name', 'Sistema')
-    print_date = now_brt().strftime('%d/%m/%Y %H:%M')
-
-    user_info_style = ParagraphStyle(
-        'ExpenseUserInfo', parent=styles['Normal'], fontSize=10,
-        textColor=colors.black, fontName='Helvetica-Bold', leading=14
-    )
-    user_info = [
-        Paragraph(f"Usuário: {created_by}", user_info_style),
-        Spacer(1, 6),
-        Paragraph(f"Data da impressão: {print_date}", user_info_style),
-    ]
-
-    barcode_section_data = [[barcode_image, user_info]]
-    barcode_section_table = Table(barcode_section_data, colWidths=[160, 350])
-    barcode_section_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (1, 0), (1, 0), 20),
-    ]))
-    elements.append(barcode_section_table)
+    elements.append(_pdf_barcode_block(
+        report.get('report_number_formatted', '0'), report.get('created_by_name', 'Sistema'), doc.width,
+        barcode_width=140, print_datetime=True,
+    ))
 
     # ========== RECIBOS ANEXADOS ==========
     if any(p.get('receipts') for p in purchases):
-        elements.append(Spacer(1, 20))
-        elements.append(Paragraph("RECIBOS ANEXADOS", section_title_style))
-        elements.append(Spacer(1, 5))
+        elements.extend(_pdf_section_title("Recibos anexados", doc.width))
 
         receipt_label_style = ParagraphStyle(
-            'ExpenseReceiptLabel', parent=styles['Normal'], fontSize=9,
-            fontName='Helvetica-Bold', textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), spaceAfter=4
+            'ExpenseReceiptLabel', parent=styles['Normal'], fontSize=8.5,
+            fontName='Helvetica-Bold', textColor=_hex(BRAND_DARK), spaceAfter=4
         )
-        unavailable_style = ParagraphStyle('ExpenseReceiptUnavailable', parent=styles['Normal'], fontSize=8, textColor=colors.grey)
+        unavailable_style = ParagraphStyle('ExpenseReceiptUnavailable', parent=styles['Normal'], fontSize=8, textColor=_hex(BRAND_MUTED))
 
         images_per_row = 3
         for p in purchases:
@@ -4478,7 +3799,7 @@ def generate_expense_report_pdf(report: dict, company: dict = None) -> bytes:
                 continue
 
             label = f"{p.get('supplier_name') or '-'} — {fmt_date(p.get('purchase_date'))} — {money(p.get('amount'))}"
-            elements.append(Paragraph(label, receipt_label_style))
+            elements.append(Paragraph(xml_escape(label), receipt_label_style))
 
             rows = []
             current_row = []
@@ -4505,7 +3826,7 @@ def generate_expense_report_pdf(report: dict, company: dict = None) -> bytes:
                     current_row.append('')
                 rows.append(current_row)
 
-            receipts_table = Table(rows, colWidths=[170] * images_per_row)
+            receipts_table = Table(rows, colWidths=[doc.width / images_per_row] * images_per_row)
             receipts_table.setStyle(TableStyle([
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
@@ -4515,7 +3836,6 @@ def generate_expense_report_pdf(report: dict, company: dict = None) -> bytes:
             elements.append(receipts_table)
             elements.append(Spacer(1, 8))
 
-    # Build with page footer
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
@@ -4533,179 +3853,88 @@ def generate_container_audit_pdf(audit: dict, company: dict = None) -> bytes:
         pagesize=A4,
         rightMargin=15*mm,
         leftMargin=15*mm,
-        topMargin=15*mm,
+        topMargin=12*mm,
         bottomMargin=20*mm
     )
 
     elements = []
     styles = getSampleStyleSheet()
 
-    # ========== HEADER SECTION ==========
+    # ========== CABEÇALHO ==========
     logo_buffer = download_logo(company)
-    report_title = f"AUDITORIA DE ESTOQUE Nº {audit.get('audit_code', '-')}"
-    header_elements = _build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    report_title = f"Auditoria de Estoque Nº {audit.get('audit_code', '-')}"
+    elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
-    # ========== INFO BAR ==========
-    status_label = 'Concluída' if audit.get('status') == 'CONCLUIDA' else 'Em Andamento'
-    completed_str = fmt_datetime(audit.get('completed_at')) if audit.get('completed_at') else '-'
-    info_text = (
-        f"Cliente: {audit.get('client_name', '-')}"
-        f"  |  Responsável: {audit.get('created_by_name', '-')}"
-        f"  |  Status: {status_label}"
-        f"  |  Concluída em: {completed_str}"
+    # ========== DADOS ==========
+    is_done = audit.get('status') == 'CONCLUIDA'
+    status_value = Paragraph(
+        _pdf_tone_markup('Concluída' if is_done else 'Em Andamento', 'emerald' if is_done else 'amber'),
+        ParagraphStyle('AuditStatus', fontName='Helvetica-Bold', fontSize=8.5, leading=10.5),
     )
-    info_style = ParagraphStyle(
-        'AuditInfoBar', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    info_data = [[Paragraph(info_text, info_style)]]
-    info_table = Table(info_data, colWidths=[doc.width])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 12))
+    elements.append(_pdf_info_grid([
+        ("Cliente", audit.get('client_name', '-'), 2),
+        ("Status", status_value),
+        ("Responsável", audit.get('created_by_name', '-'), 2),
+        ("Concluída em", fmt_datetime(audit.get('completed_at')) if audit.get('completed_at') else '-'),
+    ], doc.width, cols=3))
+    elements.append(Spacer(1, 10))
 
-    gen_info_style = ParagraphStyle(
-        'AuditGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=10
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
-
-    # ========== RESUMO ==========
+    # ========== INDICADORES ==========
     items = audit.get('items', []) or []
-    total_confirmado = sum(1 for i in items if i.get('status') == 'CONFIRMADO')
-    total_faltante = sum(1 for i in items if i.get('status') == 'FALTANTE')
-    total_nao_esperado = sum(1 for i in items if i.get('status') == 'NAO_ESPERADO')
-    total_esperado = sum(1 for i in items if i.get('expected'))
-
-    summary_style = ParagraphStyle(
-        'AuditSummary', parent=styles['Normal'], fontSize=10,
-        textColor=colors.black, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceAfter=12
-    )
-    summary_text = (
-        f"Esperados: {total_esperado}  |  Confirmados: {total_confirmado}  |  "
-        f"Faltantes: {total_faltante}  |  Não Esperados: {total_nao_esperado}"
-    )
-    elements.append(Paragraph(summary_text, summary_style))
+    elements.extend(_build_pdf_summary([
+        ("Esperados", _fmt_int(sum(1 for i in items if i.get('expected')))),
+        ("Confirmados", _fmt_int(sum(1 for i in items if i.get('status') == 'CONFIRMADO'))),
+        ("Faltantes", _fmt_int(sum(1 for i in items if i.get('status') == 'FALTANTE'))),
+        ("Não esperados", _fmt_int(sum(1 for i in items if i.get('status') == 'NAO_ESPERADO'))),
+    ], doc.width))
 
     # ========== TABELA DE ITENS ==========
-    cell_style_l = ParagraphStyle('AuditCellL', parent=styles['Normal'], fontSize=8, leading=9.5, alignment=TA_LEFT)
-    cell_style_c = ParagraphStyle('AuditCellC', parent=cell_style_l, alignment=TA_CENTER)
-
-    def cell(text, align='left'):
-        style = cell_style_c if align == 'center' else cell_style_l
-        return Paragraph(str(text) if text not in (None, '') else '-', style)
-
+    cell = _pdf_cell_factory(styles, font_size=8)
     STATUS_LABELS = {
         'CONFIRMADO': 'Confirmado',
         'FALTANTE': 'Faltante',
         'NAO_ESPERADO': 'Não Esperado',
         'PENDENTE': 'Pendente',
     }
-    STATUS_COLORS = {
-        'CONFIRMADO': colors.HexColor('#D4EDDA'),
-        'FALTANTE': colors.HexColor('#F8D7DA'),
-        'NAO_ESPERADO': colors.HexColor('#FFF3CD'),
-        'PENDENTE': colors.white,
-    }
+    STATUS_TONES = {'CONFIRMADO': 'emerald', 'FALTANTE': 'red', 'NAO_ESPERADO': 'amber', 'PENDENTE': 'slate'}
 
-    data = [['Container', 'Situação', 'Nº Transação', 'Tamanho/Tipo', 'Observações']]
-    for item in items:
+    data = [_pdf_header_cells(['Container', 'Situação', 'Nº Transação', 'Tamanho/Tipo', 'Observações'], font_size=8)]
+    alert_cmds = []
+    for idx, item in enumerate(items, start=1):
+        status = item.get('status')
         data.append([
-            cell(item.get('container_number'), align='center'),
-            cell(STATUS_LABELS.get(item.get('status'), item.get('status')), align='center'),
-            cell(item.get('transaction_id'), align='center'),
-            cell(item.get('size_type'), align='center'),
+            cell(item.get('container_number'), 'center', bold=True),
+            cell(None, 'center', markup=_pdf_tone_markup(STATUS_LABELS.get(status, status), STATUS_TONES.get(status, 'slate'))),
+            cell(item.get('transaction_id'), 'center'),
+            cell(item.get('size_type'), 'center'),
             cell(item.get('observations')),
         ])
+        # Faltante / não esperado ganham fundo suave na célula de situação
+        if status in ('FALTANTE', 'NAO_ESPERADO'):
+            alert_cmds.append(('BACKGROUND', (1, idx), (1, idx), _hex(PDF_SOFT_FILLS['red' if status == 'FALTANTE' else 'amber'])))
 
-    col_widths = [doc.width*0.18, doc.width*0.16, doc.width*0.14, doc.width*0.14, doc.width*0.38]
-    table = Table(data, colWidths=col_widths, repeatRows=1)
-
-    table_style = [
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-    ]
-    for idx, item in enumerate(items, start=1):
-        bg = STATUS_COLORS.get(item.get('status'), colors.white)
-        table_style.append(('BACKGROUND', (0, idx), (-1, idx), bg))
-    table.setStyle(TableStyle(table_style))
-
-    elements.append(table)
+    if items:
+        col_widths = [doc.width*0.18, doc.width*0.16, doc.width*0.14, doc.width*0.14, doc.width*0.38]
+        table = Table(data, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style() + alert_cmds))
+        elements.append(table)
+    else:
+        elements.append(_pdf_empty_state("Nenhum container nesta auditoria.", doc.width))
 
     # ========== CÓDIGO DE BARRAS ==========
     elements.append(Spacer(1, 20))
-
-    import barcode
-    from barcode.writer import ImageWriter
-
-    barcode_buffer = io.BytesIO()
-    try:
-        barcode_str = str(audit.get('audit_code', '0'))
-        code128 = barcode.get_barcode_class('code128')
-        barcode_obj = code128(barcode_str, writer=ImageWriter())
-        barcode_obj.write(barcode_buffer, options={
-            'module_width': 0.3,
-            'module_height': 12,
-            'font_size': 10,
-            'text_distance': 5,
-            'quiet_zone': 2
-        })
-        barcode_buffer.seek(0)
-        barcode_image = Image(barcode_buffer, width=160, height=55)
-    except Exception as e:
-        logger.error(f"Error generating barcode: {e}")
-        barcode_image = Paragraph(f"[{audit.get('audit_code', '-')}]", styles['Normal'])
-
-    created_by = audit.get('created_by_name', 'Sistema')
-    print_date = now_brt().strftime('%d/%m/%Y %H:%M')
-
-    user_info_style = ParagraphStyle(
-        'AuditUserInfo', parent=styles['Normal'], fontSize=10,
-        textColor=colors.black, fontName='Helvetica-Bold', leading=14
-    )
-    user_info = [
-        Paragraph(f"Usuário: {created_by}", user_info_style),
-        Spacer(1, 6),
-        Paragraph(f"Data da impressão: {print_date}", user_info_style),
-    ]
-
-    barcode_section_data = [[barcode_image, user_info]]
-    barcode_section_table = Table(barcode_section_data, colWidths=[doc.width*0.35, doc.width*0.65])
-    barcode_section_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (1, 0), (1, 0), 20),
-    ]))
-    elements.append(barcode_section_table)
+    elements.append(_pdf_barcode_block(
+        audit.get('audit_code', '0'), audit.get('created_by_name', 'Sistema'), doc.width,
+        barcode_width=160, print_datetime=True,
+    ))
 
     # ========== FOTOS ANEXADAS ==========
     items_with_photo = [i for i in items if i.get('photo')]
     if items_with_photo:
-        elements.append(Spacer(1, 20))
-        photos_title_style = ParagraphStyle(
-            'AuditPhotosTitle', parent=styles['Normal'], fontSize=11,
-            textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceAfter=8
-        )
-        elements.append(Paragraph("FOTOS ANEXADAS", photos_title_style))
+        elements.extend(_pdf_section_title("Fotos anexadas", doc.width))
 
-        caption_style = ParagraphStyle('AuditPhotoCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER)
-        unavailable_style = ParagraphStyle('AuditPhotoUnavailable', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
+        caption_style = ParagraphStyle('AuditPhotoCaption', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=_hex(BRAND_TEXT))
+        unavailable_style = ParagraphStyle('AuditPhotoUnavailable', parent=styles['Normal'], fontSize=8, textColor=_hex(BRAND_MUTED), alignment=TA_CENTER)
 
         images_per_row = 3
         cells = []
@@ -4723,7 +3952,7 @@ def generate_container_audit_pdf(audit: dict, company: dict = None) -> bytes:
                 logger.error(f"Error loading audit photo: {e}")
             if img_flowable is None:
                 img_flowable = Paragraph("[Foto indisponível]", unavailable_style)
-            cells.append([img_flowable, Paragraph(item.get('container_number', '-'), caption_style)])
+            cells.append([img_flowable, Paragraph(xml_escape(item.get('container_number', '-') or '-'), caption_style)])
 
         rows = []
         current_row = []
@@ -4763,7 +3992,7 @@ def generate_commission_report_pdf(data: dict, company: dict = None) -> bytes:
         pagesize=A4,
         rightMargin=15*mm,
         leftMargin=15*mm,
-        topMargin=15*mm,
+        topMargin=12*mm,
         bottomMargin=20*mm
     )
 
@@ -4774,82 +4003,44 @@ def generate_commission_report_pdf(data: dict, company: dict = None) -> bytes:
         return format_currency(value)
 
     logo_buffer = download_logo(company)
-    header_elements = _build_pdf_header(styles, logo_buffer, "Relatório de Comissão", company=company, content_width=doc.width)
-    elements.extend(header_elements)
-
-    period_text = f"Período: {fmt_date(data.get('start_date')) if data.get('start_date') else 'Início'} a {fmt_date(data.get('end_date')) if data.get('end_date') else 'Hoje'}"
-    info_style = ParagraphStyle(
-        'CommissionInfoBar', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    info_data = [[Paragraph(period_text, info_style)]]
-    info_table = Table(info_data, colWidths=[doc.width])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 15))
-
-    gen_info_style = ParagraphStyle(
-        'CommissionGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
-
-    section_title_style = ParagraphStyle(
-        'CommissionSectionTitle', parent=styles['Normal'], fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceBefore=10, spaceAfter=6
-    )
-    cell_style = ParagraphStyle('CommissionCell', parent=styles['Normal'], fontSize=9, leading=11)
+    elements.extend(_build_pdf_header(styles, logo_buffer, "Relatório de Comissão", company=company, content_width=doc.width))
 
     representatives = data.get('representatives', [])
+    period_text = (
+        f"{fmt_date(data.get('start_date')) if data.get('start_date') else 'Início'} a "
+        f"{fmt_date(data.get('end_date')) if data.get('end_date') else 'Hoje'}"
+    )
+    elements.append(_pdf_info_grid([
+        ("Período", period_text),
+        ("Representantes", _fmt_int(len(representatives))),
+        ("Comissão total", money(data.get('grand_total', 0))),
+    ], doc.width, cols=3))
+
     if not representatives:
-        elements.append(Paragraph("Nenhuma comissão encontrada para o período informado.", cell_style))
+        elements.append(Spacer(1, 10))
+        elements.append(_pdf_empty_state("Nenhuma comissão encontrada para o período informado.", doc.width))
 
+    cell = _pdf_cell_factory(styles, font_size=8.5)
     for rep in representatives:
-        elements.append(Paragraph(rep['representative_name'], section_title_style))
+        elements.extend(_pdf_section_title(rep['representative_name'], doc.width))
 
-        rows = [['Cliente', '% Comissão', 'Valor Faturado', 'Comissão']]
+        rows = [_pdf_header_cells(['Cliente', '% Comissão', 'Valor Faturado', 'Comissão'], font_size=8.5)]
         for cl in rep['clients']:
             rows.append([
-                Paragraph(cl['client_name'], cell_style),
-                f"{cl['commission_percentage']:.2f}%",
-                money(cl['total_billed']),
-                money(cl['commission_value']),
+                cell(cl['client_name']),
+                cell(f"{cl['commission_percentage']:.2f}%".replace('.', ','), 'center'),
+                cell(money(cl['total_billed']), 'right'),
+                cell(money(cl['commission_value']), 'right'),
             ])
-        rows.append(['', '', 'TOTAL DO REPRESENTANTE:', money(rep['total_commission'])])
+        rows.append(['', '', cell('TOTAL DO REPRESENTANTE', 'right', bold=True), cell(money(rep['total_commission']), 'right', bold=True)])
 
         table = Table(rows, colWidths=[doc.width*0.40, doc.width*0.15, doc.width*0.225, doc.width*0.225], repeatRows=1)
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('ALIGN', (1, 1), (1, -1), 'CENTER'),
-            ('ALIGN', (2, 0), (3, -1), 'RIGHT'),
-            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#CCCCCC')),
-            ('BOX', (0, 0), (-1, -2), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F8F8F8')]),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('FONTNAME', (2, -1), (3, -1), 'Helvetica-Bold'),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ]))
+        table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(table)
-        elements.append(Spacer(1, 12))
 
     if representatives:
-        grand_total_style = ParagraphStyle(
-            'CommissionGrandTotal', parent=styles['Normal'], fontSize=12,
-            textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', alignment=TA_RIGHT, spaceBefore=10
-        )
-        elements.append(Paragraph(f"TOTAL GERAL: {money(data.get('grand_total', 0))}", grand_total_style))
+        elements.append(Spacer(1, 12))
+        elements.append(_pdf_totals_box([("Total geral", money(data.get('grand_total', 0)))], doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -4867,7 +4058,7 @@ def generate_service_price_table_pdf(client_name: str, entries: list, company: d
         pagesize=A4,
         rightMargin=15*mm,
         leftMargin=15*mm,
-        topMargin=15*mm,
+        topMargin=12*mm,
         bottomMargin=20*mm
     )
 
@@ -4875,68 +4066,37 @@ def generate_service_price_table_pdf(client_name: str, entries: list, company: d
     styles = getSampleStyleSheet()
 
     logo_buffer = download_logo(company)
-    header_elements = _build_pdf_header(styles, logo_buffer, "Tabela de Serviços", company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    elements.extend(_build_pdf_header(styles, logo_buffer, "Tabela de Serviços", company=company, content_width=doc.width))
 
-    info_style = ParagraphStyle(
-        'ServicePriceInfoBar', parent=styles['Normal'], fontSize=10,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), alignment=TA_CENTER, fontName='Helvetica-Bold'
-    )
-    info_data = [[Paragraph(f"Cliente: {client_name}", info_style)]]
-    info_table = Table(info_data, colWidths=[doc.width])
-    info_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 12))
+    elements.append(_pdf_info_grid([
+        ("Cliente", client_name or '-', 2),
+        ("Serviços", _fmt_int(len(entries))),
+    ], doc.width, cols=3))
+    elements.append(Spacer(1, 10))
 
-    gen_info_style = ParagraphStyle(
-        'ServicePriceGenInfo', parent=styles['Normal'], fontSize=9,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=12
-    )
-    elements.append(Paragraph(f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')}", gen_info_style))
+    if entries:
+        cell = _pdf_cell_factory(styles, font_size=9)
+        data = [_pdf_header_cells(['Serviço', 'Valor'], font_size=8.5)]
+        for e in entries:
+            name = xml_escape(e.get('service_type_name', '-') or '-')
+            if e.get('billing_type') == 'DIARIA':
+                size_label = f"{e['container_size_group']} pés" if e.get('container_size_group') else 'qualquer tamanho'
+                caption = f"Diária após {e.get('free_time_days', 0)} dias de free time · Contêiner {size_label}"
+                service_cell = cell(None, markup=f"<b>{name}</b><br/><font size=7 color='#{BRAND_MUTED}'>{xml_escape(caption)}</font>")
+                value_str = f"{format_currency(e.get('value', 0), e.get('currency') or 'BRL')}/dia"
+            else:
+                service_cell = cell(None, markup=f"<b>{name}</b>")
+                value_str = format_currency(e.get('value', 0), e.get('currency') or 'BRL')
+            data.append([service_cell, cell(value_str, 'right')])
 
-    cell_style = ParagraphStyle('ServicePriceCell', parent=styles['Normal'], fontSize=9, leading=11)
-
-    data = [['Serviço', 'Valor']]
-    for e in entries:
-        if e.get('billing_type') == 'DIARIA':
-            size_label = f"{e['container_size_group']} pés" if e.get('container_size_group') else 'qualquer tamanho'
-            caption = f"Diária após {e.get('free_time_days', 0)} dias de free time · Contêiner {size_label}"
-            service_cell = Paragraph(
-                f"{e.get('service_type_name', '-')}<br/><font size=7 color='#808080'>{caption}</font>",
-                cell_style
-            )
-            value_str = f"{format_currency(e.get('value', 0), e.get('currency') or 'BRL')}/dia"
-        else:
-            service_cell = Paragraph(e.get('service_type_name', '-'), cell_style)
-            value_str = format_currency(e.get('value', 0), e.get('currency') or 'BRL')
-        data.append([service_cell, value_str])
-
-    table = Table(data, colWidths=[doc.width*0.7, doc.width*0.3], repeatRows=1)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F8F8')]),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
-    elements.append(table)
-
-    if not entries:
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph("Nenhum serviço cadastrado para este cliente.", cell_style))
+        table = Table(data, colWidths=[doc.width*0.7, doc.width*0.3], repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style() + [
+            ('TOPPADDING', (0, 1), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+        ]))
+        elements.append(table)
+    else:
+        elements.append(_pdf_empty_state("Nenhum serviço cadastrado para este cliente.", doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -4944,9 +4104,10 @@ def generate_service_price_table_pdf(client_name: str, entries: list, company: d
 
 
 def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> bytes:
-    """Gera o PDF da Proposta Comercial: cabeçalho, número/destinatário/data/
-    validade, tabela de serviços e valores, blocos de Free Time e Forma de
-    Pagamento (quando preenchidos), e fechamento com assinatura da empresa."""
+    """Gera o PDF da Proposta Comercial: cabeçalho (com o assunto embaixo do
+    título), quadro com número/destinatário/data/validade, tabela de serviços
+    e valores, blocos de Free Time e Forma de Pagamento (quando preenchidos),
+    e fechamento com assinatura da empresa."""
     c = merge_company(company)
     buffer = io.BytesIO()
 
@@ -4955,108 +4116,67 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
         pagesize=A4,
         rightMargin=15*mm,
         leftMargin=15*mm,
-        topMargin=10*mm,
-        bottomMargin=12*mm
+        topMargin=12*mm,
+        bottomMargin=15*mm
     )
 
     elements = []
     styles = getSampleStyleSheet()
 
     logo_buffer = download_logo(company)
-    header_elements = _build_pdf_header(styles, logo_buffer, "PROPOSTA COMERCIAL", company=company, content_width=doc.width)
-    elements.extend(header_elements)
-
-    subject_style = ParagraphStyle(
-        'ProposalSubject', parent=styles['Normal'], fontSize=11,
-        textColor=colors.HexColor('#808080'), alignment=TA_CENTER, spaceAfter=6
-    )
-    elements.append(Paragraph(proposal.get('subject') or '', subject_style))
+    elements.extend(_build_pdf_header(
+        styles, logo_buffer, "Proposta Comercial", generation_info=proposal.get('subject') or None,
+        company=company, content_width=doc.width,
+    ))
 
     # ========== Nº / DESTINATÁRIO / DATA / VALIDADE ==========
-    label_style = ParagraphStyle('ProposalInfoLabel', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#808080'))
-    value_style = ParagraphStyle('ProposalInfoValue', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=colors.black)
     date_only = fmt_datetime(proposal.get('created_at')).split(' ')[0] if proposal.get('created_at') else now_brt().strftime('%d/%m/%Y')
+    elements.append(_pdf_info_grid([
+        ("Nº da proposta", str(proposal.get('proposal_number', '-'))),
+        ("Em nome de", proposal.get('recipient_name', '-'), 2),
+        ("Data", date_only),
+        ("Validade", f"{proposal.get('validity_days', 7)} dias"),
+    ], doc.width, cols=5))
+    elements.append(Spacer(1, 12))
 
-    info_table = Table([
-        [Paragraph('Nº DA PROPOSTA', label_style), Paragraph('EM NOME DE', label_style), Paragraph('DATA', label_style), Paragraph('VALIDADE', label_style)],
-        [Paragraph(str(proposal.get('proposal_number', '-')), value_style), Paragraph(proposal.get('recipient_name', '-'), value_style),
-         Paragraph(date_only, value_style), Paragraph(f"{proposal.get('validity_days', 7)} dias", value_style)],
-    ], colWidths=[doc.width*0.2, doc.width*0.4, doc.width*0.2, doc.width*0.2])
-    info_table.setStyle(TableStyle([
-        ('LINEBELOW', (0, 0), (-1, 0), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 4),
-        ('TOPPADDING', (0, 1), (-1, 1), 4),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 8))
-
-    body_style = ParagraphStyle('ProposalBody', parent=styles['Normal'], fontSize=10, leading=13, textColor=colors.black, spaceAfter=6)
-    elements.append(Paragraph(f"Prezado(a) {proposal.get('recipient_name', '-')},", body_style))
+    body_style = ParagraphStyle('ProposalBody', parent=styles['Normal'], fontSize=10, leading=14, textColor=_hex(BRAND_TEXT), spaceAfter=6)
+    elements.append(Paragraph(f"Prezado(a) {xml_escape(proposal.get('recipient_name', '-') or '-')},", body_style))
     elements.append(Paragraph(
         f"Agradecemos o contato e apresentamos, a seguir, nossa proposta comercial para os serviços de "
-        f"{(proposal.get('subject') or '').lower()} na {c['name']}.",
+        f"{xml_escape((proposal.get('subject') or '').lower())} na {xml_escape(c['name'])}.",
         body_style
     ))
 
     # ========== SERVIÇOS E VALORES ==========
-    section_title_style = ParagraphStyle(
-        'ProposalSectionTitle', parent=styles['Normal'], fontSize=11,
-        textColor=colors.HexColor(f'#{PRIMARY_COLOR}'), fontName='Helvetica-Bold', spaceAfter=4
-    )
-    elements.append(Paragraph("SERVIÇOS E VALORES", section_title_style))
-
+    elements.extend(_pdf_section_title("Serviços e valores", doc.width))
     proposal_currency = proposal.get('currency') or 'BRL'
-    cell_style = ParagraphStyle('ProposalCell', parent=styles['Normal'], fontSize=9, leading=11)
+    cell = _pdf_cell_factory(styles, font_size=9)
     items = proposal.get('items', []) or []
-    data = [['Serviço', 'Valor']]
+    data = [_pdf_header_cells(['Serviço', 'Valor'], font_size=8.5)]
     for item in items:
-        data.append([Paragraph(item.get('description', '-'), cell_style), format_currency(item.get('value', 0), proposal_currency)])
+        data.append([cell(item.get('description', '-')), cell(format_currency(item.get('value', 0), proposal_currency), 'right', bold=True)])
 
     items_table = Table(data, colWidths=[doc.width*0.7, doc.width*0.3], repeatRows=1)
-    items_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8F8F8')]),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    items_table.setStyle(TableStyle(_pdf_table_style() + [
+        ('TOPPADDING', (0, 1), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
     ]))
     elements.append(items_table)
 
-    note_style = ParagraphStyle('ProposalNote', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#808080'), spaceBefore=2, spaceAfter=8)
+    note_style = ParagraphStyle('ProposalNote', parent=styles['Normal'], fontSize=7.5, textColor=_hex(BRAND_MUTED), spaceBefore=3, spaceAfter=8)
     currency_note = {'USD': 'Dólares Americanos (US$)'}.get(proposal_currency, 'Reais (R$)')
     elements.append(Paragraph(f"Valores expressos em {currency_note}.", note_style))
 
     # ========== BLOCOS DESTACADOS: FREE TIME / FORMA DE PAGAMENTO ==========
-    callout_style = ParagraphStyle('ProposalCallout', parent=styles['Normal'], fontSize=9, textColor=colors.black, leading=11)
-
-    def callout_block(title, text):
-        elements.append(Paragraph(title, section_title_style))
-        box_data = [[Paragraph(text, callout_style)]]
-        box_table = Table(box_data, colWidths=[doc.width])
-        box_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#FFF9E6')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#FFD700')),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(box_table)
+    if proposal.get('free_time_text'):
+        elements.append(_pdf_note_box("Free time de armazenagem", proposal['free_time_text'], doc.width))
         elements.append(Spacer(1, 6))
 
-    if proposal.get('free_time_text'):
-        callout_block("FREE TIME DE ARMAZENAGEM", proposal['free_time_text'])
-
     if proposal.get('payment_terms_text'):
-        callout_block("FORMA DE PAGAMENTO", proposal['payment_terms_text'])
+        elements.append(_pdf_note_box("Forma de pagamento", proposal['payment_terms_text'], doc.width))
+        elements.append(Spacer(1, 6))
 
+    elements.append(Spacer(1, 4))
     elements.append(Paragraph(
         f"Esta proposta tem validade de {proposal.get('validity_days', 7)} dias a partir da data de emissão.",
         body_style
@@ -5068,11 +4188,11 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
 
     elements.append(Spacer(1, 6))
     elements.append(Paragraph("Atenciosamente,", body_style))
-    signature_style = ParagraphStyle('ProposalSignature', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', textColor=colors.black)
-    elements.append(Paragraph(c['name'], signature_style))
+    signature_style = ParagraphStyle('ProposalSignature', parent=styles['Normal'], fontSize=11, fontName='Helvetica-Bold', textColor=_hex(BRAND_DARK))
+    elements.append(Paragraph(xml_escape(c['name']), signature_style))
     if c.get('slogan'):
-        slogan_style = ParagraphStyle('ProposalSlogan', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#808080'))
-        elements.append(Paragraph(c['slogan'], slogan_style))
+        slogan_style = ParagraphStyle('ProposalSlogan', parent=styles['Normal'], fontSize=9, textColor=_hex(BRAND_MUTED))
+        elements.append(Paragraph(xml_escape(c['slogan']), slogan_style))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -5092,25 +4212,18 @@ def generate_vehicle_checklist_pdf(checklist: dict, company: dict = None) -> byt
         pagesize=A4,
         rightMargin=15 * mm,
         leftMargin=15 * mm,
-        topMargin=15 * mm,
+        topMargin=12 * mm,
         bottomMargin=20 * mm
     )
 
     elements = []
     styles = getSampleStyleSheet()
-    # Largura útil real da página (A4 - margens), não um valor fixo — evita vazar
-    # da margem, que era o que acontecia com o 540 fixo usado antes aqui.
+    # Largura útil real da página (A4 - margens), não um valor fixo — evita vazar da margem.
     SECTION_WIDTH = doc.width
 
-    label_style = ParagraphStyle('CLLabel', parent=styles['Normal'], fontSize=7.5, fontName='Helvetica', textColor=colors.HexColor('#555555'))
-    value_style = ParagraphStyle('CLValue', parent=styles['Normal'], fontSize=9.5, fontName='Helvetica-Bold', textColor=colors.black)
-    section_title_style = ParagraphStyle('CLSection', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=colors.white)
-    item_style = ParagraphStyle('CLItem', parent=styles['Normal'], fontSize=8, fontName='Helvetica', leading=10)
-
-    # ========== HEADER ==========
+    # ========== CABEÇALHO ==========
     logo_buffer = download_logo(company)
-    header_elements = _build_pdf_header(styles, logo_buffer, f"CHECKLIST DE VEÍCULO Nº {checklist.get('checklist_number', '-')}", company=company, content_width=doc.width)
-    elements.extend(header_elements)
+    elements.extend(_build_pdf_header(styles, logo_buffer, f"Checklist de Veículo Nº {checklist.get('checklist_number', '-')}", company=company, content_width=doc.width))
 
     # ========== FALHA / ATENÇÃO ==========
     has_failure = any(
@@ -5119,43 +4232,42 @@ def generate_vehicle_checklist_pdf(checklist: dict, company: dict = None) -> byt
         for item in (checklist.get(f"{section}_items") or [])
     )
     if has_failure:
-        warn_style = ParagraphStyle('CLWarn', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=colors.white, alignment=TA_CENTER)
+        warn_style = ParagraphStyle('CLWarn', parent=styles['Normal'], fontSize=9.5, leading=12, fontName='Helvetica-Bold', textColor=_hex(PDF_TONES['red']))
         warn_table = Table([[Paragraph("ATENÇÃO: há item(ns) reprovado(s) neste checklist. O carregamento deve ser cancelado.", warn_style)]], colWidths=[SECTION_WIDTH])
         warn_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#DC2626')),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('BACKGROUND', (0, 0), (-1, -1), _hex(PDF_SOFT_FILLS['red'])),
+            ('LINEBEFORE', (0, 0), (0, -1), 3, _hex(PDF_TONES['red'])),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 7),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
         ]))
         elements.append(warn_table)
         elements.append(Spacer(1, 8))
 
-    # ========== INFO DO CABEÇALHO ==========
-    def info_pair(label, value):
-        return [Paragraph(label, label_style), Paragraph(str(value) if value not in (None, '') else '-', value_style)]
+    # ========== DADOS DO CHECKLIST ==========
+    elements.append(_pdf_info_grid([
+        ("Expedidor", checklist.get('expedidor')),
+        ("UN", checklist.get('un')),
+        ("Data/Hora da Vistoria", fmt_datetime(checklist.get('inspection_datetime'))),
+        ("Cód. Agendamento", checklist.get('scheduling_code')),
+        ("Cliente", checklist.get('client_name'), 2),
+        ("Transportadora", checklist.get('transport_company_name'), 2),
+        ("Número ORP/ODP", checklist.get('orp_odp_number')),
+        ("Número da NF", checklist.get('nf_number')),
+        ("Produto(s)", checklist.get('products_description')),
+        ("Código SAP", checklist.get('sap_code')),
+        ("Motorista", checklist.get('driver_name'), 2),
+        ("CPF Motorista", checklist.get('driver_cpf')),
+        ("CNH Vencimento", fmt_date(checklist.get('cnh_expiry'))),
+        ("CNH Nº / Categoria", f"{checklist.get('cnh_number') or '-'} / {checklist.get('cnh_category') or '-'}"),
+        ("Placa do Cavalo / Ano", f"{checklist.get('cavalo_plate') or '-'} / {checklist.get('cavalo_year') or '-'}"),
+        ("Placa Carreta 1 / Ano", f"{checklist.get('carreta1_plate') or '-'} / {checklist.get('carreta1_year') or '-'}"),
+        ("Capacidade Carreta 1", checklist.get('carreta1_capacity')),
+        ("Placa Carreta 2 / Ano", f"{checklist.get('carreta2_plate') or '-'} / {checklist.get('carreta2_year') or '-'}"),
+        ("Capacidade Carreta 2", checklist.get('carreta2_capacity')),
+    ], SECTION_WIDTH, cols=4))
 
-    info_rows = [
-        [info_pair("Expedidor", checklist.get('expedidor')), info_pair("UN", checklist.get('un'))],
-        [info_pair("Data/Hora da Vistoria", fmt_datetime(checklist.get('inspection_datetime'))), info_pair("Cód. Agendamento", checklist.get('scheduling_code'))],
-        [info_pair("Cliente", checklist.get('client_name')), info_pair("Transportadora", checklist.get('transport_company_name'))],
-        [info_pair("Número ORP/ODP", checklist.get('orp_odp_number')), info_pair("Número da NF", checklist.get('nf_number'))],
-        [info_pair("Motorista", checklist.get('driver_name')), info_pair("CPF Motorista", checklist.get('driver_cpf'))],
-        [info_pair("CNH Nº / Categoria", f"{checklist.get('cnh_number') or '-'} / {checklist.get('cnh_category') or '-'}"), info_pair("CNH Vencimento", fmt_date(checklist.get('cnh_expiry')))],
-        [info_pair("Produto(s)", checklist.get('products_description')), info_pair("Código SAP", checklist.get('sap_code'))],
-        [info_pair("Placa do Cavalo / Ano", f"{checklist.get('cavalo_plate') or '-'} / {checklist.get('cavalo_year') or '-'}"), info_pair("", "")],
-        [info_pair("Placa Carreta 1 / Ano", f"{checklist.get('carreta1_plate') or '-'} / {checklist.get('carreta1_year') or '-'}"), info_pair("Capacidade Carreta 1", checklist.get('carreta1_capacity'))],
-        [info_pair("Placa Carreta 2 / Ano", f"{checklist.get('carreta2_plate') or '-'} / {checklist.get('carreta2_year') or '-'}"), info_pair("Capacidade Carreta 2", checklist.get('carreta2_capacity'))],
-    ]
-    info_table = Table(info_rows, colWidths=[SECTION_WIDTH / 2, SECTION_WIDTH / 2])
-    info_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    elements.append(info_table)
-    elements.append(Spacer(1, 10))
+    cell = _pdf_cell_factory(styles, font_size=8)
 
     # ========== SEÇÕES DE ITENS ==========
     for section in VEHICLE_CHECKLIST_TEMPLATE_SECTIONS:
@@ -5164,146 +4276,75 @@ def generate_vehicle_checklist_pdf(checklist: dict, company: dict = None) -> byt
             continue
         has_expiry = section == 'documentos'
 
-        sec_header = Table([[Paragraph(VEHICLE_CHECKLIST_SECTION_LABELS[section], section_title_style)]], colWidths=[SECTION_WIDTH])
-        sec_header.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(sec_header)
-
-        header_row = ["Descrição", "Sim", "Não"] + (["Vencimento"] if has_expiry else [])
-        rows = [header_row]
-        for item in items:
+        elements.extend(_pdf_section_title(VEHICLE_CHECKLIST_SECTION_LABELS[section], SECTION_WIDTH))
+        rows = [_pdf_header_cells(["Descrição", "Sim", "Não"] + (["Vencimento"] if has_expiry else []), font_size=8)]
+        fail_cmds = []
+        for idx, item in enumerate(items, start=1):
             answer = item.get('answer')
             row = [
-                Paragraph(item.get('text', ''), item_style),
-                "X" if answer == 'SIM' else "",
-                "X" if answer == 'NAO' else "",
+                cell(item.get('text', '')),
+                cell(None, 'center', markup=_pdf_tone_markup('X', 'emerald') if answer == 'SIM' else ''),
+                cell(None, 'center', markup=_pdf_tone_markup('X', 'red') if answer == 'NAO' else ''),
             ]
             if has_expiry:
-                row.append(fmt_date(item.get('expiry')))
+                row.append(cell(fmt_date(item.get('expiry')), 'center'))
             rows.append(row)
+            if answer == 'NAO':
+                fail_cmds.append(('BACKGROUND', (0, idx), (-1, idx), _hex(PDF_SOFT_FILLS['red'])))
 
-        # Colunas fixas (Sim/Não/Vencimento) + Descrição absorvendo o resto da
-        # largura útil da página — nunca ultrapassa a margem.
+        # Colunas fixas (Sim/Não/Vencimento) + Descrição absorvendo o resto da largura útil.
         col_widths = [SECTION_WIDTH - 140, 35, 35, 70] if has_expiry else [SECTION_WIDTH - 70, 35, 35]
         items_table = Table(rows, colWidths=col_widths, repeatRows=1)
-        items_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 8),
-            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
-            ('BOX', (0, 0), (-1, -1), 1, colors.black),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('LEFTPADDING', (0, 0), (-1, -1), 5),
-        ]))
+        items_table.setStyle(TableStyle(_pdf_table_style() + fail_cmds))
         elements.append(items_table)
-        elements.append(Spacer(1, 8))
 
     # ========== PRODUTOS / RÓTULOS DE RISCO ==========
     products = checklist.get('products') or []
     if products:
-        prod_header = Table([[Paragraph("Produtos Transportados", section_title_style)]], colWidths=[SECTION_WIDTH])
-        prod_header.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(prod_header)
-
-        prod_rows = [["Produto", "ONU", "Nº de Risco", "Subclasse"]]
+        elements.extend(_pdf_section_title("Produtos transportados", SECTION_WIDTH))
+        prod_rows = [_pdf_header_cells(["Produto", "ONU", "Nº de Risco", "Subclasse"], font_size=8)]
         for p in products:
             prod_rows.append([
-                Paragraph(p.get('product') or '-', item_style),
-                p.get('un_number') or '-', p.get('risk_number') or '-', p.get('subclass') or '-'
+                cell(p.get('product') or '-'),
+                cell(p.get('un_number') or '-', 'center'),
+                cell(p.get('risk_number') or '-', 'center'),
+                cell(p.get('subclass') or '-', 'center'),
             ])
         # ONU/Risco/Subclasse são códigos curtos e fixos; Produto absorve o resto.
-        prod_table = Table(prod_rows, colWidths=[SECTION_WIDTH - 300, 100, 100, 100])
-        prod_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
-            ('BOX', (0, 0), (-1, -1), 1, colors.black),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
+        prod_table = Table(prod_rows, colWidths=[SECTION_WIDTH - 300, 100, 100, 100], repeatRows=1)
+        prod_table.setStyle(TableStyle(_pdf_table_style()))
         elements.append(prod_table)
-        elements.append(Spacer(1, 10))
 
     # ========== KIT: VALIDADES / ÚLTIMAS 3 VIAGENS ==========
-    extra_rows = [
-        [info_pair("Validade Calço/Extintor 1", fmt_date(checklist.get('kit_validity_1'))), info_pair("Validade 2", fmt_date(checklist.get('kit_validity_2')))],
-        [info_pair("Validade 3", fmt_date(checklist.get('kit_validity_3'))), info_pair("", "")],
-        [info_pair("Últ. Viagem - Produto 1", checklist.get('last_trip_product_1')), info_pair("Produto 2", checklist.get('last_trip_product_2'))],
-        [info_pair("Produto 3", checklist.get('last_trip_product_3')), info_pair("", "")],
-    ]
-    extra_table = Table(extra_rows, colWidths=[SECTION_WIDTH / 2, SECTION_WIDTH / 2])
-    extra_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    elements.append(extra_table)
-    elements.append(Spacer(1, 10))
+    elements.extend(_pdf_section_title("Kit e últimas viagens", SECTION_WIDTH))
+    elements.append(_pdf_info_grid([
+        ("Validade Calço/Extintor 1", fmt_date(checklist.get('kit_validity_1'))),
+        ("Validade 2", fmt_date(checklist.get('kit_validity_2'))),
+        ("Validade 3", fmt_date(checklist.get('kit_validity_3'))),
+        ("Últ. Viagem - Produto 1", checklist.get('last_trip_product_1')),
+        ("Produto 2", checklist.get('last_trip_product_2')),
+        ("Produto 3", checklist.get('last_trip_product_3')),
+    ], SECTION_WIDTH, cols=3))
 
     # ========== OBSERVAÇÕES ==========
     if checklist.get('observations'):
-        obs_header = Table([[Paragraph("Observações", section_title_style)]], colWidths=[SECTION_WIDTH])
-        obs_header.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(obs_header)
-        obs_content_style = ParagraphStyle('CLObs', parent=styles['Normal'], fontSize=9, fontName='Helvetica')
-        obs_table = Table([[Paragraph(checklist['observations'], obs_content_style)]], colWidths=[SECTION_WIDTH])
-        obs_table.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, colors.black),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ]))
-        elements.append(obs_table)
         elements.append(Spacer(1, 10))
+        elements.append(_pdf_note_box("Observações", checklist['observations'], SECTION_WIDTH))
 
     # ========== RESPONSÁVEIS ==========
-    resp_header = Table([[Paragraph("Responsáveis", section_title_style)]], colWidths=[SECTION_WIDTH])
-    resp_header.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-    ]))
-    elements.append(resp_header)
-    resp_rows = [
-        [info_pair("Resp. Transportadora", checklist.get('transport_responsible_name')), info_pair("RG", checklist.get('transport_responsible_rg'))],
-        [info_pair("Recebedor da LVT", checklist.get('lvt_receiver_name')), info_pair("Matrícula", checklist.get('lvt_receiver_registration'))],
-        [info_pair("Resp. pela Vistoria", checklist.get('inspection_responsible_name')), info_pair("Matrícula", checklist.get('inspection_responsible_registration'))],
-        [info_pair("Registro de Mérito", checklist.get('merit_record')), info_pair("Registro de Ocorrências", checklist.get('occurrence_record'))],
-        [info_pair("Documento do Condutor", checklist.get('driver_document')), info_pair("Liberação do Veículo", fmt_datetime(checklist.get('release_datetime')))],
-    ]
-    resp_table = Table(resp_rows, colWidths=[SECTION_WIDTH / 2, SECTION_WIDTH / 2])
-    resp_table.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('LEFTPADDING', (0, 0), (-1, -1), 8),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-    ]))
-    elements.append(resp_table)
+    elements.extend(_pdf_section_title("Responsáveis", SECTION_WIDTH))
+    elements.append(_pdf_info_grid([
+        ("Resp. Transportadora", checklist.get('transport_responsible_name')),
+        ("RG", checklist.get('transport_responsible_rg')),
+        ("Recebedor da LVT", checklist.get('lvt_receiver_name')),
+        ("Matrícula", checklist.get('lvt_receiver_registration')),
+        ("Resp. pela Vistoria", checklist.get('inspection_responsible_name')),
+        ("Matrícula", checklist.get('inspection_responsible_registration')),
+        ("Registro de Mérito", checklist.get('merit_record')),
+        ("Registro de Ocorrências", checklist.get('occurrence_record')),
+        ("Documento do Condutor", checklist.get('driver_document')),
+        ("Liberação do Veículo", fmt_datetime(checklist.get('release_datetime'))),
+    ], SECTION_WIDTH, cols=2))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
@@ -5660,7 +4701,11 @@ def _voucher_field(label, value, label_value_style):
     generate_movement_voucher_pdf pra ser reaproveitado por outros documentos
     no mesmo formato visual (ex: Ordem de Carregamento)."""
     v = value if value not in (None, '') else '-'
-    return Paragraph(f'<font size=7 color="#333333">{label}</font><br/><font size=10><b>{v}</b></font>', label_value_style)
+    return Paragraph(
+        f'<font size=6.5 color="#{BRAND_MUTED}">{str(label).upper()}</font><br/>'
+        f'<font size=9.5 color="#{BRAND_DARK}"><b>{v}</b></font>',
+        label_value_style,
+    )
 
 
 def _voucher_field_row(pairs, width, label_value_style, n_cols=4):
@@ -5680,16 +4725,21 @@ def _voucher_field_row(pairs, width, label_value_style, n_cols=4):
 
 
 def _voucher_boxed_section(title, row_tables, width, box_title_style, extra=None):
-    inner = [Paragraph(f'<b>{title}</b>', box_title_style)]
+    """Seção de comprovante: título na cor da marca e campos numa caixa de
+    fundo suave com barra lateral - mesmo acabamento dos quadros de
+    informação dos relatórios (_pdf_info_grid)."""
+    inner = [Paragraph(f'<font color="#{PRIMARY_COLOR}"><b>{title}</b></font>', box_title_style)]
     for i, rt in enumerate(row_tables):
-        inner.append(Spacer(1, 6 if i == 0 else 8))
+        inner.append(Spacer(1, 5 if i == 0 else 7))
         inner.append(rt)
     if extra:
-        inner.append(Spacer(1, 6 if row_tables else 2))
+        inner.append(Spacer(1, 5 if row_tables else 2))
         inner.extend(extra)
     wrapper = Table([[inner]], colWidths=[width])
     wrapper.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
+        ('LINEBEFORE', (0, 0), (0, -1), 2.5, _hex(PRIMARY_COLOR)),
         ('LEFTPADDING', (0, 0), (-1, -1), 10),
         ('RIGHTPADDING', (0, 0), (-1, -1), 10),
         ('TOPPADDING', (0, 0), (-1, -1), 6),
@@ -5705,7 +4755,7 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
     from reportlab.graphics.barcode import code128
 
     c = merge_company(company)
-    via_label = 'VIA TERMINAL' if via == 'TERMINAL' else 'VIA MOTORISTA'
+    via_label = 'Via Terminal' if via == 'TERMINAL' else 'Via Motorista'
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -5717,9 +4767,7 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
 
     label_value_style = styles['Normal']
     box_title_style = ParagraphStyle('VoucherBoxTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
-    title_style = ParagraphStyle('VoucherTitle', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER)
-    subtitle_style = ParagraphStyle('VoucherSubtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)
-    footer_style = ParagraphStyle('VoucherFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=colors.HexColor('#555555'))
+    footer_style = ParagraphStyle('VoucherFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=_hex(BRAND_MUTED))
 
     def field(label, value):
         return _voucher_field(label, value, label_value_style)
@@ -5735,31 +4783,22 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
         if idx > 0:
             elements.append(PageBreak())
 
-        # Header: logo + dados completos da empresa (centralizado), mesmo bloco
-        # compartilhado com os demais relatórios (_build_pdf_header) - já traz
-        # endereço/CNPJ/e-mail/telefone e a logo no tamanho padrão do sistema.
-        elements.extend(_build_pdf_header(styles, logo_buffer, '', company=company, content_width=width)[:2])
-
-        # Título
-        title_tbl = Table([
-            [Paragraph('COMPROVANTE DE MOVIMENTAÇÃO DE CONTÊINER', title_style)],
-            [Paragraph(f"ID Transação: #{m.get('transaction_id')} - {via_label}", subtitle_style)],
-        ], colWidths=[width])
-        title_tbl.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
-            ('TOPPADDING', (0, 0), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
-        elements.append(title_tbl)
-        elements.append(Spacer(1, 8))
+        # Cabeçalho padrão (logo + empresa à esquerda); o título do comprovante,
+        # o ID da transação e a via ficam no bloco da direita.
+        elements.extend(_build_pdf_header(
+            styles, logo_buffer,
+            f"Comprovante de Movimentação - ID Transação #{m.get('transaction_id')}  ·  {via_label}",
+            company=company, content_width=width,
+        ))
 
         created_brt = to_brt(m.get('created_at'))
         created_str = created_brt.strftime('%d/%m/%Y %H:%M') if created_brt else '-'
+        is_entry = m.get('operation_type') == 'ENTRADA'
 
         elements.append(boxed_section('Informações da Operação', [
             field_row([
                 ('ID Transação', f"#{m.get('transaction_id')}"),
-                ('Tipo de Operação', m.get('operation_type')),
+                ('Tipo de Operação', f'<font color="#{PRIMARY_COLOR if is_entry else PDF_TONES["amber"]}">{m.get("operation_type")}</font>'),
                 ('Status', m.get('status')),
                 ('Data/Hora', created_str),
             ]),
@@ -5781,7 +4820,7 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
 
         elements.append(boxed_section('Informações do Contêiner', [
             field_row([
-                ('Numero Container', m.get('container_number')),
+                ('Número Container', m.get('container_number')),
                 ('Tamanho/Tipo', m.get('size_type')),
                 ('Armador', m.get('shipping_line')),
                 ('Tara', m.get('tare')),
@@ -5801,8 +4840,9 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
         elements.append(Spacer(1, 6))
 
         if m.get('observations'):
+            obs_style = ParagraphStyle('VoucherObs', parent=styles['Normal'], fontSize=9, leading=12, textColor=_hex(BRAND_TEXT))
             elements.append(boxed_section('Observações', [], extra=[
-                Paragraph(str(m['observations']).replace('\n', '<br/>'), styles['Normal']),
+                Paragraph(str(m['observations']).replace('\n', '<br/>'), obs_style),
             ]))
             elements.append(Spacer(1, 6))
 
@@ -5813,7 +4853,7 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
             extra = [field('Estado do Container', ', '.join(_MOVEMENT_DAMAGE_LABELS.get(d, d) for d in damages) if damages else '-')]
             if photos:
                 extra.append(Spacer(1, 4))
-                extra.append(Paragraph(f"{len(photos)} foto(s) do container anexada(s) ao registro digital.", ParagraphStyle('VoucherPhotoNote', parent=styles['Normal'], fontSize=8)))
+                extra.append(Paragraph(f"{len(photos)} foto(s) do container anexada(s) ao registro digital.", ParagraphStyle('VoucherPhotoNote', parent=styles['Normal'], fontSize=8, textColor=_hex(BRAND_MUTED))))
             if notes:
                 extra.append(Spacer(1, 4))
                 extra.append(field('Observações da Vistoria', notes))
@@ -5821,34 +4861,12 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
             elements.append(Spacer(1, 6))
 
         # Área de assinaturas
-        sig_title_style = ParagraphStyle('VoucherSigTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold', alignment=TA_CENTER)
-        sig_info_style = ParagraphStyle('VoucherSigInfo', parent=styles['Normal'], fontSize=8)
-        sig_data = [[
-            [
-                Paragraph('Assinatura do Motorista', sig_title_style),
-                Spacer(1, 24),
-                HRFlowable(width='100%', thickness=0.8, color=colors.black),
-                Paragraph(f"Nome: {m.get('driver_name') or '-'}", sig_info_style),
-                Paragraph(f"CPF: {m.get('driver_cpf') or '-'}", sig_info_style),
-            ],
-            [
-                Paragraph('Assinatura do Responsável', sig_title_style),
-                Spacer(1, 24),
-                HRFlowable(width='100%', thickness=0.8, color=colors.black),
-                Paragraph(f"Nome: {m.get('user_name') or '-'}", sig_info_style),
-                Paragraph(f"Data: {now_brt().strftime('%d/%m/%Y')}", sig_info_style),
-            ],
-        ]]
-        sig_tbl = Table(sig_data, colWidths=[width / 2] * 2)
-        sig_tbl.setStyle(TableStyle([
-            ('BOX', (0, 0), (-1, -1), 1, colors.black),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('LEFTPADDING', (0, 0), (-1, -1), 15),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 15),
-        ]))
-        elements.append(sig_tbl)
-        elements.append(Spacer(1, 8))
+        elements.append(Spacer(1, 4))
+        elements.append(_pdf_signatures([
+            ('Assinatura do Motorista', f"{m.get('driver_name') or '-'}  ·  CPF {m.get('driver_cpf') or '-'}"),
+            ('Assinatura do Responsável', f"{m.get('user_name') or '-'}  ·  {now_brt().strftime('%d/%m/%Y')}"),
+        ], width, space_above=34))
+        elements.append(Spacer(1, 12))
 
         # Código de barras + usuário + data/hora
         barcode_value = str(m.get('transaction_id') or 0).zfill(6)
@@ -5856,23 +4874,30 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
             bc = code128.Code128(barcode_value, barWidth=1.0, barHeight=28)
         except Exception:
             bc = None
-        bc_num = Paragraph(f"<b>{m.get('transaction_id')}</b>", ParagraphStyle('VoucherBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER))
+        bc_num = Paragraph(f"<b>{m.get('transaction_id')}</b>", ParagraphStyle('VoucherBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=_hex(BRAND_DARK)))
         left_cell = [bc, bc_num] if bc else [bc_num]
+        info_label = ParagraphStyle('VoucherInfoLabel', fontName='Helvetica', fontSize=7, leading=9, textColor=_hex(BRAND_MUTED))
+        info_value = ParagraphStyle('VoucherInfoValue', fontName='Helvetica-Bold', fontSize=9, leading=11, textColor=_hex(BRAND_DARK))
         right_info = [
-            Paragraph(f"<b>Usuário: {m.get('user_name') or '-'}</b>", styles['Normal']),
-            Paragraph(f"<b>Data e hora da impressão: {now_brt().strftime('%d/%m/%Y %H:%M')}</b>", styles['Normal']),
+            Paragraph("USUÁRIO", info_label),
+            Paragraph(xml_escape(m.get('user_name') or '-'), info_value),
+            Spacer(1, 3),
+            Paragraph("DATA E HORA DA IMPRESSÃO", info_label),
+            Paragraph(now_brt().strftime('%d/%m/%Y %H:%M'), info_value),
         ]
-        info_tbl = Table([[left_cell, right_info]], colWidths=[100, width - 100])
+        info_tbl = Table([[left_cell, right_info]], colWidths=[110, width - 110])
         info_tbl.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LINEBELOW', (0, 0), (-1, -1), 1, colors.black),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (0, 0), 0),
+            ('LEFTPADDING', (1, 0), (1, 0), 14),
+            ('LINEBELOW', (0, 0), (-1, -1), 0.75, _hex(BRAND_LINE)),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ]))
         elements.append(info_tbl)
         elements.append(Spacer(1, 6))
 
         elements.append(Paragraph(
-            f"{c['name']} | Este documento é válido como comprovante de movimentação",
+            f"{xml_escape(c['name'])}  ·  Este documento é válido como comprovante de movimentação",
             footer_style
         ))
 

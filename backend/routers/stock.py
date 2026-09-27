@@ -738,7 +738,8 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
     from xml.sax.saxutils import escape as xml_escape
     from reports import (
         download_logo, _build_pdf_header, _voucher_field_row, _voucher_boxed_section,
-        merge_company, now_brt, PRIMARY_COLOR, HEADER_BG_COLOR,
+        merge_company, now_brt, PRIMARY_COLOR, PDF_TONES,
+        _pdf_table_style, _pdf_header_cells, _pdf_totals_box, _hex, BRAND_LINE, BRAND_DARK, BRAND_MUTED, BRAND_TEXT,
     )
 
     doc_data = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
@@ -765,7 +766,7 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
         return xml_escape(str(value)) if value not in (None, '') else ''
 
     OPERATION_LABELS = {'ENTRADA': 'Entrada', 'SAIDA': 'Saída'}
-    OPERATION_HEX = {'ENTRADA': '#15803D', 'SAIDA': '#B91C1C'}.get(movement.get('operation_type'), '#000000')
+    OPERATION_HEX = {'ENTRADA': f'#{PRIMARY_COLOR}', 'SAIDA': f"#{PDF_TONES['amber']}"}.get(movement.get('operation_type'), f'#{BRAND_DARK}')
 
     buffer = io.BytesIO()
     pdf_doc = SimpleDocTemplate(
@@ -778,11 +779,9 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
 
     label_value_style = styles['Normal']
     box_title_style = ParagraphStyle('SMBoxTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
-    title_style = ParagraphStyle('SMTitle', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', alignment=TA_CENTER)
-    subtitle_style = ParagraphStyle('SMSubtitle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER)
-    footer_style = ParagraphStyle('SMFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=colors.HexColor('#555555'))
-    text_block_style = ParagraphStyle('SMTextBlock', parent=styles['Normal'], fontSize=8.5, leading=10.5)
-    item_desc_style = ParagraphStyle('SMItemDesc', parent=styles['Normal'], fontSize=7.5, leading=9)
+    footer_style = ParagraphStyle('SMFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=_hex(BRAND_MUTED))
+    text_block_style = ParagraphStyle('SMTextBlock', parent=styles['Normal'], fontSize=8.5, leading=10.5, textColor=_hex(BRAND_TEXT))
+    item_desc_style = ParagraphStyle('SMItemDesc', parent=styles['Normal'], fontSize=7.5, leading=9, textColor=_hex(BRAND_TEXT))
 
     def field_row(pairs, n_cols=4):
         return _voucher_field_row(pairs, width, label_value_style, n_cols=n_cols)
@@ -791,19 +790,12 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
         return _voucher_boxed_section(title, row_tables, width, box_title_style, extra=extra)
 
     elements = []
-    elements.extend(_build_pdf_header(styles, logo_buffer, '', company=company, content_width=width)[:2])
-
-    title_tbl = Table([
-        [Paragraph('MOVIMENTAÇÃO DE ESTOQUE', title_style)],
-        [Paragraph(f"Nº {movement['movement_number']} - {OPERATION_LABELS.get(movement.get('operation_type'), movement.get('operation_type'))}", subtitle_style)],
-    ], colWidths=[width])
-    title_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1.5, colors.black),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-    ]))
-    elements.append(title_tbl)
-    elements.append(Spacer(1, 6))
+    # Cabeçalho padrão dos documentos, com título + número/operação à direita.
+    operation_label = OPERATION_LABELS.get(movement.get('operation_type'), movement.get('operation_type'))
+    elements.extend(_build_pdf_header(
+        styles, logo_buffer, f"Movimentação de Estoque - Nº {movement['movement_number']}  ·  {operation_label}",
+        company=company, content_width=width,
+    ))
 
     elements.append(boxed_section('Dados da Movimentação', [
         field_row([
@@ -830,7 +822,7 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
         elements.append(Spacer(1, 6))
 
     item_header = ['Código', 'Descrição', 'Qtd', 'V. Unit.', 'V. Total']
-    item_rows = [item_header]
+    item_rows = [_pdf_header_cells(item_header, font_size=7.5)]
     for it in (movement.get('items') or []):
         item_rows.append([
             str(it.get('product_code')) if it.get('product_code') is not None else '-',
@@ -844,62 +836,40 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
     item_table_width = width - 20
     item_scale = item_table_width / sum(item_base_widths)
     item_t = Table(item_rows, colWidths=[w * item_scale for w in item_base_widths], repeatRows=1)
-    item_style = [
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F5F5F5')),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+    item_t.setStyle(TableStyle(_pdf_table_style(total_row=True, zebra=bool(movement.get('items'))) + [
         ('FONTSIZE', (0, 0), (-1, -1), 7.5),
-        ('BOX', (0, 0), (-1, -1), 1, colors.black),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CCCCCC')),
         ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 3),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-        ('LEFTPADDING', (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-    ]
-    if movement.get('items'):
-        item_style.append(('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#FAFAFA')]))
-    item_t.setStyle(TableStyle(item_style))
+    ]))
     elements.append(boxed_section('Itens', [], extra=[item_t]))
     elements.append(Spacer(1, 6))
 
-    grand_total_style = ParagraphStyle('SMGrandTotal', parent=styles['Normal'], fontSize=11,
-                                       fontName='Helvetica-Bold', alignment=TA_CENTER,
-                                       textColor=colors.HexColor(f'#{PRIMARY_COLOR}'))
-    total_tbl = Table([[Paragraph(f"VALOR TOTAL: {money(movement.get('total_value'))}", grand_total_style)]], colWidths=[width])
-    total_tbl.setStyle(TableStyle([
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor(f'#{PRIMARY_COLOR}')),
-        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor(f'#{HEADER_BG_COLOR}')),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
-    elements.append(total_tbl)
-    elements.append(Spacer(1, 8))
+    elements.append(_pdf_totals_box([("Valor total", f"R$ {money(movement.get('total_value'))}")], width, width=230))
+    elements.append(Spacer(1, 10))
 
     barcode_value = str(movement.get('movement_number') or 0).zfill(6)
     try:
         bc = code128.Code128(barcode_value, barWidth=1.0, barHeight=28)
     except Exception:
         bc = None
-    bc_num = Paragraph(f"<b>{movement['movement_number']}</b>", ParagraphStyle('SMBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER))
+    bc_num = Paragraph(f"<b>{movement['movement_number']}</b>", ParagraphStyle('SMBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=_hex(BRAND_DARK)))
     left_cell = [bc, bc_num] if bc else [bc_num]
+    info_text_style = ParagraphStyle('SMInfoText', parent=styles['Normal'], fontSize=9, leading=12, textColor=_hex(BRAND_DARK))
     right_info = [
-        Paragraph(f"<b>Usuário: {safe_text(movement.get('created_by_name')) or '-'}</b>", styles['Normal']),
-        Paragraph(f"<b>Data e hora da impressão: {now_brt().strftime('%d/%m/%Y %H:%M')}</b>", styles['Normal']),
+        Paragraph(f"<font color='#{BRAND_MUTED}'>Usuário:</font> <b>{safe_text(movement.get('created_by_name')) or '-'}</b>", info_text_style),
+        Paragraph(f"<font color='#{BRAND_MUTED}'>Data e hora da impressão:</font> <b>{now_brt().strftime('%d/%m/%Y %H:%M')}</b>", info_text_style),
     ]
     info_tbl = Table([[left_cell, right_info]], colWidths=[100, width - 100])
     info_tbl.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('LINEBELOW', (0, 0), (-1, -1), 1, colors.black),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (1, 0), (1, 0), 12),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.75, _hex(BRAND_LINE)),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
     ]))
     elements.append(info_tbl)
     elements.append(Spacer(1, 6))
 
     elements.append(Paragraph(
-        f"{company['name']} | Este documento é válido como comprovante de Movimentação de Estoque",
+        f"{company['name']}  ·  Este documento é válido como comprovante de Movimentação de Estoque",
         footer_style
     ))
 
