@@ -199,6 +199,7 @@ export const api = {
 
   // Gestão de Usuários (admin)
   getUsers: () => axios.get(`${API}/users`),
+  createUser: (data) => axios.post(`${API}/users`, data),
   updateUserRole: (userId, role) => axios.put(`${API}/users/${userId}/role`, { role }),
   updateUserStatus: (userId, active) => axios.put(`${API}/users/${userId}/status`, { active }),
 

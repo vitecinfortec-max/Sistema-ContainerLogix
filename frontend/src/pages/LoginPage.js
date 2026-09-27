@@ -5,16 +5,14 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { LogIn, Mail, Lock, User, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 
 export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -22,19 +20,13 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      if (isLogin) {
-        const userData = await login(email, password);
-        toast.success('Login realizado com sucesso!');
-        
-        // Verificar se precisa alterar a senha
-        if (userData.must_change_password) {
-          navigate('/change-password');
-        } else {
-          navigate('/dashboard');
-        }
+      const userData = await login(email, password);
+      toast.success('Login realizado com sucesso!');
+
+      // Verificar se precisa alterar a senha
+      if (userData.must_change_password) {
+        navigate('/change-password');
       } else {
-        await register(name, email, password);
-        toast.success('Cadastro realizado com sucesso!');
         navigate('/dashboard');
       }
     } catch (error) {
@@ -102,32 +94,14 @@ export default function LoginPage() {
           {/* Cabeçalho do Formulário */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-              {isLogin ? 'Bem-vindo!' : 'Criar Conta'}
+              Bem-vindo!
             </h2>
             <p className="text-slate-500 dark:text-slate-400 mt-2">
-              {isLogin ? 'Entre com suas credenciais para acessar o sistema' : 'Preencha os dados para criar sua conta'}
+              Entre com suas credenciais para acessar o sistema
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-slate-700 dark:text-slate-300 font-medium">Nome Completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    id="name"
-                    data-testid="name-input"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required={!isLogin}
-                    className="h-12 pl-11 border-slate-300 dark:border-slate-600 focus:border-primary focus:ring-primary"
-                  />
-                </div>
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-700 dark:text-slate-300 font-medium">Email</Label>
               <div className="relative">
@@ -184,31 +158,21 @@ export default function LoginPage() {
               ) : (
                 <>
                   <LogIn className="w-5 h-5 mr-2" />
-                  {isLogin ? 'Entrar' : 'Cadastrar'}
+                  Entrar
                 </>
               )}
             </Button>
 
-            <div className="flex items-center justify-between pt-2">
-              <button
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-sm text-primary hover:underline font-medium"
-                data-testid="toggle-auth-mode"
+            {/* Novos acessos são criados por um administrador em Gestão de Usuários */}
+            <div className="flex items-center justify-end pt-2">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-slate-500 dark:text-slate-400 hover:text-primary hover:underline inline-flex items-center"
+                data-testid="forgot-password-link"
               >
-                {isLogin ? 'Crie sua conta aqui' : 'Já tem conta? Faça login'}
-              </button>
-
-              {isLogin && (
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-slate-500 dark:text-slate-400 hover:text-primary hover:underline inline-flex items-center"
-                  data-testid="forgot-password-link"
-                >
-                  <KeyRound className="w-3 h-3 mr-1" />
-                  Esqueci minha senha
-                </Link>
-              )}
+                <KeyRound className="w-3 h-3 mr-1" />
+                Esqueci minha senha
+              </Link>
             </div>
           </form>
 

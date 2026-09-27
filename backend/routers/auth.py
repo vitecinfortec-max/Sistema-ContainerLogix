@@ -63,34 +63,16 @@ from shared import (
 
 api_router = APIRouter(prefix="/api")
 
-@api_router.post("/auth/register", response_model=Token)
-async def register(user_input: UserCreate):
-    existing = await db.users.find_one({"email": user_input.email}, {"_id": 0})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email já cadastrado")
-    
-    user = User(
-        name=user_input.name,
-        email=user_input.email,
-        password=get_password_hash(user_input.password),
-        role="operator"  # Autocadastro nunca concede admin; promoção deve ser feita direto no banco por um admin
+@api_router.post("/auth/register")
+async def register():
+    # Autocadastro desativado: qualquer um que achasse o sistema conseguia
+    # criar acesso. Novos usuários agora são criados por um admin em Gestão de
+    # Usuários (POST /users). A rota fica só pra responder com uma mensagem
+    # clara a alguma aba antiga ainda aberta com o formulário "Criar Conta".
+    raise HTTPException(
+        status_code=403,
+        detail="O cadastro pela tela de login foi desativado. Peça a um administrador para criar seu acesso em Gestão de Usuários.",
     )
-    
-    doc = user.model_dump()
-    doc['created_at'] = doc['created_at'].isoformat()
-    await db.users.insert_one(doc)
-    
-    access_token = create_access_token(data={"sub": user.id, "email": user.email, "name": user.name})
-    
-    user_response = UserResponse(
-        id=user.id,
-        name=user.name,
-        email=user.email,
-        role=user.role,
-        created_at=user.created_at
-    )
-    
-    return Token(access_token=access_token, token_type="bearer", user=user_response)
 
 # Password Recovery with Resend
 import resend

@@ -36,6 +36,15 @@ class UserCreate(BaseModel):
     email: str
     password: str
 
+class UserAdminCreate(BaseModel):
+    """Cadastro feito por um admin em Gestão de Usuários (o autocadastro pelo
+    login foi desativado). is_superadmin fica de fora de propósito."""
+    name: str
+    email: str
+    password: str
+    role: Literal["admin", "operator"] = "operator"
+    must_change_password: bool = True
+
 class UserLogin(BaseModel):
     email: str
     password: str

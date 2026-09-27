@@ -13,7 +13,7 @@ axios.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url || '';
-    const isAuthFlow = ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password'].some((p) => url.includes(p));
+    const isAuthFlow = ['/auth/login', '/auth/forgot-password', '/auth/reset-password'].some((p) => url.includes(p));
     if (status === 401 && !isAuthFlow) {
       sessionStorage.removeItem('token');
       delete axios.defaults.headers.common['Authorization'];
@@ -61,16 +61,6 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  const register = async (name, email, password, role = 'operator') => {
-    const response = await axios.post(`${API}/auth/register`, { name, email, password, role });
-    const { access_token, user: userData } = response.data;
-    sessionStorage.setItem('token', access_token);
-    setToken(access_token);
-    setUser(userData);
-    axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-    return userData;
-  };
-
   const logout = () => {
     sessionStorage.removeItem('token');
     setToken(null);
@@ -79,7 +69,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, register, logout, loading, token, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, loading, token, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );
