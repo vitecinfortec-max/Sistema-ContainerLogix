@@ -300,12 +300,12 @@ async def download_flex_tank_report(
     movement_type: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Gera relatório Excel das movimentações de Flex Tank"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-    
+    """Gera relatório Excel das movimentações de Flex Tank (padrão visual das
+    planilhas via generate_flex_tank_report_excel)."""
+    from reports import generate_flex_tank_report_excel
+
     query = {}
-    
+
     if start_date or end_date:
         date_filter = {}
         if start_date:
@@ -314,119 +314,21 @@ async def download_flex_tank_report(
             date_filter["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
         if date_filter:
             query["movement_date"] = date_filter
-    
+
     if client_id:
         query["client_id"] = client_id
-    
+
     if movement_type:
         query["movement_type"] = movement_type
-    
+
     movements = await db.flex_tank_movements.find(query, {"_id": 0}).sort("movement_date", -1).to_list(None)
-    
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Movimentações Flex Tank"
-    
-    # Estilos
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    header_fill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
-    thin_border = Border(
-        left=Side(style='thin', color='B4B4B4'),
-        right=Side(style='thin', color='B4B4B4'),
-        top=Side(style='thin', color='B4B4B4'),
-        bottom=Side(style='thin', color='B4B4B4')
-    )
-    alt_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-    entrada_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-    saida_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-    
-    # Cabeçalhos - adicionado Cliente Destino
-    headers = ["Nº Registro", "Nº Bolsa", "Tamanho", "Data", "Tipo", "Cliente", "Cliente Destino", "Container", "Observações"]
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        cell.border = thin_border
-    
-    # Congelar primeira linha
-    ws.freeze_panes = 'A2'
-    
-    # Dados
-    for row, m in enumerate(movements, 2):
-        # Nº Registro
-        cell = ws.cell(row=row, column=1, value=m.get("movement_number"))
-        cell.border = thin_border
-        cell.alignment = Alignment(horizontal='center')
-        
-        # Nº Bolsa
-        cell = ws.cell(row=row, column=2, value=m.get("bag_number"))
-        cell.border = thin_border
-        
-        # Tamanho
-        cell = ws.cell(row=row, column=3, value=m.get("bag_size"))
-        cell.border = thin_border
-        cell.alignment = Alignment(horizontal='center')
-        
-        # Data
-        movement_date = m.get("movement_date")
-        if isinstance(movement_date, str):
-            movement_date = datetime.fromisoformat(movement_date.replace('Z', '+00:00'))
-        cell = ws.cell(row=row, column=4, value=movement_date.strftime("%d/%m/%Y") if movement_date else "")
-        cell.border = thin_border
-        cell.alignment = Alignment(horizontal='center')
-        
-        # Tipo (com formatação condicional)
-        tipo = m.get("movement_type")
-        cell = ws.cell(row=row, column=5, value=tipo)
-        cell.border = thin_border
-        cell.alignment = Alignment(horizontal='center')
-        if tipo == "ENTRADA":
-            cell.fill = entrada_fill
-        elif tipo == "SAIDA":
-            cell.fill = saida_fill
-        
-        # Cliente
-        cell = ws.cell(row=row, column=6, value=m.get("client_name") or "-")
-        cell.border = thin_border
-        
-        # Cliente Destino
-        cell = ws.cell(row=row, column=7, value=m.get("destination_client_name") or "-")
-        cell.border = thin_border
-        
-        # Container
-        cell = ws.cell(row=row, column=8, value=m.get("container_number") or "-")
-        cell.border = thin_border
-        
-        # Observações
-        cell = ws.cell(row=row, column=9, value=m.get("observations") or "-")
-        cell.border = thin_border
-        
-        # Linha alternada
-        if row % 2 == 0:
-            for col in [1, 2, 3, 4, 6, 7, 8, 9]:  # Não aplicar na coluna Tipo (5)
-                ws.cell(row=row, column=col).fill = alt_fill
-    
-    # Ajustar largura das colunas
-    ws.column_dimensions['A'].width = 12
-    ws.column_dimensions['B'].width = 22
-    ws.column_dimensions['C'].width = 12
-    ws.column_dimensions['D'].width = 12
-    ws.column_dimensions['E'].width = 10
-    ws.column_dimensions['F'].width = 35
-    ws.column_dimensions['G'].width = 35
-    ws.column_dimensions['H'].width = 18
-    ws.column_dimensions['I'].width = 35
-    
-    # Salvar em memória
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    
+
+    company = await get_company_settings()
+    excel_bytes = generate_flex_tank_report_excel(movements, company=company)
+
     filename = f"relatorio_flex_tank_{now_brt().strftime('%d-%m-%Y_%H-%M')}.xlsx"
-    
     return StreamingResponse(
-        output,
+        io.BytesIO(excel_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )

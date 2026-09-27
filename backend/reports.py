@@ -942,7 +942,7 @@ def _xl_col_px(width_chars):
     return int((width_chars or 8.43) * 7 + 5)
 
 
-def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, center_cols=None, right_align_cols=None, number_fmt_cols=None, total_col=None, stats_text=None, company_name=None, logo_buffer=None, total_number_format='R$ #,##0.00', company=None, autofilter=False):
+def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, center_cols=None, right_align_cols=None, number_fmt_cols=None, total_col=None, stats_text=None, company_name=None, logo_buffer=None, total_number_format='R$ #,##0.00', company=None, autofilter=False, empty_message=None):
     """
     Formatação padrão das planilhas Excel do sistema - mesma identidade visual
     dos PDFs (_build_pdf_header/_pdf_table_style). O layout de linhas é FIXO
@@ -966,10 +966,12 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
     - center_cols: set of 0-based col indices for center alignment
     - right_align_cols: set of 0-based col indices for right alignment
     - number_fmt_cols: dict {0-based col index: format_string}
-    - total_col: 0-based col index for SUM total row (or None)
+    - total_col: índice (0-based) da coluna somada na linha de TOTAL, ou lista
+      de índices pra somar mais de uma coluna (ex.: Litros e Valor)
     - company: dict de "Dados da Empresa" (opcional) pra linha de CNPJ/contato
     - autofilter: liga o filtro do Excel no cabeçalho (relatórios de consulta;
       desligado em documentos que vão pro cliente, como fatura)
+    - empty_message: texto mostrado na linha 9 quando não há nenhuma linha
     """
     from openpyxl.utils import get_column_letter
     from openpyxl.cell.rich_text import CellRichText, TextBlock
@@ -1154,25 +1156,35 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
                 cell.number_format = number_fmt_cols[i]
 
     # ======== LINHA DE TOTAL ========
-    if total_col is not None and total_data > 0:
+    total_cols = [total_col] if isinstance(total_col, int) else list(total_col or [])
+    if total_cols and total_data > 0:
         total_row_num = data_start + total_data
         total_border = Border(top=brand_side, bottom=line_side)
         band(total_row_num, fill=soft_fill, border=total_border)
 
-        label_ci = first_col + total_col - 1
+        label_ci = first_col + min(total_cols) - 1
         label_cell = ws.cell(row=total_row_num, column=label_ci, value='TOTAL:')
         label_cell.font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
         label_cell.alignment = Alignment(horizontal='right', vertical='center')
 
-        val_ci = first_col + total_col
-        val_letter = get_column_letter(val_ci)
-        sum_formula = f'=SUM({val_letter}{data_start}:{val_letter}{data_start + total_data - 1})'
-        sum_cell = ws.cell(row=total_row_num, column=val_ci, value=sum_formula)
-        sum_cell.font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
-        sum_cell.number_format = total_number_format
-        sum_cell.alignment = Alignment(horizontal='right', vertical='center')
+        for tc in total_cols:
+            val_ci = first_col + tc
+            val_letter = get_column_letter(val_ci)
+            sum_formula = f'=SUM({val_letter}{data_start}:{val_letter}{data_start + total_data - 1})'
+            sum_cell = ws.cell(row=total_row_num, column=val_ci, value=sum_formula)
+            sum_cell.font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
+            sum_cell.number_format = number_fmt_cols.get(tc, total_number_format)
+            sum_cell.alignment = Alignment(horizontal='right', vertical='center')
         ws.row_dimensions[total_row_num].height = 20
         last_row = total_row_num
+    elif total_data == 0 and empty_message:
+        ws.merge_cells(start_row=data_start, start_column=first_col, end_row=data_start, end_column=last_col)
+        c = ws.cell(row=data_start, column=first_col, value=empty_message)
+        c.font = Font(name='Calibri', size=10, italic=True, color=BRAND_MUTED)
+        c.alignment = Alignment(horizontal='center', vertical='center')
+        band(data_start, fill=zebra_fill, border=Border(bottom=line_side))
+        ws.row_dimensions[data_start].height = 28
+        last_row = data_start
     else:
         last_row = data_start + total_data - 1
 
@@ -1201,6 +1213,200 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
     ws.oddFooter.left.size = 8
     ws.oddFooter.right.text = "Página &P de &N"
     ws.oddFooter.right.size = 8
+
+
+# ==================== BLOCOS EXTRAS DAS PLANILHAS ====================
+# Pra conteúdo abaixo da tabela principal (totais por moeda, observações,
+# dados bancários, tabelas de resumo) no mesmo visual de _bsoft_style_excel.
+
+XL_CURRENCY_FORMATS = {'BRL': 'R$ #,##0.00', 'USD': '$ #,##0.00', 'EUR': '€ #,##0.00'}
+XL_DATE = 'dd/mm/yyyy'
+XL_DATETIME = 'dd/mm/yyyy hh:mm'
+XL_DECIMAL = '#,##0.00'
+
+
+def _xl_currency_format(currency):
+    return XL_CURRENCY_FORMATS.get(currency or 'BRL', 'R$ #,##0.00')
+
+
+def _xl_date(value):
+    """Converte data/ISO em datetime sem fuso (horário de Brasília) pra gravar
+    como data de verdade na planilha - ordena e filtra certo no Excel. Datas
+    só de dia ('YYYY-MM-DD') viram datetime à meia-noite; valor que não dá pra
+    converter volta como veio (texto)."""
+    if value in (None, ''):
+        return None
+    try:
+        if isinstance(value, datetime):
+            dt = value
+        else:
+            s = str(value).strip()
+            if len(s) == 10:
+                return datetime.strptime(s, '%Y-%m-%d')
+            dt = datetime.fromisoformat(s.replace('Z', '+00:00'))
+        if dt.tzinfo is not None:
+            dt = to_brt(dt)
+        return dt.replace(tzinfo=None)
+    except Exception:
+        return value
+
+
+def _xl_col_span_width(ws, first_col, last_col):
+    from openpyxl.utils import get_column_letter
+    return sum((ws.column_dimensions[get_column_letter(ci)].width or 8.43) for ci in range(first_col, last_col + 1))
+
+
+def _xl_section_title(ws, row, first_col, last_col, text):
+    """Título de bloco (na cor da marca) mesclado de first_col a last_col."""
+    if last_col > first_col:
+        ws.merge_cells(start_row=row, start_column=first_col, end_row=row, end_column=last_col)
+    c = ws.cell(row=row, column=first_col, value=text)
+    c.font = Font(name='Calibri', size=11, bold=True, color=PRIMARY_COLOR)
+    c.alignment = Alignment(horizontal='left', vertical='center')
+    ws.row_dimensions[row].height = 20
+    return row + 1
+
+
+def _xl_table(ws, start_row, first_col, headers, rows, number_formats=None, center_cols=None, total_values=None):
+    """Mini-tabela no padrão das planilhas (cabeçalho na cor da marca,
+    filetes, listras e linha de total opcional). `total_values`: valores da
+    linha de total, None nas colunas vazias. Retorna a próxima linha livre."""
+    number_formats = number_formats or {}
+    center_cols = center_cols or set()
+    line_side = Side(style='thin', color=BRAND_LINE)
+    white_side = Side(style='thin', color='FFFFFF')
+    brand_side = Side(style='medium', color=PRIMARY_COLOR)
+    left = Alignment(horizontal='left', vertical='center')
+    center = Alignment(horizontal='center', vertical='center')
+    right = Alignment(horizontal='right', vertical='center')
+
+    r = start_row
+    for i, h in enumerate(headers):
+        cell = ws.cell(row=r, column=first_col + i, value=h)
+        cell.font = Font(name='Calibri', size=10, bold=True, color='FFFFFF')
+        cell.fill = _xl_fill(PRIMARY_COLOR)
+        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        cell.border = Border(left=white_side, right=white_side, bottom=brand_side)
+    ws.row_dimensions[r].height = 20
+    r += 1
+    for k, row in enumerate(rows):
+        for i, v in enumerate(row):
+            cell = ws.cell(row=r, column=first_col + i, value=v)
+            cell.font = Font(name='Calibri', size=10, color=BRAND_TEXT)
+            cell.border = Border(bottom=line_side)
+            if k % 2 == 1:
+                cell.fill = _xl_fill(BRAND_ZEBRA)
+            if i in number_formats:
+                cell.number_format = number_formats[i]
+                cell.alignment = right
+            elif i in center_cols:
+                cell.alignment = center
+            else:
+                cell.alignment = left
+        r += 1
+    if total_values is not None:
+        for i, v in enumerate(total_values):
+            cell = ws.cell(row=r, column=first_col + i, value=v)
+            cell.font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
+            cell.fill = _xl_fill(BRAND_SOFT)
+            cell.border = Border(top=brand_side, bottom=line_side)
+            if i in number_formats and not isinstance(v, str):
+                cell.number_format = number_formats[i]
+            cell.alignment = right if (i in number_formats or isinstance(v, str)) else left
+        ws.row_dimensions[r].height = 20
+        r += 1
+    return r
+
+
+def _xl_totals(ws, start_row, label_first_col, label_last_col, value_col, rows, number_format='R$ #,##0.00', highlight_last=True):
+    """Quadro de totais (rótulo mesclado à esquerda, valor à direita) com a
+    última linha em destaque na cor da marca - mesmo quadro de totais dos PDFs.
+    Cada item de `rows` é (rótulo, valor) ou (rótulo, valor, formato)."""
+    line_side = Side(style='thin', color=BRAND_LINE)
+    r = start_row
+    for i, item in enumerate(rows):
+        label, value = item[0], item[1]
+        fmt = item[2] if len(item) > 2 else number_format
+        grand = highlight_last and i == len(rows) - 1
+        if label_last_col > label_first_col:
+            ws.merge_cells(start_row=r, start_column=label_first_col, end_row=r, end_column=label_last_col)
+        lc = ws.cell(row=r, column=label_first_col, value=label)
+        vc = ws.cell(row=r, column=value_col, value=value)
+        if not isinstance(value, str):
+            vc.number_format = fmt
+        for ci in list(range(label_first_col, label_last_col + 1)) + [value_col]:
+            cell = ws.cell(row=r, column=ci)
+            if grand:
+                cell.fill = _xl_fill(PRIMARY_COLOR)
+            else:
+                cell.border = Border(bottom=line_side)
+        lc.font = Font(name='Calibri', size=11 if grand else 10, bold=grand, color='FFFFFF' if grand else BRAND_TEXT)
+        vc.font = Font(name='Calibri', size=11 if grand else 10, bold=True, color='FFFFFF' if grand else BRAND_DARK)
+        lc.alignment = Alignment(horizontal='right', vertical='center', indent=1)
+        vc.alignment = Alignment(horizontal='right', vertical='center')
+        ws.row_dimensions[r].height = 22 if grand else 18
+        r += 1
+    return r
+
+
+def _xl_note(ws, row, first_col, last_col, title, text):
+    """Caixa de observações: título na cor da marca + texto (quebras de linha
+    preservadas) numa faixa mesclada de fundo suave. Retorna a próxima linha livre."""
+    import math
+    t = ws.cell(row=row, column=first_col, value=title)
+    t.font = Font(name='Calibri', size=10, bold=True, color=PRIMARY_COLOR)
+    ws.row_dimensions[row].height = 18
+    body_row = row + 1
+    if last_col > first_col:
+        ws.merge_cells(start_row=body_row, start_column=first_col, end_row=body_row, end_column=last_col)
+    body = ws.cell(row=body_row, column=first_col, value=str(text or '-'))
+    body.font = Font(name='Calibri', size=10, color=BRAND_TEXT)
+    body.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True, indent=1)
+    for ci in range(first_col, last_col + 1):
+        cell = ws.cell(row=body_row, column=ci)
+        cell.fill = _xl_fill('F8FAFC')
+        cell.border = Border(
+            left=Side(style='medium', color=PRIMARY_COLOR) if ci == first_col else None,
+            top=Side(style='thin', color=BRAND_LINE), bottom=Side(style='thin', color=BRAND_LINE),
+        )
+    chars_per_line = max(20, int(_xl_col_span_width(ws, first_col, last_col) * 1.1))
+    n_lines = sum(max(1, math.ceil(len(line) / chars_per_line)) for line in str(text or '-').split('\n'))
+    ws.row_dimensions[body_row].height = max(20, 15 * n_lines + 6)
+    return body_row + 2
+
+
+def _xl_key_values(ws, row, first_col, pairs, label_span=2, value_span=4, title=None):
+    """Bloco 'rótulo / valor' (ex.: dados bancários), uma linha por par, com
+    rótulo e valor em faixas mescladas próprias pra nunca ficarem cortados.
+    Retorna a próxima linha livre."""
+    last_col = first_col + label_span + value_span - 1
+    if title:
+        row = _xl_section_title(ws, row, first_col, last_col, title)
+    line_side = Side(style='thin', color=BRAND_LINE)
+    for label, value in pairs:
+        v_first = first_col + label_span
+        if label_span > 1:
+            ws.merge_cells(start_row=row, start_column=first_col, end_row=row, end_column=v_first - 1)
+        if value_span > 1:
+            ws.merge_cells(start_row=row, start_column=v_first, end_row=row, end_column=last_col)
+        lc = ws.cell(row=row, column=first_col, value=label)
+        vc = ws.cell(row=row, column=v_first, value=value)
+        lc.font = Font(name='Calibri', size=9, bold=True, color=BRAND_MUTED)
+        vc.font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
+        lc.alignment = Alignment(horizontal='left', vertical='center', indent=1)
+        vc.alignment = Alignment(horizontal='left', vertical='center')
+        for ci in range(first_col, last_col + 1):
+            cell = ws.cell(row=row, column=ci)
+            cell.fill = _xl_fill('F8FAFC')
+            cell.border = Border(bottom=line_side)
+        ws.row_dimensions[row].height = 18
+        row += 1
+    return row
+
+
+def _xl_extend_print_area(ws, last_col_letter, last_row):
+    """Estende a área de impressão até last_row (blocos abaixo da tabela)."""
+    ws.print_area = f'A1:{last_col_letter}{last_row}'
 
 
 def generate_stock_report_pdf(products: list, company: dict = None) -> bytes:
@@ -1270,16 +1476,14 @@ def generate_stock_report_excel(products: list, company: dict = None) -> bytes:
         ws = wb.active
         ws.title = "Relatório de Estoque"
 
-        title = "Relatório de Estoque"
         total_value = sum((p.get('stock_quantity') or 0) * (p.get('reference_value') or 0) for p in products)
-        stats_text = f"Total de Produtos: {len(products)}  |  Valor Total em Estoque: R$ {total_value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        zero_stock = sum(1 for p in products if not (p.get('stock_quantity') or 0))
+        stats_text = (
+            f"Produtos: {_fmt_int(len(products))}   •   Sem saldo: {_fmt_int(zero_stock)}   •   "
+            f"Valor total em estoque: {format_currency(total_value, 'BRL')}"
+        )
 
         headers = ['Cód. Produto', 'Almoxarifado', 'Produto', 'Quantidade', 'Valor do Produto']
-        col_widths = {'B': 14, 'C': 26, 'D': 40, 'E': 14, 'F': 18}
-        center_cols = {0, 3}
-        right_align_cols = {4}
-        number_fmt_cols = {4: 'R$ #,##0.00'}
-
         data_rows = [
             [
                 p.get('code', '-'),
@@ -1292,14 +1496,19 @@ def generate_stock_report_excel(products: list, company: dict = None) -> bytes:
         ]
 
         _bsoft_style_excel(
-            ws, title, stats_text, headers, data_rows, col_widths,
-            center_cols=center_cols,
-            right_align_cols=right_align_cols,
-            number_fmt_cols=number_fmt_cols,
+            ws, "Relatório de Estoque", stats_text, headers, data_rows,
+            {'B': 14, 'C': 26, 'D': 44, 'E': 13, 'F': 18},
+            center_cols={0, 3},
+            number_fmt_cols={4: 'R$ #,##0.00'},
             stats_text=stats_text,
             company_name=c['name'],
-            logo_buffer=download_logo(company)
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhum produto cadastrado.",
         )
+        # Produto sem saldo com a quantidade em vermelho (mesmo destaque do PDF)
+        _xl_color_column(ws, 3, ['red' if not (p.get('stock_quantity') or 0) else None for p in products])
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -1307,13 +1516,7 @@ def generate_stock_report_excel(products: list, company: dict = None) -> bytes:
 
     except Exception as e:
         logger.error(f"Error generating stock report Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar relatório."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook()
 
 
 def generate_stock_ledger_report_pdf(rows: list, company: dict = None, report_title: str = "Relatório de Movimentações de Estoque") -> bytes:
@@ -1390,19 +1593,14 @@ def generate_stock_ledger_report_excel(rows: list, company: dict = None, report_
         entrada_total = round(sum(r.get('total_value') or 0 for r in entrada_rows), 2)
         saida_total = round(sum(r.get('total_value') or 0 for r in saida_rows), 2)
         stats_text = (
-            f"Entradas: {len(entrada_rows)} ({format_currency(entrada_total)})  |  "
-            f"Saídas: {len(saida_rows)} ({format_currency(saida_total)})"
+            f"Entradas: {_fmt_int(len(entrada_rows))} ({format_currency(entrada_total)})   •   "
+            f"Saídas: {_fmt_int(len(saida_rows))} ({format_currency(saida_total)})"
         )
 
         headers = ['Data', 'Tipo', 'Produto', 'Almoxarifado', 'Quantidade', 'Valor Unit.', 'Valor Total', 'Referência']
-        col_widths = {'B': 12, 'C': 10, 'D': 32, 'E': 20, 'F': 12, 'G': 14, 'H': 14, 'I': 24}
-        center_cols = {0, 1, 4}
-        right_align_cols = {5, 6}
-        number_fmt_cols = {5: 'R$ #,##0.00', 6: 'R$ #,##0.00'}
-
         data_rows = [
             [
-                fmt_date(r.get('date')),
+                _xl_date(r.get('date')),
                 'Entrada' if r.get('operation_type') == 'ENTRADA' else 'Saída',
                 r.get('product_name') or '-',
                 r.get('warehouse_name') or '-',
@@ -1415,14 +1613,18 @@ def generate_stock_ledger_report_excel(rows: list, company: dict = None, report_
         ]
 
         _bsoft_style_excel(
-            ws, report_title, stats_text, headers, data_rows, col_widths,
-            center_cols=center_cols,
-            right_align_cols=right_align_cols,
-            number_fmt_cols=number_fmt_cols,
+            ws, report_title, stats_text, headers, data_rows,
+            {'B': 12, 'C': 10, 'D': 34, 'E': 22, 'F': 12, 'G': 14, 'H': 14, 'I': 26},
+            center_cols={0, 1},
+            number_fmt_cols={0: XL_DATE, 4: XL_DECIMAL, 5: 'R$ #,##0.00', 6: 'R$ #,##0.00'},
             stats_text=stats_text,
             company_name=c['name'],
-            logo_buffer=download_logo(company)
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhuma movimentação encontrada para os filtros selecionados.",
         )
+        _xl_color_column(ws, 1, ['primary' if r.get('operation_type') == 'ENTRADA' else 'amber' for r in rows])
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -1430,13 +1632,7 @@ def generate_stock_ledger_report_excel(rows: list, company: dict = None, report_
 
     except Exception as e:
         logger.error(f"Error generating stock ledger report Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar relatório."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook()
 
 
 def generate_delivery_status_excel(status: dict, company: dict = None) -> bytes:
@@ -1456,8 +1652,9 @@ def generate_delivery_status_excel(status: dict, company: dict = None) -> bytes:
 
         title = f"Status de Entrega Nº {status.get('status_number', '-')} - Programação #{status.get('schedule_number', '-')}"
         stats_text = (
-            f"Cliente Destino: {status.get('destination_client_name', '-')}"
-            f"  |  Data: {status_date_value or '-'}"
+            f"Cliente destino: {status.get('destination_client_name', '-')}"
+            f"   •   Data: {status_date_value or '-'}"
+            f"   •   Booking: {status.get('booking') or '-'}"
         )
 
         items = status.get('items', []) or []
@@ -1465,10 +1662,10 @@ def generate_delivery_status_excel(status: dict, company: dict = None) -> bytes:
 
         headers = ['#', 'Motorista', 'CPF', 'Cavalo', 'Carreta', 'Container', 'Local', 'Agend. Porto', 'Chegada', 'Início Carreg.', 'Término Carreg.', 'Saída', 'Entrega Finalizada']
         col_widths = {
-            'B': 4.5, 'C': 26, 'D': 15, 'E': 12, 'F': 12, 'G': 16, 'H': 22,
-            'I': 12, 'J': 12, 'K': 13, 'L': 14, 'M': 10, 'N': 16
+            'B': 5, 'C': 28, 'D': 15, 'E': 11, 'F': 11, 'G': 16, 'H': 26,
+            'I': 12, 'J': 10, 'K': 13, 'L': 14, 'M': 9, 'N': 16
         }
-        center_cols = {0, 7, 8, 9, 10, 11, 12}
+        center_cols = {0, 2, 3, 4, 7, 8, 9, 10, 11, 12}
 
         if has_bag_numbers:
             headers.append('Nº da Bolsa')
@@ -1502,8 +1699,14 @@ def generate_delivery_status_excel(status: dict, company: dict = None) -> bytes:
             center_cols=center_cols,
             stats_text=stats_text,
             company_name=c['name'],
-            logo_buffer=download_logo(company)
+            logo_buffer=download_logo(company),
+            company=company,
+            empty_message="Nenhum motorista neste status de entrega.",
         )
+        last_row = 9 + max(len(data_rows), 1)
+        if status.get('observations'):
+            last_row = _xl_note(ws, last_row + 1, 2, 1 + len(headers), "Observações", status['observations'])
+            _xl_extend_print_area(ws, 'O' if has_bag_numbers else 'N', last_row)
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -1511,13 +1714,7 @@ def generate_delivery_status_excel(status: dict, company: dict = None) -> bytes:
 
     except Exception as e:
         logger.error(f"Error generating delivery status Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar relatório."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook()
 
 
 def generate_excel_report(movements: list, report_title: str = "Relatório de Movimentações", company: dict = None) -> bytes:
@@ -1699,138 +1896,216 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
         return buffer.getvalue()
 
 
+def _xl_error_workbook(message="Erro ao gerar relatório."):
+    """Planilha mínima devolvida quando a geração falha (mantém a resposta
+    como .xlsx válido em vez de estourar o endpoint)."""
+    wb = Workbook()
+    ws = wb.active
+    ws['A1'] = message
+    ws['A1'].font = Font(size=14, bold=True, color="FF0000")
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+def _xl_color_column(ws, col_idx0, tones, bold=True, first_data_row=9):
+    """Pinta o texto de uma coluna da tabela principal conforme `tones`
+    (lista com um tom de PDF_TONES por linha, None = mantém) - mesma cor de
+    status usada nos PDFs (Entrada/Saída, Pago/Pendente...)."""
+    for offset, tone in enumerate(tones):
+        if tone:
+            ws.cell(row=first_data_row + offset, column=2 + col_idx0).font = Font(
+                name='Calibri', size=10, bold=bold, color=PDF_TONES.get(tone, BRAND_DARK))
+
+
+def generate_yard_control_excel(containers: list, stats: dict, filter_text: str = None, company: dict = None) -> bytes:
+    """Controle de Pátio em Excel no padrão das planilhas do sistema: uma linha
+    por container, dias no pátio com alerta de permanência (>30, >60 e >90
+    dias) e os filtros aplicados na linha de indicadores."""
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Controle de Pátio"
+
+        stats_text = (
+            f"Containers: {_fmt_int(stats['total'])}   •   Cheios/Vazios: {_fmt_int(stats['full'])}/{_fmt_int(stats['empty'])}"
+            f"   •   Média de dias: {stats['avg_days']}   •   Máximo: {_fmt_int(stats['max_days'])}"
+            f"   •   >30 dias: {_fmt_int(stats['over_30_days'])}   •   >60: {_fmt_int(stats['over_60_days'])}"
+            f"   •   >90: {_fmt_int(stats['over_90_days'])}"
+        )
+        title = "Controle de Pátio" + (f" - {filter_text}" if filter_text else "")
+
+        def op_type(item):
+            value = item.get('operation_type') or ('ENTRADA' if item.get('in_stock', True) else 'SAIDA')
+            return 'SAÍDA' if value == 'SAIDA' else value
+
+        headers = ["Nº Container", "Tipo", "Status", "Tamanho", "Armador", "Cliente", "Data Entrada", "Data Saída", "Dias no Pátio", "Booking"]
+        data_rows = [[
+            item['container_number'], op_type(item), item.get('status') or '-', item.get('size_type') or '-',
+            item.get('shipping_line') or '-', item.get('client_name') or '-',
+            _xl_date(item.get('entry_date')) or '-', _xl_date(item.get('exit_date')) or '-',
+            item.get('days_in_yard') or 0, item.get('booking') or '-',
+        ] for item in containers]
+
+        _bsoft_style_excel(
+            ws, title, stats_text, headers, data_rows,
+            {'B': 17, 'C': 11, 'D': 10, 'E': 10, 'F': 18, 'G': 32, 'H': 13, 'I': 13, 'J': 13, 'K': 15},
+            center_cols={1, 2, 3, 6, 7, 8},
+            number_fmt_cols={6: XL_DATE, 7: XL_DATE},
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhum container encontrado para os filtros selecionados.",
+        )
+        _xl_color_column(ws, 1, ['amber' if op_type(item) == 'SAÍDA' else 'primary' for item in containers])
+
+        # Alerta de permanência na coluna de dias (mesmas faixas dos indicadores)
+        for offset, item in enumerate(containers):
+            days = item.get('days_in_yard') or 0
+            if days > 30:
+                cell = ws.cell(row=9 + offset, column=10)
+                fill = 'FEE2E2' if days > 90 else 'FED7AA' if days > 60 else 'FEF3C7'
+                cell.fill = _xl_fill(fill)
+                cell.font = Font(name='Calibri', size=10, bold=True, color=PDF_TONES['red'] if days > 90 else PDF_TONES['amber'])
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+    except Exception as e:
+        logger.error(f"Error generating yard control Excel: {e}")
+        return _xl_error_workbook()
+
+
+def generate_flex_tank_report_excel(movements: list, company: dict = None, report_title: str = "Relatório de Flex Tank") -> bytes:
+    """Movimentações de Flex Tank (bolsas) em Excel no padrão das planilhas
+    do sistema: uma linha por movimentação, Entrada/Saída em cor."""
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Movimentações Flex Tank"
+
+        entries = sum(1 for m in movements if m.get('movement_type') == 'ENTRADA')
+        exits = sum(1 for m in movements if m.get('movement_type') == 'SAIDA')
+        stats_text = (
+            f"Movimentações: {_fmt_int(len(movements))}   •   Entradas: {_fmt_int(entries)}   •   Saídas: {_fmt_int(exits)}"
+        )
+
+        headers = ["Nº Registro", "Nº Bolsa", "Tamanho", "Data", "Tipo", "Cliente", "Cliente Destino", "Container", "Observações"]
+        data_rows = [[
+            m.get("movement_number"), m.get("bag_number") or '-', m.get("bag_size") or '-',
+            _xl_date(m.get("movement_date")) or '-',
+            'SAÍDA' if m.get("movement_type") == 'SAIDA' else (m.get("movement_type") or '-'),
+            m.get("client_name") or "-", m.get("destination_client_name") or "-",
+            m.get("container_number") or "-", m.get("observations") or "-",
+        ] for m in movements]
+
+        _bsoft_style_excel(
+            ws, report_title, stats_text, headers, data_rows,
+            {'B': 12, 'C': 22, 'D': 11, 'E': 12, 'F': 10, 'G': 32, 'H': 32, 'I': 17, 'J': 36},
+            center_cols={0, 2, 3, 4},
+            number_fmt_cols={3: XL_DATE},
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhuma movimentação encontrada para os filtros selecionados.",
+        )
+        _xl_color_column(ws, 4, ['primary' if m.get('movement_type') == 'ENTRADA' else 'amber' for m in movements])
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+
+    except Exception as e:
+        logger.error(f"Error generating flex tank Excel: {e}")
+        return _xl_error_workbook()
+
+
 def _write_storage_charges_excel(ws, storage_charges: list, start_row: int) -> int:
     """Escreve a seção de cobrança de Diária de Armazenagem a partir de
     start_row (título + uma tabela por moeda, com subtotal). Retorna a
-    próxima linha livre depois da seção. Reaproveitado como bloco extra do
-    Relatório de Faturamento e como corpo do Relatório de Diárias
-    standalone (generate_storage_overage_excel_report)."""
+    próxima linha livre depois da seção. Usado como bloco extra do
+    Relatório de Faturamento."""
     if not storage_charges:
         return start_row
 
-    last_row = start_row
-    storage_title_font = Font(size=12, bold=True, color=PRIMARY_COLOR)
-    storage_header_font = Font(size=9, bold=True, color="FFFFFF")
-    storage_header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
-    storage_subtotal_font = Font(size=9, bold=True)
-    storage_subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-
-    ws.cell(row=last_row, column=2, value="COBRANÇA DE DIÁRIA DE ARMAZENAGEM — CONTAINERS ACIMA DO FREE TIME")
-    ws.cell(row=last_row, column=2).font = storage_title_font
-    ws.merge_cells(start_row=last_row, start_column=2, end_row=last_row, end_column=8)
-    last_row += 2
+    last_row = _xl_section_title(ws, start_row, 2, 8, "Cobrança de Diária de Armazenagem — containers acima do free time")
 
     by_currency = {}
     for charge in storage_charges:
         by_currency.setdefault(charge.get('currency') or 'BRL', []).append(charge)
 
-    storage_headers = ['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor']
+    headers = ['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Valor']
     for currency, group in by_currency.items():
-        for col, header in enumerate(storage_headers, start=2):
-            header_cell = ws.cell(row=last_row, column=col, value=header)
-            header_cell.font = storage_header_font
-            header_cell.fill = storage_header_fill
-        last_row += 1
-        for charge in group:
-            ws.cell(row=last_row, column=2, value=charge['container_number'])
-            ws.cell(row=last_row, column=3, value=charge['client_name'])
-            ws.cell(row=last_row, column=4, value=charge['entry_date'].strftime('%d/%m/%Y'))
-            ws.cell(row=last_row, column=5, value=charge['days_in_yard'])
-            ws.cell(row=last_row, column=6, value=charge['free_time_days'])
-            ws.cell(row=last_row, column=7, value=charge['extra_days'])
-            ws.cell(row=last_row, column=8, value=format_currency(charge['service_value'], currency))
-            last_row += 1
+        money_fmt = _xl_currency_format(currency)
+        rows = [[
+            charge['container_number'], charge['client_name'], _xl_date(charge['entry_date']),
+            charge['days_in_yard'], charge['free_time_days'], charge['extra_days'], charge['service_value'],
+        ] for charge in group]
         subtotal = round(sum(charge['service_value'] for charge in group), 2)
-        ws.cell(row=last_row, column=6, value='SUBTOTAL:').font = storage_subtotal_font
-        ws.cell(row=last_row, column=7, value=format_currency(subtotal, currency)).font = storage_subtotal_font
-        for col in range(2, 9):
-            ws.cell(row=last_row, column=col).fill = storage_subtotal_fill
-        last_row += 2
+        last_row = _xl_table(
+            ws, last_row, 2, headers, rows,
+            number_formats={2: XL_DATE, 6: money_fmt}, center_cols={3, 4, 5},
+            total_values=[None, None, None, None, None, 'SUBTOTAL', subtotal],
+        ) + 1
 
     return last_row + 1
 
 
 def generate_storage_overage_excel_report(storage_charges: list, company: dict = None, report_title: str = "Relatório de Diárias de Armazenagem") -> bytes:
     """Relatório standalone (Excel) com só a cobrança de Diária de
-    Armazenagem - mesmo bloco usado como seção extra do Relatório de
-    Faturamento, mas sem a tabela de movimentações."""
+    Armazenagem - uma linha por container acima do free time, com o total
+    separado por moeda (nunca um total único misturando moedas)."""
     try:
         c = merge_company(company)
         wb = Workbook()
         ws = wb.active
         ws.title = "Diárias"
 
-        stats_text = f"Containers em Aberto: {len(storage_charges)}  |  Valor Total: {_storage_charges_totals_text(storage_charges)}"
+        extra_days_total = sum(charge.get('extra_days') or 0 for charge in storage_charges)
+        stats_text = (
+            f"Containers em aberto: {_fmt_int(len(storage_charges))}   •   Diárias excedentes: {_fmt_int(extra_days_total)}"
+            f"   •   Valor total: {_storage_charges_totals_text(storage_charges)}"
+        )
 
-        ws.column_dimensions['A'].width = 3
-        for letter, w in {'B': 16, 'C': 26, 'D': 12, 'E': 14, 'F': 10, 'G': 14, 'H': 14}.items():
-            ws.column_dimensions[letter].width = w
+        headers = ['Container', 'Cliente', 'Entrada', 'Dias no Pátio', 'Free Time', 'Dias Excedentes', 'Moeda', 'Valor']
+        data_rows = [[
+            charge['container_number'], charge['client_name'], _xl_date(charge['entry_date']),
+            charge['days_in_yard'], charge['free_time_days'], charge['extra_days'],
+            charge.get('currency') or 'BRL', charge['service_value'],
+        ] for charge in storage_charges]
 
-        logo_buffer = download_logo(company)
-        if logo_buffer is not None:
-            try:
-                target_height_px = 92
-                try:
-                    logo_buffer.seek(0)
-                    with PILImage.open(logo_buffer) as pil_img:
-                        orig_w, orig_h = pil_img.size
-                    target_width_px = int(target_height_px * orig_w / orig_h) if orig_h else target_height_px
-                except Exception:
-                    target_width_px = target_height_px
-                logo_buffer.seek(0)
-                logo_img = XLImage(logo_buffer)
-                logo_img.height = target_height_px
-                logo_img.width = target_width_px
-                ws.add_image(logo_img, 'A2')
-            except Exception as e:
-                logger.error(f"Error adding logo to storage overage Excel: {e}")
+        _bsoft_style_excel(
+            ws, report_title, stats_text, headers, data_rows,
+            {'B': 16, 'C': 30, 'D': 12, 'E': 13, 'F': 11, 'G': 15, 'H': 9, 'I': 15},
+            center_cols={2, 3, 4, 5, 6},
+            number_fmt_cols={2: XL_DATE, 7: 'R$ #,##0.00'},
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhum container em estoque passou do free time configurado na Tabela de Serviços.",
+        )
 
-        ws.merge_cells('B2:H3')
-        cell = ws['B2']
-        cell.value = c['name']
-        cell.font = Font(name='Calibri', size=38, bold=True, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[2].height = 30
-        ws.row_dimensions[3].height = 40.5
-
-        ws.merge_cells('B4:H4')
-        cell = ws['B4']
-        cell.value = report_title
-        cell.font = Font(name='Calibri', size=16, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[4].height = 21
-
-        ws.row_dimensions[5].height = 13
-
-        ws.merge_cells('B6:H6')
-        cell = ws['B6']
-        cell.value = stats_text
-        cell.font = Font(name='Calibri', size=12, bold=True, color=PRIMARY_COLOR)
-        cell.fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type='solid')
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[6].height = 28
-
-        ws.merge_cells('B7:H7')
-        cell = ws['B7']
-        cell.value = f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')} | Fuso: UTC-3 (Brasília)"
-        cell.font = Font(name='Calibri', size=9, color='808080')
-        cell.alignment = Alignment(horizontal='center')
-        ws.row_dimensions[7].height = 15
-
+        # Formato de moeda por linha + total por moeda logo abaixo da tabela
+        for offset, charge in enumerate(storage_charges):
+            ws.cell(row=9 + offset, column=9).number_format = _xl_currency_format(charge.get('currency'))
+        _xl_color_column(ws, 5, ['red'] * len(storage_charges))
         if storage_charges:
-            last_row = _write_storage_charges_excel(ws, storage_charges, 9)
-        else:
-            ws.cell(row=9, column=2, value="Nenhum container em estoque passou do free time configurado na Tabela de Serviços.")
-            ws.cell(row=9, column=2).font = Font(size=10, color='808080')
-            last_row = 9
-
-        ws.sheet_view.showGridLines = False
-        ws.print_area = f'A1:H{max(last_row, 9)}'
-        ws.page_setup.orientation = 'landscape'
-        ws.page_setup.fitToWidth = 1
-        ws.page_setup.fitToHeight = 0
-        ws.sheet_properties.pageSetUpPr.fitToPage = True
-        ws.print_options.horizontalCentered = True
+            totals = {}
+            for charge in storage_charges:
+                cur = charge.get('currency') or 'BRL'
+                totals[cur] = round(totals.get(cur, 0) + (charge.get('service_value') or 0), 2)
+            rows = [(f"Total ({cur})" if len(totals) > 1 else "Valor total", v, _xl_currency_format(cur)) for cur, v in totals.items()]
+            last_row = _xl_totals(ws, 9 + len(storage_charges) + 1, 6, 8, 9, rows, highlight_last=len(totals) == 1)
+            _xl_extend_print_area(ws, 'I', last_row)
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -1838,19 +2113,12 @@ def generate_storage_overage_excel_report(storage_charges: list, company: dict =
 
     except Exception as e:
         logger.error(f"Error generating storage overage Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar relatório."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook()
 
 
 def generate_fuel_supply_report_excel(supplies: list, company: dict = None, report_title: str = "Relatório de Abastecimento") -> bytes:
-    """Relatório standalone dos Abastecimentos (fuel supply) - mesmo padrão
-    visual/estrutura do Relatório de Diárias de Armazenagem
-    (generate_storage_overage_excel_report), com uma linha por abastecimento."""
+    """Relatório standalone dos Abastecimentos (fuel supply): uma linha por
+    abastecimento, com total de litros e de valor."""
     try:
         c = merge_company(company)
         wb = Workbook()
@@ -1859,116 +2127,40 @@ def generate_fuel_supply_report_excel(supplies: list, company: dict = None, repo
 
         total_liters = round(sum(s.get('liters') or 0 for s in supplies), 2)
         total_value = round(sum(s.get('total_value') or 0 for s in supplies), 2)
+        avg_price = total_value / total_liters if total_liters else 0
         liters_text = f"{total_liters:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        stats_text = f"Abastecimentos: {len(supplies)}  |  Litros: {liters_text}  |  Valor Total: {format_currency(total_value, 'BRL')}"
+        stats_text = (
+            f"Abastecimentos: {_fmt_int(len(supplies))}   •   Litros: {liters_text}   •   "
+            f"Preço médio/litro: {format_currency(avg_price, 'BRL')}   •   Valor total: {format_currency(total_value, 'BRL')}"
+        )
 
-        ws.column_dimensions['A'].width = 3
-        for letter, w in {'B': 12, 'C': 14, 'D': 20, 'E': 20, 'F': 16, 'G': 12, 'H': 14, 'I': 14}.items():
-            ws.column_dimensions[letter].width = w
+        headers = ['Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total']
+        data_rows = [[
+            _xl_date(s.get('supply_date')), s.get('equipment_plate') or '-', s.get('driver_name') or '-',
+            s.get('supplier_name') or '-', s.get('fuel_type_label') or '-',
+            s.get('liters') or 0, s.get('unit_price') or 0, s.get('total_value') or 0,
+        ] for s in supplies]
 
-        logo_buffer = download_logo(company)
-        if logo_buffer is not None:
-            try:
-                target_height_px = 92
-                try:
-                    logo_buffer.seek(0)
-                    with PILImage.open(logo_buffer) as pil_img:
-                        orig_w, orig_h = pil_img.size
-                    target_width_px = int(target_height_px * orig_w / orig_h) if orig_h else target_height_px
-                except Exception:
-                    target_width_px = target_height_px
-                logo_buffer.seek(0)
-                logo_img = XLImage(logo_buffer)
-                logo_img.height = target_height_px
-                logo_img.width = target_width_px
-                ws.add_image(logo_img, 'A2')
-            except Exception as e:
-                logger.error(f"Error adding logo to fuel supply Excel: {e}")
-
-        ws.merge_cells('B2:I3')
-        cell = ws['B2']
-        cell.value = c['name']
-        cell.font = Font(name='Calibri', size=38, bold=True, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[2].height = 30
-        ws.row_dimensions[3].height = 40.5
-
-        ws.merge_cells('B4:I4')
-        cell = ws['B4']
-        cell.value = report_title
-        cell.font = Font(name='Calibri', size=16, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[4].height = 21
-
-        ws.row_dimensions[5].height = 13
-
-        ws.merge_cells('B6:I6')
-        cell = ws['B6']
-        cell.value = stats_text
-        cell.font = Font(name='Calibri', size=12, bold=True, color=PRIMARY_COLOR)
-        cell.fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type='solid')
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[6].height = 28
-
-        ws.merge_cells('B7:I7')
-        cell = ws['B7']
-        cell.value = f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')} | Fuso: UTC-3 (Brasília)"
-        cell.font = Font(name='Calibri', size=9, color='808080')
-        cell.alignment = Alignment(horizontal='center')
-        ws.row_dimensions[7].height = 15
-
-        last_row = 9
-        if supplies:
-            header_font = Font(size=9, bold=True, color="FFFFFF")
-            header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
-            headers = ['Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total']
-            for col, header in enumerate(headers, start=2):
-                header_cell = ws.cell(row=last_row, column=col, value=header)
-                header_cell.font = header_font
-                header_cell.fill = header_fill
-            last_row += 1
-            for s in supplies:
-                ws.cell(row=last_row, column=2, value=fmt_date(s.get('supply_date')))
-                ws.cell(row=last_row, column=3, value=s.get('equipment_plate') or '-')
-                ws.cell(row=last_row, column=4, value=s.get('driver_name') or '-')
-                ws.cell(row=last_row, column=5, value=s.get('supplier_name') or '-')
-                ws.cell(row=last_row, column=6, value=s.get('fuel_type_label') or '-')
-                ws.cell(row=last_row, column=7, value=s.get('liters') or 0)
-                ws.cell(row=last_row, column=8, value=format_currency(s.get('unit_price') or 0))
-                ws.cell(row=last_row, column=9, value=format_currency(s.get('total_value') or 0))
-                last_row += 1
-            subtotal_font = Font(size=9, bold=True)
-            subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-            ws.cell(row=last_row, column=8, value='TOTAL:').font = subtotal_font
-            ws.cell(row=last_row, column=9, value=format_currency(total_value)).font = subtotal_font
-            for col in range(2, 10):
-                ws.cell(row=last_row, column=col).fill = subtotal_fill
-            last_row += 1
-        else:
-            ws.cell(row=last_row, column=2, value="Nenhum abastecimento encontrado para os filtros selecionados.")
-            ws.cell(row=last_row, column=2).font = Font(size=10, color='808080')
-
-        ws.sheet_view.showGridLines = False
-        ws.print_area = f'A1:I{max(last_row, 9)}'
-        ws.page_setup.orientation = 'landscape'
-        ws.page_setup.fitToWidth = 1
-        ws.page_setup.fitToHeight = 0
-        ws.sheet_properties.pageSetUpPr.fitToPage = True
-        ws.print_options.horizontalCentered = True
-
+        _bsoft_style_excel(
+            ws, report_title, stats_text, headers, data_rows,
+            {'B': 12, 'C': 14, 'D': 26, 'E': 26, 'F': 16, 'G': 12, 'H': 13, 'I': 15},
+            center_cols={0, 1},
+            number_fmt_cols={0: XL_DATE, 5: XL_DECIMAL, 6: 'R$ #,##0.00', 7: 'R$ #,##0.00'},
+            total_col=[5, 7],
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhum abastecimento encontrado para os filtros selecionados.",
+        )
         buffer = io.BytesIO()
         wb.save(buffer)
         return buffer.getvalue()
 
     except Exception as e:
         logger.error(f"Error generating fuel supply Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar relatório."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook()
 
 
 _OS_STATUS_LABELS_XLSX = {
@@ -1977,9 +2169,8 @@ _OS_STATUS_LABELS_XLSX = {
 
 
 def generate_service_orders_report_excel(orders: list, company: dict = None, report_title: str = "Relatório de Serviços") -> bytes:
-    """Relatório standalone das Ordens de Serviço - mesmo padrão visual/
-    estrutura do Relatório de Abastecimento (generate_fuel_supply_report_excel),
-    com uma linha por OS."""
+    """Relatório standalone das Ordens de Serviço: uma linha por OS, com a
+    situação colorida e o total de valor."""
     try:
         c = merge_company(company)
         wb = Workbook()
@@ -1987,99 +2178,35 @@ def generate_service_orders_report_excel(orders: list, company: dict = None, rep
         ws.title = "Ordens de Serviço"
 
         total_value = round(sum(o.get('grand_total') or 0 for o in orders), 2)
-        stats_text = f"Ordens de Serviço: {len(orders)}  |  Valor Total: {format_currency(total_value, 'BRL')}"
+        open_count = sum(1 for o in orders if o.get('status') in ('ABERTO', 'ANDAMENTO'))
+        closed_count = sum(1 for o in orders if o.get('status') == 'FECHADO')
+        stats_text = (
+            f"Ordens de serviço: {_fmt_int(len(orders))}   •   Em aberto/andamento: {_fmt_int(open_count)}   •   "
+            f"Fechadas: {_fmt_int(closed_count)}   •   Valor total: {format_currency(total_value, 'BRL')}"
+        )
 
-        ws.column_dimensions['A'].width = 3
-        for letter, w in {'B': 10, 'C': 16, 'D': 14, 'E': 20, 'F': 16, 'G': 14}.items():
-            ws.column_dimensions[letter].width = w
+        headers = ['Nº OS', 'Data Abertura', 'Equipamento', 'Categoria', 'Status', 'Valor Total']
+        data_rows = [[
+            o.get('os_number'), _xl_date(o.get('opened_at')), o.get('equipment_plate') or '-',
+            o.get('category') or '-', _OS_STATUS_LABELS_XLSX.get(o.get('status'), o.get('status') or '-'),
+            o.get('grand_total') or 0,
+        ] for o in orders]
 
-        logo_buffer = download_logo(company)
-        if logo_buffer is not None:
-            try:
-                target_height_px = 92
-                try:
-                    logo_buffer.seek(0)
-                    with PILImage.open(logo_buffer) as pil_img:
-                        orig_w, orig_h = pil_img.size
-                    target_width_px = int(target_height_px * orig_w / orig_h) if orig_h else target_height_px
-                except Exception:
-                    target_width_px = target_height_px
-                logo_buffer.seek(0)
-                logo_img = XLImage(logo_buffer)
-                logo_img.height = target_height_px
-                logo_img.width = target_width_px
-                ws.add_image(logo_img, 'A2')
-            except Exception as e:
-                logger.error(f"Error adding logo to service orders Excel: {e}")
-
-        ws.merge_cells('B2:G3')
-        cell = ws['B2']
-        cell.value = c['name']
-        cell.font = Font(name='Calibri', size=38, bold=True, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[2].height = 30
-        ws.row_dimensions[3].height = 40.5
-
-        ws.merge_cells('B4:G4')
-        cell = ws['B4']
-        cell.value = report_title
-        cell.font = Font(name='Calibri', size=16, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[4].height = 21
-
-        ws.row_dimensions[5].height = 13
-
-        ws.merge_cells('B6:G6')
-        cell = ws['B6']
-        cell.value = stats_text
-        cell.font = Font(name='Calibri', size=12, bold=True, color=PRIMARY_COLOR)
-        cell.fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type='solid')
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[6].height = 28
-
-        ws.merge_cells('B7:G7')
-        cell = ws['B7']
-        cell.value = f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')} | Fuso: UTC-3 (Brasília)"
-        cell.font = Font(name='Calibri', size=9, color='808080')
-        cell.alignment = Alignment(horizontal='center')
-        ws.row_dimensions[7].height = 15
-
-        last_row = 9
-        if orders:
-            header_font = Font(size=9, bold=True, color="FFFFFF")
-            header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
-            headers = ['Nº OS', 'Data Abertura', 'Equipamento', 'Categoria', 'Status', 'Valor Total']
-            for col, header in enumerate(headers, start=2):
-                header_cell = ws.cell(row=last_row, column=col, value=header)
-                header_cell.font = header_font
-                header_cell.fill = header_fill
-            last_row += 1
-            for o in orders:
-                ws.cell(row=last_row, column=2, value=o.get('os_number'))
-                ws.cell(row=last_row, column=3, value=fmt_datetime(o.get('opened_at')))
-                ws.cell(row=last_row, column=4, value=o.get('equipment_plate') or '-')
-                ws.cell(row=last_row, column=5, value=o.get('category') or '-')
-                ws.cell(row=last_row, column=6, value=_OS_STATUS_LABELS_XLSX.get(o.get('status'), o.get('status') or '-'))
-                ws.cell(row=last_row, column=7, value=format_currency(o.get('grand_total') or 0))
-                last_row += 1
-            subtotal_font = Font(size=9, bold=True)
-            subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-            ws.cell(row=last_row, column=6, value='TOTAL:').font = subtotal_font
-            ws.cell(row=last_row, column=7, value=format_currency(total_value)).font = subtotal_font
-            for col in range(2, 8):
-                ws.cell(row=last_row, column=col).fill = subtotal_fill
-            last_row += 1
-        else:
-            ws.cell(row=last_row, column=2, value="Nenhuma ordem de serviço encontrada para os filtros selecionados.")
-            ws.cell(row=last_row, column=2).font = Font(size=10, color='808080')
-
-        ws.sheet_view.showGridLines = False
-        ws.print_area = f'A1:G{max(last_row, 9)}'
-        ws.page_setup.orientation = 'landscape'
-        ws.page_setup.fitToWidth = 1
-        ws.page_setup.fitToHeight = 0
-        ws.sheet_properties.pageSetUpPr.fitToPage = True
-        ws.print_options.horizontalCentered = True
+        _bsoft_style_excel(
+            ws, report_title, stats_text, headers, data_rows,
+            {'B': 10, 'C': 17, 'D': 15, 'E': 30, 'F': 16, 'G': 16},
+            center_cols={0, 1, 2, 4},
+            number_fmt_cols={1: XL_DATETIME, 5: 'R$ #,##0.00'},
+            total_col=5,
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhuma ordem de serviço encontrada para os filtros selecionados.",
+        )
+        status_tones = {"ABERTO": 'blue', "ANDAMENTO": 'amber', "FECHADO": 'emerald', "CANCELADO": 'red'}
+        _xl_color_column(ws, 4, [status_tones.get(o.get('status')) for o in orders])
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -2087,22 +2214,30 @@ def generate_service_orders_report_excel(orders: list, company: dict = None, rep
 
     except Exception as e:
         logger.error(f"Error generating service orders Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar relatório."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook()
 
 
 _TURNO_LABELS_XLSX = {"DIA": "Dia", "NOITE": "Noite"}
 
 
+def _port_service_xl_rows(services):
+    """Linhas da tabela de Serviço Portuário (relatório e fatura usam as mesmas colunas)."""
+    return [[
+        s.get('service_number'), _xl_date(s.get('service_date')), s.get('client_name') or '-',
+        s.get('driver_name') or '-', s.get('cavalo_plate') or '-',
+        _TURNO_LABELS_XLSX.get(s.get('turno'), s.get('turno') or '-'),
+        s.get('entry_time') or '-', s.get('exit_time') or '-', s.get('operation_value') or 0,
+    ] for s in services]
+
+
+_PORT_SERVICE_XL_HEADERS = ['Nº', 'Data', 'Cliente', 'Motorista', 'Placa', 'Turno', 'Entrada', 'Saída', 'Valor']
+
+
+_PORT_SERVICE_XL_WIDTHS = {'B': 8, 'C': 12, 'D': 28, 'E': 28, 'F': 12, 'G': 9, 'H': 10, 'I': 10, 'J': 15}
+
+
 def generate_port_services_report_excel(services: list, company: dict = None, report_title: str = "Relatório de Serviço Portuário") -> bytes:
-    """Relatório standalone de Serviço Portuário - mesmo padrão visual/
-    estrutura do Relatório de Serviços (generate_service_orders_report_excel),
-    com uma linha por serviço."""
+    """Relatório standalone de Serviço Portuário: uma linha por serviço, com total."""
     try:
         c = merge_company(company)
         wb = Workbook()
@@ -2110,107 +2245,26 @@ def generate_port_services_report_excel(services: list, company: dict = None, re
         ws.title = "Serviço Portuário"
 
         total_value = round(sum(s.get('operation_value') or 0 for s in services), 2)
-        stats_text = f"Serviços: {len(services)}  |  Valor Total: {format_currency(total_value, 'BRL')}"
+        day_count = sum(1 for s in services if s.get('turno') == 'DIA')
+        night_count = sum(1 for s in services if s.get('turno') == 'NOITE')
+        stats_text = (
+            f"Serviços: {_fmt_int(len(services))}   •   Turno dia: {_fmt_int(day_count)}   •   "
+            f"Turno noite: {_fmt_int(night_count)}   •   Valor total: {format_currency(total_value, 'BRL')}"
+        )
 
-        ws.column_dimensions['A'].width = 3
-        for letter, w in {'B': 8, 'C': 12, 'D': 22, 'E': 22, 'F': 12, 'G': 8, 'H': 10, 'I': 10, 'J': 14}.items():
-            ws.column_dimensions[letter].width = w
-
-        logo_buffer = download_logo(company)
-        if logo_buffer is not None:
-            try:
-                target_height_px = 92
-                try:
-                    logo_buffer.seek(0)
-                    with PILImage.open(logo_buffer) as pil_img:
-                        orig_w, orig_h = pil_img.size
-                    target_width_px = int(target_height_px * orig_w / orig_h) if orig_h else target_height_px
-                except Exception:
-                    target_width_px = target_height_px
-                logo_buffer.seek(0)
-                logo_img = XLImage(logo_buffer)
-                logo_img.height = target_height_px
-                logo_img.width = target_width_px
-                ws.add_image(logo_img, 'A2')
-            except Exception as e:
-                logger.error(f"Error adding logo to port services Excel: {e}")
-
-        ws.merge_cells('B2:J3')
-        cell = ws['B2']
-        cell.value = c['name']
-        cell.font = Font(name='Calibri', size=38, bold=True, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[2].height = 30
-        ws.row_dimensions[3].height = 40.5
-
-        ws.merge_cells('B4:J4')
-        cell = ws['B4']
-        cell.value = report_title
-        cell.font = Font(name='Calibri', size=16, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[4].height = 21
-
-        ws.row_dimensions[5].height = 13
-
-        ws.merge_cells('B6:J6')
-        cell = ws['B6']
-        cell.value = stats_text
-        cell.font = Font(name='Calibri', size=12, bold=True, color=PRIMARY_COLOR)
-        cell.fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type='solid')
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[6].height = 28
-
-        ws.merge_cells('B7:J7')
-        cell = ws['B7']
-        cell.value = f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')} | Fuso: UTC-3 (Brasília)"
-        cell.font = Font(name='Calibri', size=9, color='808080')
-        cell.alignment = Alignment(horizontal='center')
-        ws.row_dimensions[7].height = 15
-
-        last_row = 9
-        if services:
-            header_font = Font(size=9, bold=True, color="FFFFFF")
-            header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
-            headers = ['Nº', 'Data', 'Cliente', 'Motorista', 'Placa', 'Turno', 'Entrada', 'Saída', 'Valor']
-            for col, header in enumerate(headers, start=2):
-                header_cell = ws.cell(row=last_row, column=col, value=header)
-                header_cell.font = header_font
-                header_cell.fill = header_fill
-            last_row += 1
-            for s in services:
-                service_date_display = s.get('service_date') or '-'
-                try:
-                    service_date_display = datetime.strptime(s['service_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
-                except Exception:
-                    pass
-                ws.cell(row=last_row, column=2, value=s.get('service_number'))
-                ws.cell(row=last_row, column=3, value=service_date_display)
-                ws.cell(row=last_row, column=4, value=s.get('client_name') or '-')
-                ws.cell(row=last_row, column=5, value=s.get('driver_name') or '-')
-                ws.cell(row=last_row, column=6, value=s.get('cavalo_plate') or '-')
-                ws.cell(row=last_row, column=7, value=_TURNO_LABELS_XLSX.get(s.get('turno'), s.get('turno') or '-'))
-                ws.cell(row=last_row, column=8, value=s.get('entry_time') or '-')
-                ws.cell(row=last_row, column=9, value=s.get('exit_time') or '-')
-                ws.cell(row=last_row, column=10, value=format_currency(s.get('operation_value') or 0))
-                last_row += 1
-            subtotal_font = Font(size=9, bold=True)
-            subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-            ws.cell(row=last_row, column=9, value='TOTAL:').font = subtotal_font
-            ws.cell(row=last_row, column=10, value=format_currency(total_value)).font = subtotal_font
-            for col in range(2, 11):
-                ws.cell(row=last_row, column=col).fill = subtotal_fill
-            last_row += 1
-        else:
-            ws.cell(row=last_row, column=2, value="Nenhum serviço portuário encontrado para os filtros selecionados.")
-            ws.cell(row=last_row, column=2).font = Font(size=10, color='808080')
-
-        ws.sheet_view.showGridLines = False
-        ws.print_area = f'A1:J{max(last_row, 9)}'
-        ws.page_setup.orientation = 'landscape'
-        ws.page_setup.fitToWidth = 1
-        ws.page_setup.fitToHeight = 0
-        ws.sheet_properties.pageSetUpPr.fitToPage = True
-        ws.print_options.horizontalCentered = True
+        _bsoft_style_excel(
+            ws, report_title, stats_text, _PORT_SERVICE_XL_HEADERS, _port_service_xl_rows(services),
+            _PORT_SERVICE_XL_WIDTHS,
+            center_cols={0, 1, 4, 5, 6, 7},
+            number_fmt_cols={1: XL_DATE, 8: 'R$ #,##0.00'},
+            total_col=8,
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhum serviço portuário encontrado para os filtros selecionados.",
+        )
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -2218,13 +2272,7 @@ def generate_port_services_report_excel(services: list, company: dict = None, re
 
     except Exception as e:
         logger.error(f"Error generating port services Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar relatório."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook()
 
 
 def _format_port_service_period(batch: dict) -> str:
@@ -2246,146 +2294,46 @@ def _format_port_service_period(batch: dict) -> str:
 
 
 def generate_port_service_invoice_excel(batch: dict, services: list, company: dict = None) -> bytes:
-    """Fatura de Serviço Portuário (Financeiro) - mesma estrutura visual do
-    Relatório de Serviço Portuário (generate_port_services_report_excel),
-    com a barra de estatísticas trocada pelos dados da fatura (Cliente,
-    Período, Valor Total)."""
+    """Fatura de Serviço Portuário (Financeiro): tabela dos serviços faturados,
+    quadro de totais (valor, desconto, total) e observações."""
     try:
         c = merge_company(company)
         wb = Workbook()
         ws = wb.active
         ws.title = "Fatura Serviço Portuário"
 
+        total_value = batch.get('total_value') or 0
+        discount_value = batch.get('discount_value') or 0
         net_total = batch.get('net_total')
         if net_total is None:
-            net_total = batch.get('total_value') or 0
+            net_total = total_value
+        title = f"Fatura de Serviço Portuário Nº {batch.get('batch_number', '-')} - Cliente: {batch.get('client_name') or '-'}"
         stats_text = (
-            f"Cliente: {batch.get('client_name') or '-'}  |  Período: {_format_port_service_period(batch)}  |  "
-            f"Serviços: {batch.get('item_count', len(services))}  |  Valor Total: {format_currency(net_total, 'BRL')}"
+            f"Período: {_format_port_service_period(batch)}   •   Serviços: {_fmt_int(batch.get('item_count', len(services)))}"
+            f"   •   Valor total: {format_currency(net_total, 'BRL')}"
         )
 
-        ws.column_dimensions['A'].width = 3
-        for letter, w in {'B': 8, 'C': 12, 'D': 22, 'E': 22, 'F': 12, 'G': 8, 'H': 10, 'I': 10, 'J': 14}.items():
-            ws.column_dimensions[letter].width = w
+        _bsoft_style_excel(
+            ws, title, stats_text, _PORT_SERVICE_XL_HEADERS, _port_service_xl_rows(services),
+            _PORT_SERVICE_XL_WIDTHS,
+            center_cols={0, 1, 4, 5, 6, 7},
+            number_fmt_cols={1: XL_DATE, 8: 'R$ #,##0.00'},
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company),
+            company=company,
+            empty_message="Nenhum serviço nesta fatura.",
+        )
 
-        logo_buffer = download_logo(company)
-        if logo_buffer is not None:
-            try:
-                target_height_px = 92
-                try:
-                    logo_buffer.seek(0)
-                    with PILImage.open(logo_buffer) as pil_img:
-                        orig_w, orig_h = pil_img.size
-                    target_width_px = int(target_height_px * orig_w / orig_h) if orig_h else target_height_px
-                except Exception:
-                    target_width_px = target_height_px
-                logo_buffer.seek(0)
-                logo_img = XLImage(logo_buffer)
-                logo_img.height = target_height_px
-                logo_img.width = target_width_px
-                ws.add_image(logo_img, 'A2')
-            except Exception as e:
-                logger.error(f"Error adding logo to port service invoice Excel: {e}")
-
-        ws.merge_cells('B2:J3')
-        cell = ws['B2']
-        cell.value = c['name']
-        cell.font = Font(name='Calibri', size=38, bold=True, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[2].height = 30
-        ws.row_dimensions[3].height = 40.5
-
-        ws.merge_cells('B4:J4')
-        cell = ws['B4']
-        cell.value = f"FATURA DE SERVIÇO PORTUÁRIO Nº {batch.get('batch_number', '-')}"
-        cell.font = Font(name='Calibri', size=16, color=PRIMARY_COLOR)
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[4].height = 21
-
-        ws.row_dimensions[5].height = 13
-
-        ws.merge_cells('B6:J6')
-        cell = ws['B6']
-        cell.value = stats_text
-        cell.font = Font(name='Calibri', size=12, bold=True, color=PRIMARY_COLOR)
-        cell.fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type='solid')
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[6].height = 28
-
-        ws.merge_cells('B7:J7')
-        cell = ws['B7']
-        cell.value = f"Gerado em: {now_brt().strftime('%d/%m/%Y %H:%M')} | Fuso: UTC-3 (Brasília)"
-        cell.font = Font(name='Calibri', size=9, color='808080')
-        cell.alignment = Alignment(horizontal='center')
-        ws.row_dimensions[7].height = 15
-
-        last_row = 9
-        if services:
-            header_font = Font(size=9, bold=True, color="FFFFFF")
-            header_fill = PatternFill(start_color=PRIMARY_COLOR, end_color=PRIMARY_COLOR, fill_type="solid")
-            headers = ['Nº', 'Data', 'Cliente', 'Motorista', 'Placa', 'Turno', 'Entrada', 'Saída', 'Valor']
-            for col, header in enumerate(headers, start=2):
-                header_cell = ws.cell(row=last_row, column=col, value=header)
-                header_cell.font = header_font
-                header_cell.fill = header_fill
-            last_row += 1
-            for s in services:
-                service_date_display = s.get('service_date') or '-'
-                try:
-                    service_date_display = datetime.strptime(s['service_date'], '%Y-%m-%d').strftime('%d/%m/%Y')
-                except Exception:
-                    pass
-                ws.cell(row=last_row, column=2, value=s.get('service_number'))
-                ws.cell(row=last_row, column=3, value=service_date_display)
-                ws.cell(row=last_row, column=4, value=s.get('client_name') or '-')
-                ws.cell(row=last_row, column=5, value=s.get('driver_name') or '-')
-                ws.cell(row=last_row, column=6, value=s.get('cavalo_plate') or '-')
-                ws.cell(row=last_row, column=7, value=_TURNO_LABELS_XLSX.get(s.get('turno'), s.get('turno') or '-'))
-                ws.cell(row=last_row, column=8, value=s.get('entry_time') or '-')
-                ws.cell(row=last_row, column=9, value=s.get('exit_time') or '-')
-                ws.cell(row=last_row, column=10, value=format_currency(s.get('operation_value') or 0))
-                last_row += 1
-            subtotal_font = Font(size=9, bold=True)
-            subtotal_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-            discount_value = batch.get('discount_value') or 0
-
-            ws.cell(row=last_row, column=9, value='Valor dos Serviços:').font = subtotal_font
-            ws.cell(row=last_row, column=10, value=format_currency(batch.get('total_value') or 0)).font = subtotal_font
-            for col in range(2, 11):
-                ws.cell(row=last_row, column=col).fill = subtotal_fill
-            last_row += 1
-
-            ws.cell(row=last_row, column=9, value='Desconto:').font = subtotal_font
-            ws.cell(row=last_row, column=10, value=format_currency(discount_value)).font = subtotal_font
-            for col in range(2, 11):
-                ws.cell(row=last_row, column=col).fill = subtotal_fill
-            last_row += 1
-
-            total_font = Font(size=10, bold=True, color=PRIMARY_COLOR)
-            total_fill = PatternFill(start_color=HEADER_BG_COLOR, end_color=HEADER_BG_COLOR, fill_type="solid")
-            ws.cell(row=last_row, column=9, value='VALOR TOTAL:').font = total_font
-            ws.cell(row=last_row, column=10, value=format_currency(net_total)).font = total_font
-            for col in range(2, 11):
-                ws.cell(row=last_row, column=col).fill = total_fill
-            last_row += 1
-
-            if batch.get('observations'):
-                last_row += 1
-                ws.cell(row=last_row, column=2, value='Observações:').font = Font(size=9, bold=True)
-                last_row += 1
-                ws.cell(row=last_row, column=2, value=batch['observations']).font = Font(size=9)
-                last_row += 1
-        else:
-            ws.cell(row=last_row, column=2, value="Nenhum serviço nesta fatura.")
-            ws.cell(row=last_row, column=2).font = Font(size=10, color='808080')
-
-        ws.sheet_view.showGridLines = False
-        ws.print_area = f'A1:J{max(last_row, 9)}'
-        ws.page_setup.orientation = 'landscape'
-        ws.page_setup.fitToWidth = 1
-        ws.page_setup.fitToHeight = 0
-        ws.sheet_properties.pageSetUpPr.fitToPage = True
-        ws.print_options.horizontalCentered = True
+        last_row = 9 + max(len(services), 1) + 1
+        last_row = _xl_totals(ws, last_row, 7, 9, 10, [
+            ("Valor dos serviços", total_value),
+            ("Desconto", discount_value),
+            ("Valor total", net_total),
+        ])
+        if batch.get('observations'):
+            last_row = _xl_note(ws, last_row + 1, 2, 10, "Observações", batch['observations'])
+        _xl_extend_print_area(ws, 'J', last_row)
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -2393,17 +2341,57 @@ def generate_port_service_invoice_excel(batch: dict, services: list, company: di
 
     except Exception as e:
         logger.error(f"Error generating port service invoice Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar fatura."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook("Erro ao gerar fatura.")
+
+
+_MOVEMENT_XL_HEADERS = [
+    'ID', 'Data/Hora', 'Tipo', 'Nº Container', 'Cliente',
+    'Placa', 'Transportadora', 'Armador', 'Status', 'Tamanho',
+    'Tipo de Serviço', 'Nota Fiscal', 'Valor da Operação'
+]
+
+
+_MOVEMENT_XL_WIDTHS = {
+    'B': 8, 'C': 16, 'D': 10, 'E': 15, 'F': 28,
+    'G': 11, 'H': 22, 'I': 15, 'J': 9, 'K': 10,
+    'L': 22, 'M': 12, 'N': 17
+}
+
+
+def _movement_xl_rows(movements):
+    """Linhas de movimentação pra Faturamento e Fatura (mesmas colunas)."""
+    return [[
+        m.get('transaction_id', '-'),
+        _xl_date(m.get('created_at')),
+        "ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA",
+        m.get('container_number') or '-',
+        m.get('client_name') or '-',
+        m.get('truck_plate') or '-',
+        m.get('transport_company') or '-',
+        m.get('shipping_line') or '-',
+        m.get('status') or '-',
+        m.get('size_type') or '-',
+        m.get('service_type', '') or '-',
+        m.get('invoice_number', '') or '-',
+        m.get('service_value') if m.get('service_value') else 0,
+    ] for m in movements]
+
+
+def _bank_pairs(c):
+    return [
+        ("Banco", c['bank_name']),
+        ("Agência", c['bank_agency']),
+        ("Conta corrente", c['bank_account']),
+        ("Chave PIX", c['pix_key']),
+        ("Beneficiário", c['name']),
+        ("CNPJ", c['cnpj']),
+    ]
 
 
 def generate_billing_excel(movements: list, company: dict = None, storage_charges: list = None) -> bytes:
-    """Generate billing Excel report with Bsoft template style."""
+    """Relatório de Faturamento em Excel: uma linha por movimentação (valor na
+    moeda de cada uma), total por moeda, diárias de armazenagem em aberto e
+    dados bancários."""
     try:
         c = merge_company(company)
         wb = Workbook()
@@ -2422,122 +2410,49 @@ def generate_billing_excel(movements: list, company: dict = None, storage_charge
             val_str = format_currency(currency_totals.get(single_currency, 0), single_currency)
         else:
             val_str = ' + '.join(format_currency(v, cur) for cur, v in currency_totals.items())
-        stats_text = f"Total: {len(movements)} movimentações  |  Valor Total: {val_str}"
+        total_billed = sum(1 for m in movements if m.get('billed'))
+        stats_text = (
+            f"Movimentações: {_fmt_int(len(movements))}   •   Faturadas: {_fmt_int(total_billed)}   •   "
+            f"Não faturadas: {_fmt_int(len(movements) - total_billed)}   •   Valor total: {val_str}"
+        )
 
-        headers = [
-            'ID', 'Data/Hora', 'Tipo', 'Nº Container', 'Cliente',
-            'Placa', 'Transportadora', 'Armador', 'Status', 'Tamanho',
-            'Tipo de Serviço', 'Nota Fiscal', 'Valor da Operação'
-        ]
-
-        data_rows = []
-        for m in movements:
-            dt_brt = to_brt(m.get('created_at'))
-            created_at = dt_brt.strftime('%d/%m/%Y %H:%M') if dt_brt else str(m.get('created_at', ''))
-            data_rows.append([
-                m.get('transaction_id', '-'),
-                created_at,
-                "ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA",
-                m.get('container_number') or '-',
-                m.get('client_name') or '-',
-                m.get('truck_plate') or '-',
-                m.get('transport_company') or '-',
-                m.get('shipping_line') or '-',
-                m.get('status') or '-',
-                m.get('size_type') or '-',
-                m.get('service_type', '') or '-',
-                m.get('invoice_number', '') or '-',
-                m.get('service_value') if m.get('service_value') else 0,
-            ])
-
-        col_widths = {
-            'B': 7.3, 'C': 13.7, 'D': 8, 'E': 14, 'F': 25,
-            'G': 12, 'H': 20, 'I': 14, 'J': 6, 'K': 8,
-            'L': 16, 'M': 12, 'N': 18
-        }
-
-        # Center alignment for: ID(0), Tipo(2), Status(8), Tamanho(9)
-        center_cols = {0, 2, 8, 9}
-
-        currency_excel_format = {'BRL': 'R$ #,##0.00', 'USD': '$ #,##0.00', 'EUR': '€ #,##0.00'}
-        default_value_format = currency_excel_format.get(single_currency or 'BRL', 'R$ #,##0.00')
-
+        default_value_format = _xl_currency_format(single_currency or 'BRL')
         _bsoft_style_excel(
-            ws, "Relatório de Faturamento", stats_text, headers, data_rows, col_widths,
-            center_cols=center_cols,
-            right_align_cols={12},
-            number_fmt_cols={12: default_value_format},
+            ws, "Relatório de Faturamento", stats_text, _MOVEMENT_XL_HEADERS, _movement_xl_rows(movements),
+            _MOVEMENT_XL_WIDTHS,
+            center_cols={0, 1, 2, 8, 9},
+            number_fmt_cols={1: XL_DATETIME, 12: default_value_format},
             total_col=12 if single_currency else None,
             total_number_format=default_value_format,
             stats_text=stats_text,
             company_name=c['name'],
-            logo_buffer=download_logo(company)
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhuma movimentação encontrada para os filtros selecionados.",
         )
+        _xl_color_column(ws, 2, ['primary' if m.get('operation_type') == 'ENTRADA' else 'amber' for m in movements])
 
-        # Quando o relatório mistura moedas, cada linha precisa do formato da
-        # sua própria moeda (o número passado pra _bsoft_style_excel acima é
-        # só o padrão de coluna) e o total vira uma linha manual por moeda -
-        # nunca um SUM único, que misturaria valores de moedas diferentes.
+        # Mistura de moedas: cada linha no formato da sua moeda e o total vira
+        # um quadro com uma linha por moeda - nunca um SUM único misturando moedas.
+        next_row = 9 + max(len(movements), 1) + 1
         if not single_currency:
-            value_col = 2 + 12  # first_col (B=2) + índice da coluna Valor
-            data_start = 9  # header_row (8) + 1, mesma convenção de _bsoft_style_excel
             for idx, m in enumerate(movements):
-                cur = m.get('currency') or 'BRL'
-                ws.cell(row=data_start + idx, column=value_col).number_format = currency_excel_format.get(cur, 'R$ #,##0.00')
-            total_row = data_start + len(movements) + 1
-            label_cell = ws.cell(row=total_row, column=value_col - 1, value='TOTAL:')
-            label_cell.font = Font(name='Calibri', size=9, bold=True)
-            label_cell.alignment = Alignment(horizontal='right', vertical='center')
-            total_cell = ws.cell(row=total_row, column=value_col, value=val_str)
-            total_cell.font = Font(name='Calibri', size=9, bold=True)
+                ws.cell(row=9 + idx, column=14).number_format = _xl_currency_format(m.get('currency'))
+            next_row = _xl_totals(ws, next_row, 11, 13, 14, [
+                (f"Total ({cur})", round(v, 2), _xl_currency_format(cur)) for cur, v in currency_totals.items()
+            ], highlight_last=False)
 
         # ========== DIÁRIAS DE ARMAZENAGEM EM ABERTO ==========
         # Seção adicional, calculada na hora (nada é persistido) - containers
         # em estoque que já passaram do free time acordado na Tabela de
-        # Serviços. Cada moeda presente ganha seu próprio subtotal, nunca um
-        # total único misturando moedas.
-        last_row = _write_storage_charges_excel(ws, storage_charges, ws.max_row + 3)
+        # Serviços. Cada moeda presente ganha seu próprio subtotal.
+        next_row = _write_storage_charges_excel(ws, storage_charges, next_row + 1)
 
         # ========== DADOS BANCÁRIOS ==========
-
-        # Estilo para o título dos dados bancários
-        bank_title_font = Font(size=12, bold=True, color=PRIMARY_COLOR)
-        bank_label_font = Font(size=10, bold=True)
-        bank_value_font = Font(size=10)
-
-        # Título "DADOS BANCÁRIOS PARA PAGAMENTO"
-        ws.cell(row=last_row, column=2, value="DADOS BANCÁRIOS PARA PAGAMENTO")
-        ws.cell(row=last_row, column=2).font = bank_title_font
-        ws.merge_cells(start_row=last_row, start_column=2, end_row=last_row, end_column=6)
-
-        # Linha separadora
-        last_row += 1
-
-        # Dados do banco
-        bank_data = [
-            ("Banco:", c['bank_name']),
-            ("Agência:", c['bank_agency']),
-            ("Conta Corrente:", c['bank_account']),
-            ("CNPJ:", c['cnpj']),
-            ("Beneficiário:", c['name']),
-            ("", ""),
-            ("Chave PIX:", c['pix_key']),
-        ]
-        
-        for label, value in bank_data:
-            last_row += 1
-            if label:
-                ws.cell(row=last_row, column=2, value=label)
-                ws.cell(row=last_row, column=2).font = bank_label_font
-                ws.cell(row=last_row, column=3, value=value)
-                ws.cell(row=last_row, column=3).font = bank_value_font
-            elif value:
-                ws.cell(row=last_row, column=2, value=value)
-                ws.cell(row=last_row, column=2).font = bank_value_font
-
-        # Estende a área de impressão pra incluir o bloco de dados bancários,
-        # que fica abaixo da tabela principal.
-        ws.print_area = f'A1:N{last_row}'
+        last_row = _xl_key_values(ws, next_row + 1, 2, _bank_pairs(c), label_span=2, value_span=5,
+                                  title="Dados bancários para pagamento")
+        _xl_extend_print_area(ws, 'N', last_row)
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -2545,13 +2460,7 @@ def generate_billing_excel(movements: list, company: dict = None, storage_charge
 
     except Exception as e:
         logger.error(f"Error generating billing Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar relatório."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook()
 
 
 def generate_billing_pdf_report(movements: list, report_title: str = "Relatório de Faturamento", company: dict = None, storage_charges: list = None) -> bytes:
@@ -3132,7 +3041,8 @@ def generate_invoice_pdf(invoice: dict, movements: list, company: dict = None) -
 
 
 def generate_invoice_excel(invoice: dict, movements: list, company: dict = None) -> bytes:
-    """Generate invoice Excel with Bsoft template style."""
+    """Fatura (movimentações) em Excel: tabela das movimentações com total,
+    observações e dados bancários pra pagamento."""
     try:
         c = merge_company(company)
         wb = Workbook()
@@ -3142,118 +3052,40 @@ def generate_invoice_excel(invoice: dict, movements: list, company: dict = None)
         ws.title = sheet_title[:31] or "Fatura"
 
         _inv_dt = to_brt(invoice.get('created_at'))
-        created_at = _inv_dt.strftime('%d/%m/%Y %H:%M') if _inv_dt else str(invoice.get('created_at', '-'))
-
-        # Calculate total value
-        total_value = sum(m.get('service_value', 0) or 0 for m in movements)
-        val_str = f"R$ {total_value:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+        issued = _inv_dt.strftime('%d/%m/%Y') if _inv_dt else '-'
 
         # Movimentações com Valor da Operação zerado/vazio não aparecem na
         # fatura exportada - não somam nada ao total, então ocultá-las não
         # afeta o valor (mesmo critério do PDF).
         visible_movements = [m for m in movements if (m.get('service_value') or 0) != 0]
+        total_value = sum(m.get('service_value', 0) or 0 for m in movements)
 
-        title = f"FATURA Nº {invoice.get('invoice_number', '-')} - Cliente: {invoice.get('client_name', '-')}"
-        stats_text = f"Total: {len(visible_movements)} movimentações  |  Valor: {val_str}  |  Data: {created_at}"
-
-        headers = [
-            'ID', 'Data/Hora', 'Tipo', 'Nº Container', 'Cliente', 'Placa',
-            'Transportadora', 'Armador', 'Status', 'Tamanho',
-            'Tipo de Serviço', 'Nota Fiscal', 'Valor da Operação'
-        ]
-
-        data_rows = []
-        for m in visible_movements:
-            _m_dt = to_brt(m.get('created_at'))
-            mov_date = _m_dt.strftime('%d/%m/%Y %H:%M') if _m_dt else '-'
-            data_rows.append([
-                m.get('transaction_id', '-'),
-                mov_date,
-                "ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA",
-                m.get('container_number', '-'),
-                m.get('client_name', '-') or '-',
-                m.get('truck_plate', '-') or '-',
-                m.get('transport_company', '-') or '-',
-                m.get('shipping_line', '-') or '-',
-                m.get('status', '-') or '-',
-                m.get('size_type', '-') or '-',
-                m.get('service_type', '-') or '-',
-                m.get('invoice_number', '-') or '-',
-                m.get('service_value') if m.get('service_value') else 0,
-            ])
-
-        col_widths = {
-            'B': 7.3, 'C': 13.7, 'D': 8, 'E': 14, 'F': 25, 'G': 12,
-            'H': 20, 'I': 14, 'J': 6, 'K': 8, 'L': 16, 'M': 12, 'N': 18
-        }
-
-        # Center alignment for: ID(0), Tipo(2), Status(8), Tamanho(9)
-        center_cols = {0, 2, 8, 9}
+        title = f"Fatura Nº {invoice.get('invoice_number', '-')} - Cliente: {invoice.get('client_name', '-')}"
+        stats_text = (
+            f"CNPJ: {invoice.get('client_cnpj') or '-'}   •   Data de emissão: {issued}   •   "
+            f"Movimentações: {_fmt_int(len(visible_movements))}   •   Valor total: {format_currency(total_value, 'BRL')}"
+        )
 
         _bsoft_style_excel(
-            ws, title, stats_text,
-            headers, data_rows, col_widths,
-            center_cols=center_cols,
-            right_align_cols={12},
-            number_fmt_cols={12: 'R$ #,##0.00'},
+            ws, title, stats_text, _MOVEMENT_XL_HEADERS, _movement_xl_rows(visible_movements),
+            _MOVEMENT_XL_WIDTHS,
+            center_cols={0, 1, 2, 8, 9},
+            number_fmt_cols={1: XL_DATETIME, 12: 'R$ #,##0.00'},
             total_col=12,
             stats_text=stats_text,
             company_name=c['name'],
-            logo_buffer=download_logo(company)
+            logo_buffer=download_logo(company),
+            company=company,
+            empty_message="Nenhuma movimentação com valor nesta fatura.",
         )
+        _xl_color_column(ws, 2, ['primary' if m.get('operation_type') == 'ENTRADA' else 'amber' for m in visible_movements])
 
-        # Notes section
-        data_start = 9  # Updated to match new header rows (8 = header row)
-        notes_row = data_start + len(data_rows) + 2
-        
+        next_row = 9 + max(len(visible_movements), 1) + 2
         if invoice.get('notes'):
-            ws.cell(row=notes_row, column=2, value="OBSERVAÇÕES:")
-            ws.cell(row=notes_row, column=2).font = Font(name='Calibri', size=10, bold=True)
-            ws.merge_cells(f'B{notes_row + 1}:N{notes_row + 1}')
-            notes_cell = ws.cell(row=notes_row + 1, column=2, value=invoice.get('notes', ''))
-            notes_cell.font = Font(name='Calibri', size=10)
-            notes_cell.alignment = Alignment(wrap_text=True)
-            notes_cell.border = Border(
-                left=Side(style='thin'), right=Side(style='thin'),
-                top=Side(style='thin'), bottom=Side(style='thin')
-            )
-            ws.row_dimensions[notes_row + 1].height = 30
-            bank_start_row = notes_row + 3  # Pular 1 linha após observações
-        else:
-            bank_start_row = notes_row + 1
-        
-        # ========== DADOS BANCÁRIOS ==========
-        # Estilo para o título dos dados bancários
-        bank_title_font = Font(name='Calibri', size=12, bold=True, color=PRIMARY_COLOR)
-        bank_label_font = Font(name='Calibri', size=10, bold=True)
-        bank_value_font = Font(name='Calibri', size=10)
-
-        # Título "DADOS BANCÁRIOS PARA PAGAMENTO"
-        ws.cell(row=bank_start_row, column=2, value="DADOS BANCÁRIOS PARA PAGAMENTO")
-        ws.cell(row=bank_start_row, column=2).font = bank_title_font
-        ws.merge_cells(start_row=bank_start_row, start_column=2, end_row=bank_start_row, end_column=6)
-
-        # Dados do banco - SEM linha em branco entre Beneficiário e Chave PIX
-        bank_data = [
-            ("Banco:", c['bank_name']),
-            ("Agência:", c['bank_agency']),
-            ("Conta Corrente:", c['bank_account']),
-            ("CNPJ:", c['cnpj']),
-            ("Beneficiário:", c['name']),
-            ("Chave PIX:", c['pix_key']),
-        ]
-
-        current_row = bank_start_row
-        for label, value in bank_data:
-            current_row += 1
-            ws.cell(row=current_row, column=2, value=label)
-            ws.cell(row=current_row, column=2).font = bank_label_font
-            ws.cell(row=current_row, column=3, value=value)
-            ws.cell(row=current_row, column=3).font = bank_value_font
-
-        # Estende a área de impressão pra incluir observações e dados bancários,
-        # que ficam abaixo da tabela principal.
-        ws.print_area = f'A1:N{current_row}'
+            next_row = _xl_note(ws, next_row, 2, 14, "Observações", invoice.get('notes', ''))
+        last_row = _xl_key_values(ws, next_row, 2, _bank_pairs(c), label_span=2, value_span=5,
+                                  title="Dados bancários para pagamento")
+        _xl_extend_print_area(ws, 'N', last_row)
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -3261,13 +3093,7 @@ def generate_invoice_excel(invoice: dict, movements: list, company: dict = None)
 
     except Exception as e:
         logger.error(f"Error generating invoice Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar fatura."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook("Erro ao gerar fatura.")
 
 
 FREIGHT_PAYMENT_STATUS_LABELS = {"PENDENTE": "Pendente", "PAGO": "Pago", "CANCELADO": "Cancelado"}
@@ -3368,8 +3194,7 @@ def generate_freight_payment_report_pdf(driver_info: dict, payments: list, perio
 
 
 def generate_freight_payment_report_excel(driver_info: dict, payments: list, period: dict, company: dict = None) -> bytes:
-    """Versão Excel da prestação de contas de Pagamento Frete, mesmo template
-    Bsoft do Relatório de Movimentações (_bsoft_style_excel), incluindo Nº do
+    """Versão Excel da prestação de contas de Pagamento Frete, incluindo Nº do
     Container/Tamanho/Placas lidos da Ordem de Carregamento de origem. Quando
     a ordem levou mais de um container na mesma viagem, os valores de Nº do
     Container/Tamanho ficam empilhados (quebra de linha dentro da célula)."""
@@ -3385,9 +3210,11 @@ def generate_freight_payment_report_excel(driver_info: dict, payments: list, per
         total_geral = total_pago + total_pendente
 
         period_str = f"{period.get('date_from') or '-'} a {period.get('date_to') or '-'}"
-        title = f"PRESTAÇÃO DE CONTAS - PAGAMENTO FRETE - Motorista: {driver_info.get('name', '-')}"
-        val_str = f"R$ {total_geral:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-        stats_text = f"Período: {period_str}  |  Lançamentos: {len(payments)}  |  Total Geral: {val_str}"
+        title = f"Prestação de Contas — Pagamento Frete - Motorista: {driver_info.get('name', '-')}"
+        stats_text = (
+            f"CPF: {driver_info.get('cpf') or '-'}   •   Período: {period_str}   •   "
+            f"Lançamentos: {_fmt_int(len(payments))}   •   Total geral: {format_currency(total_geral, 'BRL')}"
+        )
 
         headers = [
             'Ordem Nº', 'Nº Pgto', 'Rota', 'Data Aprovação', 'Nº do Container',
@@ -3397,8 +3224,6 @@ def generate_freight_payment_report_excel(driver_info: dict, payments: list, per
         data_rows = []
         multiline_row_lines = []
         for p in payments:
-            created = to_brt(p.get('created_at'))
-            paid = to_brt(p.get('paid_at')) if p.get('paid_at') else None
             items = p.get('container_items') or []
             container_numbers = [str(it.get('container_number')) if it.get('container_number') else '-' for it in items] or ['-']
             sizes = [str(it.get('size_type')) if it.get('size_type') else '-' for it in items] or ['-']
@@ -3406,34 +3231,30 @@ def generate_freight_payment_report_excel(driver_info: dict, payments: list, per
                 p.get('order_number'),
                 p.get('payment_number'),
                 p.get('route_name') or '-',
-                created.strftime('%d/%m/%Y %H:%M') if created else '-',
+                _xl_date(p.get('created_at')),
                 '\n'.join(container_numbers),
                 '\n'.join(sizes),
                 p.get('truck_plate') or '-',
                 p.get('trailer_plate') or '-',
                 p.get('freight_value') or 0,
                 FREIGHT_PAYMENT_STATUS_LABELS.get(p.get('status'), p.get('status')),
-                paid.strftime('%d/%m/%Y %H:%M') if paid else '-',
+                _xl_date(p.get('paid_at')) if p.get('paid_at') else '-',
             ])
             multiline_row_lines.append(max(len(container_numbers), len(sizes)))
 
-        col_widths = {
-            'B': 9, 'C': 9, 'D': 26, 'E': 16, 'F': 16,
-            'G': 9, 'H': 12, 'I': 12, 'J': 14, 'K': 12, 'L': 16
-        }
-        center_cols = {0, 1, 5, 9}
-
         _bsoft_style_excel(
-            ws, title, stats_text,
-            headers, data_rows, col_widths,
-            center_cols=center_cols,
-            right_align_cols={8},
-            number_fmt_cols={8: 'R$ #,##0.00'},
-            total_col=None,
+            ws, title, stats_text, headers, data_rows,
+            {'B': 9, 'C': 9, 'D': 30, 'E': 16, 'F': 16, 'G': 9, 'H': 12, 'I': 12, 'J': 14, 'K': 12, 'L': 16},
+            center_cols={0, 1, 3, 5, 6, 7, 9, 10},
+            number_fmt_cols={3: XL_DATETIME, 8: 'R$ #,##0.00', 10: XL_DATETIME},
             stats_text=stats_text,
             company_name=c['name'],
-            logo_buffer=download_logo(company)
+            logo_buffer=download_logo(company),
+            company=company,
+            empty_message="Nenhum lançamento no período.",
         )
+        status_tones = {'PAGO': 'emerald', 'PENDENTE': 'amber', 'CANCELADO': 'red'}
+        _xl_color_column(ws, 9, [status_tones.get(p.get('status')) for p in payments])
 
         # Quebra de linha dentro da célula pra Nº do Container/Tamanho quando a
         # ordem levou mais de um container (empilhados um abaixo do outro) +
@@ -3448,23 +3269,13 @@ def generate_freight_payment_report_excel(driver_info: dict, payments: list, per
             if n_lines > 1:
                 ws.row_dimensions[row_num].height = max(15, 14 * n_lines)
 
-        totals_row = data_start + len(data_rows) + 1
-
-        bold_font = Font(name='Calibri', size=10, bold=True)
-        normal_font = Font(name='Calibri', size=10)
-
-        for offset, (label, value) in enumerate([
-            ("Total Pago:", total_pago),
-            ("Total Pendente:", total_pendente),
-            ("Total Geral:", total_geral),
-        ]):
-            row = totals_row + offset
-            ws.cell(row=row, column=2, value=label).font = bold_font
-            value_cell = ws.cell(row=row, column=3, value=value)
-            value_cell.number_format = 'R$ #,##0.00'
-            value_cell.font = normal_font
-
-        ws.print_area = f'A1:L{totals_row + 2}'
+        totals_row = data_start + max(len(data_rows), 1) + 1
+        last_row = _xl_totals(ws, totals_row, 7, 9, 10, [
+            ("Total pago", total_pago),
+            ("Total pendente", total_pendente),
+            ("Total geral", total_geral),
+        ])
+        _xl_extend_print_area(ws, 'L', last_row)
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -3472,13 +3283,7 @@ def generate_freight_payment_report_excel(driver_info: dict, payments: list, per
 
     except Exception as e:
         logger.error(f"Error generating freight payment report Excel: {e}")
-        wb = Workbook()
-        ws = wb.active
-        ws['A1'] = "Erro ao gerar prestação de contas."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        return buffer.getvalue()
+        return _xl_error_workbook("Erro ao gerar prestação de contas.")
 
 
 def generate_freight_payment_receipt_pdf(batch: dict, payments: list, company: dict = None) -> bytes:

@@ -1606,142 +1606,35 @@ async def download_yard_control_excel(
     date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Gera relatório Excel de containers no pátio"""
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-    
-    # Buscar dados com todos os filtros
+    """Gera relatório Excel de containers no pátio (padrão visual das planilhas
+    via generate_yard_control_excel)."""
+    from reports import generate_yard_control_excel
+
     yard_data = await get_yard_control(status_filter, client_name, shipping_line, min_days, movement_type, date_from, date_to, current_user)
-    containers = yard_data['containers']
-    stats = yard_data['stats']
-    
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Controle de Pátio"
-    
-    # Estilos
-    header_font = Font(bold=True, color="FFFFFF", size=11)
-    header_fill = PatternFill(start_color="2F5496", end_color="2F5496", fill_type="solid")
-    thin_border = Border(
-        left=Side(style='thin', color='B4B4B4'),
-        right=Side(style='thin', color='B4B4B4'),
-        top=Side(style='thin', color='B4B4B4'),
-        bottom=Side(style='thin', color='B4B4B4')
-    )
-    warning_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-    alert_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
-    danger_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")
-    entrada_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-    saida_fill = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
-    
-    # Título
-    ws.merge_cells('A1:J1')
-    title_cell = ws.cell(row=1, column=1, value="CONTROLE DE CONTAINERS NO PÁTIO")
-    title_cell.font = Font(bold=True, size=14)
-    title_cell.alignment = Alignment(horizontal='center')
-    
-    # Filtros aplicados
-    filter_text = "Filtros: "
+
+    # Filtros aplicados viram o complemento do título ("Controle de Pátio - ...")
+    filter_parts = []
     if movement_type:
-        filter_text += f"Tipo: {movement_type} | "
+        filter_parts.append(f"Tipo: {movement_type}")
     if status_filter:
-        filter_text += f"Status: {status_filter} | "
+        filter_parts.append(f"Status: {status_filter}")
+    if client_name:
+        filter_parts.append(f"Cliente: {client_name}")
+    if shipping_line:
+        filter_parts.append(f"Armador: {shipping_line}")
+    if min_days:
+        filter_parts.append(f"Mínimo de {min_days} dias")
     if date_from or date_to:
-        filter_text += f"Período: {date_from or 'início'} a {date_to or 'atual'} | "
-    ws.merge_cells('A2:J2')
-    ws.cell(row=2, column=1, value=filter_text.rstrip(' | ') if filter_text != "Filtros: " else "Filtros: Todos")
-    
-    # Estatísticas
-    ws.cell(row=4, column=1, value=f"Total de Registros: {stats['total']}")
-    ws.cell(row=4, column=3, value=f"Vazios: {stats['empty']}")
-    ws.cell(row=4, column=5, value=f"Cheios: {stats['full']}")
-    ws.cell(row=5, column=1, value=f"Média de Dias: {stats['avg_days']}")
-    ws.cell(row=5, column=3, value=f"Máximo de Dias: {stats['max_days']}")
-    ws.cell(row=5, column=5, value=f">30 dias: {stats['over_30_days']} | >60 dias: {stats['over_60_days']} | >90 dias: {stats['over_90_days']}")
-    
-    # Cabeçalhos
-    headers = ["Nº Container", "Tipo", "Status", "Tamanho", "Armador", "Cliente", "Data Entrada", "Data Saída", "Dias no Pátio", "Booking"]
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=7, column=col, value=header)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        cell.border = thin_border
-    
-    # Congelar
-    ws.freeze_panes = 'A8'
-    
-    # Dados
-    for row, c in enumerate(containers, 8):
-        ws.cell(row=row, column=1, value=c['container_number']).border = thin_border
-        
-        tipo_cell = ws.cell(row=row, column=2, value=c.get('operation_type', 'ENTRADA'))
-        tipo_cell.border = thin_border
-        if c.get('operation_type') == 'ENTRADA' or c.get('in_stock', True):
-            tipo_cell.fill = entrada_fill
-        else:
-            tipo_cell.fill = saida_fill
-        
-        ws.cell(row=row, column=3, value=c['status']).border = thin_border
-        ws.cell(row=row, column=4, value=c['size_type']).border = thin_border
-        ws.cell(row=row, column=5, value=c['shipping_line']).border = thin_border
-        ws.cell(row=row, column=6, value=c['client_name'] or '-').border = thin_border
-        
-        # Data Entrada
-        if c.get('entry_date'):
-            try:
-                entry_date = datetime.fromisoformat(c['entry_date'].replace('Z', '+00:00'))
-                ws.cell(row=row, column=7, value=entry_date.strftime('%d/%m/%Y')).border = thin_border
-            except:
-                ws.cell(row=row, column=7, value='-').border = thin_border
-        else:
-            ws.cell(row=row, column=7, value='-').border = thin_border
-        
-        # Data Saída
-        if c.get('exit_date'):
-            try:
-                exit_date = datetime.fromisoformat(c['exit_date'].replace('Z', '+00:00'))
-                ws.cell(row=row, column=8, value=exit_date.strftime('%d/%m/%Y')).border = thin_border
-            except:
-                ws.cell(row=row, column=8, value='-').border = thin_border
-        else:
-            ws.cell(row=row, column=8, value='-').border = thin_border
-        
-        days_cell = ws.cell(row=row, column=9, value=c['days_in_yard'])
-        days_cell.border = thin_border
-        days_cell.alignment = Alignment(horizontal='center')
-        
-        # Colorir baseado nos dias
-        if c['days_in_yard'] > 90:
-            days_cell.fill = danger_fill
-        elif c['days_in_yard'] > 60:
-            days_cell.fill = warning_fill
-        elif c['days_in_yard'] > 30:
-            days_cell.fill = alert_fill
-        
-        ws.cell(row=row, column=10, value=c['booking'] or '-').border = thin_border
-    
-    # Ajustar larguras
-    ws.column_dimensions['A'].width = 18
-    ws.column_dimensions['B'].width = 12
-    ws.column_dimensions['C'].width = 10
-    ws.column_dimensions['D'].width = 12
-    ws.column_dimensions['E'].width = 18
-    ws.column_dimensions['F'].width = 30
-    ws.column_dimensions['G'].width = 14
-    ws.column_dimensions['H'].width = 14
-    ws.column_dimensions['I'].width = 15
-    ws.column_dimensions['J'].width = 15
-    
-    # Salvar
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
-    
+        filter_parts.append(f"Período: {date_from or 'início'} a {date_to or 'atual'}")
+
+    company = await get_company_settings()
+    excel_bytes = generate_yard_control_excel(
+        yard_data['containers'], yard_data['stats'], filter_text=' · '.join(filter_parts) or None, company=company,
+    )
+
     filename = f"controle_patio_{now_brt().strftime('%d-%m-%Y_%H-%M')}.xlsx"
-    
     return StreamingResponse(
-        output,
+        io.BytesIO(excel_bytes),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
