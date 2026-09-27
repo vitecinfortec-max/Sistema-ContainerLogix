@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
   StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
@@ -10,11 +10,12 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Checkbox } from '../components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
-import { Wallet, Plus, Eye, Trash2, Printer, Pencil, X } from 'lucide-react';
+import { Wallet, Plus, Eye, Trash2, Printer, Pencil, X, CheckCircle2, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -32,6 +33,8 @@ export default function DailyRateRequestPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
 
   const [clients, setClients] = useState([]);
@@ -90,11 +93,12 @@ export default function DailyRateRequestPage() {
     }
   };
 
-  const loadRequests = async (search = '') => {
+  const loadRequests = async (search = searchQuery, status = statusFilter) => {
     setLoading(true);
     try {
       const params = { page: pagination.page, per_page: 15 };
       if (search) params.search = search;
+      if (status) params.status = status;
 
       const response = await api.getDailyRateRequests(params);
       setRequests(response.data.items);
@@ -117,8 +121,36 @@ export default function DailyRateRequestPage() {
 
   const clearSearch = () => {
     setSearchQuery('');
+    setStatusFilter('');
     setPagination(prev => ({ ...prev, page: 1 }));
-    loadRequests('');
+    loadRequests('', '');
+  };
+
+  const handleStatusFilterChange = (value) => {
+    const next = value === 'ALL' ? '' : value;
+    setStatusFilter(next);
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadRequests(searchQuery, next);
+  };
+
+  // Marca como Pago/Pendente todas as solicitações selecionadas (uma ou
+  // várias). Só habilita quando todas estão no status de origem certo.
+  const markSelectedAs = async (newStatus) => {
+    const targets = requests.filter((r) => selectedIds.has(r.id) && r.status !== newStatus);
+    if (targets.length === 0 || updatingStatus) return;
+    setUpdatingStatus(true);
+    try {
+      await Promise.all(targets.map((r) => api.updateDailyRateRequestStatus(r.id, newStatus)));
+      const plural = targets.length > 1;
+      toast.success(newStatus === 'PAGO'
+        ? (plural ? `${targets.length} solicitações marcadas como pagas` : 'Solicitação marcada como paga')
+        : (plural ? `${targets.length} solicitações voltaram para pendente` : 'Solicitação voltou para pendente'));
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar o status');
+    } finally {
+      setUpdatingStatus(false);
+      loadRequests();
+    }
   };
 
   const resetForm = () => {
@@ -246,6 +278,9 @@ export default function DailyRateRequestPage() {
   const singleSelectedRequest = selectedIds.size === 1
     ? requests.find(r => r.id === [...selectedIds][0])
     : null;
+  const selectedRequests = requests.filter((r) => selectedIds.has(r.id));
+  const canMarkPaid = selectedRequests.length > 0 && selectedRequests.every((r) => r.status === 'PENDENTE');
+  const canMarkPending = selectedRequests.length > 0 && selectedRequests.every((r) => r.status === 'PAGO');
 
   const handlePrintPDF = async (id) => {
     try {
@@ -281,7 +316,7 @@ export default function DailyRateRequestPage() {
       <div className="space-y-4">
         <PageHeader icon={Wallet} title="Solicitação de Diária" subtitle="Gerencie as solicitações de diária, comissão e almoço dos motoristas" />
 
-        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch} onApply={handleSearch}>
+        <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearSearch} onApply={handleSearch}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Motorista, placa ou cliente">
               <SearchInput
@@ -290,6 +325,17 @@ export default function DailyRateRequestPage() {
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 data-testid="search-daily-rate-input"
               />
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter || 'ALL'} onValueChange={handleStatusFilterChange}>
+                <SelectTrigger className="h-9 text-sm" data-testid="filter-daily-rate-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos</SelectItem>
+                  <SelectItem value="PENDENTE">Pendente</SelectItem>
+                  <SelectItem value="PAGO">Pago</SelectItem>
+                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -305,6 +351,10 @@ export default function DailyRateRequestPage() {
             >
               <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedRequest && openDetails(singleSelectedRequest)} disabled={!singleSelectedRequest} />
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedRequest && openEditModal(singleSelectedRequest)} disabled={!singleSelectedRequest} />
+              <ToolbarDivider />
+              <ToolbarButton icon={CheckCircle2} label="Marcar como pago" tone="emerald" onClick={() => markSelectedAs('PAGO')} disabled={!canMarkPaid || updatingStatus} testId="daily-rate-mark-paid" />
+              <ToolbarButton icon={RotateCcw} label="Marcar como pendente" tone="amber" onClick={() => markSelectedAs('PENDENTE')} disabled={!canMarkPending || updatingStatus} testId="daily-rate-mark-pending" />
+              <ToolbarDivider />
               <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedRequest && handlePrintPDF(singleSelectedRequest.id)} disabled={!singleSelectedRequest} />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRequest && handleDelete(singleSelectedRequest.id)} disabled={!singleSelectedRequest} />
             </Toolbar>
@@ -498,7 +548,10 @@ export default function DailyRateRequestPage() {
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Solicitação #{selectedRequest?.request_number}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              Solicitação #{selectedRequest?.request_number}
+              {selectedRequest && getStatusBadge(selectedRequest.status)}
+            </DialogTitle>
           </DialogHeader>
 
           {selectedRequest && (
