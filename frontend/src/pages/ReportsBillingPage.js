@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { FilterCard, FilterField, SearchInput, DataCard, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { FileText, FileSpreadsheet, Calendar, X, BarChart3 } from 'lucide-react';
+import { FileText, FileSpreadsheet, X, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -231,87 +231,102 @@ export default function ReportsBillingPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="reports-billing-page">
-        {/* Header */}
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Relatório de Faturamento
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gere relatórios financeiros com dados de faturamento das movimentações</p>
-        </div>
+      <div className="space-y-4" data-testid="reports-billing-page">
+        <PageHeader icon={BarChart3} title="Relatório de Faturamento" subtitle="Gere relatórios financeiros com dados de faturamento das movimentações" />
 
-        {/* Filters */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                Filtrar
-              </span>
-              {hasFilters && (
-                <button onClick={clearFilters} className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="report-billing-clear-filters">
-                  <X className="w-3 h-3" />
-                  Limpar
-                </button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="h-8 text-xs"
-                  data-testid="report-billing-date-from"
-                />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="h-8 text-xs"
-                  data-testid="report-billing-date-to"
-                />
-              </div>
+        <FilterCard
+          hasFilters={!!hasFilters}
+          onClear={clearFilters}
+          clearLinkTestId="report-billing-clear-filters"
+          actions={(
+            <div className="flex items-center justify-end gap-2 flex-wrap">
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Faturamento</span>
+              <Button type="button" variant="outline" size="sm" onClick={downloadPDF} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-billing-pdf-button">
+                <FileText className="w-4 h-4 text-red-600" /> PDF
+              </Button>
+              <Button type="button" size="sm" onClick={downloadExcel} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-billing-excel-button">
+                <FileSpreadsheet className="w-4 h-4" /> Excel
+              </Button>
+              <span className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-1" />
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Diárias de armazenagem</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={downloadStorageOveragePDF}
+                disabled={loading}
+                title={dateFrom || dateTo ? 'Baixar PDF de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar PDF de Diárias'}
+                className="h-8 text-xs gap-1.5"
+                data-testid="download-storage-overage-pdf-button"
+              >
+                <FileText className="w-4 h-4 text-red-600" /> PDF
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={downloadStorageOverageExcel}
+                disabled={loading}
+                title={dateFrom || dateTo ? 'Baixar Excel de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar Excel de Diárias'}
+                className="h-8 text-xs gap-1.5"
+                data-testid="download-storage-overage-excel-button"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel
+              </Button>
+            </div>
+          )}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <FilterField label="Data início">
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-9 text-sm"
+                data-testid="report-billing-date-from"
+              />
+            </FilterField>
+            <FilterField label="Data fim">
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-9 text-sm"
+                data-testid="report-billing-date-to"
+              />
+            </FilterField>
 
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Operação</Label>
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-billing-filter-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[13px]">Todas as Operações</SelectItem>
-                    <SelectItem value="ENTRADA" className="text-[13px]">Apenas Entradas</SelectItem>
-                    <SelectItem value="SAIDA" className="text-[13px]">Apenas Saídas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <FilterField label="Operação">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="h-9 text-sm" data-testid="report-billing-filter-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todas as Operações</SelectItem>
+                  <SelectItem value="ENTRADA" className="text-[13px]">Apenas Entradas</SelectItem>
+                  <SelectItem value="SAIDA" className="text-[13px]">Apenas Saídas</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
 
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-billing-filter-status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[13px]">Todos os Status</SelectItem>
-                    <SelectItem value="CHEIO" className="text-[13px]">Cheio</SelectItem>
-                    <SelectItem value="VAZIO" className="text-[13px]">Vazio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <FilterField label="Status">
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="h-9 text-sm" data-testid="report-billing-filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todos os Status</SelectItem>
+                  <SelectItem value="CHEIO" className="text-[13px]">Cheio</SelectItem>
+                  <SelectItem value="VAZIO" className="text-[13px]">Vazio</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
 
-              {/* Cliente - Autocomplete (digite para buscar) */}
-              <div ref={clientBoxRef}>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
+            {/* Cliente - Autocomplete (digite para buscar) */}
+            <div ref={clientBoxRef}>
+              <FilterField label="Cliente">
                 <div className="relative">
-                  <Input
+                  <SearchInput
                     value={clientSearch}
                     onChange={(e) => handleClientSearch(e.target.value)}
                     onFocus={() => {
@@ -319,7 +334,7 @@ export default function ReportsBillingPage() {
                         setShowClientSuggestions(true);
                       }
                     }}
-                    className={`h-8 text-xs pr-8 ${filterClient !== 'all' ? 'border-emerald-500 bg-emerald-50' : ''}`}
+                    className={`pr-8 ${filterClient !== 'all' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : ''}`}
                     data-testid="report-billing-filter-client"
                   />
                   {filterClient !== 'all' && (
@@ -357,99 +372,36 @@ export default function ReportsBillingPage() {
                     </div>
                   )}
                 </div>
-              </div>
-
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Faturado</Label>
-                <Select value={billedFilter} onValueChange={setBilledFilter}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-billing-filter-billed">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[13px]">Todas</SelectItem>
-                    <SelectItem value="billed" className="text-[13px]">Faturadas</SelectItem>
-                    <SelectItem value="unbilled" className="text-[13px]">Não Faturadas</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              </FilterField>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Barra de ações */}
-        <div className="flex flex-wrap items-end gap-4">
-          <div>
-            <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wide font-semibold">Faturamento</Label>
-            <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={downloadPDF}
-                disabled={loading}
-                title="Baixar PDF"
-                data-testid="download-billing-pdf-button"
-                className="h-9 w-9 p-0 disabled:opacity-30"
-              >
-                <FileText className="w-4 h-4 text-red-600" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={downloadExcel}
-                disabled={loading}
-                title="Baixar Excel"
-                data-testid="download-billing-excel-button"
-                className="h-9 w-9 p-0 disabled:opacity-30"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-green-600" />
-              </Button>
-            </div>
+            <FilterField label="Faturado">
+              <Select value={billedFilter} onValueChange={setBilledFilter}>
+                <SelectTrigger className="h-9 text-sm" data-testid="report-billing-filter-billed">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todas</SelectItem>
+                  <SelectItem value="billed" className="text-[13px]">Faturadas</SelectItem>
+                  <SelectItem value="unbilled" className="text-[13px]">Não Faturadas</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
           </div>
-
-          <div>
-            <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wide font-semibold">Diárias de Armazenagem</Label>
-            <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={downloadStorageOveragePDF}
-                disabled={loading}
-                title={dateFrom || dateTo ? 'Baixar PDF de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar PDF de Diárias'}
-                data-testid="download-storage-overage-pdf-button"
-                className="h-9 w-9 p-0 disabled:opacity-30"
-              >
-                <FileText className="w-4 h-4 text-red-600" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={downloadStorageOverageExcel}
-                disabled={loading}
-                title={dateFrom || dateTo ? 'Baixar Excel de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar Excel de Diárias'}
-                data-testid="download-storage-overage-excel-button"
-                className="h-9 w-9 p-0 disabled:opacity-30"
-              >
-                <FileSpreadsheet className="w-4 h-4 text-green-600" />
-              </Button>
-            </div>
-            {(dateFrom || dateTo) && (
-              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 max-w-[220px]">
-                Considera só os dias excedentes dentro do período selecionado.
-              </p>
-            )}
-          </div>
-        </div>
+          {(dateFrom || dateTo) && (
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
+              O relatório de Diárias de Armazenagem considera só os dias excedentes dentro do período selecionado.
+            </p>
+          )}
+        </FilterCard>
 
         {/* Faturamento por Dia */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-billing-chart-card">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-primary" />
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Faturamento por Dia</CardTitle>
-              <span className="text-xs text-slate-400 dark:text-slate-500">(últimos 14 dias)</span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
+        <DataCard
+          title={(<span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Faturamento por dia</span>)}
+          meta={<span className="text-xs text-slate-400 dark:text-slate-500">últimos 14 dias</span>}
+          testId="daily-billing-chart-card"
+        >
+          <div className="p-4">
             {dailyChart.length > 0 ? (
               <div className="h-72 w-full" data-testid="daily-billing-chart">
                 <ResponsiveContainer width="100%" height="100%">
@@ -468,13 +420,10 @@ export default function ReportsBillingPage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
-              </div>
+              <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </DataCard>
       </div>
     </Layout>
   );

@@ -1,25 +1,27 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterField, DataCard, Toolbar, ToolbarButton, StatusPill, PlateTag, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Autocomplete } from '../components/Autocomplete';
-import { Anchor, Search, Eye, Printer, FileSpreadsheet, Pencil, X, Check } from 'lucide-react';
+import { Anchor, Search, Eye, FileText, FileSpreadsheet, Pencil, Printer, X, Check, Receipt } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const BATCH_STATUS_OPTIONS = [
-  { value: 'PENDENTE', label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'PAGO', label: 'Pago', color: 'bg-green-100 text-green-800' },
-  { value: 'CANCELADO', label: 'Cancelado', color: 'bg-red-100 text-red-800' },
+  { value: 'PENDENTE', label: 'Pendente', tone: 'amber' },
+  { value: 'PAGO', label: 'Pago', tone: 'emerald' },
+  { value: 'CANCELADO', label: 'Cancelado', tone: 'red' },
 ];
 
 const getBatchStatusBadge = (status) => BATCH_STATUS_OPTIONS.find(s => s.value === status) || BATCH_STATUS_OPTIONS[0];
@@ -288,24 +290,14 @@ export default function PortServiceBillingPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="port-service-billing-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Faturamento Portuário</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Selecione um cliente e um período pra faturar os Serviços Portuários realizados</p>
-        </div>
+      <div className="space-y-4" data-testid="port-service-billing-page">
+        <PageHeader icon={Anchor} title="Faturamento Portuário" subtitle="Selecione um cliente e um período pra faturar os Serviços Portuários realizados" />
 
         {/* Gerar Fatura */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Anchor className="w-4 h-4" />
-              Gerar Fatura
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div className="sm:col-span-2">
-                <Label className="text-xs mb-1 block">Cliente *</Label>
+        <DataCard title={(<span className="flex items-center gap-2"><Receipt className="w-4 h-4 text-primary" />Gerar fatura</span>)}>
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+              <FilterField label="Cliente *" className="sm:col-span-2">
                 <Autocomplete
                   value={clientName}
                   onChange={(val) => { setClientName(val); setClientId(''); }}
@@ -313,96 +305,105 @@ export default function PortServiceBillingPage() {
                   options={clients}
                   displayField="name"
                   valueField="id"
+                  className="text-sm"
                 />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">Período De</Label>
-                <Input type="date" className="h-9" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-              </div>
-              <div>
-                <Label className="text-xs mb-1 block">Período Até</Label>
-                <Input type="date" className="h-9" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-              </div>
+              </FilterField>
+              <FilterField label="Período de">
+                <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              </FilterField>
+              <FilterField label="Período até">
+                <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              </FilterField>
             </div>
-            <Button size="sm" onClick={handleSearchCandidates} disabled={searching} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
-              <Search className="w-3.5 h-3.5 mr-1.5" />
-              Buscar
-            </Button>
+            <div className="flex justify-end">
+              <Button size="sm" onClick={handleSearchCandidates} disabled={searching} className="h-8 text-xs px-4 gap-1.5">
+                <Search className="w-3.5 h-3.5" />
+                {searching ? 'Buscando...' : 'Buscar serviços'}
+              </Button>
+            </div>
 
             {candidates.length > 0 && (
-              <div className="space-y-3 pt-2">
-                <div className="border rounded-md overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="text-left p-2 w-10">
-                          <Checkbox
-                            checked={candidates.length > 0 && candidates.every(c => selectedIds.has(c.id))}
-                            onCheckedChange={toggleSelectAllCandidates}
-                          />
-                        </th>
-                        <th className="text-left p-2">Nº</th>
-                        <th className="text-left p-2">Data</th>
-                        <th className="text-left p-2">Motorista</th>
-                        <th className="text-left p-2">Placa</th>
-                        <th className="text-left p-2">Turno</th>
-                        <th className="text-right p-2">Valor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {candidates.map((c) => {
-                        const isSelected = selectedIds.has(c.id);
-                        return (
-                          <tr
-                            key={c.id}
-                            className={`border-t cursor-pointer ${isSelected ? 'bg-primary/10' : ''}`}
-                            onClick={() => toggleSelect(c.id)}
-                          >
-                            <td className="p-2" onClick={(e) => e.stopPropagation()}>
-                              <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(c.id)} />
-                            </td>
-                            <td className="p-2">#{c.service_number}</td>
-                            <td className="p-2">{fmtDate(c.service_date)}</td>
-                            <td className="p-2">{c.driver_name}</td>
-                            <td className="p-2 font-mono">{c.cavalo_plate}</td>
-                            <td className="p-2">{c.turno === 'NOITE' ? 'Noite' : 'Dia'}</td>
-                            <td className="p-2 text-right">{fmtMoney(c.operation_value)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              <div className="space-y-3">
+                <div className="rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th className="w-10 pr-0">
+                            <Checkbox
+                              checked={candidates.length > 0 && candidates.every(c => selectedIds.has(c.id))}
+                              onCheckedChange={toggleSelectAllCandidates}
+                            />
+                          </th>
+                          <th>Nº</th>
+                          <th>Data</th>
+                          <th>Motorista</th>
+                          <th>Placa</th>
+                          <th>Turno</th>
+                          <th className="!text-right">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {candidates.map((c) => {
+                          const isSelected = selectedIds.has(c.id);
+                          return (
+                            <tr
+                              key={c.id}
+                              data-selected={isSelected}
+                              className="cursor-pointer"
+                              onClick={() => toggleSelect(c.id)}
+                            >
+                              <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                                <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(c.id)} />
+                              </td>
+                              <td className="cell-strong whitespace-nowrap tabular-nums">#{c.service_number}</td>
+                              <td className="whitespace-nowrap tabular-nums">{fmtDate(c.service_date)}</td>
+                              <td><div className="max-w-[220px] truncate" title={c.driver_name || ''}>{c.driver_name}</div></td>
+                              <td><PlateTag>{c.cavalo_plate}</PlateTag></td>
+                              <td>
+                                <StatusPill tone={c.turno === 'NOITE' ? 'violet' : 'amber'} dot={false}>
+                                  {c.turno === 'NOITE' ? 'Noite' : 'Dia'}
+                                </StatusPill>
+                              </td>
+                              <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(c.operation_value)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <Label className="text-xs mb-1 block">Desconto (R$)</Label>
+                  <FilterField label="Desconto (R$)">
                     <Input
                       type="number"
                       step="0.01"
                       min="0"
-                      className="h-9"
+                      className="h-9 text-sm"
                       value={discountValue}
                       onChange={(e) => setDiscountValue(e.target.value)}
                       data-testid="port-service-invoice-discount-input"
                     />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label className="text-xs mb-1 block">Observações</Label>
+                  </FilterField>
+                  <FilterField label="Observações" className="sm:col-span-2">
                     <Input
-                      className="h-9"
+                      className="h-9 text-sm"
                       value={batchObservations}
                       onChange={(e) => setBatchObservations(e.target.value)}
                     />
-                  </div>
+                  </FilterField>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    {selectedIds.size} selecionado(s) — Serviços: {fmtMoney(selectedTotal)}
-                    {discountNumber > 0 && <> — Desconto: {fmtMoney(discountNumber)}</>}
-                    {' '}— Total: <span className="font-semibold text-foreground">{fmtMoney(netTotal)}</span>
-                  </span>
+                <div className="flex items-center justify-between gap-3 flex-wrap rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-4 py-3">
+                  <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-[13px] text-slate-500 dark:text-slate-400">
+                    <span><span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{selectedIds.size}</span> selecionado(s)</span>
+                    <span>Serviços: <span className="font-medium text-slate-700 dark:text-slate-200 tabular-nums">{fmtMoney(selectedTotal)}</span></span>
+                    {discountNumber > 0 && (
+                      <span>Desconto: <span className="font-medium text-red-600 dark:text-red-400 tabular-nums">- {fmtMoney(discountNumber)}</span></span>
+                    )}
+                    <span>Total: <span className="text-base font-semibold text-primary tabular-nums">{fmtMoney(netTotal)}</span></span>
+                  </div>
                   <Button onClick={handleGenerateInvoice} disabled={generating || selectedIds.size === 0} data-testid="generate-port-service-invoice-button">
                     {generating ? 'Gerando...' : `Gerar Fatura (${selectedIds.size})`}
                   </Button>
@@ -410,131 +411,87 @@ export default function PortServiceBillingPage() {
               </div>
             )}
             {candidates.length === 0 && clientId && !searching && (
-              <p className="text-sm text-muted-foreground pt-2">Nenhum Serviço Portuário pendente de faturamento encontrado pra esse cliente/período.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum Serviço Portuário pendente de faturamento encontrado pra esse cliente/período.</p>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </DataCard>
 
-        {/* Toolbar da lista de faturas */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedBatch && openDetails(singleSelectedBatch)}
-            disabled={!singleSelectedBatch}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Ver Detalhes"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedBatch && handlePrintPDF(singleSelectedBatch.id)}
-            disabled={!singleSelectedBatch}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Baixar PDF"
-          >
-            <Printer className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedBatch && handleDownloadExcel(singleSelectedBatch.id)}
-            disabled={!singleSelectedBatch}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Baixar Excel"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-green-600" />
-          </Button>
-          {selectedBatchIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedBatchIds.size} selecionado(s)
-            </span>
+        {/* Faturas geradas - marque uma pra habilitar as ações da barra */}
+        <DataCard
+          title="Faturas de serviço portuário"
+          count={pagination.total}
+          toolbar={(
+            <Toolbar selectedCount={selectedBatchIds.size}>
+              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedBatch && openDetails(singleSelectedBatch)} disabled={!singleSelectedBatch} />
+              <ToolbarButton icon={FileText} label="Baixar PDF" tone="red" onClick={() => singleSelectedBatch && handlePrintPDF(singleSelectedBatch.id)} disabled={!singleSelectedBatch} />
+              <ToolbarButton icon={FileSpreadsheet} label="Baixar Excel" tone="emerald" onClick={() => singleSelectedBatch && handleDownloadExcel(singleSelectedBatch.id)} disabled={!singleSelectedBatch} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Anchor className="w-4 h-4" />
-              Faturas de Serviço Portuário ({pagination.total})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loadingBatches ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : batches.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                Nenhuma fatura de Serviço Portuário gerada ainda
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left w-10">
-                        <Checkbox
-                          checked={batches.length > 0 && batches.every(b => selectedBatchIds.has(b.id))}
-                          onCheckedChange={toggleSelectAllBatchesOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Período</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Serviços</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Valor Total</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Criado em</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {batches.map((batch, idx) => {
-                      const isSelected = selectedBatchIds.has(batch.id);
-                      const badge = getBatchStatusBadge(batch.status);
-                      return (
-                        <tr
-                          key={batch.id}
-                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          onClick={() => toggleSelectBatch(batch.id)}
-                        >
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectBatch(batch.id)} />
-                          </td>
-                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{batch.batch_number}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{batch.client_name}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{fmtPeriod(batch.period_from, batch.period_to)}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{batch.item_count}</td>
-                          <td className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">{fmtMoney(batch.net_total ?? batch.total_value)}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${badge.color}`}>{badge.label}</span>
-                          </td>
-                          <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                            {batch.created_at && format(new Date(batch.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {pagination.pages > 1 && (
-              <div className="flex justify-center gap-2 mt-4 pb-4">
-                <Button variant="outline" size="sm" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
-                  Anterior
-                </Button>
-                <span className="px-4 py-2 text-sm">Página {pagination.page} de {pagination.pages}</span>
-                <Button variant="outline" size="sm" disabled={pagination.page === pagination.pages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>
-                  Próxima
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          footer={(
+            <TablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              pageSize={15}
+              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+            />
+          )}
+        >
+          {loadingBatches ? (
+            <EmptyState title="Carregando..." />
+          ) : batches.length === 0 ? (
+            <EmptyState icon={Anchor} title="Nenhuma fatura de Serviço Portuário gerada ainda" hint="Use o card acima pra buscar os serviços de um cliente e gerar a fatura" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={batches.length > 0 && batches.every(b => selectedBatchIds.has(b.id))}
+                        onCheckedChange={toggleSelectAllBatchesOnPage}
+                      />
+                    </th>
+                    <th>Nº</th>
+                    <th>Cliente</th>
+                    <th>Período</th>
+                    <th className="!text-right">Serviços</th>
+                    <th className="!text-right">Valor total</th>
+                    <th>Status</th>
+                    <th>Criado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map((batch) => {
+                    const isSelected = selectedBatchIds.has(batch.id);
+                    const badge = getBatchStatusBadge(batch.status);
+                    return (
+                      <tr
+                        key={batch.id}
+                        data-selected={isSelected}
+                        className="cursor-pointer"
+                        onClick={() => toggleSelectBatch(batch.id)}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectBatch(batch.id)} />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{batch.batch_number}</td>
+                        <td><div className="max-w-[240px] truncate" title={batch.client_name || ''}>{batch.client_name}</div></td>
+                        <td className="whitespace-nowrap tabular-nums">{fmtPeriod(batch.period_from, batch.period_to)}</td>
+                        <td className="text-right tabular-nums">{batch.item_count}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(batch.net_total ?? batch.total_value)}</td>
+                        <td><StatusPill tone={badge.tone}>{badge.label}</StatusPill></td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {batch.created_at && format(new Date(batch.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
 
       {/* Modal Detalhes */}

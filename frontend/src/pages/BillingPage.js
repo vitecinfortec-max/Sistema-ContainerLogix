@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
+  StatusPill, UserTag, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -12,8 +16,8 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { 
   Receipt, Plus, Search, FileText, Trash2, Eye, 
-  ChevronLeft, ChevronRight, X, Check, Package,
-  Calendar, User, DollarSign, Download, FileSpreadsheet,
+  X, Check, Package,
+  Calendar, User, DollarSign, FileSpreadsheet,
   Edit, History, Clock, ChevronDown
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -23,9 +27,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 const ITEMS_PER_PAGE = 15;
 
 const INVOICE_STATUS_OPTIONS = [
-  { value: 'PENDENTE', label: 'Pendente', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'PAGO', label: 'Pago', color: 'bg-green-100 text-green-800' },
-  { value: 'CANCELADO', label: 'Cancelado', color: 'bg-red-100 text-red-800' },
+  { value: 'PENDENTE', label: 'Pendente', tone: 'amber' },
+  { value: 'PAGO', label: 'Pago', tone: 'emerald' },
+  { value: 'CANCELADO', label: 'Cancelado', tone: 'red' },
 ];
 
 const getInvoiceStatusBadge = (status) => {
@@ -55,7 +59,10 @@ export default function BillingPage() {
   const [totalInvoices, setTotalInvoices] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  
+  // Filtro por cliente da lista: o texto digitado só vale ao clicar em Filtrar
+  const [clientFilter, setClientFilter] = useState('');
+  const [appliedClient, setAppliedClient] = useState('');
+
   // Estado do Modal de Nova Fatura
   const [showNewInvoice, setShowNewInvoice] = useState(false);
   const [unbilledMovements, setUnbilledMovements] = useState([]);
@@ -109,14 +116,15 @@ export default function BillingPage() {
     loadInvoices();
     loadClients();
     setSelectedIds(new Set());
-  }, [currentPage]);
+  }, [currentPage, appliedClient]);
 
   const loadInvoices = async () => {
     try {
       setLoading(true);
+      const clientParams = appliedClient ? { client_name: appliedClient } : {};
       const [invoicesRes, countRes] = await Promise.all([
-        api.getInvoices({ page: currentPage, per_page: ITEMS_PER_PAGE }),
-        api.getInvoicesCount()
+        api.getInvoices({ page: currentPage, per_page: ITEMS_PER_PAGE, ...clientParams }),
+        api.getInvoicesCount(clientParams)
       ]);
       setInvoices(invoicesRes.data);
       setTotalInvoices(countRes.data.count);
@@ -529,10 +537,10 @@ export default function BillingPage() {
 
   const formatHistoryAction = (action) => {
     switch (action) {
-      case 'CREATED': return { label: 'Criada', color: 'bg-green-100 text-green-800' };
-      case 'UPDATED': return { label: 'Atualizada', color: 'bg-blue-100 text-blue-800' };
-      case 'DELETED': return { label: 'Excluída', color: 'bg-red-100 text-red-800' };
-      default: return { label: action, color: 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200' };
+      case 'CREATED': return { label: 'Criada', tone: 'emerald' };
+      case 'UPDATED': return { label: 'Atualizada', tone: 'blue' };
+      case 'DELETED': return { label: 'Excluída', tone: 'red' };
+      default: return { label: action, tone: 'slate' };
     }
   };
 
@@ -674,6 +682,17 @@ export default function BillingPage() {
 
   const totalPages = Math.ceil(totalInvoices / ITEMS_PER_PAGE);
 
+  const applyClientFilter = () => {
+    setAppliedClient(clientFilter.trim());
+    setCurrentPage(1);
+  };
+
+  const clearClientFilter = () => {
+    setClientFilter('');
+    setAppliedClient('');
+    setCurrentPage(1);
+  };
+
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -692,220 +711,146 @@ export default function BillingPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="billing-page">
-        {/* Header */}
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Faturamento
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-            Gerencie as faturas do sistema
-          </p>
-        </div>
+      <div className="space-y-4" data-testid="billing-page">
+        <PageHeader icon={Receipt} title="Faturamento" subtitle="Gerencie as faturas do sistema" />
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openNewInvoiceModal}
-            className="h-9 w-9 p-0"
-            title="Gerar Faturamento"
-            data-testid="new-invoice-button"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedInvoice && viewInvoiceDetails(singleSelectedInvoice)}
-            disabled={!singleSelectedInvoice}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Ver Detalhes"
-            data-testid={singleSelectedInvoice ? `view-invoice-${singleSelectedInvoice.id}` : undefined}
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedInvoice && downloadPdf(singleSelectedInvoice)}
-            disabled={!singleSelectedInvoice || downloadingPdf === singleSelectedInvoice?.id}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Baixar PDF"
-          >
-            {singleSelectedInvoice && downloadingPdf === singleSelectedInvoice.id ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
-            ) : (
-              <Download className="w-4 h-4 text-emerald-600" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedInvoice && downloadExcel(singleSelectedInvoice)}
-            disabled={!singleSelectedInvoice || downloadingExcel === singleSelectedInvoice?.id}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Baixar Excel"
-            data-testid={singleSelectedInvoice ? `download-invoice-${singleSelectedInvoice.id}` : undefined}
-          >
-            {singleSelectedInvoice && downloadingExcel === singleSelectedInvoice.id ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-            ) : (
-              <FileSpreadsheet className="w-4 h-4 text-green-600" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedInvoice && openEditModal(singleSelectedInvoice)}
-            disabled={!singleSelectedInvoice}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Editar"
-            data-testid={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
-          >
-            <Edit className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedInvoice && confirmDelete(singleSelectedInvoice)}
-            disabled={!singleSelectedInvoice}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Excluir"
-            data-testid={singleSelectedInvoice ? `delete-invoice-${singleSelectedInvoice.id}` : undefined}
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedIds.size} selecionado(s)
-            </span>
+        <FilterCard hasFilters={!!appliedClient || !!clientFilter} onClear={clearClientFilter} onApply={applyClientFilter}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Cliente">
+              <SearchInput
+                value={clientFilter}
+                onChange={(e) => setClientFilter(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && applyClientFilter()}
+                data-testid="invoice-client-filter"
+              />
+            </FilterField>
+          </div>
+        </FilterCard>
+
+        {/* Lista - marque uma fatura pra habilitar as ações da barra */}
+        <DataCard
+          title="Faturas geradas"
+          count={totalInvoices}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Gerar faturamento" onClick={openNewInvoiceModal} testId="new-invoice-button" />}
+            >
+              <ToolbarButton
+                icon={Eye}
+                label="Ver detalhes"
+                tone="primary"
+                onClick={() => singleSelectedInvoice && viewInvoiceDetails(singleSelectedInvoice)}
+                disabled={!singleSelectedInvoice}
+                testId={singleSelectedInvoice ? `view-invoice-${singleSelectedInvoice.id}` : undefined}
+              />
+              <ToolbarButton
+                icon={Edit}
+                label="Editar"
+                tone="blue"
+                onClick={() => singleSelectedInvoice && openEditModal(singleSelectedInvoice)}
+                disabled={!singleSelectedInvoice}
+                testId={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
+              />
+              <ToolbarDivider />
+              <ToolbarButton
+                icon={FileText}
+                label={singleSelectedInvoice && downloadingPdf === singleSelectedInvoice.id ? 'Gerando PDF...' : 'Baixar PDF'}
+                tone="red"
+                onClick={() => singleSelectedInvoice && downloadPdf(singleSelectedInvoice)}
+                disabled={!singleSelectedInvoice || downloadingPdf === singleSelectedInvoice?.id}
+              />
+              <ToolbarButton
+                icon={FileSpreadsheet}
+                label={singleSelectedInvoice && downloadingExcel === singleSelectedInvoice.id ? 'Gerando Excel...' : 'Baixar Excel'}
+                tone="emerald"
+                onClick={() => singleSelectedInvoice && downloadExcel(singleSelectedInvoice)}
+                disabled={!singleSelectedInvoice || downloadingExcel === singleSelectedInvoice?.id}
+                testId={singleSelectedInvoice ? `download-invoice-${singleSelectedInvoice.id}` : undefined}
+              />
+              <ToolbarDivider />
+              <ToolbarButton
+                icon={Trash2}
+                label="Excluir"
+                tone="red"
+                onClick={() => singleSelectedInvoice && confirmDelete(singleSelectedInvoice)}
+                disabled={!singleSelectedInvoice}
+                testId={singleSelectedInvoice ? `delete-invoice-${singleSelectedInvoice.id}` : undefined}
+              />
+            </Toolbar>
           )}
-        </div>
-
-        {/* Lista de Faturas */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <span className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Faturas Geradas ({totalInvoices})
-              </span>
-              {totalPages > 1 && (
-                <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
-                  Página {currentPage} de {totalPages}
-                </span>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {invoices.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left w-10">
-                        <Checkbox
-                          checked={invoices.length > 0 && invoices.every(i => selectedIds.has(i.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nº Fatura</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cliente</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">CNPJ</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Qtd. Movim.</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Valor Total</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Usuário</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {invoices.map((invoice) => (
+          footer={(
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalInvoices}
+              pageSize={ITEMS_PER_PAGE}
+              onPageChange={goToPage}
+            />
+          )}
+        >
+          {invoices.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={invoices.length > 0 && invoices.every(i => selectedIds.has(i.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Nº fatura</th>
+                    <th>Data</th>
+                    <th>Cliente</th>
+                    <th>CNPJ</th>
+                    <th className="!text-right">Qtd. movim.</th>
+                    <th className="!text-right">Valor total</th>
+                    <th>Status</th>
+                    <th>Usuário</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((invoice) => {
+                    const badge = getInvoiceStatusBadge(invoice.status);
+                    return (
                       <tr
                         key={invoice.id}
-                        className={`cursor-pointer transition-colors ${selectedIds.has(invoice.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        data-selected={selectedIds.has(invoice.id)}
+                        className="cursor-pointer"
                         onClick={() => toggleSelect(invoice.id)}
                         data-testid="invoice-row"
                       >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedIds.has(invoice.id)}
                             onCheckedChange={() => toggleSelect(invoice.id)}
                           />
                         </td>
-                        <td className="px-4 py-2.5 text-[13px] font-bold text-primary">
-                          #{invoice.invoice_number}
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px]">
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{invoice.invoice_number}</td>
+                        <td className="whitespace-nowrap tabular-nums">
                           {format(new Date(invoice.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                         </td>
-                        <td className="px-4 py-2.5 text-[13px] font-medium">{invoice.client_name}</td>
-                        <td className="px-4 py-2.5 text-[13px] font-mono">{invoice.client_cnpj || '-'}</td>
-                        <td className="px-4 py-2.5 text-[13px] text-center">
-                          <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-bold text-[12px]">
-                            {invoice.movement_ids.length}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px] font-mono font-bold text-green-700">
-                          {formatCurrency(invoice.total_value)}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${getInvoiceStatusBadge(invoice.status).color}`}>
-                            {getInvoiceStatusBadge(invoice.status).label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px] text-slate-600 dark:text-slate-400">{shortenName(invoice.user_name)}</td>
+                        <td><div className="max-w-[260px] truncate font-medium text-slate-700 dark:text-slate-200" title={invoice.client_name || ''}>{invoice.client_name}</div></td>
+                        <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{invoice.client_cnpj || '-'}</td>
+                        <td className="text-right tabular-nums">{invoice.movement_ids.length}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{formatCurrency(invoice.total_value)}</td>
+                        <td><StatusPill tone={badge.tone}>{badge.label}</StatusPill></td>
+                        <td><UserTag name={invoice.user_name ? shortenName(invoice.user_name) : null} /></td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-10">
-                <FileText className="w-12 h-12 text-slate-400 dark:text-slate-500 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium text-slate-600 dark:text-slate-400">
-                  Nenhuma fatura gerada
-                </p>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Clique em "Gerar Faturamento" para criar uma nova fatura
-                </p>
-              </div>
-            )}
-
-            {/* Controles de Paginação */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-2.5 border-t bg-slate-50 dark:bg-slate-800">
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, totalInvoices)} de {totalInvoices} faturas
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="h-8 text-[12px]"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5 mr-1" />
-                    Anterior
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="h-8 text-[12px]"
-                  >
-                    Próxima
-                    <ChevronRight className="w-3.5 h-3.5 ml-1" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={FileText}
+              title={appliedClient ? 'Nenhuma fatura encontrada para esse cliente' : 'Nenhuma fatura gerada'}
+              hint={appliedClient ? 'Ajuste o filtro' : 'Clique em "Gerar faturamento" para criar uma nova fatura'}
+            />
+          )}
+        </DataCard>
       </div>
 
       {/* Modal - Nova Fatura */}
@@ -1201,9 +1146,9 @@ export default function BillingPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] text-slate-500 dark:text-slate-400">Status:</span>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getInvoiceStatusBadge(selectedInvoice.status).color}`}>
+                  <StatusPill tone={getInvoiceStatusBadge(selectedInvoice.status).tone} className="text-xs px-3 py-1">
                     {getInvoiceStatusBadge(selectedInvoice.status).label}
-                  </span>
+                  </StatusPill>
                 </div>
                 <Select
                   value={selectedInvoice.status || 'PENDENTE'}
@@ -1348,9 +1293,9 @@ export default function BillingPage() {
                           <div key={h.id} className="border rounded-lg p-3 bg-white dark:bg-slate-900">
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-2">
-                                <span className={`px-2 py-0.5 rounded text-xs font-medium ${actionInfo.color}`}>
+                                <StatusPill tone={actionInfo.tone} dot={false}>
                                   {actionInfo.label}
-                                </span>
+                                </StatusPill>
                                 <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">{h.user_name}</span>
                               </div>
                               <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">

@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,7 +15,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import {
-  Calculator, Plus, Eye, Trash2, Search, Printer, Pencil, X,
+  Calculator, Plus, Eye, Trash2, Printer, Pencil, X,
   CheckCircle2, RotateCcw, Camera, Receipt
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -40,9 +44,9 @@ function createEmptyPurchase() {
 }
 
 function balanceInfo(balance) {
-  if (balance > 0.004) return { label: 'Valor a Ressarcir ao Funcionário', className: 'text-amber-600', value: balance };
-  if (balance < -0.004) return { label: 'Saldo a Devolver pelo Funcionário', className: 'text-red-600', value: Math.abs(balance) };
-  return { label: 'Quitado', className: 'text-green-600', value: 0 };
+  if (balance > 0.004) return { label: 'Valor a Ressarcir ao Funcionário', className: 'text-amber-600 dark:text-amber-400', value: balance };
+  if (balance < -0.004) return { label: 'Saldo a Devolver pelo Funcionário', className: 'text-red-600 dark:text-red-400', value: Math.abs(balance) };
+  return { label: 'Quitado', className: 'text-emerald-600 dark:text-emerald-400', value: 0 };
 }
 
 export default function ExpenseReportsPage() {
@@ -110,6 +114,12 @@ export default function ExpenseReportsPage() {
   const handleSearch = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
     loadReports(searchQuery);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadReports('');
   };
 
   const resetForm = () => {
@@ -376,19 +386,9 @@ export default function ExpenseReportsPage() {
   };
 
   const getStatusBadge = (status) => {
-    const styles = {
-      'EM_ANDAMENTO': 'bg-yellow-100 text-yellow-800',
-      'CONCLUIDA': 'bg-green-100 text-green-800'
-    };
-    const labels = {
-      'EM_ANDAMENTO': 'Em Andamento',
-      'CONCLUIDA': 'Concluída'
-    };
-    return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${styles[status] || styles['EM_ANDAMENTO']}`}>
-        {labels[status] || status}
-      </span>
-    );
+    const tones = { EM_ANDAMENTO: 'amber', CONCLUIDA: 'emerald' };
+    const labels = { EM_ANDAMENTO: 'Em Andamento', CONCLUIDA: 'Concluída' };
+    return <StatusPill tone={tones[status] || 'amber'}>{labels[status] || status}</StatusPill>;
   };
 
   const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -403,202 +403,109 @@ export default function ExpenseReportsPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="expense-reports-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Prestação de Contas
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de depósitos recebidos e compras realizadas por período</p>
-        </div>
+      <div className="space-y-4" data-testid="expense-reports-page">
+        <PageHeader icon={Calculator} title="Prestação de Contas" subtitle="Controle de depósitos recebidos e compras realizadas por período" />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 space-y-3">
-            <div className="grid grid-cols-1 sm:max-w-sm gap-3">
-              <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Número ou fornecedor</Label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                    className="h-9 text-sm pl-8"
-                    data-testid="search-expense-report-input"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <Button size="sm" onClick={handleSearch} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
-                Filtrar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch} onApply={handleSearch}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Número ou fornecedor">
+              <SearchInput
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                data-testid="search-expense-report-input"
+              />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openNewModal}
-            className="h-9 w-9 p-0"
-            title="Nova Prestação de Contas"
-            data-testid="new-expense-report-btn"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedReport && openDetails(singleSelectedReport)}
-            disabled={!singleSelectedReport}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Ver Detalhes"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedReport && openEditModal(singleSelectedReport)}
-            disabled={!singleSelectedReport || singleSelectedReport.status !== 'EM_ANDAMENTO'}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Editar"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          {singleSelectedReport?.status === 'CONCLUIDA' ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleReopen(singleSelectedReport.id)}
-              className="h-9 w-9 p-0"
-              title="Reabrir"
+        {/* Lista - marque uma prestação pra habilitar as ações da barra. Concluir
+            vira Reabrir quando a prestação selecionada já está concluída. */}
+        <DataCard
+          title="Prestações de contas"
+          count={pagination.total}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova prestação" onClick={openNewModal} testId="new-expense-report-btn" />}
             >
-              <RotateCcw className="w-4 h-4 text-blue-600" />
-            </Button>
+              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedReport && openDetails(singleSelectedReport)} disabled={!singleSelectedReport} />
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedReport && openEditModal(singleSelectedReport)} disabled={!singleSelectedReport || singleSelectedReport.status !== 'EM_ANDAMENTO'} />
+              {singleSelectedReport?.status === 'CONCLUIDA' ? (
+                <ToolbarButton icon={RotateCcw} label="Reabrir" tone="amber" onClick={() => handleReopen(singleSelectedReport.id)} />
+              ) : (
+                <ToolbarButton icon={CheckCircle2} label="Concluir" tone="emerald" onClick={() => singleSelectedReport && handleComplete(singleSelectedReport.id)} disabled={!singleSelectedReport} />
+              )}
+              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedReport && handlePrintPDF(singleSelectedReport.id)} disabled={!singleSelectedReport || singleSelectedReport.status !== 'CONCLUIDA'} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedReport && handleDelete(singleSelectedReport.id)} disabled={!singleSelectedReport} />
+            </Toolbar>
+          )}
+          footer={(
+            <TablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              pageSize={15}
+              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+            />
+          )}
+        >
+          {loading ? (
+            <EmptyState title="Carregando..." />
+          ) : reports.length === 0 ? (
+            <EmptyState
+              icon={Calculator}
+              title="Nenhuma prestação de contas encontrada"
+              hint={searchQuery ? 'Ajuste a busca' : 'Registre a primeira pelo botão "Nova prestação"'}
+            />
           ) : (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => singleSelectedReport && handleComplete(singleSelectedReport.id)}
-              disabled={!singleSelectedReport}
-              className="h-9 w-9 p-0 disabled:opacity-30"
-              title="Concluir"
-            >
-              <CheckCircle2 className="w-4 h-4 text-green-600" />
-            </Button>
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={reports.length > 0 && reports.every(r => selectedIds.has(r.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Nº</th>
+                    <th>Período</th>
+                    <th className="!text-right">Total compras</th>
+                    <th className="!text-right">Saldo</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reports.map((report) => {
+                    const bi = balanceInfo(report.balance || 0);
+                    const isSelected = selectedIds.has(report.id);
+                    return (
+                      <tr
+                        key={report.id}
+                        data-selected={isSelected}
+                        className="cursor-pointer"
+                        onClick={() => toggleSelect(report.id)}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelect(report.id)}
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{report.report_number_formatted}</td>
+                        <td className="whitespace-nowrap tabular-nums">{formatPeriodDate(report.period_start)} a {formatPeriodDate(report.period_end)}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(report.total_purchases)}</td>
+                        <td className={`text-right whitespace-nowrap tabular-nums font-semibold ${bi.className}`}>{formatMoney(bi.value)}</td>
+                        <td>{getStatusBadge(report.status)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedReport && handlePrintPDF(singleSelectedReport.id)}
-            disabled={!singleSelectedReport || singleSelectedReport.status !== 'CONCLUIDA'}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Baixar PDF"
-          >
-            <Printer className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedReport && handleDelete(singleSelectedReport.id)}
-            disabled={!singleSelectedReport}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Excluir"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedIds.size} selecionado(s)
-            </span>
-          )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Calculator className="w-4 h-4" />
-              Prestações de Contas ({pagination.total})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : reports.length === 0 ? (
-              <div className="p-12 text-center text-muted-foreground">
-                Nenhuma prestação de contas encontrada
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left w-10">
-                        <Checkbox
-                          checked={reports.length > 0 && reports.every(r => selectedIds.has(r.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Período</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Total Compras</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Saldo</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reports.map((report, idx) => {
-                      const bi = balanceInfo(report.balance || 0);
-                      const isSelected = selectedIds.has(report.id);
-                      return (
-                        <tr
-                          key={report.id}
-                          className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          onClick={() => toggleSelect(report.id)}
-                        >
-                          <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleSelect(report.id)}
-                            />
-                          </td>
-                          <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{report.report_number_formatted}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{formatPeriodDate(report.period_start)} a {formatPeriodDate(report.period_end)}</td>
-                          <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{formatMoney(report.total_purchases)}</td>
-                          <td className={`px-4 py-2.5 text-sm font-semibold ${bi.className}`}>{formatMoney(bi.value)}</td>
-                          <td className="px-4 py-2.5">{getStatusBadge(report.status)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {pagination.pages > 1 && (
-              <div className="flex justify-center gap-2 mt-4">
-                <Button variant="outline" size="sm" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
-                  Anterior
-                </Button>
-                <span className="px-4 py-2 text-sm">Página {pagination.page} de {pagination.pages}</span>
-                <Button variant="outline" size="sm" disabled={pagination.page === pagination.pages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>
-                  Próxima
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        </DataCard>
       </div>
 
       {/* Modal Nova/Editar Prestação de Contas */}

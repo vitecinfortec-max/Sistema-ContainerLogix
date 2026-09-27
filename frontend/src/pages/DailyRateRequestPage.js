@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -10,7 +14,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
-import { Wallet, Plus, Eye, Trash2, Search, Printer, Pencil, X } from 'lucide-react';
+import { Wallet, Plus, Eye, Trash2, Printer, Pencil, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -75,7 +79,7 @@ export default function DailyRateRequestPage() {
       const [clientsRes, driversRes, vehiclesRes] = await Promise.all([
         api.getClients(),
         api.getDrivers(),
-        api.getVehicles({ per_page: 100 })
+        api.getVehicles({ per_page: 1000 })
       ]);
       setClients(clientsRes.data);
       setDrivers(driversRes.data);
@@ -109,6 +113,12 @@ export default function DailyRateRequestPage() {
   const handleSearch = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
     loadRequests(searchQuery);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadRequests('');
   };
 
   const resetForm = () => {
@@ -259,190 +269,110 @@ export default function DailyRateRequestPage() {
   };
 
   const getStatusBadge = (status) => {
-    const styles = {
-      'PENDENTE': 'bg-yellow-100 text-yellow-800',
-      'PAGO': 'bg-green-100 text-green-800',
-      'CANCELADO': 'bg-red-100 text-red-800'
-    };
-    const labels = {
-      'PENDENTE': 'Pendente',
-      'PAGO': 'Pago',
-      'CANCELADO': 'Cancelado'
-    };
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status] || styles['PENDENTE']}`}>
-        {labels[status] || status}
-      </span>
-    );
+    const tones = { PENDENTE: 'amber', PAGO: 'emerald', CANCELADO: 'red' };
+    const labels = { PENDENTE: 'Pendente', PAGO: 'Pago', CANCELADO: 'Cancelado' };
+    return <StatusPill tone={tones[status] || 'amber'}>{labels[status] || status}</StatusPill>;
   };
 
   const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <Layout>
-      <div className="space-y-5">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Solicitação de Diária</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie as solicitações de diária, comissão e almoço dos motoristas</p>
-        </div>
+      <div className="space-y-4">
+        <PageHeader icon={Wallet} title="Solicitação de Diária" subtitle="Gerencie as solicitações de diária, comissão e almoço dos motoristas" />
 
-        {/* Filtrar */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="flex items-center gap-2 max-w-md">
-              <Input
+        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch} onApply={handleSearch}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Motorista, placa ou cliente">
+              <SearchInput
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                className="h-9"
                 data-testid="search-daily-rate-input"
               />
-              <Button variant="outline" size="sm" onClick={handleSearch} className="h-9">
-                <Search className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openNewModal}
-            className="h-9 w-9 p-0"
-            title="Nova Solicitação"
-            data-testid="new-daily-rate-btn"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedRequest && openDetails(singleSelectedRequest)}
-            disabled={!singleSelectedRequest}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Ver Detalhes"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedRequest && openEditModal(singleSelectedRequest)}
-            disabled={!singleSelectedRequest}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Editar"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedRequest && handlePrintPDF(singleSelectedRequest.id)}
-            disabled={!singleSelectedRequest}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Baixar PDF"
-          >
-            <Printer className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedRequest && handleDelete(singleSelectedRequest.id)}
-            disabled={!singleSelectedRequest}
-            className="h-9 w-9 p-0 disabled:opacity-30"
-            title="Excluir"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-xs text-slate-500 dark:text-slate-400 ml-2 pr-1">
-              {selectedIds.size} selecionado(s)
-            </span>
+        {/* Lista - marque uma solicitação pra habilitar as ações da barra */}
+        <DataCard
+          title="Solicitações"
+          count={pagination.total}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova solicitação" onClick={openNewModal} testId="new-daily-rate-btn" />}
+            >
+              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedRequest && openDetails(singleSelectedRequest)} disabled={!singleSelectedRequest} />
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedRequest && openEditModal(singleSelectedRequest)} disabled={!singleSelectedRequest} />
+              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedRequest && handlePrintPDF(singleSelectedRequest.id)} disabled={!singleSelectedRequest} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRequest && handleDelete(singleSelectedRequest.id)} disabled={!singleSelectedRequest} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Wallet className="w-4 h-4" />
-              Solicitações ({pagination.total})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : requests.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhuma solicitação encontrada
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left py-3 px-4 w-10">
+          footer={(
+            <TablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              pageSize={15}
+              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+            />
+          )}
+        >
+          {loading ? (
+            <EmptyState title="Carregando..." />
+          ) : requests.length === 0 ? (
+            <EmptyState
+              icon={Wallet}
+              title="Nenhuma solicitação encontrada"
+              hint={searchQuery ? 'Ajuste a busca' : 'Registre a primeira pelo botão "Nova solicitação"'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={requests.length > 0 && requests.every(r => selectedIds.has(r.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Nº</th>
+                    <th className="!text-right">Itens</th>
+                    <th className="!text-right">Total</th>
+                    <th>Status</th>
+                    <th>Criado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map(request => (
+                    <tr
+                      key={request.id}
+                      data-selected={selectedIds.has(request.id)}
+                      className="cursor-pointer"
+                      onClick={() => toggleSelect(request.id)}
+                    >
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          checked={requests.length > 0 && requests.every(r => selectedIds.has(r.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
+                          checked={selectedIds.has(request.id)}
+                          onCheckedChange={() => toggleSelect(request.id)}
                         />
-                      </th>
-                      <th className="text-left py-3 px-4 font-medium">Nº</th>
-                      <th className="text-left py-3 px-4 font-medium">Itens</th>
-                      <th className="text-left py-3 px-4 font-medium">Total</th>
-                      <th className="text-left py-3 px-4 font-medium">Status</th>
-                      <th className="text-left py-3 px-4 font-medium">Criado em</th>
+                      </td>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{request.request_number}</td>
+                      <td className="text-right tabular-nums">{request.items?.length || 0}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{formatMoney(request.total_value)}</td>
+                      <td>{getStatusBadge(request.status)}</td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        {request.created_at && format(new Date(request.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {requests.map(request => (
-                      <tr
-                        key={request.id}
-                        className={`border-b cursor-pointer transition-colors ${selectedIds.has(request.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-muted/50'}`}
-                        onClick={() => toggleSelect(request.id)}
-                      >
-                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(request.id)}
-                            onCheckedChange={() => toggleSelect(request.id)}
-                          />
-                        </td>
-                        <td className="py-3 px-4 font-mono font-bold">#{request.request_number}</td>
-                        <td className="py-3 px-4">{request.items?.length || 0}</td>
-                        <td className="py-3 px-4">{formatMoney(request.total_value)}</td>
-                        <td className="py-3 px-4">{getStatusBadge(request.status)}</td>
-                        <td className="py-3 px-4">
-                          {request.created_at && format(new Date(request.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {pagination.pages > 1 && (
-              <div className="flex justify-center gap-2 mt-4">
-                <Button variant="outline" size="sm" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
-                  Anterior
-                </Button>
-                <span className="px-4 py-2 text-sm">Página {pagination.page} de {pagination.pages}</span>
-                <Button variant="outline" size="sm" disabled={pagination.page === pagination.pages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>
-                  Próxima
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
 
       {/* Modal Nova/Editar Solicitação */}
