@@ -1,25 +1,28 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  StatCard, StatGrid, FilterCard, FilterField, DataCard, Toolbar, ToolbarButton, ToolbarDivider,
+  StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { HandCoins, CheckCircle2, RotateCcw, Pencil, Search, Download, FileSpreadsheet, Receipt } from 'lucide-react';
+import { HandCoins, CheckCircle2, RotateCcw, Pencil, Download, FileText, FileSpreadsheet, Receipt, Clock, ListChecks } from 'lucide-react';
 
 const STATUS_LABELS = { PENDENTE: 'Pendente', PAGO: 'Pago', CANCELADO: 'Cancelado' };
-const STATUS_BADGE_CLASS = {
-  PENDENTE: 'bg-amber-100 text-amber-700',
-  PAGO: 'bg-emerald-100 text-emerald-700',
-  CANCELADO: 'bg-rose-100 text-rose-700',
+const STATUS_TONES = {
+  PENDENTE: 'amber',
+  PAGO: 'emerald',
+  CANCELADO: 'red',
 };
 
 const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -127,6 +130,20 @@ export default function FreightPaymentsPage() {
   const canMarkPaidBatch = sameDriverSelected && selectedItems.every((p) => p.status === 'PENDENTE');
   const canExportReport = sameDriverSelected;
 
+  // Indicadores do topo - sobre os lançamentos que batem com os filtros
+  const sumByStatus = (status) => list.filter((p) => p.status === status).reduce((acc, p) => acc + (p.freight_value || 0), 0);
+  const pendingTotal = sumByStatus('PENDENTE');
+  const paidTotal = sumByStatus('PAGO');
+  const pendingCount = list.filter((p) => p.status === 'PENDENTE').length;
+  const hasFilters = !!(driverFilterName || statusFilter || dateFrom || dateTo);
+  const clearFilters = () => {
+    setDriverFilterName('');
+    setDriverFilterId('');
+    setStatusFilter('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
   const markStatus = async (id, status) => {
     try {
       await api.updateFreightPaymentStatus(id, status);
@@ -213,234 +230,165 @@ export default function FreightPaymentsPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="freight-payments-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <HandCoins className="w-4 h-4" />
-            Pagamento Frete
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Lançamentos gerados a partir das Ordens de Coleta aprovadas em rotas cadastradas</p>
-        </div>
+      <div className="space-y-4" data-testid="freight-payments-page">
+        <PageHeader
+          icon={HandCoins}
+          title="Pagamento Frete"
+          subtitle="Lançamentos gerados a partir das Ordens de Coleta aprovadas em rotas cadastradas"
+        />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-4 gap-3">
-              <div>
-                <Label className="mb-1 block text-xs">Motorista</Label>
-                <Autocomplete
-                  value={driverFilterName}
-                  onChange={onChangeDriverFilterText}
-                  onSelect={onSelectDriverFilter}
-                  options={drivers}
-                  displayField="name"
-                  className="h-9 text-sm"
-                />
-              </div>
-              <div>
-                <Label className="mb-1 block text-xs">Status</Label>
-                <Select value={statusFilter || '_all'} onValueChange={(v) => setStatusFilter(v === '_all' ? '' : v)}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_all">Todos</SelectItem>
-                    <SelectItem value="PENDENTE">Pendente</SelectItem>
-                    <SelectItem value="PAGO">Pago</SelectItem>
-                    <SelectItem value="CANCELADO">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1 block text-xs">De</Label>
-                <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1 block text-xs">Até</Label>
-                <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatGrid>
+          <StatCard label="A pagar" value={formatMoney(pendingTotal)} icon={Clock} tone="amber" hint={`${pendingCount} lançamento${pendingCount === 1 ? '' : 's'} pendente${pendingCount === 1 ? '' : 's'}`} />
+          <StatCard label="Pago" value={formatMoney(paidTotal)} icon={CheckCircle2} tone="emerald" hint="no período filtrado" />
+          <StatCard label="Lançamentos" value={list.length} icon={ListChecks} tone="blue" hint="com os filtros atuais" />
+          <StatCard label="Ordens de pagamento" value={batches.length} icon={Receipt} tone="primary" hint="recibos gerados" />
+        </StatGrid>
 
-        {/* Barra de ações - marque 1+ lançamentos na tabela abaixo pra habilitar as ações. Sem
-            botão "Adicionar": lançamentos só nascem automaticamente quando uma Ordem de Coleta
-            numa Rota cadastrada é Aprovada. Marcar como Pago aceita vários lançamentos de uma vez,
-            desde que sejam todos do mesmo motorista (gera 1 Ordem de Pagamento) - as demais ações
-            (Pendente/Editar) continuam 1 por vez. PDF/Excel exportam a Prestação de Contas dos
-            lançamentos selecionados (também exige motorista único, mas aceita qualquer status). */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleMarkPaidBatch}
-            disabled={!canMarkPaidBatch || markingPaid}
-            title="Marcar como Pago"
-            data-testid="freight-payment-mark-paid"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelected && markStatus(singleSelected.id, 'PENDENTE')}
-            disabled={!singleSelected || singleSelected.status !== 'PAGO'}
-            title="Marcar como Pendente"
-            data-testid="freight-payment-mark-pending"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <RotateCcw className="w-4 h-4 text-amber-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelected && openEdit(singleSelected)}
-            disabled={!singleSelected || singleSelected.status !== 'PENDENTE'}
-            title="Editar"
-            data-testid="freight-payment-edit"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => downloadReport('pdf')}
-            disabled={!canExportReport || generating}
-            title="Gerar Prestação de Contas em PDF"
-            data-testid="freight-payment-report-pdf"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Download className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => downloadReport('excel')}
-            disabled={!canExportReport || generating}
-            title="Gerar Prestação de Contas em Excel"
-            data-testid="freight-payment-report-excel"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Motorista">
+              <Autocomplete
+                value={driverFilterName}
+                onChange={onChangeDriverFilterText}
+                onSelect={onSelectDriverFilter}
+                options={drivers}
+                displayField="name"
+                className="h-9 text-sm"
+              />
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter || '_all'} onValueChange={(v) => setStatusFilter(v === '_all' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  <SelectItem value="PENDENTE">Pendente</SelectItem>
+                  <SelectItem value="PAGO">Pago</SelectItem>
+                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="De">
+              <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </FilterField>
+            <FilterField label="Até">
+              <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            </FilterField>
+          </div>
+        </FilterCard>
+
+        {/* Lista - marque 1+ lançamentos pra habilitar as ações. Sem botão "Adicionar":
+            lançamentos só nascem automaticamente quando uma Ordem de Coleta numa Rota
+            cadastrada é Aprovada. Marcar como Pago aceita vários lançamentos de uma vez,
+            desde que sejam todos do mesmo motorista (gera 1 Ordem de Pagamento) - as demais
+            ações (Pendente/Editar) continuam 1 por vez. PDF/Excel exportam a Prestação de
+            Contas dos lançamentos selecionados (também exige motorista único, mas aceita
+            qualquer status). */}
+        <DataCard
+          title="Lançamentos"
+          count={loading ? '...' : list.length}
+          toolbar={(
+            <Toolbar selectedCount={selectedIds.size}>
+              <ToolbarButton icon={CheckCircle2} label="Marcar como Pago" tone="emerald" onClick={handleMarkPaidBatch} disabled={!canMarkPaidBatch || markingPaid} testId="freight-payment-mark-paid" />
+              <ToolbarButton icon={RotateCcw} label="Marcar como Pendente" tone="amber" onClick={() => singleSelected && markStatus(singleSelected.id, 'PENDENTE')} disabled={!singleSelected || singleSelected.status !== 'PAGO'} testId="freight-payment-mark-pending" />
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelected && openEdit(singleSelected)} disabled={!singleSelected || singleSelected.status !== 'PENDENTE'} testId="freight-payment-edit" />
+              <ToolbarDivider />
+              <ToolbarButton icon={FileText} label="Prestação de Contas em PDF" tone="red" onClick={() => downloadReport('pdf')} disabled={!canExportReport || generating} testId="freight-payment-report-pdf" />
+              <ToolbarButton icon={FileSpreadsheet} label="Prestação de Contas em Excel" tone="emerald" onClick={() => downloadReport('excel')} disabled={!canExportReport || generating} testId="freight-payment-report-excel" />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <HandCoins className="w-4 h-4" />
-              {loading ? 'Carregando...' : `Lançamentos (${list.length})`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+        >
+          {list.length === 0 && !loading ? (
+            <EmptyState icon={HandCoins} title="Nenhum lançamento encontrado" hint="Os lançamentos aparecem aqui quando uma Ordem de Coleta numa rota cadastrada é aprovada" />
+          ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-800">
-                    <TableHead className="w-9">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
                       <Checkbox
                         checked={list.length > 0 && list.every((p) => selectedIds.has(p.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
-                    </TableHead>
-                    <TableHead className="text-[12px] font-semibold">Nº</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Ordem Nº</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Rota</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Motorista</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Transportadora</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Valor do Frete</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Status</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Aprovação</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Pagamento</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.length === 0 && !loading && (
-                    <TableRow><TableCell colSpan={10} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhum lançamento encontrado.</TableCell></TableRow>
-                  )}
+                    </th>
+                    <th>Nº</th>
+                    <th>Ordem Nº</th>
+                    <th>Rota</th>
+                    <th>Motorista</th>
+                    <th>Transportadora</th>
+                    <th className="!text-right">Valor do frete</th>
+                    <th>Status</th>
+                    <th>Aprovação</th>
+                    <th>Pagamento</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {list.map((p) => (
-                    <TableRow
+                    <tr
                       key={p.id}
                       onClick={() => toggleSelect(p.id)}
-                      className={`cursor-pointer transition-colors ${selectedIds.has(p.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                      data-selected={selectedIds.has(p.id)}
+                      className="cursor-pointer"
                       data-testid={`freight-payment-row-${p.payment_number}`}
                     >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(p.id)}
                           onCheckedChange={() => toggleSelect(p.id)}
                         />
-                      </TableCell>
-                      <TableCell className="text-[13px] font-semibold text-primary">Nº {p.payment_number}</TableCell>
-                      <TableCell className="text-[13px]">Nº {p.order_number}</TableCell>
-                      <TableCell className="text-[13px]">{p.route_name || '-'}</TableCell>
-                      <TableCell className="text-[13px]">{p.driver_name || '-'}</TableCell>
-                      <TableCell className="text-[13px]">{p.transport_company || '-'}</TableCell>
-                      <TableCell className="text-[13px]">{formatMoney(p.freight_value)}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE_CLASS[p.status] || 'bg-slate-100 text-slate-600'}`}>
+                      </td>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{p.payment_number}</td>
+                      <td className="whitespace-nowrap tabular-nums">#{p.order_number}</td>
+                      <td><div className="max-w-[220px] truncate" title={p.route_name || ''}>{p.route_name || '-'}</div></td>
+                      <td><div className="max-w-[200px] truncate" title={p.driver_name || ''}>{p.driver_name || '-'}</div></td>
+                      <td><div className="max-w-[200px] truncate" title={p.transport_company || ''}>{p.transport_company || '-'}</div></td>
+                      <td className="text-right tabular-nums whitespace-nowrap">{formatMoney(p.freight_value)}</td>
+                      <td>
+                        <StatusPill tone={STATUS_TONES[p.status] || 'slate'}>
                           {STATUS_LABELS[p.status] || p.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-[12px]">{p.created_at ? format(new Date(p.created_at), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
-                      <TableCell className="text-[12px]">{p.paid_at ? format(new Date(p.paid_at), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
-                    </TableRow>
+                        </StatusPill>
+                      </td>
+                      <td className="whitespace-nowrap tabular-nums">{p.created_at ? format(new Date(p.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
+                      <td className="whitespace-nowrap tabular-nums">{p.paid_at ? format(new Date(p.paid_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </DataCard>
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Receipt className="w-4 h-4" />
-              {loadingBatches ? 'Carregando...' : `Ordens de Pagamento (${batches.length})`}
-            </CardTitle>
-            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Geradas ao marcar 1+ lançamentos como Pago - revise aqui e baixe o recibo de cada uma.
-            </p>
-          </CardHeader>
-          <CardContent className="p-0">
+        <DataCard
+          title="Ordens de pagamento"
+          count={loadingBatches ? '...' : batches.length}
+          meta={<span className="hidden md:inline text-xs text-slate-400 dark:text-slate-500">geradas ao marcar lançamentos como Pago - baixe o recibo de cada uma</span>}
+        >
+          {batches.length === 0 && !loadingBatches ? (
+            <EmptyState icon={Receipt} title="Nenhuma Ordem de Pagamento gerada ainda" />
+          ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-800">
-                    <TableHead className="text-[12px] font-semibold">Nº</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Motorista</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Transportadora</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Lançamentos</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Valor Total</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Data do Pagamento</TableHead>
-                    <TableHead className="text-[12px] font-semibold text-right pr-4">Recibo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {batches.length === 0 && !loadingBatches && (
-                    <TableRow><TableCell colSpan={7} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma Ordem de Pagamento gerada ainda.</TableCell></TableRow>
-                  )}
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Nº</th>
+                    <th>Motorista</th>
+                    <th>Transportadora</th>
+                    <th className="!text-right">Lançamentos</th>
+                    <th className="!text-right">Valor total</th>
+                    <th>Data do pagamento</th>
+                    <th className="!text-right">Recibo</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {batches.map((b) => (
-                    <TableRow key={b.id} data-testid={`freight-payment-batch-row-${b.batch_number}`}>
-                      <TableCell className="text-[13px] font-semibold text-primary">Nº {b.batch_number}</TableCell>
-                      <TableCell className="text-[13px]">{b.driver_name || '-'}</TableCell>
-                      <TableCell className="text-[13px]">{b.transport_company || '-'}</TableCell>
-                      <TableCell className="text-[13px]">{b.item_count}</TableCell>
-                      <TableCell className="text-[13px] font-semibold">{formatMoney(b.total_value)}</TableCell>
-                      <TableCell className="text-[12px]">{b.created_at ? format(new Date(b.created_at), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
-                      <TableCell className="text-right pr-2">
+                    <tr key={b.id} data-testid={`freight-payment-batch-row-${b.batch_number}`}>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{b.batch_number}</td>
+                      <td><div className="max-w-[220px] truncate" title={b.driver_name || ''}>{b.driver_name || '-'}</div></td>
+                      <td><div className="max-w-[220px] truncate" title={b.transport_company || ''}>{b.transport_company || '-'}</div></td>
+                      <td className="text-right tabular-nums">{b.item_count}</td>
+                      <td className="text-right tabular-nums whitespace-nowrap cell-strong">{formatMoney(b.total_value)}</td>
+                      <td className="whitespace-nowrap tabular-nums">{b.created_at ? format(new Date(b.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
+                      <td className="text-right !py-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -451,14 +399,14 @@ export default function FreightPaymentsPage() {
                         >
                           <Download className="w-4 h-4 text-primary" />
                         </Button>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </DataCard>
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

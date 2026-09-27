@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -15,7 +18,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Trash2, Search, Save, PackageCheck, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, PackageCheck, Download, Printer, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 
 const ORDER_TYPE_OPTIONS = [
@@ -30,10 +33,10 @@ const STATUS_OPTIONS = [
   ['CANCELADA', 'Cancelada'],
 ];
 const STATUS_LABELS = STATUS_OPTIONS.reduce((acc, [v, l]) => { acc[v] = l; return acc; }, {});
-const STATUS_BADGE_CLASS = {
-  PENDENTE: 'bg-amber-100 text-amber-700',
-  APROVADA: 'bg-emerald-100 text-emerald-700',
-  CANCELADA: 'bg-rose-100 text-rose-700',
+const STATUS_TONES = {
+  PENDENTE: 'amber',
+  APROVADA: 'emerald',
+  CANCELADA: 'red',
 };
 
 const SIZE_TYPE_OPTIONS = [
@@ -354,154 +357,114 @@ export default function LoadingOrderPage() {
   };
 
   const singleSelectedOrder = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;
+  const countByStatus = (status) => list.filter((o) => o.status === status).length;
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="loading-order-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <PackageCheck className="w-4 h-4" />
-            Ordem de Carregamento
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Minutas de coleta e entrega de container pro motorista</p>
-        </div>
+      <div className="space-y-4" data-testid="loading-order-page">
+        <PageHeader icon={PackageCheck} title="Ordem de Carregamento" subtitle="Minutas de coleta e entrega de container pro motorista" />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="relative max-w-md">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-              <Input value={search}
-                onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 text-[13px]" data-testid="loading-order-search" />
-            </div>
-          </CardContent>
-        </Card>
+        <StatGrid>
+          <StatCard label="Ordens" value={list.length} icon={PackageCheck} tone="blue" hint={search ? 'que batem com a busca' : 'cadastradas'} />
+          <StatCard label="Pendentes" value={countByStatus('PENDENTE')} icon={Clock} tone="amber" hint="aguardando aprovação" />
+          <StatCard label="Aprovadas" value={countByStatus('APROVADA')} icon={CheckCircle2} tone="primary" hint="movimentação gerada" />
+          <StatCard label="Canceladas" value={countByStatus('CANCELADA')} icon={XCircle} tone="red" />
+        </StatGrid>
 
-        {/* Barra de ações - marque uma ordem na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreate}
-            title="Adicionar"
-            data-testid="loading-order-new-btn"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedOrder && openEdit(singleSelectedOrder.id)}
-            disabled={!singleSelectedOrder}
-            title="Editar"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedOrder && downloadPDF(singleSelectedOrder.id, singleSelectedOrder.order_number)}
-            disabled={!singleSelectedOrder}
-            title="Baixar PDF"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Download className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number)}
-            disabled={!singleSelectedOrder}
-            title="Excluir"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Número, container, motorista ou transportadora">
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="loading-order-search" />
+            </FilterField>
+          </div>
+        </FilterCard>
+
+        {/* Lista - marque uma ordem pra habilitar as ações da barra */}
+        <DataCard
+          title="Ordens de carregamento"
+          count={loading ? '...' : list.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova ordem" onClick={openCreate} testId="loading-order-new-btn" />}
+            >
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedOrder && openEdit(singleSelectedOrder.id)} disabled={!singleSelectedOrder} />
+              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedOrder && downloadPDF(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <PackageCheck className="w-4 h-4" />
-              {loading ? 'Carregando...' : `Ordens de Carregamento Registradas (${list.length})`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-800">
-                    <TableHead className="w-9">
+        >
+          {list.length === 0 && !loading ? (
+            <EmptyState
+              icon={PackageCheck}
+              title={search ? 'Nenhuma ordem encontrada' : 'Nenhuma ordem de carregamento cadastrada'}
+              hint={search ? 'Ajuste a busca' : 'Cadastre a primeira pelo botão "Nova ordem"'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
                       <Checkbox
                         checked={list.length > 0 && list.every((o) => selectedIds.has(o.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
-                    </TableHead>
-                    <TableHead className="text-[12px] font-semibold">Nº</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Tipo</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Container</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Motorista</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Transportadora</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Rota</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Status</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Emissão</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.length === 0 && !loading && (
-                    <TableRow><TableCell colSpan={9} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">Nenhuma ordem de carregamento cadastrada.</TableCell></TableRow>
-                  )}
+                    </th>
+                    <th>Nº</th>
+                    <th>Tipo</th>
+                    <th>Container</th>
+                    <th>Motorista</th>
+                    <th>Transportadora</th>
+                    <th>Rota</th>
+                    <th>Status</th>
+                    <th>Emissão</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {list.map((o) => (
-                    <TableRow
+                    <tr
                       key={o.id}
                       onClick={() => toggleSelect(o.id)}
-                      className={`cursor-pointer transition-colors ${selectedIds.has(o.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                      data-selected={selectedIds.has(o.id)}
+                      className="cursor-pointer"
                       data-testid={`loading-order-row-${o.order_number}`}
                     >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(o.id)}
                           onCheckedChange={() => toggleSelect(o.id)}
                           data-testid={`loading-order-row-checkbox-${o.order_number}`}
                         />
-                      </TableCell>
-                      <TableCell className="text-[13px] font-semibold text-primary">Nº {o.order_number}</TableCell>
-                      <TableCell className="text-[12px]">{ORDER_TYPE_LABELS[o.order_type] || o.order_type}</TableCell>
-                      <TableCell className="text-[12px] font-mono">
+                      </td>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{o.order_number}</td>
+                      <td>
+                        <StatusPill tone={o.order_type === 'ENTREGA' ? 'violet' : 'blue'} dot={false}>
+                          {o.order_type === 'ENTREGA' ? 'Entrega' : 'Coleta'}
+                        </StatusPill>
+                      </td>
+                      <td className="font-mono whitespace-nowrap text-slate-700 dark:text-slate-200">
                         {o.items && o.items.length > 0
                           ? `${o.items[0].container_number || '-'}${o.items.length > 1 ? ` +${o.items.length - 1}` : ''}`
                           : '-'}
-                      </TableCell>
-                      <TableCell className="text-[13px]">{o.driver_name || '-'}</TableCell>
-                      <TableCell className="text-[13px]">{o.transport_company || '-'}</TableCell>
-                      <TableCell className="text-[13px]">{o.route_name || '-'}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE_CLASS[o.status] || 'bg-slate-100 text-slate-600'}`}>
+                      </td>
+                      <td><div className="max-w-[200px] truncate" title={o.driver_name || ''}>{o.driver_name || '-'}</div></td>
+                      <td><div className="max-w-[200px] truncate" title={o.transport_company || ''}>{o.transport_company || '-'}</div></td>
+                      <td><div className="max-w-[200px] truncate" title={o.route_name || ''}>{o.route_name || '-'}</div></td>
+                      <td>
+                        <StatusPill tone={STATUS_TONES[o.status] || 'slate'}>
                           {STATUS_LABELS[o.status] || o.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-[12px]">{o.created_at ? format(new Date(o.created_at), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
-                    </TableRow>
+                        </StatusPill>
+                      </td>
+                      <td className="whitespace-nowrap tabular-nums">{o.created_at ? format(new Date(o.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </DataCard>
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -545,7 +508,7 @@ export default function LoadingOrderPage() {
                   <div>
                     <Label className="mb-1 block">Rota</Label>
                     <Select value={form.route_id || '_empty'} onValueChange={(v) => onSelectRoute(v === '_empty' ? '' : v)}>
-                      <SelectTrigger className="h-9 text-sm" data-testid="loading-order-route"><SelectValue placeholder="Selecione uma rota" /></SelectTrigger>
+                      <SelectTrigger className="h-9 text-sm" data-testid="loading-order-route"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="_empty">-</SelectItem>
                         {freightRoutes

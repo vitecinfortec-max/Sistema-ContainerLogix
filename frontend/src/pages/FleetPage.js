@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, PlateTag, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -16,10 +20,13 @@ import { api } from '../lib/api';
 import { cn, sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Truck, Wrench, Plus, Eye, Trash2, FileText, Search, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2 } from 'lucide-react';
+import { Truck, Wrench, Plus, Eye, Trash2, FileText, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { compressImage } from '../lib/imageCompression';
+
+const VEHICLE_STATUS_LABELS = { ATIVO: 'Ativo', INATIVO: 'Inativo', MANUTENCAO: 'Manutenção' };
+const VEHICLE_STATUS_TONES = { ATIVO: 'emerald', INATIVO: 'slate', MANUTENCAO: 'amber' };
 
 export default function FleetPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -373,22 +380,10 @@ export default function FleetPage() {
     });
   };
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      'ATIVO': 'bg-green-100 text-green-800',
-      'INATIVO': 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200',
-      'MANUTENCAO': 'bg-yellow-100 text-yellow-800',
-    };
-    const labels = {
-      'ATIVO': 'Ativo',
-      'INATIVO': 'Inativo',
-      'MANUTENCAO': 'Manutenção',
-    };
-    return (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${styles[status] || styles['ATIVO']}`}>
-        {labels[status] || status}
-      </span>
-    );
+  const clearVehicleSearch = () => {
+    setVehicleSearch('');
+    setVehiclePagination(prev => ({ ...prev, page: 1 }));
+    loadVehicles('');
   };
 
   // ========== FUNÇÕES DE REVISÕES ==========
@@ -415,6 +410,12 @@ export default function FleetPage() {
   const handleSearch = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
     loadRevisions(searchPlate);
+  };
+
+  const clearRevisionSearch = () => {
+    setSearchPlate('');
+    setPagination(prev => ({ ...prev, page: 1 }));
+    loadRevisions('');
   };
 
   const handleInputChange = (field, value) => {
@@ -646,362 +647,215 @@ export default function FleetPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="fleet-page">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              {activeTab === 'revisions' ? <Wrench className="w-4 h-4" /> : <Car className="w-4 h-4" />}
-              {activeTab === 'revisions' ? 'Controle de Revisão' : 'Cadastro de Veículo'}
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-              {activeTab === 'revisions' ? 'Registro de revisões e trocas de óleo dos veículos' : 'Cadastro e gerenciamento da frota de veículos'}
-            </p>
-          </div>
-        </div>
+      <div className="space-y-4" data-testid="fleet-page">
+        <PageHeader
+          icon={activeTab === 'revisions' ? Wrench : Car}
+          title={activeTab === 'revisions' ? 'Controle de Revisão' : 'Cadastro de Veículo'}
+          subtitle={activeTab === 'revisions' ? 'Registro de revisões e trocas de óleo dos veículos' : 'Cadastro e gerenciamento da frota de veículos'}
+        />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* ========== ABA CADASTRO DE VEÍCULOS ========== */}
-          <TabsContent value="vehicles" className="space-y-5">
-            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                  <Search className="w-4 h-4" />
-                  Filtrar
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 space-y-3">
-                <div className="grid grid-cols-1 sm:max-w-sm gap-3">
-                  <div>
-                    <Label className="mb-1 block">Placa, modelo ou marca</Label>
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                      <Input
-                        value={vehicleSearch}
-                        onChange={(e) => setVehicleSearch(e.target.value.toUpperCase())}
-                        onKeyPress={(e) => e.key === 'Enter' && handleVehicleSearch()}
-                        className="h-9 text-sm pl-8"
-                        data-testid="search-vehicle-input"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 pt-1">
-                  <Button size="sm" onClick={handleVehicleSearch} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
-                    Filtrar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="vehicles" className="space-y-4 mt-0">
+            <FilterCard hasFilters={!!vehicleSearch} onClear={clearVehicleSearch} onApply={handleVehicleSearch}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <FilterField label="Placa, modelo ou marca">
+                  <SearchInput
+                    value={vehicleSearch}
+                    onChange={(e) => setVehicleSearch(e.target.value.toUpperCase())}
+                    onKeyPress={(e) => e.key === 'Enter' && handleVehicleSearch()}
+                    data-testid="search-vehicle-input"
+                  />
+                </FilterField>
+              </div>
+            </FilterCard>
 
-            {/* Barra de ações - marque um veículo na tabela abaixo pra habilitar as ações */}
-            <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={openNewVehicleModal}
-                title="Adicionar"
-                data-testid="new-vehicle-btn"
-                className="h-9 w-9 p-0"
-              >
-                <Plus className="w-4 h-4 text-primary" />
-              </Button>
-              <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => singleSelectedVehicle && openEditVehicleModal(singleSelectedVehicle)}
-                disabled={!singleSelectedVehicle}
-                title="Editar"
-                className="h-9 w-9 p-0 disabled:opacity-30"
-              >
-                <Pencil className="w-4 h-4 text-blue-600" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => singleSelectedVehicle && handleDeleteVehicle(singleSelectedVehicle.id)}
-                disabled={!singleSelectedVehicle}
-                title="Excluir"
-                className="h-9 w-9 p-0 disabled:opacity-30"
-              >
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </Button>
-              {selectedVehicleIds.size > 0 && (
-                <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-                  {selectedVehicleIds.size} selecionado{selectedVehicleIds.size > 1 ? 's' : ''}
-                </span>
+            {/* Lista - marque um veículo pra habilitar as ações da barra */}
+            <DataCard
+              title="Veículos"
+              count={vehiclePagination.total}
+              toolbar={(
+                <Toolbar
+                  selectedCount={selectedVehicleIds.size}
+                  primary={<ToolbarPrimary icon={Plus} label="Novo veículo" onClick={openNewVehicleModal} testId="new-vehicle-btn" />}
+                >
+                  <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedVehicle && openEditVehicleModal(singleSelectedVehicle)} disabled={!singleSelectedVehicle} />
+                  <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedVehicle && handleDeleteVehicle(singleSelectedVehicle.id)} disabled={!singleSelectedVehicle} />
+                </Toolbar>
               )}
-            </div>
-
-            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  <Car className="w-4 h-4" />
-                  Veículos Cadastrados ({vehiclePagination.total})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {vehiclesLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : vehicles.length === 0 ? (
-                  <div className="p-12 text-center text-muted-foreground">
-                    Nenhum veículo cadastrado
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-800">
-                          <th className="w-9 px-4 py-2.5">
+              footer={(
+                <TablePagination
+                  currentPage={vehiclePagination.page}
+                  totalPages={vehiclePagination.pages}
+                  totalItems={vehiclePagination.total}
+                  pageSize={15}
+                  onPageChange={(page) => setVehiclePagination(prev => ({ ...prev, page }))}
+                />
+              )}
+            >
+              {vehiclesLoading ? (
+                <EmptyState title="Carregando..." />
+              ) : vehicles.length === 0 ? (
+                <EmptyState
+                  icon={Car}
+                  title={vehicleSearch ? 'Nenhum veículo encontrado' : 'Nenhum veículo cadastrado'}
+                  hint={vehicleSearch ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo veículo"'}
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th className="w-10 pr-0">
+                          <Checkbox
+                            checked={vehicles.length > 0 && vehicles.every(v => selectedVehicleIds.has(v.id))}
+                            onCheckedChange={toggleSelectAllVehiclesOnPage}
+                            data-testid="select-all-vehicles-checkbox"
+                          />
+                        </th>
+                        <th>Placa</th>
+                        <th>Tipo</th>
+                        <th>Marca</th>
+                        <th>Modelo</th>
+                        <th>Ano</th>
+                        <th>Motorista</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicles.map((vehicle) => (
+                        <tr
+                          key={vehicle.id}
+                          onClick={() => toggleSelectVehicle(vehicle.id)}
+                          data-selected={selectedVehicleIds.has(vehicle.id)}
+                          className="cursor-pointer"
+                        >
+                          <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
-                              checked={vehicles.length > 0 && vehicles.every(v => selectedVehicleIds.has(v.id))}
-                              onCheckedChange={toggleSelectAllVehiclesOnPage}
-                              data-testid="select-all-vehicles-checkbox"
+                              checked={selectedVehicleIds.has(vehicle.id)}
+                              onCheckedChange={() => toggleSelectVehicle(vehicle.id)}
+                              data-testid="vehicle-row-checkbox"
                             />
-                          </th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Marca</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modelo</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Ano</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motorista</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
+                          </td>
+                          <td><PlateTag>{vehicle.plate}</PlateTag></td>
+                          <td className="whitespace-nowrap">{vehicleTypes.find(t => t.value === vehicle.vehicle_type)?.label || vehicle.vehicle_type}</td>
+                          <td>{vehicle.brand || '-'}</td>
+                          <td>{vehicle.model || '-'}</td>
+                          <td className="tabular-nums">{vehicle.year || '-'}</td>
+                          <td><div className="max-w-[220px] truncate" title={vehicle.driver_name || ''}>{vehicle.driver_name || '-'}</div></td>
+                          <td>
+                            <StatusPill tone={VEHICLE_STATUS_TONES[vehicle.status] || 'emerald'}>
+                              {VEHICLE_STATUS_LABELS[vehicle.status] || vehicle.status}
+                            </StatusPill>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {vehicles.map((vehicle, idx) => (
-                          <tr
-                            key={vehicle.id}
-                            onClick={() => toggleSelectVehicle(vehicle.id)}
-                            className={`cursor-pointer transition-colors ${selectedVehicleIds.has(vehicle.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          >
-                            <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                              <Checkbox
-                                checked={selectedVehicleIds.has(vehicle.id)}
-                                onCheckedChange={() => toggleSelectVehicle(vehicle.id)}
-                                data-testid="vehicle-row-checkbox"
-                              />
-                            </td>
-                            <td className="px-4 py-2.5 text-sm font-mono font-semibold text-slate-800 dark:text-slate-200">{vehicle.plate}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicleTypes.find(t => t.value === vehicle.vehicle_type)?.label || vehicle.vehicle_type}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.brand || '-'}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.model || '-'}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.year || '-'}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{vehicle.driver_name || '-'}</td>
-                            <td className="px-4 py-2.5">{getStatusBadge(vehicle.status)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {vehiclePagination.pages > 1 && (
-                  <div className="flex justify-center gap-2 mt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={vehiclePagination.page === 1}
-                      onClick={() => setVehiclePagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                    >
-                      Anterior
-                    </Button>
-                    <span className="px-4 py-2 text-sm">
-                      Página {vehiclePagination.page} de {vehiclePagination.pages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={vehiclePagination.page === vehiclePagination.pages}
-                      onClick={() => setVehiclePagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                    >
-                      Próxima
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </DataCard>
           </TabsContent>
 
           {/* ========== ABA CONTROLE DE REVISÃO ========== */}
-          <TabsContent value="revisions" className="space-y-5 mt-4">
-            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="flex items-center gap-2 text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                  <Search className="w-4 h-4" />
-                  Filtrar
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 space-y-3">
-                <div className="grid grid-cols-1 sm:max-w-sm gap-3">
-                  <div>
-                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Placa</Label>
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                      <Input
-                        value={searchPlate}
-                        onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
-                        onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                        className="h-9 text-sm pl-8"
-                        data-testid="search-plate-input"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 pt-1">
-                  <Button size="sm" onClick={handleSearch} className="h-8 text-xs font-medium bg-primary hover:bg-primary/90">
-                    Filtrar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="revisions" className="space-y-4 mt-0">
+            <FilterCard hasFilters={!!searchPlate} onClear={clearRevisionSearch} onApply={handleSearch}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <FilterField label="Placa">
+                  <SearchInput
+                    value={searchPlate}
+                    onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    data-testid="search-plate-input"
+                  />
+                </FilterField>
+              </div>
+            </FilterCard>
 
-            {/* Barra de ações - marque uma revisão na tabela abaixo pra habilitar as ações */}
-            <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setNewModalOpen(true)}
-                title="Adicionar"
-                data-testid="new-revision-btn"
-                className="h-9 w-9 p-0"
-              >
-                <Plus className="w-4 h-4 text-primary" />
-              </Button>
-              <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => singleSelectedRevision && handleViewDetails(singleSelectedRevision)}
-                disabled={!singleSelectedRevision}
-                title="Ver Detalhes"
-                className="h-9 w-9 p-0 disabled:opacity-30"
-              >
-                <Eye className="w-4 h-4 text-primary" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => singleSelectedRevision && handlePrintPDF(singleSelectedRevision.id)}
-                disabled={!singleSelectedRevision}
-                title="Imprimir PDF"
-                className="h-9 w-9 p-0 disabled:opacity-30"
-              >
-                <Printer className="w-4 h-4 text-blue-600" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => singleSelectedRevision && handleDelete(singleSelectedRevision.id)}
-                disabled={!singleSelectedRevision}
-                title="Excluir"
-                className="h-9 w-9 p-0 disabled:opacity-30"
-              >
-                <Trash2 className="w-4 h-4 text-destructive" />
-              </Button>
-              {selectedRevisionIds.size > 0 && (
-                <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-                  {selectedRevisionIds.size} selecionado{selectedRevisionIds.size > 1 ? 's' : ''}
-                </span>
+            {/* Lista - marque uma revisão pra habilitar as ações da barra */}
+            <DataCard
+              title="Revisões"
+              count={pagination.total}
+              toolbar={(
+                <Toolbar
+                  selectedCount={selectedRevisionIds.size}
+                  primary={<ToolbarPrimary icon={Plus} label="Nova revisão" onClick={() => setNewModalOpen(true)} testId="new-revision-btn" />}
+                >
+                  <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedRevision && handleViewDetails(singleSelectedRevision)} disabled={!singleSelectedRevision} />
+                  <ToolbarButton icon={Printer} label="Imprimir PDF" tone="emerald" onClick={() => singleSelectedRevision && handlePrintPDF(singleSelectedRevision.id)} disabled={!singleSelectedRevision} />
+                  <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRevision && handleDelete(singleSelectedRevision.id)} disabled={!singleSelectedRevision} />
+                </Toolbar>
               )}
-            </div>
-
-            {/* Tabela de revisões */}
-            <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                  <Wrench className="w-4 h-4" />
-                  Revisões Registradas ({pagination.total})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {loading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : revisions.length === 0 ? (
-                  <div className="p-12 text-center text-muted-foreground">
-                    Nenhuma revisão encontrada
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-800">
-                          <th className="w-9 px-4 py-2.5">
+              footer={(
+                <TablePagination
+                  currentPage={pagination.page}
+                  totalPages={pagination.pages}
+                  totalItems={pagination.total}
+                  pageSize={15}
+                  onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+                />
+              )}
+            >
+              {loading ? (
+                <EmptyState title="Carregando..." />
+              ) : revisions.length === 0 ? (
+                <EmptyState
+                  icon={Wrench}
+                  title="Nenhuma revisão encontrada"
+                  hint={searchPlate ? 'Ajuste a busca' : 'Registre a primeira pelo botão "Nova revisão"'}
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th className="w-10 pr-0">
+                          <Checkbox
+                            checked={revisions.length > 0 && revisions.every(r => selectedRevisionIds.has(r.id))}
+                            onCheckedChange={toggleSelectAllRevisionsOnPage}
+                            data-testid="select-all-checkbox"
+                          />
+                        </th>
+                        <th>Nº</th>
+                        <th>Placa</th>
+                        <th>Modelo</th>
+                        <th>Data</th>
+                        <th className="!text-right">KM atual</th>
+                        <th>Óleo</th>
+                        <th>Mecânico</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {revisions.map((revision) => (
+                        <tr
+                          key={revision.id}
+                          onClick={() => toggleSelectRevision(revision.id)}
+                          data-selected={selectedRevisionIds.has(revision.id)}
+                          className="cursor-pointer"
+                        >
+                          <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                             <Checkbox
-                              checked={revisions.length > 0 && revisions.every(r => selectedRevisionIds.has(r.id))}
-                              onCheckedChange={toggleSelectAllRevisionsOnPage}
-                              data-testid="select-all-checkbox"
+                              checked={selectedRevisionIds.has(revision.id)}
+                              onCheckedChange={() => toggleSelectRevision(revision.id)}
+                              data-testid="revision-row-checkbox"
                             />
-                          </th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Modelo</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">KM Atual</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Óleo</th>
-                          <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Mecânico</th>
+                          </td>
+                          <td className="cell-strong whitespace-nowrap tabular-nums">#{revision.revision_number}</td>
+                          <td><PlateTag>{revision.vehicle_plate}</PlateTag></td>
+                          <td>{revision.vehicle_model || '-'}</td>
+                          <td className="whitespace-nowrap tabular-nums">
+                            {format(new Date(revision.revision_date), 'dd/MM/yyyy', { locale: ptBR })}
+                          </td>
+                          <td className="text-right whitespace-nowrap tabular-nums">{formatKM(revision.current_km)}</td>
+                          <td><div className="max-w-[200px] truncate" title={revision.oil_used || ''}>{revision.oil_used || '-'}</div></td>
+                          <td><div className="max-w-[200px] truncate" title={revision.mechanic_name || ''}>{revision.mechanic_name || '-'}</div></td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {revisions.map((revision, idx) => (
-                          <tr
-                            key={revision.id}
-                            onClick={() => toggleSelectRevision(revision.id)}
-                            className={`cursor-pointer transition-colors ${selectedRevisionIds.has(revision.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                          >
-                            <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                              <Checkbox
-                                checked={selectedRevisionIds.has(revision.id)}
-                                onCheckedChange={() => toggleSelectRevision(revision.id)}
-                                data-testid="revision-row-checkbox"
-                              />
-                            </td>
-                            <td className="px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-200">#{revision.revision_number}</td>
-                            <td className="px-4 py-2.5 text-sm font-mono text-slate-700 dark:text-slate-300">{revision.vehicle_plate}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{revision.vehicle_model || '-'}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                              {format(new Date(revision.revision_date), 'dd/MM/yyyy', { locale: ptBR })}
-                            </td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{formatKM(revision.current_km)}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{revision.oil_used}</td>
-                            <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{revision.mechanic_name}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-
-                {/* Paginação */}
-                {pagination.pages > 1 && (
-                  <div className="flex justify-center gap-2 mt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={pagination.page === 1}
-                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                    >
-                      Anterior
-                    </Button>
-                    <span className="px-4 py-2 text-sm">
-                      Página {pagination.page} de {pagination.pages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={pagination.page === pagination.pages}
-                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                    >
-                      Próxima
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </DataCard>
           </TabsContent>
         </Tabs>
       </div>

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -8,9 +11,6 @@ import { Textarea } from '../components/ui/textarea';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '../components/ui/dialog';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
@@ -19,7 +19,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import { format } from 'date-fns';
 import {
-  Plus, Pencil, Trash2, FileText, Download, Search, X, Save, Calculator,
+  Plus, Pencil, Trash2, FileText, Printer, X, Save, Calculator,
 } from 'lucide-react';
 
 const buildEmptyForm = () => {
@@ -569,164 +569,91 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="rpa-terceiro-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Contrato de Frete</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-            Contrato de Afretamento para motoristas terceiros
-          </p>
-        </div>
+      <div className="space-y-4" data-testid="rpa-terceiro-page">
+        <PageHeader icon={FileText} title="Contrato de Frete" subtitle="Contrato de Afretamento para motoristas terceiros" />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="relative max-w-md">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-9 text-[13px]"
-                data-testid="rpa-search-input"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <FilterField label="Número, motorista, CPF, cliente ou container">
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="rpa-search-input" />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Barra de ações - marque um contrato na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreate}
-            title="Adicionar"
-            data-testid="rpa-new-button"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedContract && openEdit(singleSelectedContract.id)}
-            disabled={!singleSelectedContract}
-            title="Editar"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Pencil className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedContract && downloadPDF(singleSelectedContract.id, singleSelectedContract.rpa_number)}
-            disabled={!singleSelectedContract}
-            title="Baixar PDF"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Download className="w-4 h-4 text-emerald-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedContract && handleDelete(singleSelectedContract.id, singleSelectedContract.rpa_number)}
-            disabled={!singleSelectedContract}
-            title="Excluir"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        {/* Lista - marque um contrato pra habilitar as ações da barra */}
+        <DataCard
+          title="Contratos"
+          count={loading ? '...' : rpas.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Novo contrato" onClick={openCreate} testId="rpa-new-button" />}
+            >
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedContract && openEdit(singleSelectedContract.id)} disabled={!singleSelectedContract} />
+              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedContract && downloadPDF(singleSelectedContract.id, singleSelectedContract.rpa_number)} disabled={!singleSelectedContract} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedContract && handleDelete(singleSelectedContract.id, singleSelectedContract.rpa_number)} disabled={!singleSelectedContract} />
+            </Toolbar>
           )}
-        </div>
-
-        {/* List */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <FileText className="w-4 h-4" />
-              {loading ? 'Carregando...' : `Lista de Contratos (${rpas.length})`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50 dark:bg-slate-800">
-                    <TableHead className="w-9">
+        >
+          {rpas.length === 0 && !loading ? (
+            <EmptyState
+              icon={FileText}
+              title={search ? 'Nenhum contrato encontrado' : 'Nenhum contrato cadastrado'}
+              hint={search ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo contrato"'}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
                       <Checkbox
                         checked={rpas.length > 0 && rpas.every((r) => selectedIds.has(r.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
-                    </TableHead>
-                    <TableHead className="text-[12px] font-semibold">Nº</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Motorista</TableHead>
-                    <TableHead className="text-[12px] font-semibold">CPF</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Cliente</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Container</TableHead>
-                    <TableHead className="text-[12px] font-semibold">Data</TableHead>
-                    <TableHead className="text-[12px] font-semibold text-right">Saldo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rpas.length === 0 && !loading && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center text-slate-400 dark:text-slate-500 py-8 text-sm">
-                        Nenhum contrato cadastrado.
-                      </TableCell>
-                    </TableRow>
-                  )}
+                    </th>
+                    <th>Nº</th>
+                    <th>Motorista</th>
+                    <th>CPF</th>
+                    <th>Cliente</th>
+                    <th>Container</th>
+                    <th>Data</th>
+                    <th className="!text-right">Saldo</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {rpas.map((r) => (
-                    <TableRow
+                    <tr
                       key={r.id}
                       onClick={() => toggleSelect(r.id)}
-                      className={`cursor-pointer transition-colors ${selectedIds.has(r.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                      data-selected={selectedIds.has(r.id)}
+                      className="cursor-pointer"
                       data-testid={`rpa-row-${r.rpa_number}`}
                     >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(r.id)}
                           onCheckedChange={() => toggleSelect(r.id)}
                           data-testid={`rpa-row-checkbox-${r.rpa_number}`}
                         />
-                      </TableCell>
-                      <TableCell className="text-[13px] font-semibold text-primary">
-                        Nº {r.rpa_number}
-                      </TableCell>
-                      <TableCell className="text-[13px]">{r.driver_name || '-'}</TableCell>
-                      <TableCell className="text-[12px] text-slate-500 dark:text-slate-400">{r.driver_cpf || '-'}</TableCell>
-                      <TableCell className="text-[13px]">{r.client_name || '-'}</TableCell>
-                      <TableCell className="text-[12px] font-mono">{r.container_number || '-'}</TableCell>
-                      <TableCell className="text-[12px]">
+                      </td>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{r.rpa_number}</td>
+                      <td><div className="max-w-[220px] truncate" title={r.driver_name || ''}>{r.driver_name || '-'}</div></td>
+                      <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{r.driver_cpf || '-'}</td>
+                      <td><div className="max-w-[220px] truncate" title={r.client_name || ''}>{r.client_name || '-'}</div></td>
+                      <td className="font-mono whitespace-nowrap text-slate-700 dark:text-slate-200">{r.container_number || '-'}</td>
+                      <td className="whitespace-nowrap tabular-nums">
                         {r.service_date ? format(new Date(r.service_date), 'dd/MM/yyyy') : '-'}
-                      </TableCell>
-                      <TableCell className="text-[13px] font-semibold text-right text-primary">
-                        {fmtMoney(r.balance)}
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(r.balance)}</td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </DataCard>
       </div>
 
       {/* Dialog Create/Edit */}
@@ -734,10 +661,10 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto" data-testid="rpa-dialog">
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="flex items-center gap-2 text-base">
-              <FileText className="w-5 h-5 text-emerald-600" />
+              <FileText className="w-5 h-5 text-primary" />
               {editingId ? 'Editar Contrato de Frete' : 'Novo Contrato de Frete'}
               {nextNumber !== null && (
-                <Badge variant="outline" className="ml-2 text-emerald-700 border-emerald-300">
+                <Badge variant="outline" className="ml-2 text-primary border-primary/30">
                   Nº {nextNumber}
                 </Badge>
               )}
@@ -762,7 +689,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <div className="grid grid-cols-2 gap-3">
               <div className="relative" ref={contratadoBoxRef}>
                 <Label className="mb-1 block">
-                  Transportadora / Contratado <span className="text-emerald-600 normal-case font-normal">(digite para buscar cadastrados)</span>
+                  Transportadora / Contratado <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -816,7 +743,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               {/* Motorista - Autocomplete */}
               <div className="relative" ref={driverBoxRef}>
                 <Label className="mb-1 block">
-                  Motorista * <span className="text-emerald-600 normal-case font-normal">(digite para buscar cadastrados)</span>
+                  Motorista * <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -873,7 +800,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Field label="Tipo de Veículo Principal" value={form.vehicle_type} onChange={(v) => onChange('vehicle_type', v)} testid="rpa-vehicle-type" />
               <div>
                 <Label className="mb-1 block">
-                  Veículo Principal (Placa) <span className="text-emerald-600 normal-case font-normal">(digite para buscar cadastrados)</span>
+                  Veículo Principal (Placa) <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <Autocomplete
                   className="text-sm"
@@ -889,7 +816,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Field label="Proprietário" value={form.truck_owner} onChange={(v) => onChange('truck_owner', v)} testid="rpa-truck-owner" />
               <div>
                 <Label className="mb-1 block">
-                  Vinculado 01 (Placa) <span className="text-emerald-600 normal-case font-normal">(digite para buscar cadastrados)</span>
+                  Vinculado 01 (Placa) <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <Autocomplete
                   className="text-sm"
@@ -925,7 +852,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               {/* Cliente - Autocomplete */}
               <div className="relative" ref={clientBoxRef}>
                 <Label className="mb-1 block">
-                  Cliente <span className="text-emerald-600 normal-case font-normal">(digite para buscar cadastrados)</span>
+                  Cliente <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <div className="relative">
                   <Input
@@ -1132,12 +1059,12 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             </div>
 
             {/* SALDO A RECEBER */}
-            <div className="flex items-center justify-between p-4 bg-emerald-50 border-2 border-emerald-200 rounded-lg">
-              <div className="flex items-center gap-2 text-emerald-800 font-semibold">
+            <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="flex items-center gap-2 text-primary font-semibold">
                 <Calculator className="w-5 h-5" />
                 Saldo a Receber
               </div>
-              <div className="text-xl font-bold text-emerald-700" data-testid="rpa-balance">
+              <div className="text-xl font-bold text-primary" data-testid="rpa-balance">
                 {fmtMoney(calcBalance())}
               </div>
             </div>
@@ -1185,7 +1112,6 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
               data-testid="rpa-save-btn"
             >
               <Save className="w-4 h-4 mr-2" />
@@ -1202,7 +1128,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
 function SectionHeader({ title, noMargin }) {
   return (
     <div className={noMargin ? '' : 'mt-2'}>
-      <h3 className="text-[12px] font-bold uppercase tracking-wider text-emerald-700 border-b-2 border-emerald-200 pb-1">
+      <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary border-b-2 border-primary/20 pb-1">
         {title}
       </h3>
     </div>

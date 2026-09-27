@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -11,7 +14,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Trash2, Route as RouteIcon, Edit, Search } from 'lucide-react';
+import { Plus, Trash2, Route as RouteIcon, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -19,9 +22,9 @@ const STATUS_OPTIONS = [
   ['ATIVO', 'Ativo'],
   ['INATIVO', 'Inativo'],
 ];
-const STATUS_BADGE_CLASS = {
-  ATIVO: 'bg-emerald-100 text-emerald-700',
-  INATIVO: 'bg-slate-100 text-slate-600',
+const STATUS_TONES = {
+  ATIVO: 'emerald',
+  INATIVO: 'slate',
 };
 
 const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -165,13 +168,8 @@ export default function FreightRoutesPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="freight-routes-page">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-            Rota
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Cadastro de rotas dos motoristas, com o valor do frete de cada trajeto</p>
-        </div>
+      <div className="space-y-4" data-testid="freight-routes-page">
+        <PageHeader icon={RouteIcon} title="Rota" subtitle="Cadastro de rotas dos motoristas, com o valor do frete de cada trajeto" />
 
         <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
@@ -254,136 +252,88 @@ export default function FreightRoutesPage() {
             </DialogContent>
           </Dialog>
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 text-[13px] pl-9"
-                data-testid="search-route-input"
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Origem ou destino">
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-route-input" />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Barra de ações - marque uma rota na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreateDialog}
-            title="Adicionar"
-            data-testid="add-route-button"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedRoute && openEditDialog(singleSelectedRoute)}
-            disabled={!singleSelectedRoute}
-            title="Editar"
-            data-testid="edit-route-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Edit className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedRoute && handleDelete(singleSelectedRoute.id)}
-            disabled={!singleSelectedRoute}
-            title="Excluir"
-            data-testid="delete-route-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        {/* Lista - marque uma rota pra habilitar as ações da barra */}
+        <DataCard
+          title="Rotas"
+          count={filteredRoutes.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova rota" onClick={openCreateDialog} testId="add-route-button" />}
+            >
+              <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedRoute && openEditDialog(singleSelectedRoute)} disabled={!singleSelectedRoute} testId="edit-route-button" />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRoute && handleDelete(singleSelectedRoute.id)} disabled={!singleSelectedRoute} testId="delete-route-button" />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <RouteIcon className="w-4 h-4" />
-              Lista de Rotas ({filteredRoutes.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {filteredRoutes.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
-                    <tr>
-                      <th className="w-9 px-4 py-2.5">
+        >
+          {filteredRoutes.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={filteredRoutes.length > 0 && filteredRoutes.every(r => selectedIds.has(r.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </th>
+                    <th>Origem</th>
+                    <th>Destino</th>
+                    <th className="!text-right">Valor do frete</th>
+                    <th>Status</th>
+                    <th>Cadastrado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRoutes.map((route) => (
+                    <tr
+                      key={route.id}
+                      onClick={() => toggleSelect(route.id)}
+                      data-selected={selectedIds.has(route.id)}
+                      className="cursor-pointer"
+                      data-testid="route-row"
+                    >
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          checked={filteredRoutes.length > 0 && filteredRoutes.every(r => selectedIds.has(r.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                          data-testid="select-all-checkbox"
+                          checked={selectedIds.has(route.id)}
+                          onCheckedChange={() => toggleSelect(route.id)}
+                          data-testid="route-row-checkbox"
                         />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Origem</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Destino</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Valor do Frete</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Status</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
+                      </td>
+                      <td className="cell-strong">{route.origin}</td>
+                      <td className="cell-strong">{route.destination}</td>
+                      <td className="text-right tabular-nums whitespace-nowrap">{formatMoney(route.freight_value)}</td>
+                      <td>
+                        <StatusPill tone={STATUS_TONES[route.status] || 'emerald'}>
+                          {route.status === 'INATIVO' ? 'Inativo' : 'Ativo'}
+                        </StatusPill>
+                      </td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        {format(new Date(route.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredRoutes.map((route) => (
-                      <tr
-                        key={route.id}
-                        onClick={() => toggleSelect(route.id)}
-                        className={`cursor-pointer transition-colors ${selectedIds.has(route.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                        data-testid="route-row"
-                      >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(route.id)}
-                            onCheckedChange={() => toggleSelect(route.id)}
-                            data-testid="route-row-checkbox"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px] font-medium">{route.origin}</td>
-                        <td className="px-4 py-2.5 text-[13px] font-medium">{route.destination}</td>
-                        <td className="px-4 py-2.5 text-[13px]">{formatMoney(route.freight_value)}</td>
-                        <td className="px-4 py-2.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${STATUS_BADGE_CLASS[route.status] || 'bg-slate-100 text-slate-600'}`}>
-                            {route.status === 'INATIVO' ? 'Inativo' : 'Ativo'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px]">
-                          {format(new Date(route.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-slate-500 dark:text-slate-400" data-testid="no-routes">
-                <RouteIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">
-                  {search ? 'Nenhuma rota encontrada' : 'Nenhuma rota cadastrada'}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={RouteIcon}
+              title={search ? 'Nenhuma rota encontrada' : 'Nenhuma rota cadastrada'}
+              hint={search ? 'Ajuste a busca' : 'Cadastre a primeira rota pelo botão "Nova rota"'}
+              testId="no-routes"
+            />
+          )}
+        </DataCard>
       </div>
       <ConfirmDialog />
     </Layout>
