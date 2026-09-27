@@ -60,7 +60,7 @@ export default function ServicePriceTablePage() {
     <Layout>
       <div className="space-y-5" data-testid="service-price-table-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Tabela de Serviços</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Tabela de Serviços</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Preços por cliente - usados para preencher automaticamente o Valor do Serviço na emissão de EIR</p>
         </div>
 

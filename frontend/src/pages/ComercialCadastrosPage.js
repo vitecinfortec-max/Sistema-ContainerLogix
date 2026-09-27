@@ -199,7 +199,7 @@ export default function ComercialCadastrosPage() {
     <Layout>
       <div className="space-y-5" data-testid="comercial-cadastros-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Cadastro</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Cadastro</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Cadastros de apoio do módulo Comercial</p>
         </div>
 

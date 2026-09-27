@@ -282,7 +282,7 @@ export default function DailyRateRequestPage() {
     <Layout>
       <div className="space-y-5">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Solicitação de Diária</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Solicitação de Diária</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie as solicitações de diária, comissão e almoço dos motoristas</p>
         </div>
 

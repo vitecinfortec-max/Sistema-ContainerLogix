@@ -580,7 +580,7 @@ export default function InternationalInvoicePage() {
       <div className="space-y-6" data-testid="international-invoice-page">
         {/* Header */}
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Globe className="h-4 w-4 text-primary" />
             Invoices Internacionais
           </h1>

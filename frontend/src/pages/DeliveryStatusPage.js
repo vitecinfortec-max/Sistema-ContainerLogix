@@ -282,7 +282,7 @@ export default function DeliveryStatusPage() {
       <div className="space-y-5" data-testid="delivery-status-page">
         {/* Header */}
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Status de Entrega</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Status de Entrega</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Controle de horários de entrega por programação</p>
         </div>
 

@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatusPill, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Eye, Trash2, Search, ListChecks } from 'lucide-react';
+import { Plus, Eye, Trash2, ListChecks } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const STATUS_STYLES = {
-  EM_ANDAMENTO: 'bg-yellow-100 text-yellow-800',
-  CONCLUIDA: 'bg-green-100 text-green-800',
+const STATUS_TONES = {
+  EM_ANDAMENTO: 'amber',
+  CONCLUIDA: 'emerald',
 };
 const STATUS_LABELS = {
   EM_ANDAMENTO: 'Em Andamento',
@@ -94,144 +95,99 @@ export default function ContainerAuditsPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="container-audits-page">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Auditoria de Estoque</h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Confronto entre o estoque do sistema e o que foi encontrado fisicamente no pátio</p>
-        </div>
+      <div className="space-y-4" data-testid="container-audits-page">
+        <PageHeader
+          icon={ListChecks}
+          title="Auditoria de Estoque"
+          subtitle="Confronto entre o estoque do sistema e o que foi encontrado fisicamente no pátio"
+        />
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
-              <div className="sm:col-span-2">
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Código ou Cliente</Label>
-                <Input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-8 text-xs" data-testid="search-audit" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!searchTerm} onClear={() => setSearchTerm('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Código ou cliente" className="sm:col-span-2">
+              <SearchInput value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} data-testid="search-audit" />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/container-audits/new')} title="Nova Auditoria" data-testid="new-audit-btn" className="h-9 w-9 p-0">
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedItem && navigate(`/container-audits/${singleSelectedItem.id}`)}
-            disabled={!singleSelectedItem}
-            title="Ver Detalhes"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)}
-            disabled={!singleSelectedItem || singleSelectedItem.status === 'CONCLUIDA'}
-            title="Excluir"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        <DataCard
+          title="Auditorias"
+          count={pagination.total.toLocaleString('pt-BR')}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Nova auditoria" onClick={() => navigate('/container-audits/new')} testId="new-audit-btn" />}
+            >
+              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedItem && navigate(`/container-audits/${singleSelectedItem.id}`)} disabled={!singleSelectedItem} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)} disabled={!singleSelectedItem || singleSelectedItem.status === 'CONCLUIDA'} />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <span className="flex items-center gap-2">
-                <ListChecks className="w-4 h-4" />
-                Auditorias ({pagination.total})
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
-            ) : filteredAudits.length === 0 ? (
-              <div className="text-center py-8 text-sm text-slate-500 dark:text-slate-400">Nenhuma auditoria encontrada</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="w-9 px-4 py-2.5">
-                        <Checkbox
-                          checked={filteredAudits.length > 0 && filteredAudits.every(a => selectedIds.has(a.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                        />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Código</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
-                      <th className="hidden sm:table-cell px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                      <th className="hidden sm:table-cell px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Divergências</th>
+          footer={(
+            <TablePagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.total}
+              pageSize={pagination.perPage}
+              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+            />
+          )}
+        >
+          {loading ? (
+            <EmptyState title="Carregando..." />
+          ) : filteredAudits.length === 0 ? (
+            <EmptyState icon={ListChecks} title="Nenhuma auditoria encontrada" hint="Ajuste a busca ou inicie uma nova auditoria" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={filteredAudits.length > 0 && filteredAudits.every(a => selectedIds.has(a.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                      />
+                    </th>
+                    <th>Código</th>
+                    <th>Cliente</th>
+                    <th className="hidden sm:table-cell">Data</th>
+                    <th>Status</th>
+                    <th className="hidden sm:table-cell">Divergências</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAudits.map((audit) => (
+                    <tr
+                      key={audit.id}
+                      onClick={() => toggleSelect(audit.id)}
+                      data-selected={selectedIds.has(audit.id)}
+                      className="cursor-pointer"
+                    >
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox checked={selectedIds.has(audit.id)} onCheckedChange={() => toggleSelect(audit.id)} />
+                      </td>
+                      <td className="cell-strong font-mono whitespace-nowrap">{audit.audit_code}</td>
+                      <td><div className="max-w-[300px] truncate" title={audit.client_name || ''}>{audit.client_name}</div></td>
+                      <td className="hidden sm:table-cell whitespace-nowrap tabular-nums">
+                        {format(new Date(audit.created_at), 'dd/MM/yyyy', { locale: ptBR })}{' '}
+                        <span className="text-slate-400 dark:text-slate-500">{format(new Date(audit.created_at), 'HH:mm', { locale: ptBR })}</span>
+                      </td>
+                      <td>
+                        <StatusPill tone={STATUS_TONES[audit.status] || 'amber'}>{STATUS_LABELS[audit.status] || audit.status}</StatusPill>
+                      </td>
+                      <td className="hidden sm:table-cell">
+                        {getDivergenceCount(audit) > 0 ? (
+                          <StatusPill tone="red">{getDivergenceCount(audit)}</StatusPill>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-slate-500">-</span>
+                        )}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAudits.map((audit, idx) => (
-                      <tr
-                        key={audit.id}
-                        onClick={() => toggleSelect(audit.id)}
-                        className={`cursor-pointer transition-colors ${selectedIds.has(audit.id) ? 'bg-primary/10 hover:bg-primary/15' : `hover:bg-slate-50 dark:hover:bg-slate-800/80 ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}`}
-                      >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox checked={selectedIds.has(audit.id)} onCheckedChange={() => toggleSelect(audit.id)} />
-                        </td>
-                        <td className="px-4 py-2.5 text-sm font-semibold font-mono text-slate-800 dark:text-slate-200">{audit.audit_code}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{audit.client_name}</td>
-                        <td className="hidden sm:table-cell px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
-                          {format(new Date(audit.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${STATUS_STYLES[audit.status] || STATUS_STYLES.EM_ANDAMENTO}`}>
-                            {STATUS_LABELS[audit.status] || audit.status}
-                          </span>
-                        </td>
-                        <td className="hidden sm:table-cell px-4 py-2.5">
-                          {getDivergenceCount(audit) > 0 ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-50 text-red-700">
-                              {getDivergenceCount(audit)}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-400 dark:text-slate-500">-</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 dark:border-slate-800">
-                <div className="text-xs text-slate-400 dark:text-slate-500">Página {pagination.page} de {pagination.totalPages}</div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page === 1} onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}>
-                    Anterior
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" disabled={pagination.page === pagination.totalPages} onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}>
-                    Próximo
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
       </div>
       <ConfirmDialog />
     </Layout>

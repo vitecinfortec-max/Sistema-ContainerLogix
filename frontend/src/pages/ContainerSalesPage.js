@@ -185,7 +185,7 @@ export default function ContainerSalesPage() {
     <Layout>
       <div className="space-y-5" data-testid="container-sales-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <BadgeDollarSign className="w-4 h-4" />
             Registro de Venda
           </h1>

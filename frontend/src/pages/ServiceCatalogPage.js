@@ -163,7 +163,7 @@ export default function ServiceCatalogPage() {
     <Layout>
       <div className="space-y-5" data-testid="service-catalog-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Cadastro de Serviço</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Cadastro de Serviço</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Catálogo de serviços do Estoque</p>
         </div>
 

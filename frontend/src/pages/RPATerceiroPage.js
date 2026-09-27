@@ -571,7 +571,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
     <Layout>
       <div className="space-y-5" data-testid="rpa-terceiro-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Contrato de Frete</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Contrato de Frete</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
             Contrato de Afretamento para motoristas terceiros
           </p>

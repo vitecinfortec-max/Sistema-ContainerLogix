@@ -133,7 +133,7 @@ export default function NewFlexTankMovementPage() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
               Nova Movimentação
             </h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Registre uma entrada ou saída de bolsa Flex Tank</p>
@@ -141,11 +141,11 @@ export default function NewFlexTankMovementPage() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Dados da Movimentação</CardTitle>
+          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dados da Movimentação</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="bag_number">Número da Bolsa *</Label>

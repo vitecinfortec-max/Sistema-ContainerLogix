@@ -649,7 +649,7 @@ export default function FleetPage() {
       <div className="space-y-5" data-testid="fleet-page">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
               {activeTab === 'revisions' ? <Wrench className="w-4 h-4" /> : <Car className="w-4 h-4" />}
               {activeTab === 'revisions' ? 'Controle de Revisão' : 'Cadastro de Veículo'}
             </h1>

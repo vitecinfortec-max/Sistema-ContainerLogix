@@ -419,7 +419,7 @@ export default function ContainerVistoriaDetailPage() {
               Voltar
             </Button>
             <div>
-              <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 Vistoria de Container #{vistoria.vistoria_number}
               </h1>
               <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
@@ -440,11 +440,11 @@ export default function ContainerVistoriaDetailPage() {
         </div>
 
         {/* Informações */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Informações do Container</CardTitle>
+        <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Container</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Número do Container</p>
@@ -484,22 +484,22 @@ export default function ContainerVistoriaDetailPage() {
 
         {/* Observações */}
         {vistoria.observations && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Observações</CardTitle>
+          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4">
               <p className="whitespace-pre-wrap">{vistoria.observations}</p>
             </CardContent>
           </Card>
         )}
 
         {/* Estado do Container */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Estado do Container</CardTitle>
+        <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Estado do Container</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             {vistoria.no_damage ? (
               <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-800 font-semibold text-sm">
                 Sem Avarias
@@ -522,14 +522,14 @@ export default function ContainerVistoriaDetailPage() {
         </Card>
 
         {/* Fotos da Vistoria */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Camera className="w-5 h-5" />
+        <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+              <Camera className="w-4 h-4 text-primary" />
               Fotos da Vistoria ({photos.length}/{MAX_VISTORIA_PHOTOS})
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             <div className="flex flex-wrap items-end gap-2 mb-4">
               <div className="w-56">
                 <Label htmlFor="new_photo_type">Tipo da foto</Label>
@@ -613,11 +613,11 @@ export default function ContainerVistoriaDetailPage() {
         </Card>
 
         {/* Metadados e Código de Barras */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Informações da Vistoria</CardTitle>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações da Vistoria</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 flex-1">
                 <div>

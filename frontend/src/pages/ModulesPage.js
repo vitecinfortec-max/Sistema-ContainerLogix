@@ -86,7 +86,7 @@ export default function ModulesPage() {
       <div className="space-y-5" data-testid="modules-page">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
               <LayoutGrid className="w-5 h-5 text-primary" />
               Módulos Contratados
             </h1>
@@ -104,8 +104,8 @@ export default function ModulesPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {catalog.map((group) => (
             <Card key={group.key}>
-              <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
-                <CardTitle className="text-[13px] font-medium flex items-center justify-between">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
                   <span>{group.label}</span>
                   <div className="flex items-center gap-2">
                     <span className={`text-[11px] font-medium ${!isDisabled(group.key) ? 'text-green-600' : 'text-slate-400 dark:text-slate-500'}`}>

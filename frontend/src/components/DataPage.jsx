@@ -53,8 +53,13 @@ export function StatGrid({ children, className }) {
   return <div className={cn('grid grid-cols-2 lg:grid-cols-4 gap-3', className)}>{children}</div>;
 }
 
-/** Card de filtros: título + "Limpar filtros" no topo, campos, e botões no rodapé. */
-export function FilterCard({ children, hasFilters, onClear, onApply, title = 'Filtros' }) {
+/**
+ * Card de filtros: título + "Limpar filtros" no topo, campos, e rodapé com
+ * Limpar/Filtrar (quando a tela aplica filtros por botão) e/ou ações extras
+ * (ex.: Baixar PDF/Excel nas telas de relatório). Telas com filtro ao vivo
+ * (sem onApply) mostram só o link "Limpar filtros" do topo.
+ */
+export function FilterCard({ children, hasFilters, onClear, onApply, actions, title = 'Filtros', clearTestId = 'filter-clear-button', applyTestId = 'filter-apply-button', clearLinkTestId = 'clear-all-filters' }) {
   return (
     <section className={SURFACE}>
       <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
@@ -70,7 +75,7 @@ export function FilterCard({ children, hasFilters, onClear, onApply, title = 'Fi
             type="button"
             onClick={onClear}
             className="text-xs text-slate-500 dark:text-slate-400 hover:text-primary flex items-center gap-1"
-            data-testid="clear-all-filters"
+            data-testid={clearLinkTestId}
           >
             <X className="w-3.5 h-3.5" />
             Limpar filtros
@@ -79,18 +84,19 @@ export function FilterCard({ children, hasFilters, onClear, onApply, title = 'Fi
       </div>
       <div className="p-4">
         {children}
-        {(onApply || onClear) && (
-          <div className="flex items-center justify-end gap-2 mt-3">
-            {onClear && (
-              <Button type="button" variant="outline" size="sm" onClick={onClear} className="h-8 text-xs" data-testid="filter-clear-button">
+        {(onApply || actions) && (
+          <div className="flex items-center justify-end gap-2 mt-3 flex-wrap">
+            {onClear && onApply && (
+              <Button type="button" variant="outline" size="sm" onClick={onClear} className="h-8 text-xs" data-testid={clearTestId}>
                 Limpar
               </Button>
             )}
             {onApply && (
-              <Button type="button" size="sm" onClick={onApply} className="h-8 text-xs px-5" data-testid="filter-apply-button">
+              <Button type="button" size="sm" onClick={onApply} className="h-8 text-xs px-5" data-testid={applyTestId}>
                 Filtrar
               </Button>
             )}
+            {actions}
           </div>
         )}
       </div>

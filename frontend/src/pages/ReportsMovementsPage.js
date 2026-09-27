@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import { FilterCard, FilterField, SearchInput, DataCard, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import { FileText, FileSpreadsheet, Calendar, X, BarChart3, Mail } from 'lucide-react';
+import { FileText, FileSpreadsheet, X, BarChart3, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -207,228 +207,133 @@ export default function ReportsMovementsPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="reports-movements-page">
-        {/* Header */}
-        <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-            Relatório de Movimentações
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gere e exporte relatórios das movimentações de containers</p>
-        </div>
+      <div className="space-y-4" data-testid="reports-movements-page">
+        <PageHeader icon={BarChart3} title="Relatório de Movimentações" subtitle="Gere e exporte relatórios das movimentações de containers" />
 
-        {isAdmin && (
-          <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-email-report-card">
-            <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                <Mail className="w-3.5 h-3.5" />
-                Envio Automático por E-mail
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 space-y-3">
-              <p className="text-[13px] text-slate-500 dark:text-slate-400">
-                Todo dia às 07:00 o sistema envia automaticamente, por e-mail, o relatório de movimentações do dia anterior pra cada Cliente ativo com e-mail cadastrado.
-                Use os campos abaixo pra disparar o envio manualmente (útil pra testar ou reenviar um dia específico).
-              </p>
-              <div className="flex items-end gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[11px] text-slate-500 dark:text-slate-400">Data das movimentações</Label>
-                  <Input
-                    type="date"
-                    value={emailDate}
-                    onChange={(e) => setEmailDate(e.target.value)}
-                    className="h-9 text-[13px]"
-                    data-testid="daily-email-report-date"
-                  />
-                </div>
-                <Button
-                  onClick={sendDailyEmails}
-                  disabled={sendingEmails || !emailDate}
-                  data-testid="daily-email-report-send-btn"
-                >
-                  <Mail className="w-4 h-4 mr-2" />
-                  {sendingEmails ? 'Enviando...' : 'Enviar Agora'}
-                </Button>
-              </div>
-              {emailResult && (
-                <div className="text-[12px] space-y-1 pt-1">
-                  <p className="text-green-700 dark:text-green-400">
-                    Enviado para {emailResult.sent.length} cliente(s){emailResult.sent.length > 0 ? `: ${emailResult.sent.join(', ')}` : ''}
-                  </p>
-                  {emailResult.skipped.length > 0 && (
-                    <p className="text-slate-500 dark:text-slate-400">
-                      Sem movimentação no dia ({emailResult.skipped.length}): {emailResult.skipped.join(', ')}
-                    </p>
-                  )}
-                  {emailResult.errors.length > 0 && (
-                    <p className="text-red-600 dark:text-red-400">
-                      Erro ao enviar para: {emailResult.errors.map((e) => `${e.client} (${e.error})`).join('; ')}
-                    </p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+        <FilterCard
+          hasFilters={hasFilters}
+          onClear={clearFilters}
+          clearLinkTestId="report-clear-filters"
+          actions={(
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={downloadPDF} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-pdf-button">
+                <FileText className="w-4 h-4 text-red-600" /> Baixar PDF
+              </Button>
+              <Button type="button" size="sm" onClick={downloadExcel} disabled={loading} className="h-8 text-xs gap-1.5" data-testid="download-excel-button">
+                <FileSpreadsheet className="w-4 h-4" /> Baixar Excel
+              </Button>
+            </>
+          )}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <FilterField label="Data início">
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-9 text-sm"
+                data-testid="report-date-from"
+              />
+            </FilterField>
+            <FilterField label="Data fim">
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-9 text-sm"
+                data-testid="report-date-to"
+              />
+            </FilterField>
 
-        {/* Filters */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5" />
-                Filtrar
-              </span>
-              {hasFilters && (
-                <button onClick={clearFilters} className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-primary flex items-center gap-1 font-normal" data-testid="report-clear-filters">
-                  <X className="w-3 h-3" />
-                  Limpar
-                </button>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Início</Label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="h-8 text-xs"
-                  data-testid="report-date-from"
-                />
-              </div>
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Fim</Label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="h-8 text-xs"
-                  data-testid="report-date-to"
-                />
-              </div>
+            <FilterField label="Operação">
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="h-9 text-sm" data-testid="report-filter-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todas as Operações</SelectItem>
+                  <SelectItem value="ENTRADA" className="text-[13px]">Apenas Entradas</SelectItem>
+                  <SelectItem value="SAIDA" className="text-[13px]">Apenas Saídas</SelectItem>
+                  <SelectItem value="ESTOQUE" className="text-[13px]">Estoque Atual</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
 
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Operação</Label>
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-filter-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[13px]">Todas as Operações</SelectItem>
-                    <SelectItem value="ENTRADA" className="text-[13px]">Apenas Entradas</SelectItem>
-                    <SelectItem value="SAIDA" className="text-[13px]">Apenas Saídas</SelectItem>
-                    <SelectItem value="ESTOQUE" className="text-[13px]">Estoque Atual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <FilterField label="Status">
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="h-9 text-sm" data-testid="report-filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todos os Status</SelectItem>
+                  <SelectItem value="CHEIO" className="text-[13px]">Cheio</SelectItem>
+                  <SelectItem value="VAZIO" className="text-[13px]">Vazio</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
 
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="report-filter-status">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all" className="text-[13px]">Todos os Status</SelectItem>
-                    <SelectItem value="CHEIO" className="text-[13px]">Cheio</SelectItem>
-                    <SelectItem value="VAZIO" className="text-[13px]">Vazio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Cliente - Autocomplete (digite para buscar) */}
-              <div ref={clientBoxRef}>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
+            {/* Cliente - Autocomplete (digite para buscar) */}
+            <div ref={clientBoxRef}>
+              <FilterField label="Cliente">
                 <div className="relative">
-                <Input
-                  value={clientSearch}
-                  onChange={(e) => handleClientSearch(e.target.value)}
-                  onFocus={() => {
-                    if (clientSearch.length >= 1 && clientSuggestions.length > 0) {
-                      setShowClientSuggestions(true);
-                    }
-                  }}
-                  className={`h-8 text-xs pr-8 ${filterClient !== 'all' ? 'border-emerald-500 bg-emerald-50' : ''}`}
-                  data-testid="report-filter-client"
-                />
-                {filterClient !== 'all' && (
-                  <button
-                    type="button"
-                    onClick={clearClient}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
-                    data-testid="report-filter-client-clear"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+                  <SearchInput
+                    value={clientSearch}
+                    onChange={(e) => handleClientSearch(e.target.value)}
+                    onFocus={() => {
+                      if (clientSearch.length >= 1 && clientSuggestions.length > 0) {
+                        setShowClientSuggestions(true);
+                      }
+                    }}
+                    className={`pr-8 ${filterClient !== 'all' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : ''}`}
+                    data-testid="report-filter-client"
+                  />
+                  {filterClient !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={clearClient}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+                      data-testid="report-filter-client-clear"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
 
-                {showClientSuggestions && clientSuggestions.length > 0 && (
-                  <div
-                    className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                    data-testid="report-filter-client-suggestions"
-                  >
-                    {clientSuggestions.map((client) => (
-                      <button
-                        key={client.id}
-                        type="button"
-                        onClick={() => selectClient(client)}
-                        className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 focus:outline-none border-b border-slate-100 dark:border-slate-800 last:border-b-0"
-                      >
-                        {client.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  {showClientSuggestions && clientSuggestions.length > 0 && (
+                    <div
+                      className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                      data-testid="report-filter-client-suggestions"
+                    >
+                      {clientSuggestions.map((client) => (
+                        <button
+                          key={client.id}
+                          type="button"
+                          onClick={() => selectClient(client)}
+                          className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 focus:outline-none border-b border-slate-100 dark:border-slate-800 last:border-b-0"
+                        >
+                          {client.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-                {showClientSuggestions && clientSearch.length >= 1 && clientSuggestions.length === 0 && (
-                  <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500 dark:text-slate-400">
-                    Nenhum cliente encontrado
-                  </div>
-                )}
+                  {showClientSuggestions && clientSearch.length >= 1 && clientSuggestions.length === 0 && (
+                    <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500 dark:text-slate-400">
+                      Nenhum cliente encontrado
+                    </div>
+                  )}
                 </div>
-              </div>
+              </FilterField>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Barra de ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={downloadPDF}
-            disabled={loading}
-            title="Baixar PDF"
-            data-testid="download-pdf-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <FileText className="w-4 h-4 text-red-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={downloadExcel}
-            disabled={loading}
-            title="Baixar Excel"
-            data-testid="download-excel-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-green-600" />
-          </Button>
-        </div>
+          </div>
+        </FilterCard>
 
         {/* Entradas e Saídas por Dia */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="daily-chart-card">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-primary" />
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Entradas e Saídas por Dia</CardTitle>
-              <span className="text-xs text-slate-400 dark:text-slate-500">(últimos 14 dias)</span>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
+        <DataCard
+          title={(<span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Entradas e saídas por dia</span>)}
+          meta={<span className="text-xs text-slate-400 dark:text-slate-500">últimos 14 dias</span>}
+          testId="daily-chart-card"
+        >
+          <div className="p-4">
             {dailyChart.length > 0 ? (
               <div className="h-72 w-full" data-testid="daily-chart">
                 <ResponsiveContainer width="100%" height="100%">
@@ -447,14 +352,61 @@ export default function ReportsMovementsPage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="p-8 text-center text-slate-400 dark:text-slate-500">
-                <BarChart3 className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Sem dados suficientes para exibir o gráfico</p>
-              </div>
+              <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </DataCard>
 
+        {isAdmin && (
+          <DataCard
+            title={(<span className="flex items-center gap-2"><Mail className="w-4 h-4 text-primary" />Envio automático por e-mail</span>)}
+            testId="daily-email-report-card"
+          >
+            <div className="p-4 space-y-3">
+              <p className="text-[13px] text-slate-500 dark:text-slate-400">
+                Todo dia às 07:00 o sistema envia automaticamente, por e-mail, o relatório de movimentações do dia anterior pra cada Cliente ativo com e-mail cadastrado.
+                Use os campos abaixo pra disparar o envio manualmente (útil pra testar ou reenviar um dia específico).
+              </p>
+              <div className="flex items-end gap-3 flex-wrap">
+                <FilterField label="Data das movimentações">
+                  <Input
+                    type="date"
+                    value={emailDate}
+                    onChange={(e) => setEmailDate(e.target.value)}
+                    className="h-9 text-sm"
+                    data-testid="daily-email-report-date"
+                  />
+                </FilterField>
+                <Button
+                  onClick={sendDailyEmails}
+                  disabled={sendingEmails || !emailDate}
+                  data-testid="daily-email-report-send-btn"
+                  className="h-9"
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  {sendingEmails ? 'Enviando...' : 'Enviar agora'}
+                </Button>
+              </div>
+              {emailResult && (
+                <div className="text-[12px] space-y-1 pt-1">
+                  <p className="text-emerald-700 dark:text-emerald-400">
+                    Enviado para {emailResult.sent.length} cliente(s){emailResult.sent.length > 0 ? `: ${emailResult.sent.join(', ')}` : ''}
+                  </p>
+                  {emailResult.skipped.length > 0 && (
+                    <p className="text-slate-500 dark:text-slate-400">
+                      Sem movimentação no dia ({emailResult.skipped.length}): {emailResult.skipped.join(', ')}
+                    </p>
+                  )}
+                  {emailResult.errors.length > 0 && (
+                    <p className="text-red-600 dark:text-red-400">
+                      Erro ao enviar para: {emailResult.errors.map((e) => `${e.client} (${e.error})`).join('; ')}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </DataCard>
+        )}
       </div>
     </Layout>
   );

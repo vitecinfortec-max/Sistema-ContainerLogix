@@ -147,7 +147,7 @@ export default function FuelTankLevelPage() {
     <Layout>
       <div className="space-y-5" data-testid="fuel-tank-level-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Nível do Tanque</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Nível do Tanque</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Combustível disponível no tanque próprio, descontado a cada Abastecimento vindo dele</p>
         </div>
 

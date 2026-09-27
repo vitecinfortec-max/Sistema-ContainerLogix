@@ -167,7 +167,7 @@ export default function FreightRoutesPage() {
     <Layout>
       <div className="space-y-5" data-testid="freight-routes-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             Rota
           </h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Cadastro de rotas dos motoristas, com o valor do frete de cada trajeto</p>

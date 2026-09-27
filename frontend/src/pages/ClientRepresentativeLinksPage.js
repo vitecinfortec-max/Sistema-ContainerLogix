@@ -136,7 +136,7 @@ export default function ClientRepresentativeLinksPage() {
     <Layout>
       <div className="space-y-5" data-testid="client-representative-links-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Vínculo de Clientes</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Vínculo de Clientes</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Vincule clientes a representantes comerciais com o percentual de comissão de cada um</p>
         </div>
 

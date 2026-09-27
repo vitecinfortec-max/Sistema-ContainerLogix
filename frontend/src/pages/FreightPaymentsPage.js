@@ -215,7 +215,7 @@ export default function FreightPaymentsPage() {
     <Layout>
       <div className="space-y-5" data-testid="freight-payments-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <HandCoins className="w-4 h-4" />
             Pagamento Frete
           </h1>

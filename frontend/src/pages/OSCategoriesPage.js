@@ -141,7 +141,7 @@ export default function OSCategoriesPage() {
     <Layout>
       <div className="space-y-5" data-testid="os-categories-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             Cadastro de Categoria
           </h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Categorias usadas no campo "Categoria" da Ordem de Serviço</p>

@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider,
+  StatusPill, EmptyState, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -10,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Checkbox } from '../components/ui/checkbox';
-import { Package, Clock, AlertTriangle, FileText, FileSpreadsheet, Search, Filter, X, Eye, LogOut, Users, Ship, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Package, Clock, AlertTriangle, FileText, FileSpreadsheet, Eye, LogOut, Users, Ship } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -231,11 +235,10 @@ export default function YardControlPage() {
     }
   };
 
-  const getDaysColor = (days) => {
-    if (days > 90) return 'bg-red-500 text-white';
-    if (days > 60) return 'bg-red-100 text-red-800';
-    if (days > 30) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-green-100 text-green-800';
+  const getDaysTone = (days) => {
+    if (days > 60) return 'red';
+    if (days > 30) return 'amber';
+    return 'emerald';
   };
 
   const openExitModal = (container) => {
@@ -296,72 +299,23 @@ export default function YardControlPage() {
 
   return (
     <Layout>
-      <div className="space-y-6" data-testid="yard-control-page">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-            Controle de Pátio
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Containers em estoque e tempo de permanência</p>
-        </div>
+      <div className="space-y-4" data-testid="yard-control-page">
+        <PageHeader icon={Clock} title="Controle de Pátio" subtitle="Containers em estoque e tempo de permanência" />
 
-        {/* Cards de Estatísticas */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Total no Pátio</p>
-                  <p className="text-2xl font-bold text-primary">{stats.total}</p>
-                </div>
-                <Package className="w-8 h-8 text-primary/20" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Média de Dias</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.avg_days}</p>
-                </div>
-                <Clock className="w-8 h-8 text-blue-600/20" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">Máximo de Dias</p>
-                  <p className="text-2xl font-bold text-orange-600">{stats.max_days}</p>
-                </div>
-                <AlertTriangle className="w-8 h-8 text-orange-600/20" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold">&gt;30 dias</p>
-                  <p className="text-2xl font-bold text-red-600">{stats.over_30_days}</p>
-                </div>
-                <AlertTriangle className="w-8 h-8 text-red-600/20" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <StatCard label="Total no pátio" value={stats.total.toLocaleString('pt-BR')} icon={Package} tone="primary" hint={`${stats.empty} vazios · ${stats.full} cheios`} />
+          <StatCard label="Média de dias" value={stats.avg_days} icon={Clock} tone="blue" hint="tempo médio de permanência" />
+          <StatCard label="Máximo de dias" value={stats.max_days} icon={AlertTriangle} tone="amber" hint="container há mais tempo" />
+          <StatCard label="Mais de 30 dias" value={stats.over_30_days} icon={AlertTriangle} tone="red" hint={`${stats.over_60_days} com +60 · ${stats.over_90_days} com +90`} />
+        </StatGrid>
 
-        {/* Alertas */}
+        {/* Alerta de permanência longa */}
         {stats.over_60_days > 0 && (
-          <div className="flex items-center gap-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
+          <div className="flex items-start gap-3 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-4 py-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-[13px] font-semibold text-red-800">Atenção!</p>
-              <p className="text-[12px] text-red-700">
+              <p className="text-[13px] font-semibold text-red-800 dark:text-red-300">Atenção à permanência</p>
+              <p className="text-[12px] text-red-700 dark:text-red-400">
                 {stats.over_60_days} container(s) com mais de 60 dias no pátio
                 {stats.over_90_days > 0 && `, sendo ${stats.over_90_days} com mais de 90 dias`}.
               </p>
@@ -369,405 +323,283 @@ export default function YardControlPage() {
           </div>
         )}
 
-        {/* Filtros */}
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 space-y-2">
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Status</Label>
-                <Select
-                  value={filters.status_filter || 'all'}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, status_filter: value === 'all' ? '' : value }))}
-                >
-                  <SelectTrigger data-testid="filter-status" className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="VAZIO">Vazio</SelectItem>
-                    <SelectItem value="CHEIO">Cheio</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <FilterCard
+          hasFilters={Object.values(filters).some(Boolean)}
+          onClear={clearFilters}
+          onApply={applyFilters}
+          clearTestId="clear-filters-btn"
+          applyTestId="apply-filters-btn"
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            <FilterField label="Status">
+              <Select
+                value={filters.status_filter || 'all'}
+                onValueChange={(value) => setFilters(prev => ({ ...prev, status_filter: value === 'all' ? '' : value }))}
+              >
+                <SelectTrigger data-testid="filter-status" className="h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="VAZIO">Vazio</SelectItem>
+                  <SelectItem value="CHEIO">Cheio</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
 
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Tipo</Label>
-                <Select
-                  value={filters.movement_type || 'all'}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
-                >
-                  <SelectTrigger data-testid="filter-movement-type" className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="ENTRADA">Entrada</SelectItem>
-                    <SelectItem value="SAIDA">Saída</SelectItem>
-                    <SelectItem value="ESTOQUE">Estoque Atual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <FilterField label="Tipo">
+              <Select
+                value={filters.movement_type || 'all'}
+                onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
+              >
+                <SelectTrigger data-testid="filter-movement-type" className="h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="ENTRADA">Entrada</SelectItem>
+                  <SelectItem value="SAIDA">Saída</SelectItem>
+                  <SelectItem value="ESTOQUE">Estoque Atual</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
 
-              <div className="relative">
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Cliente</Label>
-                <Input
-                  value={filters.client_name}
-                  onChange={(e) => setFilters(prev => ({ ...prev, client_name: e.target.value }))}
-                  onFocus={() => setClientInputFocused(true)}
-                  onBlur={() => setTimeout(() => setClientInputFocused(false), 200)}
-                  data-testid="filter-client"
-                  className="h-8 text-xs"
-                />
-                {clientInputFocused && filters.client_name && filters.client_name.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                    {clients
-                      .filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase()))
-                      .slice(0, 10)
-                      .map(client => (
-                        <div
-                          key={client.id}
-                          className="px-3 py-2 cursor-pointer hover:bg-muted text-[13px]"
-                          onClick={() => {
-                            setFilters(prev => ({ ...prev, client_name: client.name }));
-                            setClientInputFocused(false);
-                          }}
-                        >
-                          {client.name}
-                        </div>
-                      ))
-                    }
-                    {clients.filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase())).length === 0 && (
-                      <div className="px-3 py-2 text-[13px] text-muted-foreground">
-                        Nenhum cliente encontrado
+            <FilterField label="Cliente" className="relative">
+              <SearchInput
+                value={filters.client_name}
+                onChange={(e) => setFilters(prev => ({ ...prev, client_name: e.target.value }))}
+                onFocus={() => setClientInputFocused(true)}
+                onBlur={() => setTimeout(() => setClientInputFocused(false), 200)}
+                data-testid="filter-client"
+              />
+              {clientInputFocused && filters.client_name && filters.client_name.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {clients
+                    .filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase()))
+                    .slice(0, 10)
+                    .map(client => (
+                      <div
+                        key={client.id}
+                        className="px-3 py-2 cursor-pointer hover:bg-muted text-[13px]"
+                        onClick={() => {
+                          setFilters(prev => ({ ...prev, client_name: client.name }));
+                          setClientInputFocused(false);
+                        }}
+                      >
+                        {client.name}
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                    ))
+                  }
+                  {clients.filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase())).length === 0 && (
+                    <div className="px-3 py-2 text-[13px] text-muted-foreground">
+                      Nenhum cliente encontrado
+                    </div>
+                  )}
+                </div>
+              )}
+            </FilterField>
 
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Armador</Label>
-                <Select
-                  value={filters.shipping_line || 'all'}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, shipping_line: value === 'all' ? '' : value }))}
-                >
-                  <SelectTrigger data-testid="filter-shipping" className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {shippingLines.map(sl => (
-                      <SelectItem key={sl.id} value={sl.name}>
-                        {sl.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <FilterField label="Armador">
+              <Select
+                value={filters.shipping_line || 'all'}
+                onValueChange={(value) => setFilters(prev => ({ ...prev, shipping_line: value === 'all' ? '' : value }))}
+              >
+                <SelectTrigger data-testid="filter-shipping" className="h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {shippingLines.map(sl => (
+                    <SelectItem key={sl.id} value={sl.name}>
+                      {sl.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
 
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Dias mínimos</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={filters.min_days}
-                  onChange={(e) => setFilters(prev => ({ ...prev, min_days: e.target.value }))}
-                  data-testid="filter-min-days"
-                  className="h-8 text-xs"
-                />
-              </div>
+            <FilterField label="Dias mínimos">
+              <Input
+                type="number"
+                min="0"
+                value={filters.min_days}
+                onChange={(e) => setFilters(prev => ({ ...prev, min_days: e.target.value }))}
+                data-testid="filter-min-days"
+                className="h-9 text-sm"
+              />
+            </FilterField>
 
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Inicial</Label>
-                <Input
-                  type="date"
-                  value={filters.date_from}
-                  onChange={(e) => setFilters(prev => ({ ...prev, date_from: e.target.value }))}
-                  data-testid="filter-date-from"
-                  className="h-8 text-xs"
-                />
-              </div>
+            <FilterField label="Data inicial">
+              <Input
+                type="date"
+                value={filters.date_from}
+                onChange={(e) => setFilters(prev => ({ ...prev, date_from: e.target.value }))}
+                data-testid="filter-date-from"
+                className="h-9 text-sm"
+              />
+            </FilterField>
 
-              <div>
-                <Label className="text-[9px] text-slate-400 dark:text-slate-500 mb-0.5 block uppercase tracking-wide font-semibold">Data Final</Label>
-                <Input
-                  type="date"
-                  value={filters.date_to}
-                  onChange={(e) => setFilters(prev => ({ ...prev, date_to: e.target.value }))}
-                  data-testid="filter-date-to"
-                  className="h-8 text-xs"
-                />
-              </div>
-            </div>
+            <FilterField label="Data final">
+              <Input
+                type="date"
+                value={filters.date_to}
+                onChange={(e) => setFilters(prev => ({ ...prev, date_to: e.target.value }))}
+                data-testid="filter-date-to"
+                className="h-9 text-sm"
+              />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-            <div className="flex items-center gap-2 pt-0.5">
-              <Button variant="outline" onClick={clearFilters} className="h-7 text-xs font-medium" data-testid="clear-filters-btn">
-                Limpar
-              </Button>
-              <Button onClick={applyFilters} className="h-7 text-xs font-medium bg-primary hover:bg-primary/90" data-testid="apply-filters-btn">
-                Filtrar
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Barra de ações - marque um container na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedContainer && navigate(`/movements/${singleSelectedContainer.id}`)}
-            disabled={!singleSelectedContainer}
-            title="Ver Detalhes"
-            data-testid="view-container-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Eye className="w-4 h-4 text-primary" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedContainer && openExitModal(singleSelectedContainer)}
-            disabled={!singleSelectedContainer || singleSelectedContainer.in_stock === false}
-            title="Registrar Saída"
-            data-testid="exit-container-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <LogOut className="w-4 h-4 text-destructive" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={downloadPdf}
-            title="Exportar PDF"
-            data-testid="download-pdf-btn"
-            className="h-9 w-9 p-0"
-          >
-            <FileText className="w-4 h-4 text-red-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={downloadExcel}
-            title="Exportar Excel"
-            data-testid="download-excel-btn"
-            className="h-9 w-9 p-0"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-green-600" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
+        {/* Lista - marque um container pra habilitar as ações da barra */}
+        <DataCard
+          title="Containers no pátio"
+          count={containers.length.toLocaleString('pt-BR')}
+          meta={(
+            <span className="hidden sm:inline-flex items-center gap-1.5">
+              <StatusPill tone="slate">Vazios: {stats.empty}</StatusPill>
+              <StatusPill tone="emerald">Cheios: {stats.full}</StatusPill>
             </span>
           )}
-        </div>
-
-        {/* Tabela de Containers */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <span>Containers no Pátio ({containers.length})</span>
-              <div className="flex gap-2 text-[11px]">
-                <span className="px-2 py-1 bg-green-100 text-green-800 rounded">Vazios: {stats.empty}</span>
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">Cheios: {stats.full}</span>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : containers.length === 0 ? (
-              <div className="text-center py-8 text-[13px] text-muted-foreground">
-                Nenhum container encontrado no pátio
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="w-9 py-2.5 px-4">
+          toolbar={(
+            <Toolbar selectedCount={selectedIds.size}>
+              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedContainer && navigate(`/movements/${singleSelectedContainer.id}`)} disabled={!singleSelectedContainer} testId="view-container-button" />
+              <ToolbarButton icon={LogOut} label="Registrar saída" tone="red" onClick={() => singleSelectedContainer && openExitModal(singleSelectedContainer)} disabled={!singleSelectedContainer || singleSelectedContainer.in_stock === false} testId="exit-container-button" />
+              <ToolbarDivider />
+              <ToolbarButton icon={FileText} label="Exportar PDF" tone="red" onClick={downloadPdf} testId="download-pdf-btn" />
+              <ToolbarButton icon={FileSpreadsheet} label="Exportar Excel" tone="emerald" onClick={downloadExcel} testId="download-excel-btn" />
+            </Toolbar>
+          )}
+          footer={(
+            <TablePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={containers.length}
+              pageSize={ITEMS_PER_PAGE}
+              onPageChange={goToPage}
+            />
+          )}
+        >
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : containers.length === 0 ? (
+            <EmptyState icon={Package} title="Nenhum container encontrado no pátio" hint="Ajuste os filtros acima" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={paginatedContainers.length > 0 && paginatedContainers.every(c => selectedIds.has(c.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </th>
+                    <th>Container</th>
+                    <th>Tipo</th>
+                    <th>Status</th>
+                    <th>Tamanho</th>
+                    <th>Armador</th>
+                    <th>Cliente</th>
+                    <th>Data entrada</th>
+                    <th>Data saída</th>
+                    <th className="!text-center">Dias no pátio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedContainers.map(container => (
+                    <tr
+                      key={container.id}
+                      onClick={() => toggleSelect(container.id)}
+                      data-selected={selectedIds.has(container.id)}
+                      className="cursor-pointer"
+                      data-testid={`container-row-${container.container_number}`}
+                    >
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          checked={paginatedContainers.length > 0 && paginatedContainers.every(c => selectedIds.has(c.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                          data-testid="select-all-checkbox"
+                          checked={selectedIds.has(container.id)}
+                          onCheckedChange={() => toggleSelect(container.id)}
+                          data-testid="container-row-checkbox"
                         />
-                      </th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tamanho</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Armador</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Cliente</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data Entrada</th>
-                      <th className="text-left py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data Saída</th>
-                      <th className="text-center py-2.5 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Dias no Pátio</th>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                          <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">{container.container_number}</span>
+                          {container.is_segregated && (
+                            <span title={`Reservado para: ${container.segregation_client}`}>
+                              <StatusPill tone="amber" dot={false} className="!text-[10px] !px-1.5">SEGREGADO</StatusPill>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <StatusPill tone={container.in_stock !== false ? 'primary' : 'amber'}>
+                          {container.in_stock !== false ? 'Entrada' : 'Saída'}
+                        </StatusPill>
+                      </td>
+                      <td>
+                        <StatusPill tone={container.status === 'CHEIO' ? 'emerald' : 'slate'}>
+                          {container.status === 'CHEIO' ? 'Cheio' : container.status === 'VAZIO' ? 'Vazio' : container.status}
+                        </StatusPill>
+                      </td>
+                      <td className="whitespace-nowrap">{container.size_type}</td>
+                      <td><div className="max-w-[150px] truncate" title={container.shipping_line || ''}>{container.shipping_line}</div></td>
+                      <td><div className="max-w-[200px] truncate" title={container.client_name || ''}>{container.client_name || '-'}</div></td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        {container.entry_date ? format(new Date(container.entry_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                      </td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        {container.exit_date ? format(new Date(container.exit_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                      </td>
+                      <td className="text-center">
+                        <StatusPill
+                          tone={getDaysTone(container.days_in_yard)}
+                          dot={false}
+                          className={container.days_in_yard > 90 ? '!bg-red-600 !text-white' : ''}
+                        >
+                          {container.days_in_yard} dias
+                        </StatusPill>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedContainers.map(container => (
-                      <tr
-                        key={container.id}
-                        onClick={() => toggleSelect(container.id)}
-                        className={`border-b cursor-pointer transition-colors ${selectedIds.has(container.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-muted/50'}`}
-                        data-testid={`container-row-${container.container_number}`}
-                      >
-                        <td className="py-2.5 px-4" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(container.id)}
-                            onCheckedChange={() => toggleSelect(container.id)}
-                            data-testid="container-row-checkbox"
-                          />
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-mono font-bold text-slate-700 dark:text-slate-300">{container.container_number}</span>
-                            {container.is_segregated && (
-                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-300" title={`Reservado para: ${container.segregation_client}`}>
-                                SEGREGADO
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className={`px-2 py-1 rounded text-[10px] font-medium ${
-                            container.in_stock !== false ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {container.in_stock !== false ? 'ENTRADA' : 'SAÍDA'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4">
-                          <span className={`px-2 py-1 rounded text-[10px] font-medium ${
-                            container.status === 'CHEIO' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-200'
-                          }`}>
-                            {container.status}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">{container.size_type}</td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">{container.shipping_line}</td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">{container.client_name || '-'}</td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">
-                          {container.entry_date ? format(new Date(container.entry_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                        </td>
-                        <td className="py-2.5 px-4 text-sm text-slate-600 dark:text-slate-400">
-                          {container.exit_date ? format(new Date(container.exit_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
-                        </td>
-                        <td className="py-2.5 px-4 text-center">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${getDaysColor(container.days_in_yard)}`}>
-                            {container.days_in_yard} dias
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            
-            {/* Paginação */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t pt-4 mt-4">
-                <div className="text-sm text-muted-foreground">
-                  Mostrando {startIndex + 1} a {Math.min(endIndex, containers.length)} de {containers.length} containers
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="outline" size="sm" onClick={() => goToPage(1)} disabled={currentPage === 1} className="hidden sm:flex h-7 text-xs">
-                    <ChevronsLeft className="w-4 h-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="h-7 text-xs">
-                    <ChevronLeft className="w-4 h-4" />
-                  </Button>
-                  
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) pageNum = i + 1;
-                    else if (currentPage <= 3) pageNum = i + 1;
-                    else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-                    else pageNum = currentPage - 2 + i;
-                    return (
-                      <Button key={pageNum} variant={currentPage === pageNum ? "default" : "outline"} size="sm" onClick={() => goToPage(pageNum)} className="w-7 h-7 p-0 text-xs">
-                        {pageNum}
-                      </Button>
-                    );
-                  })}
-                  
-                  <Button variant="outline" size="sm" onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="h-7 text-xs">
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => goToPage(totalPages)} disabled={currentPage === totalPages} className="hidden sm:flex h-7 text-xs">
-                    <ChevronsRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
 
         {/* Estoque por Cliente e Armador */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Estoque por Cliente */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                <Users className="w-4 h-4" />
-                Estoque por Cliente
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {byClient.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">Nenhum dado disponível</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            { title: 'Estoque por cliente', icon: Users, rows: byClient, nameKey: 'client' },
+            { title: 'Estoque por armador', icon: Ship, rows: byShipping, nameKey: 'shipping_line' },
+          ].map(({ title, icon: Icon, rows, nameKey }) => (
+            <DataCard
+              key={title}
+              title={(<span className="flex items-center gap-2"><Icon className="w-4 h-4 text-primary" />{title}</span>)}
+              count={rows.length}
+            >
+              {rows.length === 0 ? (
+                <EmptyState title="Nenhum dado disponível" />
               ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {byClient.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded">
-                      <span className="font-medium truncate flex-1">{item.client}</span>
-                      <div className="flex gap-2 text-sm">
-                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 rounded">{item.empty} V</span>
-                        <span className="px-2 py-0.5 bg-blue-100 rounded">{item.full} C</span>
-                        <span className="px-2 py-0.5 bg-primary text-primary-foreground rounded font-bold">{item.total}</span>
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                  {rows.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                      <span className="text-[13px] font-medium text-slate-700 dark:text-slate-200 truncate flex-1" title={item[nameKey]}>{item[nameKey]}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <StatusPill tone="slate" dot={false}>{item.empty} V</StatusPill>
+                        <StatusPill tone="emerald" dot={false}>{item.full} C</StatusPill>
+                        <span className="min-w-8 text-center rounded-full bg-primary text-primary-foreground text-[11px] font-bold px-2 py-0.5 tabular-nums">{item.total}</span>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Estoque por Armador */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Ship className="w-5 h-5" />
-                Estoque por Armador
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {byShipping.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">Nenhum dado disponível</p>
-              ) : (
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {byShipping.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded">
-                      <span className="font-medium truncate flex-1">{item.shipping_line}</span>
-                      <div className="flex gap-2 text-sm">
-                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-slate-700 rounded">{item.empty} V</span>
-                        <span className="px-2 py-0.5 bg-blue-100 rounded">{item.full} C</span>
-                        <span className="px-2 py-0.5 bg-primary text-primary-foreground rounded font-bold">{item.total}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            </DataCard>
+          ))}
         </div>
       </div>
 

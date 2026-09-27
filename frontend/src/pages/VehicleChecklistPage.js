@@ -737,7 +737,7 @@ export default function VehicleChecklistPage() {
 
       <div className="space-y-5 no-print">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <ClipboardCheck className="w-4 h-4" />
             Checklist de Veículo
           </h1>

@@ -173,7 +173,7 @@ export default function ReportsServiceOrdersPage() {
     <Layout>
       <div className="space-y-5" data-testid="reports-service-orders-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
             Relatório de Serviços
           </h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Acompanhe as Ordens de Serviço e o custo de manutenção da frota</p>

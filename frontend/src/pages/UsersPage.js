@@ -93,7 +93,7 @@ export default function UsersPage() {
     <Layout>
       <div className="space-y-5" data-testid="users-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-primary" />
             Gestão de Usuários
           </h1>
@@ -102,9 +102,9 @@ export default function UsersPage() {
           </p>
         </div>
 
-        <Card>
-          <CardHeader className="bg-slate-50 dark:bg-slate-800 py-3">
-            <CardTitle className="text-[13px] font-medium">Usuários Cadastrados ({users.length})</CardTitle>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+            <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Usuários Cadastrados ({users.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {users.length > 0 ? (

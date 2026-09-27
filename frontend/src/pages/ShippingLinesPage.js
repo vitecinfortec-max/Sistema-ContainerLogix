@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -9,7 +12,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Trash2, Ship, Edit, Search } from 'lucide-react';
+import { Plus, Trash2, Ship, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -144,13 +147,8 @@ export default function ShippingLinesPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="shipping-lines-page">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
-            Armadores
-          </h1>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gerencie o cadastro de armadores (shipping lines)</p>
-        </div>
+      <div className="space-y-4" data-testid="shipping-lines-page">
+        <PageHeader icon={Ship} title="Armadores" subtitle="Gerencie o cadastro de armadores (shipping lines)" />
 
         <Dialog open={open} onOpenChange={(isOpen) => {
             setOpen(isOpen);
@@ -198,128 +196,78 @@ export default function ShippingLinesPage() {
             </DialogContent>
           </Dialog>
 
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5" />
-              Filtrar
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 text-[13px] pl-9"
-                data-testid="search-line-input"
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Nome ou código">
+              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-line-input" />
+            </FilterField>
+          </div>
+        </FilterCard>
 
-        {/* Barra de ações - marque um armador na tabela abaixo pra habilitar as ações */}
-        <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 p-1 w-fit">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={openCreateDialog}
-            title="Adicionar"
-            data-testid="add-line-button"
-            className="h-9 w-9 p-0"
-          >
-            <Plus className="w-4 h-4 text-primary" />
-          </Button>
-          <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedLine && openEditDialog(singleSelectedLine)}
-            disabled={!singleSelectedLine}
-            title="Editar"
-            data-testid="edit-line-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Edit className="w-4 h-4 text-blue-600" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => singleSelectedLine && handleDelete(singleSelectedLine.id)}
-            disabled={!singleSelectedLine}
-            title="Excluir"
-            data-testid="delete-line-button"
-            className="h-9 w-9 p-0 disabled:opacity-30"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-          {selectedIds.size > 0 && (
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 pl-1 pr-2">
-              {selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}
-            </span>
+        {/* Lista - marque um armador pra habilitar as ações da barra */}
+        <DataCard
+          title="Armadores"
+          count={filteredLines.length}
+          toolbar={(
+            <Toolbar
+              selectedCount={selectedIds.size}
+              primary={<ToolbarPrimary icon={Plus} label="Novo armador" onClick={openCreateDialog} testId="add-line-button" />}
+            >
+              <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedLine && openEditDialog(singleSelectedLine)} disabled={!singleSelectedLine} testId="edit-line-button" />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedLine && handleDelete(singleSelectedLine.id)} disabled={!singleSelectedLine} testId="delete-line-button" />
+            </Toolbar>
           )}
-        </div>
-
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
-          <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-            <CardTitle className="flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
-              <Ship className="w-4 h-4" />
-              Lista de Armadores ({filteredLines.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {filteredLines.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-800 border-b">
-                    <tr>
-                      <th className="w-9 px-4 py-2.5">
+        >
+          {filteredLines.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="w-10 pr-0">
+                      <Checkbox
+                        checked={filteredLines.length > 0 && filteredLines.every(l => selectedIds.has(l.id))}
+                        onCheckedChange={toggleSelectAllOnPage}
+                        data-testid="select-all-checkbox"
+                      />
+                    </th>
+                    <th>Nome</th>
+                    <th>Código</th>
+                    <th>Cadastrado em</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredLines.map((line) => (
+                    <tr
+                      key={line.id}
+                      onClick={() => toggleSelect(line.id)}
+                      data-selected={selectedIds.has(line.id)}
+                      className="cursor-pointer"
+                      data-testid="line-row"
+                    >
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          checked={filteredLines.length > 0 && filteredLines.every(l => selectedIds.has(l.id))}
-                          onCheckedChange={toggleSelectAllOnPage}
-                          data-testid="select-all-checkbox"
+                          checked={selectedIds.has(line.id)}
+                          onCheckedChange={() => toggleSelect(line.id)}
+                          data-testid="line-row-checkbox"
                         />
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nome</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Código</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cadastrado em</th>
+                      </td>
+                      <td className="cell-strong">{line.name}</td>
+                      <td className="font-mono">{line.code || '-'}</td>
+                      <td className="whitespace-nowrap tabular-nums">{format(new Date(line.created_at), 'dd/MM/yyyy', { locale: ptBR })}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredLines.map((line) => (
-                      <tr
-                        key={line.id}
-                        onClick={() => toggleSelect(line.id)}
-                        className={`cursor-pointer transition-colors ${selectedIds.has(line.id) ? 'bg-primary/10 hover:bg-primary/15' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                        data-testid="line-row"
-                      >
-                        <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(line.id)}
-                            onCheckedChange={() => toggleSelect(line.id)}
-                            data-testid="line-row-checkbox"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 text-[13px] font-medium">{line.name}</td>
-                        <td className="px-4 py-2.5 text-[13px] font-mono">{line.code || '-'}</td>
-                        <td className="px-4 py-2.5 text-[13px]">
-                          {format(new Date(line.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-10 text-center text-slate-500 dark:text-slate-400" data-testid="no-lines">
-                <Ship className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="text-[13px] font-medium">
-                  {search ? 'Nenhum armador encontrado' : 'Nenhum armador cadastrado'}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState
+              icon={Ship}
+              title={search ? 'Nenhum armador encontrado' : 'Nenhum armador cadastrado'}
+              hint={search ? 'Ajuste a busca' : 'Cadastre o primeiro armador pelo botão "Novo armador"'}
+              testId="no-lines"
+            />
+          )}
+        </DataCard>
       </div>
       <ConfirmDialog />
     </Layout>

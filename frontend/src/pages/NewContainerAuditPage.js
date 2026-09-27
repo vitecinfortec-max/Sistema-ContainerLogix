@@ -65,7 +65,7 @@ export default function NewContainerAuditPage() {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Nova Auditoria</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Nova Auditoria</h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Escolha o cliente que será auditado</p>
           </div>
         </div>

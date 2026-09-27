@@ -287,7 +287,7 @@ export default function OrdemServicoPage() {
     <Layout>
       <div className="space-y-5" data-testid="ordem-servico-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Ordem de Serviço</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Ordem de Serviço</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Gestão de OS para manutenção da frota</p>
         </div>
 

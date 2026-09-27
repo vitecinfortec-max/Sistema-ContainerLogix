@@ -174,7 +174,7 @@ export default function NewContainerVistoriaPage() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
               Nova Vistoria de Container
             </h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Preencha os dados da vistoria</p>
@@ -183,11 +183,11 @@ export default function NewContainerVistoriaPage() {
 
         <form onSubmit={handleSubmit}>
           {/* Informações do Container */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Informações do Container</CardTitle>
+          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Container</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="container_number">Número do Container *</Label>
@@ -216,7 +216,7 @@ export default function NewContainerVistoriaPage() {
                   <Label htmlFor="shipping_line">Armador</Label>
                   <Select value={formData.shipping_line} onValueChange={(value) => handleInputChange('shipping_line', value)}>
                     <SelectTrigger id="shipping_line" data-testid="shipping-line-select">
-                      <SelectValue placeholder="Selecione" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {shippingLines.map((line) => (
@@ -304,11 +304,11 @@ export default function NewContainerVistoriaPage() {
           </Card>
 
           {/* Estado do Container */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Estado do Container</CardTitle>
+          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Estado do Container</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-4 space-y-4">
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="no_damage"
@@ -358,14 +358,14 @@ export default function NewContainerVistoriaPage() {
           </Card>
 
           {/* Fotos da Vistoria */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="w-5 h-5" />
+          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <Camera className="w-4 h-4 text-primary" />
                 Fotos da Vistoria ({photos.length}/{MAX_VISTORIA_PHOTOS})
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4">
               <p className="text-sm text-muted-foreground mb-4">
                 Adicione até {MAX_VISTORIA_PHOTOS} fotos e informe o que cada uma representa.
               </p>

@@ -75,7 +75,7 @@ export default function TankSettingsPage() {
     <Layout>
       <div className="space-y-5" data-testid="tank-settings-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Configuração de Tanque</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Configuração de Tanque</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
             Define a capacidade do tanque próprio e o litro mínimo pra disparar o alerta em "Nível do Tanque"
           </p>

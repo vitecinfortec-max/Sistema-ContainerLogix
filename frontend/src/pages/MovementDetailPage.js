@@ -513,7 +513,7 @@ export default function MovementDetailPage() {
         <div className="no-print">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
             <div>
-              <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 Detalhes do Gate
               </h1>
               <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Visualização</p>
@@ -539,10 +539,10 @@ export default function MovementDetailPage() {
               em vez das caixas antigas de borda preta grossa. */}
           {/* Informações da Operação */}
           <Card className="mb-2 border border-slate-200 dark:border-slate-700 shadow-none">
-            <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300">Informações da Operação</CardTitle>
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações da Operação</CardTitle>
             </CardHeader>
-            <CardContent className="p-3">
+            <CardContent className="p-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">ID Transação</p>
@@ -578,10 +578,10 @@ export default function MovementDetailPage() {
 
           {/* Informações do Veículo e Motorista */}
           <Card className="mb-2 border border-slate-200 dark:border-slate-700 shadow-none">
-            <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300">Informações do Veículo e Motorista</CardTitle>
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Veículo e Motorista</CardTitle>
             </CardHeader>
-            <CardContent className="p-3">
+            <CardContent className="p-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-2">
                 <div>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">Motorista</p>
@@ -611,10 +611,10 @@ export default function MovementDetailPage() {
 
           {/* Informações do Contêiner */}
           <Card className="mb-2 border border-slate-200 dark:border-slate-700 shadow-none">
-            <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300">Informações do Contêiner</CardTitle>
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Contêiner</CardTitle>
             </CardHeader>
-            <CardContent className="p-3">
+            <CardContent className="p-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-2">
                 <div>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">Nº Container</p>
@@ -675,10 +675,10 @@ export default function MovementDetailPage() {
           {/* Observações - Exibir apenas se houver */}
           {movement.observations && (
             <Card className="mb-2 border border-slate-200 dark:border-slate-700 shadow-none">
-              <CardHeader className="py-2 px-3 border-b border-slate-100 dark:border-slate-800">
-                <CardTitle className="text-xs font-medium text-slate-600 dark:text-slate-300">Observações</CardTitle>
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</CardTitle>
               </CardHeader>
-              <CardContent className="p-3">
+              <CardContent className="p-4">
                 <p className="text-xs whitespace-pre-wrap text-slate-800 dark:text-slate-200">{movement.observations}</p>
               </CardContent>
             </Card>
@@ -686,14 +686,14 @@ export default function MovementDetailPage() {
 
           {/* Fotos do Container */}
           {movement.container_photos && Object.keys(movement.container_photos).length > 0 && (
-            <Card className="mb-2">
-              <CardHeader className="bg-slate-50 dark:bg-slate-800 py-2">
-                <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <Card className="mb-2 border border-slate-200 dark:border-slate-700 shadow-none">
+              <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                   <Camera className="w-4 h-4" />
                   Fotos do Container ({Object.keys(movement.container_photos).length})
                 </CardTitle>
               </CardHeader>
-              <CardContent className="py-3">
+              <CardContent className="p-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {Object.entries(movement.container_photos).map(([position, url]) => (
                     <div key={position} className="space-y-1">

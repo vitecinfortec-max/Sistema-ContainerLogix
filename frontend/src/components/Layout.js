@@ -82,6 +82,7 @@ const PAGE_TITLES = {
   '/movements': 'Gate',
   '/movements/new': 'Novo Registro',
   '/yard-control': 'Controle de Pátio',
+  '/unit-segregation': 'Segregação de Unidade',
   '/fleet/rpa-terceiro': 'Contrato de Frete',
   '/fleet/rpa-terceiro/new': 'Novo Contrato de Frete',
   '/fleet/ordem-servico': 'Ordem de Serviço',
@@ -322,7 +323,7 @@ export default function Layout({ children }) {
     if (savedOpcoesSistema !== null) setOpcoesSistemaOpen(JSON.parse(savedOpcoesSistema));
   }, []);
 
-  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/');
+  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname === '/unit-segregation';
   const isCadastroActive = location.pathname === '/cadastro';
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/port-services-billing';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte

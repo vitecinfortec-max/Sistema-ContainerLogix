@@ -227,7 +227,7 @@ export default function EditMovementPage() {
       <div className="max-w-5xl mx-auto" data-testid="edit-movement-page">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
               Editar Gate
             </h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Atualize as informações do registro</p>
@@ -239,11 +239,11 @@ export default function EditMovementPage() {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <Card>
-            <CardHeader className="bg-slate-50 dark:bg-slate-800">
-              <CardTitle className="text-lg">Tipo de Operação</CardTitle>
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tipo de Operação</CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
+            <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="operation_type">Tipo de Operação *</Label>
@@ -273,11 +273,11 @@ export default function EditMovementPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="bg-slate-50 dark:bg-slate-800">
-              <CardTitle className="text-lg">Informações do Veículo e Motorista</CardTitle>
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Veículo e Motorista</CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
+            <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="driver_name">Nome do Motorista *</Label>
@@ -390,11 +390,11 @@ export default function EditMovementPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="bg-slate-50 dark:bg-slate-800">
-              <CardTitle className="text-lg">Informações do Contêiner</CardTitle>
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Contêiner</CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
+            <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="container_number">Nº Container *</Label>

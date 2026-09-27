@@ -359,7 +359,7 @@ export default function LoadingOrderPage() {
     <Layout>
       <div className="space-y-5" data-testid="loading-order-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <PackageCheck className="w-4 h-4" />
             Ordem de Carregamento
           </h1>

@@ -163,7 +163,7 @@ export default function StockEntriesPage() {
     <Layout>
       <div className="space-y-5" data-testid="stock-entries-page">
         <div>
-          <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">Entradas de Estoque</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Entradas de Estoque</h1>
           <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Histórico de entradas geradas por importação de XML de Nota Fiscal</p>
         </div>
 

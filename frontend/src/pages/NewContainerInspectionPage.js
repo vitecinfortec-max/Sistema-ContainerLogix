@@ -209,7 +209,7 @@ export default function NewContainerInspectionPage() {
             Voltar
           </Button>
           <div>
-            <h1 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
               Novo Registro Fotográfico
             </h1>
             <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Preencha os dados do registro</p>
@@ -218,11 +218,11 @@ export default function NewContainerInspectionPage() {
 
         <form onSubmit={handleSubmit}>
           {/* Informações do Container */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Informações do Container</CardTitle>
+          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Container</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="container_number">Número do Container *</Label>
@@ -374,11 +374,11 @@ export default function NewContainerInspectionPage() {
           </Card>
 
           {/* Itens de Vistoria */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Itens de Vistoria</CardTitle>
+          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Itens de Vistoria</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-4 space-y-4">
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="no_damage"
@@ -440,14 +440,14 @@ export default function NewContainerInspectionPage() {
           </Card>
 
           {/* Fotos do Container */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="w-5 h-5" />
+          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                <Camera className="w-4 h-4 text-primary" />
                 Fotos do Container ({photos.length}/{MAX_CONTAINER_INSPECTION_PHOTOS})
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4">
               <p className="text-sm text-muted-foreground mb-4">
                 Adicione até {MAX_CONTAINER_INSPECTION_PHOTOS} fotos e informe o que cada uma representa.
               </p>
