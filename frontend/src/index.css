@@ -282,6 +282,12 @@
     background: white !important;
   }
   
+  /* Documentos no visual padrão dos PDFs (components/PrintDocument.jsx):
+     mesmas margens do comprovante de Registro de Gate gerado no servidor */
+  .print-registry.print-doc {
+    padding: 10mm 12mm !important;
+  }
+
   .print-registry img {
     display: inline-block !important;
     max-width: 100% !important;

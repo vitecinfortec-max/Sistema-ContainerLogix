@@ -11,6 +11,7 @@ import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
 import { VISTORIA_PHOTO_TYPES, MAX_VISTORIA_PHOTOS } from './NewContainerVistoriaPage';
 import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings';
+import { PrintHeader, PrintSection, PrintFieldGrid, PrintText, PrintPhotoGrid, PrintClosing } from '../components/PrintDocument';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Label } from '../components/ui/label';
 
@@ -160,245 +161,77 @@ export default function ContainerVistoriaDetailPage() {
     );
   }
 
-  // Componente de impressão
+  // Componente de impressão - mesmo visual dos PDFs gerados no servidor
+  // (cabeçalho, quadros e código de barras de components/PrintDocument.jsx)
+  const barcodeValue = `VC${String(vistoria.vistoria_number).padStart(6, '0')}`;
   const PrintView = () => (
     <div className="print-only">
-      <div className="print-registry" style={{
+      <div className="print-registry print-doc" style={{
         width: '210mm',
         minHeight: '297mm',
-        padding: '8mm',
-        fontFamily: 'Arial, sans-serif',
+        padding: '10mm 12mm',
+        fontFamily: 'Helvetica, Arial, sans-serif',
         backgroundColor: '#fff',
         boxSizing: 'border-box'
       }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '10px',
-          gap: '16px'
-        }}>
-          <img
-            src={getCompanyLogoUrl(company)}
-            alt={company.name}
-            style={{ height: '95px', width: 'auto' }}
-          />
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: '20px',
-              fontWeight: 'bold',
-              color: '#000',
-              fontFamily: 'Arial Black, sans-serif'
-            }}>
-              {company.name}
-            </div>
-            <div style={{ fontSize: '9px', color: '#333' }}>CNPJ: {company.cnpj}</div>
-            {(company.address || '').split('\n').filter(line => line.trim()).map((line, i) => (
-              <div key={i} style={{ fontSize: '9px', color: '#333' }}>{line.trim()}</div>
-            ))}
-            <div style={{ fontSize: '9px', color: '#333' }}>{company.email} | {company.phone}</div>
-          </div>
-        </div>
+        <PrintHeader
+          company={company}
+          logoUrl={getCompanyLogoUrl(company)}
+          title="Vistoria de Container"
+          subtitle={`Vistoria Nº ${vistoria.vistoria_number}`}
+        />
 
-        {/* Título */}
-        <div style={{
-          backgroundColor: '#fff',
-          border: '2px solid #000',
-          padding: '6px 10px',
-          borderRadius: '4px',
-          textAlign: 'center',
-          marginBottom: '10px'
-        }}>
-          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#000' }}>
-            VISTORIA DE CONTAINER
-          </div>
-          <div style={{ fontSize: '11px', color: '#000', marginTop: '2px' }}>
-            Vistoria Nº {vistoria.vistoria_number}
-          </div>
-        </div>
+        <PrintSection title="Informações do Container">
+          <PrintFieldGrid fields={[
+            ['Número do Container', vistoria.container_number],
+            ['Cliente', vistoria.client_name],
+            ['Armador', vistoria.shipping_line],
+            ['Tamanho/Tipo', vistoria.size_type],
+            ['Placa do Cavalo', vistoria.truck_plate],
+            ['Carreta', vistoria.trailer_plate],
+            ['Transportadora', vistoria.transport_company],
+            ['Tara', vistoria.tare],
+          ]} />
+        </PrintSection>
 
-        {/* Informações */}
-        <div style={{
-          border: '1px solid #000',
-          borderRadius: '4px',
-          marginBottom: '8px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            backgroundColor: '#f0f0f0',
-            padding: '4px 8px',
-            borderBottom: '1px solid #000',
-            fontWeight: 'bold',
-            fontSize: '10px'
-          }}>
-            Informações do Container
-          </div>
-          <div style={{ padding: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Número do Container</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{vistoria.container_number}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Cliente</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{vistoria.client_name || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Armador</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{vistoria.shipping_line || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Placa do Cavalo</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{vistoria.truck_plate || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Carreta</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{vistoria.trailer_plate || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Transportadora</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{vistoria.transport_company || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Tamanho/Tipo</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{vistoria.size_type || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Tara</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{vistoria.tare || '-'}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Observações */}
         {vistoria.observations && (
-          <div style={{
-            border: '1px solid #000',
-            borderRadius: '4px',
-            marginBottom: '8px',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              backgroundColor: '#f0f0f0',
-              padding: '4px 8px',
-              borderBottom: '1px solid #000',
-              fontWeight: 'bold',
-              fontSize: '10px'
-            }}>
-              Observações
-            </div>
-            <div style={{ padding: '8px', fontSize: '10px' }}>
-              {vistoria.observations}
-            </div>
-          </div>
+          <PrintSection title="Observações">
+            <PrintText>{vistoria.observations}</PrintText>
+          </PrintSection>
         )}
 
-        {/* Estado do Container */}
-        <div style={{
-          border: '1px solid #000',
-          borderRadius: '4px',
-          marginBottom: '8px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            backgroundColor: '#f0f0f0',
-            padding: '4px 8px',
-            borderBottom: '1px solid #000',
-            fontWeight: 'bold',
-            fontSize: '10px'
-          }}>
-            Estado do Container
-          </div>
-          <div style={{ padding: '8px', fontSize: '10px' }}>
-            {vistoria.no_damage ? (
-              <strong>Sem Avarias</strong>
-            ) : vistoria.damage_items && vistoria.damage_items.length > 0 ? (
-              vistoria.damage_items.join(' • ')
-            ) : (
-              'Nenhum serviço informado.'
-            )}
-          </div>
-        </div>
+        <PrintSection title="Estado do Container">
+          {vistoria.no_damage ? (
+            <PrintText strong>Sem Avarias</PrintText>
+          ) : vistoria.damage_items && vistoria.damage_items.length > 0 ? (
+            <PrintText>{vistoria.damage_items.join('  •  ')}</PrintText>
+          ) : (
+            <PrintText>Nenhum serviço informado.</PrintText>
+          )}
+        </PrintSection>
 
-        {/* Fotos da Vistoria */}
         {vistoria.photos && vistoria.photos.length > 0 && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr 1fr',
-            gap: '8px',
-            marginBottom: '8px'
-          }}>
-            {vistoria.photos.map(photo => (
-              <div key={photo.id} style={{
-                border: '1px solid #000',
-                borderRadius: '4px',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  backgroundColor: '#f0f0f0',
-                  padding: '4px 8px',
-                  borderBottom: '1px solid #000',
-                  fontWeight: 'bold',
-                  fontSize: '10px',
-                  textAlign: 'center'
-                }}>
-                  {PHOTO_LABELS[photo.type] || photo.type}
-                </div>
-                <div style={{
-                  height: '65mm',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#fafafa',
-                  padding: '4px'
-                }}>
-                  <img
-                    src={getPhotoUrl(photo.url)}
-                    alt={PHOTO_LABELS[photo.type] || photo.type}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain'
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          <PrintSection title={`Fotos da Vistoria (${vistoria.photos.length})`} style={{ breakInside: 'auto', pageBreakInside: 'auto' }}>
+            <PrintPhotoGrid
+              photos={vistoria.photos}
+              getLabel={(photo) => PHOTO_LABELS[photo.type] || photo.type}
+              getUrl={(photo) => getPhotoUrl(photo.url)}
+              columns={4}
+            />
+          </PrintSection>
         )}
 
-        {/* Rodapé */}
-        <div style={{
-          borderTop: '1px solid #000',
-          paddingTop: '6px',
-          fontSize: '11px',
-          color: '#000'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', flex: 1 }}>
-              <div>
-                <strong>Registrado por: {vistoria.created_by_name}</strong>
-              </div>
-              <div>
-                <strong>Data de criação: {format(new Date(vistoria.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
-              </div>
-              <div>
-                <strong>Data de emissão: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
-              </div>
-            </div>
-            {barcodeImage && (
-              <div style={{ textAlign: 'center' }}>
-                <img src={barcodeImage} alt="Código de Barras" style={{ height: '50px', width: 'auto' }} />
-                <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000', marginTop: '2px' }}>
-                  {`VC${String(vistoria.vistoria_number).padStart(6, '0')}`}
-                </div>
-              </div>
-            )}
-          </div>
-          <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', borderTop: '1px solid #ddd', paddingTop: '4px' }}>
-            {company.name} | Este documento é válido como registro de vistoria
-          </div>
-        </div>
+        <PrintClosing
+          barcodeImage={barcodeImage}
+          code={barcodeValue}
+          fields={[
+            ['Registrado por', vistoria.created_by_name],
+            ['Data de criação', format(new Date(vistoria.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })],
+            ['Data de emissão', format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })],
+          ]}
+          companyName={company.name}
+          note="Este documento é válido como registro de vistoria"
+        />
       </div>
     </div>
   );

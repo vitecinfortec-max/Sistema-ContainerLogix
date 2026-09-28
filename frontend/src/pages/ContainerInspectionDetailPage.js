@@ -11,6 +11,7 @@ import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
 import { CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS } from './NewContainerInspectionPage';
 import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings';
+import { PrintHeader, PrintSection, PrintFieldGrid, PrintText, PrintPhotoGrid, PrintClosing } from '../components/PrintDocument';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Label } from '../components/ui/label';
 
@@ -163,251 +164,77 @@ export default function ContainerInspectionDetailPage() {
     );
   }
 
-  // Componente de impressão
+  // Componente de impressão - mesmo visual dos PDFs gerados no servidor
+  // (cabeçalho, quadros e código de barras de components/PrintDocument.jsx)
+  const barcodeValue = `RFC${String(inspection.inspection_number).padStart(6, '0')}`;
   const PrintView = () => (
     <div className="print-only">
-      <div className="print-registry" style={{
+      <div className="print-registry print-doc" style={{
         width: '210mm',
         minHeight: '297mm',
-        padding: '8mm',
-        fontFamily: 'Arial, sans-serif',
+        padding: '10mm 12mm',
+        fontFamily: 'Helvetica, Arial, sans-serif',
         backgroundColor: '#fff',
         boxSizing: 'border-box'
       }}>
-        {/* Header */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: '6px',
-          gap: '16px'
-        }}>
-          <img
-            src={getCompanyLogoUrl(company)}
-            alt={company.name}
-            style={{ height: '68px', width: 'auto' }}
-          />
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              fontSize: '20px',
-              fontWeight: 'bold',
-              color: '#000',
-              fontFamily: 'Arial Black, sans-serif'
-            }}>
-              {company.name}
-            </div>
-            <div style={{ fontSize: '9px', color: '#333' }}>CNPJ: {company.cnpj}</div>
-            {(company.address || '').split('\n').filter(line => line.trim()).map((line, i) => (
-              <div key={i} style={{ fontSize: '9px', color: '#333' }}>{line.trim()}</div>
-            ))}
-            <div style={{ fontSize: '9px', color: '#333' }}>{company.email} | {company.phone}</div>
-          </div>
-        </div>
+        <PrintHeader
+          company={company}
+          logoUrl={getCompanyLogoUrl(company)}
+          title="Registro Fotográfico de Contêiner"
+          subtitle={`Registro Nº ${inspection.inspection_number}`}
+        />
 
-        {/* Título */}
-        <div style={{
-          backgroundColor: '#fff',
-          border: '2px solid #000',
-          padding: '4px 10px',
-          borderRadius: '4px',
-          textAlign: 'center',
-          marginBottom: '6px'
-        }}>
-          <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#000' }}>
-            REGISTRO FOTOGRÁFICO DE CONTÊINER
-          </div>
-          <div style={{ fontSize: '11px', color: '#000', marginTop: '2px' }}>
-            Registro Nº {inspection.inspection_number}
-          </div>
-        </div>
+        <PrintSection title="Informações do Container">
+          <PrintFieldGrid fields={[
+            ['Número do Container', inspection.container_number],
+            ['Lacre', inspection.container_seal],
+            ['Tamanho/Tipo', inspection.size_type],
+            ['Booking', inspection.booking],
+            ['Terminal de Coleta', inspection.collection_terminal],
+            ['Terminal de Origem', inspection.origin_terminal],
+            ['Cliente', inspection.client_name],
+            ['Armador', inspection.shipping_line_name],
+          ]} />
+        </PrintSection>
 
-        {/* Informações */}
-        <div style={{
-          border: '1px solid #000',
-          borderRadius: '4px',
-          marginBottom: '6px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            backgroundColor: '#f0f0f0',
-            padding: '3px 8px',
-            borderBottom: '1px solid #000',
-            fontWeight: 'bold',
-            fontSize: '10px'
-          }}>
-            Informações do Container
-          </div>
-          <div style={{ padding: '6px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Número do Container</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.container_number}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Lacre</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.container_seal || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Tamanho/Tipo</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.size_type || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Terminal de Coleta</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.collection_terminal || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Terminal de Origem</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.origin_terminal || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Booking</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.booking || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Cliente</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.client_name || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '8px', color: '#666' }}>Armador</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{inspection.shipping_line_name || '-'}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Observações */}
         {inspection.observations && (
-          <div style={{ 
-            border: '1px solid #000', 
-            borderRadius: '4px', 
-            marginBottom: '8px',
-            overflow: 'hidden'
-          }}>
-            <div style={{ 
-              backgroundColor: '#f0f0f0', 
-              padding: '4px 8px', 
-              borderBottom: '1px solid #000',
-              fontWeight: 'bold',
-              fontSize: '10px'
-            }}>
-              Observações
-            </div>
-            <div style={{ padding: '8px', fontSize: '10px' }}>
-              {inspection.observations}
-            </div>
-          </div>
+          <PrintSection title="Observações">
+            <PrintText>{inspection.observations}</PrintText>
+          </PrintSection>
         )}
 
-        {/* Itens de Vistoria */}
-        <div style={{
-          border: '1px solid #000',
-          borderRadius: '4px',
-          marginBottom: '6px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            backgroundColor: '#f0f0f0',
-            padding: '3px 8px',
-            borderBottom: '1px solid #000',
-            fontWeight: 'bold',
-            fontSize: '10px'
-          }}>
-            Itens de Vistoria
-          </div>
-          <div style={{ padding: '6px 8px', fontSize: '10px' }}>
-            {inspection.no_damage ? (
-              <strong>Container sem avarias</strong>
-            ) : inspection.damage_items && inspection.damage_items.length > 0 ? (
-              inspection.damage_items.join(' • ')
-            ) : (
-              'Nenhum item informado.'
-            )}
-          </div>
-        </div>
+        <PrintSection title="Itens de Vistoria">
+          {inspection.no_damage ? (
+            <PrintText strong>Container sem avarias</PrintText>
+          ) : inspection.damage_items && inspection.damage_items.length > 0 ? (
+            <PrintText>{inspection.damage_items.join('  •  ')}</PrintText>
+          ) : (
+            <PrintText>Nenhum item informado.</PrintText>
+          )}
+        </PrintSection>
 
-        {/* Fotos do Registro */}
         {inspection.photos && inspection.photos.length > 0 && (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr',
-            gap: '6px',
-            marginBottom: '6px'
-          }}>
-            {inspection.photos.map(photo => (
-              <div key={photo.id} style={{
-                border: '1px solid #000',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                maxHeight: '55mm'
-              }}>
-                <div style={{
-                  backgroundColor: '#f0f0f0',
-                  padding: '2px 8px',
-                  borderBottom: '1px solid #000',
-                  fontWeight: 'bold',
-                  fontSize: '9px',
-                  textAlign: 'center'
-                }}>
-                  {PHOTO_LABELS[photo.type] || photo.type}
-                </div>
-                <div style={{
-                  height: '48mm',
-                  maxHeight: '48mm',
-                  overflow: 'hidden',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#fafafa',
-                  padding: '4px'
-                }}>
-                  <img
-                    src={getPhotoUrl(photo.url)}
-                    alt={PHOTO_LABELS[photo.type] || photo.type}
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      height: '100%',
-                      maxWidth: '100%',
-                      maxHeight: '100%',
-                      objectFit: 'contain'
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          <PrintSection title={`Fotos do Registro (${inspection.photos.length})`} style={{ breakInside: 'auto', pageBreakInside: 'auto' }}>
+            <PrintPhotoGrid
+              photos={inspection.photos}
+              getLabel={(photo) => PHOTO_LABELS[photo.type] || photo.type}
+              getUrl={(photo) => getPhotoUrl(photo.url)}
+              columns={3}
+            />
+          </PrintSection>
         )}
 
-        {/* Rodapé */}
-        <div style={{
-          borderTop: '1px solid #000',
-          paddingTop: '4px',
-          fontSize: '10px',
-          color: '#000'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', flex: 1 }}>
-              <div>
-                <strong>Registrado por: {inspection.created_by_name}</strong>
-              </div>
-              <div>
-                <strong>Data de criação: {format(new Date(inspection.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
-              </div>
-              <div>
-                <strong>Data de emissão: {format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
-              </div>
-            </div>
-            {barcodeImage && (
-              <div style={{ textAlign: 'center' }}>
-                <img src={barcodeImage} alt="Código de Barras" style={{ height: '38px', width: 'auto' }} />
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#000', marginTop: '1px' }}>
-                  {`RFC${String(inspection.inspection_number).padStart(6, '0')}`}
-                </div>
-              </div>
-            )}
-          </div>
-          <div style={{ textAlign: 'center', fontSize: '8px', color: '#666', borderTop: '1px solid #ddd', paddingTop: '3px' }}>
-            {company.name} | Este documento é válido como registro fotográfico
-          </div>
-        </div>
+        <PrintClosing
+          barcodeImage={barcodeImage}
+          code={barcodeValue}
+          fields={[
+            ['Registrado por', inspection.created_by_name],
+            ['Data de criação', format(new Date(inspection.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })],
+            ['Data de emissão', format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })],
+          ]}
+          companyName={company.name}
+          note="Este documento é válido como registro fotográfico"
+        />
       </div>
     </div>
   );
