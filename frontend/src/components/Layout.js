@@ -333,13 +333,13 @@ export default function Layout({ children }) {
   // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
   const fleetTab = new URLSearchParams(location.search).get('tab');
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
-  const isManutencaoRelatorioActive = location.pathname === '/reports/fuel-supply' || location.pathname === '/reports/service-orders';
+  const isManutencaoRelatorioActive = location.pathname === '/reports/service-orders';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
-  const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque';
+  const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules' || location.pathname === '/tank-settings';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status' || location.pathname === '/port-services' || location.pathname === '/reports/port-services';
@@ -539,6 +539,7 @@ export default function Layout({ children }) {
     { path: '/fleet/ordem-abastecimento', label: 'Ordem de Abastecimento', icon: Clipboard, moduleKey: 'frota.ordem_abastecimento' },
     { path: '/fleet/abastecimento', label: 'Abastecimento', icon: Fuel, moduleKey: 'frota.abastecimento' },
     { path: '/fleet/nivel-tanque', label: 'Nível do Tanque', icon: Droplet, moduleKey: 'abastecimento.nivel_tanque' },
+    { path: '/reports/fuel-supply', label: 'Relatório de Abastecimento', icon: BarChart3, moduleKey: 'frota.relatorio_abastecimento' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const manutencaoCadastroItems = [
@@ -546,7 +547,6 @@ export default function Layout({ children }) {
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const manutencaoRelatorioItems = [
-    { path: '/reports/fuel-supply', label: 'Relatório de Abastecimento', icon: BarChart3, moduleKey: 'frota.relatorio_abastecimento' },
     { path: '/reports/service-orders', label: 'Relatório de Serviços', icon: BarChart3, moduleKey: 'frota.relatorio_servicos' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 

@@ -269,13 +269,13 @@ MODULE_CATALOG = [
         {"key": "frota.cadastro_categoria", "label": "Cadastro de Categoria"},
         {"key": "frota.checklist", "label": "Checklist"},
         {"key": "frota.controle_media", "label": "Controle de Média"},
-        {"key": "frota.relatorio_abastecimento", "label": "Relatório de Abastecimento"},
         {"key": "frota.relatorio_servicos", "label": "Relatório de Serviços"},
     ]},
     {"key": "abastecimento", "label": "Abastecimento", "items": [
         {"key": "frota.ordem_abastecimento", "label": "Ordem de Abastecimento"},
         {"key": "frota.abastecimento", "label": "Abastecimento"},
         {"key": "abastecimento.nivel_tanque", "label": "Nível do Tanque"},
+        {"key": "frota.relatorio_abastecimento", "label": "Relatório de Abastecimento"},
         {"key": "abastecimento.configuracao_tanque", "label": "Configuração de Tanque"},
     ]},
     {"key": "cadastro", "label": "Cadastro", "items": [
