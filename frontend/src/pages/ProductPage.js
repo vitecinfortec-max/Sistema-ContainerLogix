@@ -29,6 +29,7 @@ function buildEmptyForm() {
     description: '', stock_quantity: '', warehouse_id: '', warehouse_name: '', barcode: '', ncm: '', cfop: '',
     unit: 'UNIDADE', family_id: '', family_name: '', reference_value: '', icms_rate: '',
     other_taxes_rate: '', origin: 'NACIONAL', linked_party_name: '', status: 'ATIVO', observations: '',
+    ca_number: '',
   };
 }
 
@@ -105,6 +106,7 @@ export default function ProductPage() {
       reference_value: item.reference_value?.toString() || '', icms_rate: item.icms_rate?.toString() || '',
       other_taxes_rate: item.other_taxes_rate?.toString() || '', origin: item.origin || 'NACIONAL',
       linked_party_name: item.linked_party_name || '', status: item.status || 'ATIVO', observations: item.observations || '',
+      ca_number: item.ca_number || '',
     });
     setNextCode(item.code);
     setEditId(item.id);
@@ -327,7 +329,7 @@ export default function ProductPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Código de Barras/SKU</Label>
                 <Input value={formData.barcode} onChange={(e) => setField('barcode', e.target.value)} className="h-10 text-[13px]" />
@@ -339,6 +341,11 @@ export default function ProductPage() {
               <div className="space-y-1.5">
                 <Label className="text-[13px]">CFOP Padrão</Label>
                 <Input value={formData.cfop} onChange={(e) => setField('cfop', e.target.value)} className="h-10 text-[13px]" />
+              </div>
+              {/* C.A. do EPI - preenche sozinho na Entrega de EPI's */}
+              <div className="space-y-1.5">
+                <Label className="text-[13px]">C.A. (se for EPI)</Label>
+                <Input value={formData.ca_number} onChange={(e) => setField('ca_number', e.target.value)} className="h-10 text-[13px]" data-testid="product-ca-input" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

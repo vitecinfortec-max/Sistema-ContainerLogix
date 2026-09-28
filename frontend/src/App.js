@@ -24,6 +24,7 @@ import ProductPage from './pages/ProductPage';
 import StockPage from './pages/StockPage';
 import StockEntriesPage from './pages/StockEntriesPage';
 import StockMovementsPage from './pages/StockMovementsPage';
+import EpiDeliveriesPage from './pages/EpiDeliveriesPage';
 import StockReportPage from './pages/StockReportPage';
 import ReportsMovementsPage from './pages/ReportsMovementsPage';
 import ReportsBillingPage from './pages/ReportsBillingPage';
@@ -396,6 +397,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="estoque.movimentacao">
                 <StockMovementsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/entrega-epi"
+            element={
+              <ProtectedRoute moduleKey="estoque.entrega_epi">
+                <EpiDeliveriesPage />
               </ProtectedRoute>
             }
           />

@@ -248,6 +248,63 @@ async def validate_and_read_upload(file: UploadFile, allowed_extensions: set) ->
     return file_ext, content
 
 
+# ==================== ASSINATURAS (Motorista / Funcionário) ====================
+# A assinatura vem da tela como data URL (imagem importada ou desenhada na
+# tela) e vira um PNG em uploads/signatures/. Cada assinatura nova ganha um
+# arquivo novo (nunca sobrescreve), então uma Entrega de EPI que guardou o
+# caminho da assinatura do dia continua imprimindo a assinatura daquele dia.
+SIGNATURES_DIR = UPLOADS_DIR / 'signatures'
+SIGNATURE_URL_PREFIX = '/api/uploads/signatures/'
+MAX_SIGNATURE_BYTES = 3 * 1024 * 1024
+
+
+def save_signature_value(kind: str, person_id: str, incoming, existing):
+    """Resolve o valor de signature_url recebido no cadastro:
+    - data URL de imagem -> salva como PNG e devolve o caminho novo;
+    - vazio/None -> assinatura removida (None);
+    - o próprio caminho que já estava salvo -> mantém;
+    - qualquer outra coisa -> ignora e mantém o que já estava (a tela só
+      manda data URL, vazio ou o caminho atual)."""
+    if incoming is None or (isinstance(incoming, str) and not incoming.strip()):
+        return None
+    if not isinstance(incoming, str):
+        return existing
+    if not incoming.startswith('data:image/'):
+        return existing
+    import base64
+    from PIL import Image as PILImage
+    try:
+        header, b64 = incoming.split(',', 1)
+        raw = base64.b64decode(b64, validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Assinatura inválida")
+    if len(raw) > MAX_SIGNATURE_BYTES:
+        raise HTTPException(status_code=400, detail="Imagem da assinatura muito grande (máximo 3MB)")
+    try:
+        with PILImage.open(io.BytesIO(raw)) as img:
+            img.load()
+            img = img.convert('RGBA')
+            # Reduz fotos grandes de assinatura - nos PDFs ela sai com ~3cm
+            img.thumbnail((1200, 600))
+            SIGNATURES_DIR.mkdir(parents=True, exist_ok=True)
+            filename = f"{kind}_{person_id}_{uuid.uuid4().hex[:10]}.png"
+            img.save(SIGNATURES_DIR / filename, 'PNG', optimize=True)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Não foi possível ler a imagem da assinatura")
+    return SIGNATURE_URL_PREFIX + filename
+
+
+def signature_file_path(url):
+    """Caminho no disco de uma assinatura salva (ou None se não existir)."""
+    if not url or not str(url).startswith(SIGNATURE_URL_PREFIX):
+        return None
+    name = Path(str(url)[len(SIGNATURE_URL_PREFIX):]).name  # sem "../"
+    path = SIGNATURES_DIR / name
+    return path if path.is_file() else None
+
+
 # ==================== MÓDULOS CONTRATADOS ====================
 # Cada instância (um cliente) pode ter grupos ou itens específicos do menu
 # desativados até o cliente contratar aquele serviço. A chave de um item é
@@ -307,7 +364,7 @@ MODULE_CATALOG = [
         {"key": "operacional.servico_portuario", "label": "Serviço Portuário"},
         {"key": "operacional.relatorio_servico_portuario", "label": "Relatório de Serviço Portuário"},
     ]},
-    {"key": "estoque", "label": "Estoque", "items": [
+    {"key": "estoque", "label": "Almoxarifado", "items": [
         {"key": "estoque.almoxarifado", "label": "Almoxarifado"},
         {"key": "estoque.familia_produto", "label": "Família de Produto"},
         {"key": "estoque.familia_servico", "label": "Família de Serviço"},
@@ -317,6 +374,7 @@ MODULE_CATALOG = [
         {"key": "estoque.entradas", "label": "Entradas de Estoque"},
         {"key": "estoque.movimentacao", "label": "Movimentação de Estoque"},
         {"key": "estoque.relatorio", "label": "Relatórios do Estoque"},
+        {"key": "estoque.entrega_epi", "label": "Entrega de EPI's"},
     ]},
     {"key": "comercial", "label": "Comercial", "items": [
         {"key": "comercial.representante", "label": "Representante"},
@@ -386,6 +444,7 @@ PATH_MODULE_MAP = [
     ("/api/stock/entries", "estoque.entradas"),
     ("/api/stock/nfe-import", "estoque.entradas"),
     ("/api/stock/movements", "estoque.movimentacao"),
+    ("/api/epi-deliveries", "estoque.entrega_epi"),
     ("/api/products", "estoque.produto"),
     ("/api/fuel-supplies/consumption-summary", "frota.controle_media"),
     ("/api/fuel-supplies/consumption-history", "frota.controle_media"),

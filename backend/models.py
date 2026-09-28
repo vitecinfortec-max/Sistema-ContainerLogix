@@ -118,6 +118,7 @@ class Driver(BaseModel):
     photo_url: Optional[str] = None
     cnh_photo_front_url: Optional[str] = None
     cnh_photo_back_url: Optional[str] = None
+    signature_url: Optional[str] = None  # assinatura (imagem) - impressa no Termo/Ficha de Entrega de EPI
     status: str = "ATIVO"
     observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -142,6 +143,7 @@ class DriverCreate(BaseModel):
     photo_url: Optional[str] = None
     cnh_photo_front_url: Optional[str] = None
     cnh_photo_back_url: Optional[str] = None
+    signature_url: Optional[str] = None  # assinatura (imagem) - impressa no Termo/Ficha de Entrega de EPI
     status: str = "ATIVO"
     observations: Optional[str] = None
 
@@ -353,6 +355,7 @@ class Employee(BaseModel):
     email: Optional[str] = None
     address_details: Optional[dict] = None
     access_level: Optional[str] = None  # informativo (administrador, portaria, pátio, financeiro, etc.)
+    signature_url: Optional[str] = None  # assinatura (imagem) - impressa no Termo/Ficha de Entrega de EPI
     status: str = "ATIVO"
     observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -371,6 +374,7 @@ class EmployeeCreate(BaseModel):
     email: Optional[str] = None
     address_details: Optional[dict] = None
     access_level: Optional[str] = None
+    signature_url: Optional[str] = None
     status: str = "ATIVO"
     observations: Optional[str] = None
 
@@ -3457,6 +3461,7 @@ class Product(BaseModel):
     other_taxes_rate: float = 0.0
     origin: Optional[str] = None  # NACIONAL | IMPORTADO
     linked_party_name: Optional[str] = None  # Cliente/Fornecedor vinculado (se específico)
+    ca_number: Optional[str] = None  # C.A. (Certificado de Aprovação) quando o produto é um EPI
     status: str = "ATIVO"
     observations: Optional[str] = None
     created_by: str
@@ -3480,6 +3485,7 @@ class ProductCreate(BaseModel):
     other_taxes_rate: float = 0.0
     origin: Optional[str] = None
     linked_party_name: Optional[str] = None
+    ca_number: Optional[str] = None
     status: str = "ATIVO"
     observations: Optional[str] = None
 
@@ -3609,6 +3615,68 @@ class StockMovementUpdate(StockMovementCreate):
 
 class StockMovementResponse(StockMovement):
     total_value: float = 0.0
+
+
+# ==================== ENTREGA DE EPI'S ====================
+
+EPI_RECIPIENT_TYPES = ["MOTORISTA", "FUNCIONARIO"]
+
+
+class EpiDeliveryItem(BaseModel):
+    """EPI entregue (produto do estoque) numa Entrega de EPI's."""
+    product_id: str
+    product_code: Optional[int] = None
+    product_description: str = ''
+    unit: Optional[str] = None
+    quantity: float
+    ca_number: Optional[str] = None  # C.A. (Certificado de Aprovação)
+
+
+class EpiDelivery(BaseModel):
+    """Entrega de EPI a um Motorista ou Funcionário. Dá baixa no estoque
+    gerando uma Saída em Movimentação de Estoque (stock_movement_id), que é
+    ajustada/desfeita junto quando a entrega é editada/excluída.
+    signature_url guarda a assinatura que a pessoa tinha no cadastro no dia
+    da entrega (os arquivos de assinatura nunca são sobrescritos, então o
+    Termo/Ficha continuam mostrando a assinatura daquele dia)."""
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    delivery_number: int  # gerado automaticamente via contador atômico
+    recipient_type: Literal["MOTORISTA", "FUNCIONARIO"]
+    recipient_id: str
+    recipient_name: str
+    recipient_cpf: Optional[str] = None
+    recipient_position: Optional[str] = None  # cargo/função (Funcionário)
+    recipient_department: Optional[str] = None  # setor (Funcionário)
+    recipient_code: Optional[str] = None  # matrícula (Funcionário)
+    delivery_date: str  # YYYY-MM-DD
+    warehouse_id: str
+    warehouse_name: str
+    items: List[EpiDeliveryItem] = []
+    observations: Optional[str] = None
+    signature_url: Optional[str] = None
+    stock_movement_id: Optional[str] = None
+    stock_movement_number: Optional[int] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None
+
+
+class EpiDeliveryCreate(BaseModel):
+    recipient_type: Literal["MOTORISTA", "FUNCIONARIO"]
+    recipient_id: str
+    delivery_date: str
+    warehouse_id: str
+    warehouse_name: str
+    items: List[EpiDeliveryItem] = []
+    observations: Optional[str] = None
+
+
+class EpiDeliveryResponse(EpiDelivery):
+    total_quantity: float = 0.0
+    has_signature: bool = False  # assinatura da entrega ou, se não havia, a atual do cadastro
 
 
 # ==================== FINANCEIRO - PRESTAÇÃO DE CONTAS ====================

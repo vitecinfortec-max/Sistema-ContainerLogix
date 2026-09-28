@@ -4709,3 +4709,211 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
     doc.build(elements)
     buffer.seek(0)
     return buffer.getvalue()
+
+
+# ==================== ENTREGA DE EPI'S ====================
+
+EPI_DECLARATION = (
+    "Declaro ter recebido gratuitamente de {company} os Equipamentos de Proteção Individual (EPI) "
+    "relacionados neste documento, em perfeito estado de conservação e funcionamento, e ter sido "
+    "orientado(a) sobre o uso correto, a guarda e a conservação de cada um. Comprometo-me a usá-los "
+    "apenas para a finalidade a que se destinam, a responsabilizar-me pela guarda e conservação, a "
+    "comunicar qualquer alteração que os torne impróprios para uso e a devolvê-los quando solicitado, "
+    "ciente de que o uso é obrigatório (NR-6)."
+)
+
+
+def _fmt_qty(value):
+    """Quantidade sem casas desnecessárias: 1 -> "1", 1.5 -> "1,5"."""
+    try:
+        v = float(value or 0)
+    except (TypeError, ValueError):
+        return str(value)
+    return (f"{v:.3f}".rstrip('0').rstrip('.')).replace('.', ',')
+
+
+def _fmt_date_br(value):
+    if not value:
+        return '-'
+    try:
+        return datetime.fromisoformat(str(value)[:10]).strftime('%d/%m/%Y')
+    except ValueError:
+        return str(value)
+
+
+def _signature_image(path, max_w, max_h):
+    """Assinatura (PNG) redimensionada pra caber em max_w x max_h mantendo a
+    proporção, ou None se o arquivo não existir/não abrir."""
+    if not path:
+        return None
+    try:
+        with PILImage.open(path) as im:
+            w, h = im.size
+        if not w or not h:
+            return None
+        scale = min(max_w / w, max_h / h)
+        return Image(str(path), width=w * scale, height=h * scale, mask='auto')
+    except Exception as e:
+        logger.error(f"Error loading signature image: {e}")
+        return None
+
+
+def _epi_person_grid(person, content_width, extra=None):
+    """Quadro com os dados da pessoa que recebeu os EPIs."""
+    is_employee = person.get('type') == 'FUNCIONARIO'
+    pairs = [
+        ('Nome', person.get('recipient_name'), 2),
+        ('CPF', person.get('recipient_cpf')),
+        ('Tipo', 'Funcionário' if is_employee else 'Motorista'),
+        ('Cargo / Função', person.get('recipient_position')),
+    ]
+    if is_employee:  # Setor/Matrícula só existem no cadastro de Funcionário
+        pairs += [('Setor', person.get('recipient_department')), ('Matrícula', person.get('recipient_code'))]
+    if is_employee and person.get('admission_date'):
+        pairs.append(('Admissão', _fmt_date_br(person.get('admission_date'))))
+    pairs += list(extra or [])
+    return _pdf_info_grid(pairs, content_width, cols=4)
+
+
+def generate_epi_delivery_pdf(delivery: dict, signature_path=None, company: dict = None) -> bytes:
+    """Termo de Entrega de EPI de uma entrega: dados da pessoa, EPIs entregues
+    (Qtd/Un/EPI/C.A.), declaração de recebimento e a assinatura da pessoa
+    (importada/desenhada no cadastro) sobre a linha de assinatura."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15 * mm, leftMargin=15 * mm, topMargin=12 * mm, bottomMargin=18 * mm)
+    width = doc.width
+    styles = getSampleStyleSheet()
+    cell = _pdf_cell_factory(styles, font_size=8)
+    elements = []
+
+    elements.extend(_build_pdf_header(
+        styles, download_logo(company),
+        f"Termo de Entrega de EPI - Nº {delivery.get('delivery_number')}  ·  {_fmt_date_br(delivery.get('delivery_date'))}",
+        company=company, content_width=width,
+    ))
+
+    person = {**delivery, 'type': delivery.get('recipient_type')}
+    elements.append(_epi_person_grid(person, width, extra=[
+        ('Data da entrega', _fmt_date_br(delivery.get('delivery_date'))),
+        ('Almoxarifado', delivery.get('warehouse_name'), 2),
+        ('Entregue por', delivery.get('created_by_name')),
+    ]))
+
+    elements.extend(_pdf_section_title('EPIs entregues', width))
+    rows = [_pdf_header_cells(['Qtd', 'Un', 'EPI', 'C.A.'], font_size=7.5)]
+    for it in delivery.get('items') or []:
+        rows.append([
+            cell(_fmt_qty(it.get('quantity')), 'center', bold=True),
+            cell(it.get('unit') or 'UN', 'center'),
+            cell(it.get('product_description')),
+            cell(it.get('ca_number'), 'center'),
+        ])
+    items_table = Table(rows, colWidths=[width * 0.10, width * 0.10, width * 0.60, width * 0.20], repeatRows=1)
+    items_table.setStyle(TableStyle(_pdf_table_style()))
+    elements.append(items_table)
+
+    if delivery.get('observations'):
+        elements.append(Spacer(1, 8))
+        elements.append(_pdf_note_box('Observações', delivery.get('observations'), width))
+
+    elements.append(Spacer(1, 10))
+    elements.append(_pdf_note_box('Declaração', EPI_DECLARATION.format(company=c['name']), width))
+
+    # Assinatura: a imagem fica logo acima da linha, no lado da pessoa; do
+    # outro lado, a linha de quem entregou (assinada à mão, se for o caso).
+    gap = 28
+    col_w = (width - gap) / 2
+    sig = _signature_image(signature_path, col_w - 20, 46)
+    title_style = ParagraphStyle('EpiSignTitle', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=_hex(BRAND_DARK), alignment=TA_CENTER)
+    sub_style = ParagraphStyle('EpiSignSub', fontName='Helvetica', fontSize=7, leading=9, textColor=_hex(BRAND_MUTED), alignment=TA_CENTER)
+    no_sig_style = ParagraphStyle('EpiNoSig', fontName='Helvetica-Oblique', fontSize=7, leading=9, textColor=_hex(BRAND_MUTED), alignment=TA_CENTER)
+    sign_table = Table([
+        [sig or Paragraph('Sem assinatura no cadastro - assinar à mão', no_sig_style), '', ''],
+        [[Paragraph(xml_escape(delivery.get('recipient_name') or '-'), title_style),
+          Paragraph(f"CPF {xml_escape(delivery.get('recipient_cpf') or '-')}", sub_style)],
+         '',
+         [Paragraph('Responsável pela entrega', title_style),
+          Paragraph(xml_escape(delivery.get('created_by_name') or '-'), sub_style)]],
+    ], colWidths=[col_w, gap, col_w], rowHeights=[54, None])
+    sign_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, 0), 'BOTTOM'),
+        ('VALIGN', (0, 1), (-1, 1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 2),
+        ('TOPPADDING', (0, 1), (-1, 1), 3),
+        ('LINEBELOW', (0, 0), (0, 0), 0.8, _hex(BRAND_TEXT)),
+        ('LINEBELOW', (2, 0), (2, 0), 0.8, _hex(BRAND_TEXT)),
+    ]))
+    elements.append(Spacer(1, 22))
+    elements.append(sign_table)
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
+def generate_epi_ficha_pdf(person: dict, rows: list, company: dict = None, date_from=None, date_to=None) -> bytes:
+    """Ficha de Controle de Entrega de EPI de uma pessoa: todos os EPIs que
+    ela recebeu (um por linha), cada linha com a assinatura da entrega."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=12 * mm, leftMargin=12 * mm, topMargin=12 * mm, bottomMargin=18 * mm)
+    width = doc.width
+    styles = getSampleStyleSheet()
+    cell = _pdf_cell_factory(styles, font_size=7.5)
+    elements = []
+
+    period = None
+    if date_from or date_to:
+        period = f"Período: {_fmt_date_br(date_from) if date_from else 'início'} a {_fmt_date_br(date_to) if date_to else 'hoje'}"
+    elements.extend(_build_pdf_header(
+        styles, download_logo(company), f"Ficha de Controle de EPI - {person.get('recipient_name') or ''}",
+        generation_info=period, company=company, content_width=width,
+    ))
+    elements.append(_epi_person_grid(person, width))
+    elements.append(Spacer(1, 8))
+
+    total_qty = sum(float(r.get('quantity') or 0) for r in rows)
+    deliveries = len({r.get('delivery_number') for r in rows})
+    elements.extend(_build_pdf_summary([
+        ('Entregas', _fmt_int(deliveries)),
+        ('EPIs entregues', _fmt_qty(total_qty)),
+        ('Última entrega', _fmt_date_br(rows[-1].get('delivery_date')) if rows else '-'),
+    ], width))
+
+    elements.extend(_pdf_section_title('EPIs recebidos', width))
+    if not rows:
+        elements.append(_pdf_empty_state('Nenhuma entrega de EPI registrada para esta pessoa.', width))
+    else:
+        widths = [0.11, 0.07, 0.06, 0.06, 0.35, 0.12, 0.23]
+        widths = [w * width for w in widths]
+        data = [_pdf_header_cells(['Data', 'Nº', 'Qtd', 'Un', 'EPI', 'C.A.', 'Assinatura'], font_size=7)]
+        no_sig_style = ParagraphStyle('EpiFichaNoSig', fontName='Helvetica-Oblique', fontSize=6.5, leading=8, textColor=_hex(BRAND_MUTED), alignment=TA_CENTER)
+        for r in rows:
+            sig = _signature_image(r.get('signature_path'), widths[-1] - 10, 26)
+            data.append([
+                cell(_fmt_date_br(r.get('delivery_date')), 'center'),
+                cell(r.get('delivery_number'), 'center'),
+                cell(_fmt_qty(r.get('quantity')), 'center', bold=True),
+                cell(r.get('unit') or 'UN', 'center'),
+                cell(r.get('product_description')),
+                cell(r.get('ca_number'), 'center'),
+                sig or Paragraph('sem assinatura', no_sig_style),
+            ])
+        table = Table(data, colWidths=widths, repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style() + [
+            ('ALIGN', (-1, 1), (-1, -1), 'CENTER'),
+            ('TOPPADDING', (0, 1), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 3),
+        ]))
+        elements.append(table)
+
+    elements.append(Spacer(1, 10))
+    elements.append(_pdf_note_box('Declaração', EPI_DECLARATION.format(company=c['name']), width))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()

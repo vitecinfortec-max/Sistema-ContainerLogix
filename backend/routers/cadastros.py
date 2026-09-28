@@ -61,10 +61,20 @@ from shared import (
     db, manager, get_current_active_user, get_current_admin_user, get_company_settings,
     get_next_transaction_id, parse_datetime_value, round_money, migrate_inspection_photos,
     load_logo_buffer, validate_and_read_upload, ALLOWED_EXTENSIONS, ALLOWED_RECEIPT_EXTENSIONS,
-    MAX_FILE_SIZE, check_rate_limit, client_ip, UPLOADS_DIR, ROOT_DIR
+    MAX_FILE_SIZE, check_rate_limit, client_ip, UPLOADS_DIR, ROOT_DIR,
+    save_signature_value,
 )
 
 api_router = APIRouter(prefix="/api")
+
+
+def _incoming_signature(data, kind, person_id, existing_url):
+    """Assinatura no create/update do cadastro. Se o campo nem veio no
+    corpo (ex.: uma aba antiga do sistema, de antes do campo existir),
+    mantém a assinatura salva em vez de apagá-la."""
+    if 'signature_url' not in data.model_fields_set:
+        return existing_url
+    return save_signature_value(kind, person_id, data.signature_url, existing_url)
 
 @api_router.post("/drivers", response_model=DriverResponse)
 async def create_driver(driver_input: DriverCreate, current_user: dict = Depends(get_current_active_user)):
@@ -73,6 +83,7 @@ async def create_driver(driver_input: DriverCreate, current_user: dict = Depends
         raise HTTPException(status_code=400, detail="Já existe uma pessoa cadastrada com este CPF")
 
     driver = Driver(**driver_input.model_dump(), created_by=current_user['sub'])
+    driver.signature_url = _incoming_signature(driver_input, 'motorista', driver.id, None)
 
     doc = driver.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
@@ -115,6 +126,7 @@ async def update_driver(driver_id: str, driver_input: DriverCreate, current_user
         "created_at": existing['created_at'],
         "created_by": existing['created_by']
     }
+    update_data['signature_url'] = _incoming_signature(driver_input, 'motorista', driver_id, existing.get('signature_url'))
 
     await db.drivers.replace_one({"id": driver_id}, update_data)
 
@@ -395,6 +407,7 @@ async def delete_terminal(terminal_id: str, current_user: dict = Depends(get_cur
 @api_router.post("/employees", response_model=EmployeeResponse)
 async def create_employee(employee_input: EmployeeCreate, current_user: dict = Depends(get_current_active_user)):
     employee = Employee(**employee_input.model_dump(), created_by=current_user['sub'])
+    employee.signature_url = _incoming_signature(employee_input, 'funcionario', employee.id, None)
 
     doc = employee.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
@@ -427,10 +440,30 @@ async def update_employee(employee_id: str, employee_input: EmployeeCreate, curr
         "created_at": existing['created_at'],
         "created_by": existing['created_by']
     }
+    update_data['signature_url'] = _incoming_signature(employee_input, 'funcionario', employee_id, existing.get('signature_url'))
 
     await db.employees.replace_one({"id": employee_id}, update_data)
 
     return EmployeeResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
+
+class SignatureUpdate(PydanticBaseModel):
+    signature: Optional[str] = None  # data URL da imagem, ou vazio pra remover
+
+
+@api_router.put("/signatures/{kind}/{person_id}")
+async def update_person_signature(kind: str, person_id: str, data: SignatureUpdate, current_user: dict = Depends(get_current_active_user)):
+    """Grava só a assinatura de um Motorista/Funcionário, sem reenviar o
+    cadastro inteiro - usado pelo "Assinar agora" da Entrega de EPI's."""
+    collection = {'motorista': db.drivers, 'funcionario': db.employees}.get(kind)
+    if collection is None:
+        raise HTTPException(status_code=404, detail="Tipo de cadastro inválido")
+    existing = await collection.find_one({"id": person_id}, {"_id": 0, "id": 1, "signature_url": 1})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Cadastro não encontrado")
+    url = save_signature_value(kind, person_id, data.signature, existing.get('signature_url'))
+    await collection.update_one({"id": person_id}, {"$set": {"signature_url": url}})
+    return {"signature_url": url}
+
 
 @api_router.delete("/employees/{employee_id}")
 async def delete_employee(employee_id: str, current_user: dict = Depends(get_current_active_user)):

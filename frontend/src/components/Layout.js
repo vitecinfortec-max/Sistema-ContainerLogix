@@ -43,6 +43,7 @@ import {
   PackageCheck,
   Tag,
   Boxes,
+  HardHat,
   Warehouse,
   Layers,
   FileSpreadsheet,
@@ -101,6 +102,7 @@ const PAGE_TITLES = {
   '/estoque': 'Estoque',
   '/estoque/entradas': 'Entradas de Estoque',
   '/estoque/movimentacao': 'Movimentação de Estoque',
+  '/estoque/entrega-epi': "Entrega de EPI's",
   '/estoque/relatorio': 'Relatórios do Estoque',
   '/loading-orders': 'Ordem de Carregamento',
   '/freight-routes': 'Rota',
@@ -335,7 +337,7 @@ export default function Layout({ children }) {
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
   const isManutencaoRelatorioActive = location.pathname === '/reports/service-orders';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
-  const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio'].includes(location.pathname);
+  const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio', '/estoque/entrega-epi'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
@@ -557,6 +559,7 @@ export default function Layout({ children }) {
     { path: '/estoque/produtos', label: 'Produto', icon: Package, moduleKey: 'estoque.produto' },
     { path: '/estoque/servicos', label: 'Cadastro de Serviço', icon: Wrench, moduleKey: 'estoque.cadastro_servico' },
     { path: '/estoque/relatorio', label: 'Relatórios do Estoque', icon: FileSpreadsheet, moduleKey: 'estoque.relatorio' },
+    { path: '/estoque/entrega-epi', label: "Entrega de EPI's", icon: HardHat, moduleKey: 'estoque.entrega_epi' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const estoqueCadastroItems = [
@@ -671,7 +674,7 @@ export default function Layout({ children }) {
     if (isCadastroActive) return 'Cadastro';
     if (isFinanceiroActive) return 'Financeiro';
     if (isOperacionalActive) return 'Operacional';
-    if (isEstoqueActive) return 'Estoque';
+    if (isEstoqueActive) return 'Almoxarifado';
     if (isComercialActive) return 'Comercial';
     if (isGestaoContainerActive) return 'Gestão de Container';
     if (isOpcoesSistemaActive) return 'Opções do Sistema';
@@ -1081,7 +1084,7 @@ export default function Layout({ children }) {
                 )}
 
                 {/* Estoque */}
-                {isEstoqueGroupVisible && renderGroupHeader('Estoque', Boxes, estoqueOpen, toggleEstoque, isEstoqueActive, 'nav-estoque-toggle')}
+                {isEstoqueGroupVisible && renderGroupHeader('Almoxarifado', Boxes, estoqueOpen, toggleEstoque, isEstoqueActive, 'nav-estoque-toggle')}
                 {isEstoqueGroupVisible && estoqueOpen && sidebarOpen && (
                   <div>
                     {estoqueItems.map((item) => renderNavItem(item, true))}
@@ -1216,7 +1219,7 @@ export default function Layout({ children }) {
                 {isOperacionalGroupVisible && operacionalOpen && operacionalItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Estoque Mobile */}
-                {isEstoqueGroupVisible && renderMobileGroupToggle('Estoque', Boxes, estoqueOpen, toggleEstoque, isEstoqueActive)}
+                {isEstoqueGroupVisible && renderMobileGroupToggle('Almoxarifado', Boxes, estoqueOpen, toggleEstoque, isEstoqueActive)}
                 {isEstoqueGroupVisible && estoqueOpen && (
                   <div>
                     {estoqueItems.map((item) => renderMobileNavItem(item))}

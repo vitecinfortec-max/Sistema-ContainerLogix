@@ -95,6 +95,17 @@ export const api = {
   createStockMovement: (data) => axios.post(`${API}/stock/movements`, data),
   updateStockMovement: (id, data) => axios.put(`${API}/stock/movements/${id}`, data),
   getStockMovementPDF: (id) => axios.get(`${API}/stock/movements/${id}/pdf`, { responseType: 'blob' }),
+  // Entrega de EPI's (grupo Almoxarifado)
+  getEpiDeliveries: (params) => axios.get(`${API}/epi-deliveries`, { params }),
+  getEpiDelivery: (id) => axios.get(`${API}/epi-deliveries/${id}`),
+  getEpiDeliveryNextNumber: () => axios.get(`${API}/epi-deliveries/next-number`),
+  createEpiDelivery: (data) => axios.post(`${API}/epi-deliveries`, data),
+  updateEpiDelivery: (id, data) => axios.put(`${API}/epi-deliveries/${id}`, data),
+  deleteEpiDelivery: (id) => axios.delete(`${API}/epi-deliveries/${id}`),
+  getEpiDeliveryPDF: (id) => axios.get(`${API}/epi-deliveries/${id}/pdf`, { responseType: 'blob' }),
+  getEpiFichaPDF: (params) => axios.get(`${API}/epi-deliveries/ficha/pdf`, { params, responseType: 'blob' }),
+  // Assinatura de Motorista (kind=motorista) ou Funcionário (kind=funcionario), em data URL
+  updatePersonSignature: (kind, id, signature) => axios.put(`${API}/signatures/${kind}/${id}`, { signature }),
 
   getOSCategories: () => axios.get(`${API}/os-categories`),
   createOSCategory: (data) => axios.post(`${API}/os-categories`, data),
@@ -111,7 +122,7 @@ export const api = {
   updateTerminal: (id, data) => axios.put(`${API}/terminals/${id}`, data),
   deleteTerminal: (id) => axios.delete(`${API}/terminals/${id}`),
 
-  getEmployees: () => axios.get(`${API}/employees`),
+  getEmployees: (params) => axios.get(`${API}/employees`, { params }),
   createEmployee: (data) => axios.post(`${API}/employees`, data),
   updateEmployee: (id, data) => axios.put(`${API}/employees/${id}`, data),
   deleteEmployee: (id) => axios.delete(`${API}/employees/${id}`),

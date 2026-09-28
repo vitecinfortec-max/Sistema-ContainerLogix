@@ -14,6 +14,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { AddressFields } from '../components/AddressFields';
+import { SignatureField } from '../components/SignaturePad';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -97,6 +98,7 @@ const TYPES = [
       { name: 'transport_company', label: 'Transportadora Vinculada (vazio = autônomo)' },
       { name: 'default_truck_plate', label: 'Placa do Cavalo (padrão)' },
       { name: 'default_trailer_plate', label: 'Placa da Carreta (padrão)' },
+      { name: 'signature_url', label: "Assinatura (sai no Termo e na Ficha de Entrega de EPI's)", type: 'signature' },
       { name: 'status', label: 'Status', type: 'select', options: STATUS_COM_BLOQUEADO },
       { name: 'observations', label: 'Observações', type: 'textarea' },
     ],
@@ -155,6 +157,7 @@ const TYPES = [
       { name: 'email', label: 'Email' },
       { name: 'address_details', label: 'Endereço', type: 'address' },
       { name: 'access_level', label: 'Nível de Acesso (informativo)', placeholder: 'Ex: administrador, portaria, pátio, financeiro...' },
+      { name: 'signature_url', label: "Assinatura (sai no Termo e na Ficha de Entrega de EPI's)", type: 'signature' },
       { name: 'status', label: 'Status', type: 'select', options: STATUS_FUNCIONARIO },
       { name: 'observations', label: 'Observações', type: 'textarea' },
     ],
@@ -533,6 +536,8 @@ export default function CadastroUnificadoPage() {
                           {f.options.map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
                         </SelectContent>
                       </Select>
+                    ) : f.type === 'signature' ? (
+                      <SignatureField value={formData[f.name]} onChange={(v) => setField(f.name, v)} personName={formData.name} />
                     ) : f.type === 'textarea' ? (
                       <Textarea value={formData[f.name] || ''} onChange={(e) => setField(f.name, e.target.value)} className="text-[13px] min-h-[70px]" />
                     ) : (f.mask === 'cnpj' || f.mask === 'doc') ? (
