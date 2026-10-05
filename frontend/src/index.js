@@ -5,6 +5,7 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import "@/index.css";
 import App from "@/App";
 import OfflineApp from "@/offline/OfflineApp";
+import { MotionProvider } from "@/components/Motion";
 
 const isOfflineMode = process.env.REACT_APP_OFFLINE_MODE === 'true';
 const isElectron = navigator.userAgent.toLowerCase().includes('electron');
@@ -32,7 +33,9 @@ if (isElectron) {
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    {isOfflineMode ? <OfflineApp /> : <App />}
+    <MotionProvider>
+      {isOfflineMode ? <OfflineApp /> : <App />}
+    </MotionProvider>
   </React.StrictMode>,
 );
 

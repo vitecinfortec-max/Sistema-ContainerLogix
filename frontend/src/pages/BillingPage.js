@@ -936,7 +936,7 @@ export default function BillingPage() {
                   <span className="text-xs text-slate-500 dark:text-slate-400">Adicionadas via busca por ID/Código de Barras</span>
                 </div>
                 <div className="max-h-[200px] overflow-y-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm rows-in">
                     <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
                       <tr>
                         <th className="px-3 py-2 text-left w-10"></th>
@@ -1009,7 +1009,7 @@ export default function BillingPage() {
                   </div>
                 ) : (
                   <div className="max-h-[250px] overflow-y-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm rows-in">
                       <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
                         <tr>
                           <th className="px-3 py-2 text-left w-10"></th>
@@ -1239,7 +1239,7 @@ export default function BillingPage() {
                     </div>
                   ) : (
                     <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
+                      <table className="w-full text-sm rows-in">
                         <thead className="bg-slate-50 dark:bg-slate-800">
                           <tr>
                             <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">ID</th>
@@ -1421,7 +1421,7 @@ export default function BillingPage() {
                   {loadingEditMovements ? (
                     <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Carregando...</div>
                   ) : editMovements.length > 0 ? (
-                    <table className="w-full">
+                    <table className="w-full rows-in">
                       <thead className="bg-slate-50 dark:bg-slate-800 border-b sticky top-0">
                         <tr>
                           <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">ID</th>
@@ -1492,7 +1492,7 @@ export default function BillingPage() {
 
                 <div className="max-h-40 overflow-y-auto">
                   {editAvailableMovements.length > 0 ? (
-                    <table className="w-full">
+                    <table className="w-full rows-in">
                       <thead className="bg-slate-50 dark:bg-slate-800 border-b sticky top-0">
                         <tr>
                           <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">ID</th>

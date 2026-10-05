@@ -130,6 +130,73 @@
   }
 }
 
+/* Movimento das listagens: as linhas entram em cascata quando a lista carrega
+   (só na montagem - marcar/desmarcar uma linha não reanima). Vale pra
+   .data-table e pra qualquer tabela com a classe .rows-in. As 14 primeiras
+   escalonam; o restante entra junto com a última. Quem pediu "reduzir
+   movimento" no sistema operacional não recebe a animação. */
+@keyframes cl-row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .data-table tbody tr,
+  .rows-in tbody tr {
+    animation: cl-row-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+  }
+  .data-table tbody tr:nth-child(1),
+  .rows-in tbody tr:nth-child(1) { animation-delay: 0.00s; }
+  .data-table tbody tr:nth-child(2),
+  .rows-in tbody tr:nth-child(2) { animation-delay: 0.02s; }
+  .data-table tbody tr:nth-child(3),
+  .rows-in tbody tr:nth-child(3) { animation-delay: 0.04s; }
+  .data-table tbody tr:nth-child(4),
+  .rows-in tbody tr:nth-child(4) { animation-delay: 0.06s; }
+  .data-table tbody tr:nth-child(5),
+  .rows-in tbody tr:nth-child(5) { animation-delay: 0.08s; }
+  .data-table tbody tr:nth-child(6),
+  .rows-in tbody tr:nth-child(6) { animation-delay: 0.10s; }
+  .data-table tbody tr:nth-child(7),
+  .rows-in tbody tr:nth-child(7) { animation-delay: 0.12s; }
+  .data-table tbody tr:nth-child(8),
+  .rows-in tbody tr:nth-child(8) { animation-delay: 0.14s; }
+  .data-table tbody tr:nth-child(9),
+  .rows-in tbody tr:nth-child(9) { animation-delay: 0.16s; }
+  .data-table tbody tr:nth-child(10),
+  .rows-in tbody tr:nth-child(10) { animation-delay: 0.18s; }
+  .data-table tbody tr:nth-child(11),
+  .rows-in tbody tr:nth-child(11) { animation-delay: 0.20s; }
+  .data-table tbody tr:nth-child(12),
+  .rows-in tbody tr:nth-child(12) { animation-delay: 0.22s; }
+  .data-table tbody tr:nth-child(13),
+  .rows-in tbody tr:nth-child(13) { animation-delay: 0.24s; }
+  .data-table tbody tr:nth-child(14),
+  .rows-in tbody tr:nth-child(14) { animation-delay: 0.26s; }
+}
+@media print {
+  .data-table tbody tr,
+  .rows-in tbody tr { animation: none !important; }
+}
+
+/* Cards (components/ui/card.jsx) sobem ao aparecer; irmãos entram um logo
+   depois do outro. Quem já anima o Card por conta própria (Dashboard, com
+   Motion) desliga isso pondo .no-card-in num elemento pai. */
+@keyframes cl-rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .card-in { animation: cl-rise-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .card-in:nth-child(2) { animation-delay: 0.05s; }
+  .card-in:nth-child(3) { animation-delay: 0.10s; }
+  .card-in:nth-child(4) { animation-delay: 0.15s; }
+  .card-in:nth-child(n+5) { animation-delay: 0.20s; }
+  .no-card-in .card-in { animation: none; }
+}
+@media print {
+  .card-in { animation: none !important; }
+}
+
 @layer base {
   * {
     @apply border-border;

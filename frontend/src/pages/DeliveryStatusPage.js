@@ -681,7 +681,7 @@ export default function DeliveryStatusPage() {
               <div>
                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Horários por Motorista</h4>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm rows-in">
                     <thead>
                       <tr className="border-b border-slate-200 dark:border-slate-700">
                         <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">#</th>

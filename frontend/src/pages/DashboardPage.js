@@ -17,6 +17,8 @@ import {
   ResponsiveContainer, Tooltip,
   PieChart, Pie, Cell
 } from 'recharts';
+import { AnimatePresence } from 'motion/react';
+import { motion, Stagger, StaggerItem, AnimatedNumber, riseIn, staggerParent } from '../components/Motion';
 
 const RANK_STYLES = [
   { icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10' },
@@ -155,9 +157,9 @@ export default function DashboardPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="dashboard-container">
+      <Stagger className="space-y-5 no-card-in" stagger={0.07} data-testid="dashboard-container">
         {/* Atalhos */}
-        <div>
+        <StaggerItem>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider" data-testid="shortcuts-title">Atalhos</h2>
             <button
@@ -169,42 +171,60 @@ export default function DashboardPage() {
               Personalizar
             </button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <motion.div variants={staggerParent(0.04)} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {activeShortcuts.map((shortcut) => {
               const Icon = shortcut.icon;
               return (
-                <button
+                <motion.button
                   key={shortcut.id}
+                  variants={riseIn}
+                  whileHover={{ y: -3 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => navigate(shortcut.path)}
-                  className="flex flex-col items-center gap-2 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-primary/40 hover:shadow-sm transition-all group cursor-pointer"
+                  className="flex flex-col items-center gap-2 p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-primary/40 hover:shadow-md transition-[border-color,box-shadow] group cursor-pointer"
                   data-testid={`shortcut-${shortcut.id}`}
                 >
                   <div className={`w-10 h-10 rounded-lg ${shortcut.bg} flex items-center justify-center group-hover:scale-110 transition-transform`}>
                     <Icon className={`w-5 h-5 ${shortcut.color}`} />
                   </div>
                   <span className="text-xs font-medium text-slate-600 dark:text-slate-400 text-center leading-tight">{shortcut.label}</span>
-                </button>
+                </motion.button>
               );
             })}
 
             {/* Add shortcut button */}
-            <button
+            <motion.button
+              variants={riseIn}
+              whileTap={{ scale: 0.97 }}
               onClick={openEditor}
-              className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-primary/40 hover:bg-primary/5 transition-all cursor-pointer"
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-primary/40 hover:bg-primary/5 transition-colors cursor-pointer"
               data-testid="add-shortcut-button"
             >
               <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
                 <Plus className="w-5 h-5 text-slate-400 dark:text-slate-500" />
               </div>
               <span className="text-xs font-medium text-slate-400 dark:text-slate-500">Adicionar</span>
-            </button>
-          </div>
-        </div>
+            </motion.button>
+          </motion.div>
+        </StaggerItem>
 
         {/* Shortcuts Editor Modal */}
+        <AnimatePresence>
         {showEditor && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" data-testid="shortcuts-editor-modal">
-            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+            data-testid="shortcuts-editor-modal"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden"
+            >
               <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
                 <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">Personalizar Atalhos</h3>
                 <button onClick={() => setShowEditor(false)} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400">
@@ -264,97 +284,111 @@ export default function DashboardPage() {
                   </Button>
                 </div>
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
+        </AnimatePresence>
 
         {/* Stats Grid - 4 cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-primary/30 transition-colors" data-testid="stat-entries-today">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <ArrowDownCircle className="w-5 h-5 text-primary" />
+        <motion.div variants={staggerParent(0.05)} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <motion.div variants={riseIn} whileHover={{ y: -2 }}>
+  <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-primary/30 transition-colors" data-testid="stat-entries-today">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <ArrowDownCircle className="w-5 h-5 text-primary" />
+                  </div>
                 </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.entries_today || 0}</div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Entradas Hoje</p>
-            </CardContent>
-          </Card>
+                <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 tabular-nums"><AnimatedNumber value={stats?.entries_today || 0} /></div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Entradas Hoje</p>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-amber-300 transition-colors" data-testid="stat-exits-today">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
-                  <ArrowUpCircle className="w-5 h-5 text-amber-500" />
+          <motion.div variants={riseIn} whileHover={{ y: -2 }}>
+  <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-amber-300 transition-colors" data-testid="stat-exits-today">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <ArrowUpCircle className="w-5 h-5 text-amber-500" />
+                  </div>
                 </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.exits_today || 0}</div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Saídas Hoje</p>
-            </CardContent>
-          </Card>
+                <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 tabular-nums"><AnimatedNumber value={stats?.exits_today || 0} /></div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Saídas Hoje</p>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-emerald-300 transition-colors" data-testid="stat-stock-full">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
-                  <Package className="w-5 h-5 text-emerald-500" />
+          <motion.div variants={riseIn} whileHover={{ y: -2 }}>
+  <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-emerald-300 transition-colors" data-testid="stat-stock-full">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+                    <Package className="w-5 h-5 text-emerald-500" />
+                  </div>
                 </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.stock_full || 0}</div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque Cheios</p>
-            </CardContent>
-          </Card>
+                <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 tabular-nums"><AnimatedNumber value={stats?.stock_full || 0} /></div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque Cheios</p>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-slate-300 dark:hover:border-slate-600 transition-colors" data-testid="stat-stock-empty">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                  <Container className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+          <motion.div variants={riseIn} whileHover={{ y: -2 }}>
+  <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-slate-300 dark:hover:border-slate-600 transition-colors" data-testid="stat-stock-empty">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                    <Container className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                  </div>
                 </div>
-              </div>
-              <div className="text-2xl font-bold text-slate-800 dark:text-slate-200">{stats?.stock_empty || 0}</div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque Vazios</p>
-            </CardContent>
-          </Card>
-        </div>
+                <div className="text-2xl font-bold text-slate-800 dark:text-slate-200 tabular-nums"><AnimatedNumber value={stats?.stock_empty || 0} /></div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Estoque Vazios</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
 
         {/* Monthly Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card className="border border-primary/20 shadow-none" data-testid="stat-entries-month">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium text-primary">Entradas no Mês</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-slate-800 dark:text-slate-200">{stats?.entries_month || 0}</div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
+        <motion.div variants={staggerParent(0.05)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <motion.div variants={riseIn}>
+  <Card className="border border-primary/20 shadow-none" data-testid="stat-entries-month">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium text-primary">Entradas no Mês</span>
                 </div>
-                <ArrowDownCircle className="w-10 h-10 text-primary/20" />
-              </div>
-            </CardContent>
-          </Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-3xl font-bold text-slate-800 dark:text-slate-200 tabular-nums"><AnimatedNumber value={stats?.entries_month || 0} /></div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
+                  </div>
+                  <ArrowDownCircle className="w-10 h-10 text-primary/20" />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-          <Card className="border border-amber-200 shadow-none" data-testid="stat-exits-month">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar className="w-4 h-4 text-amber-600" />
-                <span className="text-sm font-medium text-amber-600">Saídas no Mês</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-3xl font-bold text-slate-800 dark:text-slate-200">{stats?.exits_month || 0}</div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
+          <motion.div variants={riseIn}>
+  <Card className="border border-amber-200 shadow-none" data-testid="stat-exits-month">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-4 h-4 text-amber-600" />
+                  <span className="text-sm font-medium text-amber-600">Saídas no Mês</span>
                 </div>
-                <ArrowUpCircle className="w-10 h-10 text-amber-500/20" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-3xl font-bold text-slate-800 dark:text-slate-200 tabular-nums"><AnimatedNumber value={stats?.exits_month || 0} /></div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
+                  </div>
+                  <ArrowUpCircle className="w-10 h-10 text-amber-500/20" />
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.div>
 
         {/* Alertas do Sistema */}
+        <StaggerItem>
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="system-alerts-card">
           <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
             <div className="flex items-center gap-2">
@@ -428,9 +462,10 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        </StaggerItem>
 
         {/* Driver Ranking + Stock Distribution */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <StaggerItem className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="driver-ranking-card">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
               <div className="flex items-center gap-2">
@@ -545,9 +580,10 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </StaggerItem>
 
         {/* Recent Movements Table */}
+        <StaggerItem>
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="recent-movements-card">
           <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
             <div className="flex items-center justify-between">
@@ -567,7 +603,7 @@ export default function DashboardPage() {
           <CardContent className="p-0">
             {stats?.recent_movements && stats.recent_movements.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full rows-in">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
                       <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data/Hora</th>
@@ -620,7 +656,8 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </StaggerItem>
+      </Stagger>
     </Layout>
   );
 }

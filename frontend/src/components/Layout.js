@@ -74,6 +74,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { useModuleConfig } from '../context/ModuleConfigContext';
 import { api } from '../lib/api';
 import CommandPalette from './CommandPalette';
+import { PageTransition } from './Motion';
 
 // Intervalo de checagem do alerta de containers parados no pátio
 const YARD_ALERT_POLL_MS = 5 * 60 * 1000;
@@ -716,11 +717,11 @@ export default function Layout({ children }) {
           key={item.path}
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-          className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 ${
+          className={`group flex items-center py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 ${
             isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
           } ${deepIndent ? 'pl-14' : 'pl-10'} pr-5 text-[13px] gap-2`}
         >
-          <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
+          <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
           <span>{item.label}</span>
         </Link>
       );
@@ -732,7 +733,7 @@ export default function Layout({ children }) {
         key={item.path}
         to={item.path}
         data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-        className={`flex items-center py-3 transition-colors border-b border-slate-100 dark:border-slate-800 ${
+        className={`group flex items-center py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 ${
           isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
         } px-5 gap-3 text-[13px]`}
       >
@@ -807,7 +808,7 @@ export default function Layout({ children }) {
     return (
       <button
         onClick={toggle}
-        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors border-b border-slate-100 dark:border-slate-800 text-[13px] ${
+        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-[13px] ${
           isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
         }`}
         data-testid={testId}
@@ -1306,9 +1307,9 @@ export default function Layout({ children }) {
         <main className={`flex-1 min-w-0 transition-all duration-300 ${
           sidebarOpen ? 'md:ml-[225px]' : 'md:ml-16'
         } mt-14 md:mt-12 pb-20 md:pb-0`}>
-          <div className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
+          <PageTransition className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
             {children}
-          </div>
+          </PageTransition>
         </main>
       </div>
 

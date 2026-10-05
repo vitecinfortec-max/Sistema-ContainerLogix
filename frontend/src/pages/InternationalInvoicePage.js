@@ -1099,7 +1099,7 @@ export default function InternationalInvoicePage() {
                 <div>
                   <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Itens</h4>
                   <div className="border rounded overflow-hidden">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm rows-in">
                       <thead className="bg-slate-100 dark:bg-slate-700">
                         <tr>
                           <th className="text-left p-2">Descrição</th>

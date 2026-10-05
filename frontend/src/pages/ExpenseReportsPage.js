@@ -713,7 +713,7 @@ export default function ExpenseReportsPage() {
               <div>
                 <h4 className="font-semibold mb-2">Depósitos Recebidos ({selectedReport.deposits?.length || 0})</h4>
                 <div className="border rounded overflow-hidden">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm rows-in">
                     <thead className="bg-muted">
                       <tr>
                         <th className="text-left p-2">Data</th>

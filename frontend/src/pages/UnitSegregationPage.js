@@ -668,7 +668,7 @@ export default function UnitSegregationPage() {
                   <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 border-b">
                     <span className="text-[11px] text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">Containers Segregados</span>
                   </div>
-                  <table className="w-full text-sm">
+                  <table className="w-full text-sm rows-in">
                     <thead>
                       <tr className="border-b bg-slate-50 dark:bg-slate-800">
                         <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">#</th>

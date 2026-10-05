@@ -597,7 +597,7 @@ export default function PortServiceBillingPage() {
                   </div>
                 ) : (
                   <div className="border rounded overflow-hidden">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm rows-in">
                       <thead className="bg-muted">
                         <tr>
                           <th className="text-left p-2">Nº</th>

@@ -3,11 +3,21 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { motion, riseIn, staggerParent, AnimatedNumber, EASE, DURATION } from './Motion';
 
 // Blocos compartilhados das telas de listagem (cabeçalho de filtros,
 // indicadores, card da lista com barra de ações, paginação, selos de status).
 // O visual de todas as telas sai daqui + das classes .data-table do index.css,
 // então um ajuste de estilo feito aqui vale pro sistema inteiro.
+// O mesmo vale pro movimento (components/Motion.jsx): indicadores entram em
+// sequência e contam até o valor, filtros e lista sobem ao aparecer.
+
+// Entrada dos blocos da tela, um logo depois do outro (ordem de leitura)
+const blockIn = (delay) => ({
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: DURATION.base, ease: EASE, delay },
+});
 
 const SOFT_TONES = {
   primary: 'bg-primary/10 text-primary',
@@ -34,7 +44,12 @@ const SURFACE = 'rounded-lg border border-slate-200 dark:border-slate-700 bg-car
 /** Indicador numérico (KPI) no topo da tela. */
 export function StatCard({ label, value, icon: Icon, tone = 'primary', hint, testId }) {
   return (
-    <div className={cn(SURFACE, 'p-3 sm:p-4 flex items-center gap-3 min-w-0')} data-testid={testId}>
+    <motion.div
+      variants={riseIn}
+      whileHover={{ y: -2 }}
+      className={cn(SURFACE, 'p-3 sm:p-4 flex items-center gap-3 min-w-0 transition-shadow hover:shadow-[0_6px_16px_-6px_rgba(15,23,42,0.18)]')}
+      data-testid={testId}
+    >
       {Icon && (
         <div className={cn('hidden sm:flex w-10 h-10 rounded-full items-center justify-center shrink-0', SOFT_TONES[tone] || SOFT_TONES.primary)}>
           <Icon className="w-5 h-5" />
@@ -42,15 +57,24 @@ export function StatCard({ label, value, icon: Icon, tone = 'primary', hint, tes
       )}
       <div className="min-w-0">
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{label}</p>
-        <p className="text-xl sm:text-2xl font-semibold leading-tight tabular-nums text-slate-900 dark:text-slate-100 truncate">{value}</p>
+        <p className="text-xl sm:text-2xl font-semibold leading-tight tabular-nums text-slate-900 dark:text-slate-100 truncate"><AnimatedNumber value={value} /></p>
         {hint && <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{hint}</p>}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 export function StatGrid({ children, className }) {
-  return <div className={cn('grid grid-cols-2 lg:grid-cols-4 gap-3', className)}>{children}</div>;
+  return (
+    <motion.div
+      variants={staggerParent(0.05)}
+      initial="hidden"
+      animate="show"
+      className={cn('grid grid-cols-2 lg:grid-cols-4 gap-3', className)}
+    >
+      {children}
+    </motion.div>
+  );
 }
 
 /**
@@ -61,7 +85,7 @@ export function StatGrid({ children, className }) {
  */
 export function FilterCard({ children, hasFilters, onClear, onApply, actions, title = 'Filtros', clearTestId = 'filter-clear-button', applyTestId = 'filter-apply-button', clearLinkTestId = 'clear-all-filters' }) {
   return (
-    <section className={SURFACE}>
+    <motion.section {...blockIn(0.06)} className={SURFACE}>
       <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
         <span className="flex items-center gap-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200">
           <SlidersHorizontal className="w-4 h-4 text-primary" />
@@ -100,7 +124,7 @@ export function FilterCard({ children, hasFilters, onClear, onApply, actions, ti
           </div>
         )}
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -126,7 +150,7 @@ export function SearchInput({ value, onChange, className, ...props }) {
 /** Card da lista: título + contador à esquerda, barra de ações à direita. */
 export function DataCard({ title, count, meta, toolbar, children, footer, className, testId }) {
   return (
-    <section className={cn(SURFACE, 'overflow-hidden', className)} data-testid={testId}>
+    <motion.section {...blockIn(0.12)} className={cn(SURFACE, 'overflow-hidden', className)} data-testid={testId}>
       <div className="flex items-center justify-between gap-3 flex-wrap px-4 py-2.5 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-2 min-w-0">
           <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
@@ -141,7 +165,7 @@ export function DataCard({ title, count, meta, toolbar, children, footer, classN
       </div>
       {children}
       {footer}
-    </section>
+    </motion.section>
   );
 }
 
@@ -239,9 +263,14 @@ export function EmptyState({ icon: Icon, title, hint, testId }) {
   return (
     <div className="px-6 py-14 text-center" data-testid={testId}>
       {Icon && (
-        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+        >
           <Icon className="w-6 h-6 text-slate-400 dark:text-slate-500" />
-        </div>
+        </motion.div>
       )}
       <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{title}</p>
       {hint && <p className="text-xs mt-1 text-slate-400 dark:text-slate-500">{hint}</p>}

@@ -1,5 +1,6 @@
 import { Button } from './ui/button';
 import { RefreshCw, HelpCircle, Plus, Settings, MoreVertical } from 'lucide-react';
+import { Reveal } from './Motion';
 
 function ToolbarIcon({ icon: Icon, onClick, title }) {
   return (
@@ -16,7 +17,7 @@ function ToolbarIcon({ icon: Icon, onClick, title }) {
  */
 export default function PageHeader({ title, subtitle, icon: Icon, meta, actions, toolbar }) {
   return (
-    <div className="flex items-center justify-between gap-3 flex-wrap">
+    <Reveal y={6} className="flex items-center justify-between gap-3 flex-wrap">
       <div className="flex items-center gap-3 min-w-0">
         {Icon && (
           <div className="hidden sm:flex w-10 h-10 shrink-0 rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/15 items-center justify-center">
@@ -47,6 +48,6 @@ export default function PageHeader({ title, subtitle, icon: Icon, meta, actions,
           {actions}
         </div>
       )}
-    </div>
+    </Reveal>
   );
 }
