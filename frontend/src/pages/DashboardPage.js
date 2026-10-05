@@ -1,24 +1,24 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
 import {
   ArrowDownCircle, ArrowUpCircle, Container, Package, Plus, Calendar, ArrowRight,
-  FileText, Receipt, Truck, Users, BarChart3, DollarSign, Ship, Building2,
-  ClipboardList, X, Check, Settings2, Trophy, Medal, Award, AlertTriangle, CheckCircle2
+  Receipt, Truck, Users, BarChart3, DollarSign, Ship, Building2,
+  ClipboardList, X, Check, Settings2, Trophy, Medal, Award, AlertTriangle, CheckCircle2,
+  Fuel, Wrench, Clock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useWebSocket } from '../hooks/useWebSocket';
-import {
-  ResponsiveContainer, Tooltip,
-  PieChart, Pie, Cell
-} from 'recharts';
 import { AnimatePresence } from 'motion/react';
-import { motion, Stagger, StaggerItem, AnimatedNumber, riseIn, staggerParent } from '../components/Motion';
+import { motion, Stagger, StaggerItem, AnimatedNumber, riseIn, staggerParent, EASE } from '../components/Motion';
+import { DonutChart, Sparkline, CHART_COLORS, dailyChartData } from '../components/Charts';
+import Stage3D from '../components/three/Stage3D';
+import { yardScene, yardPlan } from '../components/three/yardScene';
 
 const RANK_STYLES = [
   { icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10' },
@@ -26,16 +26,68 @@ const RANK_STYLES = [
   { icon: Award, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-500/10' },
 ];
 
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload || !payload.length) return null;
+const ALERT_TONES = {
+  red: {
+    pill: 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20',
+    dot: 'bg-red-500',
+  },
+  orange: {
+    pill: 'border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-500/10 dark:text-orange-300 dark:hover:bg-orange-500/20',
+    dot: 'bg-orange-500',
+  },
+  amber: {
+    pill: 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20',
+    dot: 'bg-amber-500',
+  },
+};
+
+// Alerta clicável do Dashboard. Os críticos (vermelhos) têm um ponto pulsando
+// pra chamar o olho; a seta aparece ao passar o mouse.
+function AlertPill({ tone, icon: Icon, onClick, testId, children }) {
+  const style = ALERT_TONES[tone];
   return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.dataKey} style={{ color: entry.color }} className="font-medium">
-          {entry.name}: {entry.value}
-        </p>
-      ))}
+    <motion.button
+      type="button"
+      variants={riseIn}
+      whileHover={{ y: -1 }}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`group inline-flex items-center gap-1.5 rounded-full border py-1 pl-2 pr-2.5 text-xs font-semibold transition-colors ${style.pill}`}
+      data-testid={testId}
+    >
+      <span className="relative flex h-2 w-2 shrink-0">
+        {tone === 'red' && <span className={`absolute inline-flex h-full w-full rounded-full opacity-60 animate-ping motion-reduce:animate-none ${style.dot}`} />}
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${style.dot}`} />
+      </span>
+      <Icon className="w-3.5 h-3.5 shrink-0" />
+      <span className="text-left">{children}</span>
+      <ArrowRight className="w-3 h-3 shrink-0 -ml-1 opacity-0 transition-all group-hover:ml-0 group-hover:opacity-100" />
+    </motion.button>
+  );
+}
+
+// Linha da legenda do estoque: quantidade, participação e barra proporcional
+function StockShare({ label, value, share, barClass, dotClass, testId }) {
+  return (
+    <div data-testid={testId}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+          <span className={`w-2.5 h-2.5 rounded-full inline-block ${dotClass}`} />
+          {label}
+        </span>
+        <span className="flex items-baseline gap-1.5">
+          <span className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-200"><AnimatedNumber value={value} /></span>
+          <span className="w-9 text-right text-[11px] tabular-nums text-slate-400 dark:text-slate-500">{share}%</span>
+        </span>
+      </div>
+      <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+        <motion.div
+          className={`h-full rounded-full ${barClass}`}
+          initial={{ width: 0 }}
+          animate={{ width: `${share}%` }}
+          transition={{ duration: 0.8, ease: EASE, delay: 0.3 }}
+        />
+      </div>
     </div>
   );
 }
@@ -43,14 +95,14 @@ function ChartTooltip({ active, payload, label }) {
 const ALL_SHORTCUTS = [
   { id: 'new-movement', label: 'Novo Registro', icon: Plus, path: '/movements/new', color: 'text-primary', bg: 'bg-primary/10' },
   { id: 'movements', label: 'Gate', icon: Container, path: '/movements', color: 'text-slate-600 dark:text-slate-400', bg: 'bg-slate-100 dark:bg-slate-700' },
-  { id: 'report-movements', label: 'Rel. Movimentações', icon: BarChart3, path: '/reports/movements', color: 'text-blue-600', bg: 'bg-blue-50' },
-  { id: 'report-billing', label: 'Rel. Faturamento', icon: DollarSign, path: '/reports/billing', color: 'text-amber-600', bg: 'bg-amber-50' },
-  { id: 'invoices', label: 'Faturas', icon: Receipt, path: '/billing', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { id: 'clients', label: 'Clientes', icon: Users, path: '/clients', color: 'text-violet-600', bg: 'bg-violet-50' },
-  { id: 'drivers', label: 'Motoristas', icon: Truck, path: '/drivers', color: 'text-orange-600', bg: 'bg-orange-50' },
-  { id: 'companies', label: 'Transportadoras', icon: Building2, path: '/companies', color: 'text-cyan-600', bg: 'bg-cyan-50' },
-  { id: 'shipping-lines', label: 'Armadores', icon: Ship, path: '/shipping-lines', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { id: 'service-types', label: 'Tipos de Serviço', icon: ClipboardList, path: '/service-types', color: 'text-pink-600', bg: 'bg-pink-50' },
+  { id: 'report-movements', label: 'Rel. Movimentações', icon: BarChart3, path: '/reports/movements', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+  { id: 'report-billing', label: 'Rel. Faturamento', icon: DollarSign, path: '/reports/billing', color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+  { id: 'invoices', label: 'Faturas', icon: Receipt, path: '/billing', color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+  { id: 'clients', label: 'Clientes', icon: Users, path: '/clients', color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-500/10' },
+  { id: 'drivers', label: 'Motoristas', icon: Truck, path: '/drivers', color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-500/10' },
+  { id: 'companies', label: 'Transportadoras', icon: Building2, path: '/companies', color: 'text-cyan-600', bg: 'bg-cyan-50 dark:bg-cyan-500/10' },
+  { id: 'shipping-lines', label: 'Armadores', icon: Ship, path: '/shipping-lines', color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-500/10' },
+  { id: 'service-types', label: 'Tipos de Serviço', icon: ClipboardList, path: '/service-types', color: 'text-pink-600', bg: 'bg-pink-50 dark:bg-pink-500/10' },
 ];
 
 const DEFAULT_SHORTCUT_IDS = ['new-movement', 'movements', 'report-movements', 'report-billing', 'invoices', 'clients'];
@@ -144,6 +196,16 @@ export default function DashboardPage() {
 
   const currentMonth = format(new Date(), 'MMMM', { locale: ptBR });
   const capitalizedMonth = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
+
+  const dailyTrend = useMemo(() => dailyChartData(stats?.daily_chart), [stats?.daily_chart]);
+  const stockFull = stats?.stock_full || 0;
+  const stockEmpty = stats?.stock_empty || 0;
+  const stockTotal = stockFull + stockEmpty;
+  // Participação em % inteiros que somam 100 (arredondar os dois lados dava 101)
+  const fullShare = stockTotal > 0 ? Math.round((stockFull / stockTotal) * 100) : 0;
+  const emptyShare = stockTotal > 0 ? 100 - fullShare : 0;
+  const yardUnit = yardPlan(stockFull, stockEmpty).unit;
+  const rankingMax = Math.max(1, ...(stats?.driver_ranking || []).map((d) => d.total || 0));
 
   if (loading) {
     return (
@@ -309,7 +371,7 @@ export default function DashboardPage() {
   <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-amber-300 transition-colors" data-testid="stat-exits-today">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center">
                     <ArrowUpCircle className="w-5 h-5 text-amber-500" />
                   </div>
                 </div>
@@ -323,7 +385,7 @@ export default function DashboardPage() {
   <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-emerald-300 transition-colors" data-testid="stat-stock-full">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center">
                     <Package className="w-5 h-5 text-emerald-500" />
                   </div>
                 </div>
@@ -362,14 +424,21 @@ export default function DashboardPage() {
                     <div className="text-3xl font-bold text-slate-800 dark:text-slate-200 tabular-nums"><AnimatedNumber value={stats?.entries_month || 0} /></div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
                   </div>
-                  <ArrowDownCircle className="w-10 h-10 text-primary/20" />
+                  {dailyTrend.length > 1 ? (
+                    <div className="text-right" data-testid="entries-trend">
+                      <Sparkline data={dailyTrend} dataKey="entries" name="Entradas" color={CHART_COLORS.primary} className="h-12 w-32 sm:w-44" />
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
+                    </div>
+                  ) : (
+                    <ArrowDownCircle className="w-10 h-10 text-primary/20" />
+                  )}
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
           <motion.div variants={riseIn}>
-  <Card className="border border-amber-200 shadow-none" data-testid="stat-exits-month">
+  <Card className="border border-amber-200 dark:border-amber-500/30 shadow-none" data-testid="stat-exits-month">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Calendar className="w-4 h-4 text-amber-600" />
@@ -380,7 +449,14 @@ export default function DashboardPage() {
                     <div className="text-3xl font-bold text-slate-800 dark:text-slate-200 tabular-nums"><AnimatedNumber value={stats?.exits_month || 0} /></div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{capitalizedMonth}</p>
                   </div>
-                  <ArrowUpCircle className="w-10 h-10 text-amber-500/20" />
+                  {dailyTrend.length > 1 ? (
+                    <div className="text-right" data-testid="exits-trend">
+                      <Sparkline data={dailyTrend} dataKey="exits" name="Saídas" color={CHART_COLORS.amber} className="h-12 w-32 sm:w-44" />
+                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
+                    </div>
+                  ) : (
+                    <ArrowUpCircle className="w-10 h-10 text-amber-500/20" />
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -398,62 +474,38 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="p-4">
             {(alerts.over_30 + alerts.over_60 + alerts.over_90 + alerts.maintenance_due_soon + alerts.maintenance_overdue) > 0 || alerts.tank_low ? (
-              <div className="flex flex-wrap gap-2">
+              <motion.div variants={staggerParent(0.05)} initial="hidden" animate="show" className="flex flex-wrap gap-2">
                 {alerts.tank_low && (
-                  <button
-                    onClick={() => navigate('/fleet/nivel-tanque')}
-                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-                    data-testid="alert-tank-low"
-                  >
+                  <AlertPill tone="red" icon={Fuel} onClick={() => navigate('/fleet/nivel-tanque')} testId="alert-tank-low">
                     Tanque de combustível abaixo do mínimo
-                  </button>
+                  </AlertPill>
                 )}
                 {alerts.maintenance_overdue > 0 && (
-                  <button
-                    onClick={() => navigate('/fleet/hodometro')}
-                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-                    data-testid="alert-maintenance-overdue"
-                  >
+                  <AlertPill tone="red" icon={Wrench} onClick={() => navigate('/fleet/hodometro')} testId="alert-maintenance-overdue">
                     {alerts.maintenance_overdue} veículo{alerts.maintenance_overdue > 1 ? 's' : ''} com manutenção vencida
-                  </button>
+                  </AlertPill>
                 )}
                 {alerts.maintenance_due_soon > 0 && (
-                  <button
-                    onClick={() => navigate('/fleet/hodometro')}
-                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
-                    data-testid="alert-maintenance-due-soon"
-                  >
+                  <AlertPill tone="amber" icon={Wrench} onClick={() => navigate('/fleet/hodometro')} testId="alert-maintenance-due-soon">
                     {alerts.maintenance_due_soon} veículo{alerts.maintenance_due_soon > 1 ? 's' : ''} com manutenção próxima
-                  </button>
+                  </AlertPill>
                 )}
                 {alerts.over_30 > 0 && (
-                  <button
-                    onClick={() => navigate('/yard-control?min_days=31')}
-                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
-                    data-testid="alert-over-30"
-                  >
+                  <AlertPill tone="amber" icon={Clock} onClick={() => navigate('/yard-control?min_days=31')} testId="alert-over-30">
                     {alerts.over_30} container{alerts.over_30 > 1 ? 's' : ''} há mais de 30 dias no pátio
-                  </button>
+                  </AlertPill>
                 )}
                 {alerts.over_60 > 0 && (
-                  <button
-                    onClick={() => navigate('/yard-control?min_days=61')}
-                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors"
-                    data-testid="alert-over-60"
-                  >
+                  <AlertPill tone="orange" icon={Clock} onClick={() => navigate('/yard-control?min_days=61')} testId="alert-over-60">
                     {alerts.over_60} container{alerts.over_60 > 1 ? 's' : ''} há mais de 60 dias no pátio
-                  </button>
+                  </AlertPill>
                 )}
                 {alerts.over_90 > 0 && (
-                  <button
-                    onClick={() => navigate('/yard-control?min_days=91')}
-                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
-                    data-testid="alert-over-90"
-                  >
+                  <AlertPill tone="red" icon={Clock} onClick={() => navigate('/yard-control?min_days=91')} testId="alert-over-90">
                     {alerts.over_90} container{alerts.over_90 > 1 ? 's' : ''} há mais de 90 dias no pátio
-                  </button>
+                  </AlertPill>
                 )}
-              </div>
+              </motion.div>
             ) : (
               <div className="p-4 text-center text-slate-400 dark:text-slate-500">
                 <CheckCircle2 className="w-10 h-10 mx-auto mb-2 opacity-40" />
@@ -493,6 +545,18 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{driver.driver_name}</p>
+                          {/* Entradas + saídas, na proporção do primeiro colocado */}
+                          <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                            <motion.div
+                              className="flex h-full rounded-full overflow-hidden"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${((driver.total || 0) / rankingMax) * 100}%` }}
+                              transition={{ duration: 0.7, ease: EASE, delay: 0.25 + Math.min(idx, 10) * 0.05 }}
+                            >
+                              <span className="h-full bg-primary" style={{ flexGrow: driver.entries || 0 }} />
+                              <span className="h-full bg-amber-500" style={{ flexGrow: driver.exits || 0 }} />
+                            </motion.div>
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 text-xs flex-shrink-0">
                           <span className="flex items-center gap-1 text-primary" title="Entradas">
@@ -503,7 +567,7 @@ export default function DashboardPage() {
                             <ArrowUpCircle className="w-3.5 h-3.5" />
                             {driver.exits}
                           </span>
-                          <span className="font-semibold text-slate-700 dark:text-slate-300 w-6 text-right">{driver.total}</span>
+                          <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-300 w-6 text-right">{driver.total}</span>
                         </div>
                       </div>
                     );
@@ -518,62 +582,53 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="stock-distribution-card">
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none flex flex-col" data-testid="stock-distribution-card">
             <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-emerald-500" />
                 <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Estoque Atual no Pátio</CardTitle>
               </div>
             </CardHeader>
-            <CardContent className="p-4">
-              {(stats?.stock_full || 0) + (stats?.stock_empty || 0) > 0 ? (
-                <div className="flex items-center gap-4">
-                  <div className="h-52 w-1/2" data-testid="stock-distribution-chart">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
+            <CardContent className="p-4 flex-1 flex items-center">
+              {stockTotal > 0 ? (
+                <div className="w-full flex flex-col sm:flex-row sm:items-center gap-4">
+                  {/* Mini-pátio 3D; sem WebGL entra a rosca no lugar */}
+                  <div className="h-60 sm:h-72 w-full sm:w-[60%] shrink-0" data-testid="stock-distribution-chart">
+                    <Stage3D
+                      scene={yardScene}
+                      params={{ full: stockFull, empty: stockEmpty }}
+                      className="h-full w-full"
+                      ariaLabel={`Pátio com ${stockFull} contêineres cheios e ${stockEmpty} vazios`}
+                      testId="stock-yard-3d"
+                      fallback={(
+                        <DonutChart
+                          className="h-full"
                           data={[
-                            { name: 'Cheios', value: stats?.stock_full || 0 },
-                            { name: 'Vazios', value: stats?.stock_empty || 0 },
+                            { name: 'Cheios', value: stockFull, color: CHART_COLORS.emerald },
+                            { name: 'Vazios', value: stockEmpty, color: CHART_COLORS.slate },
                           ]}
-                          dataKey="value"
-                          nameKey="name"
-                          innerRadius={45}
-                          outerRadius={75}
-                          paddingAngle={3}
-                        >
-                          <Cell fill="#10b981" />
-                          <Cell fill="#94a3b8" />
-                        </Pie>
-                        <Tooltip content={<ChartTooltip />} />
-                      </PieChart>
-                    </ResponsiveContainer>
+                        />
+                      )}
+                    />
                   </div>
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
-                        Cheios
-                      </span>
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{stats?.stock_full || 0}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                        <span className="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block" />
-                        Vazios
-                      </span>
-                      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{stats?.stock_empty || 0}</span>
-                    </div>
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <StockShare label="Cheios" value={stockFull} share={fullShare} barClass="bg-emerald-500" dotClass="bg-emerald-500" testId="stock-share-full" />
+                    <StockShare label="Vazios" value={stockEmpty} share={emptyShare} barClass="bg-slate-400" dotClass="bg-slate-400" testId="stock-share-empty" />
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                       <span className="text-sm text-slate-500 dark:text-slate-400">Total</span>
-                      <span className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                        {(stats?.stock_full || 0) + (stats?.stock_empty || 0)}
+                      <span className="text-lg font-bold tabular-nums text-slate-800 dark:text-slate-200" data-testid="stock-total">
+                        <AnimatedNumber value={stockTotal} />
                       </span>
                     </div>
+                    {yardUnit > 1 && (
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                        No modelo, cada contêiner representa {yardUnit} unidades.
+                      </p>
+                    )}
                   </div>
                 </div>
               ) : (
-                <div className="p-8 text-center text-slate-400 dark:text-slate-500">
+                <div className="w-full p-8 text-center text-slate-400 dark:text-slate-500">
                   <Package className="w-10 h-10 mx-auto mb-3 opacity-40" />
                   <p className="text-sm">Nenhum container em estoque</p>
                 </div>

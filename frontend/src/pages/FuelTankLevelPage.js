@@ -12,6 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { sanitizeKmInput } from '../lib/utils';
+import { motion, AnimatedNumber, EASE } from '../components/Motion';
+import Stage3D from '../components/three/Stage3D';
+import { tankScene } from '../components/three/tankScene';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Droplet, Plus, Trash2, Settings } from 'lucide-react';
@@ -19,6 +22,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const fmtLiters = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
+
+const fmtPercent = (v) => `${Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
 
 const fmtDate = (d) => {
   if (!d) return '-';
@@ -141,10 +146,16 @@ export default function FuelTankLevelPage() {
     });
   };
 
-  const barColor = level?.status === 'LOW' ? 'bg-red-500' : 'bg-primary';
-  const badge = level?.status === 'LOW'
+  const isLow = level?.status === 'LOW';
+  const badge = isLow
     ? { label: 'Nível baixo', tone: 'red' }
     : { label: 'Nível OK', tone: 'emerald' };
+  const capacity = Number(level?.capacity_liters) || 0;
+  const current = Number(level?.current_liters) || 0;
+  // Frações de 0 a 1 pro medidor (o saldo pode passar da capacidade ou ficar
+  // negativo se os lançamentos não baterem; o desenho não sai do tanque)
+  const fillFraction = capacity > 0 ? Math.min(1, Math.max(0, current / capacity)) : 0;
+  const minFraction = capacity > 0 ? Math.min(1, Math.max(0, (Number(level?.minimum_alert_liters) || 0) / capacity)) : 0;
 
   return (
     <Layout>
@@ -158,9 +169,11 @@ export default function FuelTankLevelPage() {
         {/* Medidor */}
         <DataCard
           title="Medidor"
-          meta={level?.configured && !loadingLevel ? <StatusPill tone={badge.tone}>{badge.label}</StatusPill> : null}
+          meta={level?.configured ? <StatusPill tone={badge.tone}>{badge.label}</StatusPill> : null}
         >
-          {loadingLevel ? (
+          {/* "Carregando" só na primeira leitura: nas seguintes (depois de um
+              reabastecimento) o medidor fica na tela e anima até o novo nível */}
+          {loadingLevel && !level ? (
             <EmptyState title="Carregando..." />
           ) : !level?.configured ? (
             <div className="px-6 py-10 text-center">
@@ -174,30 +187,67 @@ export default function FuelTankLevelPage() {
               </Link>
             </div>
           ) : (
-            <div className="p-5 space-y-3">
-              <div className="flex items-end justify-between gap-3 flex-wrap">
-                <div>
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Disponível agora</p>
-                  <span className="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{fmtLiters(level.current_liters)}</span>
-                  <span className="text-sm text-slate-400 dark:text-slate-500 tabular-nums"> / {fmtLiters(level.capacity_liters)}</span>
+            <div className="p-5 flex flex-col md:flex-row md:items-center gap-5">
+              {/* Modelo 3D do tanque; sem WebGL fica só a leitura ao lado */}
+              <Stage3D
+                scene={tankScene}
+                params={{ fraction: fillFraction, minFraction, low: isLow }}
+                className="h-56 sm:h-72 w-full md:w-[56%] shrink-0"
+                ariaLabel={`Tanque de combustível com ${fmtPercent(level.percentage)} da capacidade`}
+                testId="tank-3d"
+              />
+              <div className="flex-1 min-w-0 w-full space-y-4">
+                <div className="flex items-end justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Disponível agora</p>
+                    <span className="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100" data-testid="tank-current-liters">
+                      <AnimatedNumber value={fmtLiters(level.current_liters)} />
+                    </span>
+                  </div>
+                  <span className={`text-2xl font-semibold tabular-nums ${isLow ? 'text-red-600 dark:text-red-400' : 'text-primary'}`} data-testid="tank-percentage">
+                    <AnimatedNumber value={fmtPercent(level.percentage)} />
+                  </span>
                 </div>
-                <span className="text-2xl font-semibold tabular-nums text-slate-700 dark:text-slate-200">{level.percentage}%</span>
+                <div>
+                  <div className="relative w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800">
+                    <motion.div
+                      className={`h-full rounded-full bg-gradient-to-r ${isLow ? 'from-red-400 to-red-500' : 'from-primary/70 to-primary'}`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${fillFraction * 100}%` }}
+                      transition={{ duration: 0.9, ease: EASE, delay: 0.25 }}
+                    />
+                    {minFraction > 0 && (
+                      // Marca do alerta mínimo em cima da barra
+                      <div
+                        className="absolute -top-1 -bottom-1 w-0.5 rounded-full bg-red-500"
+                        style={{ left: `${minFraction * 100}%` }}
+                        title="Alerta mínimo"
+                      />
+                    )}
+                  </div>
+                  <div className="flex justify-between mt-1.5 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+                    <span>0 L</span>
+                    <span>{fmtLiters(level.capacity_liters)}</span>
+                  </div>
+                </div>
+                <dl className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <div className="min-w-0">
+                    <dt className="text-[11px] text-slate-500 dark:text-slate-400">Capacidade</dt>
+                    <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate">{fmtLiters(level.capacity_liters)}</dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] text-slate-500 dark:text-slate-400">Espaço livre</dt>
+                    <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate">{fmtLiters(Math.max(0, capacity - current))}</dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                      <span className="inline-block w-2.5 h-0.5 rounded-full bg-red-500 shrink-0" />
+                      Alerta mínimo
+                    </dt>
+                    <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate">{fmtLiters(level.minimum_alert_liters)}</dd>
+                  </div>
+                </dl>
               </div>
-              <div className="relative w-full h-6 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                <div className={`h-full ${barColor} transition-all`} style={{ width: `${level.percentage}%` }} />
-                {level.capacity_liters > 0 && (
-                  // Marca do alerta mínimo em cima da barra
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-red-500/70"
-                    style={{ left: `${Math.min(100, (level.minimum_alert_liters / level.capacity_liters) * 100)}%` }}
-                    title="Alerta mínimo"
-                  />
-                )}
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <span className="inline-block w-2.5 h-0.5 bg-red-500/70" />
-                Alerta mínimo: <span className="tabular-nums font-medium text-slate-700 dark:text-slate-200">{fmtLiters(level.minimum_alert_liters)}</span>
-              </p>
             </div>
           )}
         </DataCard>

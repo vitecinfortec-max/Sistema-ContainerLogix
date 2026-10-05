@@ -10,10 +10,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { FileText, FileSpreadsheet, BarChart3, ClipboardList, Wallet, Gauge, Clock } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-} from 'recharts';
+import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
 const STATUS_OPTIONS = [
   ['ABERTO', 'Aberto'],
@@ -24,19 +21,9 @@ const STATUS_OPTIONS = [
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload || !payload.length) return null;
-  return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.dataKey} style={{ color: entry.color }} className="font-medium">
-          {entry.name}: {fmtMoney(entry.value)}
-        </p>
-      ))}
-    </div>
-  );
-}
+const DAILY_SERIES = [
+  { key: 'total_value', name: 'Valor de Serviços', color: CHART_COLORS.primary },
+];
 
 export default function ReportsServiceOrdersPage() {
   const [dateFrom, setDateFrom] = useState('');
@@ -236,20 +223,13 @@ export default function ReportsServiceOrdersPage() {
         >
           <div className="p-4">
             {dailyChart.some((d) => d.total_value > 0) ? (
-              <div className="h-72 w-full" data-testid="daily-service-orders-chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dailyChart.map(d => ({
-                    ...d,
-                    label: format(new Date(d.date + 'T00:00:00'), 'dd/MM', { locale: ptBR })
-                  }))} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100 dark:stroke-slate-800" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
-                    <Bar dataKey="total_value" name="Valor de Serviços" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <BarsChart
+                testId="daily-service-orders-chart"
+                data={dailyChartData(dailyChart)}
+                series={DAILY_SERIES}
+                valueFormat={fmtMoney}
+                allowDecimals
+              />
             ) : (
               <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
             )}

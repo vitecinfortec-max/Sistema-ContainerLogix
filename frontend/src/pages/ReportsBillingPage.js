@@ -9,26 +9,14 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { FileText, FileSpreadsheet, X, BarChart3 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-} from 'recharts';
+import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload || !payload.length) return null;
-  const formatCurrency = (value) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.dataKey} style={{ color: entry.color }} className="font-medium">
-          {entry.name}: {formatCurrency(entry.value)}
-        </p>
-      ))}
-    </div>
-  );
-}
+const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const DAILY_SERIES = [
+  { key: 'billed', name: 'Faturado', color: CHART_COLORS.primary },
+  { key: 'unbilled', name: 'Não Faturado', color: CHART_COLORS.amber },
+];
 
 export default function ReportsBillingPage() {
   const [filterType, setFilterType] = useState('all');
@@ -403,22 +391,13 @@ export default function ReportsBillingPage() {
         >
           <div className="p-4">
             {dailyChart.length > 0 ? (
-              <div className="h-72 w-full" data-testid="daily-billing-chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dailyChart.map(d => ({
-                    ...d,
-                    label: format(new Date(d.date + 'T00:00:00'), 'dd/MM', { locale: ptBR })
-                  }))} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100 dark:stroke-slate-800" />
-                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="billed" name="Faturado" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={28} />
-                    <Bar dataKey="unbilled" name="Não Faturado" fill="#f59e0b" radius={[3, 3, 0, 0]} maxBarSize={28} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <BarsChart
+                testId="daily-billing-chart"
+                data={dailyChartData(dailyChart)}
+                series={DAILY_SERIES}
+                valueFormat={fmtMoney}
+                allowDecimals
+              />
             ) : (
               <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
             )}

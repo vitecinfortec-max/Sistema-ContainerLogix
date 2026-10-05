@@ -12,10 +12,7 @@ import {
   ArrowDownCircle, ArrowUpCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-} from 'recharts';
+import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
 const MODELO_OPTIONS = [
   ['INVENTARIO', 'Inventário'],
@@ -43,19 +40,14 @@ const REFERENCE_OPTIONS = [
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtQty = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload || !payload.length) return null;
-  return (
-    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-slate-700 dark:text-slate-300 mb-1">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.dataKey} style={{ color: entry.color }} className="font-medium">
-          {entry.name}: {fmtMoney(entry.value)}
-        </p>
-      ))}
-    </div>
-  );
-}
+const WAREHOUSE_SERIES = [
+  { key: 'total_value', name: 'Valor em Estoque', color: CHART_COLORS.primary },
+];
+
+const LEDGER_DAILY_SERIES = [
+  { key: 'entrada_value', name: 'Entradas', color: CHART_COLORS.primary },
+  { key: 'saida_value', name: 'Saídas', color: CHART_COLORS.amber },
+];
 
 export default function StockReportPage() {
   const [modelo, setModelo] = useState('INVENTARIO');
@@ -382,17 +374,15 @@ export default function StockReportPage() {
           >
             <div className="p-4">
               {byWarehouseChart.some((d) => d.total_value > 0) ? (
-                <div className="h-72 w-full" data-testid="stock-by-warehouse-chart">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={byWarehouseChart} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100 dark:stroke-slate-800" />
-                      <XAxis dataKey="warehouse_name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
-                      <Bar dataKey="total_value" name="Valor em Estoque" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={40} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <BarsChart
+                  testId="stock-by-warehouse-chart"
+                  data={byWarehouseChart}
+                  xKey="warehouse_name"
+                  series={WAREHOUSE_SERIES}
+                  valueFormat={fmtMoney}
+                  allowDecimals
+                  maxBarSize={40}
+                />
               ) : (
                 <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
               )}
@@ -406,22 +396,13 @@ export default function StockReportPage() {
           >
             <div className="p-4">
               {dailyChart.some((d) => d.entrada_value > 0 || d.saida_value > 0) ? (
-                <div className="h-72 w-full" data-testid="stock-ledger-daily-chart">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dailyChart.map(d => ({
-                      ...d,
-                      label: format(new Date(d.date + 'T00:00:00'), 'dd/MM', { locale: ptBR })
-                    }))} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100 dark:stroke-slate-800" />
-                      <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={{ stroke: '#e2e8f0' }} tickLine={false} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }} />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <Bar dataKey="entrada_value" name="Entradas" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} maxBarSize={28} />
-                      <Bar dataKey="saida_value" name="Saídas" fill="#f59e0b" radius={[3, 3, 0, 0]} maxBarSize={28} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <BarsChart
+                  testId="stock-ledger-daily-chart"
+                  data={dailyChartData(dailyChart)}
+                  series={LEDGER_DAILY_SERIES}
+                  valueFormat={fmtMoney}
+                  allowDecimals
+                />
               ) : (
                 <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
               )}
