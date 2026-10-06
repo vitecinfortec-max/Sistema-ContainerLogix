@@ -322,6 +322,12 @@
     position: relative !important;
   }
   
+  /* Via no visual padrão dos PDFs (components/PrintDocument.jsx): mesmas
+     margens do comprovante gerado no servidor */
+  .via-section.print-doc {
+    padding: 10mm 12mm !important;
+  }
+
   /* Última via não precisa de quebra de página após */
   .via-section:last-child {
     page-break-after: auto !important;

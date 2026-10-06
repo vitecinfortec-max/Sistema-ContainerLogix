@@ -12,6 +12,9 @@ import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
 import { DAMAGE_LABELS } from '../components/ContainerPhotoUpload';
 import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings';
+import {
+  PRINT_COLORS, PrintHeader, PrintSection, PrintFieldGrid, PrintField, PrintSignatures, PrintClosing,
+} from '../components/PrintDocument';
 
 // Função para gerar código de barras como imagem base64
 function generateBarcodeImage(value) {
@@ -100,393 +103,127 @@ export default function MovementDetailPage() {
     }
   };
 
-  // Componente de Via para impressão - Layout compacto para caber em A4
-  const ViaSection = ({ viaType }) => (
-    <div className="via-section" style={{
-      width: '210mm',
-      height: '297mm',
-      maxHeight: '297mm',
-      padding: '8mm 12mm',
-      fontFamily: 'Arial, sans-serif',
-      backgroundColor: '#fff',
-      boxSizing: 'border-box',
-      overflow: 'hidden',
-      pageBreakAfter: 'always',
-      pageBreakInside: 'avoid'
-    }}>
-      {/* HEADER: Logo + dados completos da empresa - mesmo padrão do PDF gerado
-          pelo backend (_build_pdf_header em reports.py), pra ficar igual
-          independente de vir do "Baixar PDF" ou da impressão direto da tela. */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: '10px',
-        gap: '14px'
+  // Via impressa do comprovante (abre sozinha ao emitir a EIR e no botão
+  // "Imprimir"). É o mesmo documento do "Baixar PDF" da lista, gerado no
+  // servidor por generate_movement_voucher_pdf (backend/reports.py): mesmos
+  // quadros, campos, ordem e regras - mudou lá, mudar aqui. Uma página A4 por via.
+  const ViaSection = ({ viaLabel }) => {
+    const damages = movement.container_damages || [];
+    const photos = movement.container_photos;
+    const isEntry = movement.operation_type === 'ENTRADA';
+    const ROW_GAP = '10pt'; // distância entre as linhas de campos, medida no PDF do servidor
+    const CLOSE_TO_TITLE = { marginTop: '-3pt' }; // quadro sem linhas de campos: texto logo abaixo do título
+    return (
+      <div className="via-section print-doc" style={{
+        width: '210mm',
+        height: '297mm',
+        maxHeight: '297mm',
+        padding: '10mm 12mm',
+        fontFamily: 'Helvetica, Arial, sans-serif',
+        backgroundColor: '#fff',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+        pageBreakAfter: 'always',
+        pageBreakInside: 'avoid'
       }}>
-        <img
-          src={getCompanyLogoUrl(company)}
-          alt={company.name}
-          style={{ maxHeight: '46px', maxWidth: '46px', width: 'auto', height: 'auto', objectFit: 'contain' }}
+        <PrintHeader
+          company={company}
+          logoUrl={getCompanyLogoUrl(company)}
+          title="Comprovante de Movimentação"
+          subtitle={`ID Transação #${movement.transaction_id}  ·  ${viaLabel}`}
         />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#000' }}>
-            {company.name}
-          </div>
-          <div style={{ fontSize: '9px', color: '#000' }}>CNPJ: {company.cnpj}</div>
-          {(company.address || '').split('\n').filter(Boolean).map((line, i) => (
-            <div key={i} style={{ fontSize: '9px', color: '#000' }}>{line.trim()}</div>
-          ))}
-          <div style={{ fontSize: '9px', color: '#000' }}>{company.email} | {company.phone}</div>
-        </div>
-      </div>
 
-      {/* TÍTULO: Fundo branco com borda */}
-      <div style={{ 
-        backgroundColor: '#fff', 
-        border: '2px solid #000',
-        padding: '8px 15px', 
-        borderRadius: '4px', 
-        textAlign: 'center', 
-        marginBottom: '10px'
-      }}>
-        <div style={{ 
-          fontSize: '14px', 
-          fontWeight: 'bold', 
-          color: '#000',
-          letterSpacing: '1px'
-        }}>
-          COMPROVANTE DE MOVIMENTAÇÃO DE CONTÊINER
-        </div>
-        <div style={{ 
-          fontSize: '12px', 
-          color: '#000',
-          marginTop: '3px'
-        }}>
-          ID Transação: #{movement.transaction_id} {viaType && `- ${viaType}`}
-        </div>
-      </div>
+        <PrintSection title="Informações da Operação">
+          <PrintFieldGrid fields={[
+            ['ID Transação', `#${movement.transaction_id}`],
+            ['Tipo de Operação', <span style={{ color: isEntry ? PRINT_COLORS.primary : '#B45309' }}>{movement.operation_type}</span>],
+            ['Status', movement.status],
+            ['Data/Hora', format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm')],
+          ]} />
+        </PrintSection>
 
-      {/* BOX 1: Informações da Operação - 4 colunas */}
-      <div style={{ 
-        border: '1px solid #000', 
-        borderRadius: '4px', 
-        marginBottom: '8px',
-        overflow: 'hidden'
-      }}>
-        <div style={{ 
-          backgroundColor: '#fff', 
-          padding: '5px 10px', 
-          borderBottom: '1px solid #000'
-        }}>
-          <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>
-            Informações da Operação
-          </span>
-        </div>
-        <div style={{ padding: '8px 10px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px' }}>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>ID Transação</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>#{movement.transaction_id}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Tipo de Operação</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.operation_type}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Status</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.status}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Data/Hora</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>
-                {format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm')}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+        <PrintSection title="Informações do Veículo e Motorista">
+          <PrintFieldGrid columns={3} rowGap={ROW_GAP} fields={[
+            ['Motorista', movement.driver_name],
+            ['CPF', movement.driver_cpf],
+            ['Transportadora', movement.transport_company],
+          ]} />
+          <div style={{ height: ROW_GAP }} />
+          <PrintFieldGrid columns={2} fields={[
+            ['Placa Cavalo', movement.truck_plate],
+            ['Placa Carreta', movement.trailer_plate_1],
+          ]} />
+        </PrintSection>
 
-      {/* BOX 2: Informações do Veículo e Motorista - 3 colunas, 2 linhas */}
-      <div style={{ 
-        border: '1px solid #000', 
-        borderRadius: '4px', 
-        marginBottom: '8px',
-        overflow: 'hidden'
-      }}>
-        <div style={{ 
-          backgroundColor: '#fff', 
-          padding: '5px 10px', 
-          borderBottom: '1px solid #000'
-        }}>
-          <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>
-            Informações do Veículo e Motorista
-          </span>
-        </div>
-        <div style={{ padding: '8px 10px' }}>
-          {/* Linha 1: Motorista | CPF | Transportadora */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '1fr 1fr 1fr', 
-            gap: '10px',
-            marginBottom: '8px',
-            paddingBottom: '8px',
-            borderBottom: '1px solid #ddd'
-          }}>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Motorista</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.driver_name}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>CPF</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.driver_cpf}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Transportadora</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.transport_company}</div>
-            </div>
-          </div>
-          {/* Linha 2: Placa Cavalo | Placa Carreta */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Placa Cavalo</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.truck_plate}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Placa Carreta</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.trailer_plate_1}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+        <PrintSection title="Informações do Contêiner">
+          <PrintFieldGrid rowGap={ROW_GAP} fields={[
+            ['Número Container', movement.container_number],
+            ['Tamanho/Tipo', movement.size_type],
+            ['Armador', movement.shipping_line],
+            ['Tara', movement.tare],
+            ['Lacre', movement.seal],
+            ['Genset', movement.genset],
+            ['Booking', movement.booking],
+            ['Tipo de Serviço', movement.service_type],
+          ]} />
+          <div style={{ height: ROW_GAP }} />
+          <PrintFieldGrid columns={3} fields={[
+            ['Nota Fiscal', movement.invoice_number],
+            ['Cliente', movement.client_name],
+            ['Terminal de Origem', movement.origin_terminal],
+          ]} />
+        </PrintSection>
 
-      {/* BOX 3: Informações do Contêiner - 4 colunas, 3 linhas */}
-      <div style={{ 
-        border: '1px solid #000', 
-        borderRadius: '4px', 
-        marginBottom: '8px',
-        overflow: 'hidden'
-      }}>
-        <div style={{ 
-          backgroundColor: '#fff', 
-          padding: '5px 10px', 
-          borderBottom: '1px solid #000'
-        }}>
-          <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>
-            Informações do Contêiner
-          </span>
-        </div>
-        <div style={{ padding: '8px 10px' }}>
-          {/* Linha 1: Nº Container | Tamanho/Tipo | Armador | Tara */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '1fr 1fr 1fr 1fr', 
-            gap: '10px',
-            marginBottom: '8px',
-            paddingBottom: '8px',
-            borderBottom: '1px solid #ddd'
-          }}>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Nº Container</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.container_number}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Tamanho/Tipo</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.size_type}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Armador</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.shipping_line}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Tara</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.tare || '-'}</div>
-            </div>
-          </div>
-          {/* Linha 2: Lacre | Genset | Booking | Tipo de Serviço */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: '1fr 1fr 1fr 1fr', 
-            gap: '10px',
-            marginBottom: '8px',
-            paddingBottom: '8px',
-            borderBottom: '1px solid #ddd'
-          }}>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Lacre</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.seal || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Genset</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.genset || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Booking</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.booking || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Tipo de Serviço</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.service_type || '-'}</div>
-            </div>
-          </div>
-          {/* Linha 3: Nota Fiscal | Cliente | Terminal de Origem */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Nota Fiscal</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.invoice_number || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Cliente</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.client_name || '-'}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Terminal de Origem</div>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>{movement.origin_terminal || '-'}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* BOX 4: Observações - Exibir apenas se houver */}
-      {movement.observations && (
-        <div style={{ 
-          border: '1px solid #000', 
-          borderRadius: '4px', 
-          marginBottom: '8px',
-          overflow: 'hidden'
-        }}>
-          <div style={{ 
-            backgroundColor: '#fff', 
-            padding: '5px 10px', 
-            borderBottom: '1px solid #000'
-          }}>
-            <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>
-              Observações
-            </span>
-          </div>
-          <div style={{ padding: '8px 10px' }}>
-            <div style={{ fontSize: '11px', color: '#000', whiteSpace: 'pre-wrap' }}>
+        {movement.observations && (
+          <PrintSection title="Observações">
+            <div style={{ ...CLOSE_TO_TITLE, fontSize: '9pt', lineHeight: '12pt', color: PRINT_COLORS.text, whiteSpace: 'pre-wrap' }}>
               {movement.observations}
             </div>
-          </div>
-        </div>
-      )}
+          </PrintSection>
+        )}
 
-      {/* BOX 5: Vistoria de Container - Exibir se houver avarias marcadas, fotos anexadas ou observações de vistoria */}
-      {((movement.container_damages && movement.container_damages.length > 0) || movement.container_photos || movement.inspection_notes) && (
-        <div style={{
-          border: '1px solid #000',
-          borderRadius: '4px',
-          marginBottom: '8px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            backgroundColor: '#fff',
-            padding: '5px 10px',
-            borderBottom: '1px solid #000'
-          }}>
-            <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>
-              Vistoria de Container
-            </span>
-          </div>
-          <div style={{ padding: '8px 10px' }}>
-            <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Estado do Container</div>
-            <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000', marginBottom: '6px' }}>
-              {movement.container_damages && movement.container_damages.length > 0
-                ? movement.container_damages.map(d => DAMAGE_LABELS[d] || d).join(', ')
-                : '-'}
+        {/* Só aparece se houver avaria marcada, foto anexada ou observação de vistoria */}
+        {(damages.length > 0 || photos || movement.inspection_notes) && (
+          <PrintSection title="Vistoria de Container">
+            <div style={CLOSE_TO_TITLE}>
+              <PrintField
+                label="Estado do Container"
+                value={damages.length > 0 ? damages.map((d) => DAMAGE_LABELS[d] || d).join(', ') : '-'}
+              />
             </div>
-            {movement.container_photos && (
-              <div style={{ fontSize: '10px', color: '#000', marginBottom: '4px' }}>
-                {Object.keys(movement.container_photos).length} foto(s) do container anexada(s) ao registro digital.
+            {photos && (
+              <div style={{ fontSize: '8pt', lineHeight: '10pt', color: PRINT_COLORS.muted, marginTop: '4pt' }}>
+                {Object.keys(photos).length} foto(s) do container anexada(s) ao registro digital.
               </div>
             )}
             {movement.inspection_notes && (
-              <div>
-                <div style={{ fontSize: '9px', color: '#000', marginBottom: '2px' }}>Observações da Vistoria</div>
-                <div style={{ fontSize: '10px', color: '#000', whiteSpace: 'pre-wrap' }}>{movement.inspection_notes}</div>
+              <div style={{ marginTop: '4pt', whiteSpace: 'pre-wrap' }}>
+                <PrintField label="Observações da Vistoria" value={movement.inspection_notes} />
               </div>
             )}
-          </div>
-        </div>
-      )}
+          </PrintSection>
+        )}
 
-      {/* ÁREA DE ASSINATURAS */}
-      <div style={{ 
-        border: '1px solid #000', 
-        borderRadius: '4px', 
-        padding: '12px 15px',
-        marginBottom: '10px'
-      }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-          {/* Assinatura do Motorista */}
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              fontSize: '11px', 
-              fontWeight: 'bold', 
-              color: '#000',
-              marginBottom: '30px'
-            }}>
-              Assinatura do Motorista
-            </div>
-            <div style={{ borderTop: '1px solid #000', paddingTop: '6px' }}>
-              <div style={{ fontSize: '10px', color: '#000' }}>Nome: {movement.driver_name}</div>
-              <div style={{ fontSize: '10px', color: '#000' }}>CPF: {movement.driver_cpf}</div>
-            </div>
-          </div>
-          {/* Assinatura do Responsável */}
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              fontSize: '11px', 
-              fontWeight: 'bold', 
-              color: '#000',
-              marginBottom: '30px'
-            }}>
-              Assinatura do Responsável
-            </div>
-            <div style={{ borderTop: '1px solid #000', paddingTop: '6px' }}>
-              <div style={{ fontSize: '10px', color: '#000' }}>Nome: {movement.user_name}</div>
-              <div style={{ fontSize: '10px', color: '#000' }}>Data: {format(new Date(), 'dd/MM/yyyy')}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+        <PrintSignatures signers={[
+          ['Assinatura do Motorista', `${movement.driver_name || '-'}  ·  CPF ${movement.driver_cpf || '-'}`],
+          ['Assinatura do Responsável', `${movement.user_name || '-'}  ·  ${format(new Date(), 'dd/MM/yyyy')}`],
+        ]} />
 
-      {/* CÓDIGO DE BARRAS E INFORMAÇÕES */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'flex-start',
-        gap: '15px',
-        marginBottom: '10px',
-        paddingBottom: '10px',
-        borderBottom: '1px solid #000'
-      }}>
-        <div>
-          {barcodeImage && (
-            <img src={barcodeImage} alt="Barcode" style={{ height: '40px', width: 'auto' }} />
-          )}
-          <div style={{ fontSize: '10px', fontWeight: 'bold', textAlign: 'center', marginTop: '2px', color: '#000' }}>
-            {movement.transaction_id}
-          </div>
-        </div>
-        <div>
-          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000', marginBottom: '2px' }}>
-            Usuário: {movement.user_name}
-          </div>
-          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#000' }}>
-            Data e hora da impressão: {format(new Date(), 'dd/MM/yyyy HH:mm')}
-          </div>
-        </div>
+        <div style={{ height: '2pt' }} />
+        <PrintClosing
+          stacked
+          barcodeImage={barcodeImage}
+          code={movement.transaction_id}
+          fields={[
+            ['Usuário', movement.user_name],
+            ['Data e hora da impressão', format(new Date(), 'dd/MM/yyyy HH:mm')],
+          ]}
+          companyName={company.name}
+          note="Este documento é válido como comprovante de movimentação"
+        />
       </div>
-
-      {/* RODAPÉ */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '9px', color: '#000' }}>
-          {company.name} | Este documento é válido como comprovante de movimentação
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -505,8 +242,8 @@ export default function MovementDetailPage() {
       <div className="max-w-5xl mx-auto" data-testid="movement-detail-page">
         {/* ===== ÁREA DE IMPRESSÃO (OCULTA NA TELA) ===== */}
         <div className="print-only">
-          <ViaSection viaType="VIA TERMINAL" />
-          <ViaSection viaType="VIA MOTORISTA" />
+          <ViaSection viaLabel="Via Terminal" />
+          <ViaSection viaLabel="Via Motorista" />
         </div>
 
         {/* ===== CONTEÚDO PARA VISUALIZAÇÃO NA TELA (OCULTO NA IMPRESSÃO) ===== */}

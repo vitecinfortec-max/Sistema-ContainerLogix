@@ -1,7 +1,8 @@
 // Peças dos documentos impressos pelo navegador (window.print) no mesmo visual
 // dos PDFs gerados no servidor - espelham os helpers de backend/reports.py:
 // _build_pdf_header (cabeçalho), _voucher_boxed_section/_voucher_field (quadros
-// de campos), _pdf_barcode_block (código de barras) e o rodapé do comprovante.
+// de campos), _pdf_signatures (linhas de assinatura), _pdf_barcode_block (código
+// de barras) e o rodapé do comprovante.
 // Tamanhos em pt, como lá. As cores são as mesmas constantes de lá
 // (PRIMARY_COLOR, BRAND_*) - se mudar uma, mudar a outra.
 //
@@ -86,9 +87,9 @@ export function PrintField({ label, value }) {
 }
 
 /** Grade de campos, `columns` por linha (4 = igual ao comprovante de Registro de Gate). */
-export function PrintFieldGrid({ fields, columns = 4 }) {
+export function PrintFieldGrid({ fields, columns = 4, rowGap = '7pt' }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, columnGap: '10pt', rowGap: '7pt' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, columnGap: '10pt', rowGap }}>
       {fields.map(([label, value]) => <PrintField key={label} label={label} value={value} />)}
     </div>
   );
@@ -149,18 +150,37 @@ export function PrintPhotoGrid({ photos, getLabel, getUrl, columns = 3, imageHei
   );
 }
 
-/** Código de barras + campos de controle ao lado, e a linha de validade do documento embaixo. */
-export function PrintClosing({ barcodeImage, code, fields, companyName, note }) {
+/** Linhas de assinatura lado a lado. `signers`: [[título, linha de apoio], ...]. */
+export function PrintSignatures({ signers, spaceAbove = '34pt' }) {
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: `repeat(${signers.length}, 1fr)`, columnGap: '28pt',
+      paddingTop: '4pt', breakInside: 'avoid', pageBreakInside: 'avoid',
+    }}>
+      {signers.map(([title, sub]) => (
+        <div key={title} style={{ minWidth: 0, textAlign: 'center' }}>
+          <div style={{ height: spaceAbove, borderBottom: `0.8pt solid ${C.text}` }} />
+          <div style={{ fontSize: '8pt', lineHeight: '10pt', fontWeight: 'bold', color: C.dark, paddingTop: '3pt' }}>{title}</div>
+          {sub && <div style={{ fontSize: '7pt', lineHeight: '9pt', color: C.muted }}>{sub}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Código de barras + campos de controle ao lado, e a linha de validade do documento embaixo.
+ *  `stacked`: campos um embaixo do outro (como no comprovante de Registro de Gate). */
+export function PrintClosing({ barcodeImage, code, fields, companyName, note, stacked = false }) {
   return (
     <div style={{ marginTop: '10pt', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16pt' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: stacked ? '14pt' : '16pt' }}>
         {barcodeImage && (
-          <div style={{ textAlign: 'center', flexShrink: 0 }}>
-            <img src={barcodeImage} alt="Código de Barras" style={{ height: '38px', width: 'auto', display: 'block' }} />
+          <div style={{ textAlign: 'center', flexShrink: 0, width: stacked ? '110pt' : undefined }}>
+            <img src={barcodeImage} alt="Código de Barras" style={{ height: '38px', width: 'auto', display: 'block', margin: stacked ? '0 auto' : undefined }} />
             <div style={{ fontSize: '8pt', fontWeight: 'bold', color: C.dark, marginTop: '1pt', letterSpacing: '0.5pt' }}>{code}</div>
           </div>
         )}
-        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${fields.length}, 1fr)`, columnGap: '10pt' }}>
+        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: `repeat(${stacked ? 1 : fields.length}, 1fr)`, columnGap: '10pt', rowGap: '3pt' }}>
           {fields.map(([label, value]) => (
             <div key={label} style={{ minWidth: 0 }}>
               <div style={{ fontSize: '7pt', lineHeight: '9pt', color: C.muted, textTransform: 'uppercase' }}>{label}</div>
