@@ -47,7 +47,7 @@ export default function LoginPage() {
       >
         <LoginScene3D />
         {/* Véu escuro em cima e embaixo pra marca e o texto ficarem legíveis sobre a cena */}
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent from-50% to-[#032a27] to-[86%]" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent from-[56%] to-[#032a27] to-[88%]" />
 
         <motion.div
           variants={staggerParent(0.12, 0.2)}
