@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
-  StatusPill, PlateTag, EmptyState,
+  StatusPill, PlateTag, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -56,6 +56,8 @@ function buildEmpty() {
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+const ITEMS_PER_PAGE = 15;
+
 export default function FuelSupplyOrderPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
@@ -67,6 +69,7 @@ export default function FuelSupplyOrderPage() {
   const [form, setForm] = useState(buildEmpty());
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [currentPage, setCurrentPage] = useState(1);
   const [vehicles, setVehicles] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -76,6 +79,7 @@ export default function FuelSupplyOrderPage() {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    setCurrentPage(1);
     debounceRef.current = setTimeout(() => { loadList(); }, 350);
     return () => debounceRef.current && clearTimeout(debounceRef.current);
   }, [search]);
@@ -189,8 +193,21 @@ export default function FuelSupplyOrderPage() {
     });
   };
 
+  // Paginação: a lista vem inteira da API; a tela mostra uma página por vez.
+  // Se a página atual deixar de existir (ex.: excluiu o último registro dela),
+  // cai na última que existe.
+  const totalPages = Math.max(1, Math.ceil(list.length / ITEMS_PER_PAGE));
+  const page = Math.min(currentPage, totalPages);
+  const pageItems = list.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const goToPage = (next) => {
+    if (next >= 1 && next <= totalPages) {
+      setCurrentPage(next);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const toggleSelectAllOnPage = () => {
-    const pageIds = list.map((o) => o.id);
+    const pageIds = pageItems.map((o) => o.id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -249,6 +266,15 @@ export default function FuelSupplyOrderPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
             </Toolbar>
           )}
+          footer={(
+            <TablePagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={list.length}
+              pageSize={ITEMS_PER_PAGE}
+              onPageChange={goToPage}
+            />
+          )}
         >
           {list.length === 0 && !loading ? (
             <EmptyState
@@ -263,7 +289,7 @@ export default function FuelSupplyOrderPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={list.length > 0 && list.every((o) => selectedIds.has(o.id))}
+                        checked={pageItems.length > 0 && pageItems.every((o) => selectedIds.has(o.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -279,7 +305,7 @@ export default function FuelSupplyOrderPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((o) => (
+                  {pageItems.map((o) => (
                     <tr
                       key={o.id}
                       onClick={() => toggleSelect(o.id)}
