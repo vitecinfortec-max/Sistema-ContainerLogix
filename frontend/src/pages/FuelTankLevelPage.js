@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+  DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -43,6 +43,8 @@ function createEmptyForm() {
   };
 }
 
+const ITEMS_PER_PAGE = 15;
+
 export default function FuelTankLevelPage() {
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -52,6 +54,8 @@ export default function FuelTankLevelPage() {
   const [ledger, setLedger] = useState([]);
   const [loadingLedger, setLoadingLedger] = useState(true);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const historyRef = useRef(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -101,6 +105,7 @@ export default function FuelTankLevelPage() {
       await api.createTankRefill({ ...formData, liters: Number(formData.liters) });
       toast.success('Reabastecimento registrado com sucesso!');
       setModalOpen(false);
+      setCurrentPage(1); // o lançamento novo entra no topo do histórico
       loadLevel();
       loadLedger();
     } catch (error) {
@@ -133,9 +138,24 @@ export default function FuelTankLevelPage() {
     });
   };
 
+  // Paginação do histórico: a lista vem inteira da API; a tela mostra uma
+  // página por vez. Se a página atual deixar de existir (ex.: excluiu o último
+  // registro dela), cai na última que existe.
+  const totalPages = Math.max(1, Math.ceil(ledger.length / ITEMS_PER_PAGE));
+  const page = Math.min(currentPage, totalPages);
+  const pageItems = ledger.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const pageRefills = pageItems.filter(l => l.type === 'ENTRADA'); // só Entradas são selecionáveis
+  const goToPage = (next) => {
+    if (next >= 1 && next <= totalPages) {
+      setCurrentPage(next);
+      // Volta pro começo do histórico (e não da tela: o medidor fica em cima)
+      if (historyRef.current) historyRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const toggleSelectAllOnPage = () => {
     setSelectedIds(prev => {
-      const pageIds = ledger.filter(l => l.type === 'ENTRADA').map(l => l.id);
+      const pageIds = pageRefills.map(l => l.id);
       const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
       if (allSelected) {
         const next = new Set(prev);
@@ -254,6 +274,7 @@ export default function FuelTankLevelPage() {
 
         {/* Histórico - só as Entradas (reabastecimentos) podem ser selecionadas;
             as Saídas vêm dos Abastecimentos e são excluídas por lá */}
+        <div ref={historyRef} className="scroll-mt-20">
         <DataCard
           title="Histórico"
           count={loadingLedger ? '...' : ledger.length}
@@ -264,6 +285,15 @@ export default function FuelTankLevelPage() {
             >
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={handleDelete} disabled={selectedIds.size === 0} />
             </Toolbar>
+          )}
+          footer={(
+            <TablePagination
+              currentPage={page}
+              totalPages={totalPages}
+              totalItems={ledger.length}
+              pageSize={ITEMS_PER_PAGE}
+              onPageChange={goToPage}
+            />
           )}
         >
           {loadingLedger ? (
@@ -277,7 +307,7 @@ export default function FuelTankLevelPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={ledger.some(l => l.type === 'ENTRADA') && ledger.filter(l => l.type === 'ENTRADA').every(l => selectedIds.has(l.id))}
+                        checked={pageRefills.length > 0 && pageRefills.every(l => selectedIds.has(l.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                       />
                     </th>
@@ -290,7 +320,7 @@ export default function FuelTankLevelPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ledger.map((item) => {
+                  {pageItems.map((item) => {
                     const isEntrada = item.type === 'ENTRADA';
                     const isSelected = isEntrada && selectedIds.has(item.id);
                     return (
@@ -323,6 +353,7 @@ export default function FuelTankLevelPage() {
             </div>
           )}
         </DataCard>
+        </div>
       </div>
 
       {/* Modal Reabastecer Tanque */}
