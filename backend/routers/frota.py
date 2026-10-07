@@ -237,27 +237,91 @@ async def get_simple_vehicle_checklist_template(
     """Retorna as seções/itens de verificação do checklist simplificado pro tipo de veículo informado"""
     return {"sections": SIMPLE_CHECKLIST_TEMPLATES.get(vehicle_type, [])}
 
+# O resultado do checklist (Aprovado/Reprovado/Pendente) não fica gravado: sai
+# das respostas dos itens. Mesma regra de checklistResult() no frontend
+# (components/checklist/checklistShared.js) - se mudar uma, mudar a outra.
+_CHECKLIST_LEGACY_ITEM_FIELDS = [
+    "documentos_items", "vehicle_condition_items", "epi_items",
+    "kit_items", "tank_items", "post_loading_items",
+]
+# Só o necessário pra calcular o resultado (sem fotos nem o resto do documento)
+_CHECKLIST_RESULT_PROJECTION = {
+    "_id": 0, "id": 1, "checklist_sections.items.answer": 1,
+    **{f"{field}.answer": 1 for field in _CHECKLIST_LEGACY_ITEM_FIELDS},
+}
+
+
+def vehicle_checklist_result(checklist: dict) -> str:
+    """REPROVADO se algum item foi marcado NÃO, APROVADO se todos foram marcados SIM, senão PENDENTE"""
+    answers = [
+        item.get("answer")
+        for field in _CHECKLIST_LEGACY_ITEM_FIELDS
+        for item in (checklist.get(field) or [])
+    ]
+    answers += [
+        item.get("answer")
+        for section in (checklist.get("checklist_sections") or [])
+        for item in (section.get("items") or [])
+    ]
+    if any(answer == "NAO" for answer in answers):
+        return "REPROVADO"
+    if answers and all(answer == "SIM" for answer in answers):
+        return "APROVADO"
+    return "PENDENTE"
+
+
+def _vehicle_checklist_search_query(search: Optional[str]) -> dict:
+    if not search:
+        return {}
+    search_escaped = re.escape(search)
+    return {"$or": [
+        {field: {"$regex": search_escaped, "$options": "i"}}
+        for field in ("cavalo_plate", "vehicle_plate", "driver_name", "vistoriador_name", "client_name")
+    ]}
+
+
+@api_router.get("/vehicle-checklists/stats")
+async def get_vehicle_checklist_stats(
+    search: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Quantos checklists há em cada resultado (dentro da busca, se houver) - indicadores do topo da tela"""
+    docs = await db.vehicle_checklists.find(_vehicle_checklist_search_query(search), _CHECKLIST_RESULT_PROJECTION).to_list(None)
+    counts = {"APROVADO": 0, "REPROVADO": 0, "PENDENTE": 0}
+    for doc in docs:
+        counts[vehicle_checklist_result(doc)] += 1
+    return {
+        "total": len(docs),
+        "approved": counts["APROVADO"],
+        "failed": counts["REPROVADO"],
+        "pending": counts["PENDENTE"],
+    }
+
 @api_router.get("/vehicle-checklists")
 async def get_vehicle_checklists(
     search: Optional[str] = None,
+    result: Optional[str] = Query(None, regex="^(APROVADO|REPROVADO|PENDENTE)$"),
     page: int = 1,
     per_page: int = 20,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Lista os checklists de veículo com paginação e busca por placa/motorista/cliente"""
-    query = {}
-    if search:
-        search_escaped = re.escape(search)
-        query["$or"] = [
-            {"cavalo_plate": {"$regex": search_escaped, "$options": "i"}},
-            {"vehicle_plate": {"$regex": search_escaped, "$options": "i"}},
-            {"driver_name": {"$regex": search_escaped, "$options": "i"}},
-            {"client_name": {"$regex": search_escaped, "$options": "i"}},
-        ]
-
+    """Lista os checklists de veículo com paginação, busca por placa/motorista/vistoriador/cliente e filtro por resultado"""
+    query = _vehicle_checklist_search_query(search)
     skip = (page - 1) * per_page
-    total = await db.vehicle_checklists.count_documents(query)
-    checklists = await db.vehicle_checklists.find(query, {"_id": 0}).sort("checklist_number", -1).skip(skip).limit(per_page).to_list(per_page)
+
+    if result:
+        # Como o resultado é calculado, confere todos os que batem com a busca
+        # (só com as respostas) e depois busca os documentos da página
+        docs = await db.vehicle_checklists.find(query, _CHECKLIST_RESULT_PROJECTION).sort("checklist_number", -1).to_list(None)
+        matching_ids = [doc["id"] for doc in docs if vehicle_checklist_result(doc) == result]
+        total = len(matching_ids)
+        page_ids = matching_ids[skip:skip + per_page]
+        found = await db.vehicle_checklists.find({"id": {"$in": page_ids}}, {"_id": 0}).to_list(len(page_ids) or 1)
+        by_id = {doc["id"]: doc for doc in found}
+        checklists = [by_id[checklist_id] for checklist_id in page_ids if checklist_id in by_id]
+    else:
+        total = await db.vehicle_checklists.count_documents(query)
+        checklists = await db.vehicle_checklists.find(query, {"_id": 0}).sort("checklist_number", -1).skip(skip).limit(per_page).to_list(per_page)
 
     return {
         "items": checklists,
@@ -359,10 +423,16 @@ async def upload_vehicle_checklist_photo(
 
     photo_url = f"/api/uploads/vehicle_checklists/{checklist_id}/{photo_id}{file_ext}"
     photo_entry = {"id": photo_id, "type": photo_type, "url": photo_url}
-    await db.vehicle_checklists.update_one(
-        {"id": checklist_id},
-        {"$set": {"photos": photos + [photo_entry], "updated_at": datetime.now(timezone.utc).isoformat()}}
+    # $push (e não regravar a lista lida lá em cima): a tela envia as fotos em
+    # paralelo, e duas requisições que leram a mesma lista apagavam a foto uma
+    # da outra. O filtro garante o limite mesmo com envios simultâneos.
+    result = await db.vehicle_checklists.update_one(
+        {"id": checklist_id, f"photos.{MAX_VEHICLE_CHECKLIST_PHOTOS - 1}": {"$exists": False}},
+        {"$push": {"photos": photo_entry}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
     )
+    if result.modified_count == 0:
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=f"Limite de {MAX_VEHICLE_CHECKLIST_PHOTOS} fotos por checklist atingido")
 
     return photo_entry
 
@@ -379,17 +449,17 @@ async def delete_vehicle_checklist_photo(
         raise HTTPException(status_code=404, detail="Checklist não encontrado")
 
     photos = checklist.get("photos") or []
-    remaining_photos = [p for p in photos if p["id"] != photo_id]
-    if len(remaining_photos) == len(photos):
+    if not any(p["id"] == photo_id for p in photos):
         raise HTTPException(status_code=404, detail="Foto não encontrada")
 
     photo_dir = UPLOADS_DIR / "vehicle_checklists" / checklist_id
     for file_path in photo_dir.glob(f"{photo_id}.*"):
         file_path.unlink()
 
+    # $pull pelo mesmo motivo do $push no envio: não regravar a lista inteira
     await db.vehicle_checklists.update_one(
         {"id": checklist_id},
-        {"$set": {"photos": remaining_photos, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$pull": {"photos": {"id": photo_id}}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
     )
 
     return {"message": "Foto removida com sucesso"}

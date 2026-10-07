@@ -4,6 +4,8 @@
 //
 // buildTruck(parts, mats, dims) devolve { group, wheels, wheelRadius }: quem
 // anima move group.position.x e gira as rodas (rotation.z).
+// buildTractor e buildTrailer montam cada metade sozinha (guia de fotos do
+// Checklist de Veículo), nas mesmas coordenadas do conjunto.
 
 export function truckMaterials(parts, rand) {
   const { THREE, track, standard } = parts;
@@ -38,14 +40,26 @@ const FRONT_AXLE = 3.78;
 const DRIVE_AXLES = [1.88, 2.48];
 const TRAILER_AXLES = [-1.25, -0.62];
 
-export function buildTruck(parts, mats, { width, deckY }) {
-  const { THREE, track, box, cyl, wheel, mergedBoxes, glow, bake } = parts;
+// Grupo vazio + as peças que cavalo e carreta têm em comum (rodado duplo, eixo)
+function startRig(parts, mats) {
+  const { THREE, cyl, wheel } = parts;
   const group = new THREE.Group();
   const wheels = [];
   const dual = (x) => [-0.57, -0.37, 0.37, 0.57].forEach((z) => wheels.push(wheel(group, mats.rubber, mats.rim, WHEEL_R, 0.17, x, WHEEL_R, z)));
   const axle = (x) => cyl(group, mats.dark, 0.05, 1.16, x, WHEEL_R, 0, 'z');
+  return { group, wheels, dual, axle };
+}
 
-  // ----- Semirreboque porta-contêiner -----
+// Junta o que é fixo numa malha por material (as rodas giram; o resto não)
+function finishRig(parts, { group, wheels }) {
+  parts.bake(group, (object) => wheels.includes(object));
+  return { group, wheels, wheelRadius: WHEEL_R };
+}
+
+// ----- Semirreboque porta-contêiner -----
+// `parked`: desengatado, com os pés de apoio no chão
+function addTrailer(parts, mats, { group, dual, axle }, { width, deckY, parked = false }) {
+  const { box, mergedBoxes } = parts;
   [-0.3, 0.3].forEach((z) => {
     box(group, mats.chassis, 3.4, 0.16, 0.09, -0.17, 0.53, z);   // longarina
     box(group, mats.chassis, 1.15, 0.16, 0.09, 2.0, 0.62, z);    // pescoço (passa por cima do cavalo)
@@ -71,14 +85,18 @@ export function buildTruck(parts, mats, { width, deckY }) {
   box(group, mats.dark, 0.04, 0.15, width - 0.04, -1.9, 0.6, 0);
   [-0.46, 0.46].forEach((z) => box(group, mats.tail, 0.03, 0.08, 0.2, -1.925, 0.6, z));
   box(group, mats.paint, 0.012, 0.07, 0.2, -1.925, 0.6, 0); // placa
-  // Pés de apoio (recolhidos) e refletores laterais
+  // Pés de apoio (recolhidos, ou no chão com a carreta desengatada) e refletores laterais
+  const legBottom = parked ? 0.02 : 0.19;
   [-0.36, 0.36].forEach((z) => {
-    box(group, mats.dark, 0.07, 0.3, 0.07, 1.05, 0.34, z);
-    box(group, mats.dark, 0.15, 0.02, 0.15, 1.05, 0.185, z);
+    box(group, mats.dark, 0.07, 0.49 - legBottom, 0.07, 1.05, (0.49 + legBottom) / 2, z);
+    box(group, mats.dark, 0.15, 0.02, 0.15, 1.05, legBottom - 0.005, z);
   });
   [-0.9, 0.1, 1.1].forEach((x) => [-0.35, 0.35].forEach((z) => box(group, mats.amber, 0.09, 0.03, 0.012, x, 0.53, z)));
+}
 
-  // ----- Cavalo mecânico -----
+// ----- Cavalo mecânico -----
+function addTractor(parts, mats, { group, wheels, dual, axle }) {
+  const { THREE, track, box, cyl, wheel, mergedBoxes, glow } = parts;
   [-0.24, 0.24].forEach((z) => box(group, mats.dark, 2.95, 0.14, 0.09, 2.87, 0.5, z)); // chassi
   DRIVE_AXLES.forEach((x) => { dual(x); axle(x); });
   [-0.5, 0.5].forEach((z) => wheels.push(wheel(group, mats.rubber, mats.rim, WHEEL_R, 0.2, FRONT_AXLE, WHEEL_R, z)));
@@ -146,8 +164,25 @@ export function buildTruck(parts, mats, { width, deckY }) {
     box(group, mats.lamp, 0.03, 0.1, 0.24, 4.412, 0.72, z);
     glow(group, 0xfff1c9, 0.55, 4.46, 0.72, z, 0.55);
   });
+}
 
-  bake(group, (object) => wheels.includes(object)); // as rodas giram; o resto é fixo
+export function buildTruck(parts, mats, { width, deckY }) {
+  const rig = startRig(parts, mats);
+  addTrailer(parts, mats, rig, { width, deckY });
+  addTractor(parts, mats, rig);
+  return finishRig(parts, rig);
+}
 
-  return { group, wheels, wheelRadius: WHEEL_R };
+/** Só o cavalo mecânico (ocupa de x = 1,4 a 4,45). */
+export function buildTractor(parts, mats) {
+  const rig = startRig(parts, mats);
+  addTractor(parts, mats, rig);
+  return finishRig(parts, rig);
+}
+
+/** Só a carreta, desengatada (ocupa de x = -1,93 a 2,58; o contêiner apoia em deckY). */
+export function buildTrailer(parts, mats, { width, deckY }) {
+  const rig = startRig(parts, mats);
+  addTrailer(parts, mats, rig, { width, deckY, parked: true });
+  return finishRig(parts, rig);
 }

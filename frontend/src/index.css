@@ -292,8 +292,11 @@
     left: -9999px !important;
   }
   
-  /* Mostrar elementos print-only */
+  /* Mostrar elementos print-only. Fundo branco: num documento de várias
+     páginas, o espaço que sobra antes de uma quebra de folha mostraria o
+     fundo da tela (cinza, ou escuro no tema escuro) */
   .print-only {
+    background: #fff !important;
     display: block !important;
     visibility: visible !important;
     position: relative !important;
@@ -359,6 +362,18 @@
      mesmas margens do comprovante de Registro de Gate gerado no servidor */
   .print-registry.print-doc {
     padding: 10mm 12mm !important;
+  }
+
+  /* Documento de várias páginas (Checklist de Veículo com anexo de fotos):
+     cada bloco ocupa só o que precisa (sem a altura mínima de uma folha) e
+     os seguintes começam em folha nova */
+  .print-registry.print-flow {
+    min-height: 0 !important;
+  }
+
+  .print-registry.print-page-break {
+    break-before: page !important;
+    page-break-before: always !important;
   }
 
   .print-registry img {

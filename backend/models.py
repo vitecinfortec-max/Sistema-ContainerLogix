@@ -1491,6 +1491,7 @@ SIMPLE_CHECKLIST_TEMPLATES = {
 class VehicleChecklistItemAnswer(BaseModel):
     text: str
     answer: Optional[str] = None  # "SIM", "NAO" ou None (não respondido)
+    note: Optional[str] = None  # o que foi encontrado no item (só faz sentido quando a resposta é "NAO")
 
 
 class VehicleChecklistItemSection(BaseModel):

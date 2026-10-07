@@ -337,6 +337,7 @@ export const api = {
   getVehicleChecklistTemplate: () => axios.get(`${API}/vehicle-checklists/template`),
   getSimpleVehicleChecklistTemplate: (vehicleType) => axios.get(`${API}/vehicle-checklists/simple-template`, { params: { vehicle_type: vehicleType } }),
   getVehicleChecklists: (params) => axios.get(`${API}/vehicle-checklists`, { params }),
+  getVehicleChecklistStats: (params) => axios.get(`${API}/vehicle-checklists/stats`, { params }),
   getVehicleChecklist: (id) => axios.get(`${API}/vehicle-checklists/${id}`),
   createVehicleChecklist: (data) => axios.post(`${API}/vehicle-checklists`, data),
   updateVehicleChecklist: (id, data) => axios.put(`${API}/vehicle-checklists/${id}`, data),
