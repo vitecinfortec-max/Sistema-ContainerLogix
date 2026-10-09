@@ -163,7 +163,7 @@ export default function EstoqueCadastrosPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(`Erro ao deletar ${activeType.label.toLowerCase()}`);
+        toast.error(error.response?.data?.detail || `Erro ao deletar ${activeType.label.toLowerCase()}`);
       }
     }
   };

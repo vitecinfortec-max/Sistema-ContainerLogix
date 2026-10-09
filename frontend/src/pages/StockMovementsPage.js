@@ -16,8 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Trash2, Save, ArrowLeftRight, Car, ClipboardList, Pencil, Printer } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeftRight, Car, ClipboardList, Pencil, Printer, HardHat } from 'lucide-react';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -45,6 +46,8 @@ export default function StockMovementsPage() {
   const [form, setForm] = useState(buildEmpty());
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const { confirm, ConfirmDialog } = useConfirm();
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadMovements(); loadWarehouses(); loadSuppliers(); loadProducts();
@@ -313,6 +316,33 @@ export default function StockMovementsPage() {
   };
 
   const singleSelectedMovement = selectedIds.size === 1 ? movements.find((m) => m.id === [...selectedIds][0]) : null;
+  // A saída gerada por uma Entrega de EPI só muda pela própria entrega
+  const lockedByEpi = singleSelectedMovement?.origin === 'EPI';
+
+  const handleDelete = async () => {
+    const movement = singleSelectedMovement;
+    if (!movement || lockedByEpi || deleting) return;
+    const isEntry = movement.operation_type === 'ENTRADA';
+    const ok = await confirm(
+      isEntry
+        ? `A Entrada Nº ${movement.movement_number} será excluída e as quantidades dela serão retiradas do estoque.`
+        : `A Saída Nº ${movement.movement_number} será excluída e as quantidades dela voltarão para o estoque.`,
+      'Excluir a movimentação?',
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await api.deleteStockMovement(movement.id);
+      toast.success('Movimentação excluída e saldo do estoque acertado');
+      setSelectedIds(new Set());
+      loadMovements();
+      loadProducts();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao excluir a movimentação');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <Layout>
@@ -351,8 +381,9 @@ export default function StockMovementsPage() {
               selectedCount={selectedIds.size}
               primary={<ToolbarPrimary icon={Plus} label="Nova movimentação" onClick={openCreate} testId="stock-movement-new-btn" />}
             >
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedMovement && openEdit(singleSelectedMovement.id)} disabled={!singleSelectedMovement} testId="stock-movement-edit-btn" />
+              <ToolbarButton icon={Pencil} label={lockedByEpi ? 'Editar: use a tela Entrega de EPI\'s' : 'Editar'} tone="blue" onClick={() => singleSelectedMovement && openEdit(singleSelectedMovement.id)} disabled={!singleSelectedMovement || lockedByEpi} testId="stock-movement-edit-btn" />
               <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedMovement && downloadPDF(singleSelectedMovement.id, singleSelectedMovement.movement_number)} disabled={!singleSelectedMovement} testId="stock-movement-pdf-btn" />
+              <ToolbarButton icon={Trash2} label={lockedByEpi ? 'Excluir: use a tela Entrega de EPI\'s' : 'Excluir (acerta o saldo do estoque)'} tone="red" onClick={handleDelete} disabled={!singleSelectedMovement || lockedByEpi || deleting} testId="stock-movement-delete-btn" />
             </Toolbar>
           )}
         >
@@ -405,7 +436,11 @@ export default function StockMovementsPage() {
                         <div className="max-w-[240px] truncate" title={m.purpose_text || ''}>
                           {m.purpose_type === 'VEICULO' && <span className="inline-flex items-center gap-1"><Car className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
                           {m.purpose_type === 'OS' && <span className="inline-flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
-                          {(!m.purpose_type || m.purpose_type === 'OUTRO') && (m.purpose_text || '-')}
+                          {(!m.purpose_type || m.purpose_type === 'OUTRO') && (
+                            m.origin === 'EPI'
+                              ? <span className="inline-flex items-center gap-1" title="Gerada pela Entrega de EPI's: só muda por lá"><HardHat className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>
+                              : (m.purpose_text || '-')
+                          )}
                         </div>
                       </td>
                       <td className="text-right tabular-nums">{(m.items || []).length}</td>
@@ -559,6 +594,7 @@ export default function StockMovementsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

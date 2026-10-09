@@ -4,6 +4,7 @@ Movimentação de Estoque) e gera o Termo de Entrega e a Ficha de EPI da
 pessoa, ambos com a assinatura importada/desenhada no cadastro dela."""
 import io
 import re
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -16,7 +17,7 @@ from models import (
 )
 from shared import db, get_current_active_user, get_company_settings, signature_file_path
 from reports import generate_epi_delivery_pdf, generate_epi_ficha_pdf
-from routers.stock import create_stock_movement, update_stock_movement
+from routers.stock import _create_stock_movement, _update_stock_movement
 
 api_router = APIRouter(prefix="/api")
 
@@ -248,11 +249,14 @@ async def create_epi_delivery(data: EpiDeliveryCreate, current_user: dict = Depe
     )
     number = counter["seq"]
     recipient = _recipient_fields(data.recipient_type, person)
-    movement = await create_stock_movement(
+    delivery_id = str(uuid.uuid4())
+    movement = await _create_stock_movement(
         _movement_payload(number, data, recipient['recipient_name'], items, products), current_user,
+        origin="EPI", origin_id=delivery_id, origin_label=f"Entrega de EPI Nº {number}",
     )
 
     delivery = EpiDelivery(
+        id=delivery_id,
         delivery_number=number,
         recipient_type=data.recipient_type,
         recipient_id=data.recipient_id,
@@ -299,12 +303,13 @@ async def update_epi_delivery(delivery_id: str, data: EpiDeliveryCreate, current
     if movement:
         # Ajusta a Saída já lançada pela diferença (mesma lógica da edição
         # em Movimentação de Estoque)
-        movement = await update_stock_movement(
+        movement = await _update_stock_movement(
             movement['id'], _movement_payload(number, data, recipient['recipient_name'], items, products, update=True), current_user,
         )
     else:
-        movement = await create_stock_movement(
+        movement = await _create_stock_movement(
             _movement_payload(number, data, recipient['recipient_name'], items, products), current_user,
+            origin="EPI", origin_id=delivery_id, origin_label=f"Entrega de EPI Nº {number}",
         )
 
     same_person = existing.get('recipient_type') == data.recipient_type and existing.get('recipient_id') == data.recipient_id

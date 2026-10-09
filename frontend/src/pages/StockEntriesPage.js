@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarPrimary, EmptyState } from '../components/DataPage';
+import { FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Upload, Search, FileUp, ArrowLeft, Loader2, PackagePlus, Sparkles } from 'lucide-react';
+import { Upload, FileUp, ArrowLeft, Loader2, PackagePlus, Sparkles, Undo2, AlertTriangle } from 'lucide-react';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (v) => {
@@ -19,8 +20,19 @@ const fmtDate = (v) => {
   try { return format(new Date(v), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }); } catch (e) { return '-'; }
 };
 
+// Entradas que vieram da mesma importação (mesma regra do servidor): pelo id
+// da importação, pela chave da NF-e (importações antigas) ou só ela
+const sameImport = (a, b) => {
+  if (a.import_id || b.import_id) return a.import_id === b.import_id;
+  if (a.nfe_key || b.nfe_key) return a.nfe_key === b.nfe_key;
+  return a.id === b.id;
+};
+
 export default function StockEntriesPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   const [entries, setEntries] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [reversing, setReversing] = useState(false);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -152,6 +164,31 @@ export default function StockEntriesPage() {
     }
   };
 
+  const selectedEntry = entries.find((e) => e.id === selectedId) || null;
+
+  const handleReverse = async () => {
+    if (!selectedEntry || reversing) return;
+    const group = entries.filter((e) => sameImport(e, selectedEntry));
+    const label = selectedEntry.nfe_number ? `da NF-e Nº ${selectedEntry.nfe_number}` : 'desta entrada';
+    const ok = await confirm(
+      `${group.length > 1 ? `As ${group.length} entradas` : 'A entrada'} ${label} ${group.length > 1 ? 'serão removidas' : 'será removida'} e as quantidades retiradas do estoque. Os produtos continuam cadastrados.`,
+      'Estornar a importação?',
+    );
+    if (!ok) return;
+    setReversing(true);
+    try {
+      await api.reverseStockEntryImport(selectedEntry.id);
+      toast.success('Importação estornada; as quantidades saíram do estoque');
+      setSelectedId(null);
+      loadEntries();
+      loadProducts();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao estornar a importação');
+    } finally {
+      setReversing(false);
+    }
+  };
+
   const filteredEntries = entries.filter((e) => {
     const term = search.trim().toLowerCase();
     if (!term) return true;
@@ -177,7 +214,12 @@ export default function StockEntriesPage() {
           title="Entradas registradas"
           count={loading ? '...' : filteredEntries.length}
           toolbar={(
-            <Toolbar primary={<ToolbarPrimary icon={FileUp} label="Importar XML de NF-e" onClick={openImportDialog} testId="import-nfe-button" />} />
+            <Toolbar
+              selectedCount={selectedEntry ? 1 : 0}
+              primary={<ToolbarPrimary icon={FileUp} label="Importar XML de NF-e" onClick={openImportDialog} testId="import-nfe-button" />}
+            >
+              <ToolbarButton icon={Undo2} label="Estornar importação (retira do estoque)" tone="red" onClick={handleReverse} disabled={!selectedEntry || reversing} testId="reverse-nfe-button" />
+            </Toolbar>
           )}
         >
           {filteredEntries.length > 0 ? (
@@ -196,7 +238,13 @@ export default function StockEntriesPage() {
                 </thead>
                 <tbody>
                   {filteredEntries.map((e) => (
-                    <tr key={e.id} data-testid="stock-entry-row">
+                    <tr
+                      key={e.id}
+                      data-testid="stock-entry-row"
+                      data-selected={e.id === selectedId}
+                      className="cursor-pointer"
+                      onClick={() => setSelectedId(e.id === selectedId ? null : e.id)}
+                    >
                       <td className="whitespace-nowrap tabular-nums">{fmtDate(e.created_at)}</td>
                       <td><div className="max-w-[320px] truncate cell-strong" title={e.product_name || ''}>{e.product_name}</div></td>
                       <td><div className="max-w-[220px] truncate" title={e.supplier_name || ''}>{e.supplier_name || '-'}</div></td>
@@ -282,6 +330,13 @@ export default function StockEntriesPage() {
                 </div>
               </div>
 
+              {preview.already_imported && (
+                <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-[13px] text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200" data-testid="nfe-already-imported">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{preview.already_imported}</span>
+                </div>
+              )}
+
               <div className="space-y-3">
                 {preview.items.map((item, idx) => (
                   <div key={idx} className="border border-slate-200 dark:border-slate-700 rounded-md p-3 space-y-2">
@@ -301,7 +356,11 @@ export default function StockEntriesPage() {
                         <Label className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wide">Vincular a Produto Existente</Label>
                         <Autocomplete
                           value={item.matched_product_name || ''}
-                          onChange={(v) => setItemField(idx, 'matched_product_name', v)}
+                          onChange={(v) => setPreview((p) => {
+                            const items = [...p.items];
+                            items[idx] = { ...items[idx], matched_product_name: v, matched_product_id: null };
+                            return { ...p, items };
+                          })}
                           onSelect={(p) => setItemProduct(idx, p)}
                           options={products}
                           displayField="description"
@@ -338,7 +397,7 @@ export default function StockEntriesPage() {
                 <Button type="button" variant="outline" onClick={() => setStep('upload')}>
                   <ArrowLeft className="w-4 h-4 mr-1.5" />Voltar
                 </Button>
-                <Button type="button" onClick={handleConfirm} disabled={confirming} data-testid="confirm-nfe-import-button">
+                <Button type="button" onClick={handleConfirm} disabled={confirming || !!preview.already_imported} data-testid="confirm-nfe-import-button">
                   {confirming ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Importando...</> : 'Confirmar Importação'}
                 </Button>
               </DialogFooter>
@@ -346,6 +405,7 @@ export default function StockEntriesPage() {
           )}
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

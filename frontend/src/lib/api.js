@@ -68,6 +68,7 @@ export const api = {
   createProduct: (data) => axios.post(`${API}/products`, data),
   updateProduct: (id, data) => axios.put(`${API}/products/${id}`, data),
   deleteProduct: (id) => axios.delete(`${API}/products/${id}`),
+  adjustProductStock: (id, data) => axios.post(`${API}/products/${id}/adjust-stock`, data),
 
   getStockEntries: () => axios.get(`${API}/stock/entries`),
   parseNfeImport: (file) => {
@@ -78,6 +79,7 @@ export const api = {
     });
   },
   confirmNfeImport: (data) => axios.post(`${API}/stock/nfe-import/confirm`, data),
+  reverseStockEntryImport: (entryId) => axios.post(`${API}/stock/entries/${entryId}/reverse`),
 
   getStockReportSummary: (params) => axios.get(`${API}/stock/report/summary`, { params }),
   getStockReportByWarehouse: (params) => axios.get(`${API}/stock/report/by-warehouse`, { params }),
@@ -94,6 +96,7 @@ export const api = {
   getStockMovement: (id) => axios.get(`${API}/stock/movements/${id}`),
   createStockMovement: (data) => axios.post(`${API}/stock/movements`, data),
   updateStockMovement: (id, data) => axios.put(`${API}/stock/movements/${id}`, data),
+  deleteStockMovement: (id) => axios.delete(`${API}/stock/movements/${id}`),
   getStockMovementPDF: (id) => axios.get(`${API}/stock/movements/${id}/pdf`, { responseType: 'blob' }),
   // Entrega de EPI's (grupo Almoxarifado)
   getEpiDeliveries: (params) => axios.get(`${API}/epi-deliveries`, { params }),

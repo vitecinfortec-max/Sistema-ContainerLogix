@@ -16,13 +16,14 @@ import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Trash2, Edit, Package } from 'lucide-react';
+import { Plus, Trash2, Edit, Package, Scale } from 'lucide-react';
 
 const UNIT_OPTIONS = [['KG', 'Kg'], ['TON', 'Toneladas'], ['M3', 'm³'], ['UNIDADE', 'Unidade'], ['CAIXA', 'Caixa'], ['PALLET', 'Pallet']];
 const ORIGIN_OPTIONS = [['NACIONAL', 'Nacional'], ['IMPORTADO', 'Importado']];
 const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const fmtQty = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
 function buildEmptyForm() {
   return {
@@ -46,6 +47,12 @@ export default function ProductPage() {
   const [nextCode, setNextCode] = useState(null);
   const [formData, setFormData] = useState(buildEmptyForm());
   const [submitting, setSubmitting] = useState(false);
+
+  // Ajuste de saldo: informa a quantidade contada e o motivo; o sistema lança
+  // a diferença como Entrada ou Saída em Movimentação de Estoque
+  const [adjusting, setAdjusting] = useState(null); // produto em ajuste
+  const [adjustForm, setAdjustForm] = useState({ counted: '', reason: '' });
+  const [savingAdjust, setSavingAdjust] = useState(false);
 
   // Estado de Seleção (toolbar)
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -160,8 +167,41 @@ export default function ProductPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error('Erro ao deletar produto');
+        toast.error(error.response?.data?.detail || 'Erro ao deletar produto');
       }
+    }
+  };
+
+  const openAdjust = (item) => {
+    setAdjustForm({ counted: '', reason: '' });
+    setAdjusting(item);
+  };
+
+  const adjustDifference = adjusting && adjustForm.counted !== ''
+    ? Number(adjustForm.counted) - Number(adjusting.stock_quantity || 0)
+    : null;
+
+  const handleAdjust = async (e) => {
+    e.preventDefault();
+    if (savingAdjust || !adjusting) return;
+    if (adjustForm.counted === '' || Number(adjustForm.counted) < 0) {
+      toast.error('Informe a quantidade contada');
+      return;
+    }
+    if (!adjustForm.reason.trim()) {
+      toast.error('Informe o motivo do ajuste');
+      return;
+    }
+    setSavingAdjust(true);
+    try {
+      await api.adjustProductStock(adjusting.id, { counted_quantity: Number(adjustForm.counted), reason: adjustForm.reason.trim() });
+      toast.success('Saldo ajustado; a diferença foi lançada em Movimentação de Estoque');
+      setAdjusting(null);
+      loadItems();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao ajustar o saldo');
+    } finally {
+      setSavingAdjust(false);
     }
   };
 
@@ -219,6 +259,7 @@ export default function ProductPage() {
               primary={<ToolbarPrimary icon={Plus} label="Novo produto" onClick={openCreateDialog} testId="add-product-button" />}
             >
               <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedItem && openEditDialog(singleSelectedItem)} disabled={!singleSelectedItem} />
+              <ToolbarButton icon={Scale} label="Ajustar saldo" tone="primary" onClick={() => singleSelectedItem && openAdjust(singleSelectedItem)} disabled={!singleSelectedItem} testId="adjust-stock-button" />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)} disabled={!singleSelectedItem} />
             </Toolbar>
           )}
@@ -238,6 +279,7 @@ export default function ProductPage() {
                     <th>Descrição</th>
                     <th>Almoxarifado</th>
                     <th>Família</th>
+                    <th className="!text-right">Saldo</th>
                     <th className="!text-right">Valor ref.</th>
                     <th>Status</th>
                   </tr>
@@ -263,6 +305,7 @@ export default function ProductPage() {
                         <td><div className="max-w-[340px] truncate" title={item.description || ''}>{item.description}</div></td>
                         <td><div className="max-w-[180px] truncate" title={item.warehouse_name || ''}>{item.warehouse_name || '-'}</div></td>
                         <td><div className="max-w-[180px] truncate" title={item.family_name || ''}>{item.family_name || '-'}</div></td>
+                        <td className="text-right whitespace-nowrap tabular-nums font-medium">{fmtQty(item.stock_quantity)}</td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(item.reference_value)}</td>
                         <td>
                           <StatusPill tone={item.status === 'ATIVO' ? 'emerald' : 'slate'}>
@@ -285,6 +328,66 @@ export default function ProductPage() {
         </DataCard>
       </div>
 
+      {/* Ajustar saldo */}
+      <Dialog open={!!adjusting} onOpenChange={(isOpen) => { if (!isOpen) setAdjusting(null); }}>
+        <DialogContent className="max-w-md" aria-describedby={undefined} data-testid="adjust-stock-dialog">
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="text-base flex items-center gap-2">
+              <Scale className="w-4 h-4 text-primary" /> Ajustar saldo
+            </DialogTitle>
+          </DialogHeader>
+          {adjusting && (
+            <form onSubmit={handleAdjust} className="space-y-4">
+              <div className="rounded-lg bg-slate-50 dark:bg-slate-800/60 px-3 py-2.5">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{adjusting.description}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Saldo no sistema: <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">{fmtQty(adjusting.stock_quantity)}</span>
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="adjust_counted" className="text-[13px]">Quantidade contada *</Label>
+                <Input
+                  id="adjust_counted"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={adjustForm.counted}
+                  onChange={(e) => setAdjustForm((p) => ({ ...p, counted: e.target.value }))}
+                  className="h-10 text-[13px]"
+                  data-testid="adjust-counted-input"
+                />
+                {adjustDifference !== null && (
+                  <p className={`text-xs font-medium ${adjustDifference === 0 ? 'text-slate-500' : adjustDifference > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} data-testid="adjust-difference">
+                    {adjustDifference === 0
+                      ? 'Igual ao saldo atual: não há o que ajustar.'
+                      : adjustDifference > 0
+                        ? `Será lançada uma Entrada de ${fmtQty(adjustDifference)}.`
+                        : `Será lançada uma Saída de ${fmtQty(-adjustDifference)}.`}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="adjust_reason" className="text-[13px]">Motivo *</Label>
+                <Input
+                  id="adjust_reason"
+                  value={adjustForm.reason}
+                  maxLength={120}
+                  onChange={(e) => setAdjustForm((p) => ({ ...p, reason: e.target.value }))}
+                  className="h-10 text-[13px]"
+                  data-testid="adjust-reason-input"
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAdjusting(null)}>Cancelar</Button>
+                <Button type="submit" disabled={savingAdjust || adjustDifference === 0} data-testid="adjust-save-button">
+                  {savingAdjust ? 'Ajustando...' : 'Ajustar saldo'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Modal Cadastrar/Editar Produto */}
       <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="product-dialog">
@@ -301,10 +404,25 @@ export default function ProductPage() {
                 <Input value={formData.description} onChange={(e) => setField('description', e.target.value)} required className="h-10 text-[13px]" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Quantidade em Estoque</Label>
-                <Input type="number" step="0.01" value={formData.stock_quantity} onChange={(e) => setField('stock_quantity', e.target.value)} className="h-10 text-[13px]" />
+                <Label className="text-[13px]">{editId ? 'Saldo em Estoque' : 'Saldo Inicial'}</Label>
+                {/* Na edição o saldo é só leitura: ele muda por Movimentação, NF-e, EPI ou "Ajustar saldo" */}
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.stock_quantity}
+                  onChange={(e) => setField('stock_quantity', e.target.value)}
+                  disabled={!!editId}
+                  className="h-10 text-[13px]"
+                  data-testid="product-stock-input"
+                />
               </div>
             </div>
+            <p className="-mt-2 text-xs text-slate-500 dark:text-slate-400">
+              {editId
+                ? 'O saldo não é alterado por aqui. Para corrigi-lo, use "Ajustar saldo" na lista de produtos: a diferença fica registrada em Movimentação de Estoque.'
+                : 'Se informar um saldo inicial, ele entra como uma Entrada em Movimentação de Estoque.'}
+            </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-[13px]">Almoxarifado</Label>

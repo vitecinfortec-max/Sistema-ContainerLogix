@@ -3448,7 +3448,7 @@ class Product(BaseModel):
     code: int  # gerado automaticamente via contador
     description: str
     photo_url: Optional[str] = None
-    stock_quantity: float = 0.0  # saldo corrente - também pode ser editado à mão, além de ser movimentado por StockEntry (NF-e) e StockMovement (Entrada/Saída manual)
+    stock_quantity: float = 0.0  # saldo corrente - só muda por StockEntry (NF-e) e StockMovement (Entrada/Saída, inclusive as de saldo inicial, ajuste e Entrega de EPI); o PUT do produto não mexe nele
     warehouse_id: Optional[str] = None
     warehouse_name: Optional[str] = None
     barcode: Optional[str] = None  # código de barras / SKU
@@ -3513,8 +3513,8 @@ class DailyStockLedgerPoint(BaseModel):
 class StockEntry(BaseModel):
     """Registro de entrada de estoque - histórico de onde cada quantidade
     somada a um Product veio (hoje, só via importação de XML de NF-e).
-    Product.stock_quantity continua sendo o saldo corrente (editável à
-    mão); StockEntry é o extrato/auditoria de como ele chegou lá."""
+    Product.stock_quantity continua sendo o saldo corrente; StockEntry é o
+    extrato/auditoria de como ele chegou lá."""
     model_config = ConfigDict(extra="ignore")
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -3528,6 +3528,7 @@ class StockEntry(BaseModel):
     nfe_number: Optional[str] = None
     nfe_key: Optional[str] = None  # chave de acesso (44 dígitos)
     nfe_issue_date: Optional[str] = None  # YYYY-MM-DD
+    import_id: Optional[str] = None  # agrupa as entradas da mesma importação (as antigas se agrupam pela chave da NF-e)
     observations: Optional[str] = None
     created_by: str
     created_by_name: str
@@ -3583,6 +3584,13 @@ class StockMovement(BaseModel):
     observations: Optional[str] = None
 
     items: List[StockMovementItem] = []
+
+    # Quem gerou: None = lançada na tela; EPI = Entrega de EPI (só muda por
+    # lá); SALDO_INICIAL / AJUSTE = cadastro do produto. Nunca vem do cliente
+    # (StockMovementCreate não tem esses campos).
+    origin: Optional[str] = None
+    origin_id: Optional[str] = None
+    origin_label: Optional[str] = None
 
     created_by: str
     created_by_name: str

@@ -1,11 +1,13 @@
 import io
 import re
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from pymongo.errors import DuplicateKeyError
 from typing import List
 
 from models import (
@@ -16,17 +18,85 @@ from models import (
     Product, ProductCreate, ProductResponse,
     StockValueByWarehousePoint, DailyStockLedgerPoint,
     StockEntry, StockEntryResponse,
-    StockMovement, StockMovementCreate, StockMovementUpdate, StockMovementResponse,
+    StockMovement, StockMovementCreate, StockMovementUpdate, StockMovementResponse, StockMovementItem,
     Supplier,
 )
 from shared import db, get_current_active_user, get_company_settings, validate_and_read_upload
 from reports import (
     generate_stock_report_excel, generate_stock_report_pdf,
     generate_stock_ledger_report_excel, generate_stock_ledger_report_pdf,
+    now_brt,
 )
 from nfe_import import parse_nfe_xml
 
 api_router = APIRouter(prefix="/api")
+
+
+# ==================== SALDO DE ESTOQUE ====================
+# Product.stock_quantity só muda por aqui (movimentação, NF-e, entrega de EPI,
+# ajuste): nunca é regravado com um valor lido antes, sempre somado/subtraído
+# no próprio banco, pra que dois lançamentos ao mesmo tempo não se atropelem.
+
+_QTY_EPS = 1e-9  # folga nas comparações de saldo (as quantidades são float)
+
+
+async def _apply_stock_deltas(deltas: dict, refusal: str = "Saldo insuficiente para") -> list:
+    """Soma (ou subtrai) o saldo de vários produtos: {id do produto: diferença}.
+    A baixa leva um filtro no próprio update (só desconta se o saldo cobrir),
+    então duas saídas simultâneas não deixam o saldo negativo. Se algum
+    produto não tiver saldo, desfaz o que já tinha aplicado e recusa.
+    Devolve o que aplicou, pra _revert_stock_deltas."""
+    applied = []
+    # As baixas vão primeiro: são as únicas que podem ser recusadas
+    pending = sorted(((pid, d) for pid, d in deltas.items() if abs(d) > _QTY_EPS), key=lambda x: x[1])
+    for product_id, delta in pending:
+        query = {"id": product_id}
+        if delta < 0:
+            query["stock_quantity"] = {"$gte": -delta - _QTY_EPS}
+        result = await db.products.update_one(query, {"$inc": {"stock_quantity": delta}})
+        if result.modified_count == 0:
+            await _revert_stock_deltas(applied)
+            product = await db.products.find_one({"id": product_id}, {"_id": 0, "description": 1, "stock_quantity": 1})
+            if not product:
+                raise HTTPException(status_code=404, detail="Produto não encontrado no cadastro")
+            available = float(product.get('stock_quantity') or 0)
+            raise HTTPException(
+                status_code=400,
+                detail=f"{refusal} \"{product.get('description')}\": disponível {available:g}, necessário {-delta:g}",
+            )
+        applied.append((product_id, delta))
+    return applied
+
+
+async def _revert_stock_deltas(applied: list):
+    for product_id, delta in applied:
+        await db.products.update_one({"id": product_id}, {"$inc": {"stock_quantity": -delta}})
+
+
+async def _log_stock_audit(action: str, current_user: dict, summary: str, snapshot: dict):
+    """Guarda o que foi excluído/estornado (quem, quando e o registro inteiro),
+    já que o registro em si deixa de existir."""
+    await db.stock_audit_log.insert_one({
+        "id": str(uuid.uuid4()),
+        "action": action,
+        "summary": summary,
+        "snapshot": snapshot,
+        "user_id": current_user.get('sub'),
+        "user_name": current_user.get('name'),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+async def _refuse_if_in_use(checks: list, what: str, advice: str):
+    """`checks`: [(coleção, filtro, rótulo no plural)]. Recusa a exclusão se
+    algum registro ainda apontar pro cadastro."""
+    in_use = []
+    for collection, query, label in checks:
+        count = await db[collection].count_documents(query)
+        if count:
+            in_use.append(f"{count} {label}")
+    if in_use:
+        raise HTTPException(status_code=409, detail=f"{what} está em uso ({', '.join(in_use)}). {advice}")
 
 # ==================== ALMOXARIFADO ====================
 
@@ -50,10 +120,19 @@ async def update_warehouse(item_id: str, data: WarehouseCreate, current_user: di
         raise HTTPException(status_code=404, detail="Almoxarifado não encontrado")
     update_data = {**data.model_dump(), "id": item_id, "created_at": existing['created_at'], "created_by": existing['created_by']}
     await db.warehouses.replace_one({"id": item_id}, update_data)
+    if update_data['name'] != existing.get('name'):
+        # O nome fica copiado em quem usa o almoxarifado: acompanha a troca
+        for collection in (db.products, db.stock_movements, db.epi_deliveries):
+            await collection.update_many({"warehouse_id": item_id}, {"$set": {"warehouse_name": update_data['name']}})
     return WarehouseResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
 
 @api_router.delete("/warehouses/{item_id}")
 async def delete_warehouse(item_id: str, current_user: dict = Depends(get_current_active_user)):
+    await _refuse_if_in_use([
+        ("products", {"warehouse_id": item_id}, "produto(s)"),
+        ("stock_movements", {"warehouse_id": item_id}, "movimentação(ões)"),
+        ("epi_deliveries", {"warehouse_id": item_id}, "entrega(s) de EPI"),
+    ], "Este almoxarifado", "Para tirá-lo de uso, mude o Status para Inativo.")
     result = await db.warehouses.delete_one({"id": item_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Almoxarifado não encontrado")
@@ -82,10 +161,16 @@ async def update_product_family(item_id: str, data: ProductFamilyCreate, current
         raise HTTPException(status_code=404, detail="Família de Produto não encontrada")
     update_data = {**data.model_dump(), "id": item_id, "created_at": existing['created_at'], "created_by": existing['created_by']}
     await db.product_families.replace_one({"id": item_id}, update_data)
+    if update_data['name'] != existing.get('name'):
+        await db.products.update_many({"family_id": item_id}, {"$set": {"family_name": update_data['name']}})
     return ProductFamilyResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
 
 @api_router.delete("/product-families/{item_id}")
 async def delete_product_family(item_id: str, current_user: dict = Depends(get_current_active_user)):
+    await _refuse_if_in_use(
+        [("products", {"family_id": item_id}, "produto(s)")],
+        "Esta família", "Para tirá-la de uso, mude o Status para Inativo.",
+    )
     result = await db.product_families.delete_one({"id": item_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Família de Produto não encontrada")
@@ -114,10 +199,16 @@ async def update_service_family(item_id: str, data: ServiceFamilyCreate, current
         raise HTTPException(status_code=404, detail="Família de Serviço não encontrada")
     update_data = {**data.model_dump(), "id": item_id, "created_at": existing['created_at'], "created_by": existing['created_by']}
     await db.service_families.replace_one({"id": item_id}, update_data)
+    if update_data['name'] != existing.get('name'):
+        await db.service_catalog.update_many({"family_id": item_id}, {"$set": {"family_name": update_data['name']}})
     return ServiceFamilyResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
 
 @api_router.delete("/service-families/{item_id}")
 async def delete_service_family(item_id: str, current_user: dict = Depends(get_current_active_user)):
+    await _refuse_if_in_use(
+        [("service_catalog", {"family_id": item_id}, "serviço(s)")],
+        "Esta família", "Para tirá-la de uso, mude o Status para Inativo.",
+    )
     result = await db.service_families.delete_one({"id": item_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Família de Serviço não encontrada")
@@ -177,28 +268,62 @@ async def get_next_product_code(current_user: dict = Depends(get_current_active_
     counter = await db.counters.find_one({"_id": "product_code"})
     return {"next_code": (counter["seq"] + 1) if counter else 1}
 
+def _single_item_movement(product: dict, operation_type: str, quantity: float, purpose_text: str, observations: str) -> StockMovementCreate:
+    """Movimentação de um item só, gerada pelo sistema (saldo inicial, ajuste)."""
+    unit_value = float(product.get('reference_value') or 0)
+    return StockMovementCreate(
+        operation_type=operation_type,
+        movement_date=now_brt().date().isoformat(),
+        warehouse_id=product.get('warehouse_id') or '',
+        warehouse_name=product.get('warehouse_name') or 'Sem almoxarifado',
+        purpose_type="OUTRO",
+        purpose_text=purpose_text,
+        observations=observations,
+        items=[StockMovementItem(
+            product_id=product['id'],
+            product_code=product.get('code'),
+            product_description=product.get('description') or '',
+            quantity=quantity,
+            unit_value=unit_value,
+            total_value=round(quantity * unit_value, 2),
+        )],
+    )
+
+
 @api_router.post("/products", response_model=ProductResponse)
 async def create_product(data: ProductCreate, current_user: dict = Depends(get_current_active_user)):
+    initial_quantity = float(data.stock_quantity or 0)
+    if initial_quantity < 0:
+        raise HTTPException(status_code=400, detail="A quantidade em estoque não pode ser negativa")
     counter = await db.counters.find_one_and_update(
         {"_id": "product_code"},
         {"$inc": {"seq": 1}},
         upsert=True,
         return_document=True
     )
+    # O produto nasce zerado; o saldo inicial entra como uma Entrada, pra
+    # ficar registrado de onde veio
     product = Product(
-        code=counter["seq"], **data.model_dump(),
+        code=counter["seq"], **data.model_dump(exclude={"stock_quantity"}),
         created_by=current_user['sub'], created_by_name=current_user['name']
     )
     doc = product.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.products.insert_one(doc)
-    return ProductResponse(**product.model_dump())
+    if initial_quantity > 0:
+        await _create_stock_movement(
+            _single_item_movement(
+                doc, "ENTRADA", initial_quantity, "Saldo inicial do cadastro",
+                "Gerada automaticamente pelo cadastro do produto",
+            ),
+            current_user, origin="SALDO_INICIAL", origin_id=product.id,
+        )
+    return ProductResponse(**{**product.model_dump(), "stock_quantity": initial_quantity})
 
 @api_router.get("/products", response_model=List[ProductResponse])
 async def get_products(search: str = None, current_user: dict = Depends(get_current_active_user)):
     query = {}
     if search:
-        import re
         search_escaped = re.escape(search)
         query["$or"] = [
             {"description": {"$regex": search_escaped, "$options": "i"}},
@@ -209,19 +334,55 @@ async def get_products(search: str = None, current_user: dict = Depends(get_curr
 
 @api_router.put("/products/{item_id}", response_model=ProductResponse)
 async def update_product(item_id: str, data: ProductCreate, current_user: dict = Depends(get_current_active_user)):
-    existing = await db.products.find_one({"id": item_id}, {"_id": 0})
-    if not existing:
+    # Só os dados do cadastro: o saldo fica de fora (a tela pode estar com um
+    # número antigo, e gravá-lo desfazia as movimentações feitas nesse meio
+    # tempo). Saldo se corrige por movimentação ou pelo ajuste abaixo.
+    result = await db.products.update_one({"id": item_id}, {"$set": data.model_dump(exclude={"stock_quantity"})})
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
-    update_data = {
-        **data.model_dump(), "id": item_id, "code": existing['code'],
-        "created_at": existing['created_at'], "created_by": existing['created_by'],
-        "created_by_name": existing['created_by_name']
-    }
-    await db.products.replace_one({"id": item_id}, update_data)
-    return ProductResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
+    updated = await db.products.find_one({"id": item_id}, {"_id": 0})
+    return ProductResponse(**{**updated, "created_at": datetime.fromisoformat(updated['created_at'])})
+
+
+class ProductStockAdjust(BaseModel):
+    counted_quantity: float  # quanto há de fato (contagem)
+    reason: str
+
+
+@api_router.post("/products/{item_id}/adjust-stock", response_model=ProductResponse)
+async def adjust_product_stock(item_id: str, data: ProductStockAdjust, current_user: dict = Depends(get_current_active_user)):
+    """Acerta o saldo pra quantidade contada, lançando a diferença como uma
+    Entrada ou Saída de ajuste (com o motivo), em vez de trocar o número direto."""
+    product = await db.products.find_one({"id": item_id}, {"_id": 0})
+    if not product:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
+    reason = (data.reason or '').strip()
+    if not reason:
+        raise HTTPException(status_code=400, detail="Informe o motivo do ajuste")
+    if data.counted_quantity < 0:
+        raise HTTPException(status_code=400, detail="A quantidade contada não pode ser negativa")
+    current = float(product.get('stock_quantity') or 0)
+    difference = round(data.counted_quantity - current, 6)
+    if abs(difference) < _QTY_EPS:
+        raise HTTPException(status_code=400, detail="A quantidade contada é igual ao saldo atual")
+    await _create_stock_movement(
+        _single_item_movement(
+            product, "ENTRADA" if difference > 0 else "SAIDA", abs(difference), f"Ajuste de saldo: {reason}",
+            f"Saldo anterior {current:g}, quantidade contada {data.counted_quantity:g}",
+        ),
+        current_user, origin="AJUSTE", origin_id=item_id,
+    )
+    updated = await db.products.find_one({"id": item_id}, {"_id": 0})
+    return ProductResponse(**{**updated, "created_at": datetime.fromisoformat(updated['created_at'])})
+
 
 @api_router.delete("/products/{item_id}")
 async def delete_product(item_id: str, current_user: dict = Depends(get_current_active_user)):
+    await _refuse_if_in_use([
+        ("stock_entries", {"product_id": item_id}, "entrada(s) por NF-e"),
+        ("stock_movements", {"items.product_id": item_id}, "movimentação(ões)"),
+        ("epi_deliveries", {"items.product_id": item_id}, "entrega(s) de EPI"),
+    ], "Este produto", "Para tirá-lo de uso, mude o Status para Inativo.")
     result = await db.products.delete_one({"id": item_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
@@ -409,6 +570,30 @@ async def _match_supplier(cnpj: str):
     return None
 
 
+async def _existing_nfe_import(nfe_key: Optional[str]) -> Optional[dict]:
+    """A importação já feita dessa NF-e (pela chave de acesso), se houver."""
+    key = (nfe_key or '').strip()
+    if not key:
+        return None
+    return await db.stock_entries.find_one(
+        {"nfe_key": key}, {"_id": 0, "nfe_number": 1, "created_at": 1, "created_by_name": 1},
+    )
+
+
+def _already_imported_message(existing: dict) -> str:
+    when = ''
+    try:
+        # created_at é gravado em UTC; a data mostrada é a de Brasília
+        imported_at = datetime.fromisoformat(str(existing.get('created_at'))).astimezone(timezone(timedelta(hours=-3)))
+        when = f" em {imported_at.strftime('%d/%m/%Y')}"
+    except (TypeError, ValueError):
+        pass
+    who = f" por {existing['created_by_name']}" if existing.get('created_by_name') else ''
+    number = f" Nº {existing['nfe_number']}" if existing.get('nfe_number') else ''
+    return (f"A NF-e{number} já foi importada{when}{who}. Importar de novo somaria o estoque em dobro. "
+            "Se a importação anterior estava errada, estorne-a antes.")
+
+
 @api_router.post("/stock/nfe-import/parse")
 async def parse_nfe_import(file: UploadFile = File(...), current_user: dict = Depends(get_current_active_user)):
     """Recebe o XML da NF-e, extrai emitente + itens e devolve uma prévia
@@ -432,6 +617,7 @@ async def parse_nfe_import(file: UploadFile = File(...), current_user: dict = De
             "matched_product_name": matched_product['description'] if matched_product else None,
         })
 
+    already_imported = await _existing_nfe_import(parsed['nfe_key'])
     return {
         "nfe_number": parsed['nfe_number'],
         "nfe_key": parsed['nfe_key'],
@@ -441,6 +627,8 @@ async def parse_nfe_import(file: UploadFile = File(...), current_user: dict = De
         "matched_supplier_id": matched_supplier['id'] if matched_supplier else None,
         "matched_supplier_name": matched_supplier['name'] if matched_supplier else None,
         "items": items_out,
+        # A tela avisa e não deixa confirmar (a confirmação também recusa)
+        "already_imported": _already_imported_message(already_imported) if already_imported else None,
     }
 
 
@@ -480,61 +668,115 @@ async def confirm_nfe_import(data: NfeImportConfirm, current_user: dict = Depend
         if item.quantity <= 0:
             raise HTTPException(status_code=400, detail=f"Quantidade inválida para o item \"{item.description}\"")
 
-    supplier_id = data.matched_supplier_id
-    supplier_name = (data.supplier_name or '').strip() or None
-    if not supplier_id and supplier_name:
-        supplier = Supplier(name=supplier_name, cnpj=data.supplier_cnpj, created_by=current_user['sub'])
-        doc = supplier.model_dump()
-        doc['created_at'] = doc['created_at'].isoformat()
-        await db.suppliers.insert_one(doc)
-        supplier_id = supplier.id
-
-    products_created = 0
-    products_updated = 0
-
+    # Tudo que pode recusar a importação é conferido antes de gravar
+    matched_products = {}
     for item in data.items:
-        if item.matched_product_id:
+        if item.matched_product_id and item.matched_product_id not in matched_products:
             product_doc = await db.products.find_one({"id": item.matched_product_id}, {"_id": 0})
             if not product_doc:
                 raise HTTPException(status_code=404, detail=f"Produto vinculado não encontrado: {item.description}")
-            product_id = product_doc['id']
-            product_name = product_doc['description']
-            new_qty = float(product_doc.get('stock_quantity') or 0) + item.quantity
-            await db.products.update_one({"id": product_id}, {"$set": {"stock_quantity": new_qty}})
-            products_updated += 1
-        else:
-            counter = await db.counters.find_one_and_update(
-                {"_id": "product_code"}, {"$inc": {"seq": 1}}, upsert=True, return_document=True
-            )
-            product = Product(
-                code=counter["seq"],
-                description=item.description,
-                barcode=item.barcode or None,
-                ncm=item.ncm or None,
-                cfop=item.cfop or None,
-                unit=item.unit or None,
-                reference_value=item.unit_value,
-                stock_quantity=item.quantity,
-                linked_party_name=supplier_name,
+            matched_products[item.matched_product_id] = product_doc
+
+    nfe_key = (data.nfe_key or '').strip() or None
+    existing = await _existing_nfe_import(nfe_key)
+    if existing:
+        raise HTTPException(status_code=409, detail=_already_imported_message(existing))
+    import_id = str(uuid.uuid4())
+    if nfe_key:
+        # Reserva a chave: o _id é único, então de duas confirmações da mesma
+        # nota ao mesmo tempo (clique duplo, duas abas) só uma passa
+        reservation = {
+            "_id": nfe_key, "import_id": import_id, "nfe_number": data.nfe_number,
+            "created_by_name": current_user.get('name'), "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            await db.stock_nfe_imports.insert_one(reservation)
+        except DuplicateKeyError:
+            # Reserva sem nenhuma entrada e parada há mais de 2 minutos é resto
+            # de uma importação que caiu no meio: assume o lugar dela
+            previous = await db.stock_nfe_imports.find_one({"_id": nfe_key}) or {}
+            try:
+                age = datetime.now(timezone.utc) - datetime.fromisoformat(str(previous.get('created_at')))
+            except (TypeError, ValueError):
+                age = timedelta(days=1)
+            taken = None
+            if age > timedelta(minutes=2):
+                taken = await db.stock_nfe_imports.replace_one(
+                    {"_id": nfe_key, "import_id": previous.get('import_id')}, reservation,
+                )
+            if not taken or taken.modified_count == 0:
+                raise HTTPException(status_code=409, detail="Esta NF-e está sendo importada agora. Aguarde e atualize a tela.")
+
+    created_supplier_id = None
+    created_product_ids = []
+    applied = []
+    try:
+        supplier_id = data.matched_supplier_id
+        supplier_name = (data.supplier_name or '').strip() or None
+        if not supplier_id and supplier_name:
+            supplier = Supplier(name=supplier_name, cnpj=data.supplier_cnpj, created_by=current_user['sub'])
+            doc = supplier.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.suppliers.insert_one(doc)
+            supplier_id = created_supplier_id = supplier.id
+
+        products_created = 0
+        products_updated = 0
+
+        for item in data.items:
+            if item.matched_product_id:
+                product_doc = matched_products[item.matched_product_id]
+                product_id = product_doc['id']
+                product_name = product_doc['description']
+                applied += await _apply_stock_deltas({product_id: item.quantity})
+                products_updated += 1
+            else:
+                counter = await db.counters.find_one_and_update(
+                    {"_id": "product_code"}, {"$inc": {"seq": 1}}, upsert=True, return_document=True
+                )
+                product = Product(
+                    code=counter["seq"],
+                    description=item.description,
+                    barcode=item.barcode or None,
+                    ncm=item.ncm or None,
+                    cfop=item.cfop or None,
+                    unit=item.unit or None,
+                    reference_value=item.unit_value,
+                    stock_quantity=item.quantity,
+                    linked_party_name=supplier_name,
+                    created_by=current_user['sub'], created_by_name=current_user['name'],
+                )
+                doc = product.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.products.insert_one(doc)
+                created_product_ids.append(product.id)
+                product_id = product.id
+                product_name = product.description
+                products_created += 1
+
+            entry = StockEntry(
+                product_id=product_id, product_name=product_name,
+                quantity=item.quantity, unit_value=item.unit_value, total_value=item.total_value,
+                supplier_id=supplier_id, supplier_name=supplier_name,
+                nfe_number=data.nfe_number, nfe_key=nfe_key, nfe_issue_date=data.nfe_issue_date,
+                import_id=import_id,
                 created_by=current_user['sub'], created_by_name=current_user['name'],
             )
-            doc = product.model_dump()
-            doc['created_at'] = doc['created_at'].isoformat()
-            await db.products.insert_one(doc)
-            product_id = product.id
-            product_name = product.description
-            products_created += 1
-
-        entry = StockEntry(
-            product_id=product_id, product_name=product_name,
-            quantity=item.quantity, unit_value=item.unit_value, total_value=item.total_value,
-            supplier_id=supplier_id, supplier_name=supplier_name,
-            nfe_number=data.nfe_number, nfe_key=data.nfe_key, nfe_issue_date=data.nfe_issue_date,
-            created_by=current_user['sub'], created_by_name=current_user['name'],
-        )
-        entry_doc = entry.model_dump()
-        entry_doc['created_at'] = entry_doc['created_at'].isoformat()
-        await db.stock_entries.insert_one(entry_doc)
+            entry_doc = entry.model_dump()
+            entry_doc['created_at'] = entry_doc['created_at'].isoformat()
+            await db.stock_entries.insert_one(entry_doc)
+    except Exception:
+        # Falhou no meio: desfaz o que já tinha entrado, pra nota poder ser
+        # importada de novo sem somar nada em dobro
+        await db.stock_entries.delete_many({"import_id": import_id})
+        await _revert_stock_deltas(applied)
+        if created_product_ids:
+            await db.products.delete_many({"id": {"$in": created_product_ids}})
+        if created_supplier_id:
+            await db.suppliers.delete_one({"id": created_supplier_id})
+        if nfe_key:
+            await db.stock_nfe_imports.delete_one({"_id": nfe_key})
+        raise
 
     return {
         "products_created": products_created,
@@ -549,16 +791,93 @@ async def get_stock_entries(current_user: dict = Depends(get_current_active_user
     return [StockEntryResponse(**{**i, "created_at": datetime.fromisoformat(i['created_at'])}) for i in items]
 
 
+def _same_import_query(entry: dict) -> dict:
+    """As entradas que vieram da mesma importação: pelo id da importação, pela
+    chave da NF-e (importações antigas) ou, sem nenhum dos dois, só ela."""
+    if entry.get('import_id'):
+        return {"import_id": entry['import_id']}
+    if (entry.get('nfe_key') or '').strip():
+        return {"nfe_key": entry['nfe_key']}
+    return {"id": entry['id']}
+
+
+@api_router.post("/stock/entries/{entry_id}/reverse")
+async def reverse_stock_entry_import(entry_id: str, current_user: dict = Depends(get_current_active_user)):
+    """Estorna a importação inteira da NF-e a que a entrada pertence: tira do
+    estoque o que ela somou e apaga as entradas. Os produtos e o fornecedor
+    criados por ela continuam cadastrados."""
+    entry = await db.stock_entries.find_one({"id": entry_id}, {"_id": 0})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entrada de estoque não encontrada")
+    query = _same_import_query(entry)
+    entries = await db.stock_entries.find(query, {"_id": 0}).to_list(None)
+
+    deltas = {}
+    for e in entries:
+        deltas[e['product_id']] = deltas.get(e['product_id'], 0) - float(e.get('quantity') or 0)
+    # Produto que não existe mais no cadastro não tem saldo pra devolver
+    existing_ids = {p['id'] async for p in db.products.find({"id": {"$in": list(deltas)}}, {"_id": 0, "id": 1})}
+    deltas = {pid: d for pid, d in deltas.items() if pid in existing_ids}
+    applied = await _apply_stock_deltas(
+        deltas, refusal="Não dá para estornar: parte do material desta nota já saiu do estoque. Produto",
+    )
+    try:
+        label = f"NF-e Nº {entry.get('nfe_number')}" if entry.get('nfe_number') else "importação"
+        await _log_stock_audit(
+            "NFE_IMPORT_REVERSED", current_user,
+            f"Estorno da {label}: {len(entries)} entrada(s)", {"entries": entries},
+        )
+        await db.stock_entries.delete_many(query)
+        keys = {(e.get('nfe_key') or '').strip() for e in entries} - {''}
+        if keys:
+            await db.stock_nfe_imports.delete_many({"_id": {"$in": list(keys)}})
+    except Exception:
+        await _revert_stock_deltas(applied)
+        raise
+    return {"message": "Importação estornada e quantidades retiradas do estoque", "entries_removed": len(entries)}
+
+
 # ==================== MOVIMENTAÇÃO DE ESTOQUE (ENTRADA/SAÍDA MANUAL) ====================
 
-def _stock_movement_serialize(doc: dict) -> dict:
+def _stock_movement_serialize(doc: dict, epi_numbers: Optional[dict] = None) -> dict:
+    """`epi_numbers`: {id da movimentação: nº da Entrega de EPI que a gerou}."""
     out = {**doc}
+    out.pop('_id', None)
     if isinstance(out.get('created_at'), str):
         out['created_at'] = datetime.fromisoformat(out['created_at'])
     if isinstance(out.get('updated_at'), str):
         out['updated_at'] = datetime.fromisoformat(out['updated_at'])
     out['total_value'] = round(sum(float(i.get('total_value') or 0) for i in (out.get('items') or [])), 2)
+    epi_number = (epi_numbers or {}).get(out.get('id'))
+    if epi_number is not None:
+        # Entregas antigas não gravaram a origem na movimentação
+        out['origin'] = 'EPI'
+        out['origin_label'] = out.get('origin_label') or f"Entrega de EPI Nº {epi_number}"
     return out
+
+
+async def _epi_numbers_for(movement_ids: list) -> dict:
+    """Quais dessas movimentações foram geradas por uma Entrega de EPI."""
+    if not movement_ids:
+        return {}
+    out = {}
+    async for d in db.epi_deliveries.find(
+        {"stock_movement_id": {"$in": movement_ids}}, {"_id": 0, "stock_movement_id": 1, "delivery_number": 1},
+    ):
+        out[d['stock_movement_id']] = d.get('delivery_number')
+    return out
+
+
+async def _refuse_if_generated_by_epi(movement: dict, action: str):
+    """A Saída de uma Entrega de EPI só muda pela própria entrega - senão o
+    Termo de Entrega deixa de bater com o que saiu do estoque."""
+    numbers = await _epi_numbers_for([movement['id']])
+    if movement['id'] in numbers:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Esta saída foi gerada pela Entrega de EPI Nº {numbers[movement['id']]}. "
+                   f"Para {action}, use a tela Entrega de EPI's.",
+        )
 
 
 def _stock_movement_effect_by_product(operation_type: str, items) -> dict:
@@ -574,6 +893,14 @@ def _stock_movement_effect_by_product(operation_type: str, items) -> dict:
     return out
 
 
+def _validate_movement_items(items):
+    if not items:
+        raise HTTPException(status_code=400, detail="Adicione ao menos um item à movimentação")
+    for item in items:
+        if item.quantity <= 0:
+            raise HTTPException(status_code=400, detail=f"Quantidade inválida para o item \"{item.product_description}\"")
+
+
 @api_router.get("/stock/movements/next-number")
 async def get_next_stock_movement_number(current_user: dict = Depends(get_current_active_user)):
     """Só uma prévia pra exibir na tela; o número real é reservado de forma
@@ -582,38 +909,34 @@ async def get_next_stock_movement_number(current_user: dict = Depends(get_curren
     return {"next_number": (counter["seq"] + 1) if counter else 1}
 
 
-@api_router.post("/stock/movements", response_model=StockMovementResponse)
-async def create_stock_movement(data: StockMovementCreate, current_user: dict = Depends(get_current_active_user)):
-    if not data.items:
-        raise HTTPException(status_code=400, detail="Adicione ao menos um item à movimentação")
-    for item in data.items:
-        if item.quantity <= 0:
-            raise HTTPException(status_code=400, detail=f"Quantidade inválida para o item \"{item.product_description}\"")
+async def _create_stock_movement(
+    data: StockMovementCreate, current_user: dict,
+    origin: Optional[str] = None, origin_id: Optional[str] = None, origin_label: Optional[str] = None,
+) -> dict:
+    """Lança a movimentação e aplica o efeito no saldo. `origin` marca as
+    geradas pelo sistema (EPI, SALDO_INICIAL, AJUSTE); as lançadas na tela
+    ficam sem origem."""
+    _validate_movement_items(data.items)
 
     # Carrega os produtos e confere saldo ANTES de gravar qualquer coisa -
     # numa Saída, nenhum item deve ser aplicado se algum deles não tiver
     # saldo suficiente (evita baixa parcial no estoque).
-    products_by_id = {}
-    for item in data.items:
-        product = await db.products.find_one({"id": item.product_id}, {"_id": 0})
+    effect = _stock_movement_effect_by_product(data.operation_type, data.items)
+    for product_id, delta in effect.items():
+        product = await db.products.find_one({"id": product_id}, {"_id": 0, "description": 1, "stock_quantity": 1})
         if not product:
-            raise HTTPException(status_code=404, detail=f"Produto não encontrado: {item.product_description}")
-        products_by_id[item.product_id] = product
-    if data.operation_type == "SAIDA":
-        # Soma por produto antes de comparar - o mesmo produto pode aparecer
-        # em mais de uma linha, e validar cada linha isolada contra o mesmo
-        # saldo deixaria passar uma soma que no total excede o estoque.
-        requested_by_product = {}
-        for item in data.items:
-            requested_by_product[item.product_id] = requested_by_product.get(item.product_id, 0) + item.quantity
-        for product_id, requested in requested_by_product.items():
-            available = float(products_by_id[product_id].get('stock_quantity') or 0)
-            if available < requested:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Saldo insuficiente para \"{products_by_id[product_id]['description']}\": "
-                           f"disponível {available:g}, solicitado {requested:g}"
-                )
+            description = next((i.product_description for i in data.items if i.product_id == product_id), '')
+            raise HTTPException(status_code=404, detail=f"Produto não encontrado: {description}")
+        # O efeito já vem somado por produto: o mesmo produto pode aparecer em
+        # mais de uma linha, e validar linha a linha deixaria passar uma soma
+        # que no total excede o estoque.
+        available = float(product.get('stock_quantity') or 0)
+        if delta < 0 and available + delta < -_QTY_EPS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Saldo insuficiente para \"{product['description']}\": "
+                       f"disponível {available:g}, solicitado {-delta:g}"
+            )
 
     counter = await db.counters.find_one_and_update(
         {"_id": "stock_movement_number"},
@@ -624,22 +947,25 @@ async def create_stock_movement(data: StockMovementCreate, current_user: dict = 
     movement = StockMovement(
         movement_number=counter["seq"],
         **data.model_dump(),
+        origin=origin, origin_id=origin_id, origin_label=origin_label,
         created_by=current_user['sub'],
         created_by_name=current_user['name'],
     )
 
-    sign = 1 if movement.operation_type == "ENTRADA" else -1
-    for item in movement.items:
-        await db.products.update_one({"id": item.product_id}, {"$inc": {"stock_quantity": sign * item.quantity}})
-
+    # A conferência acima dá a mensagem amigável; quem garante de fato é a
+    # baixa com filtro (duas saídas ao mesmo tempo passariam as duas na conferência)
+    applied = await _apply_stock_deltas(effect)
     doc = movement.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
-    await db.stock_movements.insert_one(doc)
+    try:
+        await db.stock_movements.insert_one(doc)
+    except Exception:
+        await _revert_stock_deltas(applied)
+        raise
     return _stock_movement_serialize(doc)
 
 
-@api_router.put("/stock/movements/{movement_id}", response_model=StockMovementResponse)
-async def update_stock_movement(movement_id: str, data: StockMovementUpdate, current_user: dict = Depends(get_current_active_user)):
+async def _update_stock_movement(movement_id: str, data: StockMovementUpdate, current_user: dict) -> dict:
     """Edita uma Movimentação já lançada. Recalcula o efeito no estoque como
     a DIFERENÇA entre o que a movimentação antiga já aplicou e o que a nova
     versão deveria aplicar (por produto) - assim cobre trocar quantidade,
@@ -648,11 +974,7 @@ async def update_stock_movement(movement_id: str, data: StockMovementUpdate, cur
     existing = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
-    if not data.items:
-        raise HTTPException(status_code=400, detail="Adicione ao menos um item à movimentação")
-    for item in data.items:
-        if item.quantity <= 0:
-            raise HTTPException(status_code=400, detail=f"Quantidade inválida para o item \"{item.product_description}\"")
+    _validate_movement_items(data.items)
 
     old_effect = _stock_movement_effect_by_product(existing.get('operation_type'), existing.get('items') or [])
     new_effect = _stock_movement_effect_by_product(data.operation_type, data.items)
@@ -660,38 +982,84 @@ async def update_stock_movement(movement_id: str, data: StockMovementUpdate, cur
         pid: new_effect.get(pid, 0) - old_effect.get(pid, 0)
         for pid in set(old_effect) | set(new_effect)
     }
+    # Só importa o produto cujo saldo muda com a edição
+    net_delta = {pid: delta for pid, delta in net_delta.items() if abs(delta) > _QTY_EPS}
 
-    products_by_id = {}
-    for pid in net_delta:
-        product = await db.products.find_one({"id": pid}, {"_id": 0})
+    for pid, delta in net_delta.items():
+        product = await db.products.find_one({"id": pid}, {"_id": 0, "description": 1, "stock_quantity": 1})
         if not product:
             raise HTTPException(status_code=404, detail=f"Produto vinculado a esta movimentação não foi encontrado (id {pid})")
-        products_by_id[pid] = product
-    for pid, delta in net_delta.items():
-        if delta < 0:
-            available = float(products_by_id[pid].get('stock_quantity') or 0)
-            if available + delta < 0:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Saldo insuficiente para \"{products_by_id[pid]['description']}\" com essa edição: "
-                           f"disponível {available:g}, faltariam {-(available + delta):g}"
-                )
+        available = float(product.get('stock_quantity') or 0)
+        if delta < 0 and available + delta < -_QTY_EPS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Saldo insuficiente para \"{product['description']}\" com essa edição: "
+                       f"disponível {available:g}, faltariam {-(available + delta):g}"
+            )
 
-    for pid, delta in net_delta.items():
-        if delta != 0:
-            await db.products.update_one({"id": pid}, {"$inc": {"stock_quantity": delta}})
-
+    applied = await _apply_stock_deltas(net_delta)
     update_data = {
         **data.model_dump(),
         "id": movement_id,
         "movement_number": existing["movement_number"],
+        "origin": existing.get("origin"),
+        "origin_id": existing.get("origin_id"),
+        "origin_label": existing.get("origin_label"),
         "created_by": existing["created_by"],
         "created_by_name": existing["created_by_name"],
         "created_at": existing["created_at"],
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.stock_movements.replace_one({"id": movement_id}, update_data)
+    try:
+        await db.stock_movements.replace_one({"id": movement_id}, update_data)
+    except Exception:
+        await _revert_stock_deltas(applied)
+        raise
     return _stock_movement_serialize(update_data)
+
+
+@api_router.post("/stock/movements", response_model=StockMovementResponse)
+async def create_stock_movement(data: StockMovementCreate, current_user: dict = Depends(get_current_active_user)):
+    return await _create_stock_movement(data, current_user)
+
+
+@api_router.put("/stock/movements/{movement_id}", response_model=StockMovementResponse)
+async def update_stock_movement(movement_id: str, data: StockMovementUpdate, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0, "id": 1})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
+    await _refuse_if_generated_by_epi(existing, "alterar")
+    return await _update_stock_movement(movement_id, data, current_user)
+
+
+@api_router.delete("/stock/movements/{movement_id}")
+async def delete_stock_movement(movement_id: str, current_user: dict = Depends(get_current_active_user)):
+    """Exclui a movimentação desfazendo o efeito dela no saldo: devolve ao
+    estoque o que uma Saída tirou, ou retira o que uma Entrada somou (se esse
+    material ainda estiver lá)."""
+    existing = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
+    await _refuse_if_generated_by_epi(existing, "excluir")
+
+    effect = _stock_movement_effect_by_product(existing.get('operation_type'), existing.get('items') or [])
+    # Produto que não existe mais no cadastro não tem saldo pra acertar
+    existing_ids = {p['id'] async for p in db.products.find({"id": {"$in": list(effect)}}, {"_id": 0, "id": 1})}
+    applied = await _apply_stock_deltas(
+        {pid: -delta for pid, delta in effect.items() if pid in existing_ids},
+        refusal="Não dá para excluir esta entrada: parte do material já saiu do estoque. Produto",
+    )
+    try:
+        operation = 'Entrada' if existing.get('operation_type') == 'ENTRADA' else 'Saída'
+        await _log_stock_audit(
+            "MOVEMENT_DELETED", current_user,
+            f"Exclusão da {operation} Nº {existing.get('movement_number')}", existing,
+        )
+        await db.stock_movements.delete_one({"id": movement_id})
+    except Exception:
+        await _revert_stock_deltas(applied)
+        raise
+    return {"message": "Movimentação excluída e saldo do estoque acertado"}
 
 
 @api_router.get("/stock/movements", response_model=List[StockMovementResponse])
@@ -712,7 +1080,8 @@ async def get_stock_movements(
             {"warehouse_name": {"$regex": search_escaped, "$options": "i"}},
         ]
     items = await db.stock_movements.find(query, {"_id": 0}).sort("movement_number", -1).to_list(None)
-    return [_stock_movement_serialize(i) for i in items]
+    epi_numbers = await _epi_numbers_for([i['id'] for i in items])
+    return [_stock_movement_serialize(i, epi_numbers) for i in items]
 
 
 @api_router.get("/stock/movements/{movement_id}", response_model=StockMovementResponse)
@@ -720,7 +1089,7 @@ async def get_stock_movement(movement_id: str, current_user: dict = Depends(get_
     doc = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
-    return _stock_movement_serialize(doc)
+    return _stock_movement_serialize(doc, await _epi_numbers_for([movement_id]))
 
 
 @api_router.get("/stock/movements/{movement_id}/pdf")
