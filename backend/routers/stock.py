@@ -15,7 +15,7 @@ from models import (
     ProductFamily, ProductFamilyCreate, ProductFamilyResponse,
     ServiceFamily, ServiceFamilyCreate, ServiceFamilyResponse,
     ServiceCatalogItem, ServiceCatalogItemCreate, ServiceCatalogItemResponse,
-    Product, ProductCreate, ProductResponse,
+    Product, ProductCreate, ProductResponse, normalize_product_unit,
     StockValueByWarehousePoint, DailyStockLedgerPoint,
     StockEntry, StockEntryResponse,
     StockMovement, StockMovementCreate, StockMovementUpdate, StockMovementResponse, StockMovementItem,
@@ -430,7 +430,29 @@ async def get_stock_report_summary(
         "total_quantity": total_quantity,
         "total_value": total_value,
         "zero_stock_count": zero_stock_count,
+        # Quantos têm saldo: somar as quantidades mistura kg, litro e unidade
+        "in_stock_count": len(products) - zero_stock_count,
     }
+
+
+@api_router.get("/stock/report/items")
+async def get_stock_report_items(
+    search: Optional[str] = None,
+    warehouse_id: Optional[str] = None,
+    family_id: Optional[str] = None,
+    status: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Os produtos do inventário (mesmos filtros do PDF/Excel), pra lista da tela."""
+    products = await _filter_products_report(search, warehouse_id, family_id, status)
+    return [{
+        "id": p.get('id'), "code": p.get('code'), "description": p.get('description'),
+        "warehouse_name": p.get('warehouse_name'), "family_name": p.get('family_name'),
+        "unit": p.get('unit'), "status": p.get('status'),
+        "stock_quantity": float(p.get('stock_quantity') or 0),
+        "reference_value": float(p.get('reference_value') or 0),
+        "total_value": round(float(p.get('stock_quantity') or 0) * float(p.get('reference_value') or 0), 2),
+    } for p in products]
 
 
 @api_router.get("/stock/report/by-warehouse", response_model=List[StockValueByWarehousePoint])
@@ -740,7 +762,7 @@ async def confirm_nfe_import(data: NfeImportConfirm, current_user: dict = Depend
                     barcode=item.barcode or None,
                     ncm=item.ncm or None,
                     cfop=item.cfop or None,
-                    unit=item.unit or None,
+                    unit=normalize_product_unit(item.unit),
                     reference_value=item.unit_value,
                     stock_quantity=item.quantity,
                     linked_party_name=supplier_name,
@@ -1373,6 +1395,19 @@ async def get_stock_ledger_summary(
         "saida_count": len(saida_rows),
         "saida_value": round(sum(r['total_value'] for r in saida_rows), 2),
     }
+
+
+@api_router.get("/stock/ledger/rows")
+async def get_stock_ledger_rows(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    operation_type: Optional[str] = None,
+    search: Optional[str] = None,
+    reference_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """As linhas do extrato (mesmos filtros do PDF/Excel), pra lista da tela."""
+    return await _build_stock_ledger(date_from, date_to, operation_type, search, reference_type)
 
 
 @api_router.get("/stock/ledger/daily-chart", response_model=List[DailyStockLedgerPoint])

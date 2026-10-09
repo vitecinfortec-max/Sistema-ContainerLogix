@@ -4,6 +4,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+  TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -174,6 +175,8 @@ export default function EstoqueCadastrosPage() {
     return activeType.listColumns.some(([field]) => (item[field] || '').toString().toLowerCase().includes(term));
   });
 
+  const { pageItems, paginationProps } = usePagination(filteredItems, { resetKey: `${activeType.key}|${search}` });
+
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -184,7 +187,7 @@ export default function EstoqueCadastrosPage() {
 
   const toggleSelectAllOnPage = () => {
     setSelectedIds(prev => {
-      const pageIds = filteredItems.map(i => i.id);
+      const pageIds = pageItems.map(i => i.id);
       const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
       if (allSelected) {
         const next = new Set(prev);
@@ -278,6 +281,7 @@ export default function EstoqueCadastrosPage() {
         <DataCard
           title={activeType.plural}
           count={loading ? '...' : filteredItems.length}
+          footer={<TablePagination {...paginationProps} />}
           toolbar={(
             <Toolbar
               selectedCount={selectedIds.size}
@@ -295,7 +299,7 @@ export default function EstoqueCadastrosPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={filteredItems.length > 0 && filteredItems.every(i => selectedIds.has(i.id))}
+                        checked={pageItems.length > 0 && pageItems.every(i => selectedIds.has(i.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                       />
                     </th>
@@ -305,7 +309,7 @@ export default function EstoqueCadastrosPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item) => {
+                  {pageItems.map((item) => {
                     const isSelected = selectedIds.has(item.id);
                     return (
                       <tr

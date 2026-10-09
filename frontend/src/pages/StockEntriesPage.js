@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState } from '../components/DataPage';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState, TablePagination, usePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -197,6 +199,8 @@ export default function StockEntriesPage() {
       || (e.nfe_number || '').toLowerCase().includes(term);
   });
 
+  const { pageItems, paginationProps } = usePagination(filteredEntries, { resetKey: search });
+
   return (
     <Layout>
       <div className="space-y-4" data-testid="stock-entries-page">
@@ -213,6 +217,7 @@ export default function StockEntriesPage() {
         <DataCard
           title="Entradas registradas"
           count={loading ? '...' : filteredEntries.length}
+          footer={<TablePagination {...paginationProps} />}
           toolbar={(
             <Toolbar
               selectedCount={selectedEntry ? 1 : 0}
@@ -237,7 +242,7 @@ export default function StockEntriesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEntries.map((e) => (
+                  {pageItems.map((e) => (
                     <tr
                       key={e.id}
                       data-testid="stock-entry-row"

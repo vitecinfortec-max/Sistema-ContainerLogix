@@ -3438,7 +3438,27 @@ class ServiceCatalogItemResponse(ServiceCatalogItemCreate):
     created_at: datetime
 
 
-PRODUCT_UNIT_OPTIONS = ["KG", "TON", "M3", "UNIDADE", "CAIXA", "PALLET"]
+PRODUCT_UNIT_OPTIONS = ["UNIDADE", "PECA", "PAR", "CAIXA", "KG", "TON", "LITRO", "METRO", "M3", "PALLET"]
+
+# Como as unidades costumam vir escritas na NF-e (uCom) -> unidade do cadastro.
+# Mesma tabela de frontend/src/lib/productUnits.js - se mudar uma, mudar a outra.
+PRODUCT_UNIT_ALIASES = {
+    "UN": "UNIDADE", "UND": "UNIDADE", "UNID": "UNIDADE", "UNI": "UNIDADE",
+    "PC": "PECA", "PÇ": "PECA", "PCA": "PECA", "PEÇA": "PECA",
+    "PR": "PAR", "CX": "CAIXA", "KGS": "KG", "QUILO": "KG",
+    "T": "TON", "TONELADA": "TON",
+    "L": "LITRO", "LT": "LITRO", "LTS": "LITRO",
+    "M": "METRO", "MT": "METRO", "MTS": "METRO", "M³": "M3",
+    "PL": "PALLET", "PLT": "PALLET",
+}
+
+
+def normalize_product_unit(unit: Optional[str]) -> Optional[str]:
+    """"UN" -> "UNIDADE", "cx" -> "CAIXA"...; o que não for conhecido fica como veio (em maiúsculas)."""
+    key = (unit or '').strip().upper()
+    if not key:
+        return None
+    return PRODUCT_UNIT_ALIASES.get(key, key)
 PRODUCT_ORIGIN_OPTIONS = ["NACIONAL", "IMPORTADO"]
 
 class Product(BaseModel):

@@ -1,15 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, EmptyState } from '../components/DataPage';
+import {
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, EmptyState, StatusPill, TablePagination, usePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
+import { qtyWithUnit } from '../lib/productUnits';
 import { toast } from 'sonner';
 import {
-  FileText, FileSpreadsheet, BarChart3, Package, Boxes, Wallet, AlertTriangle,
-  ArrowDownCircle, ArrowUpCircle,
+  FileText, FileSpreadsheet, BarChart3, Package, PackageCheck, Wallet, AlertTriangle,
+  ArrowDownCircle, ArrowUpCircle, ListChecks,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
@@ -38,7 +41,8 @@ const REFERENCE_OPTIONS = [
 ];
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const fmtQty = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const fmtQty = (v) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+const fmtDay = (v) => (/^\d{4}-\d{2}-\d{2}/.test(v || '') ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : (v || '-'));
 
 const WAREHOUSE_SERIES = [
   { key: 'total_value', name: 'Valor em Estoque', color: CHART_COLORS.primary },
@@ -62,6 +66,7 @@ export default function StockReportPage() {
   const [families, setFamilies] = useState([]);
   const [invSummary, setInvSummary] = useState({ count: 0, total_quantity: 0, total_value: 0, zero_stock_count: 0 });
   const [byWarehouseChart, setByWarehouseChart] = useState([]);
+  const [invItems, setInvItems] = useState([]);
 
   // ---- Movimentações de Estoque ----
   const [dateFrom, setDateFrom] = useState('');
@@ -71,6 +76,12 @@ export default function StockReportPage() {
   const [referenceType, setReferenceType] = useState('all');
   const [ledgerSummary, setLedgerSummary] = useState({ entrada_count: 0, entrada_value: 0, saida_count: 0, saida_value: 0 });
   const [dailyChart, setDailyChart] = useState([]);
+  const [ledgerRows, setLedgerRows] = useState([]);
+
+  // Lista da tela: os mesmos dados do PDF/Excel, 15 por página
+  const [listLoading, setListLoading] = useState(true);
+  const listRef = useRef(null);
+  const listSeq = useRef(0);
 
   useEffect(() => {
     loadWarehouses();
@@ -85,6 +96,7 @@ export default function StockReportPage() {
     } else {
       loadLedgerSummary();
     }
+    loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelo, invSearch, warehouseId, familyId, status, dateFrom, dateTo, ledgerSearch, operationType, referenceType]);
 
@@ -156,6 +168,29 @@ export default function StockReportPage() {
       console.error('Erro ao carregar resumo de movimentações de estoque:', e);
     }
   };
+
+  const loadList = async () => {
+    listSeq.current += 1;
+    const seq = listSeq.current;
+    setListLoading(true);
+    try {
+      if (modelo === 'INVENTARIO') {
+        const r = await api.getStockReportItems(buildInvParams());
+        if (seq === listSeq.current) setInvItems(r.data || []);
+      } else {
+        const r = await api.getStockLedgerRows(buildLedgerParams());
+        if (seq === listSeq.current) setLedgerRows(r.data || []);
+      }
+    } catch (e) {
+      if (seq === listSeq.current) toast.error('Erro ao carregar a lista do relatório');
+    } finally {
+      if (seq === listSeq.current) setListLoading(false);
+    }
+  };
+
+  const filtersKey = [modelo, invSearch, warehouseId, familyId, status, dateFrom, dateTo, ledgerSearch, operationType, referenceType].join('|');
+  const invPaging = usePagination(invItems, { resetKey: filtersKey, scrollRef: listRef });
+  const ledgerPaging = usePagination(ledgerRows, { resetKey: filtersKey, scrollRef: listRef });
 
   const clearFilters = () => {
     if (modelo === 'INVENTARIO') {
@@ -350,7 +385,8 @@ export default function StockReportPage() {
           <div data-testid="stock-summary-cards">
             <StatGrid>
               <StatCard icon={Package} label="Total de produtos" value={invSummary.count} tone="blue" testId="stock-kpi-count" />
-              <StatCard icon={Boxes} label="Quantidade total" value={fmtQty(invSummary.total_quantity)} tone="primary" testId="stock-kpi-quantity" />
+              {/* Quantos têm saldo (somar as quantidades misturaria kg, litro e unidade) */}
+              <StatCard icon={PackageCheck} label="Com saldo" value={invSummary.in_stock_count ?? (invSummary.count - invSummary.zero_stock_count)} tone="primary" testId="stock-kpi-in-stock" />
               <StatCard icon={Wallet} label="Valor total em estoque" value={fmtMoney(invSummary.total_value)} tone="emerald" testId="stock-kpi-value" />
               <StatCard icon={AlertTriangle} label="Sem estoque" value={invSummary.zero_stock_count} tone={invSummary.zero_stock_count > 0 ? 'amber' : 'slate'} testId="stock-kpi-zero" />
             </StatGrid>
@@ -409,6 +445,96 @@ export default function StockReportPage() {
             </div>
           </DataCard>
         )}
+
+        {/* Lista */}
+        <div ref={listRef} className="scroll-mt-20">
+          {modelo === 'INVENTARIO' ? (
+            <DataCard
+              title={(<span className="flex items-center gap-2"><ListChecks className="w-4 h-4 text-primary" />Produtos do inventário</span>)}
+              count={listLoading && invItems.length === 0 ? '...' : invItems.length}
+              footer={<TablePagination {...invPaging.paginationProps} />}
+              testId="stock-inventory-list"
+            >
+              {invItems.length > 0 ? (
+                <div className={`overflow-x-auto transition-opacity ${listLoading ? 'opacity-60' : ''}`}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Cód.</th>
+                        <th>Produto</th>
+                        <th>Almoxarifado</th>
+                        <th>Família</th>
+                        <th className="!text-right">Saldo</th>
+                        <th className="!text-right">Valor unit.</th>
+                        <th className="!text-right">Valor em estoque</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invPaging.pageItems.map((p) => (
+                        <tr key={p.id} data-testid="stock-inventory-row">
+                          <td className="cell-strong whitespace-nowrap tabular-nums">{p.code}</td>
+                          <td><div className="max-w-[320px] truncate" title={p.description || ''}>{p.description}</div></td>
+                          <td><div className="max-w-[180px] truncate" title={p.warehouse_name || ''}>{p.warehouse_name || '-'}</div></td>
+                          <td><div className="max-w-[160px] truncate" title={p.family_name || ''}>{p.family_name || '-'}</div></td>
+                          <td className={`text-right whitespace-nowrap tabular-nums font-medium ${p.stock_quantity <= 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>{qtyWithUnit(p.stock_quantity, p.unit)}</td>
+                          <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(p.reference_value)}</td>
+                          <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(p.total_value)}</td>
+                          <td><StatusPill tone={p.status === 'ATIVO' ? 'emerald' : 'slate'}>{p.status === 'ATIVO' ? 'Ativo' : 'Inativo'}</StatusPill></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState icon={Package} title={listLoading ? 'Carregando...' : 'Nenhum produto neste filtro'} />
+              )}
+            </DataCard>
+          ) : (
+            <DataCard
+              title={(<span className="flex items-center gap-2"><ListChecks className="w-4 h-4 text-primary" />Entradas e saídas</span>)}
+              count={listLoading && ledgerRows.length === 0 ? '...' : ledgerRows.length}
+              footer={<TablePagination {...ledgerPaging.paginationProps} />}
+              testId="stock-ledger-list"
+            >
+              {ledgerRows.length > 0 ? (
+                <div className={`overflow-x-auto transition-opacity ${listLoading ? 'opacity-60' : ''}`}>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th>Produto</th>
+                        <th>Almoxarifado</th>
+                        <th>Referência</th>
+                        <th className="!text-right">Quantidade</th>
+                        <th className="!text-right">Valor unit.</th>
+                        <th className="!text-right">Valor total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledgerPaging.pageItems.map((r, index) => (
+                        // O extrato não tem id por linha (uma movimentação gera várias): a chave é a posição na página
+                        <tr key={`${ledgerPaging.paginationProps.currentPage}-${index}`} data-testid="stock-ledger-row">
+                          <td className="whitespace-nowrap tabular-nums">{fmtDay(r.date)}</td>
+                          <td><StatusPill tone={r.operation_type === 'ENTRADA' ? 'emerald' : 'red'}>{r.operation_type === 'ENTRADA' ? 'Entrada' : 'Saída'}</StatusPill></td>
+                          <td><div className="max-w-[300px] truncate" title={r.product_name || ''}>{r.product_name}</div></td>
+                          <td><div className="max-w-[170px] truncate" title={r.warehouse_name || ''}>{r.warehouse_name || '-'}</div></td>
+                          <td><div className="max-w-[220px] truncate" title={r.reference_label || ''}>{r.reference_label || '-'}</div></td>
+                          <td className="text-right whitespace-nowrap tabular-nums font-medium">{fmtQty(r.quantity)}</td>
+                          <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(r.unit_value)}</td>
+                          <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(r.total_value)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <EmptyState icon={Package} title={listLoading ? 'Carregando...' : 'Nenhuma entrada ou saída neste filtro'} />
+              )}
+            </DataCard>
+          )}
+        </div>
       </div>
     </Layout>
   );

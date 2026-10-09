@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider,
-  ToolbarPrimary, StatusPill, EmptyState,
+  ToolbarPrimary, StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -16,6 +16,7 @@ import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import { SignatureCaptureDialog, signatureSrc } from '../components/SignaturePad';
 import { useConfirm } from '../hooks/useConfirm';
 import { api } from '../lib/api';
+import { qtyWithUnit } from '../lib/productUnits';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -194,7 +195,16 @@ export default function EpiDeliveriesPage() {
   const removeItem = (idx) => setForm((p) => ({ ...p, items: p.items.filter((_, i) => i !== idx) }));
 
   const productById = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products]);
-  const productLabel = (p) => `${p.description} (saldo: ${fmtQty(p.stock_quantity)}${p.unit ? ` ${p.unit}` : ''})`;
+  const productLabel = (p) => `${p.description} (saldo: ${qtyWithUnit(p.stock_quantity, p.unit)})`;
+  // EPI = produto com C.A. no cadastro ou de uma família com "EPI" no nome.
+  // Se nenhum produto estiver marcado assim, a lista continua com todos.
+  const epiProducts = useMemo(
+    () => products.filter((p) => (p.ca_number || '').trim() || /\bEPI/i.test(p.family_name || '')),
+    [products],
+  );
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const onlyEpis = epiProducts.length > 0 && !showAllProducts;
+  const pickerProducts = onlyEpis ? epiProducts : products;
 
   const handleSave = async () => {
     if (!form.recipient_id) { toast.error('Selecione o Motorista ou Funcionário na lista'); return; }
@@ -263,8 +273,9 @@ export default function EpiDeliveriesPage() {
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
+  const { pageItems, paginationProps } = usePagination(deliveries, { resetKey: `${search}|${dateFrom}|${dateTo}` });
   const toggleSelectAll = () => setSelectedIds((prev) => (
-    deliveries.length > 0 && deliveries.every((d) => prev.has(d.id)) ? new Set() : new Set(deliveries.map((d) => d.id))
+    pageItems.length > 0 && pageItems.every((d) => prev.has(d.id)) ? new Set() : new Set(pageItems.map((d) => d.id))
   ));
   const single = selectedIds.size === 1 ? deliveries.find((d) => d.id === [...selectedIds][0]) : null;
 
@@ -366,6 +377,7 @@ export default function EpiDeliveriesPage() {
         <DataCard
           title="Entregas"
           count={loading ? '...' : deliveries.length}
+          footer={<TablePagination {...paginationProps} />}
           toolbar={(
             <Toolbar
               selectedCount={selectedIds.size}
@@ -386,7 +398,7 @@ export default function EpiDeliveriesPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={deliveries.length > 0 && deliveries.every((d) => selectedIds.has(d.id))}
+                        checked={pageItems.length > 0 && pageItems.every((d) => selectedIds.has(d.id))}
                         onCheckedChange={toggleSelectAll}
                         data-testid="epi-select-all"
                       />
@@ -401,7 +413,7 @@ export default function EpiDeliveriesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {deliveries.map((d) => {
+                  {pageItems.map((d) => {
                     const itemsText = (d.items || []).map((it) => `${it.product_description} (${fmtQty(it.quantity)})`).join(', ');
                     return (
                       <tr
@@ -524,6 +536,16 @@ export default function EpiDeliveriesPage() {
                   <Plus className="w-3 h-3 mr-1" />Adicionar EPI
                 </Button>
               </div>
+              {epiProducts.length > 0 && (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400" data-testid="epi-products-scope">
+                  {onlyEpis
+                    ? `A busca mostra só os ${epiProducts.length} produto(s) com C.A. ou de família EPI.`
+                    : 'A busca está mostrando todos os produtos do estoque.'}{' '}
+                  <button type="button" onClick={() => setShowAllProducts((v) => !v)} className="font-medium text-primary hover:underline" data-testid="epi-products-scope-toggle">
+                    {onlyEpis ? 'Mostrar todos' : 'Mostrar só EPIs'}
+                  </button>
+                </p>
+              )}
               {form.items.length === 0 && (
                 <div className="text-center py-4 text-[12px] text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded">
                   Nenhum EPI adicionado
@@ -540,14 +562,14 @@ export default function EpiDeliveriesPage() {
                         value={it.product_description || ''}
                         onChange={(v) => onItemInput(idx, v)}
                         onSelect={(p) => onItemSelect(idx, p)}
-                        options={products}
+                        options={pickerProducts}
                         displayField={productLabel}
                         className="h-8 text-sm"
                         testId={`epi-item-product-${idx}`}
                       />
                       {product && (
                         <p className={`text-[11px] mt-1 ${overStock ? 'text-red-600' : 'text-slate-500 dark:text-slate-400'}`}>
-                          Saldo em estoque: {fmtQty(product.stock_quantity)}{product.unit ? ` ${product.unit}` : ''}
+                          Saldo em estoque: {qtyWithUnit(product.stock_quantity, product.unit)}
                           {overStock ? ' - insuficiente para esta quantidade' : ''}
                         </p>
                       )}

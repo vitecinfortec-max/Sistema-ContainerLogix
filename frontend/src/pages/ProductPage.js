@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+  TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -14,16 +15,15 @@ import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
+import { normalizeUnit, unitOptionsFor, qtyWithUnit, fmtQty } from '../lib/productUnits';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, Edit, Package, Scale } from 'lucide-react';
 
-const UNIT_OPTIONS = [['KG', 'Kg'], ['TON', 'Toneladas'], ['M3', 'm³'], ['UNIDADE', 'Unidade'], ['CAIXA', 'Caixa'], ['PALLET', 'Pallet']];
 const ORIGIN_OPTIONS = [['NACIONAL', 'Nacional'], ['IMPORTADO', 'Importado']];
 const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const fmtQty = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 
 function buildEmptyForm() {
   return {
@@ -109,7 +109,7 @@ export default function ProductPage() {
       stock_quantity: item.stock_quantity?.toString() || '',
       warehouse_id: item.warehouse_id || '', warehouse_name: item.warehouse_name || '',
       barcode: item.barcode || '', ncm: item.ncm || '', cfop: item.cfop || '',
-      unit: item.unit || 'UNIDADE', family_id: item.family_id || '', family_name: item.family_name || '',
+      unit: normalizeUnit(item.unit) || 'UNIDADE', family_id: item.family_id || '', family_name: item.family_name || '',
       reference_value: item.reference_value?.toString() || '', icms_rate: item.icms_rate?.toString() || '',
       other_taxes_rate: item.other_taxes_rate?.toString() || '', origin: item.origin || 'NACIONAL',
       linked_party_name: item.linked_party_name || '', status: item.status || 'ATIVO', observations: item.observations || '',
@@ -211,6 +211,8 @@ export default function ProductPage() {
     return item.description?.toLowerCase().includes(term) || item.barcode?.toLowerCase().includes(term) || String(item.code).includes(term);
   });
 
+  const { pageItems, paginationProps } = usePagination(filteredItems, { resetKey: search });
+
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -221,7 +223,7 @@ export default function ProductPage() {
 
   const toggleSelectAllOnPage = () => {
     setSelectedIds(prev => {
-      const pageIds = filteredItems.map(i => i.id);
+      const pageIds = pageItems.map(i => i.id);
       const allSelected = pageIds.length > 0 && pageIds.every(id => prev.has(id));
       if (allSelected) {
         const next = new Set(prev);
@@ -253,6 +255,7 @@ export default function ProductPage() {
         <DataCard
           title="Produtos cadastrados"
           count={loading ? '...' : filteredItems.length}
+          footer={<TablePagination {...paginationProps} />}
           toolbar={(
             <Toolbar
               selectedCount={selectedIds.size}
@@ -271,7 +274,7 @@ export default function ProductPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={filteredItems.length > 0 && filteredItems.every(i => selectedIds.has(i.id))}
+                        checked={pageItems.length > 0 && pageItems.every(i => selectedIds.has(i.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                       />
                     </th>
@@ -285,7 +288,7 @@ export default function ProductPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item) => {
+                  {pageItems.map((item) => {
                     const isSelected = selectedIds.has(item.id);
                     return (
                       <tr
@@ -305,7 +308,7 @@ export default function ProductPage() {
                         <td><div className="max-w-[340px] truncate" title={item.description || ''}>{item.description}</div></td>
                         <td><div className="max-w-[180px] truncate" title={item.warehouse_name || ''}>{item.warehouse_name || '-'}</div></td>
                         <td><div className="max-w-[180px] truncate" title={item.family_name || ''}>{item.family_name || '-'}</div></td>
-                        <td className="text-right whitespace-nowrap tabular-nums font-medium">{fmtQty(item.stock_quantity)}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums font-medium">{qtyWithUnit(item.stock_quantity, item.unit)}</td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(item.reference_value)}</td>
                         <td>
                           <StatusPill tone={item.status === 'ATIVO' ? 'emerald' : 'slate'}>
@@ -472,7 +475,7 @@ export default function ProductPage() {
                 <Select value={formData.unit} onValueChange={(v) => setField('unit', v)}>
                   <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {UNIT_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
+                    {unitOptionsFor(formData.unit).map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

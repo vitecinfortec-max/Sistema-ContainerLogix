@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+  TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -15,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
+import { qtyWithUnit } from '../lib/productUnits';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
@@ -135,8 +137,10 @@ export default function StockMovementsPage() {
     });
   };
 
+  const { pageItems, paginationProps } = usePagination(movements, { resetKey: `${search}|${operationFilter}` });
+
   const toggleSelectAllOnPage = () => {
-    const pageIds = movements.map((m) => m.id);
+    const pageIds = pageItems.map((m) => m.id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -162,6 +166,13 @@ export default function StockMovementsPage() {
       return { ...p, items };
     });
   };
+  const onItemInput = (idx, value) => setForm((p) => {
+    const items = [...(p.items || [])];
+    items[idx] = { ...items[idx], product_description: value, product_id: '', product_code: null };
+    return { ...p, items };
+  });
+  const productById = Object.fromEntries(products.map((p) => [p.id, p]));
+  const productLabel = (p) => `${p.description} (saldo: ${qtyWithUnit(p.stock_quantity, p.unit)})`;
   const setItemProduct = (idx, product) => {
     setForm((p) => {
       const items = [...(p.items || [])];
@@ -376,6 +387,7 @@ export default function StockMovementsPage() {
         <DataCard
           title="Movimentações"
           count={loading ? '...' : movements.length}
+          footer={<TablePagination {...paginationProps} />}
           toolbar={(
             <Toolbar
               selectedCount={selectedIds.size}
@@ -394,7 +406,7 @@ export default function StockMovementsPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={movements.length > 0 && movements.every((m) => selectedIds.has(m.id))}
+                        checked={pageItems.length > 0 && pageItems.every((m) => selectedIds.has(m.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="stock-movement-select-all"
                       />
@@ -409,7 +421,7 @@ export default function StockMovementsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {movements.map((m) => (
+                  {pageItems.map((m) => (
                     <tr
                       key={m.id}
                       onClick={() => toggleSelect(m.id)}
@@ -544,18 +556,29 @@ export default function StockMovementsPage() {
                     Nenhum item adicionado
                   </div>
                 )}
-                {(form.items || []).map((it, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                    <div className="col-span-6">
+                {(form.items || []).map((it, idx) => {
+                  const product = productById[it.product_id];
+                  // Na edição o saldo mostrado já inclui o efeito desta movimentação: o aviso fica só pro lançamento novo
+                  const overStock = !editingId && form.operation_type === 'SAIDA' && product && Number(it.quantity) > Number(product.stock_quantity || 0);
+                  return (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-start p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                    <div className="col-span-5">
                       <Label className="text-xs mb-1 block">Produto</Label>
                       <Autocomplete
                         value={it.product_description || ''}
-                        onChange={(v) => setItem(idx, 'product_description', v)}
+                        onChange={(v) => onItemInput(idx, v)}
                         onSelect={(prod) => setItemProduct(idx, prod)}
                         options={products}
-                        displayField="description"
+                        displayField={productLabel}
                         className="h-8 text-sm"
+                        testId={`stock-movement-item-product-${idx}`}
                       />
+                      {product && (
+                        <p className={`text-[11px] mt-1 ${overStock ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`} data-testid={`stock-movement-item-balance-${idx}`}>
+                          Saldo em estoque: {qtyWithUnit(product.stock_quantity, product.unit)}
+                          {overStock ? ' - insuficiente para esta saída' : ''}
+                        </p>
+                      )}
                     </div>
                     <div className="col-span-2">
                       <Label className="text-xs mb-1 block">Qtd</Label>
@@ -565,17 +588,18 @@ export default function StockMovementsPage() {
                       <Label className="text-xs mb-1 block">V. Unit.</Label>
                       <Input type="number" step="0.01" value={it.unit_value ?? ''} onChange={(e) => setItem(idx, 'unit_value', e.target.value)} className="h-8 text-sm text-right" data-testid={`stock-movement-item-unitvalue-${idx}`} />
                     </div>
-                    <div className="col-span-1">
+                    <div className="col-span-2">
                       <Label className="text-xs mb-1 block">Total</Label>
                       <Input value={fmtMoney(it.total_value)} readOnly className="h-8 text-sm text-right font-semibold bg-white dark:bg-slate-900" />
                     </div>
-                    <div className="col-span-1">
+                    <div className="col-span-1 pt-5">
                       <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-8 px-2 text-red-500 hover:text-red-700">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-700">
                 <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 min-w-[220px] text-right">

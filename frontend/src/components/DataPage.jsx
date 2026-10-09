@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -290,6 +291,29 @@ function PageButton({ page, currentPage, onPageChange }) {
       {page}
     </Button>
   );
+}
+
+/**
+ * Paginação no navegador de uma lista que já veio inteira da API (15 por
+ * página, como em Emitir EIR). Devolve os itens da página e as props do
+ * <TablePagination>. `resetKey`: quando muda (busca, filtro), volta pra
+ * página 1. `scrollRef`: pra onde rolar ao trocar de página (padrão: topo).
+ */
+export function usePagination(items, { pageSize = 15, resetKey, scrollRef } = {}) {
+  const [currentPage, setCurrentPage] = useState(1);
+  useEffect(() => { setCurrentPage(1); }, [resetKey]);
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const page = Math.min(currentPage, totalPages); // a lista pode encolher (exclusão)
+  const onPageChange = (next) => {
+    if (next < 1 || next > totalPages) return;
+    setCurrentPage(next);
+    if (scrollRef?.current) scrollRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  return {
+    pageItems: items.slice((page - 1) * pageSize, page * pageSize),
+    paginationProps: { currentPage: page, totalPages, totalItems: items.length, pageSize, onPageChange },
+  };
 }
 
 /** Rodapé de paginação padrão ("Mostrando 1–15 de 993" + navegação). */
