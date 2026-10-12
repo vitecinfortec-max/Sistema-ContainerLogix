@@ -54,7 +54,7 @@ from reports import (
     generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel,
     generate_movement_voucher_pdf, generate_yard_control_pdf,
     generate_storage_overage_pdf_report, generate_storage_overage_excel_report,
-    now_brt, to_brt, merge_company, DEFAULT_COMPANY
+    now_brt, to_brt, merge_company, DEFAULT_COMPANY, BRT_TZ
 )
 
 from shared import (
@@ -68,6 +68,36 @@ from routers.fuel_supply import _compute_tank_level
 
 api_router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
+
+
+def _parse_filter_day(value: str, field: str) -> date:
+    """Dia (YYYY-MM-DD) recebido num filtro de período - data inválida vira
+    400, em vez de o filtro ser ignorado em silêncio."""
+    try:
+        return datetime.fromisoformat(value).date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Data inválida em {field}: use o formato AAAA-MM-DD")
+
+
+def _filter_movements_by_period(movements: list, date_from: Optional[str], date_to: Optional[str]) -> list:
+    """Mantém as movimentações cujo dia de lançamento, no horário de Brasília,
+    cai entre date_from e date_to (ambos inclusive). Movimentação com
+    created_at ilegível não é descartada."""
+    if not date_from and not date_to:
+        return movements
+    day_from = _parse_filter_day(date_from, "date_from") if date_from else None
+    day_to = _parse_filter_day(date_to, "date_to") if date_to else None
+    filtered = []
+    for m in movements:
+        created_brt = to_brt(m.get('created_at'))
+        if created_brt is not None:
+            movement_day = created_brt.date()
+            if day_from and movement_day < day_from:
+                continue
+            if day_to and movement_day > day_to:
+                continue
+        filtered.append(m)
+    return filtered
 
 
 async def _find_last_movement(container_number: str):
@@ -565,17 +595,16 @@ async def get_movements(
         query['client_name'] = {"$regex": re.escape(client_name), "$options": "i"}
     # created_at é salvo como string ISO 8601 (sempre UTC) — comparação de string
     # funciona corretamente para ordenar/filtrar por data nesse formato.
+    # date_from/date_to são dias no horário de Brasília: o intervalo vai de
+    # 00:00 BRT do primeiro dia até 00:00 BRT do dia seguinte ao último (fim
+    # exclusivo), convertido pra UTC.
     date_range = {}
     if date_from:
-        try:
-            date_range['$gte'] = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc).isoformat()
-        except ValueError:
-            pass
+        day_from = _parse_filter_day(date_from, "date_from")
+        date_range['$gte'] = datetime.combine(day_from, datetime.min.time(), tzinfo=BRT_TZ).astimezone(timezone.utc).isoformat()
     if date_to:
-        try:
-            date_range['$lte'] = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc).isoformat()
-        except ValueError:
-            pass
+        day_to = _parse_filter_day(date_to, "date_to")
+        date_range['$lt'] = datetime.combine(day_to + timedelta(days=1), datetime.min.time(), tzinfo=BRT_TZ).astimezone(timezone.utc).isoformat()
     if date_range:
         query['created_at'] = date_range
 
@@ -1197,20 +1226,15 @@ async def get_yard_control(
     now = datetime.now(timezone.utc)
     yard_containers = []
     
-    # Parse date filters
+    # Parse date filters - dias no horário de Brasília (00:00:00 do primeiro
+    # dia até 23:59:59 do último), não em UTC
     date_from_dt = None
     date_to_dt = None
     if date_from:
-        try:
-            date_from_dt = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
-        except:
-            pass
+        date_from_dt = datetime.combine(_parse_filter_day(date_from, "date_from"), datetime.min.time(), tzinfo=BRT_TZ)
     if date_to:
-        try:
-            date_to_dt = datetime.fromisoformat(date_to).replace(hour=23, minute=59, second=59, tzinfo=timezone.utc)
-        except:
-            pass
-    
+        date_to_dt = datetime.combine(_parse_filter_day(date_to, "date_to"), datetime.min.time(), tzinfo=BRT_TZ).replace(hour=23, minute=59, second=59)
+
     for container, data in container_data.items():
         num_entries = len(data['entries'])
         num_exits = len(data['exits'])
@@ -1740,19 +1764,7 @@ async def download_pdf_report(
         movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
     
     # Filtrar por data se fornecido
-    if date_from or date_to:
-        filtered_movements = []
-        for m in movements:
-            try:
-                movement_date = parse_datetime_value(m['created_at']).date()
-                if date_from and movement_date < datetime.fromisoformat(date_from).date():
-                    continue
-                if date_to and movement_date > datetime.fromisoformat(date_to).date():
-                    continue
-                filtered_movements.append(m)
-            except:
-                filtered_movements.append(m)
-        movements = filtered_movements
+    movements = _filter_movements_by_period(movements, date_from, date_to)
     
     # Gerar título do relatório baseado no filtro
     report_title = "Relatório de Movimentações"
@@ -1799,19 +1811,7 @@ async def download_excel_report(
         movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
 
     # Filtrar por data se fornecido
-    if date_from or date_to:
-        filtered_movements = []
-        for m in movements:
-            try:
-                movement_date = parse_datetime_value(m['created_at']).date()
-                if date_from and movement_date < datetime.fromisoformat(date_from).date():
-                    continue
-                if date_to and movement_date > datetime.fromisoformat(date_to).date():
-                    continue
-                filtered_movements.append(m)
-            except:
-                filtered_movements.append(m)
-        movements = filtered_movements
+    movements = _filter_movements_by_period(movements, date_from, date_to)
     
     # Gerar título do relatório baseado no filtro
     report_title = "Relatório de Movimentações"
@@ -1895,8 +1895,11 @@ async def _compute_storage_overage_charges(
         if free_time_days is None:
             continue
         entry_date = parse_datetime_value(container['created_at'])
-        days_in_yard = (today - entry_date.date()).days
-        excess_start = entry_date.date() + timedelta(days=free_time_days)
+        # Dia da entrada no horário de Brasília (o mesmo fuso de "today"), não
+        # em UTC - senão quem entra depois das 21h conta como o dia seguinte.
+        entry_day = entry_date.astimezone(BRT_TZ).date()
+        days_in_yard = (today - entry_day).days
+        excess_start = entry_day + timedelta(days=free_time_days)
         period_start = max(excess_start, date_from) if date_from else excess_start
         period_end = min(today, date_to) if date_to else today
         extra_days = (period_end - period_start).days
@@ -1947,19 +1950,7 @@ async def download_billing_pdf_report(
 
     movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
 
-    if date_from or date_to:
-        filtered = []
-        for m in movements:
-            try:
-                movement_date = parse_datetime_value(m['created_at']).date()
-                if date_from and movement_date < datetime.fromisoformat(date_from).date():
-                    continue
-                if date_to and movement_date > datetime.fromisoformat(date_to).date():
-                    continue
-                filtered.append(m)
-            except:
-                filtered.append(m)
-        movements = filtered
+    movements = _filter_movements_by_period(movements, date_from, date_to)
 
     report_title = "Relatório de Faturamento"
     if client_name and client_name != 'all':
@@ -2008,19 +1999,7 @@ async def download_billing_excel_report(
 
     movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
 
-    if date_from or date_to:
-        filtered = []
-        for m in movements:
-            try:
-                movement_date = parse_datetime_value(m['created_at']).date()
-                if date_from and movement_date < datetime.fromisoformat(date_from).date():
-                    continue
-                if date_to and movement_date > datetime.fromisoformat(date_to).date():
-                    continue
-                filtered.append(m)
-            except:
-                filtered.append(m)
-        movements = filtered
+    movements = _filter_movements_by_period(movements, date_from, date_to)
 
     report_title = "Relatório de Faturamento"
     if client_name and client_name != 'all':

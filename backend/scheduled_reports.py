@@ -7,13 +7,14 @@ Cliente cadastrado - reaproveita o Resend já usado pela recuperação de senha
 import asyncio
 import logging
 import os
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Optional
 
 import resend
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import APIRouter, Depends
+from pymongo.errors import DuplicateKeyError
 
 from reports import generate_pdf_report, now_brt, merge_company, BRT_TZ
 from shared import db, get_company_settings, get_current_admin_user
@@ -143,6 +144,24 @@ async def trigger_daily_movement_reports(
     return await send_daily_client_movement_reports(day)
 
 
+async def _run_scheduled_daily_reports():
+    """Execução agendada: reserva o dia no banco antes de enviar. Se o backend
+    estiver rodando em mais de um processo, cada um tem o seu agendador - só
+    quem conseguir gravar a reserva envia, os outros pulam (sem e-mail em
+    dobro). O disparo manual não passa por aqui, então continua podendo
+    reenviar um dia."""
+    day = (now_brt() - timedelta(days=1)).date()
+    try:
+        await db.scheduled_job_runs.insert_one({
+            "_id": f"daily_client_movement_reports:{day.isoformat()}",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except DuplicateKeyError:
+        logger.info(f"Relatórios diários de {day.isoformat()} já enviados por outro processo - pulando")
+        return
+    await send_daily_client_movement_reports(day)
+
+
 _scheduler: AsyncIOScheduler = None
 
 
@@ -153,7 +172,7 @@ def start_scheduler():
         return
     _scheduler = AsyncIOScheduler(timezone="America/Fortaleza")
     _scheduler.add_job(
-        send_daily_client_movement_reports,
+        _run_scheduled_daily_reports,
         CronTrigger(hour=7, minute=0),
         id="daily_client_movement_reports",
         replace_existing=True,
