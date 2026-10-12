@@ -180,8 +180,8 @@ async def create_invoice(
 
 @api_router.get("/invoices", response_model=List[InvoiceResponse])
 async def get_invoices(
-    page: int = 1,
-    per_page: int = 15,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(15, ge=1, le=1000),
     client_name: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
@@ -192,7 +192,7 @@ async def get_invoices(
     
     skip = (page - 1) * per_page
     
-    invoices = await db.invoices.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    invoices = await db.invoices.find(query, {"_id": 0}).sort([("created_at", -1), ("id", -1)]).skip(skip).limit(per_page).to_list(per_page)
     
     return [
         InvoiceResponse(

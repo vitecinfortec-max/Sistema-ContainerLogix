@@ -7,8 +7,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from starlette.middleware.cors import CORSMiddleware
+import asyncio
 import os
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from shared import (
@@ -114,6 +116,25 @@ app.include_router(users_router)
 app.include_router(module_config_router)
 app.include_router(scheduled_reports_router)
 
+_WS_RECHECK_SECONDS = 60
+# O feed em tempo real só transmite eventos de movimentação - mesmo módulo
+# que o module_gate_middleware exige pra /api/movements.
+_WS_MODULE_KEY = "terminal.movimentacoes"
+
+
+async def _ws_session_valid(payload: dict) -> bool:
+    """Mesmas condições que a API HTTP exige a cada requisição: token ainda
+    dentro da validade, usuário existente e ativo (get_current_active_user) e
+    módulo de Movimentações liberado (module_gate_middleware)."""
+    exp = payload.get("exp")
+    if exp is not None and datetime.now(timezone.utc).timestamp() >= exp:
+        return False
+    user_doc = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0, "id": 1, "active": 1})
+    if not user_doc or user_doc.get('active') is False:
+        return False
+    return not is_module_disabled(_WS_MODULE_KEY, await get_disabled_modules())
+
+
 # WebSocket endpoint para sincronização em tempo real
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
@@ -130,20 +151,26 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
         await websocket.close(code=1008)
         return
 
-    # Confirma que o usuário do token ainda existe - decode_token só valida a
-    # assinatura/expiração, então um usuário removido continuava recebendo
-    # eventos em tempo real até o token expirar sozinho (até 7 dias). Mesma
-    # proteção que get_current_active_user já aplica ao resto da API.
-    user_doc = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0, "id": 1, "active": 1})
-    if not user_doc or user_doc.get('active') is False:
+    if not await _ws_session_valid(payload):
         await websocket.close(code=1008)
         return
 
     await manager.connect(websocket)
     try:
         while True:
-            # Mantém a conexão aberta e escuta mensagens (ping/pong)
-            data = await websocket.receive_text()
+            # Mantém a conexão aberta e escuta mensagens (ping/pong). A sessão
+            # é revalidada a cada mensagem recebida (o frontend manda um ping
+            # a cada 30s) e, sem mensagem nenhuma, a cada _WS_RECHECK_SECONDS -
+            # antes só o handshake checava, e a conexão seguia recebendo
+            # eventos depois de o token expirar ou a conta ser desativada.
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=_WS_RECHECK_SECONDS)
+            except asyncio.TimeoutError:
+                data = None
+            if not await _ws_session_valid(payload):
+                manager.disconnect(websocket)
+                await websocket.close(code=1008)
+                return
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
@@ -233,6 +260,20 @@ async def startup_event():
     await db.movements.create_index("created_at")
     await db.movements.create_index("transaction_id")
     await db.movements.create_index([("operation_type", 1), ("created_at", -1)])
+    # Consultado a cada ciclo do polling de fallback (/movements/sync-state).
+    await db.movements.create_index("updated_at", sparse=True)
+    # Reserva temporária usada por _container_movement_lock (movements.py) -
+    # o TTL libera sozinho uma reserva que ficou presa por queda do processo.
+    await db.movement_locks.create_index("created_at", expireAfterSeconds=60)
+    # Busca por "id" (o identificador da aplicação, não o _id do Mongo) é a
+    # consulta mais comum de detalhe/edição/exclusão nessas coleções.
+    for collection_name in (
+        "movements", "invoices", "products", "stock_movements", "stock_entries",
+        "fuel_supplies", "fuel_supply_orders",
+    ):
+        await db[collection_name].create_index("id")
+    # Controle de Média km/L: abastecimentos de vários veículos em ordem cronológica.
+    await db.fuel_supplies.create_index([("equipment_id", 1), ("supply_date", 1), ("created_at", 1)])
     await db.drivers.create_index("cpf")
     await db.clients.create_index("cnpj")
     await db.transport_companies.create_index("cnpj")

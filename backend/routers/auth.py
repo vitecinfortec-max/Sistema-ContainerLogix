@@ -173,6 +173,10 @@ async def change_password(request: ChangePasswordRequest, current_user: dict = D
     if not verify_password(request.current_password, user_doc['password']):
         raise HTTPException(status_code=400, detail="Senha atual incorreta")
     
+    # Mesmo mínimo exigido na criação de usuário (routers/users.py)
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="A nova senha deve ter ao menos 6 caracteres")
+
     # Atualizar senha e remover flag must_change_password
     new_hashed_password = get_password_hash(request.new_password)
     await db.users.update_one(

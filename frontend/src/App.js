@@ -1,4 +1,5 @@
 import '@/App.css';
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -8,80 +9,115 @@ import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import ChangePasswordPage from './pages/ChangePasswordPage';
-import DashboardPage from './pages/DashboardPage';
-import MovementsPage from './pages/MovementsPage';
-import NewMovementPage from './pages/NewMovementPage';
-import MovementDetailPage from './pages/MovementDetailPage';
-import EditMovementPage from './pages/EditMovementPage';
-import ShippingLinesPage from './pages/ShippingLinesPage';
-import CadastroUnificadoPage from './pages/CadastroUnificadoPage';
-import ServiceTypesPage from './pages/ServiceTypesPage';
-import OSCategoriesPage from './pages/OSCategoriesPage';
-import EstoqueCadastrosPage from './pages/EstoqueCadastrosPage';
-import ServiceCatalogPage from './pages/ServiceCatalogPage';
-import ProductPage from './pages/ProductPage';
-import StockPage from './pages/StockPage';
-import StockEntriesPage from './pages/StockEntriesPage';
-import StockMovementsPage from './pages/StockMovementsPage';
-import EpiDeliveriesPage from './pages/EpiDeliveriesPage';
-import StockReportPage from './pages/StockReportPage';
-import ReportsMovementsPage from './pages/ReportsMovementsPage';
-import ReportsBillingPage from './pages/ReportsBillingPage';
-import BillingPage from './pages/BillingPage';
-import ContainerInspectionsPage from './pages/ContainerInspectionsPage';
-import NewContainerInspectionPage from './pages/NewContainerInspectionPage';
-import ContainerInspectionDetailPage from './pages/ContainerInspectionDetailPage';
-import EditContainerInspectionPage from './pages/EditContainerInspectionPage';
-import ContainerVistoriasPage from './pages/ContainerVistoriasPage';
-import NewContainerVistoriaPage from './pages/NewContainerVistoriaPage';
-import ContainerVistoriaDetailPage from './pages/ContainerVistoriaDetailPage';
-import EditContainerVistoriaPage from './pages/EditContainerVistoriaPage';
-import ContainerAuditsPage from './pages/ContainerAuditsPage';
-import NewContainerAuditPage from './pages/NewContainerAuditPage';
-import ContainerAuditDetailPage from './pages/ContainerAuditDetailPage';
-import ComercialCadastrosPage from './pages/ComercialCadastrosPage';
-import ServicePriceTablePage from './pages/ServicePriceTablePage';
-import ServicePriceTableClientPage from './pages/ServicePriceTableClientPage';
-import ClientRepresentativeLinksPage from './pages/ClientRepresentativeLinksPage';
-import ComercialProposalsPage from './pages/ComercialProposalsPage';
-import NewCommercialProposalPage from './pages/NewCommercialProposalPage';
-import EditCommercialProposalPage from './pages/EditCommercialProposalPage';
-import FlexTankPage from './pages/FlexTankPage';
-import NewFlexTankMovementPage from './pages/NewFlexTankMovementPage';
-import FlexTankMovementDetailPage from './pages/FlexTankMovementDetailPage';
-import EditFlexTankMovementPage from './pages/EditFlexTankMovementPage';
-import YardControlPage from './pages/YardControlPage';
-import FleetPage from './pages/FleetPage';
-import VehicleChecklistPage from './pages/VehicleChecklistPage';
-import LoadingSchedulePage from './pages/LoadingSchedulePage';
-import DailyRateRequestPage from './pages/DailyRateRequestPage';
-import ExpenseReportsPage from './pages/ExpenseReportsPage';
-import DeliveryStatusPage from './pages/DeliveryStatusPage';
-import PortServicePage from './pages/PortServicePage';
-import ReportsPortServicesPage from './pages/ReportsPortServicesPage';
-import PortServiceBillingPage from './pages/PortServiceBillingPage';
-import InternationalInvoicePage from './pages/InternationalInvoicePage';
-import UnitSegregationPage from './pages/UnitSegregationPage';
-import RPATerceiroPage from './pages/RPATerceiroPage';
-import OrdemServicoPage from './pages/OrdemServicoPage';
-import FuelSupplyPage from './pages/FuelSupplyPage';
-import OdometerReadingsPage from './pages/OdometerReadingsPage';
-import FuelConsumptionPage from './pages/FuelConsumptionPage';
-import FuelTankLevelPage from './pages/FuelTankLevelPage';
-import TankSettingsPage from './pages/TankSettingsPage';
-import ReportsFuelSupplyPage from './pages/ReportsFuelSupplyPage';
-import ReportsServiceOrdersPage from './pages/ReportsServiceOrdersPage';
-import FuelSupplyOrderPage from './pages/FuelSupplyOrderPage';
-import LoadingOrderPage from './pages/LoadingOrderPage';
-import FreightRoutesPage from './pages/FreightRoutesPage';
-import FreightPaymentsPage from './pages/FreightPaymentsPage';
-import ContainerRepresentativesPage from './pages/ContainerRepresentativesPage';
-import ContainerPurchasesPage from './pages/ContainerPurchasesPage';
-import ContainerSalesPage from './pages/ContainerSalesPage';
-import CompanySettingsPage from './pages/CompanySettingsPage';
-import UsersPage from './pages/UsersPage';
-import ModulesPage from './pages/ModulesPage';
+
+// As demais páginas são carregadas sob demanda (um arquivo por tela), em vez
+// de irem todas no download inicial. Login e "Esqueci a senha" ficam no
+// pacote principal por serem a primeira tela de quem abre o sistema.
+//
+// Depois de uma publicação nova, os arquivos de página da versão anterior
+// deixam de existir no servidor - uma aba que ficou aberta falharia ao
+// navegar. Nesse caso recarrega a página uma vez pra pegar a versão nova (a
+// marca no sessionStorage evita recarregar em loop se o erro for outro).
+const RELOAD_FLAG = 'page-chunk-reloaded';
+const lazyPage = (load) => lazy(async () => {
+  try {
+    const page = await load();
+    try { sessionStorage.removeItem(RELOAD_FLAG); } catch (e) { /* sem storage */ }
+    return page;
+  } catch (error) {
+    let alreadyReloaded = true;
+    try {
+      alreadyReloaded = sessionStorage.getItem(RELOAD_FLAG) === '1';
+      sessionStorage.setItem(RELOAD_FLAG, '1');
+    } catch (e) { /* sem storage: não arrisca um loop de recarga */ }
+    if (!alreadyReloaded) {
+      window.location.reload();
+      return new Promise(() => {});
+    }
+    throw error;
+  }
+});
+
+const ChangePasswordPage = lazyPage(() => import('./pages/ChangePasswordPage'));
+const DashboardPage = lazyPage(() => import('./pages/DashboardPage'));
+const MovementsPage = lazyPage(() => import('./pages/MovementsPage'));
+const NewMovementPage = lazyPage(() => import('./pages/NewMovementPage'));
+const MovementDetailPage = lazyPage(() => import('./pages/MovementDetailPage'));
+const EditMovementPage = lazyPage(() => import('./pages/EditMovementPage'));
+const ShippingLinesPage = lazyPage(() => import('./pages/ShippingLinesPage'));
+const CadastroUnificadoPage = lazyPage(() => import('./pages/CadastroUnificadoPage'));
+const ServiceTypesPage = lazyPage(() => import('./pages/ServiceTypesPage'));
+const OSCategoriesPage = lazyPage(() => import('./pages/OSCategoriesPage'));
+const EstoqueCadastrosPage = lazyPage(() => import('./pages/EstoqueCadastrosPage'));
+const ServiceCatalogPage = lazyPage(() => import('./pages/ServiceCatalogPage'));
+const ProductPage = lazyPage(() => import('./pages/ProductPage'));
+const StockPage = lazyPage(() => import('./pages/StockPage'));
+const StockEntriesPage = lazyPage(() => import('./pages/StockEntriesPage'));
+const StockMovementsPage = lazyPage(() => import('./pages/StockMovementsPage'));
+const EpiDeliveriesPage = lazyPage(() => import('./pages/EpiDeliveriesPage'));
+const StockReportPage = lazyPage(() => import('./pages/StockReportPage'));
+const ReportsMovementsPage = lazyPage(() => import('./pages/ReportsMovementsPage'));
+const ReportsBillingPage = lazyPage(() => import('./pages/ReportsBillingPage'));
+const BillingPage = lazyPage(() => import('./pages/BillingPage'));
+const ContainerInspectionsPage = lazyPage(() => import('./pages/ContainerInspectionsPage'));
+const NewContainerInspectionPage = lazyPage(() => import('./pages/NewContainerInspectionPage'));
+const ContainerInspectionDetailPage = lazyPage(() => import('./pages/ContainerInspectionDetailPage'));
+const EditContainerInspectionPage = lazyPage(() => import('./pages/EditContainerInspectionPage'));
+const ContainerVistoriasPage = lazyPage(() => import('./pages/ContainerVistoriasPage'));
+const NewContainerVistoriaPage = lazyPage(() => import('./pages/NewContainerVistoriaPage'));
+const ContainerVistoriaDetailPage = lazyPage(() => import('./pages/ContainerVistoriaDetailPage'));
+const EditContainerVistoriaPage = lazyPage(() => import('./pages/EditContainerVistoriaPage'));
+const ContainerAuditsPage = lazyPage(() => import('./pages/ContainerAuditsPage'));
+const NewContainerAuditPage = lazyPage(() => import('./pages/NewContainerAuditPage'));
+const ContainerAuditDetailPage = lazyPage(() => import('./pages/ContainerAuditDetailPage'));
+const ComercialCadastrosPage = lazyPage(() => import('./pages/ComercialCadastrosPage'));
+const ServicePriceTablePage = lazyPage(() => import('./pages/ServicePriceTablePage'));
+const ServicePriceTableClientPage = lazyPage(() => import('./pages/ServicePriceTableClientPage'));
+const ClientRepresentativeLinksPage = lazyPage(() => import('./pages/ClientRepresentativeLinksPage'));
+const ComercialProposalsPage = lazyPage(() => import('./pages/ComercialProposalsPage'));
+const NewCommercialProposalPage = lazyPage(() => import('./pages/NewCommercialProposalPage'));
+const EditCommercialProposalPage = lazyPage(() => import('./pages/EditCommercialProposalPage'));
+const FlexTankPage = lazyPage(() => import('./pages/FlexTankPage'));
+const NewFlexTankMovementPage = lazyPage(() => import('./pages/NewFlexTankMovementPage'));
+const FlexTankMovementDetailPage = lazyPage(() => import('./pages/FlexTankMovementDetailPage'));
+const EditFlexTankMovementPage = lazyPage(() => import('./pages/EditFlexTankMovementPage'));
+const YardControlPage = lazyPage(() => import('./pages/YardControlPage'));
+const FleetPage = lazyPage(() => import('./pages/FleetPage'));
+const VehicleChecklistPage = lazyPage(() => import('./pages/VehicleChecklistPage'));
+const LoadingSchedulePage = lazyPage(() => import('./pages/LoadingSchedulePage'));
+const DailyRateRequestPage = lazyPage(() => import('./pages/DailyRateRequestPage'));
+const ExpenseReportsPage = lazyPage(() => import('./pages/ExpenseReportsPage'));
+const DeliveryStatusPage = lazyPage(() => import('./pages/DeliveryStatusPage'));
+const PortServicePage = lazyPage(() => import('./pages/PortServicePage'));
+const ReportsPortServicesPage = lazyPage(() => import('./pages/ReportsPortServicesPage'));
+const PortServiceBillingPage = lazyPage(() => import('./pages/PortServiceBillingPage'));
+const InternationalInvoicePage = lazyPage(() => import('./pages/InternationalInvoicePage'));
+const UnitSegregationPage = lazyPage(() => import('./pages/UnitSegregationPage'));
+const RPATerceiroPage = lazyPage(() => import('./pages/RPATerceiroPage'));
+const OrdemServicoPage = lazyPage(() => import('./pages/OrdemServicoPage'));
+const FuelSupplyPage = lazyPage(() => import('./pages/FuelSupplyPage'));
+const OdometerReadingsPage = lazyPage(() => import('./pages/OdometerReadingsPage'));
+const FuelConsumptionPage = lazyPage(() => import('./pages/FuelConsumptionPage'));
+const FuelTankLevelPage = lazyPage(() => import('./pages/FuelTankLevelPage'));
+const TankSettingsPage = lazyPage(() => import('./pages/TankSettingsPage'));
+const ReportsFuelSupplyPage = lazyPage(() => import('./pages/ReportsFuelSupplyPage'));
+const ReportsServiceOrdersPage = lazyPage(() => import('./pages/ReportsServiceOrdersPage'));
+const FuelSupplyOrderPage = lazyPage(() => import('./pages/FuelSupplyOrderPage'));
+const LoadingOrderPage = lazyPage(() => import('./pages/LoadingOrderPage'));
+const FreightRoutesPage = lazyPage(() => import('./pages/FreightRoutesPage'));
+const FreightPaymentsPage = lazyPage(() => import('./pages/FreightPaymentsPage'));
+const ContainerRepresentativesPage = lazyPage(() => import('./pages/ContainerRepresentativesPage'));
+const ContainerPurchasesPage = lazyPage(() => import('./pages/ContainerPurchasesPage'));
+const ContainerSalesPage = lazyPage(() => import('./pages/ContainerSalesPage'));
+const CompanySettingsPage = lazyPage(() => import('./pages/CompanySettingsPage'));
+const UsersPage = lazyPage(() => import('./pages/UsersPage'));
+const ModulesPage = lazyPage(() => import('./pages/ModulesPage'));
+
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen" data-testid="page-loading-spinner">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+  </div>
+);
 
 function App() {
   return (
@@ -90,6 +126,7 @@ function App() {
     <WebSocketProvider>
     <ModuleConfigProvider>
       <BrowserRouter>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -693,6 +730,7 @@ function App() {
             }
           />
         </Routes>
+        </Suspense>
         <Toaster position="top-right" richColors />
       </BrowserRouter>
     </ModuleConfigProvider>

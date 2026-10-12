@@ -606,26 +606,10 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
     """Upload de arquivo (imagem) para o servidor"""
     logging.info(f"[Upload] Recebendo arquivo: {file.filename}, content_type: {file.content_type}")
     
-    # Verificar extensão
-    file_ext = Path(file.filename).suffix.lower() if file.filename else ''
-    if file_ext not in ALLOWED_EXTENSIONS:
-        logging.error(f"[Upload] Extensão não permitida: {file_ext}")
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Tipo de arquivo não permitido. Use: {', '.join(ALLOWED_EXTENSIONS)}"
-        )
-    
-    # Ler o arquivo
-    content = await file.read()
+    # Extensão, tamanho e conteúdo - mesma validação dos outros uploads
+    file_ext, content = await validate_and_read_upload(file, ALLOWED_EXTENSIONS)
     logging.info(f"[Upload] Arquivo lido: {len(content)} bytes")
-    
-    # Verificar tamanho
-    if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Arquivo muito grande. Máximo: {MAX_FILE_SIZE // (1024*1024)}MB"
-        )
-    
+
     # Gerar nome único para o arquivo
     unique_filename = f"{uuid.uuid4()}{file_ext}"
     file_path = UPLOADS_DIR / unique_filename

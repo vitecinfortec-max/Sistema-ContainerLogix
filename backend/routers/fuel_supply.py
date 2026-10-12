@@ -118,12 +118,19 @@ async def _compute_fuel_consumption_pairs() -> list:
         {"_id": 0, "id": 1, "plate": 1, "model": 1}
     ).to_list(None)
 
+    # Uma consulta só pra todos os veículos (antes era uma por veículo), já na
+    # ordem cronológica - o agrupamento abaixo preserva essa ordem.
+    all_supplies = await db.fuel_supplies.find(
+        {"equipment_id": {"$in": [v["id"] for v in vehicles]}, "reading": {"$ne": None}},
+        {"_id": 0, "id": 1, "equipment_id": 1, "supply_number": 1, "supply_date": 1, "created_at": 1, "reading": 1, "liters": 1}
+    ).sort([("supply_date", 1), ("created_at", 1)]).to_list(None)
+    supplies_by_vehicle = {}
+    for supply in all_supplies:
+        supplies_by_vehicle.setdefault(supply["equipment_id"], []).append(supply)
+
     all_pairs = []
     for vehicle in vehicles:
-        supplies = await db.fuel_supplies.find(
-            {"equipment_id": vehicle["id"], "reading": {"$ne": None}},
-            {"_id": 0, "id": 1, "supply_number": 1, "supply_date": 1, "created_at": 1, "reading": 1, "liters": 1}
-        ).sort([("supply_date", 1), ("created_at", 1)]).to_list(None)
+        supplies = supplies_by_vehicle.get(vehicle["id"], [])
 
         for i in range(1, len(supplies)):
             prev, curr = supplies[i - 1], supplies[i]

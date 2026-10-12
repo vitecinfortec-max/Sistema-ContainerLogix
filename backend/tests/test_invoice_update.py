@@ -79,18 +79,20 @@ class TestInvoiceUpdate:
             headers=auth_headers,
             json={"client_name": test_name}
         )
-        assert update_response.status_code == 200, f"Update failed: {update_response.text}"
-        
-        updated = update_response.json()
-        assert updated['client_name'] == test_name, "Client name was not updated"
-        print(f"Updated client name from '{original_name}' to '{test_name}'")
-        
-        # Restore original name
-        restore_response = requests.put(
-            f"{BASE_URL}/api/invoices/{invoice_id}",
-            headers=auth_headers,
-            json={"client_name": original_name}
-        )
+        # A restauração fica no finally: se uma asserção falhar no meio, a
+        # fatura não pode ficar com o nome de teste.
+        try:
+            assert update_response.status_code == 200, f"Update failed: {update_response.text}"
+
+            updated = update_response.json()
+            assert updated['client_name'] == test_name, "Client name was not updated"
+            print(f"Updated client name from '{original_name}' to '{test_name}'")
+        finally:
+            restore_response = requests.put(
+                f"{BASE_URL}/api/invoices/{invoice_id}",
+                headers=auth_headers,
+                json={"client_name": original_name}
+            )
         assert restore_response.status_code == 200, "Failed to restore original name"
         print(f"Restored client name to '{original_name}'")
 
@@ -114,18 +116,18 @@ class TestInvoiceUpdate:
             headers=auth_headers,
             json={"notes": test_notes}
         )
-        assert update_response.status_code == 200, f"Update failed: {update_response.text}"
-        
-        updated = update_response.json()
-        assert updated['notes'] == test_notes, "Notes were not updated"
-        print(f"Updated notes to: {test_notes}")
-        
-        # Restore original notes
-        restore_response = requests.put(
-            f"{BASE_URL}/api/invoices/{invoice_id}",
-            headers=auth_headers,
-            json={"notes": original_notes if original_notes else None}
-        )
+        try:
+            assert update_response.status_code == 200, f"Update failed: {update_response.text}"
+
+            updated = update_response.json()
+            assert updated['notes'] == test_notes, "Notes were not updated"
+            print(f"Updated notes to: {test_notes}")
+        finally:
+            restore_response = requests.put(
+                f"{BASE_URL}/api/invoices/{invoice_id}",
+                headers=auth_headers,
+                json={"notes": original_notes if original_notes else None}
+            )
         assert restore_response.status_code == 200
 
     def test_update_invoice_not_found(self, auth_headers):

@@ -25,7 +25,9 @@ class TestYardControlEstoqueFilter:
         )
         if response.status_code == 200:
             return response.json().get("access_token")
-        pytest.skip("Authentication failed - skipping authenticated tests")
+        # Falha explícita: pular aqui fazia a suíte inteira passar "verde"
+        # sem ter testado nada quando o login quebrava.
+        pytest.fail(f"Authentication failed ({response.status_code}): {response.text}")
     
     @pytest.fixture(scope="class")
     def authenticated_client(self, auth_token):

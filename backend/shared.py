@@ -229,6 +229,24 @@ ALLOWED_RECEIPT_EXTENSIONS = ALLOWED_EXTENSIONS | {'.pdf'}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
+_UPLOAD_CHUNK_SIZE = 1024 * 1024
+
+
+def _content_matches_extension(content: bytes, file_ext: str) -> bool:
+    """Confere a assinatura (primeiros bytes) do arquivo contra a extensão -
+    a extensão sozinha é só o nome que o remetente escolheu. Extensão sem
+    assinatura conhecida aqui passa sem essa conferência."""
+    if file_ext in ('.jpg', '.jpeg'):
+        return content.startswith(bytes.fromhex('ffd8ff'))
+    if file_ext == '.png':
+        return content.startswith(bytes.fromhex('89504e470d0a1a0a'))
+    if file_ext == '.webp':
+        return content[:4] == b'RIFF' and content[8:12] == b'WEBP'
+    if file_ext == '.pdf':
+        return content[:1024].lstrip().startswith(b'%PDF-')
+    return True
+
+
 async def validate_and_read_upload(file: UploadFile, allowed_extensions: set) -> tuple[str, bytes]:
     """Valida extensão e tamanho de um arquivo enviado e retorna (extensão, conteúdo).
     Centraliza a validação que antes só existia no endpoint /upload genérico -
@@ -239,11 +257,25 @@ async def validate_and_read_upload(file: UploadFile, allowed_extensions: set) ->
             status_code=400,
             detail=f"Tipo de arquivo não permitido. Use: {', '.join(sorted(allowed_extensions))}"
         )
-    content = await file.read()
-    if len(content) > MAX_FILE_SIZE:
+    # Lê em blocos e para assim que passa do limite - antes o arquivo inteiro
+    # ia pra memória antes de o tamanho ser conferido.
+    chunks, size = [], 0
+    while True:
+        chunk = await file.read(_UPLOAD_CHUNK_SIZE)
+        if not chunk:
+            break
+        size += len(chunk)
+        if size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Arquivo muito grande. Máximo: {MAX_FILE_SIZE // (1024*1024)}MB"
+            )
+        chunks.append(chunk)
+    content = b''.join(chunks)
+    if not _content_matches_extension(content, file_ext):
         raise HTTPException(
             status_code=400,
-            detail=f"Arquivo muito grande. Máximo: {MAX_FILE_SIZE // (1024*1024)}MB"
+            detail="O conteúdo do arquivo não corresponde ao tipo indicado pela extensão"
         )
     return file_ext, content
 

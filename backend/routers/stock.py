@@ -1,4 +1,5 @@
 import io
+import math
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -919,8 +920,13 @@ def _validate_movement_items(items):
     if not items:
         raise HTTPException(status_code=400, detail="Adicione ao menos um item à movimentação")
     for item in items:
-        if item.quantity <= 0:
+        if not math.isfinite(item.quantity) or item.quantity <= 0:
             raise HTTPException(status_code=400, detail=f"Quantidade inválida para o item \"{item.product_description}\"")
+        if not math.isfinite(item.unit_value) or item.unit_value < 0:
+            raise HTTPException(status_code=400, detail=f"Valor unitário inválido para o item \"{item.product_description}\"")
+        # O total é sempre calculado aqui - o valor enviado pela tela não é
+        # confiável (entra nos relatórios de estoque como veio).
+        item.total_value = round(item.quantity * item.unit_value, 2)
 
 
 @api_router.get("/stock/movements/next-number")

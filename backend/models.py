@@ -479,12 +479,24 @@ class ContainerMovementCreate(BaseModel):
     origin_terminal: Optional[str] = None  # Terminal de Origem
     service_type: Optional[str] = None  # Tipo de Serviço
     invoice_number: Optional[str] = None  # Nota Fiscal
-    service_value: Optional[float] = None  # Valor do serviço
-    currency: str = "BRL"  # Moeda: BRL (Real) ou USD (Dólar)
+    # Vai direto pro faturamento: não pode ser negativo, NaN nem infinito.
+    service_value: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)  # Valor do serviço
+    currency: Literal["BRL", "USD"] = "BRL"  # Moeda: BRL (Real) ou USD (Dólar)
     observations: Optional[str] = None  # Observações da movimentação
     container_photos: Optional[dict] = None  # Fotos do container
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres
+
+    # A trava de duplicidade e a Segregação de Unidade buscam o container por
+    # strip().upper() - gravar o texto como veio do formulário deixava um
+    # "abcu1234567 " passar por fora das duas.
+    @field_validator('container_number')
+    @classmethod
+    def _normalize_container_number(cls, value: str) -> str:
+        value = value.strip().upper()
+        if not value:
+            raise ValueError('Número do container é obrigatório')
+        return value
 
 class ContainerMovementResponse(BaseModel):
     id: str

@@ -1,5 +1,6 @@
 import asyncio
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta, date
 from typing import Optional, List, Literal
 import io
@@ -14,6 +15,7 @@ from urllib.parse import quote as url_quote
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel as PydanticBaseModel, ValidationError
+from pymongo.errors import DuplicateKeyError
 
 from models import (
     User, UserCreate, UserLogin, UserResponse, Token,
@@ -120,6 +122,23 @@ async def get_last_movement_for_container(container_number: str, current_user: d
     return {"movement": last}
 
 
+@api_router.get("/movements/sync-state")
+async def get_movements_sync_state(current_user: dict = Depends(get_current_active_user)):
+    """Resumo barato do estado das movimentações (quantidade + última criação
+    + última edição), consultado pelo polling de fallback do frontend
+    (WebSocketContext.js) pra saber se precisa baixar a lista de novo - muda
+    quando alguém cria, edita ou exclui uma movimentação."""
+    last_created = await db.movements.find_one({}, {"_id": 0, "created_at": 1}, sort=[("created_at", -1)])
+    last_updated = await db.movements.find_one(
+        {"updated_at": {"$type": "string"}}, {"_id": 0, "updated_at": 1}, sort=[("updated_at", -1)]
+    )
+    return {
+        "count": await db.movements.estimated_document_count(),
+        "last_created_at": str(last_created['created_at']) if last_created else None,
+        "last_updated_at": last_updated['updated_at'] if last_updated else None,
+    }
+
+
 def _normalize_client_name(name: Optional[str]) -> str:
     return (name or '').strip().casefold()
 
@@ -175,6 +194,27 @@ async def _mark_segregation_retrieved(container_number: str, transaction_id: int
     )
 
 
+@asynccontextmanager
+async def _container_movement_lock(container_number: str):
+    """Reserva o container no banco enquanto uma movimentação dele é
+    registrada. A trava de duplicidade é "lê a última movimentação, depois
+    grava" - sem isso, duas Entradas enviadas ao mesmo tempo liam o mesmo
+    estado e as duas passavam. A reserva expira sozinha (índice TTL em
+    movement_locks.created_at) se o processo cair antes de liberar."""
+    key = container_number.strip().upper()
+    try:
+        await db.movement_locks.insert_one({"_id": key, "created_at": datetime.now(timezone.utc)})
+    except DuplicateKeyError:
+        raise HTTPException(
+            status_code=409,
+            detail="Outra movimentação deste container está sendo registrada neste momento. Aguarde alguns segundos e tente novamente."
+        )
+    try:
+        yield
+    finally:
+        await db.movement_locks.delete_one({"_id": key})
+
+
 async def _create_container_movement(
     movement_input: ContainerMovementCreate,
     current_user: dict,
@@ -186,6 +226,15 @@ async def _create_container_movement(
     duplicidade, o contador de transação e o broadcast de WebSocket nunca
     fiquem divergentes entre os dois (ver quick-exit em yard-control pra um
     exemplo do que dá errado quando esse caminho é duplicado à mão)."""
+    async with _container_movement_lock(movement_input.container_number):
+        return await _create_container_movement_locked(movement_input, current_user, loading_order_id)
+
+
+async def _create_container_movement_locked(
+    movement_input: ContainerMovementCreate,
+    current_user: dict,
+    loading_order_id: Optional[str] = None,
+) -> ContainerMovementResponse:
     # Trava de duplicidade: não permite registrar uma Entrada quando a
     # movimentação mais recente desse container já é uma Entrada (ainda não
     # saiu), nem uma Saída quando a mais recente já é uma Saída (já saiu e
@@ -482,8 +531,8 @@ async def get_movements(
     container_number: Optional[str] = None,
     driver_name: Optional[str] = None,
     client_name: Optional[str] = None,
-    page: int = 1,
-    per_page: int = 0,  # 0 = sem limite (compatível com quem já chamava sem paginar)
+    page: int = Query(1, ge=1),
+    per_page: int = Query(0, ge=0, le=1000),  # 0 = sem limite (compatível com quem já chamava sem paginar)
     current_user: dict = Depends(get_current_active_user)
 ):
     # Caso especial: Estoque Atual - containers que entraram mas não saíram
@@ -609,7 +658,9 @@ async def get_movements(
         query['created_at'] = date_range
 
     total = await db.movements.count_documents(query) if per_page else None
-    cursor = db.movements.find(query, {"_id": 0}).sort("created_at", -1)
+    # Desempate por id: sem ele, movimentações com o mesmo created_at podem
+    # trocar de ordem entre uma página e outra (repetindo ou pulando registro).
+    cursor = db.movements.find(query, {"_id": 0}).sort([("created_at", -1), ("id", -1)])
     if per_page:
         cursor = cursor.skip((page - 1) * per_page).limit(per_page)
     movements = await cursor.to_list(None if not per_page else per_page)
@@ -877,6 +928,8 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     # replace_one abaixo (substitui o documento inteiro) apagaria o campo
     # legado em qualquer edição.
     update_data['container_photos'] = existing.get('container_photos')
+    # Lido por /movements/sync-state pra o polling de fallback perceber edições.
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
 
     # Arredondar valor monetário para evitar problemas de precisão
     if update_data.get('service_value') is not None:

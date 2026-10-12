@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useCallback, useState } from 'react';
+import { useAuth } from './AuthContext';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const WS_BASE_URL = BACKEND_URL
@@ -30,7 +31,11 @@ export function WebSocketProvider({ children }) {
   const reconnectTimeout = useRef(null);
   const pingInterval = useRef(null);
   const pollingInterval = useRef(null);
-  const lastMovementsHash = useRef('');
+  const lastSyncState = useRef(null);
+  // Sessão encerrada pelo próprio app (logout/troca de token) ou recusada pelo
+  // servidor (código 1008) - nesses casos o onclose não deve tentar reconectar.
+  const stopped = useRef(true);
+  const { token } = useAuth();
   const usePolling = useRef(false);
   const pendingDeletes = useRef(new Set());
   const pendingCreates = useRef(new Set());
@@ -74,25 +79,40 @@ export function WebSocketProvider({ children }) {
     usePolling.current = true;
     setIsConnected(true);
 
+    // Consulta só um resumo barato (quantidade + data da última alteração) a
+    // cada ciclo, e baixa a lista apenas quando esse resumo muda - antes o
+    // histórico inteiro era transferido a cada 3s, e a comparação só por IDs
+    // deixava passar as edições.
     const poll = async () => {
       try {
         const token = sessionStorage.getItem('token');
         if (!token) return;
+        const headers = { 'Authorization': `Bearer ${token}` };
 
-        const response = await fetch(`${API_URL}/api/movements`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const stateResponse = await fetch(`${API_URL}/api/movements/sync-state`, { headers });
+        if (stateResponse.status === 401 || stateResponse.status === 403) {
+          // Sessão inválida ou módulo indisponível - não adianta insistir.
+          clearInterval(pollingInterval.current);
+          pollingInterval.current = null;
+          usePolling.current = false;
+          setIsConnected(false);
+          return;
+        }
+        if (!stateResponse.ok) return;
 
+        const syncState = JSON.stringify(await stateResponse.json());
+        if (lastSyncState.current === syncState) return;
+        const isFirstCheck = lastSyncState.current === null;
+        lastSyncState.current = syncState;
+        // Na primeira consulta só guarda a referência: a página já carregou
+        // a lista por conta própria.
+        if (isFirstCheck) return;
+
+        const response = await fetch(`${API_URL}/api/movements`, { headers });
         if (response.ok) {
           let movements = await response.json();
           movements = movements.filter(m => !pendingDeletes.current.has(m.id));
-
-          const newHash = JSON.stringify(movements.map(m => m.id).sort());
-
-          if (lastMovementsHash.current !== newHash) {
-            notifyListeners({ type: 'DATA_CHANGED', data: movements });
-            lastMovementsHash.current = newHash;
-          }
+          notifyListeners({ type: 'DATA_CHANGED', data: movements });
         }
       } catch (error) {
         console.error('Erro no polling:', error);
@@ -105,7 +125,7 @@ export function WebSocketProvider({ children }) {
 
   const connect = useCallback(() => {
     try {
-      if (ws.current?.readyState === WebSocket.OPEN) {
+      if (stopped.current || ws.current?.readyState === WebSocket.OPEN) {
         return;
       }
 
@@ -115,18 +135,21 @@ export function WebSocketProvider({ children }) {
         return;
       }
 
-      ws.current = new WebSocket(wsUrl);
+      const socket = new WebSocket(wsUrl);
+      ws.current = socket;
 
       const connectionTimeout = setTimeout(() => {
-        if (ws.current?.readyState !== WebSocket.OPEN) {
+        if (stopped.current || ws.current !== socket) return;
+        if (socket.readyState !== WebSocket.OPEN) {
           console.log('WebSocket timeout - usando polling');
-          ws.current?.close();
+          socket.close();
           startPolling();
         }
       }, 5000);
 
-      ws.current.onopen = () => {
+      socket.onopen = () => {
         clearTimeout(connectionTimeout);
+        if (stopped.current || ws.current !== socket) return;
         console.log('WebSocket conectado');
         setIsConnected(true);
         usePolling.current = false;
@@ -136,14 +159,15 @@ export function WebSocketProvider({ children }) {
           pollingInterval.current = null;
         }
 
+        clearInterval(pingInterval.current);
         pingInterval.current = setInterval(() => {
-          if (ws.current?.readyState === WebSocket.OPEN) {
-            ws.current.send('ping');
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send('ping');
           }
         }, 30000);
       };
 
-      ws.current.onmessage = (event) => {
+      socket.onmessage = (event) => {
         if (event.data === 'pong') return;
 
         try {
@@ -154,11 +178,24 @@ export function WebSocketProvider({ children }) {
         }
       };
 
-      ws.current.onclose = () => {
+      socket.onclose = (event) => {
         clearTimeout(connectionTimeout);
+        // Conexão antiga (já substituída) ou encerrada pelo próprio app.
+        if (stopped.current || ws.current !== socket) return;
         console.log('WebSocket desconectado');
-        setIsConnected(usePolling.current);
         clearInterval(pingInterval.current);
+
+        // 1008: o servidor recusou a sessão (token expirado, conta desativada
+        // ou módulo indisponível) - reconectar com o mesmo token não resolve.
+        if (event.code === 1008) {
+          stopped.current = true;
+          clearInterval(pollingInterval.current);
+          pollingInterval.current = null;
+          usePolling.current = false;
+          setIsConnected(false);
+          return;
+        }
+        setIsConnected(usePolling.current);
 
         if (!usePolling.current) {
           reconnectTimeout.current = setTimeout(() => {
@@ -168,8 +205,9 @@ export function WebSocketProvider({ children }) {
         }
       };
 
-      ws.current.onerror = (error) => {
+      socket.onerror = (error) => {
         clearTimeout(connectionTimeout);
+        if (stopped.current || ws.current !== socket) return;
         console.error('Erro WebSocket:', error);
         if (!usePolling.current) {
           startPolling();
@@ -194,9 +232,6 @@ export function WebSocketProvider({ children }) {
         let movements = await response.json();
         movements = movements.filter(m => !pendingDeletes.current.has(m.id));
 
-        const newHash = JSON.stringify(movements.map(m => m.id).sort());
-        lastMovementsHash.current = newHash;
-
         notifyListeners({ type: 'DATA_CHANGED', data: movements });
       }
     } catch (error) {
@@ -204,19 +239,32 @@ export function WebSocketProvider({ children }) {
     }
   }, [notifyListeners]);
 
+  // A conexão acompanha a sessão: abre quando há token (inclusive logo após o
+  // login, sem precisar recarregar a página) e fecha no logout. Antes só
+  // tentava conectar uma vez, ao montar o app - quem abria o sistema deslogado
+  // ficava sem tempo real até dar F5.
   useEffect(() => {
+    if (!token) return undefined;
+
+    stopped.current = false;
     connect();
 
     return () => {
+      stopped.current = true;
       clearTimeout(reconnectTimeout.current);
       clearInterval(pingInterval.current);
       clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
+      usePolling.current = false;
+      lastSyncState.current = null;
       if (ws.current) {
         ws.current.close();
+        ws.current = null;
       }
+      setIsConnected(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
   const value = {
     isConnected,
