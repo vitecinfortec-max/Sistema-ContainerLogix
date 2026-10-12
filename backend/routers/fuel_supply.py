@@ -1,70 +1,19 @@
-import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 import io
 import re
-import json
-import shutil
-import uuid
-import logging
-from pathlib import Path
-from urllib.parse import quote as url_quote
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel as PydanticBaseModel
 
 from models import (
-    User, UserCreate, UserLogin, UserResponse, Token,
-    CompanySettings, CompanySettingsUpdate,
-    Driver, DriverCreate, DriverResponse,
-    TransportCompany, TransportCompanyCreate, TransportCompanyResponse,
-    Client, ClientCreate, ClientResponse,
-    Supplier, SupplierCreate, SupplierResponse,
-    ContainerMovement, ContainerMovementCreate, ContainerMovementResponse,
-    DailyMovementPoint, DriverRankingEntry, DashboardStats,
-    ShippingLine, ShippingLineCreate, ShippingLineResponse,
-    ServiceType, ServiceTypeCreate, ServiceTypeResponse,
-    Invoice, InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceMovementDetail,
-    InvoiceHistory, InvoiceHistoryResponse,
-    ContainerInspectionPhoto, ContainerInspection, ContainerInspectionCreate,
-    ContainerInspectionUpdate, ContainerInspectionResponse,
-    CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS,
-    FlexTankMovement, FlexTankMovementCreate, FlexTankMovementUpdate,
-    FlexTankMovementResponse, FlexTankStockSummary,
-    Vehicle, VehicleCreate, VehicleUpdate, VehicleResponse,
-    VehicleChecklistItem, VehicleChecklistProduct, VehicleChecklistFields,
-    VehicleChecklist, VehicleChecklistCreate, VehicleChecklistResponse,
-    VEHICLE_CHECKLIST_TEMPLATE, VEHICLE_CHECKLIST_SECTION_LABELS,
-    VehicleRevision, VehicleRevisionCreate, VehicleRevisionResponse,
-    LoadingScheduleItem, LoadingSchedule, LoadingScheduleCreate, LoadingScheduleResponse,
-    DailyRateRequestItem, DailyRateRequest, DailyRateRequestCreate, DailyRateRequestResponse,
-    IntlInvoiceItem, IntlInvoice, IntlInvoiceCreate, IntlInvoiceResponse,
-    DeliveryStatusItem, DeliveryStatus, DeliveryStatusCreate, DeliveryStatusResponse,
-    UnitSegregationItem, UnitSegregation, UnitSegregationCreate, UnitSegregationUpdate,
-    UnitSegregationResponse,
-    RPAServiceItem, RPATerceiro, RPATerceiroCreate, RPATerceiroUpdate, RPATerceiroResponse,
-    OSItem, OrdemServico, OrdemServicoCreate, OrdemServicoUpdate, OrdemServicoResponse,
-    ExpenseReportReceipt, ExpenseReportDeposit, ExpenseReportPurchase,
-    ExpenseReport, ExpenseReportCreate, ExpenseReportResponse,
-    FuelSupply, FuelSupplyCreate, FuelSupplyUpdate, FuelSupplyResponse,
-    FuelSupplyOrder, FuelSupplyOrderCreate, FuelSupplyOrderUpdate, FuelSupplyOrderResponse,
-    DailyFuelSupplyPoint,
-    TankSettings, TankSettingsUpdate, TankRefill, TankRefillCreate, TankRefillResponse,
+    FuelSupply, FuelSupplyCreate, FuelSupplyUpdate, FuelSupplyResponse, FuelSupplyOrder,
+    FuelSupplyOrderCreate, FuelSupplyOrderUpdate, FuelSupplyOrderResponse, DailyFuelSupplyPoint,
+    TankSettings, TankSettingsUpdate, TankRefill, TankRefillCreate, TankRefillResponse
 )
-from auth import get_password_hash, verify_password, create_access_token, get_current_user, decode_token
-from reports import (
-    generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel,
-    generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel,
-    now_brt, to_brt, merge_company, DEFAULT_COMPANY
-)
+from reports import generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel, now_brt, merge_company
 
-from shared import (
-    db, manager, get_current_active_user, get_current_admin_user, get_company_settings,
-    get_next_transaction_id, parse_datetime_value, round_money, migrate_inspection_photos,
-    load_logo_buffer, validate_and_read_upload, ALLOWED_EXTENSIONS, ALLOWED_RECEIPT_EXTENSIONS,
-    MAX_FILE_SIZE, check_rate_limit, client_ip, UPLOADS_DIR, ROOT_DIR
-)
+from shared import db, get_current_active_user, get_current_admin_user, get_company_settings
 
 api_router = APIRouter(prefix="/api")
 

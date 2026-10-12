@@ -2,7 +2,6 @@ import json
 from functools import lru_cache
 
 from fastapi import APIRouter, Depends
-from typing import List
 
 from shared import ROOT_DIR, get_current_active_user
 

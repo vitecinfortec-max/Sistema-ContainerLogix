@@ -12,9 +12,9 @@ from models import (
     PortServiceBillingBatchResponse,
 )
 from reports import (
-    _build_pdf_header, _make_pdf_footer, now_brt, merge_company, format_currency,
+    _build_pdf_header, _make_pdf_footer, merge_company, format_currency,
     generate_port_services_report_pdf, generate_port_services_report_excel,
-    generate_port_service_invoice_pdf, generate_port_service_invoice_excel,
+    generate_port_service_invoice_pdf, generate_port_service_invoice_excel
 )
 from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, load_logo_buffer
 

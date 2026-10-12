@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from typing import Optional
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -8,7 +7,7 @@ import io
 
 from models import (
     ContainerAudit, ContainerAuditCreate, ContainerAuditItemUpdate, ContainerAuditResponse,
-    AuditedContainerItem, AuditedContainerPhoto,
+    AuditedContainerItem
 )
 from shared import (
     db, get_current_active_user, get_company_settings, parse_datetime_value,

@@ -3,7 +3,7 @@ from typing import List, Optional
 import io
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from models import (

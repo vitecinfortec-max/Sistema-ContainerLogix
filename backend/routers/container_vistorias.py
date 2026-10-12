@@ -5,8 +5,8 @@ import shutil
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 
 from models import (
-    ContainerVistoriaPhoto, ContainerVistoria, ContainerVistoriaCreate,
-    ContainerVistoriaUpdate, ContainerVistoriaResponse, MAX_VISTORIA_PHOTOS,
+    ContainerVistoria, ContainerVistoriaCreate, ContainerVistoriaUpdate, ContainerVistoriaResponse,
+    MAX_VISTORIA_PHOTOS
 )
 
 from shared import (
