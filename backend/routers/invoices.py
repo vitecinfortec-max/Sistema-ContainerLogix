@@ -17,6 +17,23 @@ api_router = APIRouter(prefix="/api")
 
 # ==================== INVOICES (FATURAS) ====================
 
+def _invoice_response(inv: dict) -> InvoiceResponse:
+    """Único ponto que monta a resposta de uma fatura a partir do documento
+    do banco (antes eram 4 construtores escritos à mão, campo por campo)."""
+    return InvoiceResponse(
+        id=inv['id'],
+        invoice_number=inv['invoice_number'],
+        client_name=inv['client_name'],
+        client_cnpj=inv.get('client_cnpj'),
+        movement_ids=inv['movement_ids'],
+        total_value=inv['total_value'],
+        status=inv.get('status') or 'PENDENTE',
+        notes=inv.get('notes'),
+        created_at=parse_datetime_value(inv['created_at']),
+        user_name=inv['user_name'],
+    )
+
+
 # Função para obter próximo invoice_number (sequencial)
 async def get_next_invoice_number():
     """Obtém o próximo invoice_number usando um contador atômico"""
@@ -117,18 +134,7 @@ async def create_invoice(
         user_name=current_user['name']
     )
     
-    return InvoiceResponse(
-        id=invoice.id,
-        invoice_number=invoice.invoice_number,
-        client_name=invoice.client_name,
-        client_cnpj=invoice.client_cnpj,
-        movement_ids=invoice.movement_ids,
-        total_value=invoice.total_value,
-        status=invoice.status,
-        notes=invoice.notes,
-        created_at=invoice.created_at,
-        user_name=invoice.user_name
-    )
+    return _invoice_response(doc)
 
 @api_router.get("/invoices", response_model=List[InvoiceResponse])
 async def get_invoices(
@@ -147,18 +153,7 @@ async def get_invoices(
     invoices = await db.invoices.find(query, {"_id": 0}).sort([("created_at", -1), ("id", -1)]).skip(skip).limit(per_page).to_list(per_page)
     
     return [
-        InvoiceResponse(
-            id=inv['id'],
-            invoice_number=inv['invoice_number'],
-            client_name=inv['client_name'],
-            client_cnpj=inv.get('client_cnpj'),
-            movement_ids=inv['movement_ids'],
-            total_value=inv['total_value'],
-            status=inv.get('status', 'PENDENTE'),
-            notes=inv.get('notes'),
-            created_at=datetime.fromisoformat(inv['created_at']),
-            user_name=inv['user_name']
-        )
+        _invoice_response(inv)
         for inv in invoices
     ]
 
@@ -182,18 +177,7 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
     if not invoice:
         raise HTTPException(status_code=404, detail="Fatura não encontrada")
     
-    return InvoiceResponse(
-        id=invoice['id'],
-        invoice_number=invoice['invoice_number'],
-        client_name=invoice['client_name'],
-        client_cnpj=invoice.get('client_cnpj'),
-        movement_ids=invoice['movement_ids'],
-        total_value=invoice['total_value'],
-        status=invoice.get('status', 'PENDENTE'),
-        notes=invoice.get('notes'),
-        created_at=datetime.fromisoformat(invoice['created_at']),
-        user_name=invoice['user_name']
-    )
+    return _invoice_response(invoice)
 
 @api_router.put("/invoices/{invoice_id}/status")
 async def update_invoice_status(
@@ -320,18 +304,7 @@ async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current
     # Buscar fatura atualizada
     updated_invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
     
-    return InvoiceResponse(
-        id=updated_invoice['id'],
-        invoice_number=updated_invoice['invoice_number'],
-        client_name=updated_invoice['client_name'],
-        client_cnpj=updated_invoice.get('client_cnpj'),
-        movement_ids=updated_invoice['movement_ids'],
-        total_value=updated_invoice['total_value'],
-        status=updated_invoice.get('status', 'PENDENTE'),
-        notes=updated_invoice.get('notes'),
-        created_at=datetime.fromisoformat(updated_invoice['created_at']),
-        user_name=updated_invoice['user_name']
-    )
+    return _invoice_response(updated_invoice)
 
 @api_router.get("/invoices/{invoice_id}/movements", response_model=List[InvoiceMovementDetail])
 async def get_invoice_movements(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):

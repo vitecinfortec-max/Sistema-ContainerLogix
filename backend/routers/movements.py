@@ -4,7 +4,6 @@ from datetime import datetime, timezone, timedelta, date
 from typing import Optional, List, Literal
 import io
 import re
-import uuid
 import logging
 from urllib.parse import quote as url_quote
 
@@ -32,6 +31,51 @@ from routers.fuel_supply import _compute_tank_level
 
 api_router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
+
+
+def _movement_response(m: dict) -> ContainerMovementResponse:
+    """Único ponto que monta a resposta de uma movimentação a partir do
+    documento do banco. Antes eram 7 construtores escritos à mão, campo por
+    campo, e cada um esquecia campos diferentes (foi assim que a moeda sumia
+    de algumas telas). Os fallbacks cobrem os documentos gravados pela antiga
+    saída rápida do Controle de Pátio, que usava outros nomes de campo
+    (vehicle_plate, transport_company_name, created_by_name) e não tinha CPF
+    do motorista - lidos direto com m['...'] derrubavam o Dashboard."""
+    return ContainerMovementResponse(
+        id=m['id'],
+        transaction_id=m.get('transaction_id', 0),
+        operation_type=m['operation_type'],
+        driver_name=m.get('driver_name', ''),
+        driver_cpf=m.get('driver_cpf', ''),
+        truck_plate=m.get('truck_plate', m.get('vehicle_plate', '')),
+        trailer_plate_1=m.get('trailer_plate_1', ''),
+        trailer_plate_2=m.get('trailer_plate_2'),
+        transport_company=m.get('transport_company', m.get('transport_company_name', '')),
+        client_name=m.get('client_name'),
+        buyer_name=m.get('buyer_name'),
+        container_number=m['container_number'],
+        status=m['status'],
+        size_type=m['size_type'],
+        tare=m.get('tare'),
+        shipping_line=m['shipping_line'],
+        seal=m.get('seal'),
+        genset=m.get('genset'),
+        booking=m.get('booking'),
+        origin_terminal=m.get('origin_terminal'),
+        service_type=m.get('service_type'),
+        invoice_number=m.get('invoice_number'),
+        service_value=m.get('service_value'),
+        currency=m.get('currency') or 'BRL',
+        observations=m.get('observations'),
+        container_photos=m.get('container_photos'),
+        container_damages=m.get('container_damages') or [],
+        inspection_notes=m.get('inspection_notes'),
+        loading_order_id=m.get('loading_order_id'),
+        billed=m.get('billed', False),
+        billed_at=parse_datetime_value(m['billed_at']) if m.get('billed_at') else None,
+        created_at=parse_datetime_value(m['created_at']),
+        user_name=m.get('user_name', m.get('created_by_name', '')),
+    )
 
 
 def _parse_filter_day(value: str, field: str) -> date:
@@ -269,41 +313,7 @@ async def _create_container_movement_locked(
     if movement.operation_type == 'SAIDA':
         await _mark_segregation_retrieved(movement.container_number, movement.transaction_id)
 
-    response = ContainerMovementResponse(
-        id=movement.id,
-        transaction_id=movement.transaction_id,
-        operation_type=movement.operation_type,
-        driver_name=movement.driver_name,
-        driver_cpf=movement.driver_cpf,
-        truck_plate=movement.truck_plate,
-        trailer_plate_1=movement.trailer_plate_1,
-        trailer_plate_2=movement.trailer_plate_2,
-        transport_company=movement.transport_company,
-        client_name=movement.client_name,
-        buyer_name=movement.buyer_name,
-        container_number=movement.container_number,
-        status=movement.status,
-        size_type=movement.size_type,
-        tare=movement.tare,
-        shipping_line=movement.shipping_line,
-        seal=movement.seal,
-        genset=movement.genset,
-        booking=movement.booking,
-        origin_terminal=movement.origin_terminal,
-        service_type=movement.service_type,
-        invoice_number=movement.invoice_number,
-        service_value=movement.service_value,
-        currency=movement.currency,
-        observations=movement.observations,
-        container_photos=movement.container_photos,
-        container_damages=movement.container_damages,
-        inspection_notes=movement.inspection_notes,
-        loading_order_id=movement.loading_order_id,
-        billed=movement.billed,
-        billed_at=movement.billed_at,
-        created_at=movement.created_at,
-        user_name=movement.user_name
-    )
+    response = _movement_response(doc)
 
     # Notificar todos os clientes conectados via WebSocket
     await manager.broadcast({
@@ -554,36 +564,7 @@ async def get_movements(
         in_stock_movements.sort(key=lambda x: parse_datetime_value(x['created_at']), reverse=True)
         
         return [
-            ContainerMovementResponse(
-                id=m['id'],
-                transaction_id=m.get('transaction_id', 0),
-                operation_type=m['operation_type'],
-                driver_name=m['driver_name'],
-                driver_cpf=m['driver_cpf'],
-                truck_plate=m['truck_plate'],
-                trailer_plate_1=m['trailer_plate_1'],
-                trailer_plate_2=m.get('trailer_plate_2'),
-                transport_company=m['transport_company'],
-                client_name=m.get('client_name'),
-                container_number=m['container_number'],
-                status=m['status'],
-                size_type=m['size_type'],
-                tare=m.get('tare'),
-                shipping_line=m['shipping_line'],
-                seal=m.get('seal'),
-                genset=m.get('genset'),
-                booking=m.get('booking'),
-                service_type=m.get('service_type'),
-                invoice_number=m.get('invoice_number'),
-                service_value=m.get('service_value'),
-                currency=m.get('currency') or 'BRL',
-                container_photos=m.get('container_photos'),
-                container_damages=m.get('container_damages', []),
-                billed=m.get('billed', False),
-                billed_at=parse_datetime_value(m['billed_at']) if m.get('billed_at') else None,
-                created_at=parse_datetime_value(m['created_at']),
-                user_name=m['user_name']
-            )
+            _movement_response(m)
             for m in in_stock_movements
         ]
     
@@ -628,38 +609,7 @@ async def get_movements(
     movements = await cursor.to_list(None if not per_page else per_page)
 
     items = [
-        ContainerMovementResponse(
-            id=m['id'],
-            transaction_id=m.get('transaction_id', 0),
-            operation_type=m['operation_type'],
-            driver_name=m.get('driver_name', ''),
-            driver_cpf=m.get('driver_cpf', ''),
-            truck_plate=m.get('truck_plate', m.get('vehicle_plate', '')),
-            trailer_plate_1=m.get('trailer_plate_1', ''),
-            trailer_plate_2=m.get('trailer_plate_2'),
-            transport_company=m.get('transport_company', m.get('transport_company_name', '')),
-            client_name=m.get('client_name'),
-            container_number=m['container_number'],
-            status=m['status'],
-            size_type=m['size_type'],
-            tare=m.get('tare'),
-            shipping_line=m['shipping_line'],
-            seal=m.get('seal'),
-            genset=m.get('genset'),
-            booking=m.get('booking'),
-            origin_terminal=m.get('origin_terminal'),
-            service_type=m.get('service_type'),
-            invoice_number=m.get('invoice_number'),
-            service_value=m.get('service_value'),
-            currency=m.get('currency') or 'BRL',
-            container_photos=m.get('container_photos'),
-            container_damages=m.get('container_damages', []),
-            inspection_notes=m.get('inspection_notes'),
-            billed=m.get('billed', False),
-            billed_at=parse_datetime_value(m['billed_at']) if m.get('billed_at') else None,
-            created_at=parse_datetime_value(m['created_at']),
-            user_name=m.get('user_name', m.get('created_by_name', ''))
-        )
+        _movement_response(m)
         for m in movements
     ]
 
@@ -725,38 +675,7 @@ async def get_unbilled_movements(
     movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
 
     return [
-        ContainerMovementResponse(
-            id=m['id'],
-            transaction_id=m.get('transaction_id', 0),
-            operation_type=m['operation_type'],
-            driver_name=m['driver_name'],
-            driver_cpf=m['driver_cpf'],
-            truck_plate=m['truck_plate'],
-            trailer_plate_1=m['trailer_plate_1'],
-            trailer_plate_2=m.get('trailer_plate_2'),
-            transport_company=m['transport_company'],
-            client_name=m.get('client_name'),
-            container_number=m['container_number'],
-            status=m['status'],
-            size_type=m['size_type'],
-            tare=m.get('tare'),
-            shipping_line=m['shipping_line'],
-            seal=m.get('seal'),
-            genset=m.get('genset'),
-            booking=m.get('booking'),
-            origin_terminal=m.get('origin_terminal'),
-            service_type=m.get('service_type'),
-            invoice_number=m.get('invoice_number'),
-            service_value=m.get('service_value'),
-            currency=m.get('currency') or 'BRL',
-            container_photos=m.get('container_photos'),
-            container_damages=m.get('container_damages', []),
-            inspection_notes=m.get('inspection_notes'),
-            billed=m.get('billed', False),
-            billed_at=parse_datetime_value(m['billed_at']) if m.get('billed_at') else None,
-            created_at=parse_datetime_value(m['created_at']),
-            user_name=m['user_name']
-        )
+        _movement_response(m)
         for m in movements
     ]
 
@@ -831,40 +750,7 @@ async def get_movement(movement_id: str, current_user: dict = Depends(get_curren
     if not movement:
         raise HTTPException(status_code=404, detail="Movimentação não encontrada")
     
-    return ContainerMovementResponse(
-        id=movement['id'],
-        transaction_id=movement.get('transaction_id', 0),
-        operation_type=movement['operation_type'],
-        driver_name=movement['driver_name'],
-        driver_cpf=movement['driver_cpf'],
-        truck_plate=movement['truck_plate'],
-        trailer_plate_1=movement['trailer_plate_1'],
-        trailer_plate_2=movement.get('trailer_plate_2'),
-        transport_company=movement['transport_company'],
-        client_name=movement.get('client_name'),
-        buyer_name=movement.get('buyer_name'),
-        container_number=movement['container_number'],
-        status=movement['status'],
-        size_type=movement['size_type'],
-        tare=movement.get('tare'),
-        shipping_line=movement['shipping_line'],
-        seal=movement.get('seal'),
-        genset=movement.get('genset'),
-        booking=movement.get('booking'),
-        origin_terminal=movement.get('origin_terminal'),
-        service_type=movement.get('service_type'),
-        invoice_number=movement.get('invoice_number'),
-        service_value=movement.get('service_value'),
-        currency=movement.get('currency') or 'BRL',
-        observations=movement.get('observations'),
-        container_photos=movement.get('container_photos'),
-        container_damages=movement.get('container_damages', []),
-        inspection_notes=movement.get('inspection_notes'),
-        billed=movement.get('billed', False),
-        billed_at=parse_datetime_value(movement['billed_at']) if movement.get('billed_at') else None,
-        created_at=parse_datetime_value(movement['created_at']),
-        user_name=movement['user_name']
-    )
+    return _movement_response(movement)
 
 @api_router.put("/movements/{movement_id}", response_model=ContainerMovementResponse)
 async def update_movement(movement_id: str, movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_active_user)):
@@ -915,41 +801,7 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     if update_data['operation_type'] == 'SAIDA':
         await _mark_segregation_retrieved(update_data['container_number'], update_data['transaction_id'])
 
-    return ContainerMovementResponse(
-        id=movement_id,
-        transaction_id=update_data['transaction_id'],
-        operation_type=update_data['operation_type'],
-        driver_name=update_data['driver_name'],
-        driver_cpf=update_data['driver_cpf'],
-        truck_plate=update_data['truck_plate'],
-        trailer_plate_1=update_data['trailer_plate_1'],
-        trailer_plate_2=update_data.get('trailer_plate_2'),
-        transport_company=update_data['transport_company'],
-        client_name=update_data.get('client_name'),
-        buyer_name=update_data.get('buyer_name'),
-        container_number=update_data['container_number'],
-        status=update_data['status'],
-        size_type=update_data['size_type'],
-        tare=update_data.get('tare'),
-        shipping_line=update_data['shipping_line'],
-        seal=update_data.get('seal'),
-        genset=update_data.get('genset'),
-        booking=update_data.get('booking'),
-        origin_terminal=update_data.get('origin_terminal'),
-        service_type=update_data.get('service_type'),
-        invoice_number=update_data.get('invoice_number'),
-        service_value=update_data.get('service_value'),
-        currency=update_data.get('currency') or 'BRL',
-        observations=update_data.get('observations'),
-        container_photos=update_data.get('container_photos'),
-        container_damages=update_data.get('container_damages', []),
-        inspection_notes=update_data.get('inspection_notes'),
-        loading_order_id=update_data.get('loading_order_id'),
-        billed=update_data.get('billed', False),
-        billed_at=parse_datetime_value(update_data['billed_at']) if update_data.get('billed_at') else None,
-        created_at=parse_datetime_value(update_data['created_at']),
-        user_name=update_data['user_name']
-    )
+    return _movement_response(update_data)
 
 @api_router.delete("/movements/{movement_id}")
 async def delete_movement(movement_id: str, current_user: dict = Depends(get_current_active_user)):
@@ -1152,28 +1004,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_active_us
     stock_full = stock_by_status["CHEIO"]
 
     recent_movements = [
-        ContainerMovementResponse(
-            id=m['id'],
-            transaction_id=m.get('transaction_id', 0),
-            operation_type=m['operation_type'],
-            driver_name=m['driver_name'],
-            driver_cpf=m['driver_cpf'],
-            truck_plate=m['truck_plate'],
-            trailer_plate_1=m['trailer_plate_1'],
-            trailer_plate_2=m.get('trailer_plate_2'),
-            transport_company=m['transport_company'],
-            container_number=m['container_number'],
-            status=m['status'],
-            size_type=m['size_type'],
-            tare=m.get('tare'),
-            shipping_line=m['shipping_line'],
-            seal=m.get('seal'),
-            genset=m.get('genset'),
-            booking=m.get('booking'),
-            currency=m.get('currency') or 'BRL',
-            created_at=parse_datetime_value(m['created_at']),
-            user_name=m['user_name']
-        )
+        _movement_response(m)
         for m in recent
     ]
     
@@ -1586,52 +1417,50 @@ async def register_quick_exit(
     if existing_exit:
         raise HTTPException(status_code=400, detail="Container já possui saída registrada")
     
-    # Gerar número sequencial
-    counter = await db.counters.find_one_and_update(
-        {"_id": "transaction_id"},
-        {"$inc": {"seq": 1}},
-        upsert=True,
-        return_document=True
-    )
-    transaction_id = counter["seq"]
-    
-    # Criar movimentação de saída baseada na entrada
-    exit_movement = {
-        "id": str(uuid.uuid4()),
-        "transaction_id": transaction_id,
-        "operation_type": "SAIDA",
-        "container_number": entry_movement["container_number"],
-        "status": entry_movement["status"],
-        "size_type": entry_movement["size_type"],
-        "shipping_line": entry_movement["shipping_line"],
-        "client_id": entry_movement.get("client_id"),
-        "client_name": entry_movement.get("client_name"),
-        "booking": entry_movement.get("booking"),
-        "bl_number": entry_movement.get("bl_number"),
-        "tare": entry_movement.get("tare"),
-        "seal": entry_movement.get("seal"),
-        "service_type": entry_movement.get("service_type"),
-        "driver_id": data.driver_id,
-        "driver_name": data.driver_name,
-        "vehicle_plate": data.vehicle_plate,
-        "transport_company_id": data.transport_company_id,
-        "transport_company_name": data.transport_company_name,
-        "observations": data.observations or f"Saída rápida - Entrada #{entry_movement.get('transaction_id')}",
-        "created_by": current_user["sub"],
-        "created_by_name": current_user["name"],
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": None
-    }
-    
-    await db.movements.insert_one(exit_movement)
-    
-    # Remover _id se foi adicionado pelo MongoDB
-    exit_movement.pop('_id', None)
-    
+    # CPF do motorista vem do cadastro (o formulário de saída rápida só
+    # manda o id e o nome).
+    driver_cpf = ''
+    if data.driver_id:
+        driver = await db.drivers.find_one({"id": data.driver_id}, {"_id": 0, "cpf": 1})
+        driver_cpf = (driver or {}).get('cpf') or ''
+
+    # A saída é criada pelo mesmo caminho da Emissão de EIR
+    # (_create_container_movement), com os mesmos nomes de campo. Antes este
+    # endpoint gravava o documento à mão, com outros nomes (vehicle_plate,
+    # transport_company_name, created_by_name), e pulava a trava de
+    # duplicidade, a Segregação de Unidade e o aviso em tempo real.
+    try:
+        movement_input = ContainerMovementCreate(
+            operation_type="SAIDA",
+            driver_name=data.driver_name or '',
+            driver_cpf=driver_cpf,
+            truck_plate=data.vehicle_plate or '',
+            trailer_plate_1='',
+            transport_company=data.transport_company_name or '',
+            client_name=entry_movement.get("client_name"),
+            buyer_name=entry_movement.get("buyer_name"),
+            container_number=entry_movement["container_number"],
+            status=entry_movement["status"],
+            size_type=entry_movement["size_type"],
+            tare=entry_movement.get("tare"),
+            shipping_line=entry_movement["shipping_line"],
+            seal=entry_movement.get("seal"),
+            booking=entry_movement.get("booking"),
+            service_type=entry_movement.get("service_type"),
+            observations=data.observations or f"Saída rápida - Entrada #{entry_movement.get('transaction_id')}",
+        )
+    except ValidationError:
+        raise HTTPException(
+            status_code=400,
+            detail="A entrada deste container tem dados fora do padrão atual. Registre a saída pela Emissão de EIR."
+        )
+
+    response = await _create_container_movement(movement_input, current_user)
+
     return {
         "message": "Saída registrada com sucesso",
-        "movement": exit_movement,
-        "transaction_id": transaction_id
+        "movement": response,
+        "transaction_id": response.transaction_id
     }
 
 @api_router.get("/yard-control/excel")

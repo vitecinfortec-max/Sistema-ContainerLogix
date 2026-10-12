@@ -219,3 +219,138 @@ class TestWebSocketSession:
 
     def test_disabled_module(self, monkeypatch):
         assert _ws_session_valid(monkeypatch, {"id": "u1"}, disabled_modules=["terminal"]) is False
+
+
+# ---------- Conversores únicos de resposta ----------
+
+from routers import movements as movements_router
+from routers.invoices import _invoice_response
+from routers.movements import _movement_response
+
+STORED_MOVEMENT = {
+    **MOVEMENT, "id": "m1", "transaction_id": 42, "buyer_name": "Comprador", "currency": "USD",
+    "service_value": 100.0, "observations": "obs", "loading_order_id": "lo1",
+    "created_at": "2026-10-12T15:00:00+00:00", "created_by": "u1", "user_name": "Operador",
+}
+
+
+class TestMovementResponse:
+    def test_every_stored_field_reaches_the_response(self):
+        response = _movement_response(STORED_MOVEMENT)
+        for field in ("buyer_name", "currency", "service_value", "observations", "loading_order_id", "user_name"):
+            assert getattr(response, field) == STORED_MOVEMENT[field], field
+        assert response.created_at.tzinfo is not None
+
+    def test_legacy_quick_exit_document(self):
+        # Formato gravado pela saída rápida antiga: outros nomes de campo e sem CPF.
+        legacy = {
+            "id": "m2", "transaction_id": 43, "operation_type": "SAIDA", "container_number": "ABCU1234567",
+            "status": "CHEIO", "size_type": "20DC", "shipping_line": "Armador", "driver_name": None,
+            "vehicle_plate": "AAA0A00", "transport_company_name": "Transportadora",
+            "created_by_name": "Operador", "created_at": "2026-10-12T15:00:00+00:00", "updated_at": None,
+        }
+        response = _movement_response(legacy)
+        assert response.truck_plate == "AAA0A00"
+        assert response.transport_company == "Transportadora"
+        assert response.user_name == "Operador"
+        assert response.currency == "BRL"
+        assert response.container_damages == []
+
+
+def test_invoice_response_defaults_and_dates():
+    response = _invoice_response({
+        "id": "f1", "invoice_number": 7, "client_name": "Cliente", "movement_ids": ["m1"],
+        "total_value": 100.0, "created_at": "2026-10-12T15:00:00+00:00", "user_name": "Admin",
+    })
+    assert response.status == "PENDENTE"
+    assert response.created_at.year == 2026
+
+
+# ---------- Saída rápida pelo caminho único de criação ----------
+
+class _FakeCollection:
+    """Só o que o caminho de criação usa. find_one devolve o primeiro
+    documento cujos campos simples batem com o filtro."""
+    def __init__(self, docs=()):
+        self.docs = list(docs)
+
+    async def find_one(self, query=None, projection=None, sort=None):
+        matches = [d for d in self.docs if all(d.get(k) == v for k, v in (query or {}).items() if not isinstance(v, dict))]
+        if sort:
+            matches.sort(key=lambda d: d.get(sort[0][0]) or "", reverse=sort[0][1] < 0)
+        return dict(matches[0]) if matches else None
+
+    async def insert_one(self, doc):
+        self.docs.append(doc)
+
+    async def delete_one(self, query):
+        self.docs = [d for d in self.docs if not all(d.get(k) == v for k, v in query.items())]
+
+    async def update_one(self, *args, **kwargs):
+        return None
+
+
+class _FakeCounters:
+    async def find_one_and_update(self, *args, **kwargs):
+        return {"seq": 99}
+
+
+class _FakeMovementsDb:
+    def __init__(self, movements, drivers):
+        self.movements = _FakeCollection(movements)
+        self.drivers = _FakeCollection(drivers)
+        self.unit_segregations = _FakeCollection()
+        self.movement_locks = _FakeCollection()
+        self.counters = _FakeCounters()
+
+
+class _FakeManager:
+    def __init__(self):
+        self.messages = []
+
+    async def broadcast(self, message):
+        self.messages.append(message)
+
+
+ENTRY = {
+    **MOVEMENT, "id": "e1", "transaction_id": 10, "client_name": "Cliente", "buyer_name": "Comprador",
+    "created_at": "2026-10-01T12:00:00+00:00", "created_by": "u1", "user_name": "Operador",
+}
+USER = {"sub": "u1", "name": "Operador"}
+
+
+def _quick_exit(monkeypatch, movements):
+    import shared as shared_module
+    fake_db = _FakeMovementsDb(movements, [{"id": "d1", "cpf": "11122233344"}])
+    fake_manager = _FakeManager()
+    monkeypatch.setattr(movements_router, "db", fake_db)
+    monkeypatch.setattr(shared_module, "db", fake_db)  # get_next_transaction_id lê o contador por aqui
+    monkeypatch.setattr(movements_router, "manager", fake_manager)
+    request = movements_router.QuickExitRequest(
+        entry_movement_id="e1", driver_id="d1", driver_name="Motorista", vehicle_plate="AAA0A00",
+        transport_company_name="Transportadora",
+    )
+    result = asyncio.run(movements_router.register_quick_exit(request, USER))
+    return result, fake_db, fake_manager
+
+
+class TestQuickExit:
+    def test_exit_is_stored_with_the_standard_field_names(self, monkeypatch):
+        result, fake_db, fake_manager = _quick_exit(monkeypatch, [dict(ENTRY)])
+        stored = fake_db.movements.docs[-1]
+        assert stored["operation_type"] == "SAIDA"
+        assert stored["truck_plate"] == "AAA0A00"
+        assert stored["transport_company"] == "Transportadora"
+        assert stored["driver_cpf"] == "11122233344"
+        assert stored["user_name"] == "Operador"
+        assert stored["buyer_name"] == "Comprador"
+        assert "vehicle_plate" not in stored
+        assert result["transaction_id"] == 99
+        assert fake_manager.messages[0]["type"] == "MOVEMENT_CREATED"
+        assert fake_db.movement_locks.docs == []  # reserva liberada ao final
+
+    def test_second_exit_in_a_row_is_blocked(self, monkeypatch):
+        previous_exit = {**ENTRY, "id": "s1", "operation_type": "SAIDA", "created_at": "2026-10-05T12:00:00+00:00"}
+        with pytest.raises(HTTPException) as error:
+            _quick_exit(monkeypatch, [dict(ENTRY), previous_exit])
+        assert error.value.status_code == 400
