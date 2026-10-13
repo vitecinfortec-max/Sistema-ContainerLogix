@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Camera, Upload, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Camera, Upload, X, Loader2, FileText } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
 
@@ -21,6 +21,7 @@ export const VISTORIA_PHOTO_TYPES = [
   { value: 'internal', label: 'Interno' },
   { value: 'left', label: 'Lateral Esquerda' },
   { value: 'right', label: 'Lateral Direita' },
+  { value: 'csc_plate', label: 'Placa CSC' },
 ];
 
 export const MAX_VISTORIA_PHOTOS = 12;
@@ -32,6 +33,7 @@ export default function NewContainerVistoriaPage() {
   const [shippingLines, setShippingLines] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [transportCompanies, setTransportCompanies] = useState([]);
+  const [drivers, setDrivers] = useState([]);
   const [repairServices, setRepairServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
 
@@ -42,6 +44,7 @@ export default function NewContainerVistoriaPage() {
     truck_plate: '',
     trailer_plate: '',
     transport_company: '',
+    driver_name: '',
     size_type: '20DC',
     tare: '',
     observations: '',
@@ -53,6 +56,8 @@ export default function NewContainerVistoriaPage() {
   const [photos, setPhotos] = useState([]); // { id, type, file }
   const [newPhotoType, setNewPhotoType] = useState('front');
   const fileInputRef = useRef(null);
+  // true quando o envio veio do botão "Salvar e gerar EIR de entrada"
+  const generateEirRef = useRef(false);
 
   useEffect(() => {
     loadData();
@@ -60,18 +65,20 @@ export default function NewContainerVistoriaPage() {
 
   const loadData = async () => {
     try {
-      const [clientsRes, shippingLinesRes, vehiclesRes, companiesRes, serviceTypesRes] = await Promise.all([
+      const [clientsRes, shippingLinesRes, vehiclesRes, companiesRes, serviceTypesRes, driversRes] = await Promise.all([
         api.getClients(),
         api.getShippingLines(),
         api.getVehicles({ per_page: 1000 }),
         api.getTransportCompanies(),
         api.getServiceTypes({ per_page: 1000 }),
+        api.getDrivers(),
       ]);
       setClients(clientsRes.data);
       setShippingLines(shippingLinesRes.data);
       setVehicles(Array.isArray(vehiclesRes.data) ? vehiclesRes.data : (vehiclesRes.data?.items || []));
       setTransportCompanies(companiesRes.data);
       setRepairServices(serviceTypesRes.data?.items || []);
+      setDrivers(Array.isArray(driversRes.data) ? driversRes.data : []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados');
@@ -137,6 +144,7 @@ export default function NewContainerVistoriaPage() {
         truck_plate: formData.truck_plate || null,
         trailer_plate: formData.trailer_plate || null,
         transport_company: formData.transport_company || null,
+        driver_name: formData.driver_name || null,
         size_type: formData.size_type || null,
         tare: formData.tare || null,
         observations: formData.observations || null,
@@ -151,7 +159,9 @@ export default function NewContainerVistoriaPage() {
       );
 
       toast.success('Vistoria criada com sucesso!');
-      navigate(`/container-vistorias/${vistoriaId}`);
+      // Com "Salvar e gerar EIR de entrada" a Emissão de EIR abre já preenchida
+      // com os dados desta vistoria - ver NewMovementPage.
+      navigate(generateEirRef.current ? `/movements/new?vistoria=${vistoriaId}` : `/container-vistorias/${vistoriaId}`);
     } catch (error) {
       console.error('Erro ao criar vistoria:', error);
       toast.error('Erro ao criar vistoria');
@@ -253,6 +263,17 @@ export default function NewContainerVistoriaPage() {
                     value={formData.tare}
                     onChange={(e) => handleInputChange('tare', e.target.value)}
                     data-testid="tare-input"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="driver_name">Nome do Motorista</Label>
+                  <Autocomplete
+                    value={formData.driver_name}
+                    onChange={(v) => handleInputChange('driver_name', v)}
+                    onSelect={(d) => handleInputChange('driver_name', d.name)}
+                    options={drivers}
+                    displayField="name"
                   />
                 </div>
 
@@ -446,7 +467,7 @@ export default function NewContainerVistoriaPage() {
           </Card>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4">
+          <div className="flex flex-wrap justify-end gap-4">
             <Button
               type="button"
               variant="outline"
@@ -454,7 +475,17 @@ export default function NewContainerVistoriaPage() {
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={saving} data-testid="save-btn">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={(e) => { generateEirRef.current = true; e.currentTarget.form.requestSubmit(); }}
+              data-testid="save-and-generate-eir-btn"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Salvar e gerar EIR de entrada
+            </Button>
+            <Button type="submit" disabled={saving} onClick={() => { generateEirRef.current = false; }} data-testid="save-btn">
               {saving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -22,6 +22,10 @@ const AUTO_SAVE_KEY = 'containerlogix_movement_draft';
 
 export default function NewMovementPage() {
   const navigate = useNavigate();
+  // Vistoria de Container que está gerando esta EIR de entrada ("Salvar e
+  // gerar EIR de entrada" / "Gerar EIR de entrada" na vistoria)
+  const [searchParams] = useSearchParams();
+  const vistoriaId = searchParams.get('vistoria');
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [drivers, setDrivers] = useState([]);
@@ -47,7 +51,8 @@ export default function NewMovementPage() {
   const buyerInputRef = useRef(null);
   const { notifyNewMovement, requestPermission, permission } = useNotifications();
   
-  const savedDraft = localStorage.getItem(AUTO_SAVE_KEY);
+  // Vindo de uma vistoria, o formulário parte dos dados dela, não do rascunho
+  const savedDraft = vistoriaId ? null : localStorage.getItem(AUTO_SAVE_KEY);
   const defaultValues = savedDraft ? JSON.parse(savedDraft) : {
     operation_type: 'ENTRADA',
     status: 'CHEIO',
@@ -164,6 +169,10 @@ export default function NewMovementPage() {
       setServiceTypes(serviceTypesData);
       setVehicles(vehiclesData);
       setTerminals(terminalsData);
+
+      if (vistoriaId) {
+        await fillFromVistoria(driversData);
+      }
       
       if (shippingLinesData.length === 0) {
         console.warn('[NewMovementPage] Nenhum armador encontrado!');
@@ -174,6 +183,44 @@ export default function NewMovementPage() {
       toast.error('Erro ao carregar dados. Por favor, recarregue a página.');
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  // Preenche a EIR de entrada com o que a Vistoria de Container já registrou.
+  // Status (cheio/vazio) e o que a vistoria não tiver ficam pro operador.
+  const fillFromVistoria = async (driversData) => {
+    try {
+      const { data: vistoria } = await api.getContainerVistoria(vistoriaId);
+      const code = `VC${String(vistoria.vistoria_number).padStart(6, '0')}`;
+      setValue('operation_type', 'ENTRADA');
+      setValue('container_number', vistoria.container_number);
+      if (vistoria.size_type) setValue('size_type', vistoria.size_type);
+      if (vistoria.shipping_line) setValue('shipping_line', vistoria.shipping_line);
+      if (vistoria.tare) setValue('tare', vistoria.tare);
+      if (vistoria.truck_plate) setValue('truck_plate', vistoria.truck_plate);
+      if (vistoria.trailer_plate) setValue('trailer_plate_1', vistoria.trailer_plate);
+      if (vistoria.transport_company) setValue('transport_company', vistoria.transport_company);
+      if (vistoria.client_name) {
+        setValue('client_name', vistoria.client_name);
+        setClientSearch(vistoria.client_name);
+      }
+      if (vistoria.driver_name) {
+        setValue('driver_name', vistoria.driver_name);
+        const driver = driversData.find((d) => d.name.toLowerCase() === vistoria.driver_name.toLowerCase());
+        if (driver) setValue('driver_cpf', driver.cpf);
+      }
+      if (vistoria.observations) setValue('observations', vistoria.observations);
+      if (vistoria.no_damage) {
+        setContainerDamages(['SEM_AVARIA']);
+        setInspectionNotes(`Vistoria de Container ${code}`);
+      } else {
+        const items = (vistoria.damage_items || []).join('; ');
+        setInspectionNotes(`Vistoria de Container ${code}${items ? `: ${items}` : ''}`);
+      }
+      checkContainerDuplicate(vistoria.container_number, 'ENTRADA');
+      toast.success(`Dados da vistoria ${code} preenchidos. Confira e informe o Status.`);
+    } catch (error) {
+      toast.error('Não foi possível carregar os dados da vistoria');
     }
   };
 
@@ -203,6 +250,13 @@ export default function NewMovementPage() {
       };
       const response = await api.createMovement(payload);
       localStorage.removeItem(AUTO_SAVE_KEY);
+      if (vistoriaId) {
+        // Registra na vistoria a EIR gerada (a tela dela passa a mostrar "Ver EIR")
+        await api.updateContainerVistoria(vistoriaId, {
+          movement_id: response.data.id,
+          movement_transaction_id: response.data.transaction_id,
+        }).catch(() => {});
+      }
       toast.success('Registro cadastrado com sucesso!');
 
       // Enviar notificação push
@@ -408,7 +462,9 @@ export default function NewMovementPage() {
               Novo Registro
             </h1>
             <div className="flex items-center gap-2 mt-0.5">
-              <p className="text-[13px] text-slate-500 dark:text-slate-400">Registre uma nova entrada ou saída de contêiner</p>
+              <p className="text-[13px] text-slate-500 dark:text-slate-400">
+                {vistoriaId ? 'EIR de entrada gerada a partir da Vistoria de Container' : 'Registre uma nova entrada ou saída de contêiner'}
+              </p>
               {autoSaved && (
                 <span className="inline-flex items-center text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
                   <Check className="w-3 h-3 mr-1" />

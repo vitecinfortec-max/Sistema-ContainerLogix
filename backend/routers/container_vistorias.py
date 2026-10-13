@@ -68,6 +68,7 @@ async def create_container_vistoria(
         truck_plate=data.truck_plate,
         trailer_plate=data.trailer_plate,
         transport_company=data.transport_company,
+        driver_name=data.driver_name,
         size_type=data.size_type,
         tare=data.tare,
         no_damage=data.no_damage,
@@ -99,8 +100,9 @@ async def update_container_vistoria(
 
     for field in (
         "container_number", "client_name", "shipping_line", "truck_plate",
-        "trailer_plate", "transport_company", "size_type", "tare",
+        "trailer_plate", "transport_company", "driver_name", "size_type", "tare",
         "no_damage", "damage_items", "observations",
+        "movement_id", "movement_transaction_id",
     ):
         value = getattr(data, field)
         if value is not None:
@@ -116,7 +118,7 @@ async def update_container_vistoria(
 @api_router.post("/container-vistorias/{vistoria_id}/upload-photo")
 async def upload_container_vistoria_photo(
     vistoria_id: str,
-    photo_type: str = Query(..., alias="type", regex="^(front|back|left|right|internal)$"),
+    photo_type: str = Query(..., alias="type", regex="^(front|back|left|right|internal|csc_plate)$"),
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_active_user)
 ):
@@ -141,9 +143,11 @@ async def upload_container_vistoria_photo(
 
     photo_url = f"/api/uploads/container_vistorias/{vistoria_id}/{photo_id}{file_ext}"
     photo_entry = {"id": photo_id, "type": photo_type, "url": photo_url}
+    # $push (e não regravar a lista lida acima): a tela envia as fotos em
+    # paralelo, e regravar a lista fazia um envio apagar a foto do outro.
     await db.container_vistorias.update_one(
         {"id": vistoria_id},
-        {"$set": {"photos": existing_photos + [photo_entry], "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$push": {"photos": photo_entry}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
     )
 
     return photo_entry

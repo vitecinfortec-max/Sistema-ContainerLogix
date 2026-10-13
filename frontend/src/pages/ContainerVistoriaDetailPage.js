@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Printer, Download, Camera, Upload, X, Edit, Loader2 } from 'lucide-react';
+import { ArrowLeft, Printer, Download, Camera, Upload, X, Edit, Loader2, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
@@ -190,6 +190,7 @@ export default function ContainerVistoriaDetailPage() {
             ['Placa do Cavalo', vistoria.truck_plate],
             ['Carreta', vistoria.trailer_plate],
             ['Transportadora', vistoria.transport_company],
+            ['Nome do Motorista', vistoria.driver_name],
             ['Tara', vistoria.tare],
           ]} />
         </PrintSection>
@@ -260,7 +261,18 @@ export default function ContainerVistoriaDetailPage() {
               </p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            {vistoria.movement_id ? (
+              <Button variant="outline" onClick={() => navigate(`/movements/${vistoria.movement_id}`)} data-testid="view-eir-btn">
+                <FileText className="w-4 h-4 mr-2" />
+                Ver EIR #{vistoria.movement_transaction_id}
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => navigate(`/movements/new?vistoria=${id}`)} data-testid="generate-eir-btn">
+                <FileText className="w-4 h-4 mr-2" />
+                Gerar EIR de entrada
+              </Button>
+            )}
             <Button variant="outline" onClick={() => navigate(`/container-vistorias/${id}/edit`)} data-testid="edit-btn">
               <Edit className="w-4 h-4 mr-2" />
               Editar
@@ -302,6 +314,10 @@ export default function ContainerVistoriaDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Transportadora</p>
                 <p className="font-semibold">{vistoria.transport_company || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Nome do Motorista</p>
+                <p className="font-semibold">{vistoria.driver_name || '-'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Tamanho/Tipo</p>

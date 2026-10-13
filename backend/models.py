@@ -678,7 +678,7 @@ MAX_VISTORIA_PHOTOS = 12
 
 class ContainerVistoriaPhoto(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    type: str  # front, back, left, right ou internal
+    type: str  # front, back, left, right, internal ou csc_plate (Placa CSC)
     url: str
 
 class ContainerVistoria(BaseModel):
@@ -692,11 +692,14 @@ class ContainerVistoria(BaseModel):
     truck_plate: Optional[str] = None  # Placa do Cavalo
     trailer_plate: Optional[str] = None  # Carreta
     transport_company: Optional[str] = None  # Transportadora
+    driver_name: Optional[str] = None  # Nome do Motorista
     size_type: Optional[str] = None  # Tamanho/Tipo
     tare: Optional[str] = None
     no_damage: bool = False  # Sem Avarias
     damage_items: List[str] = Field(default_factory=list)  # Tipo de Serviços (nomes do catálogo de reparo)
     observations: Optional[str] = None
+    movement_id: Optional[str] = None  # EIR de entrada gerada a partir desta vistoria
+    movement_transaction_id: Optional[int] = None  # Nº (ID Transação) dessa EIR
     photos: List[ContainerVistoriaPhoto] = Field(default_factory=list)  # até MAX_VISTORIA_PHOTOS
     created_by: str
     created_by_name: str
@@ -710,6 +713,7 @@ class ContainerVistoriaCreate(BaseModel):
     truck_plate: Optional[str] = None
     trailer_plate: Optional[str] = None
     transport_company: Optional[str] = None
+    driver_name: Optional[str] = None
     size_type: Optional[str] = None
     tare: Optional[str] = None
     no_damage: bool = False
@@ -723,11 +727,14 @@ class ContainerVistoriaUpdate(BaseModel):
     truck_plate: Optional[str] = None
     trailer_plate: Optional[str] = None
     transport_company: Optional[str] = None
+    driver_name: Optional[str] = None
     size_type: Optional[str] = None
     tare: Optional[str] = None
     no_damage: Optional[bool] = None
     damage_items: Optional[List[str]] = None
     observations: Optional[str] = None
+    movement_id: Optional[str] = None  # EIR de entrada gerada a partir desta vistoria
+    movement_transaction_id: Optional[int] = None  # Nº (ID Transação) dessa EIR
 
 class ContainerVistoriaResponse(BaseModel):
     id: str
@@ -738,11 +745,14 @@ class ContainerVistoriaResponse(BaseModel):
     truck_plate: Optional[str] = None
     trailer_plate: Optional[str] = None
     transport_company: Optional[str] = None
+    driver_name: Optional[str] = None
     size_type: Optional[str] = None
     tare: Optional[str] = None
     no_damage: bool = False
     damage_items: List[str] = Field(default_factory=list)
     observations: Optional[str] = None
+    movement_id: Optional[str] = None  # EIR de entrada gerada a partir desta vistoria
+    movement_transaction_id: Optional[int] = None  # Nº (ID Transação) dessa EIR
     photos: List[ContainerVistoriaPhoto] = Field(default_factory=list)
     created_by: str
     created_by_name: str

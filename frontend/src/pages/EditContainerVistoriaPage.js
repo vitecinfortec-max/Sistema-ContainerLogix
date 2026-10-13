@@ -30,6 +30,7 @@ export default function EditContainerVistoriaPage() {
   const [shippingLines, setShippingLines] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [transportCompanies, setTransportCompanies] = useState([]);
+  const [drivers, setDrivers] = useState([]);
   const [repairServices, setRepairServices] = useState([]);
   const [serviceSearch, setServiceSearch] = useState('');
 
@@ -40,6 +41,7 @@ export default function EditContainerVistoriaPage() {
     truck_plate: '',
     trailer_plate: '',
     transport_company: '',
+    driver_name: '',
     size_type: '20DC',
     tare: '',
     observations: '',
@@ -60,13 +62,14 @@ export default function EditContainerVistoriaPage() {
 
   const loadData = async () => {
     try {
-      const [vistoriaRes, clientsRes, shippingLinesRes, vehiclesRes, companiesRes, serviceTypesRes] = await Promise.all([
+      const [vistoriaRes, clientsRes, shippingLinesRes, vehiclesRes, companiesRes, serviceTypesRes, driversRes] = await Promise.all([
         api.getContainerVistoria(id),
         api.getClients(),
         api.getShippingLines(),
         api.getVehicles({ per_page: 1000 }),
         api.getTransportCompanies(),
         api.getServiceTypes({ per_page: 1000 }),
+        api.getDrivers(),
       ]);
 
       const vistoria = vistoriaRes.data;
@@ -78,6 +81,7 @@ export default function EditContainerVistoriaPage() {
         truck_plate: vistoria.truck_plate || '',
         trailer_plate: vistoria.trailer_plate || '',
         transport_company: vistoria.transport_company || '',
+        driver_name: vistoria.driver_name || '',
         size_type: vistoria.size_type || '20DC',
         tare: vistoria.tare || '',
         observations: vistoria.observations || '',
@@ -91,6 +95,7 @@ export default function EditContainerVistoriaPage() {
       setVehicles(Array.isArray(vehiclesRes.data) ? vehiclesRes.data : (vehiclesRes.data?.items || []));
       setTransportCompanies(companiesRes.data);
       setRepairServices(serviceTypesRes.data?.items || []);
+      setDrivers(Array.isArray(driversRes.data) ? driversRes.data : []);
     } catch (error) {
       toast.error('Erro ao carregar vistoria');
       navigate('/container-vistorias');
@@ -174,6 +179,7 @@ export default function EditContainerVistoriaPage() {
         truck_plate: formData.truck_plate || null,
         trailer_plate: formData.trailer_plate || null,
         transport_company: formData.transport_company || null,
+        driver_name: formData.driver_name || null,
         size_type: formData.size_type || null,
         tare: formData.tare || null,
         observations: formData.observations || null,
@@ -289,6 +295,17 @@ export default function EditContainerVistoriaPage() {
                     value={formData.tare}
                     onChange={(e) => handleInputChange('tare', e.target.value)}
                     data-testid="tare-input"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="driver_name">Nome do Motorista</Label>
+                  <Autocomplete
+                    value={formData.driver_name}
+                    onChange={(v) => handleInputChange('driver_name', v)}
+                    onSelect={(d) => handleInputChange('driver_name', d.name)}
+                    options={drivers}
+                    displayField="name"
                   />
                 </div>
 
