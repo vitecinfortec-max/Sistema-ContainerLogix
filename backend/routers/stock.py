@@ -1025,7 +1025,24 @@ async def _update_stock_movement(movement_id: str, data: StockMovementUpdate, cu
                        f"disponível {available:g}, faltariam {-(available + delta):g}"
             )
 
-    applied = await _apply_stock_deltas(net_delta)
+    # Marca a movimentação como "em edição por este pedido" antes de mexer no
+    # saldo, e só se ela ainda estiver na versão que foi lida acima. A
+    # diferença de saldo é calculada a partir dessa versão: duas edições
+    # simultâneas liam a mesma e as duas aplicavam a diferença. Agora a
+    # segunda não encontra mais a versão que leu e para aqui.
+    previous_version = existing.get("updated_at")
+    new_version = datetime.now(timezone.utc).isoformat()
+    claimed = await db.stock_movements.find_one_and_update(
+        {"id": movement_id, "updated_at": previous_version},
+        {"$set": {"updated_at": new_version}},
+        projection={"_id": 0, "id": 1},
+    )
+    if not claimed:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta movimentação acabou de ser alterada ou excluída por outro usuário. Recarregue a tela e tente novamente."
+        )
+
     update_data = {
         **data.model_dump(),
         "id": movement_id,
@@ -1036,12 +1053,18 @@ async def _update_stock_movement(movement_id: str, data: StockMovementUpdate, cu
         "created_by": existing["created_by"],
         "created_by_name": existing["created_by_name"],
         "created_at": existing["created_at"],
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": new_version,
     }
+    applied = []
     try:
+        applied = await _apply_stock_deltas(net_delta)
         await db.stock_movements.replace_one({"id": movement_id}, update_data)
-    except Exception:
+    except BaseException:
+        # Nada foi concluído: desfaz o saldo e devolve a versão anterior.
         await _revert_stock_deltas(applied)
+        await db.stock_movements.update_one(
+            {"id": movement_id, "updated_at": new_version}, {"$set": {"updated_at": previous_version}}
+        )
         raise
     return _stock_movement_serialize(update_data)
 
@@ -1070,22 +1093,32 @@ async def delete_stock_movement(movement_id: str, current_user: dict = Depends(g
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
     await _refuse_if_generated_by_epi(existing, "excluir")
 
-    effect = _stock_movement_effect_by_product(existing.get('operation_type'), existing.get('items') or [])
-    # Produto que não existe mais no cadastro não tem saldo pra acertar
-    existing_ids = {p['id'] async for p in db.products.find({"id": {"$in": list(effect)}}, {"_id": 0, "id": 1})}
-    applied = await _apply_stock_deltas(
-        {pid: -delta for pid, delta in effect.items() if pid in existing_ids},
-        refusal="Não dá para excluir esta entrada: parte do material já saiu do estoque. Produto",
-    )
+    # Retira o registro primeiro, num passo só: de duas exclusões
+    # simultâneas, apenas uma recebe o documento e acerta o saldo - antes as
+    # duas liam a movimentação e as duas devolviam o material ao estoque. O
+    # saldo é acertado a partir do documento retirado (o que estava gravado
+    # de fato), e o registro volta se o acerto não puder ser feito.
+    removed = await db.stock_movements.find_one_and_delete({"id": movement_id}, projection={"_id": 0})
+    if not removed:
+        raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
+
+    applied = []
     try:
-        operation = 'Entrada' if existing.get('operation_type') == 'ENTRADA' else 'Saída'
+        effect = _stock_movement_effect_by_product(removed.get('operation_type'), removed.get('items') or [])
+        # Produto que não existe mais no cadastro não tem saldo pra acertar
+        existing_ids = {p['id'] async for p in db.products.find({"id": {"$in": list(effect)}}, {"_id": 0, "id": 1})}
+        applied = await _apply_stock_deltas(
+            {pid: -delta for pid, delta in effect.items() if pid in existing_ids},
+            refusal="Não dá para excluir esta entrada: parte do material já saiu do estoque. Produto",
+        )
+        operation = 'Entrada' if removed.get('operation_type') == 'ENTRADA' else 'Saída'
         await _log_stock_audit(
             "MOVEMENT_DELETED", current_user,
-            f"Exclusão da {operation} Nº {existing.get('movement_number')}", existing,
+            f"Exclusão da {operation} Nº {removed.get('movement_number')}", removed,
         )
-        await db.stock_movements.delete_one({"id": movement_id})
-    except Exception:
+    except BaseException:
         await _revert_stock_deltas(applied)
+        await db.stock_movements.insert_one(dict(removed))
         raise
     return {"message": "Movimentação excluída e saldo do estoque acertado"}
 
