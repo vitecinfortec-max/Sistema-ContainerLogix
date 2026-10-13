@@ -22,6 +22,9 @@ from auth import decode_token
 from routers.auth import api_router as auth_router
 from routers.cadastros import api_router as cadastros_router
 from routers.movements import api_router as movements_router
+from routers.dashboard import api_router as dashboard_router
+from routers.yard_control import api_router as yard_control_router
+from routers.movement_reports import api_router as movement_reports_router
 from routers.invoices import api_router as invoices_router
 from routers.container_inspections import api_router as container_inspections_router
 from routers.container_repair_services import api_router as container_repair_services_router
@@ -84,6 +87,9 @@ app.include_router(api_router)
 app.include_router(auth_router)
 app.include_router(cadastros_router)
 app.include_router(movements_router)
+app.include_router(dashboard_router)
+app.include_router(yard_control_router)
+app.include_router(movement_reports_router)
 app.include_router(invoices_router)
 app.include_router(container_inspections_router)
 app.include_router(container_repair_services_router)

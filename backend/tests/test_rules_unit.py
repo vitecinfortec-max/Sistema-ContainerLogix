@@ -224,6 +224,7 @@ class TestWebSocketSession:
 # ---------- Conversores únicos de resposta ----------
 
 from routers import movements as movements_router
+from routers import yard_control as yard_control_router
 from routers.invoices import _invoice_response
 from routers.movements import _movement_response
 
@@ -324,13 +325,14 @@ def _quick_exit(monkeypatch, movements):
     fake_db = _FakeMovementsDb(movements, [{"id": "d1", "cpf": "11122233344"}])
     fake_manager = _FakeManager()
     monkeypatch.setattr(movements_router, "db", fake_db)
+    monkeypatch.setattr(yard_control_router, "db", fake_db)
     monkeypatch.setattr(shared_module, "db", fake_db)  # get_next_transaction_id lê o contador por aqui
     monkeypatch.setattr(movements_router, "manager", fake_manager)
-    request = movements_router.QuickExitRequest(
+    request = yard_control_router.QuickExitRequest(
         entry_movement_id="e1", driver_id="d1", driver_name="Motorista", vehicle_plate="AAA0A00",
         transport_company_name="Transportadora",
     )
-    result = asyncio.run(movements_router.register_quick_exit(request, USER))
+    result = asyncio.run(yard_control_router.register_quick_exit(request, USER))
     return result, fake_db, fake_manager
 
 
