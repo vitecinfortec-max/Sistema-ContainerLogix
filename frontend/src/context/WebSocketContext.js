@@ -80,9 +80,9 @@ export function WebSocketProvider({ children }) {
     setIsConnected(true);
 
     // Consulta só um resumo barato (quantidade + data da última alteração) a
-    // cada ciclo, e baixa a lista apenas quando esse resumo muda - antes o
-    // histórico inteiro era transferido a cada 3s, e a comparação só por IDs
-    // deixava passar as edições.
+    // cada ciclo e avisa as telas quando ele muda - antes o histórico inteiro
+    // era transferido a cada 3s, e a comparação só por IDs deixava passar as
+    // edições.
     const poll = async () => {
       try {
         const token = sessionStorage.getItem('token');
@@ -108,12 +108,9 @@ export function WebSocketProvider({ children }) {
         // a lista por conta própria.
         if (isFirstCheck) return;
 
-        const response = await fetch(`${API_URL}/api/movements`, { headers });
-        if (response.ok) {
-          let movements = await response.json();
-          movements = movements.filter(m => !pendingDeletes.current.has(m.id));
-          notifyListeners({ type: 'DATA_CHANGED', data: movements });
-        }
+        // Só avisa que mudou: cada tela recarrega o que ela mesma mostra
+        // (a de Movimentações busca de novo só a página atual da lista).
+        notifyListeners({ type: 'DATA_CHANGED' });
       } catch (error) {
         console.error('Erro no polling:', error);
       }
@@ -220,23 +217,7 @@ export function WebSocketProvider({ children }) {
   }, [startPolling, notifyListeners]);
 
   const forceRefresh = useCallback(async () => {
-    try {
-      const token = sessionStorage.getItem('token');
-      if (!token) return;
-
-      const response = await fetch(`${API_URL}/api/movements`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        let movements = await response.json();
-        movements = movements.filter(m => !pendingDeletes.current.has(m.id));
-
-        notifyListeners({ type: 'DATA_CHANGED', data: movements });
-      }
-    } catch (error) {
-      console.error('Erro ao forçar refresh:', error);
-    }
+    notifyListeners({ type: 'DATA_CHANGED' });
   }, [notifyListeners]);
 
   // A conexão acompanha a sessão: abre quando há token (inclusive logo após o

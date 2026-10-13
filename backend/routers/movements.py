@@ -98,6 +98,51 @@ def _filter_movements_by_period(movements: list, date_from: Optional[str], date_
     return filtered
 
 
+# Colunas pelas quais a lista de movimentações pode ser ordenada
+_MOVEMENT_SORT_FIELDS = {
+    "transaction_id", "operation_type", "client_name", "driver_name", "truck_plate",
+    "status", "created_at", "user_name",
+}
+
+
+def _transaction_id_prefix_ranges(text: str) -> list:
+    """Filtros que casam todo Nº de registro que COMEÇA com os dígitos
+    digitados ("12" -> 12, 120-129, 1200-1299...). transaction_id é número, e
+    faixas numéricas usam o índice - a alternativa seria converter cada
+    registro pra texto dentro do banco a cada busca."""
+    digits = text.strip().lstrip('#')
+    if not digits.isdigit() or len(digits) > 12:
+        return []
+    prefix = int(digits)
+    if prefix == 0:
+        return [{"transaction_id": 0}]
+    ranges, scale = [], 1
+    while prefix * scale < 10 ** 12:
+        low = prefix * scale
+        ranges.append({"transaction_id": {"$gte": low, "$lt": low + scale}})
+        scale *= 10
+    return ranges
+
+
+async def _movement_filter_stats(query: dict, total: int) -> dict:
+    """Entradas/saídas e cheios/vazios de tudo que o filtro alcança - os
+    indicadores do topo da tela não podem depender de quantas linhas a página
+    atual carregou."""
+    counts = {"ENTRADA": 0, "SAIDA": 0, "CHEIO": 0, "VAZIO": 0}
+    pipeline = [
+        {"$match": query},
+        {"$group": {"_id": {"op": "$operation_type", "status": "$status"}, "count": {"$sum": 1}}},
+    ]
+    async for row in db.movements.aggregate(pipeline):
+        for key in (row["_id"].get("op"), row["_id"].get("status")):
+            if key in counts:
+                counts[key] += row["count"]
+    return {
+        "total": total, "entries": counts["ENTRADA"], "exits": counts["SAIDA"],
+        "full": counts["CHEIO"], "empty": counts["VAZIO"],
+    }
+
+
 async def _find_last_movement(container_number: str):
     """Movimentação mais recente (qualquer tipo) registrada pra esse container."""
     return await db.movements.find_one(
@@ -493,6 +538,9 @@ async def get_movements(
     container_number: Optional[str] = None,
     driver_name: Optional[str] = None,
     client_name: Optional[str] = None,
+    search_id: Optional[str] = None,  # começo do Nº do registro, pra busca enquanto digita
+    sort_by: Optional[str] = None,
+    sort_dir: Literal["asc", "desc"] = "desc",
     page: int = Query(1, ge=1),
     per_page: int = Query(0, ge=0, le=1000),  # 0 = sem limite (compatível com quem já chamava sem paginar)
     current_user: dict = Depends(get_current_active_user)
@@ -590,10 +638,20 @@ async def get_movements(
     if date_range:
         query['created_at'] = date_range
 
+    if search_id and search_id.strip():
+        id_ranges = _transaction_id_prefix_ranges(search_id)
+        # Texto que não é número não bate com nenhum registro
+        query['$or'] = id_ranges or [{"transaction_id": -1}]
+
     total = await db.movements.count_documents(query) if per_page else None
-    # Desempate por id: sem ele, movimentações com o mesmo created_at podem
-    # trocar de ordem entre uma página e outra (repetindo ou pulando registro).
-    cursor = db.movements.find(query, {"_id": 0}).sort([("created_at", -1), ("id", -1)])
+    # Desempate por id: sem ele, movimentações com o mesmo valor na coluna
+    # ordenada podem trocar de ordem entre uma página e outra (repetindo ou
+    # pulando registro).
+    direction = 1 if sort_dir == "asc" else -1
+    sort_field = sort_by if sort_by in _MOVEMENT_SORT_FIELDS else "created_at"
+    if sort_by not in _MOVEMENT_SORT_FIELDS:
+        direction = -1
+    cursor = db.movements.find(query, {"_id": 0}).sort([(sort_field, direction), ("id", direction)])
     if per_page:
         cursor = cursor.skip((page - 1) * per_page).limit(per_page)
     movements = await cursor.to_list(None if not per_page else per_page)
@@ -609,7 +667,9 @@ async def get_movements(
             "total": total,
             "page": page,
             "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page
+            "pages": (total + per_page - 1) // per_page,
+            # Indicadores do filtro inteiro (não só da página devolvida)
+            "stats": await _movement_filter_stats(query, total),
         }
     return items
 

@@ -349,3 +349,75 @@ class TestReports:
         # 01/10 + 5 dias de free time = 06/10; de 06/10 a 12/10 são 6 diárias.
         assert charges[0]["extra_days"] == 6
         assert charges[0]["service_value"] == 60.0
+
+
+# ---------- Lista paginada no servidor (tela Gate) ----------
+
+class TestServerSidePagination:
+    def seed(self, api, count=23):
+        for i in range(count):
+            create(
+                api, container_number=f"ABCU{i:07d}", client_name="Cliente Par" if i % 2 == 0 else "cliente ímpar",
+                status="CHEIO" if i % 3 == 0 else "VAZIO", driver_name=f"Motorista {i:02d}",
+            )
+        create(api, container_number="ABCU0000000", operation_type="SAIDA", client_name="Cliente Par")
+
+    def page(self, api, **params):
+        response = api.get("/api/movements", params={"per_page": 10, **params})
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    def test_stats_cover_the_whole_filter_not_the_page(self, api):
+        self.seed(api)
+        data = self.page(api)
+        assert len(data["items"]) == 10
+        assert data["stats"] == {"total": 24, "entries": 23, "exits": 1, "full": 9, "empty": 15}
+
+        filtered = self.page(api, client_name="cliente par")
+        assert filtered["total"] == filtered["stats"]["total"] == 13
+        assert filtered["stats"]["entries"] == 12 and filtered["stats"]["exits"] == 1
+
+    def test_pages_do_not_repeat_or_skip_records(self, api):
+        self.seed(api)
+        seen = []
+        for number in (1, 2, 3):
+            seen += [m["id"] for m in self.page(api, page=number, sort_by="status", sort_dir="asc")["items"]]
+        assert len(seen) == 24 and len(set(seen)) == 24
+
+    def test_sorting(self, api):
+        self.seed(api)
+        newest_first = self.page(api, sort_by="transaction_id", sort_dir="desc")["items"]
+        assert [m["transaction_id"] for m in newest_first[:3]] == [24, 23, 22]
+        oldest_first = self.page(api, sort_by="transaction_id", sort_dir="asc")["items"]
+        assert [m["transaction_id"] for m in oldest_first[:3]] == [1, 2, 3]
+        by_driver = self.page(api, sort_by="driver_name", sort_dir="asc")["items"]
+        assert by_driver[0]["driver_name"] == "Motorista 00"
+
+    def test_unknown_sort_column_falls_back_to_newest_first(self, api):
+        self.seed(api)
+        items = self.page(api, sort_by="senha", sort_dir="asc")["items"]
+        assert items[0]["transaction_id"] == 24
+        assert api.get("/api/movements", params={"per_page": 10, "sort_dir": "torto"}).status_code == 422
+
+    def test_record_number_search_matches_by_prefix(self, api):
+        self.seed(api)
+        assert sorted(m["transaction_id"] for m in self.page(api, search_id="2")["items"]) == [2, 20, 21, 22, 23, 24]
+        assert [m["transaction_id"] for m in self.page(api, search_id="#17")["items"]] == [17]
+        assert self.page(api, search_id="abc")["total"] == 0
+        assert self.page(api, search_id="  ")["total"] == 24
+
+    def test_exact_transaction_id_filter_is_unchanged(self, api):
+        # Usado pela tela de Faturamento ("Editar Fatura")
+        self.seed(api)
+        assert [m["transaction_id"] for m in api.get("/api/movements", params={"transaction_id": "2"}).json()] == [2]
+
+    def test_combined_filters(self, api):
+        self.seed(api)
+        data = self.page(api, operation_type="ENTRADA", status_filter="CHEIO", client_name="cliente par", driver_name="motorista 1")
+        assert data["total"] == len(data["items"]) == 2
+        assert all(m["status"] == "CHEIO" and m["operation_type"] == "ENTRADA" for m in data["items"])
+
+    def test_page_beyond_the_end_is_empty_but_reports_totals(self, api):
+        self.seed(api)
+        data = self.page(api, page=9)
+        assert data["items"] == [] and data["total"] == 24 and data["pages"] == 3

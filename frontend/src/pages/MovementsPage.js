@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
@@ -13,7 +13,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Plus, Trash2, Container as ContainerIcon, Eye, Edit, Wifi, WifiOff, Copy, ChevronUp, ChevronDown, ChevronsUpDown, Download, Loader2, ClipboardList, ArrowDownToLine, ArrowUpFromLine, PackageCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   AlertDialog,
@@ -32,10 +32,29 @@ const STATUS_LABELS = { CHEIO: 'Cheio', VAZIO: 'Vazio' };
 const formatCount = (n) => n.toLocaleString('pt-BR');
 const formatShare = (part, total) => `${total ? Math.round((part / total) * 100) : 0}%`;
 
+// Espera o usuário parar de digitar antes de consultar o servidor
+function useDebouncedValue(value, delay = 350) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
+const EMPTY_STATS = { total: 0, entries: 0, exits: 0, full: 0, empty: 0 };
+
+// A lista é paginada, filtrada e ordenada no servidor: a tela só recebe os 15
+// registros da página atual, mais os totais do filtro inteiro pros
+// indicadores do topo. Antes o histórico completo era baixado e tudo isso era
+// feito no navegador.
 export default function MovementsPage() {
   const [movements, setMovements] = useState([]);
-  const [filteredMovements, setFilteredMovements] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [stats, setStats] = useState(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(false);
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchClient, setSearchClient] = useState('');
@@ -56,99 +75,87 @@ export default function MovementsPage() {
   const [sortDirection, setSortDirection] = useState('desc');
   const navigate = useNavigate();
 
+  // Nº do registro de cada linha marcada - a seleção pode incluir registros
+  // de outras páginas, que não estão mais em `movements`.
+  const selectedNumbers = useRef(new Map());
+  // Só a resposta do pedido mais recente é aplicada (digitação rápida gera
+  // pedidos que podem voltar fora de ordem).
+  const requestSeq = useRef(0);
+
+  const debouncedClient = useDebouncedValue(searchClient);
+  const debouncedContainer = useDebouncedValue(searchContainer);
+  const debouncedMovement = useDebouncedValue(searchMovement);
+  const debouncedDriver = useDebouncedValue(searchDriver);
+
+  const queryParams = useMemo(() => {
+    const params = { page: currentPage, per_page: ITEMS_PER_PAGE, sort_by: sortField, sort_dir: sortDirection };
+    if (filterType !== 'all') params.operation_type = filterType;
+    if (filterStatus !== 'all') params.status_filter = filterStatus;
+    if (dateFrom) params.date_from = dateFrom;
+    if (dateTo) params.date_to = dateTo;
+    if (debouncedClient.trim()) params.client_name = debouncedClient.trim();
+    if (debouncedContainer.trim()) params.container_number = debouncedContainer.trim();
+    if (debouncedMovement.trim()) params.search_id = debouncedMovement.trim();
+    if (debouncedDriver.trim()) params.driver_name = debouncedDriver.trim();
+    return params;
+  }, [currentPage, sortField, sortDirection, filterType, filterStatus, dateFrom, dateTo,
+    debouncedClient, debouncedContainer, debouncedMovement, debouncedDriver]);
+
+  const loadMovements = useCallback(async () => {
+    const seq = requestSeq.current + 1;
+    requestSeq.current = seq;
+    setFetching(true);
+    try {
+      const response = await api.getMovements(queryParams);
+      if (seq !== requestSeq.current) return;
+      const data = response.data;
+      // A página pedida deixou de existir (ex: o último registro dela foi
+      // excluído) - volta pra última que existe.
+      if (data.items.length === 0 && data.pages >= 1 && queryParams.page > data.pages) {
+        setCurrentPage(data.pages);
+        return;
+      }
+      setMovements(data.items);
+      setTotal(data.total);
+      setTotalPages(Math.max(1, data.pages));
+      setStats(data.stats || EMPTY_STATS);
+    } catch (error) {
+      if (seq !== requestSeq.current) return;
+      toast.error(error.response?.data?.detail || 'Erro ao carregar registros');
+    } finally {
+      if (seq === requestSeq.current) {
+        setFetching(false);
+        setLoading(false);
+      }
+    }
+  }, [queryParams]);
+
+  useEffect(() => { loadMovements(); }, [loadMovements]);
+
+  // Sempre a versão mais recente de loadMovements, pra quem chama de fora do
+  // ciclo de renderização (mensagens em tempo real).
+  const reloadRef = useRef(loadMovements);
+  useEffect(() => { reloadRef.current = loadMovements; }, [loadMovements]);
+
+  // Qualquer mudança feita por outro usuário recarrega a página atual da
+  // lista (com os filtros e a ordenação em uso) - não dá mais pra encaixar o
+  // registro novo direto na lista, porque a tela só tem uma página dela.
   const handleWebSocketMessage = useCallback((message) => {
     if (message.type === 'MOVEMENT_CREATED') {
-      const newMovement = { ...message.data, created_at: message.data.created_at };
-      setMovements(prev => {
-        if (prev.some(m => m.id === newMovement.id)) return prev;
-        const updated = [newMovement, ...prev];
-        return updated.sort((a, b) => b.transaction_id - a.transaction_id);
+      toast.info(`Novo registro: ${message.data.container_number}`, {
+        description: `${message.data.operation_type} - ${message.data.driver_name}`
       });
-      toast.info(`Novo registro: ${newMovement.container_number}`, {
-        description: `${newMovement.operation_type} - ${newMovement.driver_name}`
-      });
-    } else if (message.type === 'MOVEMENT_DELETED') {
-      setMovements(prev => prev.filter(m => m.id !== message.data.id));
-    } else if (message.type === 'DATA_CHANGED') {
-      const sortedMovements = message.data.sort((a, b) => b.transaction_id - a.transaction_id);
-      setMovements(sortedMovements);
+      reloadRef.current();
+    } else if (message.type === 'MOVEMENT_DELETED' || message.type === 'DATA_CHANGED') {
+      reloadRef.current();
     }
   }, []);
 
-  const { isConnected, markPendingDelete, forceRefresh } = useWebSocket(handleWebSocketMessage);
+  const { isConnected } = useWebSocket(handleWebSocketMessage);
 
-  useEffect(() => { loadMovements(); }, []);
-
-  useEffect(() => {
-    filterData();
-  }, [movements, filterType, filterStatus, searchClient, searchContainer, searchMovement, searchDriver, dateFrom, dateTo, sortField, sortDirection]);
-
-  const loadMovements = async () => {
-    try {
-      const response = await api.getMovements();
-      const sortedMovements = response.data.sort((a, b) => b.transaction_id - a.transaction_id);
-      setMovements(sortedMovements);
-    } catch (error) {
-      toast.error('Erro ao carregar registros');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterData = () => {
-    let filtered = movements;
-
-    if (searchClient) {
-      filtered = filtered.filter(m => m.client_name && m.client_name.toLowerCase().includes(searchClient.toLowerCase()));
-    }
-    if (searchContainer) {
-      filtered = filtered.filter(m => m.container_number && m.container_number.toLowerCase().includes(searchContainer.toLowerCase()));
-    }
-    if (searchMovement) {
-      filtered = filtered.filter(m => String(m.transaction_id).includes(searchMovement));
-    }
-    if (searchDriver) {
-      filtered = filtered.filter(m => m.driver_name && m.driver_name.toLowerCase().includes(searchDriver.toLowerCase()));
-    }
-    if (filterType !== 'all') {
-      filtered = filtered.filter(m => m.operation_type === filterType);
-    }
-    if (filterStatus !== 'all') {
-      filtered = filtered.filter(m => m.status === filterStatus);
-    }
-    if (dateFrom || dateTo) {
-      filtered = filtered.filter(m => {
-        const movementDate = parseISO(m.created_at);
-        const from = dateFrom ? startOfDay(parseISO(dateFrom)) : null;
-        const to = dateTo ? endOfDay(parseISO(dateTo)) : null;
-        if (from && to) return isWithinInterval(movementDate, { start: from, end: to });
-        if (from) return movementDate >= from;
-        if (to) return movementDate <= to;
-        return true;
-      });
-    }
-
-    filtered = [...filtered].sort((a, b) => {
-      let valA = a[sortField];
-      let valB = b[sortField];
-      if (sortField === 'created_at') {
-        valA = new Date(valA).getTime();
-        valB = new Date(valB).getTime();
-      } else if (typeof valA === 'string' || typeof valB === 'string') {
-        valA = (valA || '').toString().toLowerCase();
-        valB = (valB || '').toString().toLowerCase();
-      } else {
-        valA = valA ?? 0;
-        valB = valB ?? 0;
-      }
-      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
-      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    setFilteredMovements(filtered);
-    setCurrentPage(1);
-  };
+  // Mudou filtro ou ordenação: volta pra primeira página
+  const resetPage = () => setCurrentPage(1);
+  const onFilter = (setter) => (value) => { setter(value); resetPage(); };
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -157,6 +164,7 @@ export default function MovementsPage() {
       setSortField(field);
       setSortDirection('asc');
     }
+    resetPage();
   };
 
   const SortIcon = ({ field }) => {
@@ -180,11 +188,6 @@ export default function MovementsPage() {
     setCurrentPage(1);
   };
 
-  const totalPages = Math.ceil(filteredMovements.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedMovements = filteredMovements.slice(startIndex, endIndex);
-
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -192,37 +195,43 @@ export default function MovementsPage() {
     }
   };
 
-  // Indicadores do topo - refletem o filtro atual (sem filtro = todos os registros)
-  const stats = useMemo(() => {
-    let entries = 0;
-    let exits = 0;
-    let full = 0;
-    filteredMovements.forEach((m) => {
-      if (m.operation_type === 'ENTRADA') entries += 1;
-      else if (m.operation_type === 'SAIDA') exits += 1;
-      if (m.status === 'CHEIO') full += 1;
-    });
-    return { total: filteredMovements.length, entries, exits, full, empty: filteredMovements.length - full };
-  }, [filteredMovements]);
-
-  const toggleSelect = (id) => {
+  const toggleSelect = (movement) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(movement.id)) {
+        next.delete(movement.id);
+        selectedNumbers.current.delete(movement.id);
+      } else {
+        next.add(movement.id);
+        selectedNumbers.current.set(movement.id, movement.transaction_id);
+      }
       return next;
     });
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = paginatedMovements.map(m => m.id);
-    const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
+    const allSelected = movements.length > 0 && movements.every(m => selectedIds.has(m.id));
     setSelectedIds(prev => {
       const next = new Set(prev);
-      if (allSelected) {
-        pageIds.forEach(id => next.delete(id));
-      } else {
-        pageIds.forEach(id => next.add(id));
-      }
+      movements.forEach((m) => {
+        if (allSelected) {
+          next.delete(m.id);
+          selectedNumbers.current.delete(m.id);
+        } else {
+          next.add(m.id);
+          selectedNumbers.current.set(m.id, m.transaction_id);
+        }
+      });
+      return next;
+    });
+  };
+
+  const unselect = (id) => {
+    selectedNumbers.current.delete(id);
+    setSelectedIds(prev => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
       return next;
     });
   };
@@ -231,10 +240,10 @@ export default function MovementsPage() {
 
   const handleClone = async () => {
     if (!cloneId || isCloning) return;
-    const movementToClone = movements.find(m => m.id === cloneId);
-    if (!movementToClone) { toast.error('Registro não encontrado'); setCloneId(null); return; }
     setIsCloning(true);
     try {
+      // Busca o registro no servidor: ele pode estar em outra página da lista.
+      const { data: movementToClone } = await api.getMovement(cloneId);
       const cloneData = {
         operation_type: movementToClone.operation_type,
         driver_name: movementToClone.driver_name,
@@ -254,12 +263,13 @@ export default function MovementsPage() {
       };
       const response = await api.createMovement(cloneData);
       toast.success(`Registro clonado! Nova ID: #${response.data.transaction_id}`);
-      setMovements(prev => {
-        const updated = [response.data, ...prev];
-        return updated.sort((a, b) => b.transaction_id - a.transaction_id);
-      });
+      loadMovements();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao clonar registro');
+      if (error.response?.status === 404) {
+        toast.error('Registro não encontrado');
+      } else {
+        toast.error(error.response?.data?.detail || 'Erro ao clonar registro');
+      }
     } finally {
       setCloneId(null);
       setIsCloning(false);
@@ -268,32 +278,22 @@ export default function MovementsPage() {
 
   const handleDelete = async () => {
     if (!deleteId || isDeleting) return;
-    const movementExists = movements.some(m => m.id === deleteId);
-    if (!movementExists) { toast.error('Registro já foi removido'); setDeleteId(null); return; }
     setIsDeleting(true);
-    markPendingDelete(deleteId);
     const idToDelete = deleteId;
-    setMovements(prev => prev.filter(m => m.id !== idToDelete));
     try {
       await api.deleteMovement(idToDelete);
       toast.success('Registro deletado com sucesso');
-      setTimeout(() => forceRefresh(), 500);
     } catch (error) {
       if (error.response?.status === 404) {
         toast.info('Registro já foi removido');
       } else {
         toast.error(error.response?.data?.detail || 'Erro ao deletar registro');
-        forceRefresh();
       }
     } finally {
       setDeleteId(null);
       setIsDeleting(false);
-      setSelectedIds(prev => {
-        if (!prev.has(idToDelete)) return prev;
-        const next = new Set(prev);
-        next.delete(idToDelete);
-        return next;
-      });
+      unselect(idToDelete);
+      loadMovements();
     }
   };
 
@@ -305,8 +305,9 @@ export default function MovementsPage() {
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
+      const onlyId = [...selectedIds][0];
       const filename = selectedIds.size === 1
-        ? `registro-gate-${movements.find(m => m.id === [...selectedIds][0])?.transaction_id || [...selectedIds][0]}.pdf`
+        ? `registro-gate-${selectedNumbers.current.get(onlyId) || onlyId}.pdf`
         : `registros-gate-${selectedIds.size}-documentos.pdf`;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
@@ -353,16 +354,16 @@ export default function MovementsPage() {
           <StatCard label="Cheios / Vazios" value={`${formatCount(stats.full)} / ${formatCount(stats.empty)}`} icon={PackageCheck} tone="emerald" hint={`${formatShare(stats.full, stats.total)} cheios`} testId="stat-status" />
         </StatGrid>
 
-        <FilterCard hasFilters={hasFilters} onClear={clearAllFilters} onApply={filterData}>
+        <FilterCard hasFilters={hasFilters} onClear={clearAllFilters} onApply={loadMovements}>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             <FilterField label="Data início">
-              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="date-from-input" />
+              <Input type="date" value={dateFrom} onChange={e => onFilter(setDateFrom)(e.target.value)} className="h-9 text-sm" data-testid="date-from-input" />
             </FilterField>
             <FilterField label="Data fim">
-              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="date-to-input" />
+              <Input type="date" value={dateTo} onChange={e => onFilter(setDateTo)(e.target.value)} className="h-9 text-sm" data-testid="date-to-input" />
             </FilterField>
             <FilterField label="Tipo">
-              <Select value={filterType} onValueChange={setFilterType}>
+              <Select value={filterType} onValueChange={onFilter(setFilterType)}>
                 <SelectTrigger className="h-9 text-sm" data-testid="filter-type-select">
                   <SelectValue />
                 </SelectTrigger>
@@ -374,7 +375,7 @@ export default function MovementsPage() {
               </Select>
             </FilterField>
             <FilterField label="Status">
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <Select value={filterStatus} onValueChange={onFilter(setFilterStatus)}>
                 <SelectTrigger className="h-9 text-sm" data-testid="filter-status-select">
                   <SelectValue />
                 </SelectTrigger>
@@ -386,16 +387,16 @@ export default function MovementsPage() {
               </Select>
             </FilterField>
             <FilterField label="Cliente">
-              <SearchInput value={searchClient} onChange={e => setSearchClient(e.target.value)} data-testid="search-client-input" />
+              <SearchInput value={searchClient} onChange={e => onFilter(setSearchClient)(e.target.value)} data-testid="search-client-input" />
             </FilterField>
             <FilterField label="Nº container">
-              <SearchInput value={searchContainer} onChange={e => setSearchContainer(e.target.value)} data-testid="search-container-input" />
+              <SearchInput value={searchContainer} onChange={e => onFilter(setSearchContainer)(e.target.value)} data-testid="search-container-input" />
             </FilterField>
             <FilterField label="Nº registro">
-              <SearchInput value={searchMovement} onChange={e => setSearchMovement(e.target.value)} data-testid="search-movement-input" />
+              <SearchInput value={searchMovement} onChange={e => onFilter(setSearchMovement)(e.target.value)} data-testid="search-movement-input" />
             </FilterField>
             <FilterField label="Motorista">
-              <SearchInput value={searchDriver} onChange={e => setSearchDriver(e.target.value)} data-testid="search-driver-input" />
+              <SearchInput value={searchDriver} onChange={e => onFilter(setSearchDriver)(e.target.value)} data-testid="search-driver-input" />
             </FilterField>
           </div>
         </FilterCard>
@@ -403,7 +404,7 @@ export default function MovementsPage() {
         {/* Lista - marque um ou mais registros pra habilitar as ações da barra */}
         <DataCard
           title="Registros"
-          count={formatCount(filteredMovements.length)}
+          count={formatCount(total)}
           testId="movements-list"
           toolbar={(
             <Toolbar
@@ -422,20 +423,20 @@ export default function MovementsPage() {
             <TablePagination
               currentPage={currentPage}
               totalPages={totalPages}
-              totalItems={filteredMovements.length}
+              totalItems={total}
               pageSize={ITEMS_PER_PAGE}
               onPageChange={goToPage}
             />
           )}
         >
-          {paginatedMovements.length > 0 ? (
-            <div className="overflow-x-auto">
+          {movements.length > 0 ? (
+            <div className={`overflow-x-auto transition-opacity ${fetching ? 'opacity-60' : ''}`}>
               <table className="data-table">
                 <thead>
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={paginatedMovements.length > 0 && paginatedMovements.every(m => selectedIds.has(m.id))}
+                        checked={movements.length > 0 && movements.every(m => selectedIds.has(m.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -452,12 +453,12 @@ export default function MovementsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedMovements.map((movement) => {
+                  {movements.map((movement) => {
                     const createdAt = new Date(movement.created_at);
                     return (
                       <tr
                         key={movement.id}
-                        onClick={() => toggleSelect(movement.id)}
+                        onClick={() => toggleSelect(movement)}
                         data-selected={selectedIds.has(movement.id)}
                         className="cursor-pointer"
                         data-testid="movement-row"
@@ -465,7 +466,7 @@ export default function MovementsPage() {
                         <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedIds.has(movement.id)}
-                            onCheckedChange={() => toggleSelect(movement.id)}
+                            onCheckedChange={() => toggleSelect(movement)}
                             data-testid="movement-row-checkbox"
                           />
                         </td>
