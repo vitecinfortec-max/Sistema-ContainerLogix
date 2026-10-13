@@ -312,12 +312,11 @@ export default function MovementsPage() {
     const eirFilename = (id) => documentFilename('EIR', selectedContainers.current.get(id), selectedNumbers.current.get(id) || id);
     try {
       if (selectedIds.size > 1 && separateFiles) {
-        const result = await downloadDocumentsInBatch([...selectedIds].map((id) => ({
+        await downloadDocumentsInBatch([...selectedIds].map((id) => ({
           filename: eirFilename(id),
           load: () => api.downloadMovementsPdf([id], via).then((response) => response.data),
         })));
-        // null = desistiu de escolher a pasta: o diálogo continua aberto
-        if (result) setShowViaDialog(false);
+        setShowViaDialog(false);
         return;
       }
       const response = await api.downloadMovementsPdf([...selectedIds], via);
@@ -569,7 +568,7 @@ export default function MovementsPage() {
               {selectedIds.size === 1
                 ? 'Será gerado um PDF com o comprovante do registro selecionado.'
                 : separateFiles
-                  ? `Serão gerados ${selectedIds.size} PDFs, um para cada registro selecionado, com o nome EIR-CONTAINER-Nº. Você escolhe a pasta onde salvar.`
+                  ? `Serão gerados ${selectedIds.size} PDFs, um para cada registro selecionado, com o nome EIR-CONTAINER-Nº, dentro de uma pasta compactada (.zip).`
                   : `Será gerado um único PDF com ${selectedIds.size} páginas, uma para cada registro selecionado.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
