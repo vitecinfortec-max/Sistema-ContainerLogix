@@ -245,6 +245,24 @@ export const api = {
     if (!fileToken || !String(path).startsWith('/api/uploads/')) return url;
     return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(fileToken)}`;
   },
+  // Baixa um anexo pro aparelho com o nome `filename` (sem extensão - vale a
+  // do arquivo). cache: 'no-store' porque a foto já foi carregada pelo <img>
+  // da tela sem CORS, e o navegador reaproveitava essa cópia do cache (sem
+  // Access-Control-Allow-Origin) e bloqueava o download.
+  downloadFile: async (path, filename) => {
+    const response = await fetch(api.getFileUrl(path), { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Falha ao baixar o arquivo (${response.status})`);
+    const blob = await response.blob();
+    const extension = (String(path).split('?')[0].match(/.[a-z0-9]+$/i) || ['.jpg'])[0];
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}${extension}`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
   
   // Container Inspections (Registro Fotográfico)
   getContainerInspections: (params) => axios.get(`${API}/container-inspections`, { params }),

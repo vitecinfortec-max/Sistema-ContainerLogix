@@ -124,17 +124,7 @@ export default function ContainerInspectionDetailPage() {
 
   const handleDownloadPhoto = async (photoUrl, label) => {
     try {
-      const fullUrl = api.getFileUrl(photoUrl);
-      const response = await fetch(fullUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${inspection.container_number}_${label.replace(/\s+/g, '_')}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      await api.downloadFile(photoUrl, `${inspection.container_number}_${label.replace(/\s+/g, '_')}`);
       toast.success('Download iniciado!');
     } catch (error) {
       toast.error('Erro ao baixar foto');

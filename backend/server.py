@@ -127,7 +127,10 @@ async def serve_upload(file_path: str, request: Request, token: Optional[str] = 
     )
     if required_role or _UPLOADS_REQUIRE_AUTH:
         await _authorize_upload_request(request, token, required_role)
-    return FileResponse(target)
+    # Vary: Origin - a mesma URL é pedida pelo <img> da tela (sem CORS) e pelo
+    # botão de baixar (fetch, com CORS). Sem isso o navegador servia ao fetch a
+    # resposta do <img> guardada no cache, sem Access-Control-Allow-Origin.
+    return FileResponse(target, headers={"Vary": "Origin"})
 
 
 @api_router.get("/")
