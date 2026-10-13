@@ -214,12 +214,18 @@ export default function ContainerVistoriaDetailPage() {
 
         {vistoria.photos && vistoria.photos.length > 0 && (
           <PrintSection title={`Fotos da Vistoria (${vistoria.photos.length})`} style={{ breakInside: 'auto', pageBreakInside: 'auto' }}>
-            <PrintPhotoGrid
-              photos={vistoria.photos}
-              getLabel={(photo) => PHOTO_LABELS[photo.type] || photo.type}
-              getUrl={(photo) => getPhotoUrl(photo.url)}
-              columns={4}
-            />
+            {/* Fotos de 6 x 10 cm, 3 por linha: 3 x 60mm não cabem na largura
+                útil do quadro, então a grade avança 7pt sobre o recuo lateral dele */}
+            <div style={{ margin: '0 -7pt' }}>
+              <PrintPhotoGrid
+                photos={vistoria.photos}
+                getLabel={(photo) => PHOTO_LABELS[photo.type] || photo.type}
+                getUrl={(photo) => getPhotoUrl(photo.url)}
+                columns={3}
+                imageWidth="60mm"
+                imageHeight="100mm"
+              />
+            </div>
           </PrintSection>
         )}
 

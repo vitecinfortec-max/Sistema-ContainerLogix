@@ -112,13 +112,27 @@ export function PrintText({ children, strong = false }) {
 
 /** Grade de fotos: rótulo em caixa alta em cima e a foto inteira (sem cortar) numa caixa branca.
  *  A partir de 3 linhas de fotos a altura cai pra `compactImageHeight`, pra que o
- *  documento continue cabendo numa página A4 mesmo com observações e avarias. */
-export function PrintPhotoGrid({ photos, getLabel, getUrl, columns = 3, imageHeight = '48mm', compactImageHeight = '37mm' }) {
-  const height = Math.ceil(photos.length / columns) >= 3 ? compactImageHeight : imageHeight;
+ *  documento continue cabendo numa página A4 mesmo com observações e avarias.
+ *  Com `imageWidth` a caixa da foto tem tamanho fixo (imageWidth x imageHeight, sem
+ *  o modo compacto) e o documento passa a ocupar mais de uma folha: da segunda
+ *  linha em diante cada foto leva uma folga em cima, que vira a margem do topo
+ *  quando a linha cai numa folha nova (o @page do index.css tem margem zero). */
+export function PrintPhotoGrid({ photos, getLabel, getUrl, columns = 3, imageHeight = '48mm', compactImageHeight = '37mm', imageWidth }) {
+  const fixedSize = Boolean(imageWidth);
+  const height = !fixedSize && Math.ceil(photos.length / columns) >= 3 ? compactImageHeight : imageHeight;
+  const gridStyle = fixedSize
+    ? { display: 'grid', gridTemplateColumns: `repeat(${columns}, ${imageWidth})`, justifyContent: 'space-between' }
+    : { display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: '6pt' };
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: '6pt' }}>
-      {photos.map((photo) => (
-        <div key={photo.id} style={{ minWidth: 0, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+    <div style={gridStyle}>
+      {photos.map((photo, index) => (
+        <div
+          key={photo.id}
+          style={{
+            minWidth: 0, breakInside: 'avoid', pageBreakInside: 'avoid',
+            paddingTop: fixedSize && index >= columns ? '8mm' : undefined,
+          }}
+        >
           <div style={{
             fontSize: '6.5pt', lineHeight: '8pt', color: C.muted, textTransform: 'uppercase',
             fontWeight: 'bold', marginBottom: '2pt', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
