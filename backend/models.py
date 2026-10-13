@@ -693,6 +693,7 @@ class ContainerVistoria(BaseModel):
     trailer_plate: Optional[str] = None  # Carreta
     transport_company: Optional[str] = None  # Transportadora
     driver_name: Optional[str] = None  # Nome do Motorista
+    driver_cpf: Optional[str] = None  # CPF do Motorista
     size_type: Optional[str] = None  # Tamanho/Tipo
     tare: Optional[str] = None
     no_damage: bool = False  # Sem Avarias
@@ -714,6 +715,7 @@ class ContainerVistoriaCreate(BaseModel):
     trailer_plate: Optional[str] = None
     transport_company: Optional[str] = None
     driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
     size_type: Optional[str] = None
     tare: Optional[str] = None
     no_damage: bool = False
@@ -728,6 +730,7 @@ class ContainerVistoriaUpdate(BaseModel):
     trailer_plate: Optional[str] = None
     transport_company: Optional[str] = None
     driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
     size_type: Optional[str] = None
     tare: Optional[str] = None
     no_damage: Optional[bool] = None
@@ -746,6 +749,7 @@ class ContainerVistoriaResponse(BaseModel):
     trailer_plate: Optional[str] = None
     transport_company: Optional[str] = None
     driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
     size_type: Optional[str] = None
     tare: Optional[str] = None
     no_damage: bool = False
@@ -754,6 +758,8 @@ class ContainerVistoriaResponse(BaseModel):
     movement_id: Optional[str] = None  # EIR de entrada gerada a partir desta vistoria
     movement_transaction_id: Optional[int] = None  # Nº (ID Transação) dessa EIR
     photos: List[ContainerVistoriaPhoto] = Field(default_factory=list)
+    # Cadastros criados automaticamente ao salvar (só na resposta, não é gravado)
+    pre_registered: List[str] = Field(default_factory=list)
     created_by: str
     created_by_name: str
     created_at: datetime

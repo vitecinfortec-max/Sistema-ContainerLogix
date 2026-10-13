@@ -209,6 +209,7 @@ export default function NewMovementPage() {
         const driver = driversData.find((d) => d.name.toLowerCase() === vistoria.driver_name.toLowerCase());
         if (driver) setValue('driver_cpf', driver.cpf);
       }
+      if (vistoria.driver_cpf) setValue('driver_cpf', vistoria.driver_cpf);
       if (vistoria.observations) setValue('observations', vistoria.observations);
       if (vistoria.no_damage) {
         setContainerDamages(['SEM_AVARIA']);

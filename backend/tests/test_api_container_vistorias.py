@@ -78,3 +78,60 @@ class TestEntryEirLink:
         # Editar a vistoria depois não apaga o vínculo
         edited = vistorias.put(f"/api/container-vistorias/{created['id']}", json={"tare": "3900"}).json()
         assert edited["movement_id"] == "mov-1" and edited["tare"] == "3900"
+
+
+class TestPreRegistration:
+    """Salvar a vistoria cria o pré-cadastro do que ainda não existe."""
+    NEW = {"driver_cpf": "111.222.333-44"}
+
+    def cadastros(self, api):
+        vehicles = api.get("/api/vehicles", params={"per_page": 1000}).json()["items"]
+        return {
+            "drivers": api.get("/api/drivers").json(),
+            "companies": api.get("/api/transport-companies").json(),
+            "vehicles": {v["plate"]: v["vehicle_type"] for v in vehicles},
+        }
+
+    def test_cpf_is_stored(self, vistorias):
+        created = create(vistorias, **self.NEW)
+        assert vistorias.get(f"/api/container-vistorias/{created['id']}").json()["driver_cpf"] == "111.222.333-44"
+
+    def test_missing_cadastros_are_created(self, vistorias):
+        created = create(vistorias, **self.NEW)
+        assert created["pre_registered"] == ["Transportadora", "Motorista", "Cavalo", "Carreta"]
+        found = self.cadastros(vistorias)
+        assert [(d["name"], d["cpf"], d["transport_company"]) for d in found["drivers"]] == [
+            ("Motorista Um", "111.222.333-44", "Transportadora Um")
+        ]
+        assert [c["name"] for c in found["companies"]] == ["Transportadora Um"]
+        assert found["vehicles"] == {"AAA0A00": "CAVALO", "BBB0B00": "CARRETA"}
+        assert "VC000001" in found["drivers"][0]["observations"]
+
+    def test_existing_cadastros_are_left_alone(self, vistorias):
+        create(vistorias, **self.NEW)
+        # Mesmos dados com outra grafia: nada novo, nada alterado
+        again = create(
+            vistorias, driver_name="motorista um", driver_cpf="11122233344", truck_plate="aaa-0a00",
+            trailer_plate="BBB0B00", transport_company=" TRANSPORTADORA UM ",
+        )
+        assert again["pre_registered"] == []
+        found = self.cadastros(vistorias)
+        assert len(found["drivers"]) == 1 and found["drivers"][0]["cpf"] == "111.222.333-44"
+        assert len(found["companies"]) == 1 and len(found["vehicles"]) == 2
+
+    def test_driver_without_cpf_is_not_registered(self, vistorias):
+        created = create(vistorias)
+        assert created["pre_registered"] == ["Transportadora", "Cavalo", "Carreta"]
+        assert self.cadastros(vistorias)["drivers"] == []
+
+    def test_empty_vistoria_registers_nothing(self, vistorias):
+        created = vistorias.post("/api/container-vistorias", json={"container_number": "ABCU1234567"}).json()
+        assert created["pre_registered"] == []
+
+    def test_editing_registers_what_was_added_later(self, vistorias):
+        created = vistorias.post("/api/container-vistorias", json={"container_number": "ABCU1234567"}).json()
+        edited = vistorias.put(
+            f"/api/container-vistorias/{created['id']}", json={"driver_name": "Motorista Dois", "driver_cpf": "999.888.777-66"}
+        ).json()
+        assert edited["pre_registered"] == ["Motorista"]
+        assert [d["name"] for d in self.cadastros(vistorias)["drivers"]] == ["Motorista Dois"]

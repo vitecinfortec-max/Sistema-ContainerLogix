@@ -188,9 +188,10 @@ export default function ContainerVistoriaDetailPage() {
             ['Armador', vistoria.shipping_line],
             ['Tamanho/Tipo', vistoria.size_type],
             ['Placa do Cavalo', vistoria.truck_plate],
-            ['Carreta', vistoria.trailer_plate],
+            ['Placa da Carreta', vistoria.trailer_plate],
             ['Transportadora', vistoria.transport_company],
             ['Nome do Motorista', vistoria.driver_name],
+            ['CPF do Motorista', vistoria.driver_cpf],
             ['Tara', vistoria.tare],
           ]} />
         </PrintSection>
@@ -308,7 +309,7 @@ export default function ContainerVistoriaDetailPage() {
                 <p className="font-semibold">{vistoria.truck_plate || '-'}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Carreta</p>
+                <p className="text-sm text-muted-foreground">Placa da Carreta</p>
                 <p className="font-semibold">{vistoria.trailer_plate || '-'}</p>
               </div>
               <div>
@@ -318,6 +319,10 @@ export default function ContainerVistoriaDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Nome do Motorista</p>
                 <p className="font-semibold">{vistoria.driver_name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">CPF do Motorista</p>
+                <p className="font-semibold">{vistoria.driver_cpf || '-'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Tamanho/Tipo</p>

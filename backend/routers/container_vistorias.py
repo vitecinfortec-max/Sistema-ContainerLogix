@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 
 from models import (
     ContainerVistoria, ContainerVistoriaCreate, ContainerVistoriaUpdate, ContainerVistoriaResponse,
-    MAX_VISTORIA_PHOTOS
+    MAX_VISTORIA_PHOTOS, Driver, TransportCompany, VehicleCreate
 )
 
 from shared import (
@@ -17,6 +17,76 @@ from shared import (
 api_router = APIRouter(prefix="/api")
 
 # ========== VISTORIA DE CONTAINER ==========
+
+def _same_text(a, b) -> bool:
+    return (a or '').strip().casefold() == (b or '').strip().casefold()
+
+
+def _digits(value) -> str:
+    return ''.join(ch for ch in (value or '') if ch.isdigit())
+
+
+def _plate_key(value) -> str:
+    return ''.join(ch for ch in (value or '').upper() if ch.isalnum())
+
+
+async def _pre_register_cadastros(vistoria: dict, current_user: dict) -> list:
+    """Pré-cadastro do que a vistoria informou e ainda não existe no sistema:
+    Motorista (precisa de nome e CPF), Cavalo, Carreta e Transportadora.
+    Nunca altera um cadastro existente - só cria o que falta, com o mínimo
+    de dados e uma observação dizendo de qual vistoria veio. Devolve os
+    rótulos do que foi criado, pra tela avisar o operador."""
+    created = []
+    now = datetime.now(timezone.utc).isoformat()
+    origin = f"Pré-cadastro gerado pela Vistoria de Container VC{vistoria['vistoria_number']:06d} - complete os dados."
+
+    company_name = (vistoria.get('transport_company') or '').strip()
+    if company_name:
+        companies = await db.transport_companies.find({}, {"_id": 0, "name": 1, "trade_name": 1}).to_list(None)
+        if not any(_same_text(c.get('name'), company_name) or _same_text(c.get('trade_name'), company_name) for c in companies):
+            company = TransportCompany(name=company_name, observations=origin, created_by=current_user['sub'])
+            doc = company.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.transport_companies.insert_one(doc)
+            created.append('Transportadora')
+
+    driver_name = (vistoria.get('driver_name') or '').strip()
+    driver_cpf = (vistoria.get('driver_cpf') or '').strip()
+    if driver_name and _digits(driver_cpf):
+        drivers = await db.drivers.find({}, {"_id": 0, "name": 1, "cpf": 1}).to_list(None)
+        if not any(_digits(d.get('cpf')) == _digits(driver_cpf) or _same_text(d.get('name'), driver_name) for d in drivers):
+            driver = Driver(
+                name=driver_name, cpf=driver_cpf, transport_company=company_name or None,
+                observations=origin, created_by=current_user['sub'],
+            )
+            doc = driver.model_dump()
+            doc['created_at'] = doc['created_at'].isoformat()
+            await db.drivers.insert_one(doc)
+            created.append('Motorista')
+
+    for field, vehicle_type, label in (('truck_plate', 'CAVALO', 'Cavalo'), ('trailer_plate', 'CARRETA', 'Carreta')):
+        plate = (vistoria.get(field) or '').strip().upper()
+        if not _plate_key(plate):
+            continue
+        plates = await db.vehicles.find({}, {"_id": 0, "plate": 1}).to_list(None)
+        if any(_plate_key(v.get('plate')) == _plate_key(plate) for v in plates):
+            continue
+        # Mesmo formato de documento que POST /vehicles grava (routers/frota.py)
+        await db.vehicles.insert_one({
+            **VehicleCreate(
+                plate=plate, vehicle_type=vehicle_type, transport_company=company_name or None, observations=origin
+            ).model_dump(),
+            "id": str(uuid.uuid4()),
+            "driver_name": None,
+            "created_by": current_user["sub"],
+            "created_by_name": current_user.get("name", "Sistema"),
+            "created_at": now,
+            "updated_at": None,
+        })
+        created.append(label)
+
+    return created
+
 
 @api_router.get("/container-vistorias")
 async def list_container_vistorias(
@@ -69,6 +139,7 @@ async def create_container_vistoria(
         trailer_plate=data.trailer_plate,
         transport_company=data.transport_company,
         driver_name=data.driver_name,
+        driver_cpf=data.driver_cpf,
         size_type=data.size_type,
         tare=data.tare,
         no_damage=data.no_damage,
@@ -82,8 +153,10 @@ async def create_container_vistoria(
     vistoria_dict["created_at"] = vistoria_dict["created_at"].isoformat()
 
     await db.container_vistorias.insert_one(vistoria_dict)
+    vistoria_dict.pop("_id", None)
 
-    return ContainerVistoriaResponse(**vistoria_dict)
+    pre_registered = await _pre_register_cadastros(vistoria_dict, current_user)
+    return ContainerVistoriaResponse(**vistoria_dict, pre_registered=pre_registered)
 
 @api_router.put("/container-vistorias/{vistoria_id}", response_model=ContainerVistoriaResponse)
 async def update_container_vistoria(
@@ -100,7 +173,7 @@ async def update_container_vistoria(
 
     for field in (
         "container_number", "client_name", "shipping_line", "truck_plate",
-        "trailer_plate", "transport_company", "driver_name", "size_type", "tare",
+        "trailer_plate", "transport_company", "driver_name", "driver_cpf", "size_type", "tare",
         "no_damage", "damage_items", "observations",
         "movement_id", "movement_transaction_id",
     ):
@@ -113,7 +186,8 @@ async def update_container_vistoria(
         await db.container_vistorias.update_one({"id": vistoria_id}, {"$set": update_data})
 
     updated = await db.container_vistorias.find_one({"id": vistoria_id}, {"_id": 0})
-    return ContainerVistoriaResponse(**updated)
+    pre_registered = await _pre_register_cadastros(updated, current_user)
+    return ContainerVistoriaResponse(**updated, pre_registered=pre_registered)
 
 @api_router.post("/container-vistorias/{vistoria_id}/upload-photo")
 async def upload_container_vistoria_photo(

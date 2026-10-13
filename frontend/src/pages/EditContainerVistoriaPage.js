@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Save, Loader2, Camera, Upload, X } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
-import { VISTORIA_PHOTO_TYPES, MAX_VISTORIA_PHOTOS } from './NewContainerVistoriaPage';
+import { VISTORIA_PHOTO_TYPES, MAX_VISTORIA_PHOTOS, formatCPF } from './NewContainerVistoriaPage';
 
 const PHOTO_LABELS = VISTORIA_PHOTO_TYPES.reduce((acc, { value, label }) => {
   acc[value] = label;
@@ -42,6 +42,7 @@ export default function EditContainerVistoriaPage() {
     trailer_plate: '',
     transport_company: '',
     driver_name: '',
+    driver_cpf: '',
     size_type: '20DC',
     tare: '',
     observations: '',
@@ -82,6 +83,7 @@ export default function EditContainerVistoriaPage() {
         trailer_plate: vistoria.trailer_plate || '',
         transport_company: vistoria.transport_company || '',
         driver_name: vistoria.driver_name || '',
+        driver_cpf: vistoria.driver_cpf || '',
         size_type: vistoria.size_type || '20DC',
         tare: vistoria.tare || '',
         observations: vistoria.observations || '',
@@ -106,6 +108,12 @@ export default function EditContainerVistoriaPage() {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Motorista já cadastrado: puxa o CPF do cadastro
+  const handleDriverChange = (name) => {
+    const driver = drivers.find((d) => d.name.toLowerCase() === name.trim().toLowerCase());
+    setFormData(prev => ({ ...prev, driver_name: name, driver_cpf: driver ? driver.cpf : prev.driver_cpf }));
   };
 
   const addService = (service) => {
@@ -172,7 +180,7 @@ export default function EditContainerVistoriaPage() {
     setSaving(true);
 
     try {
-      await api.updateContainerVistoria(id, {
+      const response = await api.updateContainerVistoria(id, {
         container_number: formData.container_number,
         client_name: formData.client_name || null,
         shipping_line: formData.shipping_line || null,
@@ -180,6 +188,7 @@ export default function EditContainerVistoriaPage() {
         trailer_plate: formData.trailer_plate || null,
         transport_company: formData.transport_company || null,
         driver_name: formData.driver_name || null,
+        driver_cpf: formData.driver_cpf || null,
         size_type: formData.size_type || null,
         tare: formData.tare || null,
         observations: formData.observations || null,
@@ -188,6 +197,9 @@ export default function EditContainerVistoriaPage() {
       });
 
       toast.success('Vistoria atualizada com sucesso!');
+      if (response.data.pre_registered?.length) {
+        toast.info(`Pré-cadastro criado: ${response.data.pre_registered.join(', ')}. Complete os dados em Cadastro.`);
+      }
       navigate(`/container-vistorias/${id}`);
     } catch (error) {
       console.error('Erro ao atualizar vistoria:', error);
@@ -302,10 +314,22 @@ export default function EditContainerVistoriaPage() {
                   <Label htmlFor="driver_name">Nome do Motorista</Label>
                   <Autocomplete
                     value={formData.driver_name}
-                    onChange={(v) => handleInputChange('driver_name', v)}
-                    onSelect={(d) => handleInputChange('driver_name', d.name)}
+                    onChange={handleDriverChange}
+                    onSelect={(d) => handleDriverChange(d.name)}
                     options={drivers}
                     displayField="name"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="driver_cpf">CPF do Motorista</Label>
+                  <Input
+                    id="driver_cpf"
+                    value={formData.driver_cpf}
+                    onChange={(e) => handleInputChange('driver_cpf', formatCPF(e.target.value))}
+                    inputMode="numeric"
+                    className="font-mono"
+                    data-testid="driver-cpf-input"
                   />
                 </div>
 
@@ -321,7 +345,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="trailer_plate">Carreta</Label>
+                  <Label htmlFor="trailer_plate">Placa da Carreta</Label>
                   <Autocomplete
                     value={formData.trailer_plate}
                     onChange={(v) => handleInputChange('trailer_plate', v.toUpperCase())}

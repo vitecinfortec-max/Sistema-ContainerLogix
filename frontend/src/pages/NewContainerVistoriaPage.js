@@ -26,6 +26,14 @@ export const VISTORIA_PHOTO_TYPES = [
 
 export const MAX_VISTORIA_PHOTOS = 12;
 
+export const formatCPF = (value) => {
+  const digits = (value || '').replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
 export default function NewContainerVistoriaPage() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
@@ -45,6 +53,7 @@ export default function NewContainerVistoriaPage() {
     trailer_plate: '',
     transport_company: '',
     driver_name: '',
+    driver_cpf: '',
     size_type: '20DC',
     tare: '',
     observations: '',
@@ -87,6 +96,12 @@ export default function NewContainerVistoriaPage() {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Motorista já cadastrado: puxa o CPF do cadastro
+  const handleDriverChange = (name) => {
+    const driver = drivers.find((d) => d.name.toLowerCase() === name.trim().toLowerCase());
+    setFormData(prev => ({ ...prev, driver_name: name, driver_cpf: driver ? driver.cpf : prev.driver_cpf }));
   };
 
   const addService = (service) => {
@@ -145,6 +160,7 @@ export default function NewContainerVistoriaPage() {
         trailer_plate: formData.trailer_plate || null,
         transport_company: formData.transport_company || null,
         driver_name: formData.driver_name || null,
+        driver_cpf: formData.driver_cpf || null,
         size_type: formData.size_type || null,
         tare: formData.tare || null,
         observations: formData.observations || null,
@@ -159,6 +175,9 @@ export default function NewContainerVistoriaPage() {
       );
 
       toast.success('Vistoria criada com sucesso!');
+      if (response.data.pre_registered?.length) {
+        toast.info(`Pré-cadastro criado: ${response.data.pre_registered.join(', ')}. Complete os dados em Cadastro.`);
+      }
       // Com "Salvar e gerar EIR de entrada" a Emissão de EIR abre já preenchida
       // com os dados desta vistoria - ver NewMovementPage.
       navigate(generateEirRef.current ? `/movements/new?vistoria=${vistoriaId}` : `/container-vistorias/${vistoriaId}`);
@@ -270,10 +289,22 @@ export default function NewContainerVistoriaPage() {
                   <Label htmlFor="driver_name">Nome do Motorista</Label>
                   <Autocomplete
                     value={formData.driver_name}
-                    onChange={(v) => handleInputChange('driver_name', v)}
-                    onSelect={(d) => handleInputChange('driver_name', d.name)}
+                    onChange={handleDriverChange}
+                    onSelect={(d) => handleDriverChange(d.name)}
                     options={drivers}
                     displayField="name"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="driver_cpf">CPF do Motorista</Label>
+                  <Input
+                    id="driver_cpf"
+                    value={formData.driver_cpf}
+                    onChange={(e) => handleInputChange('driver_cpf', formatCPF(e.target.value))}
+                    inputMode="numeric"
+                    className="font-mono"
+                    data-testid="driver-cpf-input"
                   />
                 </div>
 
@@ -289,7 +320,7 @@ export default function NewContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="trailer_plate">Carreta</Label>
+                  <Label htmlFor="trailer_plate">Placa da Carreta</Label>
                   <Autocomplete
                     value={formData.trailer_plate}
                     onChange={(v) => handleInputChange('trailer_plate', v.toUpperCase())}
