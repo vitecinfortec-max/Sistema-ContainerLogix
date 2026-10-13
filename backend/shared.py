@@ -83,8 +83,8 @@ def migrate_inspection_photos(inspection: dict) -> dict:
 
 
 ROOT_DIR = Path(__file__).parent
+# A pasta é criada na inicialização do app (lifespan em server.py).
 UPLOADS_DIR = ROOT_DIR.parent / 'uploads'
-UPLOADS_DIR.mkdir(exist_ok=True)
 LOGO_PATH = ROOT_DIR / 'assets' / 'logo.png'
 
 

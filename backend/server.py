@@ -8,6 +8,7 @@ load_dotenv()
 
 from starlette.middleware.cors import CORSMiddleware
 import asyncio
+from contextlib import asynccontextmanager
 import os
 import logging
 from datetime import datetime, timezone
@@ -57,7 +58,19 @@ from routers.users import api_router as users_router
 from routers.module_config import api_router as module_config_router
 from scheduled_reports import api_router as scheduled_reports_router, start_scheduler, stop_scheduler
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Tudo que o processo prepara ao subir e libera ao encerrar fica aqui
+    (antes: @app.on_event, que o FastAPI marcou como obsoleto, mais a criação
+    da pasta de uploads escondida na importação de shared.py)."""
+    UPLOADS_DIR.mkdir(exist_ok=True)
+    await startup_event()
+    yield
+    stop_scheduler()
+    client.close()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -75,7 +88,8 @@ async def module_gate_middleware(request: Request, call_next):
 api_router = APIRouter(prefix="/api")
 
 # Montar diretório de uploads para servir arquivos estáticos via /api/uploads
-app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+# check_dir=False: a pasta é criada no lifespan (acima), não na importação.
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR), check_dir=False), name="uploads")
 
 
 @api_router.get("/")
@@ -209,7 +223,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@app.on_event("startup")
 async def startup_event():
     # Inicializar contador de transaction_id se não existir
     counter = await db.counters.find_one({"_id": "transaction_id"})
@@ -334,7 +347,3 @@ async def startup_event():
 
     start_scheduler()
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    stop_scheduler()
-    client.close()
