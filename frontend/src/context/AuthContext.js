@@ -25,6 +25,18 @@ axios.interceptors.response.use(
   }
 );
 
+// Token que api.getFileUrl acrescenta à URL dos anexos. Buscado antes de a
+// tela ser liberada, pra nenhuma imagem ser pedida sem ele; se falhar, o app
+// segue normalmente (só os anexos restritos deixam de abrir).
+const loadFileToken = async () => {
+  try {
+    const response = await axios.get(`${API}/auth/file-token`);
+    sessionStorage.setItem('fileToken', response.data.file_token);
+  } catch (error) {
+    sessionStorage.removeItem('fileToken');
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +54,7 @@ export const AuthProvider = ({ children }) => {
   const fetchUser = async () => {
     try {
       const response = await axios.get(`${API}/auth/me`);
+      await loadFileToken();
       setUser(response.data);
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -55,9 +68,10 @@ export const AuthProvider = ({ children }) => {
     const response = await axios.post(`${API}/auth/login`, { email, password });
     const { access_token, user: userData } = response.data;
     sessionStorage.setItem('token', access_token);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+    await loadFileToken();
     setToken(access_token);
     setUser(userData);
-    axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
     return userData;
   };
 
@@ -71,6 +85,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     sessionStorage.removeItem('token');
+    sessionStorage.removeItem('fileToken');
     setToken(null);
     setUser(null);
     delete axios.defaults.headers.common['Authorization'];

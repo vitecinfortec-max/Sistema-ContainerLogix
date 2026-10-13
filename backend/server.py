@@ -1,6 +1,5 @@
 from fastapi import FastAPI, APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Request
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from dotenv import load_dotenv
 
 # Carregar variáveis de ambiente ANTES de qualquer outra importação
@@ -18,7 +17,7 @@ from shared import (
     db, client, manager, UPLOADS_DIR,
     get_disabled_modules, match_module_for_path, is_module_disabled, session_is_current,
 )
-from auth import decode_token
+from auth import decode_token, FILE_TOKEN_SCOPE
 
 from routers.auth import api_router as auth_router
 from routers.cadastros import api_router as cadastros_router
@@ -87,9 +86,48 @@ async def module_gate_middleware(request: Request, call_next):
     return await call_next(request)
 api_router = APIRouter(prefix="/api")
 
-# Montar diretório de uploads para servir arquivos estáticos via /api/uploads
-# check_dir=False: a pasta é criada no lifespan (acima), não na importação.
-app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR), check_dir=False), name="uploads")
+# Pastas de anexos que exigem login mesmo com UPLOADS_REQUIRE_AUTH desligado:
+# recibos da Prestação de Contas (financeiro, só administradores).
+_PROTECTED_UPLOAD_PREFIXES = {"expense_reports/": "admin"}
+# Com UPLOADS_REQUIRE_AUTH=true, TODO anexo exige login. Fica desligado por
+# padrão porque versões já instaladas do app (APK, abas antigas) pedem as
+# fotos sem token - ligar só depois de todas estarem atualizadas.
+_UPLOADS_REQUIRE_AUTH = os.environ.get('UPLOADS_REQUIRE_AUTH', '').strip().lower() in ('1', 'true', 'yes', 'sim')
+
+
+async def _authorize_upload_request(request: Request, token: Optional[str], required_role: Optional[str]):
+    """Aceita o token de arquivos na URL (?token=) ou o token de sessão no
+    cabeçalho Authorization, e confere a conta como qualquer rota da API."""
+    header = request.headers.get("authorization", "")
+    raw_token = token or (header[7:] if header.lower().startswith("bearer ") else None)
+    if not raw_token:
+        raise HTTPException(status_code=401, detail="Faça login para acessar este arquivo")
+    payload = decode_token(raw_token)
+    user_doc = await db.users.find_one(
+        {"id": payload.get("sub")}, {"_id": 0, "id": 1, "active": 1, "password_version": 1, "role": 1}
+    )
+    if not user_doc or user_doc.get('active') is False or not session_is_current(payload, user_doc):
+        raise HTTPException(status_code=401, detail="Sessão inválida ou encerrada")
+    if required_role and user_doc.get('role') != required_role:
+        raise HTTPException(status_code=403, detail="Acesso restrito a administradores")
+
+
+@app.api_route("/api/uploads/{file_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+async def serve_upload(file_path: str, request: Request, token: Optional[str] = None):
+    """Entrega os anexos enviados ao sistema. Antes era uma pasta estática
+    pública: quem tivesse a URL de um recibo abria sem login."""
+    uploads_root = UPLOADS_DIR.resolve()
+    target = (UPLOADS_DIR / file_path).resolve()
+    if uploads_root not in target.parents or not target.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+
+    relative = target.relative_to(uploads_root).as_posix()
+    required_role = next(
+        (role for prefix, role in _PROTECTED_UPLOAD_PREFIXES.items() if relative.startswith(prefix)), None
+    )
+    if required_role or _UPLOADS_REQUIRE_AUTH:
+        await _authorize_upload_request(request, token, required_role)
+    return FileResponse(target)
 
 
 @api_router.get("/")
@@ -170,6 +208,9 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
     try:
         payload = decode_token(token)
     except HTTPException:
+        await websocket.close(code=1008)
+        return
+    if payload.get("scope") == FILE_TOKEN_SCOPE:
         await websocket.close(code=1008)
         return
 

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel as PydanticBaseModel
 
 from models import UserLogin, UserResponse, Token, CompanySettings, CompanySettingsUpdate
-from auth import get_password_hash, verify_password, create_access_token
+from auth import get_password_hash, verify_password, create_access_token, FILE_TOKEN_SCOPE
 
 from shared import db, get_current_active_user, get_company_settings, check_rate_limit, client_ip
 
@@ -221,6 +221,17 @@ async def login(credentials: UserLogin, http_request: Request):
     )
 
     return Token(access_token=access_token, token_type="bearer", user=user_response)
+
+@api_router.get("/auth/file-token")
+async def get_file_token(current_user: dict = Depends(get_current_active_user)):
+    """Token que o frontend acrescenta à URL dos anexos (fotos, recibos) -
+    ver FILE_TOKEN_SCOPE em auth.py e serve_upload em server.py."""
+    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "password_version": 1})
+    return {"file_token": create_access_token(data={
+        "sub": current_user['sub'], "scope": FILE_TOKEN_SCOPE,
+        "pv": (user_doc or {}).get('password_version') or 0,
+    })}
+
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_active_user)):

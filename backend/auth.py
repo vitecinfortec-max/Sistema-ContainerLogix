@@ -20,6 +20,10 @@ if not SECRET_KEY:
         "JWT_SECRET_KEY não configurada. Defina essa variável de ambiente antes de iniciar o servidor."
     )
 ALGORITHM = "HS256"
+# Token que só autoriza baixar arquivos de /api/uploads - vai na URL das
+# imagens (um <img> não manda cabeçalho de autorização), então não pode valer
+# pra mais nada: se vazar por um link copiado, não dá acesso à API.
+FILE_TOKEN_SCOPE = "files"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -56,7 +60,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     token = credentials.credentials
     payload = decode_token(token)
     user_id: str = payload.get("sub")
-    if user_id is None:
+    # Token de arquivos (ver /auth/file-token) só serve pra baixar anexos.
+    if user_id is None or payload.get("scope") == FILE_TOKEN_SCOPE:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido",

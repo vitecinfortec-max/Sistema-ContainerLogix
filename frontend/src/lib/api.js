@@ -233,7 +233,17 @@ export const api = {
     });
   },
   deleteFile: (filename) => axios.delete(`${API}/upload/${filename}`),
-  getFileUrl: (path) => `${BASE_URL}${path}`,
+  // Anexos (fotos, recibos) são pedidos pelo navegador direto de um <img>,
+  // sem cabeçalho de autorização - o token de arquivos vai na URL. Ver
+  // /auth/file-token no backend.
+  getFileToken: () => axios.get(`${API}/auth/file-token`),
+  getFileUrl: (path) => {
+    const url = `${BASE_URL}${path}`;
+    let fileToken = null;
+    try { fileToken = sessionStorage.getItem('fileToken'); } catch (e) { /* sem storage */ }
+    if (!fileToken || !String(path).startsWith('/api/uploads/')) return url;
+    return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(fileToken)}`;
+  },
   
   // Container Inspections (Registro Fotográfico)
   getContainerInspections: (params) => axios.get(`${API}/container-inspections`, { params }),

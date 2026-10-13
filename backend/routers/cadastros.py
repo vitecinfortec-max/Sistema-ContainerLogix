@@ -16,7 +16,7 @@ from models import (
 )
 
 from shared import (
-    db, get_current_active_user, validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR,
+    db, get_current_active_user, get_current_admin_user, validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR,
     save_signature_value
 )
 
@@ -595,8 +595,10 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
     }
 
 @api_router.delete("/upload/{filename}")
-async def delete_file(filename: str, current_user: dict = Depends(get_current_active_user)):
-    """Deletar arquivo do servidor"""
+async def delete_file(filename: str, current_user: dict = Depends(get_current_admin_user)):
+    """Deletar arquivo do servidor. Restrito a administradores: o arquivo não
+    guarda quem o enviou nem a que registro pertence, então qualquer usuário
+    logado conseguia apagar um anexo alheio só por saber o nome."""
     uploads_root = UPLOADS_DIR.resolve()
     # Resolve o caminho final e garante que ele continua dentro de UPLOADS_DIR -
     # sem isso, um filename como "..\\..\\backend\\server.py" escapava da pasta de uploads.
