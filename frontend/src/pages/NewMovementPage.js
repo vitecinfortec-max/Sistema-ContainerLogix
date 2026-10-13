@@ -13,6 +13,7 @@ import { useForm } from 'react-hook-form';
 import { useNotifications } from '../hooks/useNotifications';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
 import { Autocomplete } from '../components/Autocomplete';
+import ContainerValueFields from '../components/ContainerValueFields';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,6 +42,7 @@ export default function NewMovementPage() {
   const [containerDuplicateError, setContainerDuplicateError] = useState('');
   const [segregationError, setSegregationError] = useState('');
   const [servicePriceEntries, setServicePriceEntries] = useState([]);
+  const [entryLocked, setEntryLocked] = useState({});
   const clientInputRef = useRef(null);
   const buyerInputRef = useRef(null);
   const { notifyNewMovement, requestPermission, permission } = useNotifications();
@@ -64,6 +66,7 @@ export default function NewMovementPage() {
   const clientName = watch('client_name');
   const buyerName = watch('buyer_name');
   const serviceType = watch('service_type');
+  const containerValueCurrency = watch('container_value_currency');
 
   useEffect(() => {
     loadData();
@@ -295,11 +298,30 @@ export default function NewMovementPage() {
     }
   }, []);
 
+  // Numa Saída, o Valor do Container e a Data de Fabricação que a entrada do
+  // container tiver preenchidos são puxados e ficam bloqueados; o que a
+  // entrada deixou em branco continua livre pra informar na própria saída.
+  const loadEntryLocked = useCallback(async (containerNumber, opType) => {
+    if (!containerNumber || opType !== 'SAIDA') {
+      setEntryLocked({});
+      return;
+    }
+    try {
+      const response = await api.getEntryLockedFields(containerNumber);
+      const locked = response.data || {};
+      Object.entries(locked).forEach(([field, value]) => setValue(field, value));
+      setEntryLocked(locked);
+    } catch (error) {
+      setEntryLocked({});
+    }
+  }, [setValue]);
+
   const handleContainerNumberBlur = async (e) => {
     const containerNumber = formatContainerNumber(e.target.value);
     setValue('container_number', containerNumber);
     checkContainerDuplicate(containerNumber, operationType);
     checkSegregation(containerNumber, operationType, clientName, buyerName);
+    loadEntryLocked(containerNumber, operationType);
     if (operationType !== 'SAIDA') return;
     if (!containerNumber) return;
     try {
@@ -334,6 +356,11 @@ export default function NewMovementPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operationType, clientName, buyerName]);
+
+  useEffect(() => {
+    loadEntryLocked(formData.container_number, operationType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operationType]);
 
   const handleCompanyChange = (companyName) => {
     setValue('transport_company', companyName);
@@ -806,6 +833,13 @@ export default function NewMovementPage() {
                   )}
                   <p className="text-xs text-muted-foreground">Este campo não aparece na impressão</p>
                 </div>
+
+                <ContainerValueFields
+                  register={register}
+                  currency={containerValueCurrency}
+                  onCurrencyChange={(value) => setValue('container_value_currency', value)}
+                  locked={entryLocked}
+                />
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="observations">Observações</Label>

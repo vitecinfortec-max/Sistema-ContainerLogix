@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -12,6 +12,7 @@ import { Save, ArrowLeft, X } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
 import { Autocomplete } from '../components/Autocomplete';
+import ContainerValueFields from '../components/ContainerValueFields';
 import { formatContainerNumber } from '../lib/containerNumber';
 
 export default function EditMovementPage() {
@@ -39,7 +40,8 @@ export default function EditMovementPage() {
   // sobrescrever um Valor do Serviço já salvo assim que a página carrega os
   // dados existentes da movimentação.
   const userChangedPricingInputRef = useRef(false);
-  const { register, handleSubmit, setValue, watch } = useForm();
+  const { register, handleSubmit, setValue, watch, getValues } = useForm();
+  const [entryLocked, setEntryLocked] = useState({});
 
   const operationType = watch('operation_type');
   const status = watch('status');
@@ -48,11 +50,36 @@ export default function EditMovementPage() {
   const clientName = watch('client_name');
   const serviceType = watch('service_type');
   const existingCurrency = watch('currency');
+  const containerValueCurrency = watch('container_value_currency');
 
   useEffect(() => {
     loadMovement();
     loadAuxData();
   }, [id]);
+
+  // Numa Saída, o Valor do Container e a Data de Fabricação que a entrada do
+  // container tiver preenchidos são puxados e ficam bloqueados; o que a
+  // entrada deixou em branco continua livre pra informar na própria saída.
+  const loadEntryLocked = useCallback(async (containerNumber, opType) => {
+    if (!containerNumber || opType !== 'SAIDA') {
+      setEntryLocked({});
+      return;
+    }
+    try {
+      const response = await api.getEntryLockedFields(containerNumber, id);
+      const locked = response.data || {};
+      Object.entries(locked).forEach(([field, value]) => setValue(field, value));
+      setEntryLocked(locked);
+    } catch (error) {
+      setEntryLocked({});
+    }
+  }, [id, setValue]);
+
+  useEffect(() => {
+    if (loadingData) return;
+    loadEntryLocked(getValues('container_number'), operationType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operationType, loadingData]);
 
   // Fechar dropdown quando clicar fora
   useEffect(() => {
@@ -402,7 +429,11 @@ export default function EditMovementPage() {
                     id="container_number"
                     {...register('container_number', {
                       required: true,
-                      onBlur: (e) => setValue('container_number', formatContainerNumber(e.target.value)),
+                      onBlur: (e) => {
+                        const containerNumber = formatContainerNumber(e.target.value);
+                        setValue('container_number', containerNumber);
+                        loadEntryLocked(containerNumber, operationType);
+                      },
                     })}
                     className="h-12 font-mono uppercase"
                   />
@@ -593,6 +624,13 @@ export default function EditMovementPage() {
                   )}
                   <p className="text-xs text-muted-foreground">Este campo não aparece na impressão</p>
                 </div>
+
+                <ContainerValueFields
+                  register={register}
+                  currency={containerValueCurrency}
+                  onCurrencyChange={(value) => setValue('container_value_currency', value)}
+                  locked={entryLocked}
+                />
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="observations">Observações</Label>

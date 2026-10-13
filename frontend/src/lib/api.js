@@ -155,6 +155,7 @@ export const api = {
   updateMovement: (id, data) => axios.put(`${API}/movements/${id}`, data),
   deleteMovement: (id) => axios.delete(`${API}/movements/${id}`),
   getOpenEntryForContainer: (containerNumber) => axios.get(`${API}/movements/open-entry/${containerNumber}`),
+  getEntryLockedFields: (containerNumber, exitId) => axios.get(`${API}/movements/entry-locked-fields/${containerNumber}`, { params: exitId ? { exit_id: exitId } : {} }),
   getLastMovementForContainer: (containerNumber) => axios.get(`${API}/movements/last-for-container/${containerNumber}`),
   downloadMovementsPdf: (movementIds, via) => axios.post(`${API}/movements/pdf`, { movement_ids: movementIds, via }, { responseType: 'blob' }),
   

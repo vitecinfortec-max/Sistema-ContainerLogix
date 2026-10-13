@@ -717,12 +717,28 @@ def _pdf_empty_state(text, content_width):
     return table
 
 
-def generate_pdf_report(movements: list, report_title: str = "Relatório de Movimentações", company: dict = None) -> bytes:
+def _fmt_container_value(m: dict) -> str:
+    """Valor do container da movimentação com a moeda dele, ou '-'."""
+    if m.get('container_value') is None:
+        return '-'
+    return format_currency(m['container_value'], m.get('container_value_currency') or 'BRL')
+
+
+def _fmt_manufacture_date(m: dict) -> str:
+    """Fabricação do container (gravada como AAAA-MM) em MM/AAAA, ou '-'."""
+    value = m.get('manufacture_date') or ''
+    return f"{value[5:7]}/{value[:4]}" if len(value) >= 7 else '-'
+
+
+def generate_pdf_report(movements: list, report_title: str = "Relatório de Movimentações", company: dict = None, show_container_value: bool = True) -> bytes:
     """
     Relatório de Movimentações/Entradas/Saídas/Estoque Atual no padrão visual
     dos documentos do sistema: cabeçalho (_build_pdf_header), faixa de
     indicadores (_build_pdf_summary), tabela no estilo _pdf_table_style e
     rodapé com "Página X de Y" (_make_pdf_footer).
+
+    show_container_value: inclui as colunas Valor do Container e Fabricação -
+    desligado no envio automático por e-mail aos clientes (scheduled_reports).
     """
     c = merge_company(company)
     buffer = io.BytesIO()
@@ -780,12 +796,15 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
             return Paragraph(markup, cell_style_c if centered else cell_style_l)
         return Paragraph(xml_escape(str(text)) if text not in (None, '') else '-', cell_style_c if centered else cell_style_l)
 
-    # 14 colunas
-    data = [_pdf_header_cells([
+    # 14 colunas (+2 com show_container_value)
+    header_labels = [
         'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista',
         'Placa Cavalo', 'Placa Carreta', 'Transportadora', 'Terminal de Origem',
         'Status', 'Tamanho', 'Tara', 'Armador', 'Booking'
-    ])]
+    ]
+    if show_container_value:
+        header_labels += ['Valor Container', 'Fabricação']
+    data = [_pdf_header_cells(header_labels)]
 
     for m in movements:
         dt_brt = to_brt(m.get('created_at'))
@@ -801,7 +820,7 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
             else f'<font color="#{BRAND_MUTED}">{xml_escape(status)}</font>'
         )
 
-        data.append([
+        row = [
             cell(m.get('transaction_id', '-'), centered=True),
             cell(created_at),
             cell(None, centered=True, markup=type_markup),
@@ -816,12 +835,21 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
             cell(str(m.get('tare', '')) if m.get('tare') else '-', centered=True),
             cell(m.get('shipping_line', '-')),
             cell(m.get('booking', '') or '-')
-        ])
+        ]
+        if show_container_value:
+            row += [
+                cell(_fmt_container_value(m), centered=True),
+                cell(_fmt_manufacture_date(m), centered=True),
+            ]
+        data.append(row)
 
     # Larguras somam a área útil real da página (doc.width em A4 paisagem, ~785pt);
     # colunas de texto mais longo (Motorista, Transportadora, Terminal de
     # Origem) têm mais espaço pra reduzir a quantidade de quebra de linha.
-    col_widths = [30, 70, 44, 60, 105, 46, 46, 96, 62, 38, 40, 30, 66, 52]
+    if show_container_value:
+        col_widths = [30, 62, 44, 60, 70, 42, 42, 69, 50, 38, 40, 30, 60, 48, 54, 46]
+    else:
+        col_widths = [30, 70, 44, 60, 105, 46, 46, 96, 62, 38, 40, 30, 66, 52]
 
     table = Table(data, colWidths=col_widths, repeatRows=1)
     table.setStyle(TableStyle(_pdf_table_style()))
@@ -1755,11 +1783,12 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
             )
         stats_text += f"   •   Cheios: {_fmt_int(total_full)}   •   Vazios: {_fmt_int(total_empty)}"
 
-        # Headers matching template (14 columns)
+        # Headers matching template (16 columns)
         headers = [
             'ID Trans.', 'Data/Hora', 'Tipo', 'Nº Container', 'Motorista',
             'Placa Cavalo', 'Placa Carreta', 'Transportadora', 'Terminal de Origem',
-            'Status', 'Tamanho', 'Tara', 'Armador', 'Booking'
+            'Status', 'Tamanho', 'Tara', 'Armador', 'Booking',
+            'Valor Container', 'Fabricação'
         ]
 
         data_rows = []
@@ -1782,22 +1811,27 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
                 m.get('size_type', '-'),
                 m.get('tare', '') or '-',
                 m.get('shipping_line', '-'),
-                m.get('booking', '') or '-'
+                m.get('booking', '') or '-',
+                # Texto com a moeda (não número): o relatório mistura R$ e US$
+                _fmt_container_value(m),
+                _fmt_manufacture_date(m)
             ])
 
-        # 14 colunas: B a O
+        # 16 colunas: B a Q
         col_widths = {
             'B': 9, 'C': 16, 'D': 10, 'E': 15, 'F': 32, 'G': 11,
             'H': 11, 'I': 26, 'J': 20, 'K': 9, 'L': 12,
-            'M': 8, 'N': 16, 'O': 13
+            'M': 8, 'N': 16, 'O': 13, 'P': 16, 'Q': 11
         }
 
-        # Centralizadas: ID Trans.(0), Data/Hora(1), Tipo(2), Status(9), Tamanho(10), Tara(11)
-        center_cols = {0, 1, 2, 9, 10, 11}
+        # Centralizadas: ID Trans.(0), Data/Hora(1), Tipo(2), Status(9), Tamanho(10), Tara(11), Fabricação(15)
+        center_cols = {0, 1, 2, 9, 10, 11, 15}
+        right_align_cols = {14}
 
         _bsoft_style_excel(
             ws, report_title, stats_text, headers, data_rows, col_widths,
             center_cols=center_cols,
+            right_align_cols=right_align_cols,
             number_fmt_cols={1: 'dd/mm/yyyy hh:mm'},
             stats_text=stats_text,
             company_name=c['name'],

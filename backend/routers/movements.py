@@ -255,7 +255,15 @@ async def _inherit_from_open_entry(movement_input: ContainerMovementCreate, befo
     }
     if movement_input.operation_type != 'SAIDA':
         return values
-    query = {"container_number": movement_input.container_number, "operation_type": "ENTRADA"}
+    values.update(await _entry_locked_fields(movement_input.container_number, before))
+    return values
+
+
+async def _entry_locked_fields(container_number: str, before: Optional[str] = None) -> dict:
+    """O que a última entrada do container tem preenchido de valor do
+    container e data de fabricação - só as chaves preenchidas, que são as que
+    ficam travadas na saída."""
+    query = {"container_number": container_number, "operation_type": "ENTRADA"}
     if before:
         query["created_at"] = {"$lt": before}
     entry = await db.movements.find_one(
@@ -263,14 +271,15 @@ async def _inherit_from_open_entry(movement_input: ContainerMovementCreate, befo
         {"_id": 0, "container_value": 1, "container_value_currency": 1, "manufacture_date": 1},
         sort=[("created_at", -1)]
     )
+    locked = {}
     if not entry:
-        return values
+        return locked
     if entry.get("container_value") is not None:
-        values["container_value"] = entry["container_value"]
-        values["container_value_currency"] = entry.get("container_value_currency") or "BRL"
+        locked["container_value"] = entry["container_value"]
+        locked["container_value_currency"] = entry.get("container_value_currency") or "BRL"
     if entry.get("manufacture_date"):
-        values["manufacture_date"] = entry["manufacture_date"]
-    return values
+        locked["manufacture_date"] = entry["manufacture_date"]
+    return locked
 
 
 @asynccontextmanager
@@ -836,6 +845,23 @@ async def get_open_entry_for_container(container_number: str, current_user: dict
         return {"entry": None}
 
     return {"entry": entry}
+
+@api_router.get("/movements/entry-locked-fields/{container_number}")
+async def get_entry_locked_fields(
+    container_number: str,
+    exit_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Valor do container e data de fabricação que a entrada do container tem
+    preenchidos - os formulários de Emissão e Edição de EIR usam pra mostrar
+    esses campos já puxados e bloqueados numa Saída. `exit_id`: a saída que
+    está sendo editada (a entrada dela é a última anterior a ela)."""
+    before = None
+    if exit_id:
+        existing = await db.movements.find_one({"id": exit_id}, {"_id": 0, "created_at": 1})
+        if existing:
+            before = str(existing['created_at'])
+    return await _entry_locked_fields(container_number.strip().upper(), before)
 
 @api_router.get("/movements/{movement_id}", response_model=ContainerMovementResponse)
 async def get_movement(movement_id: str, current_user: dict = Depends(get_current_active_user)):

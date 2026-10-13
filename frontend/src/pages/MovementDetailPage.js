@@ -405,6 +405,20 @@ export default function MovementDetailPage() {
                   <p className="text-[10px] text-slate-500 dark:text-slate-400">Comprador</p>
                   <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.buyer_name || '-'}</p>
                 </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Valor do Container</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">
+                    {movement.container_value != null
+                      ? `${movement.container_value_currency === 'USD' ? 'US$' : 'R$'} ${Number(movement.container_value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">Data de Fabricação</p>
+                  <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">
+                    {movement.manufacture_date ? movement.manufacture_date.split('-').reverse().join('/') : '-'}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>

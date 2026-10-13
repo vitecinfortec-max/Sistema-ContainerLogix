@@ -499,6 +499,57 @@ class TestContainerValueAndManufactureDate:
         entry = api.get("/api/movements/open-entry/ABCU1234567").json()["entry"]
         assert entry["container_value"] == 12500.5 and entry["manufacture_date"] == "2019-05"
 
+    def test_locked_fields_lookup_returns_only_what_the_entry_filled(self, api):
+        assert api.get("/api/movements/entry-locked-fields/ABCU1234567").json() == {}
+        create(api, manufacture_date="2019-05")
+        assert api.get("/api/movements/entry-locked-fields/abcu1234567").json() == {"manufacture_date": "2019-05"}
+
+    def test_locked_fields_lookup_for_an_exit_being_edited_ignores_later_entries(self, api):
+        create(api, **self.ENTRY)
+        exit_movement = create(api, operation_type="SAIDA")
+        create(api, container_value=1, manufacture_date="2001-01")
+        locked = api.get(
+            "/api/movements/entry-locked-fields/ABCU1234567", params={"exit_id": exit_movement["id"]}
+        ).json()
+        assert locked == self.ENTRY
+
+    def test_movements_report_shows_both_columns(self, api):
+        import io
+        from openpyxl import load_workbook
+        from pypdf import PdfReader
+
+        create(api, **self.ENTRY)
+        create(api, container_number="ABCU2222222", container_value=8000, manufacture_date="2021-11")
+        create(api, container_number="ABCU3333333")
+
+        excel = api.get("/api/reports/excel")
+        assert excel.status_code == 200, excel.text
+        rows = [[c for c in row] for row in load_workbook(io.BytesIO(excel.content)).active.iter_rows(values_only=True)]
+        header = next(r for r in rows if "Valor Container" in r)
+        value_col, date_col, container_col = (header.index(h) for h in ("Valor Container", "Fabricação", "Nº Container"))
+        by_container = {r[container_col]: (r[value_col], r[date_col]) for r in rows if r is not header}
+        assert by_container["ABCU1234567"] == ("$ 12,500.50", "05/2019")
+        assert by_container["ABCU2222222"] == ("R$ 8.000,00", "11/2021")
+        assert by_container["ABCU3333333"] == ("-", "-")
+
+        pdf = api.get("/api/reports/pdf")
+        assert pdf.status_code == 200, pdf.text
+        reader = PdfReader(io.BytesIO(pdf.content))
+        assert len(reader.pages) == 1
+        # O cabeçalho da tabela sai em maiúsculas e pode quebrar em duas linhas
+        text = " ".join(reader.pages[0].extract_text().upper().split())
+        for expected in ("VALOR CONTAINER", "FABRICAÇÃO", "$ 12,500.50", "05/2019", "R$ 8.000,00", "11/2021"):
+            assert expected in text, expected
+
+    def test_daily_email_report_leaves_both_columns_out(self):
+        import io
+        from pypdf import PdfReader
+        from reports import generate_pdf_report
+
+        movement = {**MOVEMENT, **self.ENTRY, "transaction_id": 1, "created_at": "2026-10-12T12:00:00+00:00"}
+        text = PdfReader(io.BytesIO(generate_pdf_report([movement], show_container_value=False))).pages[0].extract_text()
+        assert "Valor Container" not in text and "12,500.50" not in text
+
     def test_validation(self, api):
         assert api.post("/api/movements", json={**MOVEMENT, "container_value": -1}).status_code == 422
         assert api.post("/api/movements", json={**MOVEMENT, "container_value_currency": "EUR"}).status_code == 422

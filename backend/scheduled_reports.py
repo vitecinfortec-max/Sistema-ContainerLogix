@@ -108,6 +108,7 @@ async def send_daily_client_movement_reports(day: date = None) -> dict:
                 movements,
                 report_title=f"Relatório de Movimentações - {c['name']}",
                 company=company,
+                show_container_value=False,
             )
 
             params = {
