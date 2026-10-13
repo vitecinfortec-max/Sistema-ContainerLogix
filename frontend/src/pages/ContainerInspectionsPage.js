@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -8,9 +8,10 @@ import {
 } from '../components/DataPage';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
+import { documentFilename, downloadDocumentsInBatch } from '../lib/batchDownload';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Eye, Printer, Trash2, ClipboardCheck } from 'lucide-react';
+import { Plus, Eye, Printer, Trash2, Download, ClipboardCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -21,6 +22,10 @@ export default function ContainerInspectionsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [isDownloading, setIsDownloading] = useState(false);
+  // Container e número de cada registro já listado - a seleção pode incluir
+  // registros de outras páginas, que não estão mais em `inspections`.
+  const knownItems = useRef(new Map());
   const [pagination, setPagination] = useState({
     page: 1,
     perPage: 20,
@@ -39,6 +44,7 @@ export default function ContainerInspectionsPage() {
         per_page: pagination.perPage
       });
       setInspections(response.data.items);
+      response.data.items.forEach((item) => knownItems.current.set(item.id, item));
       setPagination(prev => ({
         ...prev,
         total: response.data.total,
@@ -96,6 +102,23 @@ export default function ContainerInspectionsPage() {
     });
   };
 
+  // Um PDF por registro marcado, cada um num arquivo com o nome do documento
+  const handleDownloadPdfs = async () => {
+    if (selectedIds.size === 0 || isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadDocumentsInBatch([...selectedIds].map((id) => {
+        const item = knownItems.current.get(id) || {};
+        return {
+          filename: documentFilename('RegistroFotografico', item.container_number, item.inspection_number ?? id),
+          load: () => api.getContainerInspectionPDF(id).then((response) => response.data),
+        };
+      }));
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const singleSelectedItem = selectedIds.size === 1 ? filteredInspections.find(i => i.id === [...selectedIds][0]) : null;
 
   return (
@@ -126,6 +149,7 @@ export default function ContainerInspectionsPage() {
             >
               <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedItem && navigate(`/container-inspections/${singleSelectedItem.id}`)} disabled={!singleSelectedItem} testId="view-inspection-button" />
               <ToolbarButton icon={Printer} label="Imprimir" tone="emerald" onClick={() => singleSelectedItem && navigate(`/container-inspections/${singleSelectedItem.id}?print=true`)} disabled={!singleSelectedItem} testId="print-inspection-button" />
+              <ToolbarButton icon={Download} label="Baixar PDF" onClick={handleDownloadPdfs} disabled={selectedIds.size === 0 || isDownloading} testId="download-pdf-button" />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)} disabled={!singleSelectedItem} testId="delete-inspection-button" />
             </Toolbar>
           )}

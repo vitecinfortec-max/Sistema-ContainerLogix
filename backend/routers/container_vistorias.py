@@ -1,17 +1,22 @@
 from datetime import datetime, timezone
+import asyncio
+import io
 import uuid
 import shutil
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import StreamingResponse
 
 from models import (
     ContainerVistoria, ContainerVistoriaCreate, ContainerVistoriaUpdate, ContainerVistoriaResponse,
     MAX_VISTORIA_PHOTOS, Driver, TransportCompany, VehicleCreate
 )
 
+from reports import generate_container_photo_document_pdf, photo_document_filename
+
 from shared import (
     db, get_current_active_user, validate_and_read_upload, ALLOWED_EXTENSIONS,
-    UPLOADS_DIR,
+    UPLOADS_DIR, get_company_settings,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -115,6 +120,22 @@ async def get_container_vistoria(vistoria_id: str, current_user: dict = Depends(
     if not vistoria:
         raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
     return ContainerVistoriaResponse(**vistoria)
+
+@api_router.get("/container-vistorias/{vistoria_id}/pdf")
+async def download_container_vistoria_pdf(vistoria_id: str, current_user: dict = Depends(get_current_active_user)):
+    """PDF da vistoria (o mesmo documento da impressão), pro download em lote da lista"""
+    vistoria = await db.container_vistorias.find_one({"id": vistoria_id}, {"_id": 0})
+    if not vistoria:
+        raise HTTPException(status_code=404, detail="Vistoria de container não encontrada")
+    company = await get_company_settings()
+    # Fora do loop de eventos: abrir e reduzir até 12 fotos leva alguns segundos
+    pdf_bytes = await asyncio.to_thread(generate_container_photo_document_pdf, vistoria, 'vistoria', company, UPLOADS_DIR)
+    filename = photo_document_filename('Vistoria', vistoria.get('container_number'), vistoria.get('vistoria_number'))
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 @api_router.post("/container-vistorias", response_model=ContainerVistoriaResponse)
 async def create_container_vistoria(

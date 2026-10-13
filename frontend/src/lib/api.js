@@ -267,6 +267,7 @@ export const api = {
   // Container Inspections (Registro Fotográfico)
   getContainerInspections: (params) => axios.get(`${API}/container-inspections`, { params }),
   getContainerInspection: (id) => axios.get(`${API}/container-inspections/${id}`),
+  getContainerInspectionPDF: (id) => axios.get(`${API}/container-inspections/${id}/pdf`, { responseType: 'blob' }),
   createContainerInspection: (data) => axios.post(`${API}/container-inspections`, data),
   updateContainerInspection: (id, data) => axios.put(`${API}/container-inspections/${id}`, data),
   deleteContainerInspection: (id) => axios.delete(`${API}/container-inspections/${id}`),
@@ -282,6 +283,7 @@ export const api = {
   // Vistoria de Container
   getContainerVistorias: (params) => axios.get(`${API}/container-vistorias`, { params }),
   getContainerVistoria: (id) => axios.get(`${API}/container-vistorias/${id}`),
+  getContainerVistoriaPDF: (id) => axios.get(`${API}/container-vistorias/${id}/pdf`, { responseType: 'blob' }),
   createContainerVistoria: (data) => axios.post(`${API}/container-vistorias`, data),
   updateContainerVistoria: (id, data) => axios.put(`${API}/container-vistorias/${id}`, data),
   deleteContainerVistoria: (id) => axios.delete(`${API}/container-vistorias/${id}`),

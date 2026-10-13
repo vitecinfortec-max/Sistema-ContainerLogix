@@ -4755,6 +4755,249 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
     return buffer.getvalue()
 
 
+# ==================== VISTORIA DE CONTAINER / REGISTRO FOTOGRÁFICO ====================
+
+PHOTO_TYPE_LABELS = {
+    'front': 'Frente', 'back': 'Traseira', 'internal': 'Interno',
+    'left': 'Lateral Esquerda', 'right': 'Lateral Direita', 'csc_plate': 'Placa CSC',
+}
+
+# O que muda entre os dois documentos; o desenho é o mesmo. Espelham a
+# impressão do navegador (PrintView de ContainerVistoriaDetailPage.js e de
+# ContainerInspectionDetailPage.js) - se mudar um, mudar o outro.
+#   photo_width: largura fixa da caixa da foto (None = ocupa a coluna)
+#   compact_from_rows: nº de linhas de fotos a partir do qual a altura cai
+#   pra compact_photo_height (ver PrintPhotoGrid em PrintDocument.jsx)
+_PHOTO_DOCUMENTS = {
+    'vistoria': {
+        'title': 'Vistoria de Container', 'number_label': 'Vistoria Nº', 'number_field': 'vistoria_number',
+        'barcode_prefix': 'VC',
+        'fields': [
+            ('Número do Container', 'container_number'), ('Cliente', 'client_name'),
+            ('Armador', 'shipping_line'), ('Tamanho/Tipo', 'size_type'),
+            ('Placa do Cavalo', 'truck_plate'), ('Placa da Carreta', 'trailer_plate'),
+            ('Transportadora', 'transport_company'), ('Nome do Motorista', 'driver_name'),
+            ('CPF do Motorista', 'driver_cpf'), ('Tara', 'tare'),
+        ],
+        'state_title': 'Estado do Container', 'no_damage_text': 'Sem Avarias',
+        'no_items_text': 'Nenhum serviço informado.',
+        'photos_title': 'Fotos da Vistoria',
+        'photo_width': 60 * mm, 'photo_height': 100 * mm, 'compact_photo_height': 56 * mm, 'compact_from_rows': 2,
+        'note': 'Este documento é válido como registro de vistoria',
+    },
+    'inspection': {
+        'title': 'Registro Fotográfico de Contêiner', 'number_label': 'Registro Nº', 'number_field': 'inspection_number',
+        'barcode_prefix': 'RFC',
+        'fields': [
+            ('Número do Container', 'container_number'), ('Lacre', 'container_seal'),
+            ('Tamanho/Tipo', 'size_type'), ('Booking', 'booking'),
+            ('Terminal de Coleta', 'collection_terminal'), ('Terminal de Origem', 'origin_terminal'),
+            ('Cliente', 'client_name'), ('Armador', 'shipping_line_name'),
+        ],
+        'state_title': 'Itens de Vistoria', 'no_damage_text': 'Container sem avarias',
+        'no_items_text': 'Nenhum item informado.',
+        'photos_title': 'Fotos do Registro',
+        'photo_width': None, 'photo_height': 48 * mm, 'compact_photo_height': 37 * mm, 'compact_from_rows': 3,
+        'note': 'Este documento é válido como registro fotográfico',
+    },
+}
+
+
+def photo_document_filename(prefix, container_number, number) -> str:
+    """Nome do arquivo de um documento baixado: "Vistoria-TCLU7834740-4.pdf".
+    Mesma regra de frontend/src/lib/batchDownload.js (documentFilename)."""
+    container = re.sub(r'[^A-Za-z0-9]', '', str(container_number or '')) or 'SEM-CONTAINER'
+    return f"{prefix}-{container.upper()}-{number}.pdf"
+
+
+def _photo_for_pdf(url, uploads_dir, max_w, max_h):
+    """Foto anexada (URL /api/uploads/...) pronta pra entrar no PDF: virada
+    conforme o EXIF, reduzida (a foto do celular tem vários MB e o documento
+    leva até 12) e dimensionada pra caber inteira em max_w x max_h. None se o
+    arquivo não existir ou não abrir."""
+    from PIL import ImageOps
+
+    prefix = '/api/uploads/'
+    if not url or not str(url).startswith(prefix):
+        return None
+    root = Path(uploads_dir).resolve()
+    path = (root / str(url)[len(prefix):]).resolve()
+    if root not in path.parents or not path.is_file():
+        return None
+    try:
+        with PILImage.open(path) as im:
+            im = ImageOps.exif_transpose(im)
+            if im.mode in ('RGBA', 'LA', 'P'):
+                im = im.convert('RGBA')
+                background = PILImage.new('RGB', im.size, (255, 255, 255))
+                background.paste(im, mask=im.split()[-1])
+                im = background
+            else:
+                im = im.convert('RGB')
+            im.thumbnail((1100, 1100))
+            w, h = im.size
+            buf = io.BytesIO()
+            im.save(buf, 'JPEG', quality=80)
+    except Exception as e:
+        logger.warning(f"Foto {url} não pôde ser incluída no PDF: {e}")
+        return None
+    if not w or not h:
+        return None
+    buf.seek(0)
+    scale = min(max_w / w, max_h / h)
+    return Image(buf, width=w * scale, height=h * scale)
+
+
+def generate_container_photo_document_pdf(record: dict, kind: str, company: dict = None, uploads_dir=None) -> bytes:
+    """PDF da Vistoria de Container (kind='vistoria') ou do Registro
+    Fotográfico (kind='inspection'): dados do container, observações, estado,
+    fotos em 3 colunas e o código de barras do documento - o mesmo documento
+    que a tela imprime pelo navegador."""
+    from reportlab.platypus import KeepTogether
+    from reportlab.graphics.barcode import code128
+
+    cfg = _PHOTO_DOCUMENTS[kind]
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=12 * mm, leftMargin=12 * mm, topMargin=10 * mm, bottomMargin=10 * mm
+    )
+    width = doc.width
+    styles = getSampleStyleSheet()
+    logo_buffer = download_logo(c)
+    number = record.get(cfg['number_field'])
+
+    label_value_style = styles['Normal']
+    box_title_style = ParagraphStyle('PhotoDocBoxTitle', parent=styles['Normal'], fontSize=9, fontName='Helvetica-Bold')
+    text_style = ParagraphStyle('PhotoDocText', parent=styles['Normal'], fontSize=8.5, leading=11, textColor=_hex(BRAND_TEXT))
+    strong_style = ParagraphStyle('PhotoDocStrong', parent=styles['Normal'], fontSize=9.5, leading=12, fontName='Helvetica-Bold', textColor=_hex(BRAND_DARK))
+    photo_label_style = ParagraphStyle('PhotoDocPhotoLabel', fontName='Helvetica-Bold', fontSize=6.5, leading=8, textColor=_hex(BRAND_MUTED))
+    missing_style = ParagraphStyle('PhotoDocMissing', fontName='Helvetica', fontSize=7.5, leading=9, alignment=TA_CENTER, textColor=_hex(BRAND_MUTED))
+    footer_style = ParagraphStyle('PhotoDocFooter', parent=styles['Normal'], fontSize=7, alignment=TA_CENTER, textColor=_hex(BRAND_MUTED))
+
+    def safe_text(value):
+        return xml_escape(str(value)).replace('\n', '<br/>')
+
+    def boxed_section(title, row_tables, extra=None):
+        return _voucher_boxed_section(title, row_tables, width, box_title_style, extra=extra)
+
+    elements = list(_build_pdf_header(
+        styles, logo_buffer, f"{cfg['title']} - {cfg['number_label']} {number}",
+        company=company, content_width=width,
+    ))
+
+    pairs = [(label, safe_text(record[key]) if record.get(key) not in (None, '') else None) for label, key in cfg['fields']]
+    elements.append(boxed_section('Informações do Container', [
+        _voucher_field_row(pairs[i:i + 4], width - 20, label_value_style) for i in range(0, len(pairs), 4)
+    ]))
+    elements.append(Spacer(1, 6))
+
+    if record.get('observations'):
+        elements.append(boxed_section('Observações', [], extra=[Paragraph(safe_text(record['observations']), text_style)]))
+        elements.append(Spacer(1, 6))
+
+    damage_items = record.get('damage_items') or []
+    if record.get('no_damage'):
+        state = Paragraph(cfg['no_damage_text'], strong_style)
+    elif damage_items:
+        state = Paragraph('  •  '.join(safe_text(item) for item in damage_items), text_style)
+    else:
+        state = Paragraph(cfg['no_items_text'], text_style)
+    elements.append(boxed_section(cfg['state_title'], [], extra=[state]))
+    elements.append(Spacer(1, 6))
+
+    photos = record.get('photos') or []
+    if photos:
+        columns = 3
+        col_w = width / columns
+        n_rows = -(-len(photos) // columns)
+        box_h = cfg['compact_photo_height'] if n_rows >= cfg['compact_from_rows'] else cfg['photo_height']
+        # A caixa de largura fixa (6 cm na vistoria) quase encosta na coluna -
+        # por isso o recuo lateral das células é de só 2pt.
+        box_w = min(cfg['photo_width'] or col_w, col_w - 4) if cfg['photo_width'] else col_w - 6
+
+        def photo_cell(photo):
+            image = _photo_for_pdf(photo.get('url'), uploads_dir or UPLOADS_DIR, box_w - 6, box_h - 6)
+            box = Table([[image or Paragraph('Foto indisponível', missing_style)]], colWidths=[box_w], rowHeights=[box_h])
+            box.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+                ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 3),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
+                ('TOPPADDING', (0, 0), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ]))
+            label = PHOTO_TYPE_LABELS.get(photo.get('type'), photo.get('type') or '')
+            return [Paragraph(xml_escape(str(label)).upper(), photo_label_style), Spacer(1, 2), box]
+
+        title = Paragraph(f'<font color="#{PRIMARY_COLOR}"><b>{cfg["photos_title"]} ({len(photos)})</b></font>', box_title_style)
+        data = [[title] + [''] * (columns - 1)]
+        for start in range(0, len(photos), columns):
+            row = [photo_cell(p) for p in photos[start:start + columns]]
+            data.append(row + [''] * (columns - len(row)))
+        # Uma linha da tabela por linha de fotos (e não uma caixa só, como os
+        # outros quadros): é o que deixa o quadro continuar na folha seguinte.
+        photo_table = Table(data, colWidths=[col_w] * columns)
+        photo_table.hAlign = 'CENTER'
+        photo_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
+            ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
+            ('LINEBEFORE', (0, 0), (0, -1), 2.5, _hex(PRIMARY_COLOR)),
+            ('SPAN', (0, 0), (-1, 0)),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
+            ('LEFTPADDING', (0, 0), (-1, 0), 10),
+            ('TOPPADDING', (0, 0), (-1, 0), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 3),
+            ('LEFTPADDING', (0, 1), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 1), (-1, -1), 2),
+            ('TOPPADDING', (0, 1), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+        ]))
+        elements.append(photo_table)
+
+    # Código de barras + quem registrou e as datas, sem quebrar entre folhas
+    barcode_value = f"{cfg['barcode_prefix']}{str(number or 0).zfill(6)}"
+    try:
+        bc = code128.Code128(barcode_value, barWidth=0.8, barHeight=28)
+    except Exception:
+        bc = None
+    bc_num = Paragraph(f"<b>{barcode_value}</b>", ParagraphStyle('PhotoDocBcNum', parent=styles['Normal'], fontSize=8, alignment=TA_CENTER, textColor=_hex(BRAND_DARK)))
+    info_label = ParagraphStyle('PhotoDocInfoLabel', fontName='Helvetica', fontSize=7, leading=9, textColor=_hex(BRAND_MUTED))
+    info_value = ParagraphStyle('PhotoDocInfoValue', fontName='Helvetica-Bold', fontSize=9, leading=11, textColor=_hex(BRAND_DARK))
+    created_brt = to_brt(record.get('created_at'))
+    closing_fields = [
+        ('REGISTRADO POR', record.get('created_by_name') or '-'),
+        ('DATA DE CRIAÇÃO', created_brt.strftime('%d/%m/%Y às %H:%M') if created_brt else '-'),
+        ('DATA DE EMISSÃO', now_brt().strftime('%d/%m/%Y às %H:%M')),
+    ]
+    barcode_col = 150
+    field_w = (width - barcode_col) / len(closing_fields)
+    closing = Table(
+        [[[bc, bc_num] if bc else [bc_num]] + [[Paragraph(label, info_label), Paragraph(xml_escape(str(value)), info_value)] for label, value in closing_fields]],
+        colWidths=[barcode_col] + [field_w] * len(closing_fields),
+    )
+    closing.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (0, 0), 0),
+        ('LINEBELOW', (0, 0), (-1, -1), 0.75, _hex(BRAND_LINE)),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(KeepTogether([
+        Spacer(1, 10),
+        closing,
+        Spacer(1, 5),
+        Paragraph(f"{xml_escape(c['name'])}  ·  {cfg['note']}", footer_style),
+    ]))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
 # ==================== ENTREGA DE EPI'S ====================
 
 EPI_DECLARATION = (

@@ -1,17 +1,22 @@
 from datetime import datetime, timezone
+import asyncio
+import io
 import shutil
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi.responses import StreamingResponse
 
 from models import (
     ContainerInspection, ContainerInspectionCreate, ContainerInspectionUpdate,
     ContainerInspectionResponse, MAX_CONTAINER_INSPECTION_PHOTOS
 )
 
+from reports import generate_container_photo_document_pdf, photo_document_filename
+
 from shared import (
     db, get_current_active_user, migrate_inspection_photos, validate_and_read_upload,
-    ALLOWED_EXTENSIONS, UPLOADS_DIR
+    ALLOWED_EXTENSIONS, UPLOADS_DIR, get_company_settings,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -46,6 +51,23 @@ async def get_container_inspection(inspection_id: str, current_user: dict = Depe
     if not inspection:
         raise HTTPException(status_code=404, detail="Registro fotográfico de container não encontrado")
     return ContainerInspectionResponse(**migrate_inspection_photos(inspection))
+
+@api_router.get("/container-inspections/{inspection_id}/pdf")
+async def download_container_inspection_pdf(inspection_id: str, current_user: dict = Depends(get_current_active_user)):
+    """PDF do registro fotográfico (o mesmo documento da impressão), pro download em lote da lista"""
+    inspection = await db.container_inspections.find_one({"id": inspection_id}, {"_id": 0})
+    if not inspection:
+        raise HTTPException(status_code=404, detail="Registro fotográfico de container não encontrado")
+    inspection = migrate_inspection_photos(inspection)
+    company = await get_company_settings()
+    # Fora do loop de eventos: abrir e reduzir as fotos leva alguns segundos
+    pdf_bytes = await asyncio.to_thread(generate_container_photo_document_pdf, inspection, 'inspection', company, UPLOADS_DIR)
+    filename = photo_document_filename('RegistroFotografico', inspection.get('container_number'), inspection.get('inspection_number'))
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 @api_router.post("/container-inspections", response_model=ContainerInspectionResponse)
 async def create_container_inspection(

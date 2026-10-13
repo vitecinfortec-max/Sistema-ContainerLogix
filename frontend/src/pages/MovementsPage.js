@@ -10,6 +10,7 @@ import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
+import { documentFilename, downloadDocumentsInBatch } from '../lib/batchDownload';
 import { toast } from 'sonner';
 import { Plus, Trash2, Container as ContainerIcon, Eye, Edit, Wifi, WifiOff, Copy, ChevronUp, ChevronDown, ChevronsUpDown, Download, Loader2, ClipboardList, ArrowDownToLine, ArrowUpFromLine, PackageCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -70,6 +71,8 @@ export default function MovementsPage() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [showViaDialog, setShowViaDialog] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  // Com mais de um registro marcado: um PDF por registro, ou um único PDF com todos
+  const [separateFiles, setSeparateFiles] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState('transaction_id');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -78,6 +81,7 @@ export default function MovementsPage() {
   // Nº do registro de cada linha marcada - a seleção pode incluir registros
   // de outras páginas, que não estão mais em `movements`.
   const selectedNumbers = useRef(new Map());
+  const selectedContainers = useRef(new Map());
   // Só a resposta do pedido mais recente é aplicada (digitação rápida gera
   // pedidos que podem voltar fora de ordem).
   const requestSeq = useRef(0);
@@ -201,9 +205,11 @@ export default function MovementsPage() {
       if (next.has(movement.id)) {
         next.delete(movement.id);
         selectedNumbers.current.delete(movement.id);
+        selectedContainers.current.delete(movement.id);
       } else {
         next.add(movement.id);
         selectedNumbers.current.set(movement.id, movement.transaction_id);
+        selectedContainers.current.set(movement.id, movement.container_number);
       }
       return next;
     });
@@ -217,9 +223,11 @@ export default function MovementsPage() {
         if (allSelected) {
           next.delete(m.id);
           selectedNumbers.current.delete(m.id);
+          selectedContainers.current.delete(m.id);
         } else {
           next.add(m.id);
           selectedNumbers.current.set(m.id, m.transaction_id);
+          selectedContainers.current.set(m.id, m.container_number);
         }
       });
       return next;
@@ -228,6 +236,7 @@ export default function MovementsPage() {
 
   const unselect = (id) => {
     selectedNumbers.current.delete(id);
+    selectedContainers.current.delete(id);
     setSelectedIds(prev => {
       if (!prev.has(id)) return prev;
       const next = new Set(prev);
@@ -300,15 +309,24 @@ export default function MovementsPage() {
   const handleDownloadPdf = async (via) => {
     if (selectedIds.size === 0 || isDownloadingPdf) return;
     setIsDownloadingPdf(true);
+    const eirFilename = (id) => documentFilename('EIR', selectedContainers.current.get(id), selectedNumbers.current.get(id) || id);
     try {
+      if (selectedIds.size > 1 && separateFiles) {
+        const result = await downloadDocumentsInBatch([...selectedIds].map((id) => ({
+          filename: eirFilename(id),
+          load: () => api.downloadMovementsPdf([id], via).then((response) => response.data),
+        })));
+        // null = desistiu de escolher a pasta: o diálogo continua aberto
+        if (result) setShowViaDialog(false);
+        return;
+      }
       const response = await api.downloadMovementsPdf([...selectedIds], via);
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
-      const onlyId = [...selectedIds][0];
       const filename = selectedIds.size === 1
-        ? `registro-gate-${selectedNumbers.current.get(onlyId) || onlyId}.pdf`
-        : `registros-gate-${selectedIds.size}-documentos.pdf`;
+        ? eirFilename([...selectedIds][0])
+        : `EIR-${selectedIds.size}-documentos.pdf`;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
@@ -550,9 +568,22 @@ export default function MovementsPage() {
             <AlertDialogDescription>
               {selectedIds.size === 1
                 ? 'Será gerado um PDF com o comprovante do registro selecionado.'
-                : `Será gerado um único PDF com ${selectedIds.size} páginas, uma para cada registro selecionado.`}
+                : separateFiles
+                  ? `Serão gerados ${selectedIds.size} PDFs, um para cada registro selecionado, com o nome EIR-CONTAINER-Nº. Você escolhe a pasta onde salvar.`
+                  : `Será gerado um único PDF com ${selectedIds.size} páginas, uma para cada registro selecionado.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {selectedIds.size > 1 && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={separateFiles}
+                onCheckedChange={(checked) => setSeparateFiles(checked === true)}
+                disabled={isDownloadingPdf}
+                data-testid="separate-files-checkbox"
+              />
+              Um arquivo por registro
+            </label>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDownloadingPdf} data-testid="cancel-via">Cancelar</AlertDialogCancel>
             <Button
