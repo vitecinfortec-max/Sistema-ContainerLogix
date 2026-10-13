@@ -17,6 +17,7 @@ from shared import (
     db, manager, get_current_active_user, get_company_settings, get_next_transaction_id,
     parse_datetime_value, round_money
 )
+from routers.invoices import sync_invoice_with_movement, find_invoice_of_movement
 
 api_router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -760,6 +761,10 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     update_data['user_name'] = existing['user_name']
     update_data['billed'] = existing.get('billed', False)
     update_data['billed_at'] = existing.get('billed_at')
+    # Vínculo com a fatura: sem isso o replace_one abaixo apagava o invoice_id
+    # de toda movimentação faturada que fosse editada.
+    if existing.get('invoice_id') is not None:
+        update_data['invoice_id'] = existing['invoice_id']
     update_data['loading_order_id'] = existing.get('loading_order_id')
     # container_photos não faz parte de ContainerMovementCreate - sem isso, o
     # replace_one abaixo (substitui o documento inteiro) apagaria o campo
@@ -787,6 +792,10 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
 
     await db.movements.replace_one({"id": movement_id}, update_data)
 
+    # Movimentação faturada com valor alterado: a fatura acompanha.
+    if existing.get('billed') and update_data.get('service_value') != existing.get('service_value'):
+        await sync_invoice_with_movement(update_data, deleted=False, current_user=current_user)
+
     if update_data['operation_type'] == 'SAIDA':
         await _mark_segregation_retrieved(update_data['container_number'], update_data['transaction_id'])
 
@@ -794,7 +803,7 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
 
 @api_router.delete("/movements/{movement_id}")
 async def delete_movement(movement_id: str, current_user: dict = Depends(get_current_active_user)):
-    existing = await db.movements.find_one({"id": movement_id}, {"_id": 0, "billed": 1})
+    existing = await db.movements.find_one({"id": movement_id}, {"_id": 0, "id": 1, "billed": 1, "transaction_id": 1})
     if not existing:
         raise HTTPException(status_code=404, detail="Movimentação não encontrada")
 
@@ -802,10 +811,21 @@ async def delete_movement(movement_id: str, current_user: dict = Depends(get_cur
         requester = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "role": 1})
         if not requester or requester.get('role') != 'admin':
             raise HTTPException(status_code=403, detail="Movimentação já faturada não pode ser excluída. Solicite a um administrador.")
+        # Uma fatura não pode ficar sem nenhuma movimentação.
+        invoice = await find_invoice_of_movement(movement_id)
+        if invoice and len(invoice['movement_ids']) <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Esta é a única movimentação da Fatura nº {invoice['invoice_number']}. Exclua a fatura antes de excluir a movimentação."
+            )
 
     result = await db.movements.delete_one({"id": movement_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Movimentação não encontrada")
+
+    # Era faturada: sai da lista da fatura e o total é recalculado.
+    if existing.get('billed'):
+        await sync_invoice_with_movement(existing, deleted=True, current_user=current_user)
 
     # Notificar todos os clientes conectados via WebSocket
     await manager.broadcast({
