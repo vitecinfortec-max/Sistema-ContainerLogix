@@ -8,6 +8,7 @@ Servem de rede de segurança pra mexer na organização desses routers: fixam o
 comportamento visível pela API (status, campos e regras), não a forma do
 código.
 """
+from datetime import timedelta, timezone
 
 MOVEMENT = dict(
     operation_type="ENTRADA", driver_name="Motorista Um", driver_cpf="11122233344", truck_plate="AAA0A00",
@@ -196,6 +197,42 @@ class TestDashboard:
         response = api.get("/api/dashboard")
         assert response.status_code == 200, response.text
         assert response.json()["recent_movements"][0]["truck_plate"] == "CCC0C00"
+
+    def test_daily_numbers_follow_the_brasilia_day(self, api):
+        # Uma movimentação às 22:30 de ontem e outra à 00:01 de hoje, no
+        # horário de Brasília. Em UTC as duas caem no mesmo dia (hoje).
+        from reports import today_brt
+
+        today = today_brt()
+        yesterday_night = today - timedelta(minutes=90)
+        base = {**MOVEMENT, "created_by": "admin-1", "user_name": "Admin Teste", "billed": False}
+        api.run(api.db.movements.insert_many([
+            {**base, "id": "ontem", "transaction_id": 1, "container_number": "ABCU1111111",
+             "service_value": 70.0, "created_at": yesterday_night.astimezone(timezone.utc).isoformat()},
+            {**base, "id": "hoje", "transaction_id": 2, "container_number": "ABCU2222222",
+             "service_value": 30.0, "created_at": (today + timedelta(minutes=1)).astimezone(timezone.utc).isoformat()},
+        ]))
+
+        stats = api.get("/api/dashboard").json()
+        bars = {point["date"]: point["entries"] for point in stats["daily_chart"]}
+        today_key, yesterday_key = today.strftime("%Y-%m-%d"), yesterday_night.strftime("%Y-%m-%d")
+        assert stats["daily_chart"][-1]["date"] == today_key
+        assert bars[today_key] == 1
+        assert bars[yesterday_key] == 1
+        assert stats["entries_today"] == 1
+
+        billing = {point["date"]: point["unbilled"] for point in api.get("/api/reports/billing/daily-chart").json()}
+        assert billing[today_key] == 30.0
+        assert billing[yesterday_key] == 70.0
+
+    def test_other_daily_charts_end_on_the_brasilia_day(self, api):
+        from reports import today_brt
+
+        today_key = today_brt().strftime("%Y-%m-%d")
+        for path in ("/api/reports/fuel-supply/daily-chart", "/api/reports/service-orders/daily-chart",
+                     "/api/reports/port-services/daily-chart"):
+            chart = api.get(path).json()
+            assert len(chart) == 14 and chart[-1]["date"] == today_key, path
 
     def test_search(self, api):
         seed_yard(api)

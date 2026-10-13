@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from models import DailyBillingPoint
 from reports import (
+    today_brt,
     generate_pdf_report, generate_excel_report, generate_billing_pdf_report, generate_billing_excel,
     generate_storage_overage_pdf_report, generate_storage_overage_excel_report, now_brt, BRT_TZ
 )
@@ -261,7 +262,7 @@ async def _compute_storage_overage_charges(
 
 @api_router.get("/reports/billing/daily-chart", response_model=list[DailyBillingPoint])
 async def get_billing_daily_chart(current_user: dict = Depends(get_current_admin_user)):
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = today_brt()
     return await _compute_daily_billing_chart(today)
 
 

@@ -29,6 +29,16 @@ def now_brt() -> datetime:
     return datetime.now(BRT_TZ)
 
 
+# O mesmo fuso, no formato que o MongoDB aceita em $dateToString.
+BRT_OFFSET = "-03:00"
+
+
+def today_brt() -> datetime:
+    """Meia-noite de hoje em Brasília (com tzinfo) - início do "dia de hoje"
+    pra contadores e gráficos diários. Em UTC o dia virava às 21h de Brasília."""
+    return now_brt().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 def to_brt(dt_value) -> datetime | None:
     """Converte um datetime/ISO string para o fuso de Brasília.
     - Datetimes 'naive' (sem tz) são interpretados como UTC (padrão do banco).

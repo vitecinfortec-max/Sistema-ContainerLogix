@@ -2,7 +2,7 @@
 Separado de movements.py - antes ficava tudo num arquivo só.
 """
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import re
 import logging
 from urllib.parse import quote as url_quote
@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends
 
 from models import DailyMovementPoint, DailyBillingPoint, DriverRankingEntry, DashboardStats
 
+from reports import today_brt, BRT_OFFSET
 from shared import db, get_current_active_user
 from routers.frota import get_all_vehicle_maintenance_status
 from routers.fuel_supply import _compute_tank_level
@@ -67,12 +68,15 @@ async def _compute_stock_by_status() -> dict:
 
 async def _compute_daily_chart(today: datetime) -> list[DailyMovementPoint]:
     """Entradas/saídas por dia dos últimos 14 dias - agregação restrita à janela de
-    datas (usa o índice de created_at) em vez de escanear a coleção inteira."""
+    datas (usa o índice de created_at) em vez de escanear a coleção inteira. O
+    dia de cada movimentação é o dia no horário de Brasília (BRT_OFFSET), o mesmo
+    de "today" - em UTC, o que era lançado depois das 21h caía na barra do dia
+    seguinte."""
     day0 = today - timedelta(days=13)
     pipeline = [
         {"$match": _created_at_gte(day0)},
         {"$addFields": {"_day": {"$dateToString": {
-            "format": "%Y-%m-%d", "date": {"$toDate": "$created_at"}, "timezone": "UTC"
+            "format": "%Y-%m-%d", "date": {"$toDate": "$created_at"}, "timezone": BRT_OFFSET
         }}}},
         {"$group": {"_id": {"day": "$_day", "op": "$operation_type"}, "count": {"$sum": 1}}},
     ]
@@ -100,7 +104,7 @@ async def _compute_daily_billing_chart(today: datetime) -> list[DailyBillingPoin
     pipeline = [
         {"$match": {**_created_at_gte(day0), "service_value": {"$ne": None}}},
         {"$addFields": {"_day": {"$dateToString": {
-            "format": "%Y-%m-%d", "date": {"$toDate": "$created_at"}, "timezone": "UTC"
+            "format": "%Y-%m-%d", "date": {"$toDate": "$created_at"}, "timezone": BRT_OFFSET
         }}}},
         {"$group": {
             "_id": {"day": "$_day", "billed": {"$eq": ["$billed", True]}},
@@ -161,9 +165,9 @@ async def _compute_driver_ranking(first_day_of_month: datetime) -> list[DriverRa
 
 @api_router.get("/dashboard", response_model=DashboardStats)
 async def get_dashboard_stats(current_user: dict = Depends(get_current_active_user)):
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    # Início do mês atual
-    first_day_of_month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    today = today_brt()
+    # Início do mês atual (dia e mês no horário de Brasília, como "today")
+    first_day_of_month = today.replace(day=1)
 
     # Otimização: cada estatística vira uma query indexada/agregação enxuta no
     # MongoDB (executadas em paralelo) em vez de trazer a coleção inteira de

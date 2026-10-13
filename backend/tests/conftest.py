@@ -32,7 +32,7 @@ def _teach_mongomock_date_operators():
     relatórios usam pra comparar created_at (gravado como texto ISO). Aqui ele
     ganha a mesma conversão que o Mongo real faz: texto ISO ou datetime ->
     datetime em UTC."""
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     from mongomock import aggregate
 
@@ -58,13 +58,21 @@ def _teach_mongomock_date_operators():
 
     aggregate._Parser._handle_type_convertion_operator = handle
 
-    # $dateToString com "timezone": "UTC" (o padrão do Mongo, que o mongomock
-    # recusa por não implementar fusos): equivale a não informar fuso.
+    # $dateToString com "timezone" (que o mongomock recusa por não implementar
+    # fusos): "UTC" equivale a não informar; um deslocamento fixo como
+    # "-03:00" é aplicado à data antes de formatar, como o Mongo faz.
     original_date = aggregate._Parser._handle_date_operator
 
     def handle_date(self, operator, values):
-        if operator == '$dateToString' and isinstance(values, dict) and values.get('timezone') == 'UTC':
+        if operator == '$dateToString' and isinstance(values, dict) and 'timezone' in values:
+            zone = values['timezone']
             values = {k: v for k, v in values.items() if k != 'timezone'}
+            if zone != 'UTC':
+                sign = -1 if zone.startswith('-') else 1
+                hours, minutes = zone.lstrip('+-').split(':')
+                shifted = self.parse(values['date'])
+                if shifted is not None:
+                    values['date'] = shifted + sign * timedelta(hours=int(hours), minutes=int(minutes))
         return original_date(self, operator, values)
 
     aggregate._Parser._handle_date_operator = handle_date

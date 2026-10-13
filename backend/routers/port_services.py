@@ -12,6 +12,7 @@ from models import (
     PortServiceBillingBatchResponse,
 )
 from reports import (
+    today_brt,
     _build_pdf_header, _make_pdf_footer, merge_company, format_currency,
     generate_port_services_report_pdf, generate_port_services_report_excel,
     generate_port_service_invoice_pdf, generate_port_service_invoice_excel
@@ -324,7 +325,7 @@ async def _compute_daily_port_services_chart(today: datetime) -> List[DailyPortS
 
 @api_router.get("/reports/port-services/daily-chart", response_model=List[DailyPortServicePoint])
 async def get_port_services_daily_chart(current_user: dict = Depends(get_current_admin_user)):
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = today_brt()
     return await _compute_daily_port_services_chart(today)
 
 

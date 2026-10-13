@@ -11,7 +11,7 @@ from models import (
     FuelSupplyOrderCreate, FuelSupplyOrderUpdate, FuelSupplyOrderResponse, DailyFuelSupplyPoint,
     TankSettings, TankSettingsUpdate, TankRefill, TankRefillCreate, TankRefillResponse
 )
-from reports import generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel, now_brt, merge_company
+from reports import today_brt, generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel, now_brt, merge_company
 
 from shared import db, get_current_active_user, get_current_admin_user, get_company_settings
 
@@ -276,7 +276,7 @@ async def _compute_daily_fuel_supply_chart(today: datetime) -> List[DailyFuelSup
 
 @api_router.get("/reports/fuel-supply/daily-chart", response_model=List[DailyFuelSupplyPoint])
 async def get_fuel_supply_daily_chart(current_user: dict = Depends(get_current_admin_user)):
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = today_brt()
     return await _compute_daily_fuel_supply_chart(today)
 
 

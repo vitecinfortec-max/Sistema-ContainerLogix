@@ -11,6 +11,7 @@ from models import (
     OSCategoryCreate, OSCategoryResponse, DailyServiceOrderPoint
 )
 from reports import (
+    today_brt,
     generate_service_orders_report_pdf, generate_service_orders_report_excel, now_brt, merge_company
 )
 
@@ -594,7 +595,7 @@ async def _compute_daily_service_orders_chart(today: datetime) -> List[DailyServ
 
 @api_router.get("/reports/service-orders/daily-chart", response_model=List[DailyServiceOrderPoint])
 async def get_service_orders_daily_chart(current_user: dict = Depends(get_current_admin_user)):
-    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today = today_brt()
     return await _compute_daily_service_orders_chart(today)
 
 
