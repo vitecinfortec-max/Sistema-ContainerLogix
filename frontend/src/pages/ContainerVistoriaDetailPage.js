@@ -204,8 +204,10 @@ export default function ContainerVistoriaDetailPage() {
 
         {vistoria.photos && vistoria.photos.length > 0 && (
           <PrintSection title={`Fotos da Vistoria (${vistoria.photos.length})`} style={{ breakInside: 'auto', pageBreakInside: 'auto' }}>
-            {/* Fotos de 6 x 10 cm, 3 por linha: 3 x 60mm não cabem na largura
-                útil do quadro, então a grade avança 7pt sobre o recuo lateral dele */}
+            {/* 3 fotos de 6 cm de largura por linha: 3 x 60mm não cabem na largura
+                útil do quadro, então a grade avança 7pt sobre o recuo lateral dele.
+                Até 3 fotos a caixa tem 10 cm de altura; com mais, cai pra 5,6 cm, que é
+                o que deixa 2 linhas (6 fotos) por folha junto com o resto do documento */}
             <div style={{ margin: '0 -7pt' }}>
               <PrintPhotoGrid
                 photos={vistoria.photos}
@@ -214,6 +216,8 @@ export default function ContainerVistoriaDetailPage() {
                 columns={3}
                 imageWidth="60mm"
                 imageHeight="100mm"
+                compactImageHeight="56mm"
+                compactFromRows={2}
               />
             </div>
           </PrintSection>
