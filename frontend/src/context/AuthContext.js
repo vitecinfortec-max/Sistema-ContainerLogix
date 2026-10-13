@@ -61,6 +61,14 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
+  // Troca o token da sessão em andamento - a troca de senha encerra o token
+  // antigo no backend e devolve um novo.
+  const updateToken = (newToken) => {
+    sessionStorage.setItem('token', newToken);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    setToken(newToken);
+  };
+
   const logout = () => {
     sessionStorage.removeItem('token');
     setToken(null);
@@ -69,7 +77,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, logout, loading, token, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, setUser, login, logout, updateToken, loading, token, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

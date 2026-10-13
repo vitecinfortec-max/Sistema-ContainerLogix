@@ -110,12 +110,30 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 
-async def get_current_active_user(current_user: dict = Depends(get_current_user)) -> dict:
-    """Confirma que o usuário do token ainda existe na base. Sem isso, apagar um
-    usuário (ex: funcionário desligado) não revoga o acesso dele até o token
-    expirar sozinho (até 7 dias) — o token continuava sendo aceito só por
-    decodificar certo, sem checar se a conta por trás dele ainda existe."""
-    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "id": 1, "active": 1})
+# Quem ainda precisa trocar a senha provisória só alcança o necessário pra
+# trocá-la (e o que o app carrega antes de chegar nessa tela).
+_PASSWORD_CHANGE_ALLOWED_PREFIXES = ("/api/auth/", "/api/module-config")
+
+
+def session_is_current(payload: dict, user_doc: dict) -> bool:
+    """False quando o token foi emitido antes da última troca de senha da
+    conta: trocar a senha (ou entrar com uma senha provisória) encerra as
+    sessões que já estavam abertas. Cada troca soma 1 em password_version, e
+    o token carrega a versão que valia quando foi emitido ("pv"). Contas que
+    nunca trocaram de senha e tokens antigos (sem "pv") contam como versão 0,
+    então ninguém é deslogado só por esta checagem ter passado a existir."""
+    return (payload.get('pv') or 0) == (user_doc.get('password_version') or 0)
+
+
+async def _load_session_user(request: Request, current_user: dict, extra_fields: dict) -> dict:
+    """Checagens comuns a toda rota autenticada. O token sozinho só prova que
+    foi emitido por este sistema - aqui se confirma que a conta ainda existe,
+    está ativa, não trocou de senha depois de o token ser emitido e não está
+    com troca de senha obrigatória pendente."""
+    user_doc = await db.users.find_one(
+        {"id": current_user['sub']},
+        {"_id": 0, "id": 1, "active": 1, "password_version": 1, "must_change_password": 1, **extra_fields},
+    )
     if not user_doc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -128,48 +146,37 @@ async def get_current_active_user(current_user: dict = Depends(get_current_user)
             detail="Acesso desativado por um administrador",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if not session_is_current(current_user, user_doc):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessão encerrada: a senha desta conta foi alterada. Entre novamente.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user_doc.get('must_change_password') and not request.url.path.startswith(_PASSWORD_CHANGE_ALLOWED_PREFIXES):
+        raise HTTPException(status_code=403, detail="Troque sua senha provisória para continuar usando o sistema")
+    return user_doc
+
+
+async def get_current_active_user(request: Request, current_user: dict = Depends(get_current_user)) -> dict:
+    """Dependência de toda rota autenticada - ver _load_session_user."""
+    await _load_session_user(request, current_user, {})
     return current_user
 
 
-async def get_current_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
-    """Dependência para endpoints restritos ao perfil admin (módulo Financeiro).
-    Também confirma que o usuário ainda existe, pela mesma razão de get_current_active_user."""
-    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "role": 1, "active": 1})
-    if not user_doc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não encontrado ou removido",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if user_doc.get('active') is False:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Acesso desativado por um administrador",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+async def get_current_admin_user(request: Request, current_user: dict = Depends(get_current_user)) -> dict:
+    """Dependência para endpoints restritos ao perfil admin (módulo Financeiro)."""
+    user_doc = await _load_session_user(request, current_user, {"role": 1})
     if user_doc.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Acesso restrito a administradores")
     return current_user
 
 
-async def get_current_superadmin_user(current_user: dict = Depends(get_current_user)) -> dict:
+async def get_current_superadmin_user(request: Request, current_user: dict = Depends(get_current_user)) -> dict:
     """Dependência para endpoints restritos ao dono do sistema (ex: liberar/bloquear
     módulos contratados por um cliente). is_superadmin nunca é exposto em nenhum
     endpoint de edição de usuário - só pode ser setado direto no banco - então
     o admin comum de um cliente nunca consegue se autopromover a isso."""
-    user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "is_superadmin": 1, "active": 1})
-    if not user_doc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não encontrado ou removido",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    if user_doc.get('active') is False:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Acesso desativado por um administrador",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    user_doc = await _load_session_user(request, current_user, {"is_superadmin": 1})
     if not user_doc.get('is_superadmin'):
         raise HTTPException(status_code=403, detail="Acesso restrito ao proprietário do sistema")
     return current_user

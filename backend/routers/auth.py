@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -32,6 +32,29 @@ import string
 resend.api_key = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
 
+TEMP_PASSWORD_VALIDITY = timedelta(hours=1)
+
+
+def _session_token(user_doc: dict) -> str:
+    """Token de sessão. "pv" é a versão da senha no momento da emissão - ver
+    session_is_current em shared.py."""
+    return create_access_token(data={
+        "sub": user_doc['id'], "email": user_doc['email'], "name": user_doc['name'],
+        "pv": user_doc.get('password_version') or 0,
+    })
+
+
+def _temp_password_matches(user_doc: dict, password: str) -> bool:
+    """A senha digitada é a provisória enviada por e-mail, ainda na validade?"""
+    temp_hash = user_doc.get('temp_password_hash')
+    expires_at = user_doc.get('temp_password_expires_at')
+    if not temp_hash or not expires_at:
+        return False
+    if datetime.now(timezone.utc) >= datetime.fromisoformat(expires_at):
+        return False
+    return verify_password(password, temp_hash)
+
+
 def generate_temp_password(length=8):
     """Gera uma senha temporária aleatória"""
     chars = string.ascii_letters + string.digits
@@ -55,16 +78,14 @@ async def forgot_password(request: ForgotPasswordRequest, http_request: Request)
         # Não revelamos se o email existe ou não (segurança)
         return {"message": "Se o email estiver cadastrado, você receberá uma senha provisória."}
     
-    # Gerar senha provisória
+    # Gerar senha provisória. Ela NÃO substitui a senha atual: fica guardada
+    # à parte, com validade, e só passa a valer se alguém entrar com ela (o
+    # que prova acesso ao e-mail da conta). Antes este pedido já trocava a
+    # senha na hora - qualquer pessoa que soubesse o e-mail de um usuário
+    # conseguia derrubar o acesso dele, e se o envio do e-mail falhasse a
+    # conta ficava sem nenhuma senha conhecida.
     temp_password = generate_temp_password()
-    hashed_password = get_password_hash(temp_password)
-    
-    # Atualizar no banco com flag must_change_password
-    await db.users.update_one(
-        {"email": request.email},
-        {"$set": {"password": hashed_password, "must_change_password": True}}
-    )
-    
+
     # Enviar email com senha provisória
     try:
         html_content = f"""
@@ -104,6 +125,15 @@ async def forgot_password(request: ForgotPasswordRequest, http_request: Request)
         
         # Enviar email de forma assíncrona
         await asyncio.to_thread(resend.Emails.send, params)
+
+        # Só depois de o e-mail ter saído é que a senha provisória é guardada.
+        await db.users.update_one(
+            {"email": request.email},
+            {"$set": {
+                "temp_password_hash": get_password_hash(temp_password),
+                "temp_password_expires_at": (datetime.now(timezone.utc) + TEMP_PASSWORD_VALIDITY).isoformat(),
+            }}
+        )
         
     except Exception as e:
         logging.error(f"Erro ao enviar email de recuperação: {e}")
@@ -126,14 +156,25 @@ async def change_password(request: ChangePasswordRequest, current_user: dict = D
     if len(request.new_password) < 6:
         raise HTTPException(status_code=400, detail="A nova senha deve ter ao menos 6 caracteres")
 
-    # Atualizar senha e remover flag must_change_password
+    # Atualizar senha e remover flag must_change_password. A nova
+    # password_version encerra todas as sessões abertas antes deste momento (inclusive a de
+    # quem estiver usando a conta sem autorização); quem acabou de trocar a
+    # senha recebe um token novo pra continuar logado.
     new_hashed_password = get_password_hash(request.new_password)
+    password_version = (user_doc.get('password_version') or 0) + 1
     await db.users.update_one(
         {"id": current_user['sub']},
-        {"$set": {"password": new_hashed_password, "must_change_password": False}}
+        {
+            "$set": {
+                "password": new_hashed_password,
+                "must_change_password": False,
+                "password_version": password_version,
+            },
+            "$unset": {"temp_password_hash": "", "temp_password_expires_at": ""},
+        }
     )
-    
-    return {"message": "Senha alterada com sucesso"}
+    access_token = _session_token({**user_doc, "password_version": password_version})
+    return {"message": "Senha alterada com sucesso", "access_token": access_token, "token_type": "bearer"}
 
 @api_router.post("/auth/login", response_model=Token)
 async def login(credentials: UserLogin, http_request: Request):
@@ -145,12 +186,28 @@ async def login(credentials: UserLogin, http_request: Request):
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
     if not verify_password(credentials.password, user_doc['password']):
-        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
+        if not _temp_password_matches(user_doc, credentials.password):
+            raise HTTPException(status_code=401, detail="Email ou senha incorretos")
+        if user_doc.get('active') is False:
+            raise HTTPException(status_code=403, detail="Acesso desativado. Fale com um administrador.")
+        # Entrou com a senha provisória do e-mail: agora sim ela vira a senha
+        # da conta (de uso único - a troca é obrigatória), e as sessões que
+        # estavam abertas com a senha antiga são encerradas.
+        promoted = {
+            "password": user_doc['temp_password_hash'],
+            "must_change_password": True,
+            "password_version": (user_doc.get('password_version') or 0) + 1,
+        }
+        await db.users.update_one(
+            {"id": user_doc['id']},
+            {"$set": promoted, "$unset": {"temp_password_hash": "", "temp_password_expires_at": ""}}
+        )
+        user_doc.update(promoted)
 
     if user_doc.get('active') is False:
         raise HTTPException(status_code=403, detail="Acesso desativado. Fale com um administrador.")
 
-    access_token = create_access_token(data={"sub": user_doc['id'], "email": user_doc['email'], "name": user_doc['name']})
+    access_token = _session_token(user_doc)
 
     user_response = UserResponse(
         id=user_doc['id'],

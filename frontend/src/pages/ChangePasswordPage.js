@@ -13,7 +13,7 @@ const API_URL = process.env.REACT_APP_BACKEND_URL;
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
-  const { user, setUser, token } = useAuth();
+  const { user, setUser, token, updateToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -38,7 +38,7 @@ export default function ChangePasswordPage() {
 
     setLoading(true);
     try {
-      await axios.post(
+      const response = await axios.post(
         `${API_URL}/api/auth/change-password`,
         {
           current_password: formData.currentPassword,
@@ -50,6 +50,12 @@ export default function ChangePasswordPage() {
       );
 
       toast.success('Senha alterada com sucesso!');
+
+      // A troca encerra as sessões anteriores (inclusive o token que esta
+      // aba estava usando) - o backend devolve um novo pra seguir logado.
+      if (response.data?.access_token) {
+        updateToken(response.data.access_token);
+      }
       
       // Atualizar o usuário para remover flag must_change_password
       if (user) {

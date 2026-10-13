@@ -16,7 +16,7 @@ from typing import Optional
 
 from shared import (
     db, client, manager, UPLOADS_DIR,
-    get_disabled_modules, match_module_for_path, is_module_disabled,
+    get_disabled_modules, match_module_for_path, is_module_disabled, session_is_current,
 )
 from auth import decode_token
 
@@ -149,8 +149,10 @@ async def _ws_session_valid(payload: dict) -> bool:
     exp = payload.get("exp")
     if exp is not None and datetime.now(timezone.utc).timestamp() >= exp:
         return False
-    user_doc = await db.users.find_one({"id": payload.get("sub")}, {"_id": 0, "id": 1, "active": 1})
-    if not user_doc or user_doc.get('active') is False:
+    user_doc = await db.users.find_one(
+        {"id": payload.get("sub")}, {"_id": 0, "id": 1, "active": 1, "password_version": 1}
+    )
+    if not user_doc or user_doc.get('active') is False or not session_is_current(payload, user_doc):
         return False
     return not is_module_disabled(_WS_MODULE_KEY, await get_disabled_modules())
 
