@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, Literal, List
+import re
 from datetime import datetime, timezone
 import uuid
 
@@ -451,6 +452,9 @@ class ContainerMovement(BaseModel):
     container_photos: Optional[dict] = None  # Fotos do container (frente, traseira, esquerda, direita) - upload removido da UI, mantido só por compatibilidade com registros antigos
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres não cobertas pelas opções de avaria
+    container_value: Optional[float] = None  # Valor do container, informado na Entrada e herdado pela Saída (não aparece na impressão)
+    container_value_currency: str = "BRL"  # Moeda do valor do container: BRL ou USD
+    manufacture_date: Optional[str] = None  # Fabricação do container, mês/ano no formato AAAA-MM
     loading_order_id: Optional[str] = None  # Vinculo com a Ordem de Carregamento que gerou essa movimentação (interno, nunca vem do formulário)
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
@@ -486,6 +490,24 @@ class ContainerMovementCreate(BaseModel):
     container_photos: Optional[dict] = None  # Fotos do container
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres
+    # Informados na Entrada (container cheio ou vazio); a Saída herda os da
+    # entrada em aberto quando não são enviados - ver _inherit_from_open_entry
+    # em routers/movements.py.
+    container_value: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)  # Valor do container
+    container_value_currency: Literal["BRL", "USD"] = "BRL"  # Moeda do valor do container
+    manufacture_date: Optional[str] = None  # Fabricação do container, mês/ano (AAAA-MM)
+
+    @field_validator('manufacture_date')
+    @classmethod
+    def _validate_manufacture_date(cls, value: Optional[str]) -> Optional[str]:
+        value = (value or '').strip()
+        if not value:
+            return None
+        # Aceita também uma data completa (AAAA-MM-DD) e guarda só mês/ano
+        value = value[:7]
+        if not re.fullmatch(r'(19|20)\d{2}-(0[1-9]|1[0-2])', value):
+            raise ValueError('Data de fabricação inválida: use mês e ano (AAAA-MM)')
+        return value
 
     # A trava de duplicidade e a Segregação de Unidade buscam o container por
     # strip().upper() - gravar o texto como veio do formulário deixava um
@@ -527,6 +549,9 @@ class ContainerMovementResponse(BaseModel):
     container_photos: Optional[dict] = None  # Fotos do container
     container_damages: List[str] = []  # Vistoria: avarias constatadas (ou ["SEM_AVARIA"])
     inspection_notes: Optional[str] = None  # Vistoria: observações livres
+    container_value: Optional[float] = None  # Valor do container
+    container_value_currency: str = "BRL"  # Moeda do valor do container
+    manufacture_date: Optional[str] = None  # Fabricação do container (AAAA-MM)
     loading_order_id: Optional[str] = None  # Vinculo com a Ordem de Carregamento que gerou essa movimentação
     billed: bool = False  # Indica se foi faturado
     billed_at: Optional[datetime] = None  # Data/hora do faturamento

@@ -421,3 +421,89 @@ class TestServerSidePagination:
         self.seed(api)
         data = self.page(api, page=9)
         assert data["items"] == [] and data["total"] == 24 and data["pages"] == 3
+
+
+# ---------- Valor do container e data de fabricação ----------
+
+class TestContainerValueAndManufactureDate:
+    ENTRY = {"container_value": 12500.5, "container_value_currency": "USD", "manufacture_date": "2019-05"}
+
+    def test_entry_stores_both_fields(self, api):
+        created = create(api, **self.ENTRY)
+        fetched = api.get(f"/api/movements/{created['id']}").json()
+        for field, value in self.ENTRY.items():
+            assert created[field] == fetched[field] == value, field
+
+    def test_both_fields_are_optional(self, api):
+        created = create(api)
+        assert created["container_value"] is None
+        assert created["manufacture_date"] is None
+        assert created["container_value_currency"] == "BRL"
+
+    def test_empty_status_entry_also_stores_them(self, api):
+        created = create(api, status="VAZIO", **self.ENTRY)
+        assert created["container_value"] == 12500.5 and created["manufacture_date"] == "2019-05"
+
+    def test_exit_pulls_the_values_saved_on_the_entry(self, api):
+        create(api, **self.ENTRY)
+        exit_movement = create(api, operation_type="SAIDA")
+        for field, value in self.ENTRY.items():
+            assert exit_movement[field] == value, field
+
+    def test_values_pulled_from_the_entry_are_locked_on_the_exit(self, api):
+        create(api, **self.ENTRY)
+        exit_movement = create(
+            api, operation_type="SAIDA", container_value=1, container_value_currency="BRL", manufacture_date="2001-01",
+        )
+        for field, value in self.ENTRY.items():
+            assert exit_movement[field] == value, field
+
+        # Editar a saída também não consegue trocar o que veio da entrada.
+        edited = api.put(f"/api/movements/{exit_movement['id']}", json={
+            **MOVEMENT, "operation_type": "SAIDA", "container_value": 2, "manufacture_date": "2002-02",
+        }).json()
+        for field, value in self.ENTRY.items():
+            assert edited[field] == value, field
+
+    def test_what_the_entry_left_blank_can_be_filled_on_the_exit(self, api):
+        create(api, manufacture_date="2019-05")
+        exit_movement = create(api, operation_type="SAIDA", container_value=900, container_value_currency="USD")
+        assert exit_movement["manufacture_date"] == "2019-05"
+        assert exit_movement["container_value"] == 900 and exit_movement["container_value_currency"] == "USD"
+
+    def test_exit_without_entry_keeps_what_was_typed(self, api):
+        exit_movement = create(api, operation_type="SAIDA", container_value=700, manufacture_date="2015-11")
+        assert exit_movement["container_value"] == 700 and exit_movement["manufacture_date"] == "2015-11"
+
+    def test_exit_uses_the_latest_entry_of_the_container(self, api):
+        create(api, container_value=100, manufacture_date="2010-01")
+        create(api, operation_type="SAIDA")
+        create(api, container_value=250, manufacture_date="2010-01")
+        assert create(api, operation_type="SAIDA")["container_value"] == 250
+
+    def test_entry_can_be_corrected_later(self, api):
+        entry = create(api, **self.ENTRY)
+        edited = api.put(f"/api/movements/{entry['id']}", json={**MOVEMENT, "container_value": 9000, "manufacture_date": "2020-12"})
+        assert edited.status_code == 200, edited.text
+        assert edited.json()["container_value"] == 9000 and edited.json()["manufacture_date"] == "2020-12"
+
+    def test_quick_exit_inherits_them(self, api):
+        entry = create(api, **self.ENTRY)
+        response = api.post("/api/yard-control/quick-exit", json={"entry_movement_id": entry["id"]})
+        assert response.status_code == 200, response.text
+        exit_movement = api.get("/api/movements", params={"operation_type": "SAIDA"}).json()[0]
+        assert exit_movement["container_value"] == 12500.5 and exit_movement["manufacture_date"] == "2019-05"
+
+    def test_open_entry_lookup_returns_them_for_the_form(self, api):
+        create(api, **self.ENTRY)
+        entry = api.get("/api/movements/open-entry/ABCU1234567").json()["entry"]
+        assert entry["container_value"] == 12500.5 and entry["manufacture_date"] == "2019-05"
+
+    def test_validation(self, api):
+        assert api.post("/api/movements", json={**MOVEMENT, "container_value": -1}).status_code == 422
+        assert api.post("/api/movements", json={**MOVEMENT, "container_value_currency": "EUR"}).status_code == 422
+        assert api.post("/api/movements", json={**MOVEMENT, "manufacture_date": "05/2019"}).status_code == 422
+        assert api.post("/api/movements", json={**MOVEMENT, "manufacture_date": "2019-13"}).status_code == 422
+        # Data completa é aceita e guardada como mês/ano; texto vazio vira "não informado".
+        assert create(api, manufacture_date="2019-05-17")["manufacture_date"] == "2019-05"
+        assert create(api, container_number="ABCU2222222", manufacture_date="")["manufacture_date"] is None

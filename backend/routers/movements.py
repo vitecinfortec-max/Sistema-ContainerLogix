@@ -60,6 +60,9 @@ def _movement_response(m: dict) -> ContainerMovementResponse:
         container_photos=m.get('container_photos'),
         container_damages=m.get('container_damages') or [],
         inspection_notes=m.get('inspection_notes'),
+        container_value=m.get('container_value'),
+        container_value_currency=m.get('container_value_currency') or 'BRL',
+        manufacture_date=m.get('manufacture_date'),
         loading_order_id=m.get('loading_order_id'),
         billed=m.get('billed', False),
         billed_at=parse_datetime_value(m['billed_at']) if m.get('billed_at') else None,
@@ -235,6 +238,41 @@ async def _mark_segregation_retrieved(container_number: str, transaction_id: int
     )
 
 
+async def _inherit_from_open_entry(movement_input: ContainerMovementCreate, before: Optional[str] = None) -> dict:
+    """Valor do container e data de fabricação são informados na Entrada
+    (opcionais). Numa Saída, o que a entrada do container tiver preenchido
+    vale e fica travado: o que vier no pedido pra esses campos é ignorado. Só
+    o que a entrada deixou em branco pode ser informado na própria saída.
+    Aplicado em todo caminho que grava uma saída (Emissão e edição de EIR,
+    saída rápida do Controle de Pátio e Ordem de Carregamento), não só no
+    formulário, que mostra os campos puxados já bloqueados.
+    `before`: created_at da saída que está sendo editada - a entrada dela é a
+    última anterior a esse momento."""
+    values = {
+        "container_value": movement_input.container_value,
+        "container_value_currency": movement_input.container_value_currency,
+        "manufacture_date": movement_input.manufacture_date,
+    }
+    if movement_input.operation_type != 'SAIDA':
+        return values
+    query = {"container_number": movement_input.container_number, "operation_type": "ENTRADA"}
+    if before:
+        query["created_at"] = {"$lt": before}
+    entry = await db.movements.find_one(
+        query,
+        {"_id": 0, "container_value": 1, "container_value_currency": 1, "manufacture_date": 1},
+        sort=[("created_at", -1)]
+    )
+    if not entry:
+        return values
+    if entry.get("container_value") is not None:
+        values["container_value"] = entry["container_value"]
+        values["container_value_currency"] = entry.get("container_value_currency") or "BRL"
+    if entry.get("manufacture_date"):
+        values["manufacture_date"] = entry["manufacture_date"]
+    return values
+
+
 @asynccontextmanager
 async def _container_movement_lock(container_number: str):
     """Reserva o container no banco enquanto uma movimentação dele é
@@ -303,6 +341,8 @@ async def _create_container_movement_locked(
     if segregation_error:
         raise HTTPException(status_code=400, detail=segregation_error)
 
+    inherited = await _inherit_from_open_entry(movement_input)
+
     # Usar contador atômico para garantir sequência única
     next_transaction_id = await get_next_transaction_id()
 
@@ -334,6 +374,9 @@ async def _create_container_movement_locked(
         container_photos=movement_input.container_photos,
         container_damages=movement_input.container_damages,
         inspection_notes=movement_input.inspection_notes,
+        container_value=round_money(inherited['container_value']),
+        container_value_currency=inherited['container_value_currency'],
+        manufacture_date=inherited['manufacture_date'],
         loading_order_id=loading_order_id,
         created_by=current_user['sub'],
         user_name=current_user['name']
@@ -836,6 +879,11 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     # Arredondar valor monetário para evitar problemas de precisão
     if update_data.get('service_value') is not None:
         update_data['service_value'] = round_money(update_data['service_value'])
+
+    # Numa Saída, valor do container e data de fabricação seguem os da
+    # entrada (travados) - mesma regra da criação.
+    update_data.update(await _inherit_from_open_entry(movement_input, before=str(existing['created_at'])))
+    update_data['container_value'] = round_money(update_data['container_value'])
 
     # Mesma trava #1 da Segregação de Unidade aplicada na criação
     # (_create_container_movement) - editar uma EIR também pode trocar
