@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { FormActions } from '../components/FormKit';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -11,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Loader2, Plus, Camera, Upload, X } from 'lucide-react';
+import { Save, Loader2, Plus, Camera, Upload, X, ClipboardCheck } from 'lucide-react';
 import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
@@ -239,30 +241,27 @@ export default function EditContainerInspectionPage() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto" data-testid="edit-container-inspection-page">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => navigate(`/container-inspections/${id}`)} data-testid="back-btn">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              Editar Registro Fotográfico #{inspectionNumber}
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Edite as informações do registro fotográfico de container</p>
-          </div>
+      <div className="max-w-5xl mx-auto" data-testid="edit-container-inspection-page">
+        <div className="mb-4">
+          <PageHeader
+            icon={ClipboardCheck}
+            title={<>Editar Registro Fotográfico #{inspectionNumber}</>}
+            subtitle="Edite as informações do registro fotográfico de container"
+            backTo={`/container-inspections/${id}`}
+            backTestId="back-btn"
+          />
         </div>
 
         <form onSubmit={handleSubmit}>
           {/* Informações do Container */}
-          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Container</CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="container_number">Número do Container *</Label>
+                  <Label htmlFor="container_number" className="mb-1.5 block">Número do Container *</Label>
                   <Input
                     id="container_number"
                     value={formData.container_number}
@@ -274,7 +273,7 @@ export default function EditContainerInspectionPage() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="container_seal">Lacre</Label>
+                  <Label htmlFor="container_seal" className="mb-1.5 block">Lacre</Label>
                   <Input
                     id="container_seal"
                     value={formData.container_seal}
@@ -284,7 +283,7 @@ export default function EditContainerInspectionPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="size_type">Tamanho/Tipo</Label>
+                  <Label htmlFor="size_type" className="mb-1.5 block">Tamanho/Tipo</Label>
                   <Select value={formData.size_type} onValueChange={(value) => handleInputChange('size_type', value)}>
                     <SelectTrigger id="size_type" data-testid="size-type-select">
                       <SelectValue />
@@ -304,7 +303,7 @@ export default function EditContainerInspectionPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="collection_terminal">Terminal de Coleta</Label>
+                  <Label htmlFor="collection_terminal" className="mb-1.5 block">Terminal de Coleta</Label>
                   <Input
                     id="collection_terminal"
                     value={formData.collection_terminal}
@@ -314,7 +313,7 @@ export default function EditContainerInspectionPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="origin_terminal">Terminal de Origem</Label>
+                  <Label htmlFor="origin_terminal" className="mb-1.5 block">Terminal de Origem</Label>
                   <Autocomplete
                     value={formData.origin_terminal}
                     onChange={(v) => handleInputChange('origin_terminal', v)}
@@ -325,7 +324,7 @@ export default function EditContainerInspectionPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="booking">Booking</Label>
+                  <Label htmlFor="booking" className="mb-1.5 block">Booking</Label>
                   <Input
                     id="booking"
                     value={formData.booking}
@@ -335,7 +334,7 @@ export default function EditContainerInspectionPage() {
                 </div>
                 
                 <div className="relative">
-                  <Label htmlFor="client">Cliente</Label>
+                  <Label htmlFor="client" className="mb-1.5 block">Cliente</Label>
                   <Input
                     id="client"
                     value={clientSearch}
@@ -366,7 +365,7 @@ export default function EditContainerInspectionPage() {
                 </div>
                 
                 <div className="relative">
-                  <Label htmlFor="shipping_line">Armador</Label>
+                  <Label htmlFor="shipping_line" className="mb-1.5 block">Armador</Label>
                   <Input
                     id="shipping_line"
                     value={shippingLineSearch}
@@ -398,7 +397,7 @@ export default function EditContainerInspectionPage() {
               </div>
               
               <div>
-                <Label htmlFor="observations">Observações</Label>
+                <Label htmlFor="observations" className="mb-1.5 block">Observações</Label>
                 <Textarea
                   id="observations"
                   value={formData.observations}
@@ -411,7 +410,7 @@ export default function EditContainerInspectionPage() {
           </Card>
 
           {/* Itens de Vistoria */}
-          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Itens de Vistoria</CardTitle>
             </CardHeader>
@@ -434,7 +433,7 @@ export default function EditContainerInspectionPage() {
               {!noDamage && (
                 <>
                   <div>
-                    <Label className="mb-2 block">Marque os itens com avaria</Label>
+                    <Label className="mb-1.5 block">Marque os itens com avaria</Label>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {Array.from(new Set([...SUGGESTED_INSPECTION_ITEMS, ...damageItems])).map(item => (
                         <div key={item} className="flex items-center gap-2">
@@ -453,7 +452,7 @@ export default function EditContainerInspectionPage() {
 
                   <div className="flex items-end gap-2">
                     <div className="flex-1">
-                      <Label htmlFor="custom_item">Adicionar item personalizado</Label>
+                      <Label htmlFor="custom_item" className="mb-1.5 block">Adicionar item personalizado</Label>
                       <Input
                         id="custom_item"
                         value={customItem}
@@ -477,7 +476,7 @@ export default function EditContainerInspectionPage() {
           </Card>
 
           {/* Fotos do Container */}
-          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                 <Camera className="w-4 h-4 text-primary" />
@@ -491,7 +490,7 @@ export default function EditContainerInspectionPage() {
 
               <div className="flex flex-wrap items-end gap-2 mb-4">
                 <div className="w-56">
-                  <Label htmlFor="new_photo_type">Tipo da foto</Label>
+                  <Label htmlFor="new_photo_type" className="mb-1.5 block">Tipo da foto</Label>
                   <Select value={newPhotoType} onValueChange={setNewPhotoType}>
                     <SelectTrigger id="new_photo_type" data-testid="new-photo-type-select">
                       <SelectValue />
@@ -565,7 +564,7 @@ export default function EditContainerInspectionPage() {
           </Card>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4">
+          <FormActions>
             <Button
               type="button"
               variant="outline"
@@ -586,7 +585,7 @@ export default function EditContainerInspectionPage() {
                 </>
               )}
             </Button>
-          </div>
+          </FormActions>
         </form>
       </div>
     </Layout>

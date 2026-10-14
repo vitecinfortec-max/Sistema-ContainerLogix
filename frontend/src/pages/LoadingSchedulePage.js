@@ -1,3 +1,4 @@
+import { FormSectionTitle } from '../components/FormKit';
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -443,10 +444,10 @@ export default function LoadingSchedulePage() {
           <div className="space-y-6">
             {/* Cabeçalho - Clientes */}
             <div className="bg-muted/50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-4">Informações da Programação</h3>
+              <FormSectionTitle className="mb-4">Informações da Programação</FormSectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Cliente Contratante *</Label>
+                  <Label className="mb-1.5 block">Cliente Contratante *</Label>
                   <Autocomplete
                     value={formData.contracting_client_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, contracting_client_name: val, contracting_client_id: '' }))}
@@ -457,7 +458,7 @@ export default function LoadingSchedulePage() {
                   />
                 </div>
                 <div>
-                  <Label>Cliente Destino *</Label>
+                  <Label className="mb-1.5 block">Cliente Destino *</Label>
                   <Autocomplete
                     value={formData.destination_client_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, destination_client_name: val, destination_client_id: '' }))}
@@ -468,14 +469,14 @@ export default function LoadingSchedulePage() {
                   />
                 </div>
                 <div>
-                  <Label>Booking</Label>
+                  <Label className="mb-1.5 block">Booking</Label>
                   <Input 
                     value={formData.booking} 
                     onChange={(e) => setFormData(prev => ({ ...prev, booking: e.target.value.toUpperCase() }))} 
                   />
                 </div>
                 <div>
-                  <Label>Viagem</Label>
+                  <Label className="mb-1.5 block">Viagem</Label>
                   <Input
                     value={formData.voyage}
                     onChange={(e) => setFormData(prev => ({ ...prev, voyage: e.target.value.toUpperCase() }))}
@@ -487,7 +488,7 @@ export default function LoadingSchedulePage() {
             {/* Itens da Programação */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Itens da Programação</h3>
+                <FormSectionTitle bare>Itens da Programação</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
                   <Plus className="w-4 h-4 mr-1" /> Adicionar Item
                 </Button>
@@ -505,7 +506,7 @@ export default function LoadingSchedulePage() {
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
-                        <Label className="text-xs mb-1 block">Tipo *</Label>
+                        <Label className="mb-1.5 block">Tipo *</Label>
                         <Select value={item.operation_type} onValueChange={(v) => handleItemChange(index, 'operation_type', v)}>
                           <SelectTrigger className="h-9">
                             <SelectValue />
@@ -517,7 +518,7 @@ export default function LoadingSchedulePage() {
                         </Select>
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Motorista *</Label>
+                        <Label className="mb-1.5 block">Motorista *</Label>
                         <Autocomplete
                           value={item.driver_name}
                           onChange={(val) => handleItemChange(index, 'driver_name', val)}
@@ -532,11 +533,11 @@ export default function LoadingSchedulePage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">CPF</Label>
+                        <Label className="mb-1.5 block">CPF</Label>
                         <Input className="h-9" value={item.driver_cpf} onChange={(e) => handleItemChange(index, 'driver_cpf', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Cavalo *</Label>
+                        <Label className="mb-1.5 block">Cavalo *</Label>
                         <Autocomplete
                           value={item.cavalo_plate}
                           onChange={(val) => handleItemChange(index, 'cavalo_plate', val.toUpperCase())}
@@ -549,7 +550,7 @@ export default function LoadingSchedulePage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Carreta</Label>
+                        <Label className="mb-1.5 block">Carreta</Label>
                         <Autocomplete
                           value={item.carreta_plate}
                           onChange={(val) => handleItemChange(index, 'carreta_plate', val.toUpperCase())}
@@ -562,15 +563,15 @@ export default function LoadingSchedulePage() {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <Label className="text-xs mb-1 block">Local de Carregamento *</Label>
+                        <Label className="mb-1.5 block">Local de Carregamento *</Label>
                         <Input className="h-9" value={item.loading_location} onChange={(e) => handleItemChange(index, 'loading_location', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Data *</Label>
+                        <Label className="mb-1.5 block">Data *</Label>
                         <Input className="h-9" type="date" value={item.loading_date} onChange={(e) => handleItemChange(index, 'loading_date', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Nº Container</Label>
+                        <Label className="mb-1.5 block">Nº Container</Label>
                         <Input
                           className="h-9"
                           value={item.container_number}
@@ -579,12 +580,12 @@ export default function LoadingSchedulePage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Lacre</Label>
+                        <Label className="mb-1.5 block">Lacre</Label>
                         <Input className="h-9" value={item.seal_number} onChange={(e) => handleItemChange(index, 'seal_number', e.target.value.toUpperCase())} />
                       </div>
                       {(formData.contracting_client_name === BAG_NUMBER_CLIENT_NAME || formData.destination_client_name === BAG_NUMBER_CLIENT_NAME) && (
                         <div>
-                          <Label className="text-xs mb-1 block">Nº da Bolsa</Label>
+                          <Label className="mb-1.5 block">Nº da Bolsa</Label>
                           <Input
                             className="h-9"
                             value={item.bag_number}
@@ -602,7 +603,7 @@ export default function LoadingSchedulePage() {
 
             {/* Observações */}
             <div>
-              <Label>Observações</Label>
+              <Label className="mb-1.5 block">Observações</Label>
               <Input value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} />
             </div>
           </div>

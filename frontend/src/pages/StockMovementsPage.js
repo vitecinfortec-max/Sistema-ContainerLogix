@@ -496,7 +496,7 @@ export default function StockMovementsPage() {
                 <Field label="Nota Fiscal" value={form.nfe_number} onChange={(v) => onChange('nfe_number', v)} testid="stock-movement-nfe" />
                 <Field type="number" label="Valor Nota Fiscal" value={form.nfe_value} onChange={(v) => onChange('nfe_value', v)} testid="stock-movement-nfe-value" />
                 <div>
-                  <Label className="mb-1 block">Almoxarifado *</Label>
+                  <Label className="mb-1.5 block">Almoxarifado *</Label>
                   <OptionAutocomplete
                     value={form.warehouse_id}
                     onChange={(v) => {
@@ -509,7 +509,7 @@ export default function StockMovementsPage() {
                   />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Fornecedor</Label>
+                  <Label className="mb-1.5 block">Fornecedor</Label>
                   <OptionAutocomplete
                     value={form.supplier_id}
                     onChange={(v) => {
@@ -522,7 +522,7 @@ export default function StockMovementsPage() {
                   />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Finalidade</Label>
+                  <Label className="mb-1.5 block">Finalidade</Label>
                   <Autocomplete
                     value={form.purpose_text}
                     onChange={onPurposeChange}
@@ -538,7 +538,7 @@ export default function StockMovementsPage() {
                 <Field label="Conta Lançamento" value={form.account_entry} onChange={(v) => onChange('account_entry', v)} testid="stock-movement-account" />
               </div>
               <div>
-                <Label className="mb-1 block">Observações</Label>
+                <Label className="mb-1.5 block">Observações</Label>
                 <Textarea value={form.observations ?? ''} onChange={(e) => onChange('observations', e.target.value)} className="text-sm min-h-[70px]" data-testid="stock-movement-obs" />
               </div>
             </TabsContent>
@@ -563,7 +563,7 @@ export default function StockMovementsPage() {
                   return (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-start p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
                     <div className="col-span-5">
-                      <Label className="text-xs mb-1 block">Produto</Label>
+                      <Label className="mb-1.5 block">Produto</Label>
                       <Autocomplete
                         value={it.product_description || ''}
                         onChange={(v) => onItemInput(idx, v)}
@@ -581,15 +581,15 @@ export default function StockMovementsPage() {
                       )}
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs mb-1 block">Qtd</Label>
+                      <Label className="mb-1.5 block">Qtd</Label>
                       <Input type="number" step="0.01" value={it.quantity ?? ''} onChange={(e) => setItem(idx, 'quantity', e.target.value)} className="h-8 text-sm text-right" data-testid={`stock-movement-item-qty-${idx}`} />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs mb-1 block">V. Unit.</Label>
+                      <Label className="mb-1.5 block">V. Unit.</Label>
                       <Input type="number" step="0.01" value={it.unit_value ?? ''} onChange={(e) => setItem(idx, 'unit_value', e.target.value)} className="h-8 text-sm text-right" data-testid={`stock-movement-item-unitvalue-${idx}`} />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs mb-1 block">Total</Label>
+                      <Label className="mb-1.5 block">Total</Label>
                       <Input value={fmtMoney(it.total_value)} readOnly className="h-8 text-sm text-right font-semibold bg-white dark:bg-slate-900" />
                     </div>
                     <div className="col-span-1 pt-5">
@@ -642,7 +642,7 @@ function buildEmpty() {
 function Field({ label, value, onChange, type = 'text', testid }) {
   return (
     <div>
-      <Label className="mb-1 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}</Label>
       <Input type={type} value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
   );
@@ -651,7 +651,7 @@ function Field({ label, value, onChange, type = 'text', testid }) {
 function SelectField({ label, value, onChange, options, testid }) {
   return (
     <div>
-      <Label className="mb-1 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}</Label>
       <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
         <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue /></SelectTrigger>
         <SelectContent>

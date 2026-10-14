@@ -373,7 +373,7 @@ export default function PortServicePage() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>Cliente *</Label>
+                <Label className="mb-1.5 block">Cliente *</Label>
                 <Autocomplete
                   value={formData.client_name}
                   onChange={(val) => setFormData(prev => ({ ...prev, client_name: val, client_id: '' }))}
@@ -384,7 +384,7 @@ export default function PortServicePage() {
                 />
               </div>
               <div>
-                <Label>Nome do Motorista *</Label>
+                <Label className="mb-1.5 block">Nome do Motorista *</Label>
                 <Autocomplete
                   value={formData.driver_name}
                   onChange={(val) => setFormData(prev => ({ ...prev, driver_name: val, driver_id: '' }))}
@@ -395,7 +395,7 @@ export default function PortServicePage() {
                 />
               </div>
               <div>
-                <Label>Placa do Cavalo *</Label>
+                <Label className="mb-1.5 block">Placa do Cavalo *</Label>
                 <Autocomplete
                   value={formData.cavalo_plate}
                   onChange={(val) => setFormData(prev => ({ ...prev, cavalo_plate: val.toUpperCase() }))}
@@ -406,7 +406,7 @@ export default function PortServicePage() {
                 />
               </div>
               <div>
-                <Label>Turno *</Label>
+                <Label className="mb-1.5 block">Turno *</Label>
                 <Select value={formData.turno} onValueChange={(v) => setFormData(prev => ({ ...prev, turno: v }))}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
@@ -418,7 +418,7 @@ export default function PortServicePage() {
                 </Select>
               </div>
               <div>
-                <Label>Data do Serviço *</Label>
+                <Label className="mb-1.5 block">Data do Serviço *</Label>
                 <Input
                   type="date"
                   className="h-9"
@@ -427,7 +427,7 @@ export default function PortServicePage() {
                 />
               </div>
               <div>
-                <Label>Valor da Operação (R$) *</Label>
+                <Label className="mb-1.5 block">Valor da Operação (R$) *</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -439,7 +439,7 @@ export default function PortServicePage() {
                 />
               </div>
               <div>
-                <Label>Horário de Entrada</Label>
+                <Label className="mb-1.5 block">Horário de Entrada</Label>
                 <Input
                   type="time"
                   className="h-9"
@@ -448,7 +448,7 @@ export default function PortServicePage() {
                 />
               </div>
               <div>
-                <Label>Horário de Saída</Label>
+                <Label className="mb-1.5 block">Horário de Saída</Label>
                 <Input
                   type="time"
                   className="h-9"
@@ -459,7 +459,7 @@ export default function PortServicePage() {
             </div>
 
             <div>
-              <Label>Observações</Label>
+              <Label className="mb-1.5 block">Observações</Label>
               <Input value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} />
             </div>
           </div>

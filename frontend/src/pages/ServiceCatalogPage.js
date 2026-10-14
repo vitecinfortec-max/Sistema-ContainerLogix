@@ -269,9 +269,9 @@ export default function ServiceCatalogPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Tipo de Família</Label>
+              <Label className="block">Tipo de Família</Label>
               <Select value={formData.family_id || '_empty'} onValueChange={(v) => handleFamilyChange(v === '_empty' ? '' : v)}>
-                <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_empty">-- Selecione --</SelectItem>
                   {families.map((f) => <SelectItem key={f.id} value={f.id} className="text-sm">{f.name}</SelectItem>)}
@@ -279,34 +279,34 @@ export default function ServiceCatalogPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Descrição *</Label>
-              <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} required className="h-10 text-[13px]" />
+              <Label className="block">Descrição *</Label>
+              <Input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} required />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Unidade</Label>
+                <Label className="block">Unidade</Label>
                 <Select value={formData.unit} onValueChange={(v) => setFormData({ ...formData, unit: v })}>
-                  <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {UNIT_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Valor</Label>
-                <Input type="number" step="0.01" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} className="h-10 text-[13px]" />
+                <Label className="block">Valor</Label>
+                <Input type="number" step="0.01" value={formData.value} onChange={(e) => setFormData({ ...formData, value: e.target.value })} />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Ativo</Label>
+              <Label className="block">Ativo</Label>
               <Select value={formData.active ? 'true' : 'false'} onValueChange={(v) => setFormData({ ...formData, active: v === 'true' })}>
-                <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {STATUS_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" className="w-full h-10 text-[13px] font-semibold" data-testid="submit-service-catalog-button" disabled={submitting}>
+            <Button type="submit" className="w-full font-semibold" data-testid="submit-service-catalog-button" disabled={submitting}>
               {submitting ? 'Salvando...' : (editId ? 'Atualizar' : 'Cadastrar')}
             </Button>
           </form>

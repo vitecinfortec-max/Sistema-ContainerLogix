@@ -95,7 +95,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
             <motion.div variants={riseIn} className="space-y-2">
-              <Label htmlFor="email" className="text-slate-700 dark:text-slate-300 font-medium">Email</Label>
+              <Label htmlFor="email" className="text-sm text-slate-700 dark:text-slate-300 font-medium">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
                 <Input
@@ -111,7 +111,7 @@ export default function LoginPage() {
             </motion.div>
 
             <motion.div variants={riseIn} className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700 dark:text-slate-300 font-medium">Senha</Label>
+              <Label htmlFor="password" className="text-sm text-slate-700 dark:text-slate-300 font-medium">Senha</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
                 <Input

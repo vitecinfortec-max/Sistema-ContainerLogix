@@ -1,3 +1,4 @@
+import { FormSectionTitle } from '../components/FormKit';
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -676,10 +677,10 @@ export default function VehicleChecklistPage() {
           <div className="space-y-6">
             {/* Informações Gerais */}
             <div className="bg-muted/50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-4">Informações Gerais</h3>
+              <FormSectionTitle className="mb-4">Informações Gerais</FormSectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label>Expedidor</Label>
+                  <Label className="mb-1.5 block">Expedidor</Label>
                   <Input
                     value={formData.expedidor}
                     onChange={(e) => setFormData(prev => ({ ...prev, expedidor: e.target.value }))}
@@ -687,31 +688,31 @@ export default function VehicleChecklistPage() {
                   />
                 </div>
                 <div>
-                  <Label>UN</Label>
+                  <Label className="mb-1.5 block">UN</Label>
                   <Input value={formData.un} onChange={(e) => setFormData(prev => ({ ...prev, un: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Cód. Agendamento</Label>
+                  <Label className="mb-1.5 block">Cód. Agendamento</Label>
                   <Input value={formData.scheduling_code} onChange={(e) => setFormData(prev => ({ ...prev, scheduling_code: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Data e Hora da Vistoria</Label>
+                  <Label className="mb-1.5 block">Data e Hora da Vistoria</Label>
                   <Input type="datetime-local" value={formData.inspection_datetime} onChange={(e) => setFormData(prev => ({ ...prev, inspection_datetime: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Endereço da UN</Label>
+                  <Label className="mb-1.5 block">Endereço da UN</Label>
                   <Input value={formData.un_address} onChange={(e) => setFormData(prev => ({ ...prev, un_address: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Telefone</Label>
+                  <Label className="mb-1.5 block">Telefone</Label>
                   <Input value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Fax</Label>
+                  <Label className="mb-1.5 block">Fax</Label>
                   <Input value={formData.fax} onChange={(e) => setFormData(prev => ({ ...prev, fax: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Cliente</Label>
+                  <Label className="mb-1.5 block">Cliente</Label>
                   <Autocomplete
                     value={formData.client_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, client_name: val, client_id: '' }))}
@@ -721,7 +722,7 @@ export default function VehicleChecklistPage() {
                   />
                 </div>
                 <div>
-                  <Label>Transportadora</Label>
+                  <Label className="mb-1.5 block">Transportadora</Label>
                   <Autocomplete
                     value={formData.transport_company_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, transport_company_name: val, transport_company_id: '' }))}
@@ -731,19 +732,19 @@ export default function VehicleChecklistPage() {
                   />
                 </div>
                 <div>
-                  <Label>Número ORP / ODP</Label>
+                  <Label className="mb-1.5 block">Número ORP / ODP</Label>
                   <Input value={formData.orp_odp_number} onChange={(e) => setFormData(prev => ({ ...prev, orp_odp_number: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Número da NF (Descarga)</Label>
+                  <Label className="mb-1.5 block">Número da NF (Descarga)</Label>
                   <Input value={formData.nf_number} onChange={(e) => setFormData(prev => ({ ...prev, nf_number: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Produto(s)</Label>
+                  <Label className="mb-1.5 block">Produto(s)</Label>
                   <Input value={formData.products_description} onChange={(e) => setFormData(prev => ({ ...prev, products_description: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Código SAP</Label>
+                  <Label className="mb-1.5 block">Código SAP</Label>
                   <Input value={formData.sap_code} onChange={(e) => setFormData(prev => ({ ...prev, sap_code: e.target.value }))} />
                 </div>
               </div>
@@ -751,10 +752,10 @@ export default function VehicleChecklistPage() {
 
             {/* Motorista e Veículo */}
             <div className="bg-muted/50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-4">Motorista e Veículo</h3>
+              <FormSectionTitle className="mb-4">Motorista e Veículo</FormSectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label>Motorista *</Label>
+                  <Label className="mb-1.5 block">Motorista *</Label>
                   <Autocomplete
                     value={formData.driver_name}
                     onChange={(val) => setFormData(prev => ({ ...prev, driver_name: val, driver_id: '' }))}
@@ -764,22 +765,22 @@ export default function VehicleChecklistPage() {
                   />
                 </div>
                 <div>
-                  <Label>CPF do Motorista</Label>
+                  <Label className="mb-1.5 block">CPF do Motorista</Label>
                   <Input value={formData.driver_cpf} onChange={(e) => setFormData(prev => ({ ...prev, driver_cpf: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Nº CNH / Categoria</Label>
+                  <Label className="mb-1.5 block">Nº CNH / Categoria</Label>
                   <div className="flex gap-2">
                     <Input value={formData.cnh_number} onChange={(e) => setFormData(prev => ({ ...prev, cnh_number: e.target.value }))} />
                     <Input value={formData.cnh_category} onChange={(e) => setFormData(prev => ({ ...prev, cnh_category: e.target.value.toUpperCase() }))} className="w-20" />
                   </div>
                 </div>
                 <div>
-                  <Label>Vencimento CNH</Label>
+                  <Label className="mb-1.5 block">Vencimento CNH</Label>
                   <Input type="date" value={formData.cnh_expiry} onChange={(e) => setFormData(prev => ({ ...prev, cnh_expiry: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Placa do Cavalo *</Label>
+                  <Label className="mb-1.5 block">Placa do Cavalo *</Label>
                   <Autocomplete
                     value={formData.cavalo_plate}
                     onChange={(val) => setFormData(prev => ({ ...prev, cavalo_plate: val.toUpperCase() }))}
@@ -789,11 +790,11 @@ export default function VehicleChecklistPage() {
                   />
                 </div>
                 <div>
-                  <Label>Ano de Fabricação do Cavalo</Label>
+                  <Label className="mb-1.5 block">Ano de Fabricação do Cavalo</Label>
                   <Input value={formData.cavalo_year} onChange={(e) => setFormData(prev => ({ ...prev, cavalo_year: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Placa Carreta 1</Label>
+                  <Label className="mb-1.5 block">Placa Carreta 1</Label>
                   <Autocomplete
                     value={formData.carreta1_plate}
                     onChange={(val) => setFormData(prev => ({ ...prev, carreta1_plate: val.toUpperCase() }))}
@@ -803,15 +804,15 @@ export default function VehicleChecklistPage() {
                   />
                 </div>
                 <div>
-                  <Label>Ano Carreta 1</Label>
+                  <Label className="mb-1.5 block">Ano Carreta 1</Label>
                   <Input value={formData.carreta1_year} onChange={(e) => setFormData(prev => ({ ...prev, carreta1_year: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Capacidade Carreta 1</Label>
+                  <Label className="mb-1.5 block">Capacidade Carreta 1</Label>
                   <Input value={formData.carreta1_capacity} onChange={(e) => setFormData(prev => ({ ...prev, carreta1_capacity: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Placa Carreta 2</Label>
+                  <Label className="mb-1.5 block">Placa Carreta 2</Label>
                   <Autocomplete
                     value={formData.carreta2_plate}
                     onChange={(val) => setFormData(prev => ({ ...prev, carreta2_plate: val.toUpperCase() }))}
@@ -821,11 +822,11 @@ export default function VehicleChecklistPage() {
                   />
                 </div>
                 <div>
-                  <Label>Ano Carreta 2</Label>
+                  <Label className="mb-1.5 block">Ano Carreta 2</Label>
                   <Input value={formData.carreta2_year} onChange={(e) => setFormData(prev => ({ ...prev, carreta2_year: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Capacidade Carreta 2</Label>
+                  <Label className="mb-1.5 block">Capacidade Carreta 2</Label>
                   <Input value={formData.carreta2_capacity} onChange={(e) => setFormData(prev => ({ ...prev, carreta2_capacity: e.target.value }))} />
                 </div>
               </div>
@@ -833,7 +834,7 @@ export default function VehicleChecklistPage() {
 
             {/* Itens do checklist */}
             <div className="space-y-4">
-              <h3 className="font-semibold">Itens de Verificação</h3>
+              <FormSectionTitle bare>Itens de Verificação</FormSectionTitle>
               {renderItemsSection('documentos', 'Documentos')}
               {renderItemsSection('vehicle_condition', 'Condições do Veículo')}
               {renderItemsSection('epi', 'EPI')}
@@ -845,7 +846,7 @@ export default function VehicleChecklistPage() {
             {/* Produtos */}
             <div className="bg-muted/50 p-4 rounded-lg">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Produtos Transportados</h3>
+                <FormSectionTitle bare>Produtos Transportados</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addProduct}>
                   <Plus className="w-4 h-4 mr-1" />
                   Adicionar Produto
@@ -872,30 +873,30 @@ export default function VehicleChecklistPage() {
 
             {/* Kit / Últimas viagens */}
             <div className="bg-muted/50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-4">Kit de Emergência e Histórico</h3>
+              <FormSectionTitle className="mb-4">Kit de Emergência e Histórico</FormSectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label>Validade Calço/Extintor 1</Label>
+                  <Label className="mb-1.5 block">Validade Calço/Extintor 1</Label>
                   <Input type="date" value={formData.kit_validity_1} onChange={(e) => setFormData(prev => ({ ...prev, kit_validity_1: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Validade 2</Label>
+                  <Label className="mb-1.5 block">Validade 2</Label>
                   <Input type="date" value={formData.kit_validity_2} onChange={(e) => setFormData(prev => ({ ...prev, kit_validity_2: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Validade 3</Label>
+                  <Label className="mb-1.5 block">Validade 3</Label>
                   <Input type="date" value={formData.kit_validity_3} onChange={(e) => setFormData(prev => ({ ...prev, kit_validity_3: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Últ. Viagem - Produto 1</Label>
+                  <Label className="mb-1.5 block">Últ. Viagem - Produto 1</Label>
                   <Input value={formData.last_trip_product_1} onChange={(e) => setFormData(prev => ({ ...prev, last_trip_product_1: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Produto 2</Label>
+                  <Label className="mb-1.5 block">Produto 2</Label>
                   <Input value={formData.last_trip_product_2} onChange={(e) => setFormData(prev => ({ ...prev, last_trip_product_2: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Produto 3</Label>
+                  <Label className="mb-1.5 block">Produto 3</Label>
                   <Input value={formData.last_trip_product_3} onChange={(e) => setFormData(prev => ({ ...prev, last_trip_product_3: e.target.value }))} />
                 </div>
               </div>
@@ -903,52 +904,52 @@ export default function VehicleChecklistPage() {
 
             {/* Observações */}
             <div>
-              <Label>Observações</Label>
+              <Label className="mb-1.5 block">Observações</Label>
               <Textarea value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} />
             </div>
 
             {/* Responsáveis */}
             <div className="bg-muted/50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-4">Responsáveis</h3>
+              <FormSectionTitle className="mb-4">Responsáveis</FormSectionTitle>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Responsável da Transportadora</Label>
+                  <Label className="mb-1.5 block">Responsável da Transportadora</Label>
                   <Input value={formData.transport_responsible_name} onChange={(e) => setFormData(prev => ({ ...prev, transport_responsible_name: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>RG</Label>
+                  <Label className="mb-1.5 block">RG</Label>
                   <Input value={formData.transport_responsible_rg} onChange={(e) => setFormData(prev => ({ ...prev, transport_responsible_rg: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Recebedor da LVT</Label>
+                  <Label className="mb-1.5 block">Recebedor da LVT</Label>
                   <Input value={formData.lvt_receiver_name} onChange={(e) => setFormData(prev => ({ ...prev, lvt_receiver_name: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Matrícula</Label>
+                  <Label className="mb-1.5 block">Matrícula</Label>
                   <Input value={formData.lvt_receiver_registration} onChange={(e) => setFormData(prev => ({ ...prev, lvt_receiver_registration: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Responsável pela Vistoria</Label>
+                  <Label className="mb-1.5 block">Responsável pela Vistoria</Label>
                   <Input value={formData.inspection_responsible_name} onChange={(e) => setFormData(prev => ({ ...prev, inspection_responsible_name: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Matrícula</Label>
+                  <Label className="mb-1.5 block">Matrícula</Label>
                   <Input value={formData.inspection_responsible_registration} onChange={(e) => setFormData(prev => ({ ...prev, inspection_responsible_registration: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Registro de Mérito</Label>
+                  <Label className="mb-1.5 block">Registro de Mérito</Label>
                   <Input value={formData.merit_record} onChange={(e) => setFormData(prev => ({ ...prev, merit_record: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Registro de Ocorrências</Label>
+                  <Label className="mb-1.5 block">Registro de Ocorrências</Label>
                   <Input value={formData.occurrence_record} onChange={(e) => setFormData(prev => ({ ...prev, occurrence_record: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Documento do Condutor</Label>
+                  <Label className="mb-1.5 block">Documento do Condutor</Label>
                   <Input value={formData.driver_document} onChange={(e) => setFormData(prev => ({ ...prev, driver_document: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Data/Hora da Liberação do Veículo</Label>
+                  <Label className="mb-1.5 block">Data/Hora da Liberação do Veículo</Label>
                   <Input type="datetime-local" value={formData.release_datetime} onChange={(e) => setFormData(prev => ({ ...prev, release_datetime: e.target.value }))} />
                 </div>
               </div>

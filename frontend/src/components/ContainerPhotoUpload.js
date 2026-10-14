@@ -50,7 +50,7 @@ export default function ContainerPhotoUpload({ damages = [], onDamagesChange, no
       </CardHeader>
       <CardContent className="pt-6">
         <div className="mb-6">
-          <Label className="text-sm font-medium mb-2 block">Estado do Container</Label>
+          <Label className="mb-1.5 block">Estado do Container</Label>
           <p className="text-sm text-muted-foreground mb-3">
             Marque "Sem Avaria" se o container não apresentar nenhum problema, ou selecione as avarias constatadas.
           </p>
@@ -73,7 +73,7 @@ export default function ContainerPhotoUpload({ damages = [], onDamagesChange, no
         </div>
 
         <div>
-          <Label htmlFor="inspection_notes" className="text-sm font-medium mb-2 block">Observações da Vistoria</Label>
+          <Label htmlFor="inspection_notes" className="mb-1.5 block">Observações da Vistoria</Label>
           <Textarea
             id="inspection_notes"
             data-testid="inspection-notes-input"

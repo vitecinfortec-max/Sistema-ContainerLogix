@@ -354,7 +354,7 @@ export default function FuelSupplyOrderPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="mb-1 block">Empresa</Label>
+                <Label className="mb-1.5 block">Empresa</Label>
                 <Autocomplete
                   value={form.company_name}
                   onChange={(v) => onChange('company_name', v)}
@@ -369,7 +369,7 @@ export default function FuelSupplyOrderPage() {
             <div className="grid grid-cols-2 gap-3">
               <Field type="date" label="Data *" value={form.order_date} onChange={(v) => onChange('order_date', v)} testid="fuel-order-date" />
               <div>
-                <Label className="mb-1 block">Equipamento <span className="text-red-500">*</span></Label>
+                <Label className="mb-1.5 block">Equipamento <span className="text-destructive">*</span></Label>
                 <Autocomplete
                   value={form.equipment_plate}
                   onChange={(v) => onChange('equipment_plate', v)}
@@ -382,7 +382,7 @@ export default function FuelSupplyOrderPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="mb-1 block">Fornecedor</Label>
+                <Label className="mb-1.5 block">Fornecedor</Label>
                 <Autocomplete
                   value={form.supplier_name}
                   onChange={(v) => onChange('supplier_name', v)}
@@ -393,7 +393,7 @@ export default function FuelSupplyOrderPage() {
                 />
               </div>
               <div>
-                <Label className="mb-1 block">Produto <span className="text-red-500">*</span></Label>
+                <Label className="mb-1.5 block">Produto <span className="text-destructive">*</span></Label>
                 <OptionAutocomplete
                   value={form.fuel_type}
                   onChange={(v) => onChange('fuel_type', v)}
@@ -405,7 +405,7 @@ export default function FuelSupplyOrderPage() {
             </div>
 
             <div>
-              <Label className="mb-1 block">Tipo <span className="text-red-500">*</span></Label>
+              <Label className="mb-1.5 block">Tipo <span className="text-destructive">*</span></Label>
               <div className="flex flex-wrap gap-4">
                 {SUPPLY_MODE_OPTIONS.map(([v, l]) => (
                   <label key={v} className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
@@ -426,7 +426,7 @@ export default function FuelSupplyOrderPage() {
                 )}
                 {form.supply_mode === 'LITROS_VALOR' && (
                   <div>
-                    <Label className="mb-1 block">Total</Label>
+                    <Label className="mb-1.5 block">Total</Label>
                     <Input value={fmtMoney(estimatedTotal)} readOnly className="h-9 text-sm bg-muted" data-testid="fuel-order-total" />
                   </div>
                 )}
@@ -456,7 +456,7 @@ export default function FuelSupplyOrderPage() {
 
 function RequiredLabel({ label }) {
   if (typeof label === 'string' && label.endsWith(' *')) {
-    return <>{label.slice(0, -2)} <span className="text-red-500">*</span></>;
+    return <>{label.slice(0, -2)} <span className="text-destructive">*</span></>;
   }
   return label;
 }
@@ -464,7 +464,7 @@ function RequiredLabel({ label }) {
 function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   return (
     <div>
-      <Label className="mb-1 block"><RequiredLabel label={label} /></Label>
+      <Label className="mb-1.5 block"><RequiredLabel label={label} /></Label>
       <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
@@ -474,7 +474,7 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
 function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
-      <Label className="mb-1 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}</Label>
       <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
     </div>
   );

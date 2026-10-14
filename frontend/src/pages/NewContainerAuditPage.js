@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, ListChecks } from 'lucide-react';
+import { Loader2, ListChecks } from 'lucide-react';
 
 export default function NewContainerAuditPage() {
   const navigate = useNavigate();
@@ -59,16 +60,13 @@ export default function NewContainerAuditPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="new-container-audit-page">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate('/container-audits')}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Nova Auditoria</h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Escolha o cliente que será auditado</p>
-          </div>
-        </div>
+      <div className="space-y-4" data-testid="new-container-audit-page">
+        <PageHeader
+          icon={ListChecks}
+          title="Nova Auditoria"
+          subtitle="Escolha o cliente que será auditado"
+          backTo="/container-audits"
+        />
 
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none max-w-lg">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
@@ -79,7 +77,7 @@ export default function NewContainerAuditPage() {
           </CardHeader>
           <CardContent className="p-4 space-y-4">
             <div className="relative">
-              <Label htmlFor="client">Cliente</Label>
+              <Label htmlFor="client" className="mb-1.5 block">Cliente</Label>
               <Input
                 id="client"
                 value={clientSearch}

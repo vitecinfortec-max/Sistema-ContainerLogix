@@ -521,7 +521,7 @@ export default function CadastroUnificadoPage() {
                   return (
                   <div key={f.name} className="space-y-1.5">
                     {f.type !== 'address' && (
-                      <Label className="text-[13px]">{f.label}{f.required ? ' *' : ''}</Label>
+                      <Label>{f.label}{f.required ? ' *' : ''}</Label>
                     )}
                     {f.type === 'address' ? (
                       <AddressFields
@@ -531,7 +531,7 @@ export default function CadastroUnificadoPage() {
                       />
                     ) : f.type === 'select' ? (
                       <Select value={formData[f.name] || f.options[0][0]} onValueChange={(v) => setField(f.name, v)}>
-                        <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {f.options.map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
                         </SelectContent>
@@ -547,7 +547,6 @@ export default function CadastroUnificadoPage() {
                           value={formData[f.name] || ''}
                           onChange={(e) => setField(f.name, MASKS[f.mask](e.target.value))}
                           required={f.required}
-                          className="h-10 text-[13px]"
                         />
                         <Button
                           type="button"
@@ -567,13 +566,12 @@ export default function CadastroUnificadoPage() {
                         value={formData[f.name] || ''}
                         onChange={(e) => setField(f.name, f.mask ? MASKS[f.mask](e.target.value) : e.target.value)}
                         required={f.required}
-                        className="h-10 text-[13px]"
                       />
                     )}
                   </div>
                   );
                 })}
-                <Button type="submit" className="w-full h-10 text-[13px] font-semibold" data-testid="submit-cadastro-button" disabled={submitting}>
+                <Button type="submit" className="w-full font-semibold" data-testid="submit-cadastro-button" disabled={submitting}>
                   {submitting ? 'Salvando...' : (editId ? 'Atualizar' : 'Cadastrar')}
                 </Button>
               </form>

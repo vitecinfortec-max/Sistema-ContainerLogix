@@ -623,7 +623,7 @@ export default function YardControlPage() {
               </div>
 
               <div>
-                <Label>Motorista</Label>
+                <Label className="mb-1.5 block">Motorista</Label>
                 <Select value={exitData.driver_id} onValueChange={handleDriverChange}>
                   <SelectTrigger>
                     <SelectValue />
@@ -639,7 +639,7 @@ export default function YardControlPage() {
               </div>
 
               <div>
-                <Label>Transportadora</Label>
+                <Label className="mb-1.5 block">Transportadora</Label>
                 <Select value={exitData.transport_company_id} onValueChange={handleCompanyChange}>
                   <SelectTrigger>
                     <SelectValue />
@@ -655,7 +655,7 @@ export default function YardControlPage() {
               </div>
 
               <div>
-                <Label>Placa do Veículo</Label>
+                <Label className="mb-1.5 block">Placa do Veículo</Label>
                 <Input
                   value={exitData.vehicle_plate}
                   onChange={(e) => setExitData(prev => ({ ...prev, vehicle_plate: e.target.value.toUpperCase() }))}
@@ -663,7 +663,7 @@ export default function YardControlPage() {
               </div>
 
               <div>
-                <Label>Observações</Label>
+                <Label className="mb-1.5 block">Observações</Label>
                 <Input
                   value={exitData.observations}
                   onChange={(e) => setExitData(prev => ({ ...prev, observations: e.target.value }))}

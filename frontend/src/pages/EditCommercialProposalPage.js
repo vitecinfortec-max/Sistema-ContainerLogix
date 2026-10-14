@@ -153,7 +153,7 @@ export default function EditCommercialProposalPage() {
             </CardHeader>
             <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <Label>Destinatário (cliente ou prospect)</Label>
+                <Label className="mb-1.5 block">Destinatário (cliente ou prospect)</Label>
                 <Autocomplete
                   value={recipientName}
                   onChange={setRecipientName}
@@ -164,11 +164,11 @@ export default function EditCommercialProposalPage() {
                 />
               </div>
               <div className="sm:col-span-2">
-                <Label>Assunto</Label>
+                <Label className="mb-1.5 block">Assunto</Label>
                 <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
               </div>
               <div>
-                <Label>Validade (dias)</Label>
+                <Label className="mb-1.5 block">Validade (dias)</Label>
                 <Input type="number" min="1" value={validityDays} onChange={(e) => setValidityDays(e.target.value)} />
               </div>
             </CardContent>
@@ -198,11 +198,11 @@ export default function EditCommercialProposalPage() {
               {items.map((item, idx) => (
                 <div key={idx} className="flex items-end gap-2">
                   <div className="flex-1">
-                    <Label className="text-xs">Serviço</Label>
+                    <Label className="mb-1.5 block">Serviço</Label>
                     <Input value={item.description} onChange={(e) => updateItem(idx, 'description', e.target.value)} className="h-9" />
                   </div>
                   <div className="w-40">
-                    <Label className="text-xs">Valor ({CURRENCY_SYMBOL[currency]})</Label>
+                    <Label className="mb-1.5 block">Valor ({CURRENCY_SYMBOL[currency]})</Label>
                     <Input type="number" step="0.01" min="0" value={item.value} onChange={(e) => updateItem(idx, 'value', e.target.value)} className="h-9" />
                   </div>
                   <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => removeItem(idx)} disabled={items.length === 1}>

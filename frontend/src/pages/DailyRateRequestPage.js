@@ -1,3 +1,4 @@
+import { FormSectionTitle } from '../components/FormKit';
 import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -438,7 +439,7 @@ export default function DailyRateRequestPage() {
           <div className="space-y-6">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Itens da Solicitação</h3>
+                <FormSectionTitle bare>Itens da Solicitação</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
                   <Plus className="w-4 h-4 mr-1" /> Adicionar Item
                 </Button>
@@ -456,7 +457,7 @@ export default function DailyRateRequestPage() {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
-                        <Label className="text-xs mb-1 block">Motorista *</Label>
+                        <Label className="mb-1.5 block">Motorista *</Label>
                         <Autocomplete
                           value={item.driver_name}
                           onChange={(val) => handleItemChange(index, 'driver_name', val)}
@@ -470,7 +471,7 @@ export default function DailyRateRequestPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Placa *</Label>
+                        <Label className="mb-1.5 block">Placa *</Label>
                         <Autocomplete
                           value={item.vehicle_plate}
                           onChange={(val) => handleItemChange(index, 'vehicle_plate', val.toUpperCase())}
@@ -481,7 +482,7 @@ export default function DailyRateRequestPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Cliente *</Label>
+                        <Label className="mb-1.5 block">Cliente *</Label>
                         <Autocomplete
                           value={item.client_name}
                           onChange={(val) => handleItemChange(index, 'client_name', val)}
@@ -492,27 +493,27 @@ export default function DailyRateRequestPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Data de Saída *</Label>
+                        <Label className="mb-1.5 block">Data de Saída *</Label>
                         <Input className="h-9" type="date" value={item.departure_date} onChange={(e) => handleItemChange(index, 'departure_date', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Outros (R$)</Label>
+                        <Label className="mb-1.5 block">Outros (R$)</Label>
                         <Input className="h-9" type="number" step="0.01" value={item.others_value} onChange={(e) => handleItemChange(index, 'others_value', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Comissão (R$)</Label>
+                        <Label className="mb-1.5 block">Comissão (R$)</Label>
                         <Input className="h-9" type="number" step="0.01" value={item.commission_value} onChange={(e) => handleItemChange(index, 'commission_value', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Almoço (R$)</Label>
+                        <Label className="mb-1.5 block">Almoço (R$)</Label>
                         <Input className="h-9" type="number" step="0.01" value={item.lunch_value} onChange={(e) => handleItemChange(index, 'lunch_value', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Qtd. Diária</Label>
+                        <Label className="mb-1.5 block">Qtd. Diária</Label>
                         <Input className="h-9" type="number" step="1" value={item.daily_rate_quantity} onChange={(e) => handleItemChange(index, 'daily_rate_quantity', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Valor da Diária (R$)</Label>
+                        <Label className="mb-1.5 block">Valor da Diária (R$)</Label>
                         <Input className="h-9" type="number" step="0.01" value={item.daily_rate_value} onChange={(e) => handleItemChange(index, 'daily_rate_value', e.target.value)} />
                       </div>
                     </div>
@@ -530,7 +531,7 @@ export default function DailyRateRequestPage() {
             </div>
 
             <div>
-              <Label>Observações</Label>
+              <Label className="mb-1.5 block">Observações</Label>
               <Input value={formData.observations} onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))} />
             </div>
           </div>

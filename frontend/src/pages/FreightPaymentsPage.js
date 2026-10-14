@@ -416,18 +416,17 @@ export default function FreightPaymentsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Valor do Frete</Label>
+              <Label className="block">Valor do Frete</Label>
               <Input
                 type="number"
                 step="0.01"
                 min="0"
-                className="h-10 text-[13px]"
                 value={editForm.freight_value}
                 onChange={(e) => setEditForm({ ...editForm, freight_value: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Observações</Label>
+              <Label className="block">Observações</Label>
               <Textarea
                 className="text-[13px] min-h-[60px]"
                 value={editForm.observations}

@@ -1,3 +1,4 @@
+import { FormSectionTitle } from '../components/FormKit';
 import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -522,11 +523,11 @@ export default function ExpenseReportsPage() {
             {/* Período */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs mb-1 block">Período - Início *</Label>
+                <Label className="mb-1.5 block">Período - Início *</Label>
                 <Input type="date" className="h-9" value={formData.period_start} onChange={(e) => setFormData(prev => ({ ...prev, period_start: e.target.value }))} />
               </div>
               <div>
-                <Label className="text-xs mb-1 block">Período - Fim *</Label>
+                <Label className="mb-1.5 block">Período - Fim *</Label>
                 <Input type="date" className="h-9" value={formData.period_end} onChange={(e) => setFormData(prev => ({ ...prev, period_end: e.target.value }))} />
               </div>
             </div>
@@ -534,7 +535,7 @@ export default function ExpenseReportsPage() {
             {/* Depósitos Recebidos (antes das compras) */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Depósitos Recebidos</h3>
+                <FormSectionTitle bare>Depósitos Recebidos</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addDeposit}>
                   <Plus className="w-4 h-4 mr-1" /> Adicionar Depósito
                 </Button>
@@ -549,15 +550,15 @@ export default function ExpenseReportsPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pr-8">
                       <div>
-                        <Label className="text-xs mb-1 block">Valor Enviado (R$) *</Label>
+                        <Label className="mb-1.5 block">Valor Enviado (R$) *</Label>
                         <Input className="h-9" type="number" step="0.01" value={deposit.amount} onChange={(e) => handleDepositChange(index, 'amount', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Data *</Label>
+                        <Label className="mb-1.5 block">Data *</Label>
                         <Input className="h-9" type="date" value={deposit.date} onChange={(e) => handleDepositChange(index, 'date', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Enviado Por *</Label>
+                        <Label className="mb-1.5 block">Enviado Por *</Label>
                         <Input className="h-9" value={deposit.sent_by} onChange={(e) => handleDepositChange(index, 'sent_by', e.target.value)} />
                       </div>
                     </div>
@@ -572,7 +573,7 @@ export default function ExpenseReportsPage() {
             {/* Lançamentos de Compras */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">Lançamentos de Compras</h3>
+                <FormSectionTitle bare>Lançamentos de Compras</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addPurchase}>
                   <Plus className="w-4 h-4 mr-1" /> Adicionar Compra
                 </Button>
@@ -589,7 +590,7 @@ export default function ExpenseReportsPage() {
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                       <div>
-                        <Label className="text-xs mb-1 block">Local de Compra (Fornecedor) *</Label>
+                        <Label className="mb-1.5 block">Local de Compra (Fornecedor) *</Label>
                         <Autocomplete
                           value={purchase.supplier_name}
                           onChange={(val) => handlePurchaseChange(index, 'supplier_name', val)}
@@ -603,22 +604,22 @@ export default function ExpenseReportsPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Data da Compra *</Label>
+                        <Label className="mb-1.5 block">Data da Compra *</Label>
                         <Input className="h-9" type="date" value={purchase.purchase_date} onChange={(e) => handlePurchaseChange(index, 'purchase_date', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Valor da Compra (R$) *</Label>
+                        <Label className="mb-1.5 block">Valor da Compra (R$) *</Label>
                         <Input className="h-9" type="number" step="0.01" value={purchase.amount} onChange={(e) => handlePurchaseChange(index, 'amount', e.target.value)} />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Observação</Label>
+                        <Label className="mb-1.5 block">Observação</Label>
                         <Input className="h-9" value={purchase.observation} onChange={(e) => handlePurchaseChange(index, 'observation', e.target.value)} />
                       </div>
                     </div>
 
                     {/* Recibos */}
                     <div className="mt-3">
-                      <Label className="text-xs mb-1 block">Recibos / Comprovantes</Label>
+                      <Label className="mb-1.5 block">Recibos / Comprovantes</Label>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
                         {(purchase.receipts || []).map((receipt) => (
                           <div key={receipt.id} className="relative">

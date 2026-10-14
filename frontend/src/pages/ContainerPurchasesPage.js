@@ -293,9 +293,9 @@ export default function ContainerPurchasesPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Número do Container *</Label>
+                <Label className="block">Número do Container *</Label>
                 <Input
-                  className="h-10 text-[13px] font-mono"
+                  className="font-mono"
                   value={form.container_number}
                   onChange={(e) => setForm({ ...form, container_number: e.target.value.toUpperCase() })}
                   disabled={editingIsAuto}
@@ -303,9 +303,8 @@ export default function ContainerPurchasesPage() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Número do Booking</Label>
+                <Label className="block">Número do Booking</Label>
                 <Input
-                  className="h-10 text-[13px]"
                   value={form.booking}
                   onChange={(e) => setForm({ ...form, booking: e.target.value })}
                   disabled={editingIsAuto}
@@ -314,19 +313,17 @@ export default function ContainerPurchasesPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Terminal de Coleta</Label>
+                <Label className="block">Terminal de Coleta</Label>
                 <Input
-                  className="h-10 text-[13px]"
                   value={form.origin_terminal}
                   onChange={(e) => setForm({ ...form, origin_terminal: e.target.value })}
                   disabled={editingIsAuto}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Data de Entrada</Label>
+                <Label className="block">Data de Entrada</Label>
                 <Input
                   type="date"
-                  className="h-10 text-[13px]"
                   value={form.entry_date}
                   onChange={(e) => setForm({ ...form, entry_date: e.target.value })}
                   disabled={editingIsAuto}
@@ -335,24 +332,22 @@ export default function ContainerPurchasesPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Valor de Compra</Label>
+                <Label className="block">Valor de Compra</Label>
                 <Input
                   type="number"
                   step="0.01"
                   min="0"
-                  className="h-10 text-[13px]"
                   value={form.purchase_value}
                   onChange={(e) => setForm({ ...form, purchase_value: e.target.value })}
                   data-testid="purchase-value-input"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Valor de Venda (alvo)</Label>
+                <Label className="block">Valor de Venda (alvo)</Label>
                 <Input
                   type="number"
                   step="0.01"
                   min="0"
-                  className="h-10 text-[13px]"
                   value={form.sale_value}
                   onChange={(e) => setForm({ ...form, sale_value: e.target.value })}
                   data-testid="purchase-sale-target-input"
@@ -360,7 +355,7 @@ export default function ContainerPurchasesPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Observações</Label>
+              <Label className="block">Observações</Label>
               <Textarea
                 className="text-[13px] min-h-[60px]"
                 value={form.observations}

@@ -1,5 +1,6 @@
 import { Button } from './ui/button';
-import { RefreshCw, HelpCircle, Plus, Settings, MoreVertical } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, RefreshCw, HelpCircle, Plus, Settings, MoreVertical } from 'lucide-react';
 import { Reveal } from './Motion';
 
 function ToolbarIcon({ icon: Icon, onClick, title }) {
@@ -13,12 +14,28 @@ function ToolbarIcon({ icon: Icon, onClick, title }) {
 /**
  * Cabeçalho padrão das telas: ícone do módulo num quadro na cor da marca,
  * título, subtítulo (+ `meta` opcional ao lado, ex.: selo "Sincronizado") e
- * ações à direita.
+ * ações à direita. Telas de formulário e de detalhe passam `backTo` (rota ou
+ * função) e ganham a seta de voltar antes do ícone.
  */
-export default function PageHeader({ title, subtitle, icon: Icon, meta, actions, toolbar }) {
+export default function PageHeader({ title, subtitle, icon: Icon, meta, actions, toolbar, backTo, backTestId = 'back-button' }) {
+  const navigate = useNavigate();
   return (
     <Reveal y={6} className="flex items-center justify-between gap-3 flex-wrap">
       <div className="flex items-center gap-3 min-w-0">
+        {backTo && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 -mr-1 text-slate-500 dark:text-slate-400 hover:text-primary"
+            onClick={() => (typeof backTo === 'function' ? backTo() : navigate(backTo))}
+            title="Voltar"
+            aria-label="Voltar"
+            data-testid={backTestId}
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+        )}
         {Icon && (
           <div className="hidden sm:flex w-10 h-10 shrink-0 rounded-lg bg-primary/10 text-primary ring-1 ring-inset ring-primary/15 items-center justify-center">
             <Icon className="w-5 h-5" />
@@ -35,7 +52,7 @@ export default function PageHeader({ title, subtitle, icon: Icon, meta, actions,
         </div>
       </div>
       {(toolbar || actions) && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {toolbar && (
             <div className="flex items-center gap-0.5 border border-slate-200 dark:border-slate-700 rounded-md p-0.5">
               {toolbar.onRefresh && <ToolbarIcon icon={RefreshCw} onClick={toolbar.onRefresh} title="Atualizar" />}

@@ -218,9 +218,9 @@ export default function ContainerRepresentativesPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">Tipo *</Label>
+                  <Label className="block">Tipo *</Label>
                   <Select value={formData.tipo} onValueChange={(v) => setFormData({ ...formData, tipo: v })}>
-                    <SelectTrigger className="h-10 text-[13px]" data-testid="representative-tipo-select"><SelectValue /></SelectTrigger>
+                    <SelectTrigger data-testid="representative-tipo-select"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {TIPO_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
                     </SelectContent>
@@ -230,24 +230,23 @@ export default function ContainerRepresentativesPage() {
                 {formData.tipo === 'PF' ? (
                   <>
                     <div className="space-y-1.5">
-                      <Label htmlFor="name" className="text-[13px]">Nome Completo *</Label>
+                      <Label htmlFor="name" className="block">Nome Completo *</Label>
                       <Input
                         id="name"
                         data-testid="representative-name-input"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         required
-                        className="h-10 text-[13px]"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="cpf" className="text-[13px]">CPF</Label>
+                      <Label htmlFor="cpf" className="block">CPF</Label>
                       <Input
                         id="cpf"
                         data-testid="representative-cpf-input"
                         value={formData.cpf}
                         onChange={(e) => setFormData({ ...formData, cpf: formatCPF(e.target.value) })}
-                        className="h-10 text-[13px] font-mono"
+                        className="font-mono"
                         maxLength={14}
                       />
                     </div>
@@ -255,45 +254,42 @@ export default function ContainerRepresentativesPage() {
                 ) : (
                   <>
                     <div className="space-y-1.5">
-                      <Label htmlFor="name" className="text-[13px]">Razão Social *</Label>
+                      <Label htmlFor="name" className="block">Razão Social *</Label>
                       <Input
                         id="name"
                         data-testid="representative-name-input"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         required
-                        className="h-10 text-[13px]"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="trade_name" className="text-[13px]">Nome Fantasia</Label>
+                      <Label htmlFor="trade_name" className="block">Nome Fantasia</Label>
                       <Input
                         id="trade_name"
                         data-testid="representative-trade-name-input"
                         value={formData.trade_name}
                         onChange={(e) => setFormData({ ...formData, trade_name: e.target.value })}
-                        className="h-10 text-[13px]"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="cnpj" className="text-[13px]">CNPJ</Label>
+                      <Label htmlFor="cnpj" className="block">CNPJ</Label>
                       <Input
                         id="cnpj"
                         data-testid="representative-cnpj-input"
                         value={formData.cnpj}
                         onChange={(e) => setFormData({ ...formData, cnpj: formatCNPJ(e.target.value) })}
-                        className="h-10 text-[13px] font-mono"
+                        className="font-mono"
                         maxLength={18}
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="contact_name" className="text-[13px]">Pessoa de Contato</Label>
+                      <Label htmlFor="contact_name" className="block">Pessoa de Contato</Label>
                       <Input
                         id="contact_name"
                         data-testid="representative-contact-name-input"
                         value={formData.contact_name}
                         onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                        className="h-10 text-[13px]"
                       />
                     </div>
                   </>
@@ -301,77 +297,72 @@ export default function ContainerRepresentativesPage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="phone" className="text-[13px]">Telefone</Label>
+                    <Label htmlFor="phone" className="block">Telefone</Label>
                     <Input
                       id="phone"
                       data-testid="representative-phone-input"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
-                      className="h-10 text-[13px] font-mono"
+                      className="font-mono"
                       maxLength={15}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="email" className="text-[13px]">E-mail</Label>
+                    <Label htmlFor="email" className="block">E-mail</Label>
                     <Input
                       id="email"
                       type="email"
                       data-testid="representative-email-input"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="h-10 text-[13px]"
                     />
                   </div>
                 </div>
 
-                <Label className="text-[13px] text-slate-500">Dados Bancários (pagamento de comissão)</Label>
+                <Label className="text-slate-500">Dados Bancários (pagamento de comissão)</Label>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="bank_name" className="text-[13px]">Banco</Label>
+                    <Label htmlFor="bank_name" className="block">Banco</Label>
                     <Input
                       id="bank_name"
                       data-testid="representative-bank-name-input"
                       value={formData.bank_name}
                       onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                      className="h-10 text-[13px]"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="bank_agency" className="text-[13px]">Agência</Label>
+                    <Label htmlFor="bank_agency" className="block">Agência</Label>
                     <Input
                       id="bank_agency"
                       data-testid="representative-bank-agency-input"
                       value={formData.bank_agency}
                       onChange={(e) => setFormData({ ...formData, bank_agency: e.target.value })}
-                      className="h-10 text-[13px]"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="bank_account" className="text-[13px]">Conta Corrente</Label>
+                    <Label htmlFor="bank_account" className="block">Conta Corrente</Label>
                     <Input
                       id="bank_account"
                       data-testid="representative-bank-account-input"
                       value={formData.bank_account}
                       onChange={(e) => setFormData({ ...formData, bank_account: e.target.value })}
-                      className="h-10 text-[13px]"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="pix_key" className="text-[13px]">Chave PIX</Label>
+                    <Label htmlFor="pix_key" className="block">Chave PIX</Label>
                     <Input
                       id="pix_key"
                       data-testid="representative-pix-key-input"
                       value={formData.pix_key}
                       onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
-                      className="h-10 text-[13px]"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">Status</Label>
+                  <Label className="block">Status</Label>
                   <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                    <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ATIVO">Ativo</SelectItem>
                       <SelectItem value="INATIVO">Inativo</SelectItem>
@@ -380,7 +371,7 @@ export default function ContainerRepresentativesPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="observations" className="text-[13px]">Observações</Label>
+                  <Label htmlFor="observations" className="block">Observações</Label>
                   <Textarea
                     id="observations"
                     data-testid="representative-observations-input"
@@ -392,7 +383,7 @@ export default function ContainerRepresentativesPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-10 text-[13px] font-semibold"
+                  className="w-full font-semibold"
                   data-testid="submit-representative-button"
                   disabled={submitting}
                 >

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
+import { StatusPill } from '../components/DataPage';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -10,7 +12,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { formatContainerNumber } from '../lib/containerNumber';
 import {
-  ArrowLeft, CheckCircle2, XCircle, Camera, PlusCircle, Download, Loader2, ListChecks,
+  CheckCircle2, XCircle, Camera, PlusCircle, Download, Loader2, ListChecks,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -164,37 +166,29 @@ export default function ContainerAuditDetailPage() {
 
   return (
     <Layout>
-      <div className="space-y-5" data-testid="container-audit-detail-page">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => navigate('/container-audits')}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 font-mono">{audit.audit_code}</h1>
-              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                {audit.client_name} · {format(new Date(audit.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-              </p>
-            </div>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${audit.status === 'CONCLUIDA' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+      <div className="space-y-4" data-testid="container-audit-detail-page">
+        <PageHeader
+          icon={ListChecks}
+          title={<span className="font-mono">{audit.audit_code}</span>}
+          subtitle={<>{audit.client_name} · {format(new Date(audit.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</>}
+          meta={(
+            <StatusPill tone={audit.status === 'CONCLUIDA' ? 'emerald' : 'amber'}>
               {audit.status === 'CONCLUIDA' ? 'Concluída' : 'Em Andamento'}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {isLocked && (
-              <Button variant="outline" size="sm" onClick={downloadPdf} data-testid="download-audit-pdf-btn">
-                <Download className="w-4 h-4 mr-2" />
-                Baixar PDF novamente
-              </Button>
-            )}
-            {!isLocked && (
-              <Button size="sm" onClick={handleComplete} disabled={completing} data-testid="complete-audit-btn">
-                {completing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-                Concluir Auditoria
-              </Button>
-            )}
-          </div>
-        </div>
+            </StatusPill>
+          )}
+          backTo="/container-audits"
+          actions={isLocked ? (
+            <Button variant="outline" onClick={downloadPdf} data-testid="download-audit-pdf-btn">
+              <Download className="w-4 h-4 mr-2" />
+              Baixar PDF novamente
+            </Button>
+          ) : (
+            <Button onClick={handleComplete} disabled={completing} data-testid="complete-audit-btn">
+              {completing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              Concluir Auditoria
+            </Button>
+          )}
+        />
 
         <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
@@ -307,7 +301,7 @@ export default function ContainerAuditDetailPage() {
             {!isLocked && (
               <div className="flex items-end gap-2 max-w-md">
                 <div className="flex-1">
-                  <Label htmlFor="new-container">Nº Container encontrado no pátio</Label>
+                  <Label htmlFor="new-container" className="mb-1.5 block">Nº Container encontrado no pátio</Label>
                   <Input
                     id="new-container"
                     value={newContainer}

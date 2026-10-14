@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { FormActions } from '../components/FormKit';
+import { StatusPill } from '../components/DataPage';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -8,7 +11,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Save, ArrowLeft, Check, X } from 'lucide-react';
+import { Save, Check, X, Container as ContainerIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useNotifications } from '../hooks/useNotifications';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
@@ -457,40 +460,32 @@ export default function NewMovementPage() {
         </div>
       ) : (
       <div className="max-w-5xl mx-auto" data-testid="new-movement-page">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              Novo Registro
-            </h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              <p className="text-[13px] text-slate-500 dark:text-slate-400">
-                {vistoriaId ? 'EIR de entrada gerada a partir da Vistoria de Container' : 'Registre uma nova entrada ou saída de contêiner'}
-              </p>
-              {autoSaved && (
-                <span className="inline-flex items-center text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                  <Check className="w-3 h-3 mr-1" />
-                  Salvo automaticamente
-                </span>
-              )}
-            </div>
-          </div>
-          <Button variant="outline" onClick={() => navigate('/movements')} data-testid="back-button">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
+        <div className="mb-4">
+          <PageHeader
+            icon={ContainerIcon}
+            title="Novo Registro"
+            subtitle={vistoriaId ? 'EIR de entrada gerada a partir da Vistoria de Container' : 'Registre uma nova entrada ou saída de contêiner'}
+            meta={autoSaved && (
+              <StatusPill tone="emerald" dot={false}>
+                <Check className="w-3 h-3" />
+                Salvo automaticamente
+              </StatusPill>
+            )}
+            backTo="/movements"
+          />
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tipo de Operação</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="operation_type">Tipo de Operação *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="operation_type" className="block">Tipo de Operação *</Label>
                   <Select value={operationType} onValueChange={(value) => setValue('operation_type', value)}>
-                    <SelectTrigger id="operation_type" data-testid="operation-type-select" className="h-12">
+                    <SelectTrigger id="operation_type" data-testid="operation-type-select">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -500,10 +495,10 @@ export default function NewMovementPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="status" className="block">Status *</Label>
                   <Select value={status} onValueChange={(value) => setValue('status', value)}>
-                    <SelectTrigger id="status" data-testid="status-select" className="h-12">
+                    <SelectTrigger id="status" data-testid="status-select">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -522,71 +517,69 @@ export default function NewMovementPage() {
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="driver_name">Nome do Motorista *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="driver_name" className="block">Nome do Motorista *</Label>
                   <Autocomplete
                     value={watch('driver_name') || ''}
                     onChange={handleDriverChange}
                     onSelect={(d) => handleDriverChange(d.name)}
                     options={drivers}
                     displayField="name"
-                    className="h-12"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="driver_cpf">CPF *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="driver_cpf" className="block">CPF *</Label>
                   <Input
                     id="driver_cpf"
                     data-testid="driver-cpf-input"
                     {...register('driver_cpf', { required: true })}
-                    className="h-12 font-mono"
+                    className="font-mono"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="truck_plate">Placa do Cavalo *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="truck_plate" className="block">Placa do Cavalo *</Label>
                   <Autocomplete
                     value={watch('truck_plate') || ''}
                     onChange={handleTruckPlateChange}
                     onSelect={(v) => handleTruckPlateChange(v.plate)}
                     options={cavaloVehicles}
                     displayField="plate"
-                    className="h-12 font-mono uppercase"
+                    className="font-mono uppercase"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="trailer_plate_1">Placa Carreta *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="trailer_plate_1" className="block">Placa Carreta *</Label>
                   <Autocomplete
                     value={watch('trailer_plate_1') || ''}
                     onChange={handleTrailerPlateChange}
                     onSelect={(v) => handleTrailerPlateChange(v.plate)}
                     options={carretaVehicles}
                     displayField="plate"
-                    className="h-12 font-mono uppercase"
+                    className="font-mono uppercase"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="transport_company">Transportadora *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="transport_company" className="block">Transportadora *</Label>
                   <Autocomplete
                     value={watch('transport_company') || ''}
                     onChange={handleCompanyChange}
                     onSelect={(c) => handleCompanyChange(c.name)}
                     options={companies}
                     displayField="name"
-                    className="h-12"
                   />
                 </div>
 
-                <div className="space-y-2 relative" ref={clientInputRef}>
-                  <Label htmlFor="client_name">Cliente</Label>
+                <div className="space-y-1.5 relative" ref={clientInputRef}>
+                  <Label htmlFor="client_name" className="block">Cliente</Label>
                   <div className="relative">
                     <Input 
                       id="client_name" 
                       data-testid="client-name-input"
-                      className="h-12 pr-10"
+                      className="pr-10"
                       value={clientSearch}
                       onChange={(e) => {
                         setClientSearch(e.target.value);
@@ -654,13 +647,13 @@ export default function NewMovementPage() {
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="container_number">Nº Container *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="container_number" className="block">Nº Container *</Label>
                   <Input
                     id="container_number"
                     data-testid="container-number-input"
                     {...register('container_number', { required: true, onBlur: handleContainerNumberBlur })}
-                    className="h-12 font-mono uppercase"
+                    className="font-mono uppercase"
                   />
                   {containerDuplicateError && (
                     <p className="text-xs text-red-600 dark:text-red-400 font-medium" data-testid="container-duplicate-error">
@@ -674,10 +667,10 @@ export default function NewMovementPage() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="size_type">Tamanho/Tipo *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="size_type" className="block">Tamanho/Tipo *</Label>
                   <Select value={sizeType} onValueChange={(value) => setValue('size_type', value)}>
-                    <SelectTrigger id="size_type" data-testid="size-type-select" className="h-12">
+                    <SelectTrigger id="size_type" data-testid="size-type-select">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -694,13 +687,13 @@ export default function NewMovementPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="tare">Tara</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="tare" className="block">Tara</Label>
                   <Input
                     id="tare"
                     data-testid="tare-input"
                     {...register('tare')}
-                    className="h-12 font-mono"
+                    className="font-mono"
                   />
                 </div>
 
@@ -712,7 +705,7 @@ export default function NewMovementPage() {
                     </span>
                   </div>
                   <Select value={shippingLine || ''} onValueChange={(value) => setValue('shipping_line', value)}>
-                    <SelectTrigger id="shipping_line" data-testid="shipping-line-select" className="h-12">
+                    <SelectTrigger id="shipping_line" data-testid="shipping-line-select">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-80 overflow-y-auto">
@@ -736,45 +729,44 @@ export default function NewMovementPage() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="seal">Lacre</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="seal" className="block">Lacre</Label>
                   <Input
                     id="seal"
                     data-testid="seal-input"
                     {...register('seal')}
-                    className="h-12 font-mono"
+                    className="font-mono"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="genset">Genset</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="genset" className="block">Genset</Label>
                   <Input
                     id="genset"
                     data-testid="genset-input"
                     {...register('genset')}
-                    className="h-12 font-mono"
+                    className="font-mono"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="booking">Booking</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="booking" className="block">Booking</Label>
                   <Input
                     id="booking"
                     data-testid="booking-input"
                     {...register('booking')}
-                    className="h-12 font-mono"
+                    className="font-mono"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="origin_terminal">Terminal de Origem</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="origin_terminal" className="block">Terminal de Origem</Label>
                   <Autocomplete
                     value={watch('origin_terminal') || ''}
                     onChange={(v) => setValue('origin_terminal', v)}
                     onSelect={(t) => setValue('origin_terminal', t.name)}
                     options={terminals}
                     displayField="name"
-                    className="h-12"
                   />
                 </div>
 
@@ -786,7 +778,7 @@ export default function NewMovementPage() {
                     </span>
                   </div>
                   <Select value={serviceType || 'none'} onValueChange={(value) => setValue('service_type', value === 'none' ? '' : value)}>
-                    <SelectTrigger id="service_type" data-testid="service-type-select" className="h-12">
+                    <SelectTrigger id="service_type" data-testid="service-type-select">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-80 overflow-y-auto">
@@ -799,8 +791,8 @@ export default function NewMovementPage() {
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="service_value">
+                <div className="space-y-1.5">
+                  <Label htmlFor="service_value" className="block">
                     Valor do Serviço ({(matchedCurrency || (clientName === 'CARU Containers Brasil Locação' ? 'USD' : 'BRL')) === 'USD' ? 'US$' : 'R$'})
                   </Label>
                   <Input
@@ -810,29 +802,29 @@ export default function NewMovementPage() {
                     step="0.01"
                     min="0"
                     {...register('service_value', { valueAsNumber: true })}
-                    className="h-12 font-mono"
+                    className="font-mono"
                   />
                   <p className="text-xs text-muted-foreground">Este valor aparecerá apenas no relatório de faturamento</p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="invoice_number">Nota Fiscal</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="invoice_number" className="block">Nota Fiscal</Label>
                   <Input
                     id="invoice_number"
                     data-testid="invoice-number-input"
                     {...register('invoice_number')}
-                    className="h-12 font-mono"
+                    className="font-mono"
                   />
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
                 </div>
 
-                <div className="space-y-2 relative" ref={buyerInputRef}>
-                  <Label htmlFor="buyer_name">Comprador</Label>
+                <div className="space-y-1.5 relative" ref={buyerInputRef}>
+                  <Label htmlFor="buyer_name" className="block">Comprador</Label>
                   <div className="relative">
                     <Input
                       id="buyer_name"
                       data-testid="buyer-name-input"
-                      className="h-12 pr-10"
+                      className="pr-10"
                       value={buyerSearch}
                       onChange={(e) => {
                         setBuyerSearch(e.target.value);
@@ -898,8 +890,8 @@ export default function NewMovementPage() {
                   locked={entryLocked}
                 />
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="observations">Observações</Label>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label htmlFor="observations" className="block">Observações</Label>
                   <textarea
                     id="observations"
                     data-testid="observations-input"
@@ -920,11 +912,11 @@ export default function NewMovementPage() {
             disabled={loading}
           />
 
-          <div className="flex justify-end gap-4">
+          <FormActions>
             <Button type="button" variant="outline" onClick={() => navigate('/movements')} data-testid="cancel-button">
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} className="h-12 font-bold uppercase tracking-wide px-8" data-testid="save-button">
+            <Button type="submit" disabled={loading} data-testid="save-button">
               {loading ? 'Salvando...' : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
@@ -932,7 +924,7 @@ export default function NewMovementPage() {
                 </>
               )}
             </Button>
-          </div>
+          </FormActions>
         </form>
       </div>
       )}

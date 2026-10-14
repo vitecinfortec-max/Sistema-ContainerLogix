@@ -1,11 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Printer, Download, Camera, Upload, X, Edit, Loader2, FileText } from 'lucide-react';
+import { Printer, Download, Camera, Upload, X, Edit, Loader2, FileText, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
@@ -247,46 +248,41 @@ export default function ContainerVistoriaDetailPage() {
 
       {/* Conteúdo da tela */}
       <div className="max-w-5xl mx-auto no-print" data-testid="container-vistoria-detail-page">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigate('/container-vistorias')} data-testid="back-btn">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                Vistoria de Container #{vistoria.vistoria_number}
-              </h1>
-              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Criado em {format(new Date(vistoria.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            {vistoria.movement_id ? (
-              <Button variant="outline" onClick={() => navigate(`/movements/${vistoria.movement_id}`)} data-testid="view-eir-btn">
-                <FileText className="w-4 h-4 mr-2" />
-                Ver EIR #{vistoria.movement_transaction_id}
-              </Button>
-            ) : (
-              <Button variant="outline" onClick={() => navigate(`/movements/new?vistoria=${id}`)} data-testid="generate-eir-btn">
-                <FileText className="w-4 h-4 mr-2" />
-                Gerar EIR de entrada
-              </Button>
+        <div className="mb-4">
+          <PageHeader
+            icon={ShieldCheck}
+            title={<>Vistoria de Container #{vistoria.vistoria_number}</>}
+            subtitle={<>Criado em {format(new Date(vistoria.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</>}
+            backTo={'/container-vistorias'}
+            backTestId="back-btn"
+            actions={(
+              <>
+                {vistoria.movement_id ? (
+                  <Button variant="outline" onClick={() => navigate(`/movements/${vistoria.movement_id}`)} data-testid="view-eir-btn">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Ver EIR #{vistoria.movement_transaction_id}
+                  </Button>
+                ) : (
+                  <Button variant="outline" onClick={() => navigate(`/movements/new?vistoria=${id}`)} data-testid="generate-eir-btn">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Gerar EIR de entrada
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => navigate(`/container-vistorias/${id}/edit`)} data-testid="edit-btn">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+                <Button variant="outline" onClick={() => window.print()} data-testid="print-btn">
+                  <Printer className="w-4 h-4 mr-2" />
+                  Imprimir
+                </Button>
+              </>
             )}
-            <Button variant="outline" onClick={() => navigate(`/container-vistorias/${id}/edit`)} data-testid="edit-btn">
-              <Edit className="w-4 h-4 mr-2" />
-              Editar
-            </Button>
-            <Button variant="outline" onClick={() => window.print()} data-testid="print-btn">
-              <Printer className="w-4 h-4 mr-2" />
-              Imprimir
-            </Button>
-          </div>
+          />
         </div>
 
         {/* Informações */}
-        <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+        <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Container</CardTitle>
           </CardHeader>
@@ -338,7 +334,7 @@ export default function ContainerVistoriaDetailPage() {
 
         {/* Observações */}
         {vistoria.observations && (
-          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Observações</CardTitle>
             </CardHeader>
@@ -349,7 +345,7 @@ export default function ContainerVistoriaDetailPage() {
         )}
 
         {/* Estado do Container */}
-        <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+        <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Estado do Container</CardTitle>
           </CardHeader>
@@ -376,7 +372,7 @@ export default function ContainerVistoriaDetailPage() {
         </Card>
 
         {/* Fotos da Vistoria */}
-        <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+        <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
               <Camera className="w-4 h-4 text-primary" />
@@ -386,7 +382,7 @@ export default function ContainerVistoriaDetailPage() {
           <CardContent className="p-4">
             <div className="flex flex-wrap items-end gap-2 mb-4">
               <div className="w-56">
-                <Label htmlFor="new_photo_type">Tipo da foto</Label>
+                <Label htmlFor="new_photo_type" className="mb-1.5 block">Tipo da foto</Label>
                 <Select value={newPhotoType} onValueChange={setNewPhotoType}>
                   <SelectTrigger id="new_photo_type" data-testid="new-photo-type-select">
                     <SelectValue />

@@ -425,7 +425,7 @@ export default function OrdemServicoPage() {
                 <SelectField label="Tipo *" value={form.os_type} onChange={(v) => onChange('os_type', v)} options={[['INTERNO', 'Interno'], ['EXTERNO', 'Externo']]} testid="os-type" />
                 <SelectField label="Status *" value={form.status} onChange={(v) => onChange('status', v)} options={[['ABERTO', 'Aberto'], ['ANDAMENTO', 'Em Andamento'], ['FECHADO', 'Fechado'], ['CANCELADO', 'Cancelado']]} testid="os-status" />
                 <div>
-                  <Label className="mb-1 block">Categoria *</Label>
+                  <Label className="mb-1.5 block">Categoria *</Label>
                   <OptionAutocomplete
                     value={form.category}
                     onChange={(v) => onChange('category', v)}
@@ -435,7 +435,7 @@ export default function OrdemServicoPage() {
                   />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Equipamento (Placa)</Label>
+                  <Label className="mb-1.5 block">Equipamento (Placa)</Label>
                   <Autocomplete
                     value={form.equipment_plate}
                     onChange={(v) => onChange('equipment_plate', v)}
@@ -446,7 +446,7 @@ export default function OrdemServicoPage() {
                   />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Apropriação (Equip. Agregador)</Label>
+                  <Label className="mb-1.5 block">Apropriação (Equip. Agregador)</Label>
                   <Autocomplete
                     value={form.appropriation_plate}
                     onChange={(v) => onChange('appropriation_plate', v)}
@@ -457,7 +457,7 @@ export default function OrdemServicoPage() {
                   />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Pessoa *</Label>
+                  <Label className="mb-1.5 block">Pessoa *</Label>
                   <Autocomplete
                     value={form.person_name}
                     onChange={(v) => onChange('person_name', v)}
@@ -514,7 +514,7 @@ export default function OrdemServicoPage() {
               <SectionTitle>Equipe e Supervisão</SectionTitle>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label className="mb-1 block">Supervisor</Label>
+                  <Label className="mb-1.5 block">Supervisor</Label>
                   <Autocomplete
                     value={form.supervisor_name}
                     onChange={(v) => onChange('supervisor_name', v)}
@@ -525,7 +525,7 @@ export default function OrdemServicoPage() {
                   />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Técnico</Label>
+                  <Label className="mb-1.5 block">Técnico</Label>
                   <Autocomplete
                     value={form.technician_name}
                     onChange={(v) => onChange('technician_name', v)}
@@ -536,7 +536,7 @@ export default function OrdemServicoPage() {
                   />
                 </div>
                 <div>
-                  <Label className="mb-1 block">Ajudante</Label>
+                  <Label className="mb-1.5 block">Ajudante</Label>
                   <Autocomplete
                     value={form.helper_name}
                     onChange={(v) => onChange('helper_name', v)}
@@ -627,7 +627,7 @@ function SectionTitle({ children }) {
 function Field({ label, value, onChange, type = 'text', testid }) {
   return (
     <div>
-      <Label className="mb-1 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}</Label>
       <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} className="h-9 text-sm" data-testid={testid} />
     </div>
@@ -637,7 +637,7 @@ function Field({ label, value, onChange, type = 'text', testid }) {
 function SelectField({ label, value, onChange, options, testid }) {
   return (
     <div>
-      <Label className="mb-1 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}</Label>
       <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
         <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue /></SelectTrigger>
         <SelectContent>
@@ -662,7 +662,7 @@ function CheckboxField({ label, value, onChange }) {
 function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
-      <Label className="mb-1 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}</Label>
       <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
     </div>
   );
@@ -686,11 +686,11 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
         {items.map((it, idx) => (
           <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
             <div className="col-span-2">
-              <Label className="text-xs mb-1 block">Código</Label>
+              <Label className="mb-1.5 block">Código</Label>
               <Input value={it.code || ''} onChange={(e) => onChange(idx, 'code', e.target.value)} className="h-8 text-sm" data-testid={`${kind}-code-${idx}`} />
             </div>
             <div className="col-span-4">
-              <Label className="text-xs mb-1 block">Descrição</Label>
+              <Label className="mb-1.5 block">Descrição</Label>
               <Autocomplete
                 value={it.description || ''}
                 onChange={(v) => onChange(idx, 'description', v)}
@@ -706,25 +706,25 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
               />
             </div>
             <div className="col-span-1">
-              <Label className="text-xs mb-1 block">Qtd</Label>
+              <Label className="mb-1.5 block">Qtd</Label>
               <Input type="number" step="0.01" value={it.quantity ?? ''} onChange={(e) => onChange(idx, 'quantity', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-qty-${idx}`} />
             </div>
             {showUnit && (
               <div className="col-span-1">
-                <Label className="text-xs mb-1 block">Un.</Label>
+                <Label className="mb-1.5 block">Un.</Label>
                 <Input value={it.unit || ''} onChange={(e) => onChange(idx, 'unit', e.target.value)} className="h-8 text-sm" data-testid={`${kind}-unit-${idx}`} />
               </div>
             )}
             <div className="col-span-1">
-              <Label className="text-xs mb-1 block">V. Unit.</Label>
+              <Label className="mb-1.5 block">V. Unit.</Label>
               <Input type="number" step="0.01" value={it.unit_price ?? ''} onChange={(e) => onChange(idx, 'unit_price', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-unitprice-${idx}`} />
             </div>
             <div className="col-span-1">
-              <Label className="text-xs mb-1 block">Desc.</Label>
+              <Label className="mb-1.5 block">Desc.</Label>
               <Input type="number" step="0.01" value={it.discount ?? ''} onChange={(e) => onChange(idx, 'discount', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-disc-${idx}`} />
             </div>
             <div className="col-span-1">
-              <Label className="text-xs mb-1 block">Total</Label>
+              <Label className="mb-1.5 block">Total</Label>
               <Input value={fmtMoney(it.total)} readOnly className="h-8 text-sm text-right font-semibold bg-white dark:bg-slate-900" />
             </div>
             <div className="col-span-1">

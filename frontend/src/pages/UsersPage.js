@@ -232,7 +232,7 @@ export default function UsersPage() {
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="new-user-name" className="text-[13px]">Nome completo *</Label>
+              <Label htmlFor="new-user-name" className="block">Nome completo *</Label>
               <Input
                 id="new-user-name"
                 data-testid="new-user-name"
@@ -240,11 +240,10 @@ export default function UsersPage() {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
                 autoComplete="off"
-                className="h-10 text-[13px]"
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="new-user-email" className="text-[13px]">Email *</Label>
+              <Label htmlFor="new-user-email" className="block">Email *</Label>
               <Input
                 id="new-user-email"
                 data-testid="new-user-email"
@@ -253,12 +252,11 @@ export default function UsersPage() {
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
                 autoComplete="off"
-                className="h-10 text-[13px]"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="new-user-password" className="text-[13px]">Senha *</Label>
+                <Label htmlFor="new-user-password" className="block">Senha *</Label>
                 <div className="relative">
                   <Input
                     id="new-user-password"
@@ -269,7 +267,7 @@ export default function UsersPage() {
                     required
                     minLength={6}
                     autoComplete="new-password"
-                    className="h-10 text-[13px] pr-10"
+                    className="pr-10"
                   />
                   <button
                     type="button"
@@ -283,9 +281,9 @@ export default function UsersPage() {
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">Mínimo de 6 caracteres</p>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Nível de acesso *</Label>
+                <Label className="block">Nível de acesso *</Label>
                 <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
-                  <SelectTrigger className="h-10 text-[13px]" data-testid="new-user-role">
+                  <SelectTrigger data-testid="new-user-role">
                     <SelectValue>{ROLE_LABELS[formData.role]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -307,7 +305,7 @@ export default function UsersPage() {
                 <span className="block text-slate-500 dark:text-slate-400 text-[12px]">Ao entrar pela primeira vez, a pessoa é levada a trocar essa senha por uma só dela</span>
               </span>
             </label>
-            <Button type="submit" className="w-full h-10 text-[13px] font-semibold" disabled={creating} data-testid="new-user-submit">
+            <Button type="submit" className="w-full font-semibold" disabled={creating} data-testid="new-user-submit">
               {creating ? 'Cadastrando...' : 'Cadastrar usuário'}
             </Button>
           </form>

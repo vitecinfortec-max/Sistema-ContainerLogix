@@ -871,16 +871,16 @@ export default function BillingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
               {/* Busca por ID/Container (Código de Barras) */}
               <div>
-                <Label className="mb-1 block">Buscar por ID ou Container</Label>
+                <Label className="mb-1.5 block">Buscar por ID ou Container</Label>
                 <div className="flex gap-2">
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearchById()}
-                    className="h-10 flex-1"
+                    className="flex-1"
                     data-testid="search-movements-input"
                   />
-                  <Button onClick={handleSearchById} className="h-10 px-4" data-testid="search-by-id-button">
+                  <Button onClick={handleSearchById} className="px-4" data-testid="search-by-id-button">
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
@@ -894,20 +894,19 @@ export default function BillingPage() {
 
               {/* Cliente a Faturar (Nome ou CNPJ) */}
               <div>
-                <Label className="mb-1 block">Cliente a Faturar (Nome ou CNPJ)</Label>
+                <Label className="mb-1.5 block">Cliente a Faturar (Nome ou CNPJ)</Label>
                 <div className="flex gap-2">
                   <Input
                     value={clientSearchQuery}
                     onChange={(e) => setClientSearchQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSearchByClient()}
                     disabled={!!targetClientName && (addedMovements.length > 0 || selectedMovements.size > 0)}
-                    className="h-10 flex-1"
+                    className="flex-1"
                     data-testid="search-client-input"
                   />
                   <Button
                     onClick={handleSearchByClient}
                     disabled={!!targetClientName && (addedMovements.length > 0 || selectedMovements.size > 0)}
-                    className="h-10"
                     data-testid="search-by-client-button"
                   >
                     <Search className="w-4 h-4 mr-2" />
@@ -1074,25 +1073,25 @@ export default function BillingPage() {
                 <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-3">Resumo da Fatura</h4>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <Label className="text-xs mb-1 block">Cliente</Label>
+                    <Label className="mb-1.5 block">Cliente</Label>
                     <p className="font-medium">{getSelectedClient() || '-'}</p>
                   </div>
                   <div>
-                    <Label className="text-xs mb-1 block">CNPJ</Label>
+                    <Label className="mb-1.5 block">CNPJ</Label>
                     <p className="font-mono">{getSelectedClientCnpj() || '-'}</p>
                   </div>
                   <div>
-                    <Label className="text-xs mb-1 block">Qtd. Movimentações</Label>
+                    <Label className="mb-1.5 block">Qtd. Movimentações</Label>
                     <p className="font-bold text-primary">{selectedMovements.size}</p>
                   </div>
                   <div>
-                    <Label className="text-xs mb-1 block">Valor Total</Label>
+                    <Label className="mb-1.5 block">Valor Total</Label>
                     <p className="font-bold text-green-700 text-lg">{formatCurrency(getTotalValue())}</p>
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <Label className="mb-1 block">Observações (opcional)</Label>
+                  <Label className="mb-1.5 block">Observações (opcional)</Label>
                   <Textarea
                     value={invoiceNotes}
                     onChange={(e) => setInvoiceNotes(e.target.value)}
@@ -1182,7 +1181,7 @@ export default function BillingPage() {
                   <p className="font-medium">{selectedInvoice.client_name}</p>
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500 dark:text-slate-400">CNPJ</Label>
+                  <Label className="text-slate-500 dark:text-slate-400 mb-1.5 block">CNPJ</Label>
                   <p className="font-mono">{selectedInvoice.client_cnpj || '-'}</p>
                 </div>
                 <div>
@@ -1195,7 +1194,7 @@ export default function BillingPage() {
 
               {selectedInvoice.notes && (
                 <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                  <Label className="text-xs text-amber-700 font-medium">Observações</Label>
+                  <Label className="text-amber-700 mb-1.5 block">Observações</Label>
                   <p className="text-sm text-amber-900 mt-1">{selectedInvoice.notes}</p>
                 </div>
               )}
@@ -1371,31 +1370,30 @@ export default function BillingPage() {
               {/* Dados do Cliente */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="edit-client-name" className="text-[13px]">Nome do Cliente *</Label>
+                  <Label htmlFor="edit-client-name" className="block">Nome do Cliente *</Label>
                   <Input
                     id="edit-client-name"
                     data-testid="edit-client-name-input"
                     value={editFormData.client_name}
                     onChange={(e) => setEditFormData({ ...editFormData, client_name: e.target.value })}
                     required
-                    className="h-10 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="edit-client-cnpj" className="text-[13px]">CNPJ</Label>
+                  <Label htmlFor="edit-client-cnpj" className="block">CNPJ</Label>
                   <Input
                     id="edit-client-cnpj"
                     data-testid="edit-client-cnpj-input"
                     value={editFormData.client_cnpj}
                     onChange={handleCNPJChange}
-                    className="h-10 text-[13px] font-mono"
+                    className="font-mono"
                     maxLength={18}
                   />
                 </div>
               </div>
               
               <div className="space-y-1.5">
-                <Label htmlFor="edit-notes" className="text-[13px]">Observações</Label>
+                <Label htmlFor="edit-notes" className="block">Observações</Label>
                 <Textarea
                   id="edit-notes"
                   data-testid="edit-notes-input"

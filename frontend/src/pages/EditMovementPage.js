@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { FormActions } from '../components/FormKit';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -8,7 +10,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Save, ArrowLeft, X } from 'lucide-react';
+import { Save, X, Container as ContainerIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
 import { Autocomplete } from '../components/Autocomplete';
@@ -252,30 +254,26 @@ export default function EditMovementPage() {
   return (
     <Layout>
       <div className="max-w-5xl mx-auto" data-testid="edit-movement-page">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              Editar Gate
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Atualize as informações do registro</p>
-          </div>
-          <Button variant="outline" onClick={() => navigate(`/movements/${id}`)} data-testid="back-button">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
+        <div className="mb-4">
+          <PageHeader
+            icon={ContainerIcon}
+            title="Editar Gate"
+            subtitle="Atualize as informações do registro"
+            backTo={`/movements/${id}`}
+          />
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tipo de Operação</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="operation_type">Tipo de Operação *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="operation_type" className="block">Tipo de Operação *</Label>
                   <Select value={operationType} onValueChange={(value) => setValue('operation_type', value)}>
-                    <SelectTrigger id="operation_type" className="h-12">
+                    <SelectTrigger id="operation_type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -284,10 +282,10 @@ export default function EditMovementPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="status" className="block">Status *</Label>
                   <Select value={status} onValueChange={(value) => setValue('status', value)}>
-                    <SelectTrigger id="status" className="h-12">
+                    <SelectTrigger id="status">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -306,21 +304,21 @@ export default function EditMovementPage() {
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="driver_name">Nome do Motorista *</Label>
-                  <Input id="driver_name" {...register('driver_name', { required: true })} className="h-12" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="driver_name" className="block">Nome do Motorista *</Label>
+                  <Input id="driver_name" {...register('driver_name', { required: true })} />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="driver_cpf">CPF *</Label>
-                  <Input id="driver_cpf" {...register('driver_cpf', { required: true })} className="h-12 font-mono" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="driver_cpf" className="block">CPF *</Label>
+                  <Input id="driver_cpf" {...register('driver_cpf', { required: true })} className="font-mono" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="truck_plate">Placa do Cavalo *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="truck_plate" className="block">Placa do Cavalo *</Label>
                   <Input
                     id="truck_plate"
                     {...register('truck_plate', { required: true })}
                     onChange={(e) => handleTruckPlateChange(e.target.value)}
-                    className="h-12 font-mono uppercase"
+                    className="font-mono uppercase"
                     list="trucks-list"
                   />
                   <datalist id="trucks-list">
@@ -329,13 +327,13 @@ export default function EditMovementPage() {
                     ))}
                   </datalist>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="trailer_plate_1">Placa Carreta *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="trailer_plate_1" className="block">Placa Carreta *</Label>
                   <Input
                     id="trailer_plate_1"
                     {...register('trailer_plate_1', { required: true })}
                     onChange={(e) => handleTrailerPlateChange(e.target.value)}
-                    className="h-12 font-mono uppercase"
+                    className="font-mono uppercase"
                     list="trailers-list"
                   />
                   <datalist id="trailers-list">
@@ -344,17 +342,17 @@ export default function EditMovementPage() {
                     ))}
                   </datalist>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="transport_company">Transportadora *</Label>
-                  <Input id="transport_company" {...register('transport_company', { required: true })} className="h-12" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="transport_company" className="block">Transportadora *</Label>
+                  <Input id="transport_company" {...register('transport_company', { required: true })} />
                 </div>
-                <div className="space-y-2 relative" ref={clientInputRef}>
-                  <Label htmlFor="client_name">Cliente</Label>
+                <div className="space-y-1.5 relative" ref={clientInputRef}>
+                  <Label htmlFor="client_name" className="block">Cliente</Label>
                   <div className="relative">
                     <Input 
                       id="client_name" 
                       data-testid="client-name-input"
-                      className="h-12 pr-10"
+                      className="pr-10"
                       value={clientSearch}
                       onChange={(e) => {
                         setClientSearch(e.target.value);
@@ -423,8 +421,8 @@ export default function EditMovementPage() {
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="container_number">Nº Container *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="container_number" className="block">Nº Container *</Label>
                   <Input
                     id="container_number"
                     {...register('container_number', {
@@ -435,13 +433,13 @@ export default function EditMovementPage() {
                         loadEntryLocked(containerNumber, operationType);
                       },
                     })}
-                    className="h-12 font-mono uppercase"
+                    className="font-mono uppercase"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="size_type">Tamanho/Tipo *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="size_type" className="block">Tamanho/Tipo *</Label>
                   <Select value={sizeType} onValueChange={(value) => setValue('size_type', value)}>
-                    <SelectTrigger id="size_type" className="h-12">
+                    <SelectTrigger id="size_type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -457,9 +455,9 @@ export default function EditMovementPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="tare">Tara</Label>
-                  <Input id="tare" {...register('tare')} className="h-12 font-mono" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="tare" className="block">Tara</Label>
+                  <Input id="tare" {...register('tare')} className="font-mono" />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -469,7 +467,7 @@ export default function EditMovementPage() {
                     </span>
                   </div>
                   <Select value={shippingLine || ''} onValueChange={(value) => setValue('shipping_line', value)}>
-                    <SelectTrigger id="shipping_line" data-testid="shipping-line-select" className="h-12">
+                    <SelectTrigger id="shipping_line" data-testid="shipping-line-select">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-80 overflow-y-auto">
@@ -494,27 +492,26 @@ export default function EditMovementPage() {
                     <p className="text-xs text-amber-600">Nenhum armador cadastrado. Vá em "Cadastro de Armadores" para adicionar.</p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="seal">Lacre</Label>
-                  <Input id="seal" {...register('seal')} className="h-12 font-mono" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="seal" className="block">Lacre</Label>
+                  <Input id="seal" {...register('seal')} className="font-mono" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="genset">Genset</Label>
-                  <Input id="genset" {...register('genset')} className="h-12 font-mono" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="genset" className="block">Genset</Label>
+                  <Input id="genset" {...register('genset')} className="font-mono" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="booking">Booking</Label>
-                  <Input id="booking" {...register('booking')} className="h-12 font-mono" />
+                <div className="space-y-1.5">
+                  <Label htmlFor="booking" className="block">Booking</Label>
+                  <Input id="booking" {...register('booking')} className="font-mono" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="origin_terminal">Terminal de Origem</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="origin_terminal" className="block">Terminal de Origem</Label>
                   <Autocomplete
                     value={watch('origin_terminal') || ''}
                     onChange={(v) => setValue('origin_terminal', v)}
                     onSelect={(t) => setValue('origin_terminal', t.name)}
                     options={terminals}
                     displayField="name"
-                    className="h-12"
                   />
                 </div>
                 <div className="space-y-2">
@@ -525,7 +522,7 @@ export default function EditMovementPage() {
                     </span>
                   </div>
                   <Select value={serviceType || 'none'} onValueChange={(value) => { userChangedPricingInputRef.current = true; setValue('service_type', value === 'none' ? '' : value); }}>
-                    <SelectTrigger id="service_type" data-testid="service-type-select" className="h-12">
+                    <SelectTrigger id="service_type" data-testid="service-type-select">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="max-h-80 overflow-y-auto">
@@ -537,8 +534,8 @@ export default function EditMovementPage() {
                   </Select>
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="service_value">
+                <div className="space-y-1.5">
+                  <Label htmlFor="service_value" className="block">
                     Valor do Serviço ({(matchedCurrency || existingCurrency || (clientName === 'CARU Containers Brasil Locação' ? 'USD' : 'BRL')) === 'USD' ? 'US$' : 'R$'})
                   </Label>
                   <Input
@@ -547,26 +544,26 @@ export default function EditMovementPage() {
                     step="0.01"
                     min="0"
                     {...register('service_value', { valueAsNumber: true })}
-                    className="h-12 font-mono"
+                    className="font-mono"
                   />
                   <p className="text-xs text-muted-foreground">Este valor aparecerá apenas no relatório de faturamento</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="invoice_number">Nota Fiscal</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="invoice_number" className="block">Nota Fiscal</Label>
                   <Input
                     id="invoice_number"
                     {...register('invoice_number')}
-                    className="h-12 font-mono"
+                    className="font-mono"
                   />
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
                 </div>
 
-                <div className="space-y-2 relative" ref={buyerInputRef}>
-                  <Label htmlFor="buyer_name">Comprador</Label>
+                <div className="space-y-1.5 relative" ref={buyerInputRef}>
+                  <Label htmlFor="buyer_name" className="block">Comprador</Label>
                   <div className="relative">
                     <Input
                       id="buyer_name"
-                      className="h-12 pr-10"
+                      className="pr-10"
                       value={buyerSearch}
                       onChange={(e) => {
                         setBuyerSearch(e.target.value);
@@ -632,8 +629,8 @@ export default function EditMovementPage() {
                   locked={entryLocked}
                 />
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="observations">Observações</Label>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label htmlFor="observations" className="block">Observações</Label>
                   <textarea
                     id="observations"
                     data-testid="observations-input"
@@ -654,11 +651,11 @@ export default function EditMovementPage() {
             disabled={loading}
           />
 
-          <div className="flex justify-end gap-4">
+          <FormActions>
             <Button type="button" variant="outline" onClick={() => navigate(`/movements/${id}`)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading} className="h-12 font-bold uppercase tracking-wide px-8">
+            <Button type="submit" disabled={loading}>
               {loading ? 'Salvando...' : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
@@ -666,7 +663,7 @@ export default function EditMovementPage() {
                 </>
               )}
             </Button>
-          </div>
+          </FormActions>
         </form>
       </div>
     </Layout>

@@ -1,3 +1,4 @@
+import { FormSectionTitle } from '../components/FormKit';
 import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -757,7 +758,7 @@ export default function InternationalInvoicePage() {
               {/* Dados do Recebedor (fixo) */}
               {receiverData && (
                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-                  <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 mb-2">Recebedor (Emissor)</h3>
+                  <FormSectionTitle bare className="mb-2">Recebedor (Emissor)</FormSectionTitle>
                   <p className="text-sm font-medium">{receiverData.company}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.address}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.city_state} - CEP: {receiverData.zip}</p>
@@ -767,10 +768,10 @@ export default function InternationalInvoicePage() {
 
               {/* Dados do Pagador */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Dados do Pagador</h3>
+                <FormSectionTitle>Dados do Pagador</FormSectionTitle>
                 
                 <div className="relative" ref={clientInputRef}>
-                  <Label>Cliente (buscar)</Label>
+                  <Label className="mb-1.5 block">Cliente (buscar)</Label>
                   <Input
                     value={clientSearch}
                     onChange={(e) => {
@@ -803,7 +804,7 @@ export default function InternationalInvoicePage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Empresa / Nome *</Label>
+                    <Label className="mb-1.5 block">Empresa / Nome *</Label>
                     <Input
                       value={formData.payer_company}
                       onChange={(e) => setFormData({ ...formData, payer_company: e.target.value })}
@@ -811,7 +812,7 @@ export default function InternationalInvoicePage() {
                     />
                   </div>
                   <div>
-                    <Label>CNPJ</Label>
+                    <Label className="mb-1.5 block">CNPJ</Label>
                     <Input
                       value={formData.payer_cnpj}
                       onChange={(e) => setFormData({ ...formData, payer_cnpj: e.target.value })}
@@ -822,7 +823,7 @@ export default function InternationalInvoicePage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Contato</Label>
+                    <Label className="mb-1.5 block">Contato</Label>
                     <Input
                       value={formData.payer_contact}
                       onChange={(e) => setFormData({ ...formData, payer_contact: e.target.value })}
@@ -830,7 +831,7 @@ export default function InternationalInvoicePage() {
                     />
                   </div>
                   <div>
-                    <Label>E-mail</Label>
+                    <Label className="mb-1.5 block">E-mail</Label>
                     <Input
                       value={formData.payer_email}
                       onChange={(e) => setFormData({ ...formData, payer_email: e.target.value })}
@@ -840,7 +841,7 @@ export default function InternationalInvoicePage() {
                 </div>
 
                 <div>
-                  <Label>Endereço *</Label>
+                  <Label className="mb-1.5 block">Endereço *</Label>
                   <Input
                     value={formData.payer_address}
                     onChange={(e) => setFormData({ ...formData, payer_address: e.target.value })}
@@ -851,11 +852,11 @@ export default function InternationalInvoicePage() {
 
               {/* Detalhes da Invoice */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Detalhes da Invoice</h3>
+                <FormSectionTitle>Detalhes da Invoice</FormSectionTitle>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label>Data de Emissão *</Label>
+                    <Label className="mb-1.5 block">Data de Emissão *</Label>
                     <Input
                       type="date"
                       value={formData.issue_date}
@@ -864,7 +865,7 @@ export default function InternationalInvoicePage() {
                     />
                   </div>
                   <div>
-                    <Label>Data de Vencimento *</Label>
+                    <Label className="mb-1.5 block">Data de Vencimento *</Label>
                     <Input
                       type="date"
                       value={formData.due_date}
@@ -873,7 +874,7 @@ export default function InternationalInvoicePage() {
                     />
                   </div>
                   <div>
-                    <Label>Moeda *</Label>
+                    <Label className="mb-1.5 block">Moeda *</Label>
                     <Select 
                       value={formData.currency} 
                       onValueChange={(val) => setFormData({ ...formData, currency: val })}
@@ -894,7 +895,7 @@ export default function InternationalInvoicePage() {
               {/* Itens */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center border-b pb-2">
-                  <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300">Itens da Invoice</h3>
+                  <FormSectionTitle bare>Itens da Invoice</FormSectionTitle>
                   <Button variant="outline" size="sm" onClick={addInvoiceItem} data-testid="add-item-btn">
                     <Plus className="h-4 w-4 mr-1" /> Adicionar Item
                   </Button>
@@ -903,7 +904,7 @@ export default function InternationalInvoicePage() {
                 {/* Busca de Movimentação */}
                 <div className="flex gap-2 items-end bg-blue-50 p-3 rounded-lg">
                   <div className="flex-1">
-                    <Label className="text-xs text-blue-700">Buscar Movimentação pelo Número</Label>
+                    <Label className="text-blue-700 mb-1.5 block">Buscar Movimentação pelo Número</Label>
                     <Input
                       value={movementSearch}
                       onChange={(e) => setMovementSearch(e.target.value)}
@@ -932,7 +933,7 @@ export default function InternationalInvoicePage() {
                 {invoiceItems.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-2 items-end bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
                     <div className="col-span-5">
-                      <Label className="text-xs">Descrição</Label>
+                      <Label className="mb-1.5 block">Descrição</Label>
                       <Input
                         value={item.description}
                         onChange={(e) => updateInvoiceItem(index, 'description', e.target.value)}
@@ -940,7 +941,7 @@ export default function InternationalInvoicePage() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs">Qtd</Label>
+                      <Label className="mb-1.5 block">Qtd</Label>
                       <Input
                         type="number"
                         min="1"
@@ -951,7 +952,7 @@ export default function InternationalInvoicePage() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs">Valor Unit.</Label>
+                      <Label className="mb-1.5 block">Valor Unit.</Label>
                       <Input
                         type="number"
                         min="0"
@@ -962,7 +963,7 @@ export default function InternationalInvoicePage() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs">Total</Label>
+                      <Label className="mb-1.5 block">Total</Label>
                       <Input
                         value={item.total.toFixed(2)}
                         disabled
@@ -997,7 +998,7 @@ export default function InternationalInvoicePage() {
 
               {/* Observações */}
               <div>
-                <Label>Observações</Label>
+                <Label className="mb-1.5 block">Observações</Label>
                 <Textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -1207,7 +1208,7 @@ export default function InternationalInvoicePage() {
               {/* Dados do Recebedor (fixo) */}
               {receiverData && (
                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-                  <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 mb-2">Recebedor (Emissor)</h3>
+                  <FormSectionTitle bare className="mb-2">Recebedor (Emissor)</FormSectionTitle>
                   <p className="text-sm font-medium">{receiverData.company}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.address}</p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{receiverData.city_state} - CEP: {receiverData.zip}</p>
@@ -1217,10 +1218,10 @@ export default function InternationalInvoicePage() {
 
               {/* Dados do Pagador */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Dados do Pagador</h3>
+                <FormSectionTitle>Dados do Pagador</FormSectionTitle>
                 
                 <div className="relative" ref={editClientInputRef}>
-                  <Label>Cliente (buscar)</Label>
+                  <Label className="mb-1.5 block">Cliente (buscar)</Label>
                   <Input
                     value={editClientSearch}
                     onChange={(e) => {
@@ -1257,7 +1258,7 @@ export default function InternationalInvoicePage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Empresa / Nome *</Label>
+                    <Label className="mb-1.5 block">Empresa / Nome *</Label>
                     <Input
                       value={editFormData.payer_company}
                       onChange={(e) => setEditFormData({ ...editFormData, payer_company: e.target.value })}
@@ -1265,7 +1266,7 @@ export default function InternationalInvoicePage() {
                     />
                   </div>
                   <div>
-                    <Label>CNPJ</Label>
+                    <Label className="mb-1.5 block">CNPJ</Label>
                     <Input
                       value={editFormData.payer_cnpj}
                       onChange={(e) => setEditFormData({ ...editFormData, payer_cnpj: e.target.value })}
@@ -1276,7 +1277,7 @@ export default function InternationalInvoicePage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label>Contato</Label>
+                    <Label className="mb-1.5 block">Contato</Label>
                     <Input
                       value={editFormData.payer_contact}
                       onChange={(e) => setEditFormData({ ...editFormData, payer_contact: e.target.value })}
@@ -1284,7 +1285,7 @@ export default function InternationalInvoicePage() {
                     />
                   </div>
                   <div>
-                    <Label>E-mail</Label>
+                    <Label className="mb-1.5 block">E-mail</Label>
                     <Input
                       value={editFormData.payer_email}
                       onChange={(e) => setEditFormData({ ...editFormData, payer_email: e.target.value })}
@@ -1294,7 +1295,7 @@ export default function InternationalInvoicePage() {
                 </div>
 
                 <div>
-                  <Label>Endereço *</Label>
+                  <Label className="mb-1.5 block">Endereço *</Label>
                   <Input
                     value={editFormData.payer_address}
                     onChange={(e) => setEditFormData({ ...editFormData, payer_address: e.target.value })}
@@ -1305,11 +1306,11 @@ export default function InternationalInvoicePage() {
 
               {/* Detalhes da Invoice */}
               <div className="space-y-4">
-                <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 border-b pb-2">Detalhes da Invoice</h3>
+                <FormSectionTitle>Detalhes da Invoice</FormSectionTitle>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label>Data de Emissão *</Label>
+                    <Label className="mb-1.5 block">Data de Emissão *</Label>
                     <Input
                       type="date"
                       value={editFormData.issue_date}
@@ -1318,7 +1319,7 @@ export default function InternationalInvoicePage() {
                     />
                   </div>
                   <div>
-                    <Label>Data de Vencimento *</Label>
+                    <Label className="mb-1.5 block">Data de Vencimento *</Label>
                     <Input
                       type="date"
                       value={editFormData.due_date}
@@ -1327,7 +1328,7 @@ export default function InternationalInvoicePage() {
                     />
                   </div>
                   <div>
-                    <Label>Moeda *</Label>
+                    <Label className="mb-1.5 block">Moeda *</Label>
                     <Select 
                       value={editFormData.currency} 
                       onValueChange={(val) => setEditFormData({ ...editFormData, currency: val })}
@@ -1348,7 +1349,7 @@ export default function InternationalInvoicePage() {
               {/* Itens */}
               <div className="space-y-4">
                 <div className="flex justify-between items-center border-b pb-2">
-                  <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300">Itens da Invoice</h3>
+                  <FormSectionTitle bare>Itens da Invoice</FormSectionTitle>
                   <Button variant="outline" size="sm" onClick={addEditInvoiceItem} data-testid="edit-add-item-btn">
                     <Plus className="h-4 w-4 mr-1" /> Adicionar Item
                   </Button>
@@ -1357,7 +1358,7 @@ export default function InternationalInvoicePage() {
                 {/* Busca de Movimentação */}
                 <div className="flex gap-2 items-end bg-blue-50 p-3 rounded-lg">
                   <div className="flex-1">
-                    <Label className="text-xs text-blue-700">Buscar Movimentação pelo Número</Label>
+                    <Label className="text-blue-700 mb-1.5 block">Buscar Movimentação pelo Número</Label>
                     <Input
                       value={editMovementSearch}
                       onChange={(e) => setEditMovementSearch(e.target.value)}
@@ -1386,7 +1387,7 @@ export default function InternationalInvoicePage() {
                 {editInvoiceItems.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-2 items-end bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
                     <div className="col-span-5">
-                      <Label className="text-xs">Descrição</Label>
+                      <Label className="mb-1.5 block">Descrição</Label>
                       <Input
                         value={item.description}
                         onChange={(e) => updateEditInvoiceItem(index, 'description', e.target.value)}
@@ -1394,7 +1395,7 @@ export default function InternationalInvoicePage() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs">Qtd</Label>
+                      <Label className="mb-1.5 block">Qtd</Label>
                       <Input
                         type="number"
                         min="1"
@@ -1405,7 +1406,7 @@ export default function InternationalInvoicePage() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs">Valor Unit.</Label>
+                      <Label className="mb-1.5 block">Valor Unit.</Label>
                       <Input
                         type="number"
                         min="0"
@@ -1416,7 +1417,7 @@ export default function InternationalInvoicePage() {
                       />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs">Total</Label>
+                      <Label className="mb-1.5 block">Total</Label>
                       <Input
                         value={item.total.toFixed(2)}
                         disabled
@@ -1451,7 +1452,7 @@ export default function InternationalInvoicePage() {
 
               {/* Observações */}
               <div>
-                <Label>Observações</Label>
+                <Label className="mb-1.5 block">Observações</Label>
                 <Textarea
                   value={editFormData.notes}
                   onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}

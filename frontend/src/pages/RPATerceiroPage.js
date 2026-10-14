@@ -688,7 +688,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <SectionHeader title="Contratado" />
             <div className="grid grid-cols-2 gap-3">
               <div className="relative" ref={contratadoBoxRef}>
-                <Label className="mb-1 block">
+                <Label className="mb-1.5 block">
                   Transportadora / Contratado <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <div className="relative">
@@ -742,7 +742,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <div className="grid grid-cols-2 gap-3">
               {/* Motorista - Autocomplete */}
               <div className="relative" ref={driverBoxRef}>
-                <Label className="mb-1 block">
+                <Label className="mb-1.5 block">
                   Motorista * <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <div className="relative">
@@ -799,7 +799,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Field label="CPF" value={form.driver_cpf} onChange={(v) => onChange('driver_cpf', v)} testid="rpa-driver-cpf" />
               <Field label="Tipo de Veículo Principal" value={form.vehicle_type} onChange={(v) => onChange('vehicle_type', v)} testid="rpa-vehicle-type" />
               <div>
-                <Label className="mb-1 block">
+                <Label className="mb-1.5 block">
                   Veículo Principal (Placa) <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <Autocomplete
@@ -815,7 +815,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Field label="Renavam" value={form.truck_renavam} onChange={(v) => onChange('truck_renavam', v)} testid="rpa-truck-renavam" />
               <Field label="Proprietário" value={form.truck_owner} onChange={(v) => onChange('truck_owner', v)} testid="rpa-truck-owner" />
               <div>
-                <Label className="mb-1 block">
+                <Label className="mb-1.5 block">
                   Vinculado 01 (Placa) <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <Autocomplete
@@ -851,7 +851,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Field label="Nº Container" value={form.container_number} onChange={(v) => onChange('container_number', v)} testid="rpa-container-number" />
               {/* Cliente - Autocomplete */}
               <div className="relative" ref={clientBoxRef}>
-                <Label className="mb-1 block">
+                <Label className="mb-1.5 block">
                   Cliente <span className="text-primary normal-case font-normal">(digite para buscar cadastrados)</span>
                 </Label>
                 <div className="relative">
@@ -933,7 +933,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               {form.services.map((s, idx) => (
                 <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
                   <div className="col-span-8">
-                    <Label className="text-xs mb-1 block">Descrição do Serviço</Label>
+                    <Label className="mb-1.5 block">Descrição do Serviço</Label>
                     <Input
                       value={s.description}
                       onChange={(e) => updateService(idx, 'description', e.target.value)}
@@ -942,7 +942,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     />
                   </div>
                   <div className="col-span-3">
-                    <Label className="text-xs mb-1 block">Valor (R$)</Label>
+                    <Label className="mb-1.5 block">Valor (R$)</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -983,31 +983,31 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 {form.cargo_items.map((c, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
                     <div className="col-span-2">
-                      <Label className="text-xs mb-1 block">Nro NF</Label>
+                      <Label className="mb-1.5 block">Nro NF</Label>
                       <Input value={c.nf_number} onChange={(e) => updateCargoItem(idx, 'nf_number', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-3">
-                      <Label className="text-xs mb-1 block">Natureza</Label>
+                      <Label className="mb-1.5 block">Natureza</Label>
                       <Input value={c.nature} onChange={(e) => updateCargoItem(idx, 'nature', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs mb-1 block">Espécie</Label>
+                      <Label className="mb-1.5 block">Espécie</Label>
                       <Input value={c.species} onChange={(e) => updateCargoItem(idx, 'species', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
-                      <Label className="text-xs mb-1 block">Qtd.</Label>
+                      <Label className="mb-1.5 block">Qtd.</Label>
                       <Input value={c.quantity} onChange={(e) => updateCargoItem(idx, 'quantity', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
-                      <Label className="text-xs mb-1 block">Kg</Label>
+                      <Label className="mb-1.5 block">Kg</Label>
                       <Input type="number" value={c.weight_kg} onChange={(e) => updateCargoItem(idx, 'weight_kg', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
-                      <Label className="text-xs mb-1 block">M³</Label>
+                      <Label className="mb-1.5 block">M³</Label>
                       <Input type="number" value={c.cubage_m3} onChange={(e) => updateCargoItem(idx, 'cubage_m3', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
-                      <Label className="text-xs mb-1 block">Valor</Label>
+                      <Label className="mb-1.5 block">Valor</Label>
                       <Input type="number" value={c.value} onChange={(e) => updateCargoItem(idx, 'value', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
@@ -1020,7 +1020,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               </div>
             )}
             <div>
-              <Label className="mb-1 block">Relação de Documentos</Label>
+              <Label className="mb-1.5 block">Relação de Documentos</Label>
               <Input
                 value={form.documents_list}
                 onChange={(e) => onChange('documents_list', e.target.value)}
@@ -1093,7 +1093,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
 
             {/* OBSERVAÇÃO */}
             <div>
-              <Label className="mb-1 block">
+              <Label className="mb-1.5 block">
                 Observações / Instruções de Transporte
               </Label>
               <Textarea
@@ -1138,7 +1138,7 @@ function SectionHeader({ title, noMargin }) {
 function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   return (
     <div>
-      <Label className="mb-1 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}</Label>
       <Input
         type={type}
         value={value ?? ''}

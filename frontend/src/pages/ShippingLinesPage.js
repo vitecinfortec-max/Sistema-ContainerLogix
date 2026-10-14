@@ -163,30 +163,29 @@ export default function ShippingLinesPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="name" className="text-[13px]">Nome do Armador *</Label>
+                  <Label htmlFor="name" className="block">Nome do Armador *</Label>
                   <Input
                     id="name"
                     data-testid="line-name-input"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
-                    className="h-10 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="code" className="text-[13px]">Código</Label>
+                  <Label htmlFor="code" className="block">Código</Label>
                   <Input
                     id="code"
                     data-testid="line-code-input"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                    className="h-10 text-[13px] font-mono"
+                    className="font-mono"
                     maxLength={10}
                   />
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full h-10 text-[13px] font-semibold" 
+                  className="w-full font-semibold" 
                   data-testid="submit-line-button"
                   disabled={submitting}
                 >

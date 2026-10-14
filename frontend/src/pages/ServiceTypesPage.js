@@ -180,18 +180,17 @@ export default function ServiceTypesPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="name" className="text-[13px]">Nome *</Label>
+                  <Label htmlFor="name" className="block">Nome *</Label>
                   <Input
                     id="name"
                     data-testid="service-type-name-input"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
-                    className="h-10 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="description" className="text-[13px]">Descrição</Label>
+                  <Label htmlFor="description" className="block">Descrição</Label>
                   <Textarea
                     id="description"
                     data-testid="service-type-description-input"
@@ -202,7 +201,7 @@ export default function ServiceTypesPage() {
                 </div>
                 <Button 
                   type="submit" 
-                  className="w-full h-10 text-[13px] font-semibold" 
+                  className="w-full font-semibold" 
                   data-testid="submit-service-type-button"
                   disabled={submitting}
                 >

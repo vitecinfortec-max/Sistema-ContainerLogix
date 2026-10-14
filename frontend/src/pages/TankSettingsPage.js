@@ -92,24 +92,22 @@ export default function TankSettingsPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">Capacidade do Tanque (litros) *</Label>
+                  <Label className="block">Capacidade do Tanque (litros) *</Label>
                   <Input
                     type="text"
                     inputMode="decimal"
                     value={formData.capacity_liters}
                     onChange={(e) => setField('capacity_liters', e.target.value)}
-                    className="h-10 text-[13px]"
                     data-testid="tank-capacity-input"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">Alerta Mínimo (litros) *</Label>
+                  <Label className="block">Alerta Mínimo (litros) *</Label>
                   <Input
                     type="text"
                     inputMode="decimal"
                     value={formData.minimum_alert_liters}
                     onChange={(e) => setField('minimum_alert_liters', e.target.value)}
-                    className="h-10 text-[13px]"
                     data-testid="tank-minimum-input"
                   />
                 </div>

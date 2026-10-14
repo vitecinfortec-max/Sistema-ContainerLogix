@@ -570,7 +570,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
               {step === 0 && (
                 <div className="space-y-5">
                   <div>
-                    <Label className="mb-2 block">Tipo de Veículo *</Label>
+                    <Label className="mb-1.5 block">Tipo de Veículo *</Label>
                     <div className="grid grid-cols-3 gap-2" data-testid="simple-checklist-vehicle-type">
                       {VEHICLE_TYPE_OPTIONS.map(({ value, label, hint, icon: Icon }) => {
                         const selected = form.vehicle_type === value;
@@ -600,7 +600,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <Label>Placa do Veículo *</Label>
+                      <Label className="mb-1.5 block">Placa do Veículo *</Label>
                       <Autocomplete
                         value={form.vehicle_plate}
                         onChange={(value) => setField('vehicle_plate', value.toUpperCase())}
@@ -611,7 +611,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                       />
                     </div>
                     <div>
-                      <Label htmlFor="checklist_km">Km Atual</Label>
+                      <Label htmlFor="checklist_km" className="mb-1.5 block">Km Atual</Label>
                       <Input
                         id="checklist_km"
                         inputMode="numeric"
@@ -622,7 +622,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                       />
                     </div>
                     <div>
-                      <Label>Motorista *</Label>
+                      <Label className="mb-1.5 block">Motorista *</Label>
                       <Autocomplete
                         value={form.driver_name}
                         onChange={(value) => setForm((prev) => { dirty.current = true; return { ...prev, driver_name: value, driver_id: '' }; })}
@@ -633,7 +633,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                       />
                     </div>
                     <div>
-                      <Label>Vistoriador</Label>
+                      <Label className="mb-1.5 block">Vistoriador</Label>
                       <Autocomplete
                         value={form.vistoriador_name}
                         onChange={(value) => setForm((prev) => { dirty.current = true; return { ...prev, vistoriador_name: value, vistoriador_id: '' }; })}
@@ -644,7 +644,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                       />
                     </div>
                     <div>
-                      <Label htmlFor="checklist_datetime">Data e Hora</Label>
+                      <Label htmlFor="checklist_datetime" className="mb-1.5 block">Data e Hora</Label>
                       <Input
                         id="checklist_datetime"
                         type="datetime-local"
@@ -950,7 +950,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                   </div>
 
                   <div>
-                    <Label htmlFor="checklist_observations">Observações</Label>
+                    <Label htmlFor="checklist_observations" className="mb-1.5 block">Observações</Label>
                     <Textarea
                       id="checklist_observations"
                       rows={3}

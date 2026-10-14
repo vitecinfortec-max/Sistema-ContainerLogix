@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { ArrowLeft, Edit, Trash2, Loader2, Package } from 'lucide-react';
+import { Edit, Trash2, Loader2, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -66,34 +67,29 @@ export default function FlexTankMovementDetailPage() {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto" data-testid="flex-tank-movement-detail-page">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => navigate('/flex-tank')} data-testid="back-btn">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                Movimentação #{movement.movement_number}
-              </h1>
-              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Registrado em {format(new Date(movement.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate(`/flex-tank/movements/${id}/edit`)} data-testid="edit-btn">
-              <Edit className="w-4 h-4 mr-2" />
-              Editar
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} data-testid="delete-btn">
-              <Trash2 className="w-4 h-4 mr-2" />
-              Excluir
-            </Button>
-          </div>
+        <div className="mb-4">
+          <PageHeader
+            icon={Package}
+            title={<>Movimentação #{movement.movement_number}</>}
+            subtitle={<>Registrado em {format(new Date(movement.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</>}
+            backTo={'/flex-tank'}
+            backTestId="back-btn"
+            actions={(
+              <>
+                <Button variant="outline" onClick={() => navigate(`/flex-tank/movements/${id}/edit`)} data-testid="edit-btn">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Editar
+                </Button>
+                <Button variant="destructive" onClick={handleDelete} data-testid="delete-btn">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir
+                </Button>
+              </>
+            )}
+          />
         </div>
 
-        <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+        <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
           <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
             <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
               <Package className="w-4 h-4 text-primary" />

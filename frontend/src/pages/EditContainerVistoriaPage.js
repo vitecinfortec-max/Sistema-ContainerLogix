@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { FormActions } from '../components/FormKit';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -11,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Loader2, Camera, Upload, X } from 'lucide-react';
+import { Save, Loader2, Camera, Upload, X, ShieldCheck } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
 import { VISTORIA_PHOTO_TYPES, MAX_VISTORIA_PHOTOS, formatCPF } from './NewContainerVistoriaPage';
@@ -221,30 +223,27 @@ export default function EditContainerVistoriaPage() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto" data-testid="edit-container-vistoria-page">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => navigate(`/container-vistorias/${id}`)} data-testid="back-btn">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              Editar Vistoria de Container #{vistoriaNumber}
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Edite as informações da vistoria</p>
-          </div>
+      <div className="max-w-5xl mx-auto" data-testid="edit-container-vistoria-page">
+        <div className="mb-4">
+          <PageHeader
+            icon={ShieldCheck}
+            title={<>Editar Vistoria de Container #{vistoriaNumber}</>}
+            subtitle="Edite as informações da vistoria"
+            backTo={`/container-vistorias/${id}`}
+            backTestId="back-btn"
+          />
         </div>
 
         <form onSubmit={handleSubmit}>
           {/* Informações do Container */}
-          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Container</CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="container_number">Número do Container *</Label>
+                  <Label htmlFor="container_number" className="mb-1.5 block">Número do Container *</Label>
                   <Input
                     id="container_number"
                     value={formData.container_number}
@@ -256,7 +255,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="client_name">Cliente</Label>
+                  <Label htmlFor="client_name" className="mb-1.5 block">Cliente</Label>
                   <Autocomplete
                     value={formData.client_name}
                     onChange={(v) => handleInputChange('client_name', v)}
@@ -267,7 +266,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="shipping_line">Armador</Label>
+                  <Label htmlFor="shipping_line" className="mb-1.5 block">Armador</Label>
                   <Select value={formData.shipping_line} onValueChange={(value) => handleInputChange('shipping_line', value)}>
                     <SelectTrigger id="shipping_line" data-testid="shipping-line-select">
                       <SelectValue />
@@ -281,7 +280,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="size_type">Tamanho/Tipo</Label>
+                  <Label htmlFor="size_type" className="mb-1.5 block">Tamanho/Tipo</Label>
                   <Select value={formData.size_type} onValueChange={(value) => handleInputChange('size_type', value)}>
                     <SelectTrigger id="size_type" data-testid="size-type-select">
                       <SelectValue />
@@ -301,7 +300,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="tare">Tara</Label>
+                  <Label htmlFor="tare" className="mb-1.5 block">Tara</Label>
                   <Input
                     id="tare"
                     value={formData.tare}
@@ -311,7 +310,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="driver_name">Nome do Motorista</Label>
+                  <Label htmlFor="driver_name" className="mb-1.5 block">Nome do Motorista</Label>
                   <Autocomplete
                     value={formData.driver_name}
                     onChange={handleDriverChange}
@@ -322,7 +321,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="driver_cpf">CPF do Motorista</Label>
+                  <Label htmlFor="driver_cpf" className="mb-1.5 block">CPF do Motorista</Label>
                   <Input
                     id="driver_cpf"
                     value={formData.driver_cpf}
@@ -334,7 +333,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="truck_plate">Placa do Cavalo</Label>
+                  <Label htmlFor="truck_plate" className="mb-1.5 block">Placa do Cavalo</Label>
                   <Autocomplete
                     value={formData.truck_plate}
                     onChange={(v) => handleInputChange('truck_plate', v.toUpperCase())}
@@ -345,7 +344,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="trailer_plate">Placa da Carreta</Label>
+                  <Label htmlFor="trailer_plate" className="mb-1.5 block">Placa da Carreta</Label>
                   <Autocomplete
                     value={formData.trailer_plate}
                     onChange={(v) => handleInputChange('trailer_plate', v.toUpperCase())}
@@ -356,7 +355,7 @@ export default function EditContainerVistoriaPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="transport_company">Transportadora</Label>
+                  <Label htmlFor="transport_company" className="mb-1.5 block">Transportadora</Label>
                   <Autocomplete
                     value={formData.transport_company}
                     onChange={(v) => handleInputChange('transport_company', v)}
@@ -368,7 +367,7 @@ export default function EditContainerVistoriaPage() {
               </div>
 
               <div>
-                <Label htmlFor="observations">Observações</Label>
+                <Label htmlFor="observations" className="mb-1.5 block">Observações</Label>
                 <Textarea
                   id="observations"
                   value={formData.observations}
@@ -381,7 +380,7 @@ export default function EditContainerVistoriaPage() {
           </Card>
 
           {/* Estado do Container */}
-          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Estado do Container</CardTitle>
             </CardHeader>
@@ -403,7 +402,7 @@ export default function EditContainerVistoriaPage() {
 
               {!noDamage && (
                 <div>
-                  <Label className="text-sm font-medium mb-2 block">Tipo de Serviços</Label>
+                  <Label className="mb-1.5 block">Tipo de Serviços</Label>
                   <p className="text-sm text-muted-foreground mb-3">
                     Busque e adicione os serviços de reparo constatados na vistoria.
                   </p>
@@ -435,7 +434,7 @@ export default function EditContainerVistoriaPage() {
           </Card>
 
           {/* Fotos da Vistoria */}
-          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                 <Camera className="w-4 h-4 text-primary" />
@@ -445,7 +444,7 @@ export default function EditContainerVistoriaPage() {
             <CardContent className="p-4">
               <div className="flex flex-wrap items-end gap-2 mb-4">
                 <div className="w-56">
-                  <Label htmlFor="new_photo_type">Tipo da foto</Label>
+                  <Label htmlFor="new_photo_type" className="mb-1.5 block">Tipo da foto</Label>
                   <Select value={newPhotoType} onValueChange={setNewPhotoType}>
                     <SelectTrigger id="new_photo_type" data-testid="new-photo-type-select">
                       <SelectValue />
@@ -519,7 +518,7 @@ export default function EditContainerVistoriaPage() {
           </Card>
 
           {/* Botões de ação */}
-          <div className="flex justify-end gap-4">
+          <FormActions>
             <Button
               type="button"
               variant="outline"
@@ -540,7 +539,7 @@ export default function EditContainerVistoriaPage() {
                 </>
               )}
             </Button>
-          </div>
+          </FormActions>
         </form>
       </div>
     </Layout>

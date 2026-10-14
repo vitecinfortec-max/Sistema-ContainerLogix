@@ -435,7 +435,7 @@ export default function DeliveryStatusPage() {
             {/* Buscar Programação */}
             {!editingStatus && (
               <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-800">
-                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 block">Buscar Programação de Carregamento</Label>
+                <Label className="font-semibold text-slate-700 dark:text-slate-300 mb-3 mb-1.5 block">Buscar Programação de Carregamento</Label>
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">
                     <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Programação</Label>
@@ -500,7 +500,7 @@ export default function DeliveryStatusPage() {
             {/* Lista de Motoristas com Horários */}
             {formData.items.length > 0 && (
               <div className="space-y-4">
-                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Horários de Entrega por Motorista</Label>
+                <Label className="font-semibold text-slate-700 dark:text-slate-300">Horários de Entrega por Motorista</Label>
                 
                 {formData.items.map((item, index) => (
                   <div key={index} className="p-4 border rounded-lg bg-white dark:bg-slate-900">

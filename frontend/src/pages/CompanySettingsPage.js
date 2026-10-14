@@ -163,7 +163,7 @@ export default function CompanySettingsPage() {
             <CardContent className="p-4 space-y-4">
               <div className="flex flex-col sm:flex-row gap-6">
                 <div className="shrink-0">
-                  <Label className="text-[13px]">Logo</Label>
+                  <Label className="mb-1.5 block">Logo</Label>
                   <div className="mt-1.5">
                     {logoPreview ? (
                       <div className="relative w-32 h-32">
@@ -222,41 +222,39 @@ export default function CompanySettingsPage() {
 
                 <div className="flex-1 space-y-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="name" className="text-[13px]">Nome / Razão Social</Label>
+                    <Label htmlFor="name" className="block">Nome / Razão Social</Label>
                     <Input
                       id="name"
                       data-testid="company-name-input"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       disabled={!isAdmin}
-                      className="h-10 text-[13px]"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="slogan" className="text-[13px]">Slogan / Tagline</Label>
+                    <Label htmlFor="slogan" className="block">Slogan / Tagline</Label>
                     <Input
                       id="slogan"
                       data-testid="company-slogan-input"
                       value={formData.slogan}
                       onChange={(e) => setFormData({ ...formData, slogan: e.target.value })}
                       disabled={!isAdmin}
-                      className="h-10 text-[13px]"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="cnpj" className="text-[13px]">CNPJ</Label>
+                    <Label htmlFor="cnpj" className="block">CNPJ</Label>
                     <Input
                       id="cnpj"
                       data-testid="company-cnpj-input"
                       value={formData.cnpj}
                       onChange={handleCNPJChange}
                       disabled={!isAdmin}
-                      className="h-10 text-[13px] font-mono"
+                      className="font-mono"
                       maxLength={18}
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="address" className="text-[13px]">Endereço</Label>
+                    <Label htmlFor="address" className="block">Endereço</Label>
                     <Textarea
                       id="address"
                       data-testid="company-address-input"
@@ -278,19 +276,19 @@ export default function CompanySettingsPage() {
             <CardContent className="p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="phone" className="text-[13px]">Telefone</Label>
+                  <Label htmlFor="phone" className="block">Telefone</Label>
                   <Input
                     id="phone"
                     data-testid="company-phone-input"
                     value={formData.phone}
                     onChange={handlePhoneChange}
                     disabled={!isAdmin}
-                    className="h-10 text-[13px] font-mono"
+                    className="font-mono"
                     maxLength={15}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-[13px]">E-mail</Label>
+                  <Label htmlFor="email" className="block">E-mail</Label>
                   <Input
                     id="email"
                     type="email"
@@ -298,7 +296,6 @@ export default function CompanySettingsPage() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     disabled={!isAdmin}
-                    className="h-10 text-[13px]"
                   />
                 </div>
               </div>
@@ -313,47 +310,43 @@ export default function CompanySettingsPage() {
             <CardContent className="p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="bank_name" className="text-[13px]">Banco</Label>
+                  <Label htmlFor="bank_name" className="block">Banco</Label>
                   <Input
                     id="bank_name"
                     data-testid="company-bank-name-input"
                     value={formData.bank_name}
                     onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
                     disabled={!isAdmin}
-                    className="h-10 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="bank_agency" className="text-[13px]">Agência</Label>
+                  <Label htmlFor="bank_agency" className="block">Agência</Label>
                   <Input
                     id="bank_agency"
                     data-testid="company-bank-agency-input"
                     value={formData.bank_agency}
                     onChange={(e) => setFormData({ ...formData, bank_agency: e.target.value })}
                     disabled={!isAdmin}
-                    className="h-10 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="bank_account" className="text-[13px]">Conta Corrente</Label>
+                  <Label htmlFor="bank_account" className="block">Conta Corrente</Label>
                   <Input
                     id="bank_account"
                     data-testid="company-bank-account-input"
                     value={formData.bank_account}
                     onChange={(e) => setFormData({ ...formData, bank_account: e.target.value })}
                     disabled={!isAdmin}
-                    className="h-10 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="pix_key" className="text-[13px]">Chave PIX</Label>
+                  <Label htmlFor="pix_key" className="block">Chave PIX</Label>
                   <Input
                     id="pix_key"
                     data-testid="company-pix-key-input"
                     value={formData.pix_key}
                     onChange={(e) => setFormData({ ...formData, pix_key: e.target.value })}
                     disabled={!isAdmin}
-                    className="h-10 text-[13px]"
                   />
                 </div>
               </div>
@@ -367,14 +360,14 @@ export default function CompanySettingsPage() {
             </CardHeader>
             <CardContent className="p-4">
               <div className="max-w-sm space-y-1.5">
-                <Label htmlFor="auto_booking_prefix" className="text-[13px]">Prefixo de Booking Automático (Entrega)</Label>
+                <Label htmlFor="auto_booking_prefix" className="block">Prefixo de Booking Automático (Entrega)</Label>
                 <Input
                   id="auto_booking_prefix"
                   data-testid="company-auto-booking-prefix-input"
                   value={formData.auto_booking_prefix}
                   onChange={(e) => setFormData({ ...formData, auto_booking_prefix: e.target.value.toUpperCase() })}
                   disabled={!isAdmin}
-                  className="h-10 text-[13px] font-mono"
+                  className="font-mono"
                   maxLength={10}
                 />
                 <p className="text-[12px] text-slate-500 dark:text-slate-400">
@@ -388,7 +381,7 @@ export default function CompanySettingsPage() {
             <div className="flex justify-end">
               <Button
                 type="submit"
-                className="h-10 text-[13px] font-semibold"
+                className="font-semibold"
                 disabled={saving || uploadingLogo}
                 data-testid="save-company-settings-button"
               >

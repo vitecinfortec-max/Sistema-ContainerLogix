@@ -155,20 +155,19 @@ export default function OSCategoriesPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="name" className="text-[13px]">Nome *</Label>
+                  <Label htmlFor="name" className="block">Nome *</Label>
                   <Input
                     id="name"
                     data-testid="os-category-name-input"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
-                    className="h-10 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-[13px]">Status</Label>
+                  <Label className="block">Status</Label>
                   <Select value={formData.active ? 'true' : 'false'} onValueChange={(v) => setFormData({ ...formData, active: v === 'true' })}>
-                    <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="true">Ativo</SelectItem>
                       <SelectItem value="false">Inativo</SelectItem>
@@ -177,7 +176,7 @@ export default function OSCategoriesPage() {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full h-10 text-[13px] font-semibold"
+                  className="w-full font-semibold"
                   data-testid="submit-os-category-button"
                   disabled={submitting}
                 >

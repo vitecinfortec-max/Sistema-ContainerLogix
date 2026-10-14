@@ -313,9 +313,9 @@ export default function ContainerSalesPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Número do Container *</Label>
+              <Label className="block">Número do Container *</Label>
               <Input
-                className="h-10 text-[13px] font-mono"
+                className="font-mono"
                 value={form.container_number}
                 onChange={(e) => setForm({ ...form, container_number: e.target.value.toUpperCase() })}
                 disabled={editingIsAuto}
@@ -326,36 +326,33 @@ export default function ContainerSalesPage() {
               )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Representante</Label>
+              <Label className="block">Representante</Label>
               <Autocomplete
                 value={form.representative_name}
                 onChange={(v) => setForm({ ...form, representative_name: v })}
                 onSelect={(r) => setForm({ ...form, representative_id: r.id, representative_name: r.name })}
                 options={representatives}
                 displayField="name"
-                className="h-10 text-[13px]"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Valor da Venda</Label>
+                <Label className="block">Valor da Venda</Label>
                 <Input
                   type="number"
                   step="0.01"
                   min="0"
-                  className="h-10 text-[13px]"
                   value={form.sale_value}
                   onChange={(e) => setForm({ ...form, sale_value: e.target.value })}
                   data-testid="sale-value-input"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Valor Recebido</Label>
+                <Label className="block">Valor Recebido</Label>
                 <Input
                   type="number"
                   step="0.01"
                   min="0"
-                  className="h-10 text-[13px]"
                   value={form.received_value}
                   onChange={(e) => setForm({ ...form, received_value: e.target.value })}
                   data-testid="sale-received-value-input"
@@ -363,7 +360,7 @@ export default function ContainerSalesPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Observações</Label>
+              <Label className="block">Observações</Label>
               <Textarea
                 className="text-[13px] min-h-[60px]"
                 value={form.observations}

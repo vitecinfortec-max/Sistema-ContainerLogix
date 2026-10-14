@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { FormActions } from '../components/FormKit';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -9,7 +11,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { Save, Loader2, Package } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 
 export default function NewFlexTankMovementPage() {
@@ -127,28 +129,25 @@ export default function NewFlexTankMovementPage() {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto" data-testid="new-flex-tank-movement-page">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="outline" onClick={() => navigate('/flex-tank')} data-testid="back-btn">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-              Nova Movimentação
-            </h1>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Registre uma entrada ou saída de bolsa Flex Tank</p>
-          </div>
+        <div className="mb-4">
+          <PageHeader
+            icon={Package}
+            title="Nova Movimentação"
+            subtitle="Registre uma entrada ou saída de bolsa Flex Tank"
+            backTo={'/flex-tank'}
+            backTestId="back-btn"
+          />
         </div>
 
         <form onSubmit={handleSubmit}>
-          <Card className="mb-6 border border-slate-200 dark:border-slate-700 shadow-none">
+          <Card className="mb-4 border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dados da Movimentação</CardTitle>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="bag_number">Número da Bolsa *</Label>
+                  <Label htmlFor="bag_number" className="mb-1.5 block">Número da Bolsa *</Label>
                   <Input
                     id="bag_number"
                     value={formData.bag_number}
@@ -159,7 +158,7 @@ export default function NewFlexTankMovementPage() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="bag_size">Tamanho da Bolsa *</Label>
+                  <Label htmlFor="bag_size" className="mb-1.5 block">Tamanho da Bolsa *</Label>
                   <Select
                     value={formData.bag_size}
                     onValueChange={(value) => handleInputChange('bag_size', value)}
@@ -176,7 +175,7 @@ export default function NewFlexTankMovementPage() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="movement_date">Data *</Label>
+                  <Label htmlFor="movement_date" className="mb-1.5 block">Data *</Label>
                   <Input
                     id="movement_date"
                     type="date"
@@ -188,7 +187,7 @@ export default function NewFlexTankMovementPage() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="movement_type">Tipo *</Label>
+                  <Label htmlFor="movement_type" className="mb-1.5 block">Tipo *</Label>
                   <Select
                     value={formData.movement_type}
                     onValueChange={(value) => handleInputChange('movement_type', value)}
@@ -204,7 +203,7 @@ export default function NewFlexTankMovementPage() {
                 </div>
                 
                 <div className="relative">
-                  <Label htmlFor="client">Cliente</Label>
+                  <Label htmlFor="client" className="mb-1.5 block">Cliente</Label>
                   <Input
                     id="client"
                     value={clientSearch}
@@ -235,7 +234,7 @@ export default function NewFlexTankMovementPage() {
                 </div>
                 
                 <div>
-                  <Label htmlFor="container_number">Número do Container</Label>
+                  <Label htmlFor="container_number" className="mb-1.5 block">Número do Container</Label>
                   <Input
                     id="container_number"
                     value={formData.container_number}
@@ -246,7 +245,7 @@ export default function NewFlexTankMovementPage() {
                 </div>
                 
                 <div className="relative">
-                  <Label htmlFor="destination_client">Cliente Destino</Label>
+                  <Label htmlFor="destination_client" className="mb-1.5 block">Cliente Destino</Label>
                   <Input
                     id="destination_client"
                     value={destinationClientSearch}
@@ -278,7 +277,7 @@ export default function NewFlexTankMovementPage() {
               </div>
               
               <div>
-                <Label htmlFor="observations">Observações</Label>
+                <Label htmlFor="observations" className="mb-1.5 block">Observações</Label>
                 <Textarea
                   id="observations"
                   value={formData.observations}
@@ -290,7 +289,7 @@ export default function NewFlexTankMovementPage() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end gap-4">
+          <FormActions>
             <Button
               type="button"
               variant="outline"
@@ -311,7 +310,7 @@ export default function NewFlexTankMovementPage() {
                 </>
               )}
             </Button>
-          </div>
+          </FormActions>
         </form>
       </div>
     </Layout>

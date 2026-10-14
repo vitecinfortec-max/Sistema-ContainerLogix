@@ -324,7 +324,7 @@ export default function OdometerReadingsPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <Label>Veículo *</Label>
+                <Label className="mb-1.5 block">Veículo *</Label>
                 <Autocomplete
                   value={formData.vehicle_plate}
                   onChange={(val) => setFormData(prev => ({ ...prev, vehicle_plate: val.toUpperCase(), vehicle_id: '' }))}
@@ -335,7 +335,7 @@ export default function OdometerReadingsPage() {
                 />
               </div>
               <div>
-                <Label>KM *</Label>
+                <Label className="mb-1.5 block">KM *</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -348,7 +348,7 @@ export default function OdometerReadingsPage() {
                 />
               </div>
               <div>
-                <Label>Data *</Label>
+                <Label className="mb-1.5 block">Data *</Label>
                 <Input
                   type="date"
                   className="h-9"
@@ -357,7 +357,7 @@ export default function OdometerReadingsPage() {
                 />
               </div>
               <div className="md:col-span-2">
-                <Label>Observações</Label>
+                <Label className="mb-1.5 block">Observações</Label>
                 <Input
                   value={formData.observations}
                   onChange={(e) => setFormData(prev => ({ ...prev, observations: e.target.value }))}

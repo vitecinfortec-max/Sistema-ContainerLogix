@@ -15,11 +15,11 @@ export default function ContainerValueFields({ register, currency, onCurrencyCha
 
   return (
     <>
-      <div className="space-y-2">
-        <Label htmlFor="container_value">Valor do Container</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="container_value" className="block">Valor do Container</Label>
         <div className="flex gap-2">
           <Select value={currency || 'BRL'} onValueChange={onCurrencyChange} disabled={valueLocked}>
-            <SelectTrigger className="h-12 w-24 shrink-0" data-testid="container-value-currency-select">
+            <SelectTrigger className="w-24 shrink-0" data-testid="container-value-currency-select">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -43,8 +43,8 @@ export default function ContainerValueFields({ register, currency, onCurrencyCha
         </p>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="manufacture_date">Data de Fabricação</Label>
+      <div className="space-y-1.5">
+        <Label htmlFor="manufacture_date" className="block">Data de Fabricação</Label>
         <Input
           id="manufacture_date"
           data-testid="manufacture-date-input"

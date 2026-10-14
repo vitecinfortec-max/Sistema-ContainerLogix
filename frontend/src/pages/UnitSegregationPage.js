@@ -482,7 +482,7 @@ export default function UnitSegregationPage() {
             {/* Cliente - Autocomplete */}
             <div className="relative" ref={clientAutocompleteRef}>
               <Label className="mb-1.5 block">
-                Cliente Reservado <span className="text-red-500">*</span>
+                Cliente Reservado <span className="text-destructive">*</span>
               </Label>
               <div className="relative">
                 <Input
@@ -534,7 +534,7 @@ export default function UnitSegregationPage() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>
-                  Unidades a Segregar <span className="text-red-500">*</span>
+                  Unidades a Segregar <span className="text-destructive">*</span>
                 </Label>
                 <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 text-xs">
                   <Plus className="w-3.5 h-3.5 mr-1" />
@@ -547,28 +547,27 @@ export default function UnitSegregationPage() {
                   <div key={index} className="flex gap-2 items-start p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                     <div className="flex-1 grid grid-cols-3 gap-3">
                       <div>
-                        <Label className="text-xs mb-1 block">Container *</Label>
+                        <Label className="mb-1.5 block">Container *</Label>
                         <Input
                           value={item.container_number}
                           onChange={(e) => updateItem(index, 'container_number', e.target.value)}
                           onBlur={(e) => updateItem(index, 'container_number', formatContainerNumber(e.target.value))}
-                          className="h-10 text-sm font-mono"
+                          className="font-mono"
                           data-testid={`container-${index}`}
                         />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Tara</Label>
+                        <Label className="mb-1.5 block">Tara</Label>
                         <Input
                           value={item.tare}
                           onChange={(e) => updateItem(index, 'tare', e.target.value)}
-                          className="h-10 text-sm"
                           data-testid={`tare-${index}`}
                         />
                       </div>
                       <div>
-                        <Label className="text-xs mb-1 block">Armador *</Label>
+                        <Label className="mb-1.5 block">Armador *</Label>
                         <Select value={item.shipping_line} onValueChange={(v) => updateItem(index, 'shipping_line', v)}>
-                          <SelectTrigger className="h-10 text-sm" data-testid={`shipping-${index}`}>
+                          <SelectTrigger data-testid={`shipping-${index}`}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>

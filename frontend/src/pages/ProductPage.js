@@ -348,7 +348,7 @@ export default function ProductPage() {
                 </p>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="adjust_counted" className="text-[13px]">Quantidade contada *</Label>
+                <Label htmlFor="adjust_counted" className="block">Quantidade contada *</Label>
                 <Input
                   id="adjust_counted"
                   type="number"
@@ -356,7 +356,6 @@ export default function ProductPage() {
                   min="0"
                   value={adjustForm.counted}
                   onChange={(e) => setAdjustForm((p) => ({ ...p, counted: e.target.value }))}
-                  className="h-10 text-[13px]"
                   data-testid="adjust-counted-input"
                 />
                 {adjustDifference !== null && (
@@ -370,13 +369,12 @@ export default function ProductPage() {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="adjust_reason" className="text-[13px]">Motivo *</Label>
+                <Label htmlFor="adjust_reason" className="block">Motivo *</Label>
                 <Input
                   id="adjust_reason"
                   value={adjustForm.reason}
                   maxLength={120}
                   onChange={(e) => setAdjustForm((p) => ({ ...p, reason: e.target.value }))}
-                  className="h-10 text-[13px]"
                   data-testid="adjust-reason-input"
                 />
               </div>
@@ -403,11 +401,11 @@ export default function ProductPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5 col-span-2">
-                <Label className="text-[13px]">Descrição do Produto *</Label>
-                <Input value={formData.description} onChange={(e) => setField('description', e.target.value)} required className="h-10 text-[13px]" />
+                <Label className="block">Descrição do Produto *</Label>
+                <Input value={formData.description} onChange={(e) => setField('description', e.target.value)} required />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">{editId ? 'Saldo em Estoque' : 'Saldo Inicial'}</Label>
+                <Label className="block">{editId ? 'Saldo em Estoque' : 'Saldo Inicial'}</Label>
                 {/* Na edição o saldo é só leitura: ele muda por Movimentação, NF-e, EPI ou "Ajustar saldo" */}
                 <Input
                   type="number"
@@ -416,7 +414,6 @@ export default function ProductPage() {
                   value={formData.stock_quantity}
                   onChange={(e) => setField('stock_quantity', e.target.value)}
                   disabled={!!editId}
-                  className="h-10 text-[13px]"
                   data-testid="product-stock-input"
                 />
               </div>
@@ -428,61 +425,59 @@ export default function ProductPage() {
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Almoxarifado</Label>
+                <Label className="block">Almoxarifado</Label>
                 <Autocomplete
                   value={formData.warehouse_name}
                   onChange={(v) => setField('warehouse_name', v)}
                   onSelect={(w) => { setField('warehouse_name', w.name); setField('warehouse_id', w.id); }}
                   options={warehouses}
                   displayField="name"
-                  className="h-10 text-sm"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Categoria/Família do Produto</Label>
+                <Label className="block">Categoria/Família do Produto</Label>
                 <Autocomplete
                   value={formData.family_name}
                   onChange={(v) => setField('family_name', v)}
                   onSelect={(f) => { setField('family_name', f.name); setField('family_id', f.id); }}
                   options={families}
                   displayField="name"
-                  className="h-10 text-sm"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Código de Barras/SKU</Label>
-                <Input value={formData.barcode} onChange={(e) => setField('barcode', e.target.value)} className="h-10 text-[13px]" />
+                <Label className="block">Código de Barras/SKU</Label>
+                <Input value={formData.barcode} onChange={(e) => setField('barcode', e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">NCM</Label>
-                <Input value={formData.ncm} onChange={(e) => setField('ncm', e.target.value)} className="h-10 text-[13px]" />
+                <Label className="block">NCM</Label>
+                <Input value={formData.ncm} onChange={(e) => setField('ncm', e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">CFOP Padrão</Label>
-                <Input value={formData.cfop} onChange={(e) => setField('cfop', e.target.value)} className="h-10 text-[13px]" />
+                <Label className="block">CFOP Padrão</Label>
+                <Input value={formData.cfop} onChange={(e) => setField('cfop', e.target.value)} />
               </div>
               {/* C.A. do EPI - preenche sozinho na Entrega de EPI's */}
               <div className="space-y-1.5">
-                <Label className="text-[13px]">C.A. (se for EPI)</Label>
-                <Input value={formData.ca_number} onChange={(e) => setField('ca_number', e.target.value)} className="h-10 text-[13px]" data-testid="product-ca-input" />
+                <Label className="block">C.A. (se for EPI)</Label>
+                <Input value={formData.ca_number} onChange={(e) => setField('ca_number', e.target.value)}  data-testid="product-ca-input" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Unidade de Medida</Label>
+                <Label className="block">Unidade de Medida</Label>
                 <Select value={formData.unit} onValueChange={(v) => setField('unit', v)}>
-                  <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {unitOptionsFor(formData.unit).map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Origem da Mercadoria</Label>
+                <Label className="block">Origem da Mercadoria</Label>
                 <Select value={formData.origin} onValueChange={(v) => setField('origin', v)}>
-                  <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ORIGIN_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
                   </SelectContent>
@@ -491,33 +486,32 @@ export default function ProductPage() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Valor Unitário de Referência</Label>
-                <Input type="number" step="0.01" value={formData.reference_value} onChange={(e) => setField('reference_value', e.target.value)} className="h-10 text-[13px]" />
+                <Label className="block">Valor Unitário de Referência</Label>
+                <Input type="number" step="0.01" value={formData.reference_value} onChange={(e) => setField('reference_value', e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Alíquota de ICMS (%)</Label>
-                <Input type="number" step="0.01" value={formData.icms_rate} onChange={(e) => setField('icms_rate', e.target.value)} className="h-10 text-[13px]" />
+                <Label className="block">Alíquota de ICMS (%)</Label>
+                <Input type="number" step="0.01" value={formData.icms_rate} onChange={(e) => setField('icms_rate', e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Outros Impostos (%)</Label>
-                <Input type="number" step="0.01" value={formData.other_taxes_rate} onChange={(e) => setField('other_taxes_rate', e.target.value)} className="h-10 text-[13px]" />
+                <Label className="block">Outros Impostos (%)</Label>
+                <Input type="number" step="0.01" value={formData.other_taxes_rate} onChange={(e) => setField('other_taxes_rate', e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Cliente/Fornecedor Vinculado</Label>
+                <Label className="block">Cliente/Fornecedor Vinculado</Label>
                 <Autocomplete
                   value={formData.linked_party_name}
                   onChange={(v) => setField('linked_party_name', v)}
                   options={parties}
                   displayField="name"
-                  className="h-10 text-sm"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[13px]">Status</Label>
+                <Label className="block">Status</Label>
                 <Select value={formData.status} onValueChange={(v) => setField('status', v)}>
-                  <SelectTrigger className="h-10 text-[13px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
                   </SelectContent>
@@ -525,7 +519,7 @@ export default function ProductPage() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[13px]">Observações</Label>
+              <Label className="block">Observações</Label>
               <Textarea value={formData.observations} onChange={(e) => setField('observations', e.target.value)} className="text-[13px] min-h-[60px]" />
             </div>
             <DialogFooter>

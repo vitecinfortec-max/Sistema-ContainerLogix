@@ -184,30 +184,28 @@ export default function FreightRoutesPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="origin" className="text-[13px]">Origem *</Label>
+                  <Label htmlFor="origin" className="block">Origem *</Label>
                   <Input
                     id="origin"
                     data-testid="route-origin-input"
                     value={formData.origin}
                     onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
                     required
-                    className="h-10 text-[13px]"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="destination" className="text-[13px]">Destino *</Label>
+                  <Label htmlFor="destination" className="block">Destino *</Label>
                   <Input
                     id="destination"
                     data-testid="route-destination-input"
                     value={formData.destination}
                     onChange={(e) => setFormData({ ...formData, destination: e.target.value })}
                     required
-                    className="h-10 text-[13px]"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="freight_value" className="text-[13px]">Valor do Frete *</Label>
+                    <Label htmlFor="freight_value" className="block">Valor do Frete *</Label>
                     <Input
                       id="freight_value"
                       type="number"
@@ -217,13 +215,12 @@ export default function FreightRoutesPage() {
                       value={formData.freight_value}
                       onChange={(e) => setFormData({ ...formData, freight_value: e.target.value })}
                       required
-                      className="h-10 text-[13px]"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-[13px]">Status</Label>
+                    <Label className="block">Status</Label>
                     <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-                      <SelectTrigger className="h-10 text-[13px]" data-testid="route-status-select"><SelectValue /></SelectTrigger>
+                      <SelectTrigger data-testid="route-status-select"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {STATUS_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
                       </SelectContent>
@@ -231,7 +228,7 @@ export default function FreightRoutesPage() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="observations" className="text-[13px]">Observações</Label>
+                  <Label htmlFor="observations" className="block">Observações</Label>
                   <Textarea
                     id="observations"
                     data-testid="route-observations-input"
@@ -242,7 +239,7 @@ export default function FreightRoutesPage() {
                 </div>
                 <Button
                   type="submit"
-                  className="w-full h-10 text-[13px] font-semibold"
+                  className="w-full font-semibold"
                   data-testid="submit-route-button"
                   disabled={submitting}
                 >

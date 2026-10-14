@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Printer, ArrowLeft, Edit, Camera, ZoomIn, Download } from 'lucide-react';
+import { Printer, Edit, Camera, ZoomIn, Download, Container as ContainerIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
@@ -248,27 +249,25 @@ export default function MovementDetailPage() {
 
         {/* ===== CONTEÚDO PARA VISUALIZAÇÃO NA TELA (OCULTO NA IMPRESSÃO) ===== */}
         <div className="no-print">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                Detalhes do Gate
-              </h1>
-              <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">Visualização</p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => navigate('/movements')} data-testid="back-button">
-                <ArrowLeft className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Voltar</span>
-              </Button>
-              <Button variant="outline" onClick={() => navigate(`/movements/${id}/edit`)} data-testid="edit-button">
-                <Edit className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Editar</span>
-              </Button>
-              <Button onClick={() => window.print()} data-testid="print-button">
-                <Printer className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Imprimir</span>
-              </Button>
-            </div>
+          <div className="mb-4">
+            <PageHeader
+              icon={ContainerIcon}
+              title="Detalhes do Gate"
+              subtitle="Visualização"
+              backTo="/movements"
+              actions={(
+                <>
+                  <Button variant="outline" onClick={() => navigate(`/movements/${id}/edit`)} data-testid="edit-button">
+                    <Edit className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Editar</span>
+                  </Button>
+                  <Button onClick={() => window.print()} data-testid="print-button">
+                    <Printer className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Imprimir</span>
+                  </Button>
+                </>
+              )}
+            />
           </div>
 
           {/* ===== CONTEÚDO PARA VISUALIZAÇÃO NA TELA ===== */}

@@ -369,7 +369,7 @@ export default function FuelTankLevelPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Data *</Label>
+                <Label className="mb-1.5 block">Data *</Label>
                 <Input
                   type="date"
                   className="h-9"
@@ -378,7 +378,7 @@ export default function FuelTankLevelPage() {
                 />
               </div>
               <div>
-                <Label>Litros *</Label>
+                <Label className="mb-1.5 block">Litros *</Label>
                 <Input
                   type="text"
                   inputMode="decimal"
@@ -391,7 +391,7 @@ export default function FuelTankLevelPage() {
                 />
               </div>
               <div className="col-span-2">
-                <Label>Fornecedor</Label>
+                <Label className="mb-1.5 block">Fornecedor</Label>
                 <Input
                   className="h-9"
                   value={formData.supplier_name}
@@ -399,7 +399,7 @@ export default function FuelTankLevelPage() {
                 />
               </div>
               <div className="col-span-2">
-                <Label>Observações</Label>
+                <Label className="mb-1.5 block">Observações</Label>
                 <Input
                   className="h-9"
                   value={formData.observations}

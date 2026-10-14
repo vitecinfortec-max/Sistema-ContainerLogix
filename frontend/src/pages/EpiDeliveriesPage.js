@@ -472,7 +472,7 @@ export default function EpiDeliveriesPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-3">
-                <Label className="mb-1 block text-[13px]">Motorista ou Funcionário *</Label>
+                <Label className="mb-1.5 block">Motorista ou Funcionário *</Label>
                 <Autocomplete
                   value={form.recipient_label}
                   onChange={onPersonInput}
@@ -514,11 +514,11 @@ export default function EpiDeliveriesPage() {
               )}
 
               <div>
-                <Label className="mb-1 block text-[13px]">Data da entrega *</Label>
+                <Label className="mb-1.5 block">Data da entrega *</Label>
                 <Input type="date" value={form.delivery_date} onChange={(e) => setField('delivery_date', e.target.value)} className="h-9 text-sm" data-testid="epi-date-input" />
               </div>
               <div className="sm:col-span-2">
-                <Label className="mb-1 block text-[13px]">Almoxarifado (baixa do estoque) *</Label>
+                <Label className="mb-1.5 block">Almoxarifado (baixa do estoque) *</Label>
                 <OptionAutocomplete
                   value={form.warehouse_id}
                   onChange={(v) => setForm((p) => ({ ...p, warehouse_id: v, warehouse_name: warehouses.find((w) => w.id === v)?.name || '' }))}
@@ -557,7 +557,7 @@ export default function EpiDeliveriesPage() {
                 return (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-end p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700" data-testid="epi-item-row">
                     <div className="col-span-12 sm:col-span-6">
-                      <Label className="text-xs mb-1 block">EPI (produto do estoque)</Label>
+                      <Label className="mb-1.5 block">EPI (produto do estoque)</Label>
                       <Autocomplete
                         value={it.product_description || ''}
                         onChange={(v) => onItemInput(idx, v)}
@@ -575,11 +575,11 @@ export default function EpiDeliveriesPage() {
                       )}
                     </div>
                     <div className="col-span-5 sm:col-span-3">
-                      <Label className="text-xs mb-1 block">C.A.</Label>
+                      <Label className="mb-1.5 block">C.A.</Label>
                       <Input value={it.ca_number} onChange={(e) => setItem(idx, 'ca_number', e.target.value)} className="h-8 text-sm" data-testid={`epi-item-ca-${idx}`} />
                     </div>
                     <div className="col-span-5 sm:col-span-2">
-                      <Label className="text-xs mb-1 block">Qtd</Label>
+                      <Label className="mb-1.5 block">Qtd</Label>
                       <Input type="number" min="0" step="1" value={it.quantity} onChange={(e) => setItem(idx, 'quantity', e.target.value)} className="h-8 text-sm text-right" data-testid={`epi-item-qty-${idx}`} />
                     </div>
                     <div className="col-span-2 sm:col-span-1">
@@ -593,7 +593,7 @@ export default function EpiDeliveriesPage() {
             </div>
 
             <div>
-              <Label className="mb-1 block text-[13px]">Observações</Label>
+              <Label className="mb-1.5 block">Observações</Label>
               <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[60px]" data-testid="epi-obs-input" />
             </div>
           </div>

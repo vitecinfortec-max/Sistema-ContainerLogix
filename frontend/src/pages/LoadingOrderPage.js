@@ -488,7 +488,7 @@ export default function LoadingOrderPage() {
             <SectionTitle>Origem e Destino</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="mb-1 block">Terminal de Origem</Label>
+                <Label className="mb-1.5 block">Terminal de Origem</Label>
                 <Autocomplete
                   value={form.origin_terminal}
                   onChange={(v) => onChange('origin_terminal', v)}
@@ -506,7 +506,7 @@ export default function LoadingOrderPage() {
                 <SectionTitle>Rota e Frete</SectionTitle>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="mb-1 block">Rota</Label>
+                    <Label className="mb-1.5 block">Rota</Label>
                     <Select value={form.route_id || '_empty'} onValueChange={(v) => onSelectRoute(v === '_empty' ? '' : v)}>
                       <SelectTrigger className="h-9 text-sm" data-testid="loading-order-route"><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -523,7 +523,7 @@ export default function LoadingOrderPage() {
                     )}
                   </div>
                   <div>
-                    <Label className="mb-1 block">Valor do Frete</Label>
+                    <Label className="mb-1.5 block">Valor do Frete</Label>
                     <Input
                       disabled
                       value={form.route_id ? formatMoney(form.freight_value) : '-'}
@@ -541,7 +541,7 @@ export default function LoadingOrderPage() {
                 <SectionTitle>Representante</SectionTitle>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="mb-1 block">Representante</Label>
+                    <Label className="mb-1.5 block">Representante</Label>
                     <Autocomplete
                       value={form.representative_name}
                       onChange={(v) => onChange('representative_name', v)}
@@ -562,7 +562,7 @@ export default function LoadingOrderPage() {
             <div className="grid grid-cols-3 gap-3">
               {form.order_type === 'ENTREGA' && nextBookingPreview ? (
                 <div>
-                  <Label className="mb-1 block">Booking/Ref.</Label>
+                  <Label className="mb-1.5 block">Booking/Ref.</Label>
                   <Input
                     disabled
                     value={form.booking || nextBookingPreview}
@@ -577,7 +577,7 @@ export default function LoadingOrderPage() {
                 <Field label="Booking/Ref." value={form.booking} onChange={(v) => onChange('booking', v)} testid="loading-order-booking" />
               )}
               <div>
-                <Label className="mb-1 block">Cliente</Label>
+                <Label className="mb-1.5 block">Cliente</Label>
                 <Autocomplete
                   value={form.client_name}
                   onChange={(v) => onChange('client_name', v)}
@@ -600,7 +600,7 @@ export default function LoadingOrderPage() {
                 <div key={idx} className="flex flex-col gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
                   <div className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-4">
-                      <Label className="text-xs mb-1 block">ID do Container <span className="text-red-500">*</span></Label>
+                      <Label className="mb-1.5 block">ID do Container <span className="text-destructive">*</span></Label>
                       <Input
                         value={it.container_number}
                         onChange={(e) => updateContainerItem(idx, 'container_number', e.target.value.toUpperCase())}
@@ -610,7 +610,7 @@ export default function LoadingOrderPage() {
                       />
                     </div>
                     <div className="col-span-3">
-                      <Label className="text-xs mb-1 block">Status</Label>
+                      <Label className="mb-1.5 block">Status</Label>
                       <Select value={it.status || 'CHEIO'} onValueChange={(v) => updateContainerItem(idx, 'status', v)}>
                         <SelectTrigger className="h-8 text-sm" data-testid={`loading-order-item-status-${idx}`}><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -619,7 +619,7 @@ export default function LoadingOrderPage() {
                       </Select>
                     </div>
                     <div className="col-span-3">
-                      <Label className="text-xs mb-1 block">Tipo/Tamanho</Label>
+                      <Label className="mb-1.5 block">Tipo/Tamanho</Label>
                       <Select value={it.size_type || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'size_type', v === '_empty' ? '' : v)}>
                         <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -629,7 +629,7 @@ export default function LoadingOrderPage() {
                       </Select>
                     </div>
                     <div className="col-span-2">
-                      <Label className="text-xs mb-1 block">Armador</Label>
+                      <Label className="mb-1.5 block">Armador</Label>
                       <Select value={it.shipping_line || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'shipping_line', v === '_empty' ? '' : v)}>
                         <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                         <SelectContent className="max-h-80 overflow-y-auto">
@@ -644,11 +644,11 @@ export default function LoadingOrderPage() {
                   </div>
                   <div className="grid grid-cols-12 gap-2 items-end">
                     <div className="col-span-3">
-                      <Label className="text-xs mb-1 block">Peso Bruto</Label>
+                      <Label className="mb-1.5 block">Peso Bruto</Label>
                       <Input value={it.gross_weight} onChange={(e) => updateContainerItem(idx, 'gross_weight', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-3">
-                      <Label className="text-xs mb-1 block">Lacre</Label>
+                      <Label className="mb-1.5 block">Lacre</Label>
                       <Input value={it.seal} onChange={(e) => updateContainerItem(idx, 'seal', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-4" />
@@ -676,7 +676,7 @@ export default function LoadingOrderPage() {
             <SectionTitle>Dados do Transporte (Transportador/Motorista)</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="mb-1 block">Motorista <span className="text-red-500">*</span></Label>
+                <Label className="mb-1.5 block">Motorista <span className="text-destructive">*</span></Label>
                 <Autocomplete
                   value={form.driver_name}
                   onChange={(v) => onChange('driver_name', v)}
@@ -690,7 +690,7 @@ export default function LoadingOrderPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <Label className="mb-1 block">Transportadora Contratada</Label>
+                <Label className="mb-1.5 block">Transportadora Contratada</Label>
                 <Autocomplete
                   value={form.transport_company}
                   onChange={(v) => onChange('transport_company', v)}
@@ -700,7 +700,7 @@ export default function LoadingOrderPage() {
                 />
               </div>
               <div>
-                <Label className="mb-1 block">Placa do Cavalo</Label>
+                <Label className="mb-1.5 block">Placa do Cavalo</Label>
                 <Autocomplete
                   value={form.truck_plate}
                   onChange={(v) => onChange('truck_plate', v.toUpperCase())}
@@ -711,7 +711,7 @@ export default function LoadingOrderPage() {
                 />
               </div>
               <div>
-                <Label className="mb-1 block">Placa da Carreta</Label>
+                <Label className="mb-1.5 block">Placa da Carreta</Label>
                 <Autocomplete
                   value={form.trailer_plate}
                   onChange={(v) => onChange('trailer_plate', v.toUpperCase())}
@@ -754,7 +754,7 @@ function SectionTitle({ children }) {
 
 function RequiredLabel({ label }) {
   if (typeof label === 'string' && label.endsWith(' *')) {
-    return <>{label.slice(0, -2)} <span className="text-red-500">*</span></>;
+    return <>{label.slice(0, -2)} <span className="text-destructive">*</span></>;
   }
   return label;
 }
@@ -762,7 +762,7 @@ function RequiredLabel({ label }) {
 function Field({ label, value, onChange, onBlur, type = 'text', testid }) {
   return (
     <div>
-      <Label className="mb-1 block"><RequiredLabel label={label} /></Label>
+      <Label className="mb-1.5 block"><RequiredLabel label={label} /></Label>
       <Input type={type} value={value ?? ''}
         onChange={(e) => onChange(e.target.value)} onBlur={onBlur} className="h-9 text-sm" data-testid={testid} />
     </div>
@@ -772,7 +772,7 @@ function Field({ label, value, onChange, onBlur, type = 'text', testid }) {
 function SelectField({ label, value, onChange, options, testid }) {
   return (
     <div>
-      <Label className="mb-1 block"><RequiredLabel label={label} /></Label>
+      <Label className="mb-1.5 block"><RequiredLabel label={label} /></Label>
       <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
         <SelectTrigger className="h-9 text-sm" data-testid={testid}><SelectValue /></SelectTrigger>
         <SelectContent>
@@ -789,7 +789,7 @@ function WindowField({ value, onChange }) {
   const [start, end] = (value || '').split(' - ').map((s) => s.trim());
   return (
     <div>
-      <Label className="mb-1 block">Janela</Label>
+      <Label className="mb-1.5 block">Janela</Label>
       <div className="flex items-center gap-1.5">
         <Input
           type="time"
@@ -814,7 +814,7 @@ function WindowField({ value, onChange }) {
 function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
-      <Label className="mb-1 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}</Label>
       <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
     </div>
   );
