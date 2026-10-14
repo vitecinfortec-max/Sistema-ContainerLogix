@@ -597,26 +597,26 @@ export default function PortServiceBillingPage() {
                   </div>
                 ) : (
                   <div className="border rounded overflow-hidden">
-                    <table className="w-full text-sm rows-in">
-                      <thead className="bg-muted">
+                    <table className="data-table">
+                      <thead>
                         <tr>
-                          <th className="text-left p-2">Nº</th>
-                          <th className="text-left p-2">Data</th>
-                          <th className="text-left p-2">Motorista</th>
-                          <th className="text-left p-2">Placa</th>
-                          <th className="text-left p-2">Turno</th>
-                          <th className="text-right p-2">Valor</th>
+                          <th>Nº</th>
+                          <th>Data</th>
+                          <th>Motorista</th>
+                          <th>Placa</th>
+                          <th>Turno</th>
+                          <th className="!text-right">Valor</th>
                         </tr>
                       </thead>
                       <tbody>
                         {batchServices.map((s) => (
                           <tr key={s.id} className="border-t">
-                            <td className="p-2">#{s.service_number}</td>
-                            <td className="p-2">{fmtDate(s.service_date)}</td>
-                            <td className="p-2">{s.driver_name}</td>
-                            <td className="p-2 font-mono">{s.cavalo_plate}</td>
-                            <td className="p-2">{s.turno === 'NOITE' ? 'Noite' : 'Dia'}</td>
-                            <td className="p-2 text-right">{fmtMoney(s.operation_value)}</td>
+                            <td>#{s.service_number}</td>
+                            <td>{fmtDate(s.service_date)}</td>
+                            <td>{s.driver_name}</td>
+                            <td className="font-mono">{s.cavalo_plate}</td>
+                            <td>{s.turno === 'NOITE' ? 'Noite' : 'Dia'}</td>
+                            <td className="text-right">{fmtMoney(s.operation_value)}</td>
                           </tr>
                         ))}
                       </tbody>

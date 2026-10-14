@@ -336,7 +336,7 @@ export default function ProductPage() {
         <DialogContent className="max-w-md" aria-describedby={undefined} data-testid="adjust-stock-dialog">
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="text-base flex items-center gap-2">
-              <Scale className="w-4 h-4 text-primary" /> Ajustar saldo
+              <Scale className="w-4 h-4 text-primary" /> Ajustar Saldo
             </DialogTitle>
           </DialogHeader>
           {adjusting && (

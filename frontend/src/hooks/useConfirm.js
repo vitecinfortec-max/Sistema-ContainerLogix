@@ -13,10 +13,10 @@ import {
 // Substitui window.confirm por um dialog no estilo do app, mantendo a mesma
 // API assíncrona (await confirm('mensagem') -> true/false).
 export function useConfirm() {
-  const [state, setState] = useState({ open: false, title: 'Confirmar ação', message: '' });
+  const [state, setState] = useState({ open: false, title: 'Confirmar Ação', message: '' });
   const resolveRef = useRef(null);
 
-  const confirm = useCallback((message, title = 'Confirmar ação') => {
+  const confirm = useCallback((message, title = 'Confirmar Ação') => {
     setState({ open: true, title, message });
     return new Promise((resolve) => {
       resolveRef.current = resolve;

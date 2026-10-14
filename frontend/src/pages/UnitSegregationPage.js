@@ -538,7 +538,7 @@ export default function UnitSegregationPage() {
                 </Label>
                 <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 text-xs">
                   <Plus className="w-3.5 h-3.5 mr-1" />
-                  Adicionar Container
+                  Adicionar container
                 </Button>
               </div>
 
@@ -609,7 +609,7 @@ export default function UnitSegregationPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { resetForm(); setModalOpen(false); }}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : editingItem ? 'Atualizar' : 'Criar Segregação'}
+              {saving ? 'Salvando...' : editingItem ? 'Atualizar' : 'Criar segregação'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -667,24 +667,24 @@ export default function UnitSegregationPage() {
                   <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 border-b">
                     <span className="text-[11px] text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">Containers Segregados</span>
                   </div>
-                  <table className="w-full text-sm rows-in">
+                  <table className="data-table">
                     <thead>
-                      <tr className="border-b bg-slate-50 dark:bg-slate-800">
-                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">#</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Container</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Tara</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Armador</th>
-                        <th className="px-4 py-2 text-left text-[10px] font-semibold uppercase text-slate-400 dark:text-slate-500">Retirada</th>
+                      <tr>
+                        <th>#</th>
+                        <th>Container</th>
+                        <th>Tara</th>
+                        <th>Armador</th>
+                        <th>Retirada</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedItem.items.map((container, idx) => (
                         <tr key={idx} className="border-b last:border-b-0">
-                          <td className="px-4 py-2 font-semibold">{idx + 1}</td>
-                          <td className="px-4 py-2 font-mono">{container.container_number}</td>
-                          <td className="px-4 py-2">{container.tare || '-'}</td>
-                          <td className="px-4 py-2">{container.shipping_line_name || container.shipping_line}</td>
-                          <td className="px-4 py-2">
+                          <td className="font-semibold">{idx + 1}</td>
+                          <td className="font-mono">{container.container_number}</td>
+                          <td>{container.tare || '-'}</td>
+                          <td>{container.shipping_line_name || container.shipping_line}</td>
+                          <td>
                             {container.retrieved ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800" title={container.retrieved_at ? format(new Date(container.retrieved_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : ''}>
                                 <CheckCircle2 className="w-3 h-3" />
@@ -730,7 +730,7 @@ export default function UnitSegregationPage() {
             <Button variant="outline" onClick={() => setDetailModalOpen(false)}>Fechar</Button>
             <Button variant="outline" onClick={() => { handlePrintLabel(selectedItem.id); }}>
               <Tag className="w-4 h-4 mr-2" />
-              Gerar Etiqueta
+              Gerar etiqueta
             </Button>
             <Button onClick={() => { handlePrint(selectedItem.id); }}>
               <Printer className="w-4 h-4 mr-2" />

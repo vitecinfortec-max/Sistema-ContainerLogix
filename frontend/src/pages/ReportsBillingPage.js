@@ -243,7 +243,7 @@ export default function ReportsBillingPage() {
                 size="sm"
                 onClick={downloadStorageOveragePDF}
                 disabled={loading}
-                title={dateFrom || dateTo ? 'Baixar PDF de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar PDF de Diárias'}
+                title={dateFrom || dateTo ? 'Baixar PDF de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar PDF de diárias'}
                 className="h-8 text-xs gap-1.5"
                 data-testid="download-storage-overage-pdf-button"
               >
@@ -255,7 +255,7 @@ export default function ReportsBillingPage() {
                 size="sm"
                 onClick={downloadStorageOverageExcel}
                 disabled={loading}
-                title={dateFrom || dateTo ? 'Baixar Excel de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar Excel de Diárias'}
+                title={dateFrom || dateTo ? 'Baixar Excel de Diárias (só dias excedentes dentro do período selecionado)' : 'Baixar Excel de diárias'}
                 className="h-8 text-xs gap-1.5"
                 data-testid="download-storage-overage-excel-button"
               >

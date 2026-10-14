@@ -203,7 +203,7 @@ export default function FuelTankLevelPage() {
               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">O tanque ainda não foi configurado</p>
               <p className="text-xs mt-1 mb-4 text-slate-400 dark:text-slate-500">Defina a capacidade e o alerta mínimo primeiro</p>
               <Link to="/tank-settings">
-                <Button size="sm" data-testid="go-to-tank-settings-button">Configurar Tanque</Button>
+                <Button size="sm" data-testid="go-to-tank-settings-button">Configurar tanque</Button>
               </Link>
             </div>
           ) : (

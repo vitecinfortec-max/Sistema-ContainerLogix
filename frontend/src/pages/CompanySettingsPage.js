@@ -206,7 +206,7 @@ export default function CompanySettingsPage() {
                           ) : (
                             <Upload className="w-3.5 h-3.5 mr-1.5" />
                           )}
-                          {logoPreview ? 'Trocar Logo' : 'Enviar Logo'}
+                          {logoPreview ? 'Trocar logo' : 'Enviar logo'}
                         </Button>
                         <input
                           ref={fileInputRef}

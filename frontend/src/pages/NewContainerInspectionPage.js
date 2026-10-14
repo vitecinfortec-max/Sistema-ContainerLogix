@@ -544,7 +544,7 @@ export default function NewContainerInspectionPage() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Salvar Registro
+                  Salvar registro
                 </>
               )}
             </Button>

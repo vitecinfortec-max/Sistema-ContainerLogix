@@ -524,7 +524,7 @@ export default function NewContainerVistoriaPage() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Salvar Vistoria
+                  Salvar vistoria
                 </>
               )}
             </Button>

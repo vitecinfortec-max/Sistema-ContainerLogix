@@ -305,7 +305,7 @@ export default function StockEntriesPage() {
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                 <Button type="button" onClick={handleParse} disabled={parsing || !selectedFile} data-testid="analyze-nfe-button">
-                  {parsing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analisando...</> : 'Analisar Arquivo'}
+                  {parsing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Analisando...</> : 'Analisar arquivo'}
                 </Button>
               </DialogFooter>
             </div>
@@ -403,7 +403,7 @@ export default function StockEntriesPage() {
                   <ArrowLeft className="w-4 h-4 mr-1.5" />Voltar
                 </Button>
                 <Button type="button" onClick={handleConfirm} disabled={confirming || !!preview.already_imported} data-testid="confirm-nfe-import-button">
-                  {confirming ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Importando...</> : 'Confirmar Importação'}
+                  {confirming ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Importando...</> : 'Confirmar importação'}
                 </Button>
               </DialogFooter>
             </div>

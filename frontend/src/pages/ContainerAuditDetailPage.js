@@ -185,7 +185,7 @@ export default function ContainerAuditDetailPage() {
           ) : (
             <Button onClick={handleComplete} disabled={completing} data-testid="complete-audit-btn">
               {completing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-              Concluir Auditoria
+              Concluir auditoria
             </Button>
           )}
         />
@@ -199,30 +199,30 @@ export default function ContainerAuditDetailPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full rows-in">
+              <table className="data-table">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800">
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
-                    <th className="hidden sm:table-cell px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tamanho</th>
-                    <th className="hidden sm:table-cell px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Booking</th>
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Situação</th>
-                    <th className="hidden md:table-cell px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Observações</th>
-                    <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Foto</th>
-                    {!isLocked && <th className="px-4 py-2.5"></th>}
+                  <tr>
+                    <th>Container</th>
+                    <th className="hidden sm:table-cell">Tamanho</th>
+                    <th className="hidden sm:table-cell">Booking</th>
+                    <th>Situação</th>
+                    <th className="hidden md:table-cell">Observações</th>
+                    <th>Foto</th>
+                    {!isLocked && <th></th>}
                   </tr>
                 </thead>
                 <tbody>
                   {expectedItems.map((item, idx) => (
                     <tr key={item.container_number} className={idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}>
-                      <td className="px-4 py-2.5 text-sm font-mono text-slate-800 dark:text-slate-200">{item.container_number}</td>
-                      <td className="hidden sm:table-cell px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">{item.size_type || '-'}</td>
-                      <td className="hidden sm:table-cell px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">{item.booking || '-'}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="text-sm font-mono text-slate-800 dark:text-slate-200">{item.container_number}</td>
+                      <td className="hidden sm:table-cell text-sm text-slate-500 dark:text-slate-400">{item.size_type || '-'}</td>
+                      <td className="hidden sm:table-cell text-sm text-slate-500 dark:text-slate-400">{item.booking || '-'}</td>
+                      <td>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${STATUS_STYLES[item.status] || STATUS_STYLES.PENDENTE}`}>
                           {STATUS_LABELS[item.status] || item.status}
                         </span>
                       </td>
-                      <td className="hidden md:table-cell px-4 py-2.5">
+                      <td className="hidden md:table-cell">
                         {isLocked ? (
                           <span className="text-sm text-slate-500 dark:text-slate-400">{item.observations || '-'}</span>
                         ) : (
@@ -234,7 +234,7 @@ export default function ContainerAuditDetailPage() {
                           />
                         )}
                       </td>
-                      <td className="px-4 py-2.5">
+                      <td>
                         {item.photo ? (
                           <a href={item.photo.url} target="_blank" rel="noreferrer">
                             <img src={item.photo.url} alt={item.container_number} className="w-10 h-10 object-cover rounded border border-slate-200 dark:border-slate-700" />
@@ -255,7 +255,7 @@ export default function ContainerAuditDetailPage() {
                         />
                       </td>
                       {!isLocked && (
-                        <td className="px-4 py-2.5">
+                        <td>
                           <div className="flex items-center gap-1">
                             <Button
                               variant="ghost" size="sm" className="h-8 w-8 p-0"
@@ -320,19 +320,19 @@ export default function ContainerAuditDetailPage() {
 
             {unexpectedItems.length > 0 && (
               <div className="overflow-x-auto">
-                <table className="w-full rows-in">
+                <table className="data-table">
                   <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
-                      <th className="hidden md:table-cell px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Observações</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Foto</th>
+                    <tr>
+                      <th>Container</th>
+                      <th className="hidden md:table-cell">Observações</th>
+                      <th>Foto</th>
                     </tr>
                   </thead>
                   <tbody>
                     {unexpectedItems.map((item, idx) => (
                       <tr key={item.container_number} className={idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}>
-                        <td className="px-4 py-2.5 text-sm font-mono text-slate-800 dark:text-slate-200">{item.container_number}</td>
-                        <td className="hidden md:table-cell px-4 py-2.5">
+                        <td className="text-sm font-mono text-slate-800 dark:text-slate-200">{item.container_number}</td>
+                        <td className="hidden md:table-cell">
                           {isLocked ? (
                             <span className="text-sm text-slate-500 dark:text-slate-400">{item.observations || '-'}</span>
                           ) : (
@@ -344,7 +344,7 @@ export default function ContainerAuditDetailPage() {
                             />
                           )}
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td>
                           {item.photo ? (
                             <a href={item.photo.url} target="_blank" rel="noreferrer">
                               <img src={item.photo.url} alt={item.container_number} className="w-10 h-10 object-cover rounded border border-slate-200 dark:border-slate-700" />

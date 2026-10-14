@@ -1145,7 +1145,7 @@ export default function FleetPage() {
               Cancelar
             </Button>
             <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : 'Registrar Revisão'}
+              {saving ? 'Salvando...' : 'Registrar revisão'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1590,7 +1590,7 @@ export default function FleetPage() {
               Cancelar
             </Button>
             <Button onClick={handleVehicleSubmit} disabled={vehicleSaving}>
-              {vehicleSaving ? 'Salvando...' : (editingVehicle ? 'Salvar Alterações' : 'Cadastrar Veículo')}
+              {vehicleSaving ? 'Salvando...' : (editingVehicle ? 'Salvar alterações' : 'Cadastrar veículo')}
             </Button>
           </DialogFooter>
         </DialogContent>

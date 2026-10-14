@@ -288,8 +288,8 @@ export default function FreightPaymentsPage() {
           count={loading ? '...' : list.length}
           toolbar={(
             <Toolbar selectedCount={selectedIds.size}>
-              <ToolbarButton icon={CheckCircle2} label="Marcar como Pago" tone="emerald" onClick={handleMarkPaidBatch} disabled={!canMarkPaidBatch || markingPaid} testId="freight-payment-mark-paid" />
-              <ToolbarButton icon={RotateCcw} label="Marcar como Pendente" tone="amber" onClick={() => singleSelected && markStatus(singleSelected.id, 'PENDENTE')} disabled={!singleSelected || singleSelected.status !== 'PAGO'} testId="freight-payment-mark-pending" />
+              <ToolbarButton icon={CheckCircle2} label="Marcar como pago" tone="emerald" onClick={handleMarkPaidBatch} disabled={!canMarkPaidBatch || markingPaid} testId="freight-payment-mark-paid" />
+              <ToolbarButton icon={RotateCcw} label="Marcar como pendente" tone="amber" onClick={() => singleSelected && markStatus(singleSelected.id, 'PENDENTE')} disabled={!singleSelected || singleSelected.status !== 'PAGO'} testId="freight-payment-mark-pending" />
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelected && openEdit(singleSelected)} disabled={!singleSelected || singleSelected.status !== 'PENDENTE'} testId="freight-payment-edit" />
               <ToolbarDivider />
               <ToolbarButton icon={FileText} label="Prestação de Contas em PDF" tone="red" onClick={() => downloadReport('pdf')} disabled={!canExportReport || generating} testId="freight-payment-report-pdf" />

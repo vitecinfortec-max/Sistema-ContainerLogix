@@ -531,7 +531,7 @@ export default function FuelSupplyPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="fuel-cancel">Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90" data-testid="fuel-save">
-              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar Abastecimento' : 'Salvar Abastecimento'}
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar abastecimento' : 'Salvar abastecimento'}
             </Button>
           </DialogFooter>
         </DialogContent>

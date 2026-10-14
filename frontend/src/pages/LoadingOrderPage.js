@@ -592,7 +592,7 @@ export default function LoadingOrderPage() {
             <div className="flex items-center justify-between mt-1">
               <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Containers da Ordem</Label>
               <Button variant="outline" size="sm" onClick={addContainerItem} type="button" className="h-7 text-xs" data-testid="loading-order-add-item">
-                <Plus className="w-3 h-3 mr-1" />Adicionar Container
+                <Plus className="w-3 h-3 mr-1" />Adicionar container
               </Button>
             </div>
             <div className="space-y-2">
@@ -734,7 +734,7 @@ export default function LoadingOrderPage() {
             )}
             <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="loading-order-cancel">Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90" data-testid="loading-order-save">
-              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar Ordem' : 'Salvar Ordem'}
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar ordem' : 'Salvar ordem'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -897,7 +897,7 @@ export default function InternationalInvoicePage() {
                 <div className="flex justify-between items-center border-b pb-2">
                   <FormSectionTitle bare>Itens da Invoice</FormSectionTitle>
                   <Button variant="outline" size="sm" onClick={addInvoiceItem} data-testid="add-item-btn">
-                    <Plus className="h-4 w-4 mr-1" /> Adicionar Item
+                    <Plus className="h-4 w-4 mr-1" /> Adicionar item
                   </Button>
                 </div>
 
@@ -1021,7 +1021,7 @@ export default function InternationalInvoicePage() {
                 ) : (
                   <>
                     <Check className="h-4 w-4 mr-2" />
-                    Criar Invoice
+                    Criar invoice
                   </>
                 )}
               </Button>
@@ -1100,33 +1100,33 @@ export default function InternationalInvoicePage() {
                 <div>
                   <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Itens</h4>
                   <div className="border rounded overflow-hidden">
-                    <table className="w-full text-sm rows-in">
-                      <thead className="bg-slate-100 dark:bg-slate-700">
+                    <table className="data-table">
+                      <thead>
                         <tr>
-                          <th className="text-left p-2">Descrição</th>
-                          <th className="text-right p-2">Qtd</th>
-                          <th className="text-right p-2">Valor Unit.</th>
-                          <th className="text-right p-2">Total</th>
+                          <th>Descrição</th>
+                          <th className="!text-right">Qtd</th>
+                          <th className="!text-right">Valor Unit.</th>
+                          <th className="!text-right">Total</th>
                         </tr>
                       </thead>
                       <tbody>
                         {selectedInvoice.items?.map((item, idx) => (
                           <tr key={idx} className="border-t">
-                            <td className="p-2">{item.description}</td>
-                            <td className="p-2 text-right">{item.quantity}</td>
-                            <td className="p-2 text-right">
+                            <td>{item.description}</td>
+                            <td className="text-right">{item.quantity}</td>
+                            <td className="text-right">
                               {getCurrencySymbol(selectedInvoice.currency)} {item.unit_price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </td>
-                            <td className="p-2 text-right font-medium">
+                            <td className="text-right font-medium">
                               {getCurrencySymbol(selectedInvoice.currency)} {item.total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-slate-50 dark:bg-slate-800">
+                      <tfoot>
                         <tr className="border-t">
-                          <td colSpan={3} className="p-2 text-right font-semibold">TOTAL:</td>
-                          <td className="p-2 text-right font-bold text-lg">
+                          <td colSpan={3} className="text-right">TOTAL:</td>
+                          <td className="text-right font-bold text-lg">
                             {getCurrencySymbol(selectedInvoice.currency)} {selectedInvoice.total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </td>
                         </tr>
@@ -1351,7 +1351,7 @@ export default function InternationalInvoicePage() {
                 <div className="flex justify-between items-center border-b pb-2">
                   <FormSectionTitle bare>Itens da Invoice</FormSectionTitle>
                   <Button variant="outline" size="sm" onClick={addEditInvoiceItem} data-testid="edit-add-item-btn">
-                    <Plus className="h-4 w-4 mr-1" /> Adicionar Item
+                    <Plus className="h-4 w-4 mr-1" /> Adicionar item
                   </Button>
                 </div>
 
@@ -1475,7 +1475,7 @@ export default function InternationalInvoicePage() {
                 ) : (
                   <>
                     <Check className="h-4 w-4 mr-2" />
-                    Salvar Alterações
+                    Salvar alterações
                   </>
                 )}
               </Button>

@@ -111,7 +111,7 @@ export default function NewContainerAuditPage() {
 
             <Button onClick={handleStart} disabled={!selectedClient || creating} className="w-full" data-testid="start-audit-btn">
               {creating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Iniciar Auditoria
+              Iniciar auditoria
             </Button>
           </CardContent>
         </Card>

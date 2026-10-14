@@ -125,6 +125,11 @@
   .data-table tbody tr[data-selected="true"] td:first-child {
     box-shadow: inset 3px 0 0 hsl(var(--primary));
   }
+  /* Linha de total no rodapé da tabela */
+  .data-table tfoot td {
+    @apply px-3 py-2.5 font-semibold text-slate-800 bg-slate-50 border-t border-slate-200
+      dark:text-slate-100 dark:bg-slate-800/60 dark:border-slate-700;
+  }
   .data-table .cell-strong {
     @apply font-semibold text-slate-800 dark:text-slate-100;
   }

@@ -926,7 +926,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <SectionHeader title="Demonstrativo dos Serviços Prestados" noMargin />
               <Button variant="outline" size="sm" onClick={addService} type="button" className="h-7 text-xs">
                 <Plus className="w-3 h-3 mr-1" />
-                Adicionar Serviço
+                Adicionar serviço
               </Button>
             </div>
             <div className="space-y-2">
@@ -973,7 +973,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <SectionHeader title="Dados da Carga" noMargin />
               <Button variant="outline" size="sm" onClick={addCargoItem} type="button" className="h-7 text-xs">
                 <Plus className="w-3 h-3 mr-1" />
-                Adicionar Item de Carga
+                Adicionar item de carga
               </Button>
             </div>
             {form.cargo_items.length === 0 ? (
@@ -1115,7 +1115,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               data-testid="rpa-save-btn"
             >
               <Save className="w-4 h-4 mr-2" />
-              {saving ? 'Salvando...' : editingId ? 'Atualizar Contrato' : 'Salvar Contrato'}
+              {saving ? 'Salvando...' : editingId ? 'Atualizar contrato' : 'Salvar contrato'}
             </Button>
           </DialogFooter>
         </DialogContent>

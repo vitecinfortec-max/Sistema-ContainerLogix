@@ -527,7 +527,7 @@ export default function MovementsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={(open) => !isDeleting && setDeleteId(open ? deleteId : null)}>
         <AlertDialogContent data-testid="delete-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja deletar este registro? Esta ação não pode ser desfeita.
             </AlertDialogDescription>

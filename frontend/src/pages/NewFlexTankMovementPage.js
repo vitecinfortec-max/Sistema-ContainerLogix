@@ -306,7 +306,7 @@ export default function NewFlexTankMovementPage() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Registrar Movimentação
+                  Registrar movimentação
                 </>
               )}
             </Button>

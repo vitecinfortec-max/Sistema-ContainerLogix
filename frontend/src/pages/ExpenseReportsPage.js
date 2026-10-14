@@ -537,7 +537,7 @@ export default function ExpenseReportsPage() {
               <div className="flex items-center justify-between mb-3">
                 <FormSectionTitle bare>Depósitos Recebidos</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addDeposit}>
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar Depósito
+                  <Plus className="w-4 h-4 mr-1" /> Adicionar depósito
                 </Button>
               </div>
               <div className="space-y-3">
@@ -575,7 +575,7 @@ export default function ExpenseReportsPage() {
               <div className="flex items-center justify-between mb-3">
                 <FormSectionTitle bare>Lançamentos de Compras</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addPurchase}>
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar Compra
+                  <Plus className="w-4 h-4 mr-1" /> Adicionar compra
                 </Button>
               </div>
               <div className="space-y-4">
@@ -688,7 +688,7 @@ export default function ExpenseReportsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : (editingReport ? 'Salvar Alterações' : 'Criar Prestação de Contas')}
+              {saving ? 'Salvando...' : (editingReport ? 'Salvar alterações' : 'Criar prestação de contas')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -714,20 +714,20 @@ export default function ExpenseReportsPage() {
               <div>
                 <h4 className="font-semibold mb-2">Depósitos Recebidos ({selectedReport.deposits?.length || 0})</h4>
                 <div className="border rounded overflow-hidden">
-                  <table className="w-full text-sm rows-in">
-                    <thead className="bg-muted">
+                  <table className="data-table">
+                    <thead>
                       <tr>
-                        <th className="text-left p-2">Data</th>
-                        <th className="text-left p-2">Enviado Por</th>
-                        <th className="text-right p-2">Valor</th>
+                        <th>Data</th>
+                        <th>Enviado Por</th>
+                        <th className="!text-right">Valor</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedReport.deposits?.map((d, idx) => (
                         <tr key={idx} className="border-t">
-                          <td className="p-2">{formatPeriodDate(d.date)}</td>
-                          <td className="p-2">{d.sent_by}</td>
-                          <td className="p-2 text-right">{formatMoney(d.amount)}</td>
+                          <td>{formatPeriodDate(d.date)}</td>
+                          <td>{d.sent_by}</td>
+                          <td className="text-right">{formatMoney(d.amount)}</td>
                         </tr>
                       ))}
                     </tbody>

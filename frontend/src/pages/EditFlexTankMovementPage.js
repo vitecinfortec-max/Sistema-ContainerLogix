@@ -342,7 +342,7 @@ export default function EditFlexTankMovementPage() {
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Salvar Alterações
+                  Salvar alterações
                 </>
               )}
             </Button>

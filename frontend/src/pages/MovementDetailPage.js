@@ -503,7 +503,7 @@ export default function MovementDetailPage() {
                   data-testid="download-photo-btn"
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Baixar Foto
+                  Baixar foto
                 </Button>
               )}
             </DialogTitle>

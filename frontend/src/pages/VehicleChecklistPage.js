@@ -849,7 +849,7 @@ export default function VehicleChecklistPage() {
                 <FormSectionTitle bare>Produtos Transportados</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addProduct}>
                   <Plus className="w-4 h-4 mr-1" />
-                  Adicionar Produto
+                  Adicionar produto
                 </Button>
               </div>
               {formData.products.length === 0 ? (
@@ -959,7 +959,7 @@ export default function VehicleChecklistPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : (editingChecklist ? 'Salvar Alterações' : 'Criar Checklist')}
+              {saving ? 'Salvando...' : (editingChecklist ? 'Salvar alterações' : 'Criar checklist')}
             </Button>
           </DialogFooter>
         </DialogContent>

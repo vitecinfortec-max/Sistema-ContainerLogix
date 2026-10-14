@@ -547,7 +547,7 @@ export default function StockMovementsPage() {
               <div className="flex items-center justify-between">
                 <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary">Itens</h3>
                 <Button variant="outline" size="sm" type="button" onClick={addItem} className="h-7 text-xs">
-                  <Plus className="w-3 h-3 mr-1" />Adicionar Item
+                  <Plus className="w-3 h-3 mr-1" />Adicionar item
                 </Button>
               </div>
               <div className="space-y-2">
@@ -613,7 +613,7 @@ export default function StockMovementsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="stock-movement-cancel">Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} data-testid="stock-movement-save">
-              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar Movimentação' : 'Salvar Movimentação'}
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar movimentação' : 'Salvar movimentação'}
             </Button>
           </DialogFooter>
         </DialogContent>

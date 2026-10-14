@@ -229,8 +229,8 @@ export default function ContainerSalesPage() {
               selectedCount={selectedIds.size}
               primary={<ToolbarPrimary icon={Plus} label="Nova venda" onClick={openCreate} testId="add-container-sale-button" />}
             >
-              <ToolbarButton icon={CheckCircle2} label="Marcar como Recebido" tone="emerald" onClick={() => singleSelected && markStatus(singleSelected.id, 'RECEBIDO')} disabled={!singleSelected || singleSelected.status !== 'PENDENTE'} testId="sale-mark-received" />
-              <ToolbarButton icon={RotateCcw} label="Marcar como Pendente" tone="amber" onClick={() => singleSelected && markStatus(singleSelected.id, 'PENDENTE')} disabled={!singleSelected || singleSelected.status !== 'RECEBIDO'} testId="sale-mark-pending" />
+              <ToolbarButton icon={CheckCircle2} label="Marcar como recebido" tone="emerald" onClick={() => singleSelected && markStatus(singleSelected.id, 'RECEBIDO')} disabled={!singleSelected || singleSelected.status !== 'PENDENTE'} testId="sale-mark-received" />
+              <ToolbarButton icon={RotateCcw} label="Marcar como pendente" tone="amber" onClick={() => singleSelected && markStatus(singleSelected.id, 'PENDENTE')} disabled={!singleSelected || singleSelected.status !== 'RECEBIDO'} testId="sale-mark-pending" />
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelected && openEdit(singleSelected)} disabled={!singleSelected} testId="edit-container-sale-button" />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelected && handleDelete(singleSelected)} disabled={!singleSelected} testId="delete-container-sale-button" />
             </Toolbar>

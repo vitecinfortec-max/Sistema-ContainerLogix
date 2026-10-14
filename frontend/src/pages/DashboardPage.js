@@ -658,14 +658,14 @@ export default function DashboardPage() {
           <CardContent className="p-0">
             {stats?.recent_movements && stats.recent_movements.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full rows-in">
+                <table className="data-table">
                   <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800">
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Data/Hora</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tipo</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motorista</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
+                    <tr>
+                      <th>Data/Hora</th>
+                      <th>Tipo</th>
+                      <th>Container</th>
+                      <th>Motorista</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -675,10 +675,10 @@ export default function DashboardPage() {
                         className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
                         data-testid="movement-row"
                       >
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">
+                        <td className="text-sm text-slate-600 dark:text-slate-400">
                           {format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                             movement.operation_type === 'ENTRADA' 
                               ? 'bg-primary/10 text-primary' 
@@ -687,9 +687,9 @@ export default function DashboardPage() {
                             {movement.operation_type}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 text-sm font-mono font-medium text-slate-800 dark:text-slate-200">{movement.container_number}</td>
-                        <td className="px-4 py-2.5 text-sm text-slate-600 dark:text-slate-400">{movement.driver_name}</td>
-                        <td className="px-4 py-2.5">
+                        <td className="text-sm font-mono font-medium text-slate-800 dark:text-slate-200">{movement.container_number}</td>
+                        <td className="text-sm text-slate-600 dark:text-slate-400">{movement.driver_name}</td>
+                        <td>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                             movement.status === 'CHEIO' 
                               ? 'bg-emerald-50 text-emerald-700' 

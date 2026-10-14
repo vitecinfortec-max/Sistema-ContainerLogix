@@ -225,7 +225,7 @@ export default function UsersPage() {
       <Dialog open={createOpen} onOpenChange={(isOpen) => !creating && setCreateOpen(isOpen)}>
         <DialogContent data-testid="new-user-dialog">
           <DialogHeader>
-            <DialogTitle className="text-base">Novo usuário</DialogTitle>
+            <DialogTitle className="text-base">Novo Usuário</DialogTitle>
             <DialogDescription className="text-[13px]">
               Crie o acesso e passe o email e a senha para a pessoa entrar no sistema
             </DialogDescription>

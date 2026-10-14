@@ -190,7 +190,7 @@ export default function EditCommercialProposalPage() {
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Adicionar Item
+                  Adicionar item
                 </Button>
               </div>
             </CardHeader>
@@ -238,7 +238,7 @@ export default function EditCommercialProposalPage() {
 
           <Button type="submit" disabled={saving} data-testid="submit-proposal-btn">
             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-            Salvar Alterações
+            Salvar alterações
           </Button>
         </form>
       </div>

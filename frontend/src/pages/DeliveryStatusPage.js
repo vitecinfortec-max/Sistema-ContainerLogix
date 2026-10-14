@@ -636,7 +636,7 @@ export default function DeliveryStatusPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => { resetForm(); setModalOpen(false); }}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={saving || formData.items.length === 0}>
-              {saving ? 'Salvando...' : editingStatus ? 'Atualizar' : 'Criar Status'}
+              {saving ? 'Salvando...' : editingStatus ? 'Atualizar' : 'Criar status'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -681,39 +681,39 @@ export default function DeliveryStatusPage() {
               <div>
                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Horários por Motorista</h4>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm rows-in">
+                  <table className="data-table">
                     <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700">
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">#</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Motorista</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Placa</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Container</th>
-                        <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Chegada</th>
-                        <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Início</th>
-                        <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Término</th>
-                        <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Saída</th>
-                        <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Agend. Porto</th>
-                        <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Entrega Final.</th>
-                        <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Status</th>
+                      <tr>
+                        <th>#</th>
+                        <th>Motorista</th>
+                        <th>Placa</th>
+                        <th>Container</th>
+                        <th className="!text-center">Chegada</th>
+                        <th className="!text-center">Início</th>
+                        <th className="!text-center">Término</th>
+                        <th className="!text-center">Saída</th>
+                        <th className="!text-center">Agend. Porto</th>
+                        <th className="!text-center">Entrega Final.</th>
+                        <th className="!text-center">Status</th>
                         {selectedStatus.items?.some(i => i.bag_number) && (
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Nº da Bolsa</th>
+                          <th>Nº da Bolsa</th>
                         )}
                       </tr>
                     </thead>
                     <tbody>
                       {selectedStatus.items?.map((item, idx) => (
                         <tr key={idx} className="border-b border-slate-100 dark:border-slate-800">
-                          <td className="px-3 py-2 font-semibold">{idx + 1}</td>
-                          <td className="px-3 py-2">{getShortName(item.driver_name)}</td>
-                          <td className="px-3 py-2 font-mono">{item.cavalo_plate}</td>
-                          <td className="px-3 py-2">{item.container_number || '-'}</td>
-                          <td className="px-3 py-2 text-center">{item.arrival_time || '-'}</td>
-                          <td className="px-3 py-2 text-center">{item.loading_start_time || '-'}</td>
-                          <td className="px-3 py-2 text-center">{item.loading_end_time || '-'}</td>
-                          <td className="px-3 py-2 text-center">{item.departure_time || '-'}</td>
-                          <td className="px-3 py-2 text-center">{item.port_schedule_time || '-'}</td>
-                          <td className="px-3 py-2 text-center">{item.delivery_completed || '-'}</td>
-                          <td className="px-3 py-2 text-center">
+                          <td className="font-semibold">{idx + 1}</td>
+                          <td>{getShortName(item.driver_name)}</td>
+                          <td className="font-mono">{item.cavalo_plate}</td>
+                          <td>{item.container_number || '-'}</td>
+                          <td className="text-center">{item.arrival_time || '-'}</td>
+                          <td className="text-center">{item.loading_start_time || '-'}</td>
+                          <td className="text-center">{item.loading_end_time || '-'}</td>
+                          <td className="text-center">{item.departure_time || '-'}</td>
+                          <td className="text-center">{item.port_schedule_time || '-'}</td>
+                          <td className="text-center">{item.delivery_completed || '-'}</td>
+                          <td className="text-center">
                             {item.delivery_completed ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
                                 <CheckCircle2 className="w-3 h-3" />
@@ -726,7 +726,7 @@ export default function DeliveryStatusPage() {
                             )}
                           </td>
                           {selectedStatus.items?.some(i => i.bag_number) && (
-                            <td className="px-3 py-2 font-mono">{item.bag_number || '-'}</td>
+                            <td className="font-mono">{item.bag_number || '-'}</td>
                           )}
                         </tr>
                       ))}

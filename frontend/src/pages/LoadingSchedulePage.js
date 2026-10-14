@@ -490,7 +490,7 @@ export default function LoadingSchedulePage() {
               <div className="flex items-center justify-between mb-4">
                 <FormSectionTitle bare>Itens da Programação</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar Item
+                  <Plus className="w-4 h-4 mr-1" /> Adicionar item
                 </Button>
               </div>
 
@@ -611,7 +611,7 @@ export default function LoadingSchedulePage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : (editingSchedule ? 'Salvar Alterações' : 'Criar Programação')}
+              {saving ? 'Salvando...' : (editingSchedule ? 'Salvar alterações' : 'Criar programação')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -648,29 +648,29 @@ export default function LoadingSchedulePage() {
               <div>
                 <h4 className="font-semibold mb-2">Itens ({selectedSchedule.items?.length || 0})</h4>
                 <div className="border rounded overflow-hidden">
-                  <table className="w-full text-sm rows-in">
-                    <thead className="bg-muted">
+                  <table className="data-table">
+                    <thead>
                       <tr>
-                        <th className="text-left p-2">#</th>
-                        <th className="text-left p-2">Tipo</th>
-                        <th className="text-left p-2">Motorista</th>
-                        <th className="text-left p-2">CPF</th>
-                        <th className="text-left p-2">Cavalo</th>
-                        <th className="text-left p-2">Carreta</th>
-                        <th className="text-left p-2">Local</th>
-                        <th className="text-left p-2">Data</th>
-                        <th className="text-left p-2">Container</th>
-                        <th className="text-left p-2">Lacre</th>
+                        <th>#</th>
+                        <th>Tipo</th>
+                        <th>Motorista</th>
+                        <th>CPF</th>
+                        <th>Cavalo</th>
+                        <th>Carreta</th>
+                        <th>Local</th>
+                        <th>Data</th>
+                        <th>Container</th>
+                        <th>Lacre</th>
                         {selectedSchedule.items?.some(i => i.bag_number) && (
-                          <th className="text-left p-2">Nº da Bolsa</th>
+                          <th>Nº da Bolsa</th>
                         )}
                       </tr>
                     </thead>
                     <tbody>
                       {selectedSchedule.items?.map((item, idx) => (
                         <tr key={idx} className="border-t">
-                          <td className="p-2">{idx + 1}</td>
-                          <td className="p-2">
+                          <td>{idx + 1}</td>
+                          <td>
                             {item.operation_type ? (
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                 item.operation_type === 'COLETA' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
@@ -679,16 +679,16 @@ export default function LoadingSchedulePage() {
                               </span>
                             ) : '-'}
                           </td>
-                          <td className="p-2">{item.driver_name}</td>
-                          <td className="p-2">{item.driver_cpf || '-'}</td>
-                          <td className="p-2 font-mono">{item.cavalo_plate}</td>
-                          <td className="p-2 font-mono">{item.carreta_plate || '-'}</td>
-                          <td className="p-2">{item.loading_location}</td>
-                          <td className="p-2">{item.loading_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(item.loading_date) ? `${item.loading_date}T00:00:00` : item.loading_date), 'dd/MM/yyyy') : '-'}</td>
-                          <td className="p-2 font-mono">{item.container_number || '-'}</td>
-                          <td className="p-2 font-mono">{item.seal_number || '-'}</td>
+                          <td>{item.driver_name}</td>
+                          <td>{item.driver_cpf || '-'}</td>
+                          <td className="font-mono">{item.cavalo_plate}</td>
+                          <td className="font-mono">{item.carreta_plate || '-'}</td>
+                          <td>{item.loading_location}</td>
+                          <td>{item.loading_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(item.loading_date) ? `${item.loading_date}T00:00:00` : item.loading_date), 'dd/MM/yyyy') : '-'}</td>
+                          <td className="font-mono">{item.container_number || '-'}</td>
+                          <td className="font-mono">{item.seal_number || '-'}</td>
                           {selectedSchedule.items?.some(i => i.bag_number) && (
-                            <td className="p-2 font-mono">{item.bag_number || '-'}</td>
+                            <td className="font-mono">{item.bag_number || '-'}</td>
                           )}
                         </tr>
                       ))}

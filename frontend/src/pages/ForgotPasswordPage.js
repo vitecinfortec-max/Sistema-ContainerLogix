@@ -85,7 +85,7 @@ export default function ForgotPasswordPage() {
               <Link to="/login">
                 <Button className="w-full h-12" variant="outline">
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Voltar para Login
+                  Voltar para login
                 </Button>
               </Link>
             </div>
@@ -113,13 +113,13 @@ export default function ForgotPasswordPage() {
                 disabled={loading}
                 data-testid="forgot-submit-button"
               >
-                {loading ? 'Enviando...' : 'Enviar Senha Provisória'}
+                {loading ? 'Enviando...' : 'Enviar senha provisória'}
               </Button>
 
               <Link to="/login" className="block">
                 <Button variant="ghost" className="w-full">
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Voltar para Login
+                  Voltar para login
                 </Button>
               </Link>
             </form>

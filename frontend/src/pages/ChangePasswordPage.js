@@ -161,7 +161,7 @@ export default function ChangePasswordPage() {
               disabled={loading}
               data-testid="change-password-button"
             >
-              {loading ? 'Alterando...' : 'Alterar Senha'}
+              {loading ? 'Alterando...' : 'Alterar senha'}
             </Button>
           </form>
         </CardContent>

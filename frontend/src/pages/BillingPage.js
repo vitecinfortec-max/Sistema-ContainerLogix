@@ -935,42 +935,42 @@ export default function BillingPage() {
                   <span className="text-xs text-slate-500 dark:text-slate-400">Adicionadas via busca por ID/Código de Barras</span>
                 </div>
                 <div className="max-h-[200px] overflow-y-auto">
-                  <table className="w-full text-sm rows-in">
-                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
+                  <table className="data-table">
+                    <thead className="sticky top-0">
                       <tr>
-                        <th className="px-3 py-2 text-left w-10"></th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">ID</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Data</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Container</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Cliente</th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Tipo Serviço</th>
-                        <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Valor</th>
-                        <th className="px-3 py-2 w-10"></th>
+                        <th className="w-10"></th>
+                        <th>ID</th>
+                        <th>Data</th>
+                        <th>Container</th>
+                        <th>Cliente</th>
+                        <th>Tipo Serviço</th>
+                        <th className="!text-right">Valor</th>
+                        <th className="w-10"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody>
                       {addedMovements.map((movement) => (
                         <tr 
                           key={movement.id}
                           className={`hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${selectedMovements.has(movement.id) ? 'bg-primary/5' : ''}`}
                         >
-                          <td className="px-3 py-2">
+                          <td>
                             <Checkbox
                               checked={selectedMovements.has(movement.id)}
                               onCheckedChange={() => toggleMovement(movement.id)}
                             />
                           </td>
-                          <td className="px-3 py-2 font-bold text-primary">#{movement.transaction_id}</td>
-                          <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
+                          <td className="font-bold text-primary">#{movement.transaction_id}</td>
+                          <td className="text-slate-600 dark:text-slate-400">
                             {format(new Date(movement.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                           </td>
-                          <td className="px-3 py-2 font-mono font-medium">{movement.container_number}</td>
-                          <td className="px-3 py-2">{movement.client_name || '-'}</td>
-                          <td className="px-3 py-2">{movement.service_type || '-'}</td>
-                          <td className="px-3 py-2 text-right font-mono text-green-700">
+                          <td className="font-mono font-medium">{movement.container_number}</td>
+                          <td>{movement.client_name || '-'}</td>
+                          <td>{movement.service_type || '-'}</td>
+                          <td className="text-right font-mono text-green-700">
                             {formatCurrency(movement.service_value)}
                           </td>
-                          <td className="px-3 py-2">
+                          <td>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -997,7 +997,7 @@ export default function BillingPage() {
                   </span>
                   {unbilledMovements.length > 0 && (
                     <Button variant="ghost" size="sm" onClick={selectAllMovements}>
-                      {selectedMovements.size === getAllMovements().length ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                      {selectedMovements.size === getAllMovements().length ? 'Desmarcar todos' : 'Selecionar todos'}
                     </Button>
                   )}
                 </div>
@@ -1008,19 +1008,19 @@ export default function BillingPage() {
                   </div>
                 ) : (
                   <div className="max-h-[250px] overflow-y-auto">
-                    <table className="w-full text-sm rows-in">
-                      <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
+                    <table className="data-table">
+                      <thead className="sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left w-10"></th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">ID</th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Data</th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Container</th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Cliente</th>
-                          <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Tipo Serviço</th>
-                          <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Valor</th>
+                          <th className="w-10"></th>
+                          <th>ID</th>
+                          <th>Data</th>
+                          <th>Container</th>
+                          <th>Cliente</th>
+                          <th>Tipo Serviço</th>
+                          <th className="!text-right">Valor</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y">
+                      <tbody>
                         {unbilledMovements
                           .filter(m => !addedMovements.some(am => am.id === m.id))
                           .map((movement) => (
@@ -1030,20 +1030,20 @@ export default function BillingPage() {
                             onClick={() => toggleMovement(movement.id)}
                             data-testid={`movement-row-${movement.id}`}
                           >
-                            <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                            <td onClick={(e) => e.stopPropagation()}>
                               <Checkbox
                                 checked={selectedMovements.has(movement.id)}
                                 onCheckedChange={() => toggleMovement(movement.id)}
                               />
                             </td>
-                            <td className="px-3 py-2 font-bold text-primary">#{movement.transaction_id}</td>
-                            <td className="px-3 py-2 text-slate-600 dark:text-slate-400">
+                            <td className="font-bold text-primary">#{movement.transaction_id}</td>
+                            <td className="text-slate-600 dark:text-slate-400">
                               {format(new Date(movement.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                             </td>
-                            <td className="px-3 py-2 font-mono font-medium">{movement.container_number}</td>
-                            <td className="px-3 py-2">{movement.client_name || '-'}</td>
-                            <td className="px-3 py-2">{movement.service_type || '-'}</td>
-                            <td className="px-3 py-2 text-right font-mono text-green-700">
+                            <td className="font-mono font-medium">{movement.container_number}</td>
+                            <td>{movement.client_name || '-'}</td>
+                            <td>{movement.service_type || '-'}</td>
+                            <td className="text-right font-mono text-green-700">
                               {formatCurrency(movement.service_value)}
                             </td>
                           </tr>
@@ -1238,34 +1238,34 @@ export default function BillingPage() {
                     </div>
                   ) : (
                     <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm rows-in">
-                        <thead className="bg-slate-50 dark:bg-slate-800">
+                      <table className="data-table">
+                        <thead>
                           <tr>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">ID</th>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Data</th>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Container</th>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Operação</th>
-                            <th className="px-3 py-2 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Tipo Serviço</th>
-                            <th className="px-3 py-2 text-right text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Valor</th>
+                            <th>ID</th>
+                            <th>Data</th>
+                            <th>Container</th>
+                            <th>Operação</th>
+                            <th>Tipo Serviço</th>
+                            <th className="!text-right">Valor</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody>
                           {invoiceMovements.map((m) => (
                             <tr key={m.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                              <td className="px-3 py-2 font-bold text-primary">#{m.transaction_id}</td>
-                              <td className="px-3 py-2">
+                              <td className="font-bold text-primary">#{m.transaction_id}</td>
+                              <td>
                                 {format(new Date(m.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                               </td>
-                              <td className="px-3 py-2 font-mono">{m.container_number}</td>
-                              <td className="px-3 py-2">
+                              <td className="font-mono">{m.container_number}</td>
+                              <td>
                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                                   m.operation_type === 'ENTRADA' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
                                 }`}>
                                   {m.operation_type}
                                 </span>
                               </td>
-                              <td className="px-3 py-2">{m.service_type || '-'}</td>
-                              <td className="px-3 py-2 text-right font-mono text-green-700">
+                              <td>{m.service_type || '-'}</td>
+                              <td className="text-right font-mono text-green-700">
                                 {formatCurrency(m.service_value)}
                               </td>
                             </tr>
@@ -1419,27 +1419,27 @@ export default function BillingPage() {
                   {loadingEditMovements ? (
                     <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Carregando...</div>
                   ) : editMovements.length > 0 ? (
-                    <table className="w-full rows-in">
-                      <thead className="bg-slate-50 dark:bg-slate-800 border-b sticky top-0">
+                    <table className="data-table">
+                      <thead className="sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">ID</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Container</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Tipo</th>
-                          <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Valor</th>
-                          <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Remover</th>
+                          <th>ID</th>
+                          <th>Container</th>
+                          <th>Tipo</th>
+                          <th className="!text-right">Valor</th>
+                          <th className="!text-center">Remover</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y">
+                      <tbody>
                         {editMovements.map((mov) => (
                           <tr 
                             key={mov.id} 
                             className={`${movementsToRemove.has(mov.id) ? 'bg-red-50 line-through opacity-60' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                           >
-                            <td className="px-3 py-1.5 text-[12px] font-mono">{mov.transaction_id}</td>
-                            <td className="px-3 py-1.5 text-[12px]">{mov.container_number}</td>
-                            <td className="px-3 py-1.5 text-[12px]">{mov.operation_type}</td>
-                            <td className="px-3 py-1.5 text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
-                            <td className="px-3 py-1.5 text-center">
+                            <td className="text-[12px] font-mono">{mov.transaction_id}</td>
+                            <td className="text-[12px]">{mov.container_number}</td>
+                            <td className="text-[12px]">{mov.operation_type}</td>
+                            <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
+                            <td className="text-center">
                               <button
                                 type="button"
                                 onClick={() => toggleRemoveMovement(mov.id)}
@@ -1490,27 +1490,27 @@ export default function BillingPage() {
 
                 <div className="max-h-40 overflow-y-auto">
                   {editAvailableMovements.length > 0 ? (
-                    <table className="w-full rows-in">
-                      <thead className="bg-slate-50 dark:bg-slate-800 border-b sticky top-0">
+                    <table className="data-table">
+                      <thead className="sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">ID</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Container</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Tipo</th>
-                          <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Valor</th>
-                          <th className="px-3 py-2 text-center text-[10px] font-semibold uppercase text-slate-500 dark:text-slate-400">Adicionar</th>
+                          <th>ID</th>
+                          <th>Container</th>
+                          <th>Tipo</th>
+                          <th className="!text-right">Valor</th>
+                          <th className="!text-center">Adicionar</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y">
+                      <tbody>
                         {editAvailableMovements.map((mov) => (
                           <tr 
                             key={mov.id} 
                             className={`${movementsToAdd.has(mov.id) ? 'bg-green-50' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                           >
-                            <td className="px-3 py-1.5 text-[12px] font-mono">{mov.transaction_id}</td>
-                            <td className="px-3 py-1.5 text-[12px]">{mov.container_number}</td>
-                            <td className="px-3 py-1.5 text-[12px]">{mov.operation_type}</td>
-                            <td className="px-3 py-1.5 text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
-                            <td className="px-3 py-1.5 text-center">
+                            <td className="text-[12px] font-mono">{mov.transaction_id}</td>
+                            <td className="text-[12px]">{mov.container_number}</td>
+                            <td className="text-[12px]">{mov.operation_type}</td>
+                            <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
+                            <td className="text-center">
                               <button
                                 type="button"
                                 onClick={() => toggleAddMovement(mov.id)}
@@ -1548,7 +1548,7 @@ export default function BillingPage() {
                   disabled={saving}
                   data-testid="save-invoice-button"
                 >
-                  {saving ? 'Salvando...' : 'Salvar Alterações'}
+                  {saving ? 'Salvando...' : 'Salvar alterações'}
                 </Button>
               </DialogFooter>
             </form>
@@ -1578,7 +1578,7 @@ export default function BillingPage() {
               disabled={deleting}
               data-testid="confirm-delete-invoice"
             >
-              {deleting ? 'Excluindo...' : 'Excluir Fatura'}
+              {deleting ? 'Excluindo...' : 'Excluir fatura'}
             </Button>
           </DialogFooter>
         </DialogContent>

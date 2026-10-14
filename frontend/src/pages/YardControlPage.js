@@ -677,7 +677,7 @@ export default function YardControlPage() {
               Cancelar
             </Button>
             <Button onClick={handleQuickExit} disabled={savingExit}>
-              {savingExit ? 'Registrando...' : 'Confirmar Saída'}
+              {savingExit ? 'Registrando...' : 'Confirmar saída'}
             </Button>
           </DialogFooter>
         </DialogContent>

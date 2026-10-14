@@ -441,7 +441,7 @@ export default function DailyRateRequestPage() {
               <div className="flex items-center justify-between mb-4">
                 <FormSectionTitle bare>Itens da Solicitação</FormSectionTitle>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                  <Plus className="w-4 h-4 mr-1" /> Adicionar Item
+                  <Plus className="w-4 h-4 mr-1" /> Adicionar item
                 </Button>
               </div>
 
@@ -539,7 +539,7 @@ export default function DailyRateRequestPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : (editingRequest ? 'Salvar Alterações' : 'Criar Solicitação')}
+              {saving ? 'Salvando...' : (editingRequest ? 'Salvar alterações' : 'Criar solicitação')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -560,36 +560,36 @@ export default function DailyRateRequestPage() {
               <div>
                 <h4 className="font-semibold mb-2">Itens ({selectedRequest.items?.length || 0})</h4>
                 <div className="border rounded overflow-hidden">
-                  <table className="w-full text-sm rows-in">
-                    <thead className="bg-muted">
+                  <table className="data-table">
+                    <thead>
                       <tr>
-                        <th className="text-left p-2">#</th>
-                        <th className="text-left p-2">Motorista</th>
-                        <th className="text-left p-2">Placa</th>
-                        <th className="text-left p-2">Cliente</th>
-                        <th className="text-left p-2">Data</th>
-                        <th className="text-right p-2">Outros</th>
-                        <th className="text-right p-2">Comissão</th>
-                        <th className="text-right p-2">Almoço</th>
-                        <th className="text-right p-2">Qtd.</th>
-                        <th className="text-right p-2">Diária</th>
-                        <th className="text-right p-2">Total</th>
+                        <th>#</th>
+                        <th>Motorista</th>
+                        <th>Placa</th>
+                        <th>Cliente</th>
+                        <th>Data</th>
+                        <th className="!text-right">Outros</th>
+                        <th className="!text-right">Comissão</th>
+                        <th className="!text-right">Almoço</th>
+                        <th className="!text-right">Qtd.</th>
+                        <th className="!text-right">Diária</th>
+                        <th className="!text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {selectedRequest.items?.map((item, idx) => (
                         <tr key={idx} className="border-t">
-                          <td className="p-2">{idx + 1}</td>
-                          <td className="p-2">{item.driver_name}</td>
-                          <td className="p-2 font-mono">{item.vehicle_plate}</td>
-                          <td className="p-2">{item.client_name}</td>
-                          <td className="p-2">{item.departure_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(item.departure_date) ? `${item.departure_date}T00:00:00` : item.departure_date), 'dd/MM/yyyy') : '-'}</td>
-                          <td className="p-2 text-right">{formatMoney(item.others_value)}</td>
-                          <td className="p-2 text-right">{formatMoney(item.commission_value)}</td>
-                          <td className="p-2 text-right">{formatMoney(item.lunch_value)}</td>
-                          <td className="p-2 text-right">{item.daily_rate_quantity}</td>
-                          <td className="p-2 text-right">{formatMoney(item.daily_rate_value)}</td>
-                          <td className="p-2 text-right font-semibold">{formatMoney(item.total)}</td>
+                          <td>{idx + 1}</td>
+                          <td>{item.driver_name}</td>
+                          <td className="font-mono">{item.vehicle_plate}</td>
+                          <td>{item.client_name}</td>
+                          <td>{item.departure_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(item.departure_date) ? `${item.departure_date}T00:00:00` : item.departure_date), 'dd/MM/yyyy') : '-'}</td>
+                          <td className="text-right">{formatMoney(item.others_value)}</td>
+                          <td className="text-right">{formatMoney(item.commission_value)}</td>
+                          <td className="text-right">{formatMoney(item.lunch_value)}</td>
+                          <td className="text-right">{item.daily_rate_quantity}</td>
+                          <td className="text-right">{formatMoney(item.daily_rate_value)}</td>
+                          <td className="text-right font-semibold">{formatMoney(item.total)}</td>
                         </tr>
                       ))}
                     </tbody>

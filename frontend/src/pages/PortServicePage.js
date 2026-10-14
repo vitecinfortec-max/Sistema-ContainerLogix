@@ -467,7 +467,7 @@ export default function PortServicePage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : (editingService ? 'Salvar Alterações' : 'Criar Registro')}
+              {saving ? 'Salvando...' : (editingService ? 'Salvar alterações' : 'Criar registro')}
             </Button>
           </DialogFooter>
         </DialogContent>
