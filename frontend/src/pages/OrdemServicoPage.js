@@ -46,9 +46,9 @@ const formatAddress = (details) => {
 export default function OrdemServicoPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
-  const { pageItems, paginationProps } = usePagination(list, { resetKey: search });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const { pageItems, paginationProps } = usePagination(list, { resetKey: search });
   const [statusFilter, setStatusFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);

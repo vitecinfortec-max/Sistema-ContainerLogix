@@ -78,9 +78,9 @@ function buildEmpty() {
 export default function LoadingOrderPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
-  const { pageItems, paginationProps } = usePagination(list, { resetKey: search });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const { pageItems, paginationProps } = usePagination(list, { resetKey: search });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [nextNumber, setNextNumber] = useState(null);

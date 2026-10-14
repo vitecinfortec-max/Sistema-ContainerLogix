@@ -75,9 +75,9 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
   const { confirm, ConfirmDialog } = useConfirm();
 
   const [rpas, setRpas] = useState([]);
-  const { pageItems, paginationProps } = usePagination(rpas, { resetKey: search });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const { pageItems, paginationProps } = usePagination(rpas, { resetKey: search });
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
