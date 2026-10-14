@@ -650,7 +650,7 @@ export default function EditMovementPage() {
             disabled={loading}
           />
 
-          <FormActions>
+          <FormActions sticky>
             <Button type="button" variant="outline" onClick={() => navigate(`/movements/${id}`)}>
               Cancelar
             </Button>

@@ -458,6 +458,7 @@ export default function MovementsPage() {
                     </th>
                     <th className="sortable" onClick={() => handleSort('transaction_id')}>Nº<SortIcon field="transaction_id" /></th>
                     <th className="sortable" onClick={() => handleSort('operation_type')}>Tipo<SortIcon field="operation_type" /></th>
+                    <th className="sortable" onClick={() => handleSort('container_number')}>Container<SortIcon field="container_number" /></th>
                     <th className="sortable" onClick={() => handleSort('client_name')}>Cliente<SortIcon field="client_name" /></th>
                     <th className="sortable" onClick={() => handleSort('driver_name')}>Motorista<SortIcon field="driver_name" /></th>
                     <th className="sortable" onClick={() => handleSort('truck_plate')}>Placa<SortIcon field="truck_plate" /></th>
@@ -491,8 +492,9 @@ export default function MovementsPage() {
                             {movement.operation_type === 'ENTRADA' ? 'Entrada' : 'Saída'}
                           </StatusPill>
                         </td>
-                        <td><div className="max-w-[150px] min-[1400px]:max-w-[190px] 2xl:max-w-[300px] truncate" title={movement.client_name || ''}>{movement.client_name || '-'}</div></td>
-                        <td><div className="max-w-[170px] min-[1400px]:max-w-[210px] 2xl:max-w-[320px] truncate" title={movement.driver_name || ''}>{movement.driver_name}</div></td>
+                        <td className="cell-strong whitespace-nowrap font-mono text-[12px]">{movement.container_number || '-'}</td>
+                        <td><div className="max-w-[110px] xl:max-w-[150px] min-[1400px]:max-w-[190px] 2xl:max-w-[300px] truncate" title={movement.client_name || ''}>{movement.client_name || '-'}</div></td>
+                        <td><div className="max-w-[120px] xl:max-w-[170px] min-[1400px]:max-w-[210px] 2xl:max-w-[320px] truncate" title={movement.driver_name || ''}>{movement.driver_name}</div></td>
                         <td><PlateTag>{movement.truck_plate}</PlateTag></td>
                         <td>
                           <StatusPill tone={movement.status === 'CHEIO' ? 'emerald' : 'slate'}>

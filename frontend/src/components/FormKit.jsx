@@ -50,7 +50,19 @@ export function Field({ label, htmlFor, required, hint, children, className }) {
   );
 }
 
-/** Rodapé do formulário: Cancelar e ações secundárias à esquerda do Salvar. */
-export function FormActions({ children, className }) {
-  return <div className={cn('flex flex-wrap items-center justify-end gap-2', className)}>{children}</div>;
+/**
+ * Rodapé do formulário: Cancelar e ações secundárias à esquerda do Salvar.
+ * `sticky`: no celular a barra fica presa acima da navegação inferior, pra
+ * salvar um formulário longo sem rolar até o fim.
+ */
+export function FormActions({ children, className, sticky = false }) {
+  return (
+    <div className={cn(
+      'flex flex-wrap items-center justify-end gap-2',
+      sticky && 'max-md:sticky max-md:bottom-[76px] max-md:z-40 max-md:rounded-lg max-md:border max-md:border-slate-200 max-md:dark:border-slate-700 max-md:bg-card max-md:p-2 max-md:shadow-lg max-md:[&>*]:flex-1',
+      className,
+    )}>
+      {children}
+    </div>
+  );
 }

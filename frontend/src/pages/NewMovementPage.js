@@ -909,7 +909,7 @@ export default function NewMovementPage() {
             disabled={loading}
           />
 
-          <FormActions>
+          <FormActions sticky>
             <Button type="button" variant="outline" onClick={() => navigate('/movements')} data-testid="cancel-button">
               Cancelar
             </Button>
@@ -925,14 +925,6 @@ export default function NewMovementPage() {
         </form>
       </div>
       )}
-
-      <button title="Novo registro" aria-label="Novo registro"
-        onClick={() => navigate('/movements/new')}
-        className="md:hidden fixed bottom-6 right-6 bg-primary text-primary-foreground rounded-full p-4 shadow-lg hover:bg-primary/90 transition-colors z-50"
-        data-testid="fab-new-movement"
-      >
-        <Save className="w-6 h-6" />
-      </button>
     </Layout>
   );
 }

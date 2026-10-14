@@ -103,8 +103,8 @@ def _filter_movements_by_period(movements: list, date_from: Optional[str], date_
 
 # Colunas pelas quais a lista de movimentações pode ser ordenada
 _MOVEMENT_SORT_FIELDS = {
-    "transaction_id", "operation_type", "client_name", "driver_name", "truck_plate",
-    "status", "created_at", "user_name",
+    "transaction_id", "operation_type", "container_number", "client_name", "driver_name",
+    "truck_plate", "status", "created_at", "user_name",
 }
 
 
