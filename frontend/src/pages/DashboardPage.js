@@ -219,6 +219,61 @@ export default function DashboardPage() {
   return (
     <Layout>
       <Stagger className="space-y-5 no-card-in" stagger={0.07} data-testid="dashboard-container">
+        {/* Alertas do Sistema - primeiro bloco: é o que pede ação. A ordem
+            da tela vai do urgente (alertas, hoje, registros recentes) pro
+            acompanhamento (mês, ranking, estoque). */}
+        <StaggerItem>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="system-alerts-card">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Alertas do Sistema</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="px-4 py-3">
+            {(alerts.over_30 + alerts.over_60 + alerts.over_90 + alerts.maintenance_due_soon + alerts.maintenance_overdue) > 0 || alerts.tank_low ? (
+              <motion.div variants={staggerParent(0.05)} initial="hidden" animate="show" className="flex flex-wrap gap-2">
+                {alerts.tank_low && (
+                  <AlertPill tone="red" icon={Fuel} onClick={() => navigate('/fleet/nivel-tanque')} testId="alert-tank-low">
+                    Tanque de combustível abaixo do mínimo
+                  </AlertPill>
+                )}
+                {alerts.maintenance_overdue > 0 && (
+                  <AlertPill tone="red" icon={Wrench} onClick={() => navigate('/fleet/hodometro')} testId="alert-maintenance-overdue">
+                    {alerts.maintenance_overdue} veículo{alerts.maintenance_overdue > 1 ? 's' : ''} com manutenção vencida
+                  </AlertPill>
+                )}
+                {alerts.maintenance_due_soon > 0 && (
+                  <AlertPill tone="amber" icon={Wrench} onClick={() => navigate('/fleet/hodometro')} testId="alert-maintenance-due-soon">
+                    {alerts.maintenance_due_soon} veículo{alerts.maintenance_due_soon > 1 ? 's' : ''} com manutenção próxima
+                  </AlertPill>
+                )}
+                {alerts.over_30 > 0 && (
+                  <AlertPill tone="amber" icon={Clock} onClick={() => navigate('/yard-control?min_days=31')} testId="alert-over-30">
+                    {alerts.over_30} container{alerts.over_30 > 1 ? 's' : ''} há mais de 30 dias no pátio
+                  </AlertPill>
+                )}
+                {alerts.over_60 > 0 && (
+                  <AlertPill tone="orange" icon={Clock} onClick={() => navigate('/yard-control?min_days=61')} testId="alert-over-60">
+                    {alerts.over_60} container{alerts.over_60 > 1 ? 's' : ''} há mais de 60 dias no pátio
+                  </AlertPill>
+                )}
+                {alerts.over_90 > 0 && (
+                  <AlertPill tone="red" icon={Clock} onClick={() => navigate('/yard-control?min_days=91')} testId="alert-over-90">
+                    {alerts.over_90} container{alerts.over_90 > 1 ? 's' : ''} há mais de 90 dias no pátio
+                  </AlertPill>
+                )}
+              </motion.div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                Nenhum alerta no momento
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        </StaggerItem>
+
         {/* Atalhos */}
         <StaggerItem>
           <div className="flex items-center justify-between mb-3">
@@ -409,6 +464,81 @@ export default function DashboardPage() {
           </motion.div>
         </motion.div>
 
+        {/* Recent Movements Table */}
+        <StaggerItem>
+        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="recent-movements-card">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Registros de Gate Recentes</CardTitle>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => navigate('/movements')}
+                className="text-xs text-primary hover:text-primary hover:bg-primary/5 h-7 px-2"
+                data-testid="view-all-movements-button"
+              >
+                Ver todas
+                <ArrowRight className="w-3 h-3 ml-1" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {stats?.recent_movements && stats.recent_movements.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Data/Hora</th>
+                      <th>Tipo</th>
+                      <th>Container</th>
+                      <th>Motorista</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.recent_movements.map((movement, idx) => (
+                      <tr 
+                        key={movement.id} 
+                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
+                        data-testid="movement-row"
+                      >
+                        <td className="text-sm text-slate-600 dark:text-slate-400">
+                          {format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                        </td>
+                        <td>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                            movement.operation_type === 'ENTRADA' 
+                              ? 'bg-primary/10 text-primary' 
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                          }`}>
+                            {movement.operation_type}
+                          </span>
+                        </td>
+                        <td className="text-sm font-mono font-medium text-slate-800 dark:text-slate-200">{movement.container_number}</td>
+                        <td className="text-sm text-slate-600 dark:text-slate-400">{movement.driver_name}</td>
+                        <td>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            movement.status === 'CHEIO' 
+                              ? 'bg-emerald-50 text-emerald-700' 
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                          }`}>
+                            {movement.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-slate-400 dark:text-slate-500" data-testid="no-movements">
+                <Container className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                <p className="text-sm">Nenhum registro cadastrado ainda</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        </StaggerItem>
         {/* Monthly Stats */}
         <motion.div variants={staggerParent(0.05)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <motion.div variants={riseIn}>
@@ -461,59 +591,6 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
         </motion.div>
-
-        {/* Alertas do Sistema */}
-        <StaggerItem>
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="system-alerts-card">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-500" />
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Alertas do Sistema</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            {(alerts.over_30 + alerts.over_60 + alerts.over_90 + alerts.maintenance_due_soon + alerts.maintenance_overdue) > 0 || alerts.tank_low ? (
-              <motion.div variants={staggerParent(0.05)} initial="hidden" animate="show" className="flex flex-wrap gap-2">
-                {alerts.tank_low && (
-                  <AlertPill tone="red" icon={Fuel} onClick={() => navigate('/fleet/nivel-tanque')} testId="alert-tank-low">
-                    Tanque de combustível abaixo do mínimo
-                  </AlertPill>
-                )}
-                {alerts.maintenance_overdue > 0 && (
-                  <AlertPill tone="red" icon={Wrench} onClick={() => navigate('/fleet/hodometro')} testId="alert-maintenance-overdue">
-                    {alerts.maintenance_overdue} veículo{alerts.maintenance_overdue > 1 ? 's' : ''} com manutenção vencida
-                  </AlertPill>
-                )}
-                {alerts.maintenance_due_soon > 0 && (
-                  <AlertPill tone="amber" icon={Wrench} onClick={() => navigate('/fleet/hodometro')} testId="alert-maintenance-due-soon">
-                    {alerts.maintenance_due_soon} veículo{alerts.maintenance_due_soon > 1 ? 's' : ''} com manutenção próxima
-                  </AlertPill>
-                )}
-                {alerts.over_30 > 0 && (
-                  <AlertPill tone="amber" icon={Clock} onClick={() => navigate('/yard-control?min_days=31')} testId="alert-over-30">
-                    {alerts.over_30} container{alerts.over_30 > 1 ? 's' : ''} há mais de 30 dias no pátio
-                  </AlertPill>
-                )}
-                {alerts.over_60 > 0 && (
-                  <AlertPill tone="orange" icon={Clock} onClick={() => navigate('/yard-control?min_days=61')} testId="alert-over-60">
-                    {alerts.over_60} container{alerts.over_60 > 1 ? 's' : ''} há mais de 60 dias no pátio
-                  </AlertPill>
-                )}
-                {alerts.over_90 > 0 && (
-                  <AlertPill tone="red" icon={Clock} onClick={() => navigate('/yard-control?min_days=91')} testId="alert-over-90">
-                    {alerts.over_90} container{alerts.over_90 > 1 ? 's' : ''} há mais de 90 dias no pátio
-                  </AlertPill>
-                )}
-              </motion.div>
-            ) : (
-              <div className="p-4 text-center text-slate-400 dark:text-slate-500">
-                <CheckCircle2 className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                <p className="text-sm">Nenhum alerta no momento</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        </StaggerItem>
 
         {/* Driver Ranking + Stock Distribution */}
         <StaggerItem className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -636,81 +713,6 @@ export default function DashboardPage() {
           </Card>
         </StaggerItem>
 
-        {/* Recent Movements Table */}
-        <StaggerItem>
-        <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="recent-movements-card">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Registros de Gate Recentes</CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => navigate('/movements')}
-                className="text-xs text-primary hover:text-primary hover:bg-primary/5 h-7 px-2"
-                data-testid="view-all-movements-button"
-              >
-                Ver todas
-                <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {stats?.recent_movements && stats.recent_movements.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Data/Hora</th>
-                      <th>Tipo</th>
-                      <th>Container</th>
-                      <th>Motorista</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.recent_movements.map((movement, idx) => (
-                      <tr 
-                        key={movement.id} 
-                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-800/40'}`}
-                        data-testid="movement-row"
-                      >
-                        <td className="text-sm text-slate-600 dark:text-slate-400">
-                          {format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                        </td>
-                        <td>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
-                            movement.operation_type === 'ENTRADA' 
-                              ? 'bg-primary/10 text-primary' 
-                              : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
-                          }`}>
-                            {movement.operation_type}
-                          </span>
-                        </td>
-                        <td className="text-sm font-mono font-medium text-slate-800 dark:text-slate-200">{movement.container_number}</td>
-                        <td className="text-sm text-slate-600 dark:text-slate-400">{movement.driver_name}</td>
-                        <td>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            movement.status === 'CHEIO' 
-                              ? 'bg-emerald-50 text-emerald-700' 
-                              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-                          }`}>
-                            {movement.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="p-8 text-center text-slate-400 dark:text-slate-500" data-testid="no-movements">
-                <Container className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Nenhum registro cadastrado ainda</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        </StaggerItem>
       </Stagger>
     </Layout>
   );
