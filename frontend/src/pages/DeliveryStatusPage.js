@@ -357,7 +357,7 @@ export default function DeliveryStatusPage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : statuses.length === 0 ? (
             <EmptyState
               icon={ClipboardCheck}

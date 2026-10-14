@@ -676,7 +676,7 @@ export default function InternationalInvoicePage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : invoices.length === 0 ? (
             <EmptyState
               icon={Globe}
@@ -972,7 +972,7 @@ export default function InternationalInvoicePage() {
                     </div>
                     <div className="col-span-1">
                       {invoiceItems.length > 1 && (
-                        <Button
+                        <Button title="Remover" aria-label="Remover"
                           variant="ghost"
                           size="sm"
                           onClick={() => removeInvoiceItem(index)}
@@ -1426,7 +1426,7 @@ export default function InternationalInvoicePage() {
                     </div>
                     <div className="col-span-1">
                       {editInvoiceItems.length > 1 && (
-                        <Button
+                        <Button title="Remover" aria-label="Remover"
                           variant="ghost"
                           size="sm"
                           onClick={() => removeEditInvoiceItem(index)}

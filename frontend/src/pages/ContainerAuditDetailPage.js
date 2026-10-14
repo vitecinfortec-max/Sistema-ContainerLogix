@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { StatusPill } from '../components/DataPage';
+import { StatusPill, PageSkeleton } from '../components/DataPage';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -148,7 +148,7 @@ export default function ContainerAuditDetailPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="text-center py-12 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
+        <PageSkeleton />
       </Layout>
     );
   }
@@ -240,7 +240,7 @@ export default function ContainerAuditDetailPage() {
                             <img src={item.photo.url} alt={item.container_number} className="w-10 h-10 object-cover rounded border border-slate-200 dark:border-slate-700" />
                           </a>
                         ) : !isLocked ? (
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handlePhotoClick(item.container_number)} disabled={savingContainer === item.container_number}>
+                          <Button title="Tirar foto" aria-label="Tirar foto" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handlePhotoClick(item.container_number)} disabled={savingContainer === item.container_number}>
                             <Camera className="w-4 h-4 text-slate-400" />
                           </Button>
                         ) : (
@@ -257,7 +257,7 @@ export default function ContainerAuditDetailPage() {
                       {!isLocked && (
                         <td>
                           <div className="flex items-center gap-1">
-                            <Button
+                            <Button aria-label="Confirmar"
                               variant="ghost" size="sm" className="h-8 w-8 p-0"
                               title="Confirmar"
                               disabled={savingContainer === item.container_number}
@@ -265,7 +265,7 @@ export default function ContainerAuditDetailPage() {
                             >
                               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                             </Button>
-                            <Button
+                            <Button aria-label="Marcar Faltante"
                               variant="ghost" size="sm" className="h-8 w-8 p-0"
                               title="Marcar Faltante"
                               disabled={savingContainer === item.container_number}
@@ -350,7 +350,7 @@ export default function ContainerAuditDetailPage() {
                               <img src={item.photo.url} alt={item.container_number} className="w-10 h-10 object-cover rounded border border-slate-200 dark:border-slate-700" />
                             </a>
                           ) : !isLocked ? (
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handlePhotoClick(item.container_number)} disabled={savingContainer === item.container_number}>
+                            <Button title="Tirar foto" aria-label="Tirar foto" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handlePhotoClick(item.container_number)} disabled={savingContainer === item.container_number}>
                               <Camera className="w-4 h-4 text-slate-400" />
                             </Button>
                           ) : (

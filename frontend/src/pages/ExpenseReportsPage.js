@@ -452,7 +452,7 @@ export default function ExpenseReportsPage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : reports.length === 0 ? (
             <EmptyState
               icon={Calculator}
@@ -544,7 +544,7 @@ export default function ExpenseReportsPage() {
                 {formData.deposits.map((deposit, index) => (
                   <div key={index} className="border rounded-lg p-3 relative bg-muted/20">
                     <div className="absolute top-2 right-2">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeDeposit(index)} className="h-6 w-6 text-destructive">
+                      <Button title="Remover" aria-label="Remover" type="button" variant="ghost" size="icon" onClick={() => removeDeposit(index)} className="h-6 w-6 text-destructive">
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
@@ -582,7 +582,7 @@ export default function ExpenseReportsPage() {
                 {formData.purchases.map((purchase, index) => (
                   <div key={purchase.item_id} className="border rounded-lg p-4 relative">
                     <div className="absolute top-2 right-2">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removePurchase(index)} className="h-6 w-6 text-destructive">
+                      <Button title="Remover" aria-label="Remover" type="button" variant="ghost" size="icon" onClick={() => removePurchase(index)} className="h-6 w-6 text-destructive">
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
@@ -624,7 +624,7 @@ export default function ExpenseReportsPage() {
                         {(purchase.receipts || []).map((receipt) => (
                           <div key={receipt.id} className="relative">
                             <img src={api.getFileUrl(receipt.url)} alt="Recibo" className="w-16 h-16 object-cover rounded border" />
-                            <button
+                            <button aria-label="Remover recibo"
                               type="button"
                               onClick={() => removeSavedReceipt(index, receipt.id)}
                               className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
@@ -637,7 +637,7 @@ export default function ExpenseReportsPage() {
                         {(purchase.pendingFiles || []).map((pending) => (
                           <div key={pending.localId} className="relative">
                             <img src={URL.createObjectURL(pending.file)} alt="Recibo (pendente)" className="w-16 h-16 object-cover rounded border border-dashed border-primary" />
-                            <button
+                            <button aria-label="Remover"
                               type="button"
                               onClick={() => removePendingFile(index, pending.localId)}
                               className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"

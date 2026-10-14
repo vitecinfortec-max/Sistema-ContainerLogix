@@ -151,7 +151,7 @@ export default function NewCommercialProposalPage() {
                     <Label className="mb-1.5 block">Valor ({CURRENCY_SYMBOL[currency]})</Label>
                     <Input type="number" step="0.01" min="0" value={item.value} onChange={(e) => updateItem(idx, 'value', e.target.value)} className="h-9" />
                   </div>
-                  <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => removeItem(idx)} disabled={items.length === 1}>
+                  <Button title="Excluir" aria-label="Excluir" type="button" variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => removeItem(idx)} disabled={items.length === 1}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>

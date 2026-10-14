@@ -130,7 +130,7 @@ export default function ComercialProposalsPage() {
           footer={<TablePagination {...paginationProps} />}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : filteredProposals.length === 0 ? (
             <EmptyState
               icon={FileText}

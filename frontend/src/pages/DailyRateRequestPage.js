@@ -371,7 +371,7 @@ export default function DailyRateRequestPage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : requests.length === 0 ? (
             <EmptyState
               icon={Wallet}
@@ -449,7 +449,7 @@ export default function DailyRateRequestPage() {
                 {formData.items.map((item, index) => (
                   <div key={index} className="border rounded-lg p-4 relative">
                     <div className="absolute top-2 right-2">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6 text-destructive">
+                      <Button title="Remover" aria-label="Remover" type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6 text-destructive">
                         <X className="w-4 h-4" />
                       </Button>
                     </div>

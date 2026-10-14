@@ -194,7 +194,7 @@ export default function FuelTankLevelPage() {
           {/* "Carregando" só na primeira leitura: nas seguintes (depois de um
               reabastecimento) o medidor fica na tela e anima até o novo nível */}
           {loadingLevel && !level ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : !level?.configured ? (
             <div className="px-6 py-10 text-center">
               <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
@@ -297,7 +297,7 @@ export default function FuelTankLevelPage() {
           )}
         >
           {loadingLedger ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : ledger.length === 0 ? (
             <EmptyState icon={Droplet} title="Nenhuma movimentação de tanque registrada ainda" hint='Registre a primeira entrega pelo botão "Reabastecer tanque"' />
           ) : (

@@ -655,7 +655,7 @@ export default function LoadingOrderPage() {
                     </div>
                     <div className="col-span-4" />
                     <div className="col-span-2 flex justify-end">
-                      <Button
+                      <Button title="Excluir" aria-label="Excluir"
                         type="button"
                         variant="ghost"
                         size="sm"

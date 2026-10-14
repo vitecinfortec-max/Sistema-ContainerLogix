@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
-  StatusPill, UserTag, EmptyState, TablePagination,
+  StatusPill, UserTag, EmptyState, TablePagination, PageSkeleton,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -702,9 +702,7 @@ export default function BillingPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64" data-testid="billing-loading">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
+        <PageSkeleton testId="billing-loading" />
       </Layout>
     );
   }
@@ -880,7 +878,7 @@ export default function BillingPage() {
                     className="flex-1"
                     data-testid="search-movements-input"
                   />
-                  <Button onClick={handleSearchById} className="px-4" data-testid="search-by-id-button">
+                  <Button title="Adicionar" aria-label="Adicionar" onClick={handleSearchById} className="px-4" data-testid="search-by-id-button">
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
@@ -971,7 +969,7 @@ export default function BillingPage() {
                             {formatCurrency(movement.service_value)}
                           </td>
                           <td>
-                            <Button
+                            <Button title="Remover" aria-label="Remover"
                               variant="ghost"
                               size="sm"
                               onClick={() => removeAddedMovement(movement.id)}
@@ -1440,7 +1438,7 @@ export default function BillingPage() {
                             <td className="text-[12px]">{mov.operation_type}</td>
                             <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
                             <td className="text-center">
-                              <button
+                              <button aria-label={movementsToRemove.has(mov.id) ? 'Desfazer remoção' : 'Remover da fatura'}
                                 type="button"
                                 onClick={() => toggleRemoveMovement(mov.id)}
                                 className={`p-1 rounded ${movementsToRemove.has(mov.id) ? 'text-emerald-600 hover:bg-emerald-100' : 'text-red-600 hover:bg-red-100'}`}
@@ -1511,7 +1509,7 @@ export default function BillingPage() {
                             <td className="text-[12px]">{mov.operation_type}</td>
                             <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
                             <td className="text-center">
-                              <button
+                              <button aria-label={movementsToAdd.has(mov.id) ? 'Remover seleção' : 'Adicionar à fatura'}
                                 type="button"
                                 onClick={() => toggleAddMovement(mov.id)}
                                 className={`p-1 rounded ${movementsToAdd.has(mov.id) ? 'text-red-600 hover:bg-red-100' : 'text-emerald-600 hover:bg-emerald-100'}`}

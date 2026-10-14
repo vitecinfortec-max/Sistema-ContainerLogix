@@ -343,7 +343,7 @@ export default function ComercialCadastrosPage() {
           ) : (
             <EmptyState
               icon={activeType.icon}
-              title={loading ? 'Carregando...' : (search ? 'Nenhum registro encontrado' : 'Nenhum registro cadastrado')}
+              loading={loading} title={(search ? 'Nenhum registro encontrado' : 'Nenhum registro cadastrado')}
               hint={loading ? undefined : (search ? 'Ajuste a busca' : `Cadastre pelo botão "${activeType.feminine ? 'Nova' : 'Novo'} ${activeType.label.toLowerCase()}"`)}
             />
           )}

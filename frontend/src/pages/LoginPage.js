@@ -123,7 +123,7 @@ export default function LoginPage() {
                   required
                   className="h-12 pl-11 pr-11 border-slate-300 dark:border-slate-600 focus:border-primary focus:ring-primary"
                 />
-                <button
+                <button title="Mostrar ou ocultar senha" aria-label="Mostrar ou ocultar senha"
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"

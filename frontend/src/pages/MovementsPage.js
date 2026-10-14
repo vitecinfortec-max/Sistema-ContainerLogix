@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton,
-  ToolbarDivider, ToolbarPrimary, StatusPill, PlateTag, UserTag, EmptyState, TablePagination,
+  ToolbarDivider, ToolbarPrimary, StatusPill, PlateTag, UserTag, EmptyState, TablePagination, PageSkeleton,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -343,9 +343,7 @@ export default function MovementsPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64" data-testid="movements-loading">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
+        <PageSkeleton testId="movements-loading" />
       </Layout>
     );
   }

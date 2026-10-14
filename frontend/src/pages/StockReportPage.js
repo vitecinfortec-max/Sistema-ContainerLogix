@@ -487,7 +487,7 @@ export default function StockReportPage() {
                   </table>
                 </div>
               ) : (
-                <EmptyState icon={Package} title={listLoading ? 'Carregando...' : 'Nenhum produto neste filtro'} />
+                <EmptyState icon={Package} loading={listLoading} title={'Nenhum produto neste filtro'} />
               )}
             </DataCard>
           ) : (
@@ -530,7 +530,7 @@ export default function StockReportPage() {
                   </table>
                 </div>
               ) : (
-                <EmptyState icon={Package} title={listLoading ? 'Carregando...' : 'Nenhuma entrada ou saída neste filtro'} />
+                <EmptyState icon={Package} loading={listLoading} title={'Nenhuma entrada ou saída neste filtro'} />
               )}
             </DataCard>
           )}

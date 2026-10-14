@@ -260,7 +260,53 @@ export function UserTag({ name }) {
   );
 }
 
-export function EmptyState({ icon: Icon, title, hint, testId }) {
+const SKELETON_BAR = 'animate-pulse rounded bg-slate-200/80 dark:bg-slate-700/60';
+const SKELETON_WIDTHS = ['w-1/4', 'w-1/6', 'w-1/5', 'w-1/12'];
+
+/**
+ * Linhas "fantasma" no lugar da tabela enquanto a lista carrega: a tela já
+ * aparece no formato final, em vez de um texto "Carregando...".
+ */
+export function TableSkeleton({ rows = 6, testId }) {
+  return (
+    <div role="status" aria-label="Carregando" data-testid={testId}>
+      <div className="flex items-center gap-6 px-4 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-700">
+        {SKELETON_WIDTHS.map((w) => <div key={w} className={cn(SKELETON_BAR, 'h-2.5', w)} />)}
+      </div>
+      {Array.from({ length: rows }, (_, row) => (
+        <div key={row} className="flex items-center gap-6 px-4 py-3.5 border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+          {SKELETON_WIDTHS.map((w, col) => (
+            <div key={w} className={cn(SKELETON_BAR, 'h-3', w)} style={{ opacity: 1 - row * 0.12, marginRight: (row + col) % 3 === 0 ? '2%' : 0 }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Tela inteira carregando (formulário de edição, detalhe, lista que só abre
+ * depois dos dados): cabeçalho e um card com linhas fantasma.
+ */
+export function PageSkeleton({ rows = 6, testId }) {
+  return (
+    <div className="space-y-4" data-testid={testId}>
+      <div className="flex items-center gap-3">
+        <div className={cn(SKELETON_BAR, 'hidden sm:block w-10 h-10 rounded-lg')} />
+        <div className="space-y-2">
+          <div className={cn(SKELETON_BAR, 'h-4 w-48')} />
+          <div className={cn(SKELETON_BAR, 'h-3 w-72 max-w-full')} />
+        </div>
+      </div>
+      <div className={cn(SURFACE, 'overflow-hidden')}>
+        <TableSkeleton rows={rows} />
+      </div>
+    </div>
+  );
+}
+
+export function EmptyState({ icon: Icon, title, hint, testId, loading = false }) {
+  if (loading) return <TableSkeleton testId={testId} />;
   return (
     <div className="px-6 py-14 text-center" data-testid={testId}>
       {Icon && (

@@ -549,7 +549,7 @@ export default function CadastroUnificadoPage() {
                           onChange={(e) => setField(f.name, MASKS[f.mask](e.target.value))}
                           required={f.required}
                         />
-                        <Button
+                        <Button aria-label="Buscar dados pelo CNPJ"
                           type="button"
                           variant="outline"
                           size="icon"
@@ -680,7 +680,7 @@ export default function CadastroUnificadoPage() {
           ) : (
             <EmptyState
               icon={activeType.icon}
-              title={loading ? 'Carregando...' : (search ? 'Nenhum registro encontrado' : `${g.nenhum} ${activeType.label.toLowerCase()} ${g.cadastrado}`)}
+              loading={loading} title={(search ? 'Nenhum registro encontrado' : `${g.nenhum} ${activeType.label.toLowerCase()} ${g.cadastrado}`)}
               hint={loading ? undefined : (search ? 'Ajuste a busca' : 'Use o botão "Novo cadastro" para incluir o primeiro')}
             />
           )}

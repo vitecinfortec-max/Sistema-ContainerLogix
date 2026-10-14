@@ -553,7 +553,7 @@ export default function VehicleChecklistPage() {
           )}
         >
           {loading && checklists.length === 0 ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : checklists.length === 0 ? (
             <EmptyState
               icon={ClipboardCheck}
@@ -862,7 +862,7 @@ export default function VehicleChecklistPage() {
                       <Input className="col-span-2 h-9" value={p.un_number} onChange={(e) => updateProduct(idx, 'un_number', e.target.value)} />
                       <Input className="col-span-2 h-9" value={p.risk_number} onChange={(e) => updateProduct(idx, 'risk_number', e.target.value)} />
                       <Input className="col-span-2 h-9" value={p.subclass} onChange={(e) => updateProduct(idx, 'subclass', e.target.value)} />
-                      <Button type="button" variant="ghost" size="sm" className="col-span-1 h-9 w-9 p-0" onClick={() => removeProduct(idx)}>
+                      <Button title="Remover" aria-label="Remover" type="button" variant="ghost" size="sm" className="col-span-1 h-9 w-9 p-0" onClick={() => removeProduct(idx)}>
                         <X className="w-4 h-4 text-destructive" />
                       </Button>
                     </div>

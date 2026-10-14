@@ -393,7 +393,7 @@ export default function UnitSegregationPage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : segregations.length === 0 ? (
             <EmptyState icon={Package} title="Nenhuma segregação encontrada" hint="Ajuste os filtros ou crie uma nova segregação" />
           ) : (
@@ -497,7 +497,7 @@ export default function UnitSegregationPage() {
                   data-testid="client-search-input"
                 />
                 {formData.client_id && (
-                  <button
+                  <button title="Limpar" aria-label="Limpar"
                     type="button"
                     onClick={clearClient}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
@@ -579,7 +579,7 @@ export default function UnitSegregationPage() {
                       </div>
                     </div>
                     {formData.items.length > 1 && (
-                      <Button
+                      <Button title="Excluir" aria-label="Excluir"
                         type="button"
                         variant="ghost"
                         size="sm"

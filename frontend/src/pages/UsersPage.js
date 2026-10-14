@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { StatCard, StatGrid, DataCard, Toolbar, ToolbarPrimary, StatusPill, UserTag, EmptyState, TablePagination, usePagination } from '../components/DataPage';
+import { StatCard, StatGrid, DataCard, Toolbar, ToolbarPrimary, StatusPill, UserTag, EmptyState, TablePagination, usePagination, PageSkeleton } from '../components/DataPage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
@@ -125,9 +125,7 @@ export default function UsersPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64" data-testid="users-loading">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
+        <PageSkeleton testId="users-loading" />
       </Layout>
     );
   }

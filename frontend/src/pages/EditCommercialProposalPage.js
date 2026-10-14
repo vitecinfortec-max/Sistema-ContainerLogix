@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { PageSkeleton } from '../components/DataPage';
 import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -122,7 +123,7 @@ export default function EditCommercialProposalPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="text-center py-12 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
+        <PageSkeleton />
       </Layout>
     );
   }
@@ -205,7 +206,7 @@ export default function EditCommercialProposalPage() {
                     <Label className="mb-1.5 block">Valor ({CURRENCY_SYMBOL[currency]})</Label>
                     <Input type="number" step="0.01" min="0" value={item.value} onChange={(e) => updateItem(idx, 'value', e.target.value)} className="h-9" />
                   </div>
-                  <Button type="button" variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => removeItem(idx)} disabled={items.length === 1}>
+                  <Button title="Excluir" aria-label="Excluir" type="button" variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => removeItem(idx)} disabled={items.length === 1}>
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>

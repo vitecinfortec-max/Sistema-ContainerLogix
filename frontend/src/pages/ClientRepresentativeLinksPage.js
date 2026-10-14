@@ -179,7 +179,7 @@ export default function ClientRepresentativeLinksPage() {
 
         <DataCard title="Vínculos" count={loading ? '...' : links.length} footer={<TablePagination {...paginationProps} />}>
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : links.length === 0 ? (
             <EmptyState icon={Link2} title="Nenhum vínculo cadastrado" hint="Use o card acima para vincular um cliente a um representante" />
           ) : (
@@ -207,10 +207,10 @@ export default function ClientRepresentativeLinksPage() {
                       </td>
                       <td className="!py-1">
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => startEdit(link)} title="Editar">
+                          <Button aria-label="Editar" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => startEdit(link)} title="Editar">
                             <Edit className="w-3.5 h-3.5 text-blue-600" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleDelete(link.id)} title="Remover">
+                          <Button aria-label="Remover" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleDelete(link.id)} title="Remover">
                             <Trash2 className="w-3.5 h-3.5 text-destructive" />
                           </Button>
                         </div>

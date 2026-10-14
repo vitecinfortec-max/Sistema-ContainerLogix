@@ -396,7 +396,7 @@ export default function NewContainerVistoriaPage() {
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-800 font-semibold text-sm"
                         >
                           {name}
-                          <button type="button" onClick={() => removeService(name)} data-testid={`remove-service-${name}`}>
+                          <button title="Remover" aria-label="Remover" type="button" onClick={() => removeService(name)} data-testid={`remove-service-${name}`}>
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </span>
@@ -478,7 +478,7 @@ export default function NewContainerVistoriaPage() {
                           alt={photoLabels[photo.type]}
                           className="w-full h-32 object-cover rounded-lg bg-gray-50 dark:bg-slate-800"
                         />
-                        <Button
+                        <Button title="Remover" aria-label="Remover"
                           type="button"
                           variant="destructive"
                           size="icon"

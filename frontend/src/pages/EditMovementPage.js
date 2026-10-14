@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { PageSkeleton } from '../components/DataPage';
 import { FormActions } from '../components/FormKit';
 import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -244,9 +245,7 @@ export default function EditMovementPage() {
   if (loadingData) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
+        <PageSkeleton />
       </Layout>
     );
   }
@@ -364,7 +363,7 @@ export default function EditMovementPage() {
                       onFocus={() => setShowClientDropdown(true)}
                     />
                     {clientSearch && (
-                      <button
+                      <button title="Limpar" aria-label="Limpar"
                         type="button"
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400"
                         onClick={() => {
@@ -575,7 +574,7 @@ export default function EditMovementPage() {
                       onFocus={() => setShowBuyerDropdown(true)}
                     />
                     {buyerSearch && (
-                      <button
+                      <button title="Limpar" aria-label="Limpar"
                         type="button"
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400"
                         onClick={() => {

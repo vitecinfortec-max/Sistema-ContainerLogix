@@ -276,7 +276,7 @@ export default function ReportsMovementsPage() {
                     data-testid="report-filter-client"
                   />
                   {filterClient !== 'all' && (
-                    <button
+                    <button title="Limpar" aria-label="Limpar"
                       type="button"
                       onClick={clearClient}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"

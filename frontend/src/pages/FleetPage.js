@@ -695,7 +695,7 @@ export default function FleetPage() {
               )}
             >
               {vehiclesLoading ? (
-                <EmptyState title="Carregando..." />
+                <EmptyState loading />
               ) : vehicles.length === 0 ? (
                 <EmptyState
                   icon={Car}
@@ -798,7 +798,7 @@ export default function FleetPage() {
               )}
             >
               {loading ? (
-                <EmptyState title="Carregando..." />
+                <EmptyState loading />
               ) : revisions.length === 0 ? (
                 <EmptyState
                   icon={Wrench}
@@ -944,7 +944,7 @@ export default function FleetPage() {
                   {kmPhoto ? (
                     <div className="relative inline-block">
                       <img src={kmPhoto.previewUrl} alt="Foto do Km" className="w-40 h-28 object-cover rounded-lg border" />
-                      <Button
+                      <Button title="Remover" aria-label="Remover"
                         type="button"
                         variant="destructive"
                         size="icon"
@@ -1196,7 +1196,7 @@ export default function FleetPage() {
                       alt="Foto do Km"
                       className="w-48 h-32 object-cover rounded-lg border"
                     />
-                    <Button
+                    <Button title="Remover" aria-label="Remover"
                       type="button"
                       variant="destructive"
                       size="icon"

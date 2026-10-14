@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { PageSkeleton } from '../components/DataPage';
 import { FormActions } from '../components/FormKit';
 import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -214,9 +215,7 @@ export default function EditContainerVistoriaPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin" />
-        </div>
+        <PageSkeleton />
       </Layout>
     );
   }
@@ -421,7 +420,7 @@ export default function EditContainerVistoriaPage() {
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-800 font-semibold text-sm"
                         >
                           {name}
-                          <button type="button" onClick={() => removeService(name)} data-testid={`remove-service-${name}`}>
+                          <button title="Remover" aria-label="Remover" type="button" onClick={() => removeService(name)} data-testid={`remove-service-${name}`}>
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </span>
@@ -499,7 +498,7 @@ export default function EditContainerVistoriaPage() {
                           alt={PHOTO_LABELS[photo.type]}
                           className="w-full h-32 object-cover rounded-lg bg-gray-50 dark:bg-slate-800"
                         />
-                        <Button
+                        <Button title="Remover" aria-label="Remover"
                           type="button"
                           variant="destructive"
                           size="icon"

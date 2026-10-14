@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { FormActions } from '../components/FormKit';
-import { StatusPill } from '../components/DataPage';
+import { StatusPill, PageSkeleton } from '../components/DataPage';
 import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -452,11 +452,8 @@ export default function NewMovementPage() {
   return (
     <Layout>
       {loadingData ? (
-        <div className="flex items-center justify-center h-64" data-testid="loading-data">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Carregando dados...</p>
-          </div>
+        <div className="max-w-5xl mx-auto">
+          <PageSkeleton testId="loading-data" />
         </div>
       ) : (
       <div className="max-w-5xl mx-auto" data-testid="new-movement-page">
@@ -591,7 +588,7 @@ export default function NewMovementPage() {
                       onFocus={() => setShowClientDropdown(true)}
                     />
                     {clientSearch && (
-                      <button
+                      <button title="Limpar" aria-label="Limpar"
                         type="button"
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400"
                         onClick={() => {
@@ -836,7 +833,7 @@ export default function NewMovementPage() {
                       onFocus={() => setShowBuyerDropdown(true)}
                     />
                     {buyerSearch && (
-                      <button
+                      <button title="Limpar" aria-label="Limpar"
                         type="button"
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400"
                         onClick={() => {
@@ -929,7 +926,7 @@ export default function NewMovementPage() {
       </div>
       )}
 
-      <button
+      <button title="Novo registro" aria-label="Novo registro"
         onClick={() => navigate('/movements/new')}
         className="md:hidden fixed bottom-6 right-6 bg-primary text-primary-foreground rounded-full p-4 shadow-lg hover:bg-primary/90 transition-colors z-50"
         data-testid="fab-new-movement"

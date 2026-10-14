@@ -133,7 +133,7 @@ export default function ContainerAuditsPage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : filteredAudits.length === 0 ? (
             <EmptyState icon={ListChecks} title="Nenhuma auditoria encontrada" hint="Ajuste a busca ou inicie uma nova auditoria" />
           ) : (

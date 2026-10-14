@@ -292,7 +292,7 @@ export default function PortServicePage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : services.length === 0 ? (
             <EmptyState
               icon={Anchor}

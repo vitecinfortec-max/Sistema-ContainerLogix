@@ -84,7 +84,7 @@ export default function ServicePriceTablePage() {
 
         <DataCard title="Clientes com tabela cadastrada" count={loadingSummary ? '...' : clientSummaries.length} footer={<TablePagination {...paginationProps} />}>
           {loadingSummary ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : clientSummaries.length === 0 ? (
             <EmptyState icon={ListTree} title="Nenhum cliente com tabela de serviços cadastrada ainda" hint="Escolha um cliente acima para cadastrar os preços dele" />
           ) : (
@@ -108,7 +108,7 @@ export default function ServicePriceTablePage() {
                       <td className="cell-strong"><div className="max-w-[420px] truncate" title={cs.client_name}>{cs.client_name}</div></td>
                       <td className="text-right tabular-nums">{cs.count}</td>
                       <td className="text-right !py-1">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Editar">
+                        <Button aria-label="Editar" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Editar">
                           <Edit className="w-3.5 h-3.5 text-blue-600" />
                         </Button>
                       </td>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { DataCard, StatusPill } from '../components/DataPage';
+import { DataCard, StatusPill, PageSkeleton } from '../components/DataPage';
 import { Switch } from '../components/ui/switch';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
@@ -75,9 +75,7 @@ export default function ModulesPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64" data-testid="modules-loading">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
+        <PageSkeleton testId="modules-loading" />
       </Layout>
     );
   }

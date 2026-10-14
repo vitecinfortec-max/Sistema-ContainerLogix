@@ -191,7 +191,7 @@ export default function OdometerReadingsPage() {
         {/* Situação de Manutenção */}
         <DataCard title="Situação de manutenção" count={loadingStatus ? '...' : maintenanceStatus.length}>
           {loadingStatus ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : maintenanceStatus.length === 0 ? (
             <EmptyState icon={Gauge} title="Nenhum veículo com Revisão registrada ainda" />
           ) : (
@@ -251,7 +251,7 @@ export default function OdometerReadingsPage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : readings.length === 0 ? (
             <EmptyState icon={Gauge} title="Nenhum lançamento de hodômetro registrado ainda" hint='Registre o primeiro pelo botão "Novo lançamento"' />
           ) : (

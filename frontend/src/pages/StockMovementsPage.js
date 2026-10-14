@@ -465,7 +465,7 @@ export default function StockMovementsPage() {
           ) : (
             <EmptyState
               icon={ArrowLeftRight}
-              title={loading ? 'Carregando...' : (search || operationFilter ? 'Nenhuma movimentação encontrada' : 'Nenhuma movimentação de estoque registrada')}
+              loading={loading} title={(search || operationFilter ? 'Nenhuma movimentação encontrada' : 'Nenhuma movimentação de estoque registrada')}
               hint={loading ? undefined : (search || operationFilter ? 'Ajuste os filtros' : 'Registre a primeira pelo botão "Nova movimentação"')}
             />
           )}
@@ -593,7 +593,7 @@ export default function StockMovementsPage() {
                       <Input value={fmtMoney(it.total_value)} readOnly className="h-8 text-sm text-right font-semibold bg-white dark:bg-slate-900" />
                     </div>
                     <div className="col-span-1 pt-5">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-8 px-2 text-destructive hover:text-red-700">
+                      <Button title="Excluir" aria-label="Excluir" type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-8 px-2 text-destructive hover:text-red-700">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>

@@ -164,7 +164,7 @@ export default function ContainerInspectionsPage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : filteredInspections.length === 0 ? (
             <EmptyState icon={ClipboardCheck} title="Nenhum registro fotográfico encontrado" hint="Ajuste a busca ou crie um novo registro" />
           ) : (

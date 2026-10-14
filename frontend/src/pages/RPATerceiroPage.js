@@ -707,7 +707,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     data-testid="rpa-contratado-name"
                   />
                   {form.contratado_name && (
-                    <button
+                    <button title="Limpar" aria-label="Limpar"
                       type="button"
                       onClick={clearContratado}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
@@ -761,7 +761,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     data-testid="rpa-driver-name"
                   />
                   {form.driver_name && (
-                    <button
+                    <button title="Limpar" aria-label="Limpar"
                       type="button"
                       onClick={clearDriver}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
@@ -870,7 +870,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     data-testid="rpa-client-name"
                   />
                   {form.client_name && (
-                    <button
+                    <button title="Limpar" aria-label="Limpar"
                       type="button"
                       onClick={clearClient}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
@@ -955,7 +955,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     />
                   </div>
                   <div className="col-span-1">
-                    <Button
+                    <Button title="Excluir" aria-label="Excluir"
                       type="button"
                       variant="ghost"
                       size="sm"
@@ -1013,7 +1013,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                       <Input type="number" value={c.value} onChange={(e) => updateCargoItem(idx, 'value', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeCargoItem(idx)} className="h-8 px-2 text-destructive hover:text-red-700">
+                      <Button title="Excluir" aria-label="Excluir" type="button" variant="ghost" size="sm" onClick={() => removeCargoItem(idx)} className="h-8 px-2 text-destructive hover:text-red-700">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>

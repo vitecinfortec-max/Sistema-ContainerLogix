@@ -336,7 +336,7 @@ export default function FlexTankPage() {
               )}
             >
               {loading ? (
-                <EmptyState title="Carregando..." />
+                <EmptyState loading />
               ) : movements.length === 0 ? (
                 <EmptyState icon={Package} title="Nenhuma movimentação encontrada" hint="Ajuste os filtros ou registre uma nova movimentação" />
               ) : (

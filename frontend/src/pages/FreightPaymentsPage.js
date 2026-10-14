@@ -391,7 +391,7 @@ export default function FreightPaymentsPage() {
                       <td className="text-right tabular-nums whitespace-nowrap cell-strong">{formatMoney(b.total_value)}</td>
                       <td className="whitespace-nowrap tabular-nums">{b.created_at ? format(new Date(b.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
                       <td className="text-right !py-1">
-                        <Button
+                        <Button aria-label="Baixar Recibo de Pagamento"
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDownloadReceipt(b)}

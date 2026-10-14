@@ -108,7 +108,7 @@ export default function FuelConsumptionPage() {
         {/* Média Atual por Veículo */}
         <DataCard title="Média atual por veículo" count={loadingSummary ? '...' : summary.length}>
           {loadingSummary ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : summary.length === 0 ? (
             <EmptyState icon={TrendingUp} title="Nenhum veículo com pelo menos 2 abastecimentos registrados ainda" />
           ) : (
@@ -158,7 +158,7 @@ export default function FuelConsumptionPage() {
         {/* Histórico de Cálculos */}
         <DataCard title="Histórico de cálculos" count={loadingHistory ? '...' : history.length}>
           {loadingHistory ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : history.length === 0 ? (
             <EmptyState icon={TrendingUp} title="Nenhum cálculo de média disponível ainda" />
           ) : (

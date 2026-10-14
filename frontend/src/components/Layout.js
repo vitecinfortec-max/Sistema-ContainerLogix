@@ -927,7 +927,7 @@ export default function Layout({ children }) {
               </div>
             )}
           </div>
-          <button
+          <button aria-label="Configurações"
             onClick={() => navigate('/company-settings')}
             className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 dark:text-slate-400 dark:dark:text-slate-500 transition-colors"
             title="Configurações"
@@ -935,7 +935,7 @@ export default function Layout({ children }) {
           >
             <Settings className="w-[18px] h-[18px]" />
           </button>
-          <button
+          <button aria-label={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
             onClick={toggleTheme}
             className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 dark:text-slate-400 dark:dark:text-slate-500 transition-colors"
             title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
@@ -990,7 +990,7 @@ export default function Layout({ children }) {
                   data-testid="sidebar-search"
                 />
                 {searchQuery ? (
-                  <button
+                  <button title="Limpar" aria-label="Limpar"
                     onClick={() => setSearchQuery('')}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                   >
@@ -1129,7 +1129,7 @@ export default function Layout({ children }) {
                 <LogOut className="w-[18px] h-[18px]" />
                 {sidebarOpen && <span>Sair</span>}
               </button>
-              <button
+              <button title="Recolher ou expandir menu" aria-label="Recolher ou expandir menu"
                 onClick={toggleSidebar}
                 data-testid="toggle-sidebar"
                 className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400 transition-colors p-1.5 rounded"

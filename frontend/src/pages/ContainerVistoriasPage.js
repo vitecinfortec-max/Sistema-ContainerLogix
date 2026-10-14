@@ -163,7 +163,7 @@ export default function ContainerVistoriasPage() {
           )}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : filteredVistorias.length === 0 ? (
             <EmptyState icon={ShieldCheck} title="Nenhuma vistoria encontrada" hint="Ajuste a busca ou crie uma nova vistoria" />
           ) : (

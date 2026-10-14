@@ -438,7 +438,7 @@ export default function PortServiceBillingPage() {
           )}
         >
           {loadingBatches ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : batches.length === 0 ? (
             <EmptyState icon={Anchor} title="Nenhuma fatura de Serviço Portuário gerada ainda" hint="Use o card acima pra buscar os serviços de um cliente e gerar a fatura" />
           ) : (

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { PageSkeleton } from '../components/DataPage';
 import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -137,9 +138,7 @@ export default function ContainerVistoriaDetailPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin" />
-        </div>
+        <PageSkeleton />
       </Layout>
     );
   }
@@ -446,7 +445,7 @@ export default function ContainerVistoriaDetailPage() {
                         alt={PHOTO_LABELS[photo.type] || photo.type}
                         className="w-full h-48 object-contain rounded-lg bg-gray-50 dark:bg-slate-800"
                       />
-                      <Button
+                      <Button title="Remover" aria-label="Remover"
                         variant="destructive"
                         size="icon"
                         className="absolute top-2 right-2"

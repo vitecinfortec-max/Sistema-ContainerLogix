@@ -508,7 +508,7 @@ export default function NewContainerInspectionPage() {
                           alt={photoLabels[photo.type]}
                           className="w-full h-32 object-cover rounded-lg bg-gray-50 dark:bg-slate-800"
                         />
-                        <Button
+                        <Button title="Remover" aria-label="Remover"
                           type="button"
                           variant="destructive"
                           size="icon"

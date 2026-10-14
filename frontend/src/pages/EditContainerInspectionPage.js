@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { PageSkeleton } from '../components/DataPage';
 import { FormActions } from '../components/FormKit';
 import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -232,9 +233,7 @@ export default function EditContainerInspectionPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin" />
-        </div>
+        <PageSkeleton />
       </Layout>
     );
   }
@@ -545,7 +544,7 @@ export default function EditContainerInspectionPage() {
                           alt={PHOTO_LABELS[photo.type]}
                           className="w-full h-32 object-cover rounded-lg bg-gray-50 dark:bg-slate-800"
                         />
-                        <Button
+                        <Button title="Remover" aria-label="Remover"
                           type="button"
                           variant="destructive"
                           size="icon"

@@ -451,7 +451,7 @@ export default function EpiDeliveriesPage() {
           ) : (
             <EmptyState
               icon={HardHat}
-              title={loading ? 'Carregando...' : (hasFilters ? 'Nenhuma entrega encontrada' : 'Nenhuma entrega de EPI registrada')}
+              loading={loading} title={(hasFilters ? 'Nenhuma entrega encontrada' : 'Nenhuma entrega de EPI registrada')}
               hint={loading ? undefined : (hasFilters ? 'Ajuste os filtros' : 'Registre a primeira pelo botão "Nova entrega"')}
               testId="epi-empty"
             />
@@ -583,7 +583,7 @@ export default function EpiDeliveriesPage() {
                       <Input type="number" min="0" step="1" value={it.quantity} onChange={(e) => setItem(idx, 'quantity', e.target.value)} className="h-8 text-sm text-right" data-testid={`epi-item-qty-${idx}`} />
                     </div>
                     <div className="col-span-2 sm:col-span-1">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-8 px-2 text-destructive hover:text-red-700" title="Remover EPI">
+                      <Button aria-label="Remover EPI" type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-8 px-2 text-destructive hover:text-red-700" title="Remover EPI">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>

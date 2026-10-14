@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
+import { PageSkeleton } from '../components/DataPage';
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -129,9 +130,7 @@ export default function CompanySettingsPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64" data-testid="company-settings-loading">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
+        <PageSkeleton testId="company-settings-loading" />
       </Layout>
     );
   }
@@ -173,7 +172,7 @@ export default function CompanySettingsPage() {
                           className="w-32 h-32 object-contain rounded-lg border bg-white dark:bg-slate-900"
                         />
                         {isAdmin && (
-                          <Button
+                          <Button title="Remover" aria-label="Remover"
                             type="button"
                             variant="destructive"
                             size="icon"

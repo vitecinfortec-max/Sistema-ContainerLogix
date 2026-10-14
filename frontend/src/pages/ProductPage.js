@@ -324,7 +324,7 @@ export default function ProductPage() {
           ) : (
             <EmptyState
               icon={Package}
-              title={loading ? 'Carregando...' : (search ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado')}
+              loading={loading} title={(search ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado')}
               hint={loading ? undefined : (search ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo produto" ou importe uma NF-e em Entradas de Estoque')}
             />
           )}

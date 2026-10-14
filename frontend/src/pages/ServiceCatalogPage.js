@@ -248,7 +248,7 @@ export default function ServiceCatalogPage() {
           ) : (
             <EmptyState
               icon={Wrench}
-              title={loading ? 'Carregando...' : (search ? 'Nenhum serviço encontrado' : 'Nenhum serviço cadastrado')}
+              loading={loading} title={(search ? 'Nenhum serviço encontrado' : 'Nenhum serviço cadastrado')}
               hint={loading ? undefined : (search ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo serviço"')}
             />
           )}

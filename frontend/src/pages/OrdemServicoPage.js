@@ -730,7 +730,7 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
               <Input value={fmtMoney(it.total)} readOnly className="h-8 text-sm text-right font-semibold bg-white dark:bg-slate-900" />
             </div>
             <div className="col-span-1">
-              <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(idx)} className="h-8 px-2 text-destructive hover:text-red-700">
+              <Button title="Excluir" aria-label="Excluir" type="button" variant="ghost" size="sm" onClick={() => onRemove(idx)} className="h-8 px-2 text-destructive hover:text-red-700">
                 <Trash2 className="w-3.5 h-3.5" />
               </Button>
             </div>

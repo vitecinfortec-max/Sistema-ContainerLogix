@@ -265,7 +265,7 @@ export default function StockEntriesPage() {
           ) : (
             <EmptyState
               icon={PackagePlus}
-              title={loading ? 'Carregando...' : (search ? 'Nenhuma entrada encontrada' : 'Nenhuma entrada de estoque registrada')}
+              loading={loading} title={(search ? 'Nenhuma entrada encontrada' : 'Nenhuma entrada de estoque registrada')}
               hint={loading ? undefined : 'Use "Importar XML de NF-e" para lançar entradas automaticamente'}
             />
           )}

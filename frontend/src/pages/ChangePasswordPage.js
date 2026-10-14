@@ -106,7 +106,7 @@ export default function ChangePasswordPage() {
                   className="pl-10 pr-10 h-12"
                   data-testid="current-password-input"
                 />
-                <button
+                <button title="Mostrar ou ocultar senha" aria-label="Mostrar ou ocultar senha"
                   type="button"
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
@@ -129,7 +129,7 @@ export default function ChangePasswordPage() {
                   className="pl-10 pr-10 h-12"
                   data-testid="new-password-input"
                 />
-                <button
+                <button title="Mostrar ou ocultar senha" aria-label="Mostrar ou ocultar senha"
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"

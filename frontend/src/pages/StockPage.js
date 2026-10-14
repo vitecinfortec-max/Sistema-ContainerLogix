@@ -94,7 +94,7 @@ export default function StockPage() {
           footer={<TablePagination {...paginationProps} />}
         >
           {loading ? (
-            <EmptyState title="Carregando..." />
+            <EmptyState loading />
           ) : filteredItems.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="data-table">

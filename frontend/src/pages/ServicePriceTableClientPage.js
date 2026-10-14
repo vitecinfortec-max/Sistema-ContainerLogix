@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { FilterField, DataCard, StatusPill, EmptyState, TablePagination, usePagination } from '../components/DataPage';
+import { FilterField, DataCard, StatusPill, EmptyState, TablePagination, usePagination, PageSkeleton } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -168,7 +168,7 @@ export default function ServicePriceTableClientPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="text-center py-12 text-sm text-slate-500 dark:text-slate-400">Carregando...</div>
+        <PageSkeleton />
       </Layout>
     );
   }
@@ -298,10 +298,10 @@ export default function ServicePriceTableClientPage() {
                       </td>
                       <td className="!py-1">
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => startEdit(entry)} title="Editar">
+                          <Button aria-label="Editar" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => startEdit(entry)} title="Editar">
                             <Edit className="w-3.5 h-3.5 text-blue-600" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleDelete(entry.id)} title="Remover">
+                          <Button aria-label="Remover" variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleDelete(entry.id)} title="Remover">
                             <Trash2 className="w-3.5 h-3.5 text-destructive" />
                           </Button>
                         </div>

@@ -150,7 +150,7 @@ export function AddressFields({ value, onChange, international = false }) {
           <div className="flex gap-1.5">
             <Input value={v.zip || ''} onChange={(e) => set('zip', formatCEP(e.target.value))} className="h-9 text-sm font-mono" maxLength={9} />
             {!international && (
-              <Button
+              <Button aria-label="Buscar endereço pelo CEP"
                 type="button"
                 variant="outline"
                 size="icon"
