@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { FilterField, DataCard, StatusPill, EmptyState } from '../components/DataPage';
+import { FilterField, DataCard, StatusPill, EmptyState, TablePagination, usePagination } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -28,6 +28,7 @@ export default function ServicePriceTableClientPage() {
   const [loading, setLoading] = useState(true);
   const [serviceTypes, setServiceTypes] = useState([]);
   const [entries, setEntries] = useState([]);
+  const { pageItems, paginationProps } = usePagination(entries);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const [serviceNameInput, setServiceNameInput] = useState('');
@@ -262,7 +263,7 @@ export default function ServicePriceTableClientPage() {
           </form>
         </DataCard>
 
-        <DataCard title={`Serviços de ${clientName || 'cliente'}`} count={entries.length}>
+        <DataCard title={`Serviços de ${clientName || 'cliente'}`} count={entries.length} footer={<TablePagination {...paginationProps} />}>
           {entries.length === 0 ? (
             <EmptyState icon={Tags} title="Nenhum serviço cadastrado para este cliente" hint="Use o card acima para adicionar o primeiro preço" />
           ) : (
@@ -277,7 +278,7 @@ export default function ServicePriceTableClientPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map((entry) => (
+                  {pageItems.map((entry) => (
                     <tr key={entry.id} data-selected={editId === entry.id}>
                       <td className="cell-strong"><div className="max-w-[360px] truncate" title={entry.service_type_name}>{entry.service_type_name}</div></td>
                       <td>

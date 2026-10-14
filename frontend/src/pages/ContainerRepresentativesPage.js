@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -167,7 +167,7 @@ export default function ContainerRepresentativesPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = filteredRepresentatives.map(r => r.id);
+    const pageIds = pageItems.map(r => r.id);
     const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -187,6 +187,7 @@ export default function ContainerRepresentativesPage() {
       r.cnpj?.includes(term)
     );
   });
+  const { pageItems, paginationProps } = usePagination(filteredRepresentatives, { resetKey: search });
 
   const singleSelectedRepresentative = selectedIds.size === 1 ? filteredRepresentatives.find(r => r.id === [...selectedIds][0]) : null;
 
@@ -414,6 +415,7 @@ export default function ContainerRepresentativesPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRepresentative && handleDelete(singleSelectedRepresentative.id)} disabled={!singleSelectedRepresentative} testId="delete-representative-button" />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {filteredRepresentatives.length > 0 ? (
             <div className="overflow-x-auto">
@@ -422,7 +424,7 @@ export default function ContainerRepresentativesPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={filteredRepresentatives.length > 0 && filteredRepresentatives.every(r => selectedIds.has(r.id))}
+                        checked={pageItems.length > 0 && pageItems.every(r => selectedIds.has(r.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -436,7 +438,7 @@ export default function ContainerRepresentativesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRepresentatives.map((r) => (
+                  {pageItems.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => toggleSelect(r.id)}

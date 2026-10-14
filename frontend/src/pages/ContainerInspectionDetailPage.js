@@ -323,7 +323,7 @@ export default function ContainerInspectionDetailPage() {
           </CardHeader>
           <CardContent className="p-4">
             {inspection.no_damage ? (
-              <span className="inline-block px-3 py-1 rounded-full bg-green-100 text-green-800 font-semibold text-sm">
+              <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-sm">
                 Container sem avarias
               </span>
             ) : inspection.damage_items && inspection.damage_items.length > 0 ? (

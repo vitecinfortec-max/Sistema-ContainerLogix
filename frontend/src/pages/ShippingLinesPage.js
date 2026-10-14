@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState,
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -114,7 +114,7 @@ export default function ShippingLinesPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = filteredLines.map(l => l.id);
+    const pageIds = pageItems.map(l => l.id);
     const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -132,6 +132,7 @@ export default function ShippingLinesPage() {
       line.code?.toLowerCase().includes(term)
     );
   });
+  const { pageItems, paginationProps } = usePagination(filteredLines, { resetKey: search });
 
   const singleSelectedLine = selectedIds.size === 1 ? filteredLines.find(l => l.id === [...selectedIds][0]) : null;
 
@@ -216,6 +217,7 @@ export default function ShippingLinesPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedLine && handleDelete(singleSelectedLine.id)} disabled={!singleSelectedLine} testId="delete-line-button" />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {filteredLines.length > 0 ? (
             <div className="overflow-x-auto">
@@ -224,7 +226,7 @@ export default function ShippingLinesPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={filteredLines.length > 0 && filteredLines.every(l => selectedIds.has(l.id))}
+                        checked={pageItems.length > 0 && pageItems.every(l => selectedIds.has(l.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -235,7 +237,7 @@ export default function ShippingLinesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLines.map((line) => (
+                  {pageItems.map((line) => (
                     <tr
                       key={line.id}
                       onClick={() => toggleSelect(line.id)}

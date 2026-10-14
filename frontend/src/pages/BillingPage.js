@@ -967,7 +967,7 @@ export default function BillingPage() {
                           <td className="font-mono font-medium">{movement.container_number}</td>
                           <td>{movement.client_name || '-'}</td>
                           <td>{movement.service_type || '-'}</td>
-                          <td className="text-right font-mono text-green-700">
+                          <td className="text-right font-mono text-emerald-700">
                             {formatCurrency(movement.service_value)}
                           </td>
                           <td>
@@ -975,7 +975,7 @@ export default function BillingPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => removeAddedMovement(movement.id)}
-                              className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              className="h-6 w-6 p-0 text-destructive hover:text-red-700 hover:bg-red-50"
                             >
                               <X className="w-4 h-4" />
                             </Button>
@@ -1043,7 +1043,7 @@ export default function BillingPage() {
                             <td className="font-mono font-medium">{movement.container_number}</td>
                             <td>{movement.client_name || '-'}</td>
                             <td>{movement.service_type || '-'}</td>
-                            <td className="text-right font-mono text-green-700">
+                            <td className="text-right font-mono text-emerald-700">
                               {formatCurrency(movement.service_value)}
                             </td>
                           </tr>
@@ -1086,7 +1086,7 @@ export default function BillingPage() {
                   </div>
                   <div>
                     <Label className="mb-1.5 block">Valor Total</Label>
-                    <p className="font-bold text-green-700 text-lg">{formatCurrency(getTotalValue())}</p>
+                    <p className="font-bold text-emerald-700 text-lg">{formatCurrency(getTotalValue())}</p>
                   </div>
                 </div>
 
@@ -1188,7 +1188,7 @@ export default function BillingPage() {
                   <Label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                     <DollarSign className="w-3 h-3" /> Valor Total
                   </Label>
-                  <p className="font-bold text-green-700 text-lg">{formatCurrency(selectedInvoice.total_value)}</p>
+                  <p className="font-bold text-emerald-700 text-lg">{formatCurrency(selectedInvoice.total_value)}</p>
                 </div>
               </div>
 
@@ -1259,13 +1259,13 @@ export default function BillingPage() {
                               <td className="font-mono">{m.container_number}</td>
                               <td>
                                 <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                  m.operation_type === 'ENTRADA' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                                  m.operation_type === 'ENTRADA' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
                                 }`}>
                                   {m.operation_type}
                                 </span>
                               </td>
                               <td>{m.service_type || '-'}</td>
-                              <td className="text-right font-mono text-green-700">
+                              <td className="text-right font-mono text-emerald-700">
                                 {formatCurrency(m.service_value)}
                               </td>
                             </tr>
@@ -1338,9 +1338,9 @@ export default function BillingPage() {
                 data-testid="details-download-excel"
               >
                 {downloadingExcel === selectedInvoice?.id ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600 mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600 mr-2"></div>
                 ) : (
-                  <FileSpreadsheet className="w-4 h-4 mr-1.5 text-green-600" />
+                  <FileSpreadsheet className="w-4 h-4 mr-1.5 text-emerald-600" />
                 )}
                 Baixar Excel
               </Button>
@@ -1443,7 +1443,7 @@ export default function BillingPage() {
                               <button
                                 type="button"
                                 onClick={() => toggleRemoveMovement(mov.id)}
-                                className={`p-1 rounded ${movementsToRemove.has(mov.id) ? 'text-green-600 hover:bg-green-100' : 'text-red-600 hover:bg-red-100'}`}
+                                className={`p-1 rounded ${movementsToRemove.has(mov.id) ? 'text-emerald-600 hover:bg-emerald-100' : 'text-red-600 hover:bg-red-100'}`}
                                 title={movementsToRemove.has(mov.id) ? 'Desfazer remoção' : 'Remover da fatura'}
                               >
                                 {movementsToRemove.has(mov.id) ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
@@ -1466,7 +1466,7 @@ export default function BillingPage() {
                     Adicionar Movimentações
                   </span>
                   {movementsToAdd.size > 0 && (
-                    <span className="text-[11px] text-green-600">
+                    <span className="text-[11px] text-emerald-600">
                       {movementsToAdd.size} selecionada(s) para adicionar
                     </span>
                   )}
@@ -1504,7 +1504,7 @@ export default function BillingPage() {
                         {editAvailableMovements.map((mov) => (
                           <tr 
                             key={mov.id} 
-                            className={`${movementsToAdd.has(mov.id) ? 'bg-green-50' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                            className={`${movementsToAdd.has(mov.id) ? 'bg-emerald-50' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                           >
                             <td className="text-[12px] font-mono">{mov.transaction_id}</td>
                             <td className="text-[12px]">{mov.container_number}</td>
@@ -1514,7 +1514,7 @@ export default function BillingPage() {
                               <button
                                 type="button"
                                 onClick={() => toggleAddMovement(mov.id)}
-                                className={`p-1 rounded ${movementsToAdd.has(mov.id) ? 'text-red-600 hover:bg-red-100' : 'text-green-600 hover:bg-green-100'}`}
+                                className={`p-1 rounded ${movementsToAdd.has(mov.id) ? 'text-red-600 hover:bg-red-100' : 'text-emerald-600 hover:bg-emerald-100'}`}
                                 title={movementsToAdd.has(mov.id) ? 'Remover seleção' : 'Adicionar à fatura'}
                               >
                                 {movementsToAdd.has(mov.id) ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}

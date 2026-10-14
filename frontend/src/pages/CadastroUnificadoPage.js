@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, StatusPill, EmptyState,
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -460,7 +460,7 @@ export default function CadastroUnificadoPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = filteredItems.map((item) => item.id);
+    const pageIds = pageItems.map((item) => item.id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -475,6 +475,7 @@ export default function CadastroUnificadoPage() {
     if (!term) return true;
     return activeType.listColumns.some(([field]) => (item[field] || '').toString().toLowerCase().includes(term));
   });
+  const { pageItems, paginationProps } = usePagination(filteredItems, { resetKey: search });
 
   const singleSelectedItem = selectedIds.size === 1 ? filteredItems.find((item) => item.id === [...selectedIds][0]) : null;
 
@@ -625,6 +626,7 @@ export default function CadastroUnificadoPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)} disabled={!singleSelectedItem} />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {filteredItems.length > 0 ? (
             <div className="overflow-x-auto">
@@ -633,7 +635,7 @@ export default function CadastroUnificadoPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={filteredItems.length > 0 && filteredItems.every((item) => selectedIds.has(item.id))}
+                        checked={pageItems.length > 0 && pageItems.every((item) => selectedIds.has(item.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -644,7 +646,7 @@ export default function CadastroUnificadoPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item) => (
+                  {pageItems.map((item) => (
                     <tr
                       key={item.id}
                       onClick={() => toggleSelect(item.id)}

@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
-  StatusPill, PlateTag, EmptyState,
+  StatusPill, PlateTag, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -46,6 +46,7 @@ const formatAddress = (details) => {
 export default function OrdemServicoPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
+  const { pageItems, paginationProps } = usePagination(list, { resetKey: search });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -259,7 +260,7 @@ export default function OrdemServicoPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = list.map((o) => o.id);
+    const pageIds = pageItems.map((o) => o.id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -338,6 +339,7 @@ export default function OrdemServicoPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOS && handleDelete(singleSelectedOS.id, singleSelectedOS.os_number)} disabled={!singleSelectedOS} />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {list.length === 0 && !loading ? (
             <EmptyState
@@ -352,7 +354,7 @@ export default function OrdemServicoPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={list.length > 0 && list.every((o) => selectedIds.has(o.id))}
+                        checked={pageItems.length > 0 && pageItems.every((o) => selectedIds.has(o.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -367,7 +369,7 @@ export default function OrdemServicoPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((o) => (
+                  {pageItems.map((o) => (
                     <tr
                       key={o.id}
                       onClick={() => toggleSelect(o.id)}
@@ -728,7 +730,7 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
               <Input value={fmtMoney(it.total)} readOnly className="h-8 text-sm text-right font-semibold bg-white dark:bg-slate-900" />
             </div>
             <div className="col-span-1">
-              <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(idx)} className="h-8 px-2 text-red-500 hover:text-red-700">
+              <Button type="button" variant="ghost" size="sm" onClick={() => onRemove(idx)} className="h-8 px-2 text-destructive hover:text-red-700">
                 <Trash2 className="w-3.5 h-3.5" />
               </Button>
             </div>

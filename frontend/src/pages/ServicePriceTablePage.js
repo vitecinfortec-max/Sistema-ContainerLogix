@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { FilterField, DataCard, EmptyState } from '../components/DataPage';
+import { FilterField, DataCard, EmptyState, TablePagination, usePagination } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
@@ -53,6 +53,7 @@ export default function ServicePriceTablePage() {
       return acc;
     }, {})
   ).sort((a, b) => a.client_name.localeCompare(b.client_name));
+  const { pageItems, paginationProps } = usePagination(clientSummaries);
 
   const goToClient = (clientId) => navigate(`/comercial/tabela-servicos/${clientId}`);
 
@@ -81,7 +82,7 @@ export default function ServicePriceTablePage() {
           </div>
         </DataCard>
 
-        <DataCard title="Clientes com tabela cadastrada" count={loadingSummary ? '...' : clientSummaries.length}>
+        <DataCard title="Clientes com tabela cadastrada" count={loadingSummary ? '...' : clientSummaries.length} footer={<TablePagination {...paginationProps} />}>
           {loadingSummary ? (
             <EmptyState title="Carregando..." />
           ) : clientSummaries.length === 0 ? (
@@ -97,7 +98,7 @@ export default function ServicePriceTablePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {clientSummaries.map((cs) => (
+                  {pageItems.map((cs) => (
                     <tr
                       key={cs.client_id}
                       onClick={() => goToClient(cs.client_id)}

@@ -19,9 +19,9 @@ import { ptBR } from 'date-fns/locale';
 
 const STATUS_STYLES = {
   PENDENTE: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-  CONFIRMADO: 'bg-green-100 text-green-800',
+  CONFIRMADO: 'bg-emerald-100 text-emerald-800',
   FALTANTE: 'bg-red-100 text-red-800',
-  NAO_ESPERADO: 'bg-yellow-100 text-yellow-800',
+  NAO_ESPERADO: 'bg-amber-100 text-amber-800',
 };
 const STATUS_LABELS = {
   PENDENTE: 'Pendente',
@@ -263,7 +263,7 @@ export default function ContainerAuditDetailPage() {
                               disabled={savingContainer === item.container_number}
                               onClick={() => updateItem(item.container_number, 'CONFIRMADO')}
                             >
-                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                             </Button>
                             <Button
                               variant="ghost" size="sm" className="h-8 w-8 p-0"

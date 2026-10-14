@@ -42,8 +42,8 @@ function SimNaoToggle({ value, onChange, testId }) {
         onClick={() => onChange(value === 'SIM' ? null : 'SIM')}
         className={`px-2.5 py-1 rounded text-xs font-semibold border transition-colors ${
           value === 'SIM'
-            ? 'bg-green-600 border-green-600 text-white'
-            : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-green-400'
+            ? 'bg-emerald-600 border-emerald-600 text-white'
+            : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-emerald-400'
         }`}
       >
         Sim
@@ -667,7 +667,7 @@ export default function VehicleChecklistPage() {
               <ClipboardCheck className="w-5 h-5" />
               {editingChecklist ? 'Editar Checklist de Veículo' : 'Novo Checklist de Veículo'}
               {formData.template === 'petrobras_lvt' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-800">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
                   Modelo Petrobras (LVT)
                 </span>
               )}
@@ -1020,7 +1020,7 @@ export default function VehicleChecklistPage() {
                       {selectedChecklist[field].map((item, idx) => (
                         <div key={idx} className="flex items-center gap-3 px-4 py-2 text-sm">
                           <span className="flex-1">{item.text}</span>
-                          {item.answer === 'SIM' && <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />}
+                          {item.answer === 'SIM' && <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
                           {item.answer === 'NAO' && <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />}
                           {!item.answer && <span className="text-xs text-slate-400">-</span>}
                         </div>

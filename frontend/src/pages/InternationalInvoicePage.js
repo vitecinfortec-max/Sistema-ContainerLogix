@@ -976,7 +976,7 @@ export default function InternationalInvoicePage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeInvoiceItem(index)}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-destructive hover:text-red-700"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -1430,7 +1430,7 @@ export default function InternationalInvoicePage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeEditInvoiceItem(index)}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-destructive hover:text-red-700"
                         >
                           <X className="h-4 w-4" />
                         </Button>

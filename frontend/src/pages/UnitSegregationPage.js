@@ -493,7 +493,7 @@ export default function UnitSegregationPage() {
                       setShowClientSuggestions(true);
                     }
                   }}
-                  className={`h-11 pr-8 ${formData.client_id ? 'border-green-500 bg-green-50' : ''}`}
+                  className={`h-11 pr-8 ${formData.client_id ? 'border-emerald-500 bg-emerald-50' : ''}`}
                   data-testid="client-search-input"
                 />
                 {formData.client_id && (
@@ -523,8 +523,8 @@ export default function UnitSegregationPage() {
               )}
               
               {formData.client_id && selectedClientName && (
-                <p className="text-[10px] text-green-600 mt-1 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                <p className="text-[10px] text-emerald-600 mt-1 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
                   Cliente selecionado: {selectedClientName}
                 </p>
               )}
@@ -584,7 +584,7 @@ export default function UnitSegregationPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeItem(index)}
-                        className="h-10 w-10 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 mt-5"
+                        className="h-10 w-10 p-0 text-destructive hover:text-red-700 hover:bg-red-50 mt-5"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

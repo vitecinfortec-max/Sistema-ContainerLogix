@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, DataCard, Toolbar, ToolbarButton, ToolbarDivider,
-  StatusPill, EmptyState,
+  StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -29,6 +29,7 @@ const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'cu
 
 export default function FreightPaymentsPage() {
   const [list, setList] = useState([]);
+  const { pageItems, paginationProps } = usePagination(list);
   const [loading, setLoading] = useState(false);
   const [drivers, setDrivers] = useState([]);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -109,7 +110,7 @@ export default function FreightPaymentsPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = list.map((p) => p.id);
+    const pageIds = pageItems.map((p) => p.id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -296,6 +297,7 @@ export default function FreightPaymentsPage() {
               <ToolbarButton icon={FileSpreadsheet} label="Prestação de Contas em Excel" tone="emerald" onClick={() => downloadReport('excel')} disabled={!canExportReport || generating} testId="freight-payment-report-excel" />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {list.length === 0 && !loading ? (
             <EmptyState icon={HandCoins} title="Nenhum lançamento encontrado" hint="Os lançamentos aparecem aqui quando uma Ordem de Coleta numa rota cadastrada é aprovada" />
@@ -306,7 +308,7 @@ export default function FreightPaymentsPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={list.length > 0 && list.every((p) => selectedIds.has(p.id))}
+                        checked={pageItems.length > 0 && pageItems.every((p) => selectedIds.has(p.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -323,7 +325,7 @@ export default function FreightPaymentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((p) => (
+                  {pageItems.map((p) => (
                     <tr
                       key={p.id}
                       onClick={() => toggleSelect(p.id)}

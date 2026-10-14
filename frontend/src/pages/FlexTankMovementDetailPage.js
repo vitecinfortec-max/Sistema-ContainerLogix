@@ -116,7 +116,7 @@ export default function FlexTankMovementDetailPage() {
                 <p className="text-sm text-muted-foreground">Tipo</p>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                   movement.movement_type === 'ENTRADA' 
-                    ? 'bg-green-100 text-green-800' 
+                    ? 'bg-emerald-100 text-emerald-800' 
                     : 'bg-red-100 text-red-800'
                 }`}>
                   {movement.movement_type}

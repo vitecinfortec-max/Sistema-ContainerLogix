@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -112,7 +112,7 @@ export default function OSCategoriesPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = filteredCategories.map(c => c.id);
+    const pageIds = pageItems.map(c => c.id);
     const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -127,6 +127,7 @@ export default function OSCategoriesPage() {
     if (!term) return true;
     return c.name?.toLowerCase().includes(term);
   });
+  const { pageItems, paginationProps } = usePagination(filteredCategories, { resetKey: search });
 
   const singleSelectedCategory = selectedIds.size === 1 ? filteredCategories.find(c => c.id === [...selectedIds][0]) : null;
 
@@ -207,6 +208,7 @@ export default function OSCategoriesPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedCategory && handleDelete(singleSelectedCategory.id)} disabled={!singleSelectedCategory} />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {filteredCategories.length > 0 ? (
             <div className="overflow-x-auto">
@@ -215,7 +217,7 @@ export default function OSCategoriesPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={filteredCategories.length > 0 && filteredCategories.every(c => selectedIds.has(c.id))}
+                        checked={pageItems.length > 0 && pageItems.every(c => selectedIds.has(c.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -226,7 +228,7 @@ export default function OSCategoriesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCategories.map((category) => (
+                  {pageItems.map((category) => (
                     <tr
                       key={category.id}
                       onClick={() => toggleSelect(category.id)}

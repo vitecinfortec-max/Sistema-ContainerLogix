@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
-  StatusPill, EmptyState,
+  StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -78,6 +78,7 @@ function buildEmpty() {
 export default function LoadingOrderPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
+  const { pageItems, paginationProps } = usePagination(list, { resetKey: search });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -332,7 +333,7 @@ export default function LoadingOrderPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = list.map((o) => o.id);
+    const pageIds = pageItems.map((o) => o.id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -393,6 +394,7 @@ export default function LoadingOrderPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {list.length === 0 && !loading ? (
             <EmptyState
@@ -407,7 +409,7 @@ export default function LoadingOrderPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={list.length > 0 && list.every((o) => selectedIds.has(o.id))}
+                        checked={pageItems.length > 0 && pageItems.every((o) => selectedIds.has(o.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -423,7 +425,7 @@ export default function LoadingOrderPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((o) => (
+                  {pageItems.map((o) => (
                     <tr
                       key={o.id}
                       onClick={() => toggleSelect(o.id)}
@@ -659,7 +661,7 @@ export default function LoadingOrderPage() {
                         size="sm"
                         onClick={() => removeContainerItem(idx)}
                         disabled={form.items.length <= 1}
-                        className="h-8 px-2 text-red-500 hover:text-red-700 disabled:opacity-30"
+                        className="h-8 px-2 text-destructive hover:text-red-700 disabled:opacity-30"
                         data-testid={`loading-order-item-remove-${idx}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />

@@ -457,10 +457,10 @@ export default function DeliveryStatusPage() {
 
             {/* Dados da Programação */}
             {scheduleData && (
-              <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+              <div className="p-4 border rounded-lg bg-emerald-50 border-emerald-200">
                 <div className="flex items-center gap-2 mb-3">
-                  <FileText className="w-4 h-4 text-green-600" />
-                  <span className="text-sm font-semibold text-green-800">Programação Nº {scheduleData.schedule_number}</span>
+                  <FileText className="w-4 h-4 text-emerald-600" />
+                  <span className="text-sm font-semibold text-emerald-800">Programação Nº {scheduleData.schedule_number}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>

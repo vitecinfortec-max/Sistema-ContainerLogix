@@ -552,7 +552,7 @@ export default function MovementsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isCloning} data-testid="cancel-clone">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleClone} disabled={isCloning} className="bg-green-600 hover:bg-green-700" data-testid="confirm-clone">
+            <AlertDialogAction onClick={handleClone} disabled={isCloning} className="bg-emerald-600 hover:bg-emerald-700" data-testid="confirm-clone">
               {isCloning ? 'Clonando...' : 'Clonar'}
             </AlertDialogAction>
           </AlertDialogFooter>

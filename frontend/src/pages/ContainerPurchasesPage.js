@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
-  StatusPill, EmptyState,
+  StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -76,6 +76,7 @@ export default function ContainerPurchasesPage() {
     if (!term) return true;
     return p.container_number?.toUpperCase().includes(term);
   });
+  const { pageItems, paginationProps } = usePagination(filteredList);
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -86,7 +87,7 @@ export default function ContainerPurchasesPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = filteredList.map((p) => p.id);
+    const pageIds = pageItems.map((p) => p.id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -216,6 +217,7 @@ export default function ContainerPurchasesPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelected && handleDelete(singleSelected)} disabled={!singleSelected} testId="delete-container-purchase-button" />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {filteredList.length === 0 && !loading ? (
             <EmptyState
@@ -230,7 +232,7 @@ export default function ContainerPurchasesPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={filteredList.length > 0 && filteredList.every((p) => selectedIds.has(p.id))}
+                        checked={pageItems.length > 0 && pageItems.every((p) => selectedIds.has(p.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -246,7 +248,7 @@ export default function ContainerPurchasesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredList.map((p) => (
+                  {pageItems.map((p) => (
                     <tr
                       key={p.id}
                       onClick={() => toggleSelect(p.id)}

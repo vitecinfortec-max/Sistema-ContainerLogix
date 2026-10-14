@@ -61,12 +61,12 @@ export default function ForgotPasswordPage() {
         <CardContent>
           {sent ? (
             <div className="space-y-4">
-              <div className="flex flex-col items-center text-center p-4 bg-green-50 rounded-lg">
-                <CheckCircle className="w-12 h-12 text-green-500 mb-3" />
-                <p className="text-sm text-green-800 font-medium">
+              <div className="flex flex-col items-center text-center p-4 bg-emerald-50 rounded-lg">
+                <CheckCircle className="w-12 h-12 text-emerald-500 mb-3" />
+                <p className="text-sm text-emerald-800 font-medium">
                   Se o email estiver cadastrado, você receberá uma senha provisória.
                 </p>
-                <p className="text-xs text-green-600 mt-2">
+                <p className="text-xs text-emerald-600 mt-2">
                   Verifique também a pasta de spam.
                 </p>
               </div>

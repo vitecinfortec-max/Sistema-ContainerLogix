@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState,
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
@@ -77,6 +77,7 @@ export default function ComercialProposalsPage() {
     p.proposal_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.recipient_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  const { pageItems, paginationProps } = usePagination(filteredProposals, { resetKey: searchTerm });
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -87,7 +88,7 @@ export default function ComercialProposalsPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = filteredProposals.map(p => p.id);
+    const pageIds = pageItems.map(p => p.id);
     const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -126,6 +127,7 @@ export default function ComercialProposalsPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)} disabled={!singleSelectedItem} />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {loading ? (
             <EmptyState title="Carregando..." />
@@ -142,7 +144,7 @@ export default function ComercialProposalsPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={filteredProposals.length > 0 && filteredProposals.every(p => selectedIds.has(p.id))}
+                        checked={pageItems.length > 0 && pageItems.every(p => selectedIds.has(p.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                       />
                     </th>
@@ -154,7 +156,7 @@ export default function ComercialProposalsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProposals.map((p) => (
+                  {pageItems.map((p) => (
                     <tr
                       key={p.id}
                       onClick={() => toggleSelect(p.id)}

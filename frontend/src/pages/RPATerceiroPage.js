@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState,
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -75,6 +75,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
   const { confirm, ConfirmDialog } = useConfirm();
 
   const [rpas, setRpas] = useState([]);
+  const { pageItems, paginationProps } = usePagination(rpas, { resetKey: search });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -539,7 +540,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = rpas.map((r) => r.id);
+    const pageIds = pageItems.map((r) => r.id);
     const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -594,6 +595,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedContract && handleDelete(singleSelectedContract.id, singleSelectedContract.rpa_number)} disabled={!singleSelectedContract} />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {rpas.length === 0 && !loading ? (
             <EmptyState
@@ -608,7 +610,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={rpas.length > 0 && rpas.every((r) => selectedIds.has(r.id))}
+                        checked={pageItems.length > 0 && pageItems.every((r) => selectedIds.has(r.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -623,7 +625,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {rpas.map((r) => (
+                  {pageItems.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => toggleSelect(r.id)}
@@ -958,7 +960,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                       variant="ghost"
                       size="sm"
                       onClick={() => removeService(idx)}
-                      className="h-8 px-2 text-red-500 hover:text-red-700"
+                      className="h-8 px-2 text-destructive hover:text-red-700"
                       disabled={form.services.length <= 1}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -1011,7 +1013,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                       <Input type="number" value={c.value} onChange={(e) => updateCargoItem(idx, 'value', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeCargoItem(idx)} className="h-8 px-2 text-red-500 hover:text-red-700">
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeCargoItem(idx)} className="h-8 px-2 text-destructive hover:text-red-700">
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>

@@ -544,7 +544,7 @@ export default function ExpenseReportsPage() {
                 {formData.deposits.map((deposit, index) => (
                   <div key={index} className="border rounded-lg p-3 relative bg-muted/20">
                     <div className="absolute top-2 right-2">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeDeposit(index)} className="h-6 w-6 text-red-500">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeDeposit(index)} className="h-6 w-6 text-destructive">
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
@@ -582,7 +582,7 @@ export default function ExpenseReportsPage() {
                 {formData.purchases.map((purchase, index) => (
                   <div key={purchase.item_id} className="border rounded-lg p-4 relative">
                     <div className="absolute top-2 right-2">
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removePurchase(index)} className="h-6 w-6 text-red-500">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removePurchase(index)} className="h-6 w-6 text-destructive">
                         <X className="w-4 h-4" />
                       </Button>
                     </div>

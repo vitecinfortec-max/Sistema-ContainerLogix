@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState,
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -135,7 +135,7 @@ export default function FreightRoutesPage() {
   };
 
   const toggleSelectAllOnPage = () => {
-    const pageIds = filteredRoutes.map(r => r.id);
+    const pageIds = pageItems.map(r => r.id);
     const allSelected = pageIds.length > 0 && pageIds.every(id => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -153,6 +153,7 @@ export default function FreightRoutesPage() {
       route.destination?.toLowerCase().includes(term)
     );
   });
+  const { pageItems, paginationProps } = usePagination(filteredRoutes, { resetKey: search });
 
   const singleSelectedRoute = selectedIds.size === 1 ? filteredRoutes.find(r => r.id === [...selectedIds][0]) : null;
 
@@ -270,6 +271,7 @@ export default function FreightRoutesPage() {
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRoute && handleDelete(singleSelectedRoute.id)} disabled={!singleSelectedRoute} testId="delete-route-button" />
             </Toolbar>
           )}
+          footer={<TablePagination {...paginationProps} />}
         >
           {filteredRoutes.length > 0 ? (
             <div className="overflow-x-auto">
@@ -278,7 +280,7 @@ export default function FreightRoutesPage() {
                   <tr>
                     <th className="w-10 pr-0">
                       <Checkbox
-                        checked={filteredRoutes.length > 0 && filteredRoutes.every(r => selectedIds.has(r.id))}
+                        checked={pageItems.length > 0 && pageItems.every(r => selectedIds.has(r.id))}
                         onCheckedChange={toggleSelectAllOnPage}
                         data-testid="select-all-checkbox"
                       />
@@ -291,7 +293,7 @@ export default function FreightRoutesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRoutes.map((route) => (
+                  {pageItems.map((route) => (
                     <tr
                       key={route.id}
                       onClick={() => toggleSelect(route.id)}

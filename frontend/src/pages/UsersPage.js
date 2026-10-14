@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { StatCard, StatGrid, DataCard, Toolbar, ToolbarPrimary, StatusPill, UserTag, EmptyState } from '../components/DataPage';
+import { StatCard, StatGrid, DataCard, Toolbar, ToolbarPrimary, StatusPill, UserTag, EmptyState, TablePagination, usePagination } from '../components/DataPage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
@@ -28,6 +28,7 @@ export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const { confirm, ConfirmDialog } = useConfirm();
   const [users, setUsers] = useState([]);
+  const { pageItems, paginationProps } = usePagination(users);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -153,6 +154,7 @@ export default function UsersPage() {
           toolbar={
             <Toolbar primary={<ToolbarPrimary icon={UserPlus} label="Novo usuário" onClick={openCreateDialog} testId="new-user-button" />} />
           }
+          footer={<TablePagination {...paginationProps} />}
         >
           {users.length > 0 ? (
             <div className="overflow-x-auto">
@@ -167,7 +169,7 @@ export default function UsersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => {
+                  {pageItems.map((u) => {
                     const isSelf = u.id === currentUser?.id;
                     const isSaving = savingId === u.id;
                     return (

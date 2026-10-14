@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { FilterField, DataCard, StatusPill, EmptyState } from '../components/DataPage';
+import { FilterField, DataCard, StatusPill, EmptyState, TablePagination, usePagination } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Autocomplete } from '../components/Autocomplete';
@@ -15,6 +15,7 @@ export default function ClientRepresentativeLinksPage() {
   const [clients, setClients] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
   const [links, setLinks] = useState([]);
+  const { pageItems, paginationProps } = usePagination(links);
   const [loading, setLoading] = useState(true);
 
   const [clientNameInput, setClientNameInput] = useState('');
@@ -176,7 +177,7 @@ export default function ClientRepresentativeLinksPage() {
           </form>
         </DataCard>
 
-        <DataCard title="Vínculos" count={loading ? '...' : links.length}>
+        <DataCard title="Vínculos" count={loading ? '...' : links.length} footer={<TablePagination {...paginationProps} />}>
           {loading ? (
             <EmptyState title="Carregando..." />
           ) : links.length === 0 ? (
@@ -194,7 +195,7 @@ export default function ClientRepresentativeLinksPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {links.map((link) => (
+                  {pageItems.map((link) => (
                     <tr key={link.id} data-selected={editId === link.id}>
                       <td className="cell-strong"><div className="max-w-[300px] truncate" title={link.client_name}>{link.client_name}</div></td>
                       <td><div className="max-w-[240px] truncate" title={link.representative_name}>{link.representative_name}</div></td>
