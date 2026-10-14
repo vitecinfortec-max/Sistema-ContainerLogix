@@ -2,7 +2,7 @@
 // Registro Fotográfico, EIR): um PDF por registro, cada um com o nome do
 // próprio documento, todos dentro de uma pasta compactada (.zip).
 import { toast } from 'sonner';
-import { zipSync } from 'fflate';
+import { Zip, ZipPassThrough } from 'fflate';
 
 /** "Vistoria-TCLU7834740-4.pdf" - tipo do documento, container e número.
  *  Mesma regra de photo_document_filename em backend/reports.py. */
@@ -24,12 +24,12 @@ const saveWithLink = (blob, filename) => {
 };
 
 // Dois registros com o mesmo nome não podem se sobrepor dentro do zip
-const uniqueName = (files, filename) => {
-  if (!(filename in files)) return filename;
+const uniqueName = (used, filename) => {
+  let name = filename;
   const base = filename.replace(/\.pdf$/i, '');
-  let n = 2;
-  while (`${base} (${n}).pdf` in files) n += 1;
-  return `${base} (${n}).pdf`;
+  for (let n = 2; used.has(name); n += 1) name = `${base} (${n}).pdf`;
+  used.add(name);
+  return name;
 };
 
 /**
@@ -54,20 +54,32 @@ export async function downloadDocumentsInBatch(items) {
   }
 
   const toastId = toast.loading(`Gerando 1 de ${items.length}...`);
-  const files = {};
+  // O zip é montado aos poucos: cada PDF entra assim que chega e vira um
+  // pedaço de Blob (que o navegador pode guardar em disco), sem manter o lote
+  // inteiro na memória nem travar a tela montando tudo de uma vez no final.
+  const parts = [];
+  let zipError = null;
+  const zip = new Zip((error, chunk) => {
+    if (error) zipError = error;
+    else parts.push(new Blob([chunk]));
+  });
+  const used = new Set();
   const failed = [];
   for (let i = 0; i < items.length; i += 1) {
     const { filename, load } = items[i];
     toast.loading(`Gerando ${i + 1} de ${items.length}: ${filename}`, { id: toastId });
     try {
-      const blob = await load();
-      files[uniqueName(files, filename)] = new Uint8Array(await blob.arrayBuffer());
+      const data = new Uint8Array(await (await load()).arrayBuffer());
+      // Sem recomprimir: o PDF já é compactado
+      const entry = new ZipPassThrough(uniqueName(used, filename));
+      zip.add(entry);
+      entry.push(data, true);
     } catch (error) {
       failed.push(filename);
     }
   }
 
-  const saved = Object.keys(files).length;
+  const saved = items.length - failed.length;
   if (saved === 0) {
     toast.error('Nenhum arquivo pôde ser gerado', { id: toastId });
     return { saved, failed };
@@ -76,8 +88,9 @@ export async function downloadDocumentsInBatch(items) {
   // "Vistoria-TCLU7834740-4.pdf" -> "Vistoria-3-documentos.zip"
   const zipName = `${items[0].filename.split('-')[0]}-${saved}-documentos.zip`;
   try {
-    // level 0: o PDF já é compactado, recomprimir só gasta tempo
-    saveWithLink(new Blob([zipSync(files, { level: 0 })], { type: 'application/zip' }), zipName);
+    zip.end();
+    if (zipError) throw zipError;
+    saveWithLink(new Blob(parts, { type: 'application/zip' }), zipName);
   } catch (error) {
     toast.error('Erro ao montar o arquivo .zip', { id: toastId });
     return { saved: 0, failed: items.map((item) => item.filename) };
