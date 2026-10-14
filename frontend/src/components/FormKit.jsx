@@ -50,6 +50,11 @@ export function Field({ label, htmlFor, required, hint, children, className }) {
   );
 }
 
+/** Mensagem de erro embaixo do campo (ex.: obrigatório não preenchido). */
+export function FieldError({ children = 'Campo obrigatório', testId }) {
+  return <p role="alert" className="text-xs font-medium text-destructive" data-testid={testId}>{children}</p>;
+}
+
 /**
  * Rodapé do formulário: Cancelar e ações secundárias à esquerda do Salvar.
  * `sticky`: no celular a barra fica presa acima da navegação inferior, pra

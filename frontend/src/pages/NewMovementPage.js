@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { FormActions } from '../components/FormKit';
+import { FormActions, FieldError } from '../components/FormKit';
 import { StatusPill, PageSkeleton } from '../components/DataPage';
 import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -37,7 +37,8 @@ export default function NewMovementPage() {
   const [clients, setClients] = useState([]);
   const [shippingLines, setShippingLines] = useState([]);
   const [serviceTypes, setServiceTypes] = useState([]);
-  const [autoSaved, setAutoSaved] = useState(false);
+  // Hora do último rascunho gravado no navegador (fica visível no cabeçalho)
+  const [autoSavedAt, setAutoSavedAt] = useState(null);
   const [terminals, setTerminals] = useState([]);
   const [containerPhotos, setContainerPhotos] = useState(null);
   const [containerDamages, setContainerDamages] = useState([]);
@@ -90,8 +91,7 @@ export default function NewMovementPage() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(formData));
-      setAutoSaved(true);
-      setTimeout(() => setAutoSaved(false), 2000);
+      setAutoSavedAt(new Date());
     }, 1000);
 
     return () => clearTimeout(timeoutId);
@@ -227,6 +227,9 @@ export default function NewMovementPage() {
       toast.error('Não foi possível carregar os dados da vistoria');
     }
   };
+
+  // Obrigatório em branco: o formulário não envia e o campo mostra o motivo
+  const onInvalid = () => toast.error('Preencha os campos obrigatórios destacados');
 
   const onSubmit = async (data) => {
     if (containerDuplicateError) {
@@ -462,17 +465,17 @@ export default function NewMovementPage() {
             icon={ContainerIcon}
             title="Novo Registro"
             subtitle={vistoriaId ? 'EIR de entrada gerada a partir da Vistoria de Container' : 'Registre uma nova entrada ou saída de contêiner'}
-            meta={autoSaved && (
+            meta={autoSavedAt && (
               <StatusPill tone="emerald" dot={false}>
                 <Check className="w-3 h-3" />
-                Salvo automaticamente
+                Rascunho salvo às {format(autoSavedAt, 'HH:mm')}
               </StatusPill>
             )}
             backTo="/movements"
           />
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-4">
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tipo de Operação</CardTitle>
@@ -531,8 +534,10 @@ export default function NewMovementPage() {
                     id="driver_cpf"
                     data-testid="driver-cpf-input"
                     {...register('driver_cpf', { required: true })}
+                    aria-invalid={!!errors.driver_cpf}
                     className="font-mono"
                   />
+                  {errors.driver_cpf && <FieldError testId="driver-cpf-error" />}
                 </div>
 
                 <div className="space-y-1.5">
@@ -650,8 +655,10 @@ export default function NewMovementPage() {
                     id="container_number"
                     data-testid="container-number-input"
                     {...register('container_number', { required: true, onBlur: handleContainerNumberBlur })}
+                    aria-invalid={!!errors.container_number}
                     className="font-mono uppercase"
                   />
+                  {errors.container_number && <FieldError testId="container-number-error" />}
                   {containerDuplicateError && (
                     <p className="text-xs text-red-600 dark:text-red-400 font-medium" data-testid="container-duplicate-error">
                       {containerDuplicateError}

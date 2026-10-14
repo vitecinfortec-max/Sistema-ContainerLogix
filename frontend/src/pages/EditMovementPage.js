@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { PageSkeleton } from '../components/DataPage';
-import { FormActions } from '../components/FormKit';
+import { FormActions, FieldError } from '../components/FormKit';
 import PageHeader from '../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -43,7 +43,7 @@ export default function EditMovementPage() {
   // sobrescrever um Valor do Serviço já salvo assim que a página carrega os
   // dados existentes da movimentação.
   const userChangedPricingInputRef = useRef(false);
-  const { register, handleSubmit, setValue, watch, getValues } = useForm();
+  const { register, handleSubmit, setValue, watch, getValues, formState: { errors } } = useForm();
   const [entryLocked, setEntryLocked] = useState({});
 
   const operationType = watch('operation_type');
@@ -195,6 +195,9 @@ export default function EditMovementPage() {
     }
   };
 
+  // Obrigatório em branco: o formulário não envia e o campo mostra o motivo
+  const onInvalid = () => toast.error('Preencha os campos obrigatórios destacados');
+
   const onSubmit = async (data) => {
     setLoading(true);
     try {
@@ -262,7 +265,7 @@ export default function EditMovementPage() {
           />
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-4">
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tipo de Operação</CardTitle>
@@ -305,11 +308,13 @@ export default function EditMovementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="driver_name" className="block">Nome do Motorista *</Label>
-                  <Input id="driver_name" {...register('driver_name', { required: true })} />
+                  <Input id="driver_name" {...register('driver_name', { required: true })} aria-invalid={!!errors.driver_name} />
+                  {errors.driver_name && <FieldError />}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="driver_cpf" className="block">CPF *</Label>
-                  <Input id="driver_cpf" {...register('driver_cpf', { required: true })} className="font-mono" />
+                  <Input id="driver_cpf" {...register('driver_cpf', { required: true })} aria-invalid={!!errors.driver_cpf} className="font-mono" />
+                  {errors.driver_cpf && <FieldError />}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="truck_plate" className="block">Placa do Cavalo *</Label>
@@ -320,6 +325,7 @@ export default function EditMovementPage() {
                     className="font-mono uppercase"
                     list="trucks-list"
                   />
+                  {errors.truck_plate && <FieldError />}
                   <datalist id="trucks-list">
                     {cavaloVehicles.map(vehicle => (
                       <option key={vehicle.id} value={vehicle.plate} />
@@ -335,6 +341,7 @@ export default function EditMovementPage() {
                     className="font-mono uppercase"
                     list="trailers-list"
                   />
+                  {errors.trailer_plate_1 && <FieldError />}
                   <datalist id="trailers-list">
                     {carretaVehicles.map(vehicle => (
                       <option key={vehicle.id} value={vehicle.plate} />
@@ -343,7 +350,8 @@ export default function EditMovementPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="transport_company" className="block">Transportadora *</Label>
-                  <Input id="transport_company" {...register('transport_company', { required: true })} />
+                  <Input id="transport_company" {...register('transport_company', { required: true })} aria-invalid={!!errors.transport_company} />
+                  {errors.transport_company && <FieldError />}
                 </div>
                 <div className="space-y-1.5 relative" ref={clientInputRef}>
                   <Label htmlFor="client_name" className="block">Cliente</Label>
@@ -432,8 +440,10 @@ export default function EditMovementPage() {
                         loadEntryLocked(containerNumber, operationType);
                       },
                     })}
+                    aria-invalid={!!errors.container_number}
                     className="font-mono uppercase"
                   />
+                  {errors.container_number && <FieldError />}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="size_type" className="block">Tamanho/Tipo *</Label>
