@@ -113,7 +113,7 @@ function CountingText({ value }) {
     }
     node.textContent = parsed.format(shown.current);
     const controls = animate(shown.current, parsed.target, {
-      duration: 0.7,
+      duration: 0.4,
       ease: [0.16, 1, 0.3, 1],
       onUpdate: (v) => { shown.current = v; node.textContent = parsed.format(v); },
       // No fim, o texto exato que a tela passou (mesma formatação de sempre)

@@ -352,8 +352,8 @@ export default function DashboardPage() {
 
         {/* Stats Grid - 4 cards */}
         <motion.div variants={staggerParent(0.05)} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <motion.div variants={riseIn} whileHover={{ y: -2 }}>
-  <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-primary/30 transition-colors" data-testid="stat-entries-today">
+          <motion.div variants={riseIn}>
+  <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-testid="stat-entries-today">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -366,7 +366,7 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          <motion.div variants={riseIn} whileHover={{ y: -2 }}>
+          <motion.div variants={riseIn}>
   <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-amber-300 transition-colors" data-testid="stat-exits-today">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -380,7 +380,7 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          <motion.div variants={riseIn} whileHover={{ y: -2 }}>
+          <motion.div variants={riseIn}>
   <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-emerald-300 transition-colors" data-testid="stat-stock-full">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -394,7 +394,7 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          <motion.div variants={riseIn} whileHover={{ y: -2 }}>
+          <motion.div variants={riseIn}>
   <Card className="border border-slate-200 dark:border-slate-700 shadow-none hover:border-slate-300 dark:hover:border-slate-600 transition-colors" data-testid="stat-stock-empty">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">

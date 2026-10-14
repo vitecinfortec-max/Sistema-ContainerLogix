@@ -47,8 +47,7 @@ export function StatCard({ label, value, icon: Icon, tone = 'primary', hint, tes
   return (
     <motion.div
       variants={riseIn}
-      whileHover={{ y: -2 }}
-      className={cn(SURFACE, 'p-3 sm:p-4 flex items-center gap-3 min-w-0 transition-shadow hover:shadow-[0_6px_16px_-6px_rgba(15,23,42,0.18)]')}
+      className={cn(SURFACE, 'p-3 sm:p-4 flex items-center gap-3 min-w-0')}
       data-testid={testId}
     >
       {Icon && (
