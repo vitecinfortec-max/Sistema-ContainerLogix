@@ -16,6 +16,7 @@ import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import { SignatureCaptureDialog, signatureSrc } from '../components/SignaturePad';
 import { useConfirm } from '../hooks/useConfirm';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { qtyWithUnit } from '../lib/productUnits';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -77,16 +78,23 @@ export default function EpiDeliveriesPage() {
   const [signSaving, setSignSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
+  // Filtra enquanto se digita (sem botão "Filtrar"); o filtro vale também ao
+  // recarregar depois de salvar.
+  const debouncedSearch = useDebouncedValue(search.trim());
+
   useEffect(() => {
     loadDeliveries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, dateFrom, dateTo]);
+
+  useEffect(() => {
     loadPeople();
     loadProducts();
     api.getWarehouses().then((r) => setWarehouses(r.data || [])).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadDeliveries = async (term = search, from = dateFrom, to = dateTo) => {
-    setLoading(true);
+  const loadDeliveries = async (term = debouncedSearch, from = dateFrom, to = dateTo) => {
     try {
       const params = {};
       if (term) params.search = term;
@@ -329,7 +337,6 @@ export default function EpiDeliveriesPage() {
 
   const clearFilters = () => {
     setSearch(''); setDateFrom(''); setDateTo('');
-    loadDeliveries('', '', '');
   };
 
   // ===== Indicadores =====
@@ -355,13 +362,12 @@ export default function EpiDeliveriesPage() {
           <StatCard label="Sem assinatura" value={pendingSignatures} icon={AlertTriangle} tone={pendingSignatures ? 'amber' : 'slate'} hint={pendingSignatures ? 'cadastre a assinatura da pessoa' : undefined} testId="epi-kpi-unsigned" />
         </StatGrid>
 
-        <FilterCard hasFilters={hasFilters} onClear={clearFilters} onApply={() => loadDeliveries()}>
+        <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <FilterField label="Nome, CPF, EPI ou C.A." className="col-span-2">
               <SearchInput
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && loadDeliveries()}
                 data-testid="epi-search-input"
               />
             </FilterField>

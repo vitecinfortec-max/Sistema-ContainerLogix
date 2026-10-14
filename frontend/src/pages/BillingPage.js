@@ -13,6 +13,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { 
   Receipt, Plus, Search, FileText, Trash2, Eye, 
@@ -59,9 +60,9 @@ export default function BillingPage() {
   const [totalInvoices, setTotalInvoices] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  // Filtro por cliente da lista: o texto digitado só vale ao clicar em Filtrar
+  // Filtro por cliente da lista: age sozinho enquanto se digita, sem botão "Filtrar"
   const [clientFilter, setClientFilter] = useState('');
-  const [appliedClient, setAppliedClient] = useState('');
+  const appliedClient = useDebouncedValue(clientFilter.trim());
 
   // Estado do Modal de Nova Fatura
   const [showNewInvoice, setShowNewInvoice] = useState(false);
@@ -113,14 +114,18 @@ export default function BillingPage() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {
-    loadInvoices();
     loadClients();
+  }, []);
+
+  useEffect(() => {
+    loadInvoices();
     setSelectedIds(new Set());
   }, [currentPage, appliedClient]);
 
+  // Só a primeira carga mostra o esqueleto da tela: recarregar (ao filtrar,
+  // trocar de página ou salvar) mantém a lista na tela e o foco no filtro.
   const loadInvoices = async () => {
     try {
-      setLoading(true);
       const clientParams = appliedClient ? { client_name: appliedClient } : {};
       const [invoicesRes, countRes] = await Promise.all([
         api.getInvoices({ page: currentPage, per_page: ITEMS_PER_PAGE, ...clientParams }),
@@ -682,14 +687,8 @@ export default function BillingPage() {
 
   const totalPages = Math.ceil(totalInvoices / ITEMS_PER_PAGE);
 
-  const applyClientFilter = () => {
-    setAppliedClient(clientFilter.trim());
-    setCurrentPage(1);
-  };
-
   const clearClientFilter = () => {
     setClientFilter('');
-    setAppliedClient('');
     setCurrentPage(1);
   };
 
@@ -712,13 +711,12 @@ export default function BillingPage() {
       <div className="space-y-4" data-testid="billing-page">
         <PageHeader icon={Receipt} title="Faturamento" subtitle="Gerencie as faturas do sistema" />
 
-        <FilterCard hasFilters={!!appliedClient || !!clientFilter} onClear={clearClientFilter} onApply={applyClientFilter}>
+        <FilterCard hasFilters={!!appliedClient || !!clientFilter} onClear={clearClientFilter}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Cliente">
               <SearchInput
                 value={clientFilter}
-                onChange={(e) => setClientFilter(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && applyClientFilter()}
+                onChange={(e) => { setClientFilter(e.target.value); setCurrentPage(1); }}
                 data-testid="invoice-client-filter"
               />
             </FilterField>

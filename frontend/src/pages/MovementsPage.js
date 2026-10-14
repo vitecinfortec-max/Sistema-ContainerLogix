@@ -27,21 +27,12 @@ import {
   AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 const ITEMS_PER_PAGE = 15;
 const STATUS_LABELS = { CHEIO: 'Cheio', VAZIO: 'Vazio' };
 const formatCount = (n) => n.toLocaleString('pt-BR');
 const formatShare = (part, total) => `${total ? Math.round((part / total) * 100) : 0}%`;
-
-// Espera o usuário parar de digitar antes de consultar o servidor
-function useDebouncedValue(value, delay = 350) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
 
 const EMPTY_STATS = { total: 0, entries: 0, exits: 0, full: 0, empty: 0 };
 
@@ -369,7 +360,7 @@ export default function MovementsPage() {
           <StatCard label="Cheios / Vazios" value={`${formatCount(stats.full)} / ${formatCount(stats.empty)}`} icon={PackageCheck} tone="emerald" hint={`${formatShare(stats.full, stats.total)} cheios`} testId="stat-status" />
         </StatGrid>
 
-        <FilterCard hasFilters={hasFilters} onClear={clearAllFilters} onApply={loadMovements}>
+        <FilterCard hasFilters={hasFilters} onClear={clearAllFilters}>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             <FilterField label="Data início">
               <Input type="date" value={dateFrom} onChange={e => onFilter(setDateFrom)(e.target.value)} className="h-9 text-sm" data-testid="date-from-input" />

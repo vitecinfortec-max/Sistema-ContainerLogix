@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { ClipboardCheck, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText, Clock, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
@@ -60,12 +61,17 @@ export default function DeliveryStatusPage() {
   // Estado de Seleção (toolbar)
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
+  // Filtra enquanto se digita (sem botão "Filtrar"); o filtro vale também ao
+  // trocar de página e ao recarregar depois de salvar.
+  const debouncedNumber = useDebouncedValue(searchQuery.trim());
+
   useEffect(() => {
     loadStatuses();
     setSelectedIds(new Set());
-  }, [pagination.page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, debouncedNumber, statusFilter]);
 
-  const loadStatuses = async (filters = { number: searchQuery, status: statusFilter }) => {
+  const loadStatuses = async (filters = { number: debouncedNumber, status: statusFilter }) => {
     try {
       const params = { page: pagination.page, per_page: 20 };
       if (filters.number) params.schedule_number = filters.number;
@@ -80,16 +86,15 @@ export default function DeliveryStatusPage() {
     }
   };
 
-  const handleSearch = () => {
-    setPagination(prev => ({ ...prev, page: 1 }));
-    loadStatuses();
-  };
-
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('');
     setPagination(prev => ({ ...prev, page: 1 }));
-    loadStatuses({ number: '', status: '' });
+  };
+
+  const onFilter = (setter) => (value) => {
+    setter(value);
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const searchSchedule = async () => {
@@ -300,20 +305,19 @@ export default function DeliveryStatusPage() {
       <div className="space-y-4" data-testid="delivery-status-page">
         <PageHeader icon={ClipboardCheck} title="Status de Entrega" subtitle="Controle de horários de entrega por programação" />
 
-        <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearFilters} onApply={handleSearch}>
+        <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearFilters}>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <FilterField label="Nº programação">
               <Input
                 type="number"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                onChange={(e) => onFilter(setSearchQuery)(e.target.value)}
                 className="h-9 text-sm"
                 data-testid="search-schedule-number"
               />
             </FilterField>
             <FilterField label="Status">
-              <Select value={statusFilter || 'ALL'} onValueChange={(v) => setStatusFilter(v === 'ALL' ? '' : v)}>
+              <Select value={statusFilter || 'ALL'} onValueChange={(v) => onFilter(setStatusFilter)(v === 'ALL' ? '' : v)}>
                 <SelectTrigger className="h-9 text-sm" data-testid="filter-delivery-status">
                   <SelectValue />
                 </SelectTrigger>

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
@@ -72,11 +73,20 @@ export default function DailyRateRequestPage() {
     };
   }
 
+  // A busca é feita enquanto se digita (sem botão "Filtrar") e vale também
+  // ao trocar de página e ao recarregar depois de salvar.
+  const debouncedSearch = useDebouncedValue(searchQuery.trim());
+
+  useEffect(() => {
+    loadSelectData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     loadRequests();
-    loadSelectData();
     setSelectedIds(new Set());
-  }, [pagination.page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, debouncedSearch, statusFilter]);
 
   const loadSelectData = async () => {
     try {
@@ -94,8 +104,7 @@ export default function DailyRateRequestPage() {
     }
   };
 
-  const loadRequests = async (search = searchQuery, status = statusFilter) => {
-    setLoading(true);
+  const loadRequests = async (search = debouncedSearch, status = statusFilter) => {
     try {
       const params = { page: pagination.page, per_page: 15 };
       if (search) params.search = search;
@@ -115,23 +124,21 @@ export default function DailyRateRequestPage() {
     }
   };
 
-  const handleSearch = () => {
-    setPagination(prev => ({ ...prev, page: 1 }));
-    loadRequests(searchQuery);
-  };
-
   const clearSearch = () => {
     setSearchQuery('');
     setStatusFilter('');
     setPagination(prev => ({ ...prev, page: 1 }));
-    loadRequests('', '');
+  };
+
+  const handleSearchChange = (value) => {
+    setSearchQuery(value);
+    setPagination(prev => ({ ...prev, page: 1 }));
   };
 
   const handleStatusFilterChange = (value) => {
     const next = value === 'ALL' ? '' : value;
     setStatusFilter(next);
     setPagination(prev => ({ ...prev, page: 1 }));
-    loadRequests(searchQuery, next);
   };
 
   // Marca como Pago/Pendente todas as solicitações selecionadas (uma ou
@@ -317,13 +324,12 @@ export default function DailyRateRequestPage() {
       <div className="space-y-4">
         <PageHeader icon={Wallet} title="Solicitação de Diária" subtitle="Gerencie as solicitações de diária, comissão e almoço dos motoristas" />
 
-        <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearSearch} onApply={handleSearch}>
+        <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearSearch}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Motorista, placa ou cliente">
               <SearchInput
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 data-testid="search-daily-rate-input"
               />
             </FilterField>

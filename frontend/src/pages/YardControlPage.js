@@ -12,6 +12,7 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { Checkbox } from '../components/ui/checkbox';
 import { Package, Clock, AlertTriangle, FileText, FileSpreadsheet, Eye, LogOut, Users, Ship } from 'lucide-react';
@@ -58,27 +59,26 @@ export default function YardControlPage() {
   const [savingExit, setSavingExit] = useState(false);
   
   // Filtros
-  const [filters, setFilters] = useState({
+  // Link do sino de alertas chega com ?min_days=61 para já abrir filtrado
+  const [filters, setFilters] = useState(() => ({
     status_filter: '',
     client_name: '',
     shipping_line: '',
-    min_days: '',
+    min_days: new URLSearchParams(location.search).get('min_days') || '',
     movement_type: '',
     date_from: '',
     date_to: ''
-  });
+  }));
+  // Filtra enquanto se digita/escolhe, sem botão "Filtrar"
+  const appliedFilters = useDebouncedValue(filters);
   const [clientInputFocused, setClientInputFocused] = useState(false);
   useEffect(() => {
-    // Link do sino de alertas chega com ?min_days=61 para já abrir filtrado
-    const minDaysFromUrl = new URLSearchParams(location.search).get('min_days');
-    if (minDaysFromUrl) {
-      setFilters(prev => ({ ...prev, min_days: minDaysFromUrl }));
-      loadData({ min_days: minDaysFromUrl });
-    } else {
-      loadData();
-    }
     loadFiltersData();
   }, []);
+
+  useEffect(() => {
+    loadData(appliedFilters);
+  }, [appliedFilters]);
 
   const loadFiltersData = async () => {
     try {
@@ -98,10 +98,9 @@ export default function YardControlPage() {
     }
   };
 
-  const loadData = async (appliedFilters = {}) => {
-    setLoading(true);
+  const loadData = async (currentFilters = {}) => {
     try {
-      const params = { ...appliedFilters };
+      const params = { ...currentFilters };
       Object.keys(params).forEach(key => {
         if (!params[key]) delete params[key];
       });
@@ -141,9 +140,9 @@ export default function YardControlPage() {
     }
   };
 
-  const applyFilters = () => {
+  const updateFilter = (field, value) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
     setCurrentPage(1);
-    loadData(filters);
   };
 
   const clearFilters = () => {
@@ -157,7 +156,6 @@ export default function YardControlPage() {
       date_to: ''
     });
     setCurrentPage(1);
-    loadData({});
   };
 
   // Paginação
@@ -326,15 +324,12 @@ export default function YardControlPage() {
         <FilterCard
           hasFilters={Object.values(filters).some(Boolean)}
           onClear={clearFilters}
-          onApply={applyFilters}
-          clearTestId="clear-filters-btn"
-          applyTestId="apply-filters-btn"
         >
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
             <FilterField label="Status">
               <Select
                 value={filters.status_filter || 'all'}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, status_filter: value === 'all' ? '' : value }))}
+                onValueChange={(value) => updateFilter('status_filter', value === 'all' ? '' : value)}
               >
                 <SelectTrigger data-testid="filter-status" className="h-9 text-sm">
                   <SelectValue />
@@ -350,7 +345,7 @@ export default function YardControlPage() {
             <FilterField label="Tipo">
               <Select
                 value={filters.movement_type || 'all'}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
+                onValueChange={(value) => updateFilter('movement_type', value === 'all' ? '' : value)}
               >
                 <SelectTrigger data-testid="filter-movement-type" className="h-9 text-sm">
                   <SelectValue />
@@ -367,7 +362,7 @@ export default function YardControlPage() {
             <FilterField label="Cliente" className="relative">
               <SearchInput
                 value={filters.client_name}
-                onChange={(e) => setFilters(prev => ({ ...prev, client_name: e.target.value }))}
+                onChange={(e) => updateFilter('client_name', e.target.value)}
                 onFocus={() => setClientInputFocused(true)}
                 onBlur={() => setTimeout(() => setClientInputFocused(false), 200)}
                 data-testid="filter-client"
@@ -382,7 +377,7 @@ export default function YardControlPage() {
                         key={client.id}
                         className="px-3 py-2 cursor-pointer hover:bg-muted text-[13px]"
                         onClick={() => {
-                          setFilters(prev => ({ ...prev, client_name: client.name }));
+                          updateFilter('client_name', client.name);
                           setClientInputFocused(false);
                         }}
                       >
@@ -402,7 +397,7 @@ export default function YardControlPage() {
             <FilterField label="Armador">
               <Select
                 value={filters.shipping_line || 'all'}
-                onValueChange={(value) => setFilters(prev => ({ ...prev, shipping_line: value === 'all' ? '' : value }))}
+                onValueChange={(value) => updateFilter('shipping_line', value === 'all' ? '' : value)}
               >
                 <SelectTrigger data-testid="filter-shipping" className="h-9 text-sm">
                   <SelectValue />
@@ -423,7 +418,7 @@ export default function YardControlPage() {
                 type="number"
                 min="0"
                 value={filters.min_days}
-                onChange={(e) => setFilters(prev => ({ ...prev, min_days: e.target.value }))}
+                onChange={(e) => updateFilter('min_days', e.target.value)}
                 data-testid="filter-min-days"
                 className="h-9 text-sm"
               />
@@ -433,7 +428,7 @@ export default function YardControlPage() {
               <Input
                 type="date"
                 value={filters.date_from}
-                onChange={(e) => setFilters(prev => ({ ...prev, date_from: e.target.value }))}
+                onChange={(e) => updateFilter('date_from', e.target.value)}
                 data-testid="filter-date-from"
                 className="h-9 text-sm"
               />
@@ -443,7 +438,7 @@ export default function YardControlPage() {
               <Input
                 type="date"
                 value={filters.date_to}
-                onChange={(e) => setFilters(prev => ({ ...prev, date_to: e.target.value }))}
+                onChange={(e) => updateFilter('date_to', e.target.value)}
                 data-testid="filter-date-to"
                 className="h-9 text-sm"
               />

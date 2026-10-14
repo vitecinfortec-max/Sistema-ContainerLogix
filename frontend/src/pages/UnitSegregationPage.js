@@ -11,6 +11,7 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Checkbox } from '../components/ui/checkbox';
@@ -55,10 +56,24 @@ export default function UnitSegregationPage() {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
 
+  // Filtra enquanto se digita (sem botão "Filtrar"); o filtro vale também ao
+  // trocar de página e ao recarregar depois de salvar.
+  const debouncedContainer = useDebouncedValue(searchQuery.trim());
+
+  useEffect(() => {
+    loadAuxData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     loadSegregations();
-    loadAuxData();
-  }, [pagination.page, statusFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, statusFilter, debouncedContainer]);
+
+  const onFilter = (setter) => (value) => {
+    setter(value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
 
   // Fecha o dropdown de autocomplete de cliente ao clicar fora - antes ficava
   // aberto sobre a lista de containers do formulário até selecionar um cliente.
@@ -121,7 +136,7 @@ export default function UnitSegregationPage() {
     try {
       const params = { page: pagination.page, per_page: 20 };
       if (statusFilter) params.status = statusFilter;
-      if (searchQuery) params.container_number = searchQuery;
+      if (debouncedContainer) params.container_number = debouncedContainer;
       
       const response = await api.getUnitSegregations(params);
       setSegregations(response.data.items);
@@ -340,15 +355,14 @@ export default function UnitSegregationPage() {
 
         <FilterCard
           hasFilters={!!(searchQuery || statusFilter)}
-          onClear={() => { setSearchQuery(''); setStatusFilter(''); }}
-          onApply={() => { setPagination(prev => ({ ...prev, page: 1 })); loadSegregations(); }}
+          onClear={() => { setSearchQuery(''); setStatusFilter(''); setPagination(prev => ({ ...prev, page: 1 })); }}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <FilterField label="Container">
-              <SearchInput value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} data-testid="search-container" />
+              <SearchInput value={searchQuery} onChange={(e) => onFilter(setSearchQuery)(e.target.value)} data-testid="search-container" />
             </FilterField>
             <FilterField label="Status">
-              <Select value={statusFilter || "all"} onValueChange={(v) => setStatusFilter(v === "all" ? "" : v)}>
+              <Select value={statusFilter || "all"} onValueChange={(v) => onFilter(setStatusFilter)(v === "all" ? "" : v)}>
                 <SelectTrigger className="h-9 text-sm">
                   <SelectValue />
                 </SelectTrigger>

@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { cn, sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -184,15 +185,27 @@ export default function FleetPage() {
     { value: 'AGREGADO', label: 'Agregado' },
   ];
 
+  // As duas buscas filtram enquanto se digita (sem botão "Filtrar") e valem
+  // também ao trocar de página e ao recarregar depois de salvar.
+  const debouncedVehicleSearch = useDebouncedValue(vehicleSearch.trim());
+  const debouncedPlate = useDebouncedValue(searchPlate.trim());
+
   useEffect(() => {
-    if (activeTab === 'revisions') {
-      loadRevisions();
-    } else if (activeTab === 'vehicles') {
-      loadVehicles();
+    if (activeTab === 'vehicles') {
       loadDrivers();
       loadTransportCompanies();
     }
-  }, [activeTab, pagination.page, vehiclePagination.page]);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'vehicles') loadVehicles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, vehiclePagination.page, debouncedVehicleSearch]);
+
+  useEffect(() => {
+    if (activeTab === 'revisions') loadRevisions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, pagination.page, debouncedPlate]);
 
   // Carrega a frota inteira uma vez (independente da aba/paginação) para o
   // autocomplete de Placa do Controle de Revisão puxar do cadastro real.
@@ -229,8 +242,7 @@ export default function FleetPage() {
   };
 
   // ========== FUNÇÕES DE VEÍCULOS ==========
-  const loadVehicles = async (search = '') => {
-    setVehiclesLoading(true);
+  const loadVehicles = async (search = debouncedVehicleSearch) => {
     try {
       const params = { page: vehiclePagination.page, per_page: 15 };
       if (search) params.search = search;
@@ -249,9 +261,9 @@ export default function FleetPage() {
     }
   };
 
-  const handleVehicleSearch = () => {
+  const handleVehicleSearchChange = (value) => {
+    setVehicleSearch(value);
     setVehiclePagination(prev => ({ ...prev, page: 1 }));
-    loadVehicles(vehicleSearch);
   };
 
   const handleVehicleFormChange = (field, value) => {
@@ -384,12 +396,10 @@ export default function FleetPage() {
   const clearVehicleSearch = () => {
     setVehicleSearch('');
     setVehiclePagination(prev => ({ ...prev, page: 1 }));
-    loadVehicles('');
   };
 
   // ========== FUNÇÕES DE REVISÕES ==========
-  const loadRevisions = async (plate = '') => {
-    setLoading(true);
+  const loadRevisions = async (plate = debouncedPlate) => {
     try {
       const params = { page: pagination.page, per_page: 15 };
       if (plate) params.vehicle_plate = plate;
@@ -408,15 +418,14 @@ export default function FleetPage() {
     }
   };
 
-  const handleSearch = () => {
+  const handleSearchPlateChange = (value) => {
+    setSearchPlate(value);
     setPagination(prev => ({ ...prev, page: 1 }));
-    loadRevisions(searchPlate);
   };
 
   const clearRevisionSearch = () => {
     setSearchPlate('');
     setPagination(prev => ({ ...prev, page: 1 }));
-    loadRevisions('');
   };
 
   const handleInputChange = (field, value) => {
@@ -658,13 +667,12 @@ export default function FleetPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* ========== ABA CADASTRO DE VEÍCULOS ========== */}
           <TabsContent value="vehicles" className="space-y-4 mt-0">
-            <FilterCard hasFilters={!!vehicleSearch} onClear={clearVehicleSearch} onApply={handleVehicleSearch}>
+            <FilterCard hasFilters={!!vehicleSearch} onClear={clearVehicleSearch}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <FilterField label="Placa, modelo ou marca">
                   <SearchInput
                     value={vehicleSearch}
-                    onChange={(e) => setVehicleSearch(e.target.value.toUpperCase())}
-                    onKeyPress={(e) => e.key === 'Enter' && handleVehicleSearch()}
+                    onChange={(e) => handleVehicleSearchChange(e.target.value.toUpperCase())}
                     data-testid="search-vehicle-input"
                   />
                 </FilterField>
@@ -760,13 +768,12 @@ export default function FleetPage() {
 
           {/* ========== ABA CONTROLE DE REVISÃO ========== */}
           <TabsContent value="revisions" className="space-y-4 mt-0">
-            <FilterCard hasFilters={!!searchPlate} onClear={clearRevisionSearch} onApply={handleSearch}>
+            <FilterCard hasFilters={!!searchPlate} onClear={clearRevisionSearch}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <FilterField label="Placa">
                   <SearchInput
                     value={searchPlate}
-                    onChange={(e) => setSearchPlate(e.target.value.toUpperCase())}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    onChange={(e) => handleSearchPlateChange(e.target.value.toUpperCase())}
                     data-testid="search-plate-input"
                   />
                 </FilterField>

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
@@ -77,11 +78,20 @@ export default function LoadingSchedulePage() {
     };
   }
 
+  // A busca é feita enquanto se digita (sem botão "Filtrar") e vale também
+  // ao trocar de página e ao recarregar depois de salvar.
+  const debouncedSearch = useDebouncedValue(searchQuery.trim());
+
+  useEffect(() => {
+    loadSelectData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     loadSchedules();
-    loadSelectData();
     setSelectedIds(new Set());
-  }, [pagination.page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, debouncedSearch]);
 
   const loadSelectData = async () => {
     try {
@@ -99,8 +109,7 @@ export default function LoadingSchedulePage() {
     }
   };
 
-  const loadSchedules = async (search = '') => {
-    setLoading(true);
+  const loadSchedules = async (search = debouncedSearch) => {
     try {
       const params = { page: pagination.page, per_page: 15 };
       if (search) params.search = search;
@@ -122,12 +131,11 @@ export default function LoadingSchedulePage() {
   const clearSearch = () => {
     setSearchQuery('');
     setPagination(prev => ({ ...prev, page: 1 }));
-    loadSchedules('');
   };
 
-  const handleSearch = () => {
+  const handleSearchChange = (value) => {
+    setSearchQuery(value);
     setPagination(prev => ({ ...prev, page: 1 }));
-    loadSchedules(searchQuery);
   };
 
   const resetForm = () => {
@@ -332,13 +340,12 @@ export default function LoadingSchedulePage() {
       <div className="space-y-4" data-testid="loading-schedule-page">
         <PageHeader icon={Calendar} title="Programação de Carregamento" subtitle="Gerencie as programações de carregamento" />
 
-        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch} onApply={handleSearch}>
+        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Cliente, motorista ou container">
               <SearchInput
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 data-testid="search-schedule-input"
               />
             </FilterField>

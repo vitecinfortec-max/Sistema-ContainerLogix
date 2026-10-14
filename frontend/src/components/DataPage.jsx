@@ -83,7 +83,10 @@ export function StatGrid({ children, className }) {
  * (ex.: Baixar PDF/Excel nas telas de relatório). Telas com filtro ao vivo
  * (sem onApply) mostram só o link "Limpar filtros" do topo.
  */
-export function FilterCard({ children, hasFilters, onClear, onApply, actions, title = 'Filtros', clearTestId = 'filter-clear-button', applyTestId = 'filter-apply-button', clearLinkTestId = 'clear-all-filters' }) {
+// Os filtros agem sozinhos enquanto se digita/escolhe (ver
+// hooks/useDebouncedValue) - não há botão "Filtrar"; o "Limpar filtros" fica
+// no cabeçalho do bloco.
+export function FilterCard({ children, hasFilters, onClear, actions, title = 'Filtros', clearLinkTestId = 'clear-all-filters' }) {
   return (
     <motion.section {...blockIn(0.06)} className={SURFACE}>
       <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
@@ -108,18 +111,8 @@ export function FilterCard({ children, hasFilters, onClear, onApply, actions, ti
       </div>
       <div className="p-4">
         {children}
-        {(onApply || actions) && (
+        {actions && (
           <div className="flex items-center justify-end gap-2 mt-3 flex-wrap">
-            {onClear && onApply && (
-              <Button type="button" variant="outline" size="sm" onClick={onClear} className="h-8 text-xs" data-testid={clearTestId}>
-                Limpar
-              </Button>
-            )}
-            {onApply && (
-              <Button type="button" size="sm" onClick={onApply} className="h-8 text-xs px-5" data-testid={applyTestId}>
-                Filtrar
-              </Button>
-            )}
             {actions}
           </div>
         )}

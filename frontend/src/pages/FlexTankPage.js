@@ -11,6 +11,7 @@ import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Eye, Pencil, Trash2, Package, TrendingUp, TrendingDown, FileSpreadsheet } from 'lucide-react';
@@ -56,7 +57,8 @@ export default function FlexTankPage() {
     movement_number: '',
     movement_type: ''
   });
-  const [appliedFilters, setAppliedFilters] = useState({});
+  // Filtra enquanto se digita/escolhe, sem botão "Filtrar"
+  const appliedFilters = useDebouncedValue(filters);
   
   // Filtros de Relatório
   const [reportFilters, setReportFilters] = useState({
@@ -171,8 +173,8 @@ export default function FlexTankPage() {
 
   const singleSelectedId = selectedIds.size === 1 ? [...selectedIds][0] : null;
 
-  const applyFilters = () => {
-    setAppliedFilters({ ...filters });
+  const updateFilter = (field, value) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
@@ -184,7 +186,6 @@ export default function FlexTankPage() {
       movement_number: '',
       movement_type: ''
     });
-    setAppliedFilters({});
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
@@ -251,13 +252,13 @@ export default function FlexTankPage() {
         {/* Conteúdo baseado na tab ativa (sem mostrar as abas visuais) */}
         {activeTab === 'movements' && (
           <>
-            <FilterCard hasFilters={Object.values(filters).some(Boolean)} onClear={clearFilters} onApply={applyFilters}>
+            <FilterCard hasFilters={Object.values(filters).some(Boolean)} onClear={clearFilters}>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 <FilterField label="Data inicial">
                   <Input
                     type="date"
                     value={filters.start_date}
-                    onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
+                    onChange={(e) => updateFilter('start_date', e.target.value)}
                     className="h-9 text-sm"
                   />
                 </FilterField>
@@ -265,14 +266,14 @@ export default function FlexTankPage() {
                   <Input
                     type="date"
                     value={filters.end_date}
-                    onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
+                    onChange={(e) => updateFilter('end_date', e.target.value)}
                     className="h-9 text-sm"
                   />
                 </FilterField>
                 <FilterField label="Cliente">
                   <Select
                     value={filters.client_id || 'all'}
-                    onValueChange={(value) => setFilters(prev => ({ ...prev, client_id: value === 'all' ? '' : value }))}
+                    onValueChange={(value) => updateFilter('client_id', value === 'all' ? '' : value)}
                   >
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue />
@@ -289,14 +290,14 @@ export default function FlexTankPage() {
                   <Input
                     type="number"
                     value={filters.movement_number}
-                    onChange={(e) => setFilters(prev => ({ ...prev, movement_number: e.target.value }))}
+                    onChange={(e) => updateFilter('movement_number', e.target.value)}
                     className="h-9 text-sm"
                   />
                 </FilterField>
                 <FilterField label="Tipo">
                   <Select
                     value={filters.movement_type || 'all'}
-                    onValueChange={(value) => setFilters(prev => ({ ...prev, movement_type: value === 'all' ? '' : value }))}
+                    onValueChange={(value) => updateFilter('movement_type', value === 'all' ? '' : value)}
                   >
                     <SelectTrigger className="h-9 text-sm">
                       <SelectValue />

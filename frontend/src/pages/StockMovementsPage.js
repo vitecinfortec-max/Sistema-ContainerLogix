@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { qtyWithUnit } from '../lib/productUnits';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -51,13 +52,21 @@ export default function StockMovementsPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [deleting, setDeleting] = useState(false);
 
+  // Filtra enquanto se digita (sem botão "Filtrar"); o filtro vale também ao
+  // recarregar depois de salvar.
+  const debouncedSearch = useDebouncedValue(search.trim());
+
   useEffect(() => {
-    loadMovements(); loadWarehouses(); loadSuppliers(); loadProducts();
+    loadWarehouses(); loadSuppliers(); loadProducts();
     loadVehicles(); loadOrdensServico();
   }, []);
 
-  const loadMovements = async (term = search, operation = operationFilter) => {
-    setLoading(true);
+  useEffect(() => {
+    loadMovements();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, operationFilter]);
+
+  const loadMovements = async (term = debouncedSearch, operation = operationFilter) => {
     try {
       const params = {};
       if (term) params.search = term;
@@ -323,7 +332,6 @@ export default function StockMovementsPage() {
   const clearFilters = () => {
     setSearch('');
     setOperationFilter('');
-    loadMovements('', '');
   };
 
   const singleSelectedMovement = selectedIds.size === 1 ? movements.find((m) => m.id === [...selectedIds][0]) : null;
@@ -360,13 +368,12 @@ export default function StockMovementsPage() {
       <div className="space-y-4" data-testid="stock-movements-page">
         <PageHeader icon={ArrowLeftRight} title="Movimentação de Estoque" subtitle="Lançamentos manuais de Entrada e Saída de estoque" />
 
-        <FilterCard hasFilters={!!(search || operationFilter)} onClear={clearFilters} onApply={() => loadMovements()}>
+        <FilterCard hasFilters={!!(search || operationFilter)} onClear={clearFilters}>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <FilterField label="Finalidade, placa, nota fiscal ou almoxarifado" className="col-span-2">
               <SearchInput
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && loadMovements()}
                 data-testid="search-stock-movements-input"
               />
             </FilterField>
