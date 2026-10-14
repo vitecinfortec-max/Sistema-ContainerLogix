@@ -673,7 +673,7 @@ export default function LoadingSchedulePage() {
                           <td>
                             {item.operation_type ? (
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                item.operation_type === 'COLETA' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                                item.operation_type === 'COLETA' ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300' : 'bg-purple-100 text-purple-800'
                               }`}>
                                 {item.operation_type === 'COLETA' ? 'Coleta' : 'Entrega'}
                               </span>

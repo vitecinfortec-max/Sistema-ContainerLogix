@@ -19,9 +19,9 @@ import { ptBR } from 'date-fns/locale';
 
 const STATUS_STYLES = {
   PENDENTE: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
-  CONFIRMADO: 'bg-emerald-100 text-emerald-800',
-  FALTANTE: 'bg-red-100 text-red-800',
-  NAO_ESPERADO: 'bg-amber-100 text-amber-800',
+  CONFIRMADO: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300',
+  FALTANTE: 'bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300',
+  NAO_ESPERADO: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
 };
 const STATUS_LABELS = {
   PENDENTE: 'Pendente',

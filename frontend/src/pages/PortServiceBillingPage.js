@@ -405,7 +405,7 @@ export default function PortServiceBillingPage() {
                     <span>Total: <span className="text-base font-semibold text-primary tabular-nums">{fmtMoney(netTotal)}</span></span>
                   </div>
                   <Button onClick={handleGenerateInvoice} disabled={generating || selectedIds.size === 0} data-testid="generate-port-service-invoice-button">
-                    {generating ? 'Gerando...' : `Gerar Fatura (${selectedIds.size})`}
+                    {generating ? 'Gerando...' : `Gerar fatura (${selectedIds.size})`}
                   </Button>
                 </div>
               </div>

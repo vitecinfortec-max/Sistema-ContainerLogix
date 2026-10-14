@@ -326,9 +326,9 @@ export default function StockEntriesPage() {
                   <span className="text-slate-500 dark:text-slate-400">Fornecedor: </span>
                   <span className="font-semibold">{preview.supplier_name || '-'}</span>
                   {preview.matched_supplier_id ? (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-700">Já cadastrado</span>
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Já cadastrado</span>
                   ) : (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700">
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
                       <Sparkles className="w-3 h-3 mr-1" />Novo fornecedor será criado
                     </span>
                   )}
@@ -351,9 +351,9 @@ export default function StockEntriesPage() {
                         <p className="text-[11px] text-slate-400 dark:text-slate-500">NCM: {item.ncm || '-'} · CFOP: {item.cfop || '-'} · Unid.: {item.unit || '-'}</p>
                       </div>
                       {item.matched_product_id ? (
-                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-700">Produto existente</span>
+                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Produto existente</span>
                       ) : (
-                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700">Novo produto</span>
+                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Novo produto</span>
                       )}
                     </div>
                     <div className="grid grid-cols-4 gap-2">

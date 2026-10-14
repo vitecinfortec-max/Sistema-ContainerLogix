@@ -322,7 +322,7 @@ export default function ContainerInspectionDetailPage() {
           </CardHeader>
           <CardContent className="p-4">
             {inspection.no_damage ? (
-              <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-sm">
+              <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-sm dark:bg-emerald-500/15 dark:text-emerald-300">
                 Container sem avarias
               </span>
             ) : inspection.damage_items && inspection.damage_items.length > 0 ? (
@@ -330,7 +330,7 @@ export default function ContainerInspectionDetailPage() {
                 {inspection.damage_items.map(item => (
                   <span
                     key={item}
-                    className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-800 font-semibold text-sm"
+                    className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-800 font-semibold text-sm dark:bg-red-500/15 dark:text-red-300"
                   >
                     {item}
                   </span>

@@ -667,7 +667,7 @@ export default function VehicleChecklistPage() {
               <ClipboardCheck className="w-5 h-5" />
               {editingChecklist ? 'Editar Checklist de Veículo' : 'Novo Checklist de Veículo'}
               {formData.template === 'petrobras_lvt' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
                   Modelo Petrobras (LVT)
                 </span>
               )}

@@ -681,7 +681,7 @@ export default function DashboardPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                             movement.operation_type === 'ENTRADA' 
                               ? 'bg-primary/10 text-primary' 
-                              : 'bg-amber-100 text-amber-700'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
                           }`}>
                             {movement.operation_type}
                           </span>

@@ -350,7 +350,7 @@ export default function ContainerVistoriaDetailPage() {
           </CardHeader>
           <CardContent className="p-4">
             {vistoria.no_damage ? (
-              <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-sm">
+              <span className="inline-block px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-sm dark:bg-emerald-500/15 dark:text-emerald-300">
                 Sem Avarias
               </span>
             ) : vistoria.damage_items && vistoria.damage_items.length > 0 ? (
@@ -358,7 +358,7 @@ export default function ContainerVistoriaDetailPage() {
                 {vistoria.damage_items.map(item => (
                   <span
                     key={item}
-                    className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-800 font-semibold text-sm"
+                    className="inline-block px-3 py-1 rounded-full bg-red-100 text-red-800 font-semibold text-sm dark:bg-red-500/15 dark:text-red-300"
                   >
                     {item}
                   </span>

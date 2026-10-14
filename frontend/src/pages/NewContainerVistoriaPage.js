@@ -393,7 +393,7 @@ export default function NewContainerVistoriaPage() {
                       {damageItems.map((name) => (
                         <span
                           key={name}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-800 font-semibold text-sm"
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-800 font-semibold text-sm dark:bg-red-500/15 dark:text-red-300"
                         >
                           {name}
                           <button title="Remover" aria-label="Remover" type="button" onClick={() => removeService(name)} data-testid={`remove-service-${name}`}>

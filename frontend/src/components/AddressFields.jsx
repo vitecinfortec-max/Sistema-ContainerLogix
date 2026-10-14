@@ -25,7 +25,7 @@ const formatCEP = (value) => {
 };
 
 const FieldLabel = ({ children }) => (
-  <Label className="text-[12px] text-slate-500 dark:text-slate-400 mb-1 block uppercase tracking-wide">{children}</Label>
+  <Label className="mb-1.5 block">{children}</Label>
 );
 
 // Cidade/UF em cascata sozinho (sem rua/número/bairro/CEP) - pra telas que
