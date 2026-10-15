@@ -169,6 +169,20 @@ export default function MovementsPage() {
       : <ChevronDown className="w-3 h-3 inline ml-1" />;
   };
 
+  // Cabeçalho ordenável: o botão dentro do <th> deixa ordenar pelo teclado
+  // (Tab + Enter/Espaço) e o aria-sort diz ao leitor de tela qual coluna e
+  // em que sentido a lista está ordenada.
+  const SortableTh = ({ field, label, className = '' }) => (
+    <th
+      className={`sortable ${className}`}
+      aria-sort={sortField === field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button type="button" className="sort-button" onClick={() => handleSort(field)}>
+        {label}<SortIcon field={field} />
+      </button>
+    </th>
+  );
+
   const hasFilters = searchClient || searchContainer || searchMovement || searchDriver || filterType !== 'all' || filterStatus !== 'all' || dateFrom || dateTo;
 
   const clearAllFilters = () => {
@@ -447,16 +461,16 @@ export default function MovementsPage() {
                         data-testid="select-all-checkbox"
                       />
                     </th>
-                    <th className="sortable" onClick={() => handleSort('transaction_id')}>Nº<SortIcon field="transaction_id" /></th>
-                    <th className="sortable" onClick={() => handleSort('operation_type')}>Tipo<SortIcon field="operation_type" /></th>
-                    <th className="sortable" onClick={() => handleSort('container_number')}>Container<SortIcon field="container_number" /></th>
-                    <th className="sortable" onClick={() => handleSort('client_name')}>Cliente<SortIcon field="client_name" /></th>
-                    <th className="sortable" onClick={() => handleSort('driver_name')}>Motorista<SortIcon field="driver_name" /></th>
-                    <th className="sortable" onClick={() => handleSort('truck_plate')}>Placa<SortIcon field="truck_plate" /></th>
-                    <th className="sortable" onClick={() => handleSort('status')}>Status<SortIcon field="status" /></th>
-                    <th className="sortable" onClick={() => handleSort('created_at')}>Emissão<SortIcon field="created_at" /></th>
+                    <SortableTh field="transaction_id" label="Nº" />
+                    <SortableTh field="operation_type" label="Tipo" />
+                    <SortableTh field="container_number" label="Container" />
+                    <SortableTh field="client_name" label="Cliente" />
+                    <SortableTh field="driver_name" label="Motorista" />
+                    <SortableTh field="truck_plate" label="Placa" />
+                    <SortableTh field="status" label="Status" />
+                    <SortableTh field="created_at" label="Emissão" />
                     {/* Usuário é a coluna menos usada - some em telas menores pra lista caber sem rolagem lateral */}
-                    <th className="sortable hidden min-[1400px]:table-cell" onClick={() => handleSort('user_name')}>Usuário<SortIcon field="user_name" /></th>
+                    <SortableTh field="user_name" label="Usuário" className="hidden min-[1400px]:table-cell" />
                   </tr>
                 </thead>
                 <tbody>

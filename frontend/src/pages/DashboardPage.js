@@ -3,11 +3,12 @@ import Layout from '../components/Layout';
 import { PageSkeleton } from '../components/DataPage';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { api } from '../lib/api';
 import {
   ArrowDownCircle, ArrowUpCircle, Container, Package, Plus, Calendar, ArrowRight,
   Receipt, Truck, Users, BarChart3, DollarSign, Ship, Building2,
-  ClipboardList, X, Check, Settings2, Trophy, Medal, Award, AlertTriangle, CheckCircle2,
+  ClipboardList, Check, Settings2, Trophy, Medal, Award, AlertTriangle, CheckCircle2,
   Fuel, Wrench, Clock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +16,6 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useWebSocket } from '../hooks/useWebSocket';
-import { AnimatePresence } from 'motion/react';
 import { motion, Stagger, StaggerItem, AnimatedNumber, riseIn, staggerParent, EASE } from '../components/Motion';
 import { DonutChart, Sparkline, CHART_COLORS, dailyChartData } from '../components/Charts';
 import Stage3D from '../components/three/Stage3D';
@@ -324,86 +324,70 @@ export default function DashboardPage() {
           </motion.div>
         </StaggerItem>
 
-        {/* Shortcuts Editor Modal */}
-        <AnimatePresence>
-        {showEditor && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-            data-testid="shortcuts-editor-modal"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.97 }}
-              className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden"
-            >
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-                <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200">Personalizar Atalhos</h3>
-                <button title="Fechar" aria-label="Fechar" onClick={() => setShowEditor(false)} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400">
-                  <X className="w-5 h-5" />
-                </button>
+        {/* Personalizar atalhos - Dialog padrão: prende o foco, fecha com Esc e
+            é anunciado como diálogo pelo leitor de tela */}
+        <Dialog open={showEditor} onOpenChange={setShowEditor}>
+          <DialogContent className="max-w-lg p-0 gap-0 overflow-hidden" data-testid="shortcuts-editor-modal">
+            <div className="px-5 py-4 pr-12 border-b border-slate-100 dark:border-slate-800">
+              <DialogTitle className="text-base font-semibold text-slate-800 dark:text-slate-200">Personalizar Atalhos</DialogTitle>
+            </div>
+            <div className="p-5">
+              <DialogDescription className="text-sm text-slate-500 dark:text-slate-400 mb-4">Selecione os atalhos que deseja exibir no dashboard:</DialogDescription>
+              <div className="grid grid-cols-2 gap-2">
+                {ALL_SHORTCUTS.map((shortcut) => {
+                  const Icon = shortcut.icon;
+                  const isSelected = editorSelection.includes(shortcut.id);
+                  return (
+                    <button
+                      key={shortcut.id}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => toggleShortcut(shortcut.id)}
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                      }`}
+                      data-testid={`editor-shortcut-${shortcut.id}`}
+                    >
+                      <div className={`w-8 h-8 rounded-md ${shortcut.bg} flex items-center justify-center flex-shrink-0`}>
+                        <Icon className={`w-4 h-4 ${shortcut.color}`} />
+                      </div>
+                      <span className={`text-sm font-medium flex-1 ${isSelected ? 'text-primary' : 'text-slate-600 dark:text-slate-400'}`}>
+                        {shortcut.label}
+                      </span>
+                      {isSelected && (
+                        <Check className="w-4 h-4 text-primary flex-shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="p-5">
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Selecione os atalhos que deseja exibir no dashboard:</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {ALL_SHORTCUTS.map((shortcut) => {
-                    const Icon = shortcut.icon;
-                    const isSelected = editorSelection.includes(shortcut.id);
-                    return (
-                      <button
-                        key={shortcut.id}
-                        onClick={() => toggleShortcut(shortcut.id)}
-                        className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
-                          isSelected
-                            ? 'border-primary bg-primary/5'
-                            : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
-                        }`}
-                        data-testid={`editor-shortcut-${shortcut.id}`}
-                      >
-                        <div className={`w-8 h-8 rounded-md ${shortcut.bg} flex items-center justify-center flex-shrink-0`}>
-                          <Icon className={`w-4 h-4 ${shortcut.color}`} />
-                        </div>
-                        <span className={`text-sm font-medium flex-1 ${isSelected ? 'text-primary' : 'text-slate-600 dark:text-slate-400'}`}>
-                          {shortcut.label}
-                        </span>
-                        {isSelected && (
-                          <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+            </div>
+            <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+              <span className="text-xs text-slate-400 dark:text-slate-500">{editorSelection.length} selecionados</span>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEditor(false)}
+                  className="h-9"
+                  data-testid="editor-cancel-button"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => saveShortcuts(editorSelection)}
+                  className="h-9 bg-primary hover:bg-primary/90"
+                  data-testid="editor-save-button"
+                >
+                  Salvar
+                </Button>
               </div>
-              <div className="flex items-center justify-between px-5 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                <span className="text-xs text-slate-400 dark:text-slate-500">{editorSelection.length} selecionados</span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowEditor(false)}
-                    className="h-9"
-                    data-testid="editor-cancel-button"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => saveShortcuts(editorSelection)}
-                    className="h-9 bg-primary hover:bg-primary/90"
-                    data-testid="editor-save-button"
-                  >
-                    Salvar
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-        </AnimatePresence>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Stats Grid - 4 cards */}
         <motion.div variants={staggerParent(0.05)} className="grid grid-cols-2 lg:grid-cols-4 gap-4">

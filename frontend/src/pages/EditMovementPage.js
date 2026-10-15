@@ -10,8 +10,9 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
+import { ClientNamePicker } from '../components/ClientNamePicker';
 import { toast } from 'sonner';
-import { Save, X, Container as ContainerIcon } from 'lucide-react';
+import { Save, Container as ContainerIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
 import { Autocomplete } from '../components/Autocomplete';
@@ -33,12 +34,8 @@ export default function EditMovementPage() {
   const [containerDamages, setContainerDamages] = useState([]);
   const [inspectionNotes, setInspectionNotes] = useState('');
   const [clientSearch, setClientSearch] = useState('');
-  const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState('');
-  const [showBuyerDropdown, setShowBuyerDropdown] = useState(false);
   const [servicePriceEntries, setServicePriceEntries] = useState([]);
-  const clientInputRef = useRef(null);
-  const buyerInputRef = useRef(null);
   // Só true depois que o usuário troca cliente/serviço manualmente - evita
   // sobrescrever um Valor do Serviço já salvo assim que a página carrega os
   // dados existentes da movimentação.
@@ -84,19 +81,6 @@ export default function EditMovementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operationType, loadingData]);
 
-  // Fechar dropdown quando clicar fora
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (clientInputRef.current && !clientInputRef.current.contains(event.target)) {
-        setShowClientDropdown(false);
-      }
-      if (buyerInputRef.current && !buyerInputRef.current.contains(event.target)) {
-        setShowBuyerDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Carrega a tabela de preços do cliente selecionado (Comercial > Tabela de
   // Serviços), usada abaixo para preencher o Valor do Serviço automaticamente.
@@ -353,69 +337,20 @@ export default function EditMovementPage() {
                   <Input id="transport_company" {...register('transport_company', { required: true })} aria-invalid={!!errors.transport_company} />
                   {errors.transport_company && <FieldError />}
                 </div>
-                <div className="space-y-1.5 relative" ref={clientInputRef}>
+                <div className="space-y-1.5 relative">
                   <Label htmlFor="client_name" className="block">Cliente</Label>
-                  <div className="relative">
-                    <Input 
-                      id="client_name" 
-                      data-testid="client-name-input"
-                      className="pr-10"
-                      value={clientSearch}
-                      onChange={(e) => {
-                        setClientSearch(e.target.value);
-                        setShowClientDropdown(true);
-                        if (e.target.value === '') {
-                          setValue('client_name', '');
-                        }
-                      }}
-                      onFocus={() => setShowClientDropdown(true)}
-                    />
-                    {clientSearch && (
-                      <button title="Limpar" aria-label="Limpar"
-                        type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400"
-                        onClick={() => {
-                          setClientSearch('');
-                          setValue('client_name', '');
-                          setShowClientDropdown(false);
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                  {showClientDropdown && clientSearch && (
-                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {clients
-                        .filter(client => 
-                          client.name.toLowerCase().includes(clientSearch.toLowerCase())
-                        )
-                        .slice(0, 10)
-                        .map(client => (
-                          <div
-                            key={client.id}
-                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer text-sm"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              userChangedPricingInputRef.current = true;
-                              setClientSearch(client.name);
-                              setValue('client_name', client.name);
-                              setShowClientDropdown(false);
-                            }}
-                          >
-                            {client.name}
-                          </div>
-                        ))
-                      }
-                      {clients.filter(client => 
-                        client.name.toLowerCase().includes(clientSearch.toLowerCase())
-                      ).length === 0 && (
-                        <div className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400">
-                          Nenhum cliente encontrado
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <ClientNamePicker
+                    id="client_name"
+                    testId="client-name-input"
+                    text={clientSearch}
+                    clients={clients}
+                    onTextChange={(value) => {
+                      setClientSearch(value);
+                      if (value === '') setValue('client_name', '');
+                    }}
+                    onPick={(client) => { userChangedPricingInputRef.current = true; setClientSearch(client.name); setValue('client_name', client.name); }}
+                    onClear={() => { setClientSearch(''); setValue('client_name', ''); }}
+                  />
                   <p className="text-xs text-muted-foreground">Este campo aparece na impressão</p>
                 </div>
               </div>
@@ -567,67 +502,20 @@ export default function EditMovementPage() {
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
                 </div>
 
-                <div className="space-y-1.5 relative" ref={buyerInputRef}>
+                <div className="space-y-1.5 relative">
                   <Label htmlFor="buyer_name" className="block">Comprador</Label>
-                  <div className="relative">
-                    <Input
-                      id="buyer_name"
-                      className="pr-10"
-                      value={buyerSearch}
-                      onChange={(e) => {
-                        setBuyerSearch(e.target.value);
-                        setShowBuyerDropdown(true);
-                        if (e.target.value === '') {
-                          setValue('buyer_name', '');
-                        }
-                      }}
-                      onFocus={() => setShowBuyerDropdown(true)}
-                    />
-                    {buyerSearch && (
-                      <button title="Limpar" aria-label="Limpar"
-                        type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-400"
-                        onClick={() => {
-                          setBuyerSearch('');
-                          setValue('buyer_name', '');
-                          setShowBuyerDropdown(false);
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                  {showBuyerDropdown && buyerSearch && (
-                    <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {clients
-                        .filter(client =>
-                          client.name.toLowerCase().includes(buyerSearch.toLowerCase())
-                        )
-                        .slice(0, 10)
-                        .map(client => (
-                          <div
-                            key={client.id}
-                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer text-sm"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setBuyerSearch(client.name);
-                              setValue('buyer_name', client.name);
-                              setShowBuyerDropdown(false);
-                            }}
-                          >
-                            {client.name}
-                          </div>
-                        ))
-                      }
-                      {clients.filter(client =>
-                        client.name.toLowerCase().includes(buyerSearch.toLowerCase())
-                      ).length === 0 && (
-                        <div className="px-4 py-2 text-sm text-gray-500 dark:text-slate-400">
-                          Nenhum cliente encontrado
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <ClientNamePicker
+                    id="buyer_name"
+                    testId="buyer-name-input"
+                    text={buyerSearch}
+                    clients={clients}
+                    onTextChange={(value) => {
+                      setBuyerSearch(value);
+                      if (value === '') setValue('buyer_name', '');
+                    }}
+                    onPick={(client) => { setBuyerSearch(client.name); setValue('buyer_name', client.name); }}
+                    onClear={() => { setBuyerSearch(''); setValue('buyer_name', ''); }}
+                  />
                   <p className="text-xs text-muted-foreground">Este campo não aparece na impressão</p>
                 </div>
 

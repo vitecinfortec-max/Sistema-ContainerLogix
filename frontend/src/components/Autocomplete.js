@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from './ui/input';
 import { Search } from 'lucide-react';
+import { useListKeyboard } from '../hooks/useListKeyboard';
 
 // Componente de autocomplete genérico - antes copiado de forma idêntica em
 // LoadingSchedulePage, DailyRateRequestPage, ExpenseReportsPage e
@@ -53,6 +54,13 @@ export function Autocomplete({ value, onChange, options, displayField = 'name', 
     setIsOpen(false);
   };
 
+  const { inputProps, listProps, optionProps } = useListKeyboard({
+    count: filteredOptions.length,
+    open: isOpen,
+    setOpen: setIsOpen,
+    onPick: (i) => handleSelect(filteredOptions[i]),
+  });
+
   return (
     <div ref={wrapperRef} className="relative">
       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
@@ -62,15 +70,17 @@ export function Autocomplete({ value, onChange, options, displayField = 'name', 
         onChange={handleInputChange}
         onFocus={() => setIsOpen(true)}
         data-testid={testId}
+        {...inputProps}
       />
       {isOpen && filteredOptions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
+        <div {...listProps} className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
           {filteredOptions.map((option, idx) => {
             const display = typeof displayField === 'function' ? displayField(option) : option[displayField];
             return (
               <div
                 key={option[valueField] || idx}
-                className="px-3 py-2 cursor-pointer hover:bg-muted text-sm"
+                {...optionProps(idx)}
+                className="px-3 py-2 cursor-pointer text-sm data-[active]:bg-muted"
                 onClick={() => handleSelect(option)}
               >
                 {display}
