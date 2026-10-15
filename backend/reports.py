@@ -72,15 +72,44 @@ def fmt_date(value):
         return value
 
 
-def fmt_datetime(value):
-    """Formata um datetime ISO como 'DD/MM/YYYY HH:MM'; devolve o valor original
-    (ou '-') se não for possível interpretar."""
-    if not value:
-        return '-'
+def local_datetime(value) -> datetime | None:
+    """Data/hora como o usuário a vê, em Brasília. Horário com fuso (carimbado
+    pelo servidor, em UTC: created_at, approved_at...) é convertido; horário sem
+    fuso foi digitado pela pessoa num campo de data/hora e já está em Brasília,
+    então fica como está. None se não der pra interpretar."""
+    if value in (None, ''):
+        return None
     try:
-        return datetime.fromisoformat(value.replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
-    except Exception:
-        return value
+        dt = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).strip().replace('Z', '+00:00'))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        return dt
+    # Meia-noite UTC exata é um dia do calendário, não um instante: era assim
+    # que Flex Tank, Revisão e Compra de Container gravavam a data escolhida
+    # (até 2026-10-14). Convertida, cairia no dia anterior às 21h.
+    if dt.utcoffset() == timedelta(0) and dt.time() == datetime.min.time():
+        return dt.replace(tzinfo=None)
+    return dt.astimezone(BRT_TZ)
+
+
+def fmt_datetime(value, empty='-'):
+    """Formata data/hora como 'DD/MM/YYYY HH:MM' no horário de Brasília (ver
+    local_datetime); devolve o valor original (ou `empty`) se não der pra
+    interpretar."""
+    if not value:
+        return empty
+    dt = local_datetime(value)
+    return dt.strftime('%d/%m/%Y %H:%M') if dt else str(value)
+
+
+def fmt_date_local(value, empty='-'):
+    """Só a data ('DD/MM/YYYY') de um valor de data/hora, no dia de Brasília -
+    um registro feito às 22h não vira o dia seguinte."""
+    if not value:
+        return empty
+    dt = local_datetime(value)
+    return dt.strftime('%d/%m/%Y') if dt else str(value)
 
 
 # Sem valor padrão fixo: cada instância/cliente define seu próprio logo em "Dados
@@ -929,12 +958,7 @@ def generate_yard_control_pdf(containers: list, stats: dict, company: dict = Non
     cell = _pdf_cell_factory(styles)
 
     def fmt_date_iso(value):
-        if not value:
-            return '-'
-        try:
-            return datetime.fromisoformat(value.replace('Z', '+00:00')).strftime('%d/%m/%Y')
-        except Exception:
-            return '-'
+        return fmt_date_local(value) if local_datetime(value) else '-'
 
     data = [_pdf_header_cells(["Nº Container", "Tipo", "Status", "Tamanho", "Armador", "Cliente", "Data Entrada", "Data Saída", "Dias no Pátio", "Booking"])]
     alert_cmds = []
@@ -1275,15 +1299,11 @@ def _xl_date(value):
     if value in (None, ''):
         return None
     try:
-        if isinstance(value, datetime):
-            dt = value
-        else:
-            s = str(value).strip()
-            if len(s) == 10:
-                return datetime.strptime(s, '%Y-%m-%d')
-            dt = datetime.fromisoformat(s.replace('Z', '+00:00'))
-        if dt.tzinfo is not None:
-            dt = to_brt(dt)
+        if not isinstance(value, datetime) and len(str(value).strip()) == 10:
+            return datetime.strptime(str(value).strip(), '%Y-%m-%d')
+        dt = local_datetime(value)
+        if dt is None:
+            return value
         return dt.replace(tzinfo=None)
     except Exception:
         return value
@@ -2638,7 +2658,7 @@ def _build_storage_charges_pdf_elements(styles, doc_width, storage_charges: list
             rows.append([
                 cell(charge['container_number'], bold=True),
                 cell(charge['client_name']),
-                cell(charge['entry_date'].strftime('%d/%m/%Y'), 'center'),
+                cell(fmt_date_local(charge['entry_date']), 'center'),
                 cell(charge['days_in_yard'], 'center'),
                 cell(charge['free_time_days'], 'center'),
                 cell(None, 'center', markup=_pdf_tone_markup(charge['extra_days'], 'red')),
@@ -3979,7 +3999,7 @@ def generate_commercial_proposal_pdf(proposal: dict, company: dict = None) -> by
     ))
 
     # ========== Nº / DESTINATÁRIO / DATA / VALIDADE ==========
-    date_only = fmt_datetime(proposal.get('created_at')).split(' ')[0] if proposal.get('created_at') else now_brt().strftime('%d/%m/%Y')
+    date_only = fmt_date_local(proposal.get('created_at')) if proposal.get('created_at') else now_brt().strftime('%d/%m/%Y')
     elements.append(_pdf_info_grid([
         ("Nº da proposta", str(proposal.get('proposal_number', '-'))),
         ("Em nome de", proposal.get('recipient_name', '-'), 2),

@@ -21,6 +21,7 @@ import { Droplet, Plus, Trash2, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { scrollBehavior } from '../lib/reducedMotion';
+import { todayISO } from '../lib/dates';
 
 const fmtLiters = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
 
@@ -37,7 +38,7 @@ const fmtDate = (d) => {
 
 function createEmptyForm() {
   return {
-    refill_date: new Date().toISOString().split('T')[0],
+    refill_date: todayISO(),
     liters: '',
     supplier_name: '',
     observations: '',

@@ -106,7 +106,11 @@ def load_logo_buffer(company: dict = None):
 load_dotenv(ROOT_DIR / '.env')
 
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+# tz_aware: as datas gravadas como data do Mongo (created_at/updated_at de
+# vários cadastros, paid_at, released_at...) voltam com fuso UTC. Sem isso
+# voltavam "sem fuso", a API as mandava sem o "+00:00" e o navegador as lia
+# como hora local - tudo aparecia 3 horas adiantado.
+client = AsyncIOMotorClient(mongo_url, tz_aware=True, tzinfo=timezone.utc)
 db = client[os.environ['DB_NAME']]
 
 

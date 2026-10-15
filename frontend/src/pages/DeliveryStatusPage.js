@@ -18,6 +18,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { ClipboardCheck, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText, Clock, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { todayISO } from '../lib/dates';
 
 // Status do registro (ATIVO/CONCLUIDO/CANCELADO) é derivado automaticamente
 // pelo backend a partir de items[].delivery_completed - ver
@@ -49,7 +50,7 @@ export default function DeliveryStatusPage() {
   // Formulário
   const [formData, setFormData] = useState({
     schedule_number: '',
-    status_date: new Date().toISOString().split('T')[0],
+    status_date: todayISO(),
     items: [],
     observations: ''
   });
@@ -175,7 +176,7 @@ export default function DeliveryStatusPage() {
   const resetForm = () => {
     setFormData({
       schedule_number: '',
-      status_date: new Date().toISOString().split('T')[0],
+      status_date: todayISO(),
       items: [],
       observations: ''
     });

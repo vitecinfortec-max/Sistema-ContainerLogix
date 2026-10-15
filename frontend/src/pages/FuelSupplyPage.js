@@ -22,6 +22,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, Fuel, Droplet, Wallet, Gauge } from 'lucide-react';
 import { scrollBehavior } from '../lib/reducedMotion';
+import { todayISO } from '../lib/dates';
 
 const SOURCE_OPTIONS = [
   ['POSTO_EXTERNO', 'Posto Externo'],
@@ -63,8 +64,8 @@ function buildEmpty() {
     supply_order: '', fuel_supply_order_id: '',
     equipment_id: '', equipment_plate: '',
     driver_id: '', driver_name: '',
-    supply_date: new Date().toISOString().split('T')[0],
-    entry_date: new Date().toISOString().split('T')[0],
+    supply_date: todayISO(),
+    entry_date: todayISO(),
     reading: '',
     supplier_id: '', supplier_name: '',
     city: '', state: '',

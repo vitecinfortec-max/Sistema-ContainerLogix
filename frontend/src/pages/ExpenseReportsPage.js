@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { todayISO } from '../lib/dates';
 
 function newItemId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -29,7 +30,7 @@ function newItemId() {
 }
 
 function createEmptyDeposit() {
-  return { amount: '', date: new Date().toISOString().split('T')[0], sent_by: '' };
+  return { amount: '', date: todayISO(), sent_by: '' };
 }
 
 function createEmptyPurchase() {
@@ -37,7 +38,7 @@ function createEmptyPurchase() {
     item_id: newItemId(),
     supplier_id: '',
     supplier_name: '',
-    purchase_date: new Date().toISOString().split('T')[0],
+    purchase_date: todayISO(),
     amount: '',
     observation: '',
     receipts: [],

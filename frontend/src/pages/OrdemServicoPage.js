@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, FileText, Printer, Clock, Wrench, Wallet } from 'lucide-react';
+import { nowLocalInput } from '../lib/dates';
 
 const STATUS_TONES = {
   ABERTO: 'blue',
@@ -605,7 +606,7 @@ function buildEmpty() {
     category: '', equipment_plate: '', equipment_id: '', person_doc: '', person_name: '',
     person_id: '', person_type: '',
     address: '', city_uf: '', city: '', state: '', is_retorno: false, contact_type: 'banco', contact_value: '',
-    opened_at: new Date().toISOString().slice(0, 16),
+    opened_at: nowLocalInput(),
     budget_at: '', approved_at: '', forecast_close_at: '', closed_at: '',
     appropriation_plate: '', appropriation_id: '', supervision_type: 'outros', supervision_value: '',
     reading_initial: 0, reading_final: 0,

@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Trash2, Save, ArrowLeftRight, Car, ClipboardList, Pencil, Printer, HardHat } from 'lucide-react';
+import { todayISO } from '../lib/dates';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -633,7 +634,7 @@ export default function StockMovementsPage() {
 function buildEmpty() {
   return {
     operation_type: 'ENTRADA',
-    movement_date: new Date().toISOString().slice(0, 10),
+    movement_date: todayISO(),
     nfe_number: '', nfe_value: '',
     warehouse_id: '', warehouse_name: '',
     supplier_id: '', supplier_name: '',

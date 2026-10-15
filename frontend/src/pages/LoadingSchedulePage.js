@@ -21,6 +21,7 @@ import { formatContainerNumber } from '../lib/containerNumber';
 import { Calendar, Plus, Eye, Trash2, Printer, Pencil, X, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { todayISO } from '../lib/dates';
 
 // Cliente para o qual exibimos o campo "Nº da Bolsa" (flexitank) na Programação
 // de Carregamento e no Status de Entrega
@@ -71,7 +72,7 @@ export default function LoadingSchedulePage() {
       cavalo_plate: '',
       carreta_plate: '',
       loading_location: '',
-      loading_date: new Date().toISOString().split('T')[0],
+      loading_date: todayISO(),
       container_number: '',
       seal_number: '',
       bag_number: ''

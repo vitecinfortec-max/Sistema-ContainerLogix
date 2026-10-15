@@ -17,6 +17,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { Gauge, Plus, Trash2, Truck, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { todayISO } from '../lib/dates';
 
 const fmtKm = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR')} km`;
 
@@ -40,7 +41,7 @@ function createEmptyForm() {
     vehicle_id: '',
     vehicle_plate: '',
     km: '',
-    reading_date: new Date().toISOString().split('T')[0],
+    reading_date: todayISO(),
     observations: '',
   };
 }

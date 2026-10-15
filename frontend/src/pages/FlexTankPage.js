@@ -17,6 +17,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Eye, Pencil, Trash2, Package, TrendingUp, TrendingDown, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { calendarDate } from '../lib/dates';
 
 export default function FlexTankPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -380,7 +381,7 @@ export default function FlexTankPage() {
                           <td className="cell-strong whitespace-nowrap tabular-nums">#{movement.movement_number}</td>
                           <td className="font-mono whitespace-nowrap">{movement.bag_number}</td>
                           <td className="whitespace-nowrap">{movement.bag_size}</td>
-                          <td className="whitespace-nowrap tabular-nums">{format(new Date(movement.movement_date), 'dd/MM/yyyy', { locale: ptBR })}</td>
+                          <td className="whitespace-nowrap tabular-nums">{format(calendarDate(movement.movement_date), 'dd/MM/yyyy', { locale: ptBR })}</td>
                           <td>
                             <StatusPill tone={movement.movement_type === 'ENTRADA' ? 'primary' : 'amber'}>
                               {movement.movement_type === 'ENTRADA' ? 'Entrada' : 'Saída'}

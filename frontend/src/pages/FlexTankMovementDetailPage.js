@@ -11,6 +11,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Edit, Trash2, Loader2, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { calendarDate } from '../lib/dates';
 
 export default function FlexTankMovementDetailPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -108,7 +109,7 @@ export default function FlexTankMovementDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Data</p>
                 <p className="font-semibold text-lg">
-                  {format(new Date(movement.movement_date), "dd/MM/yyyy", { locale: ptBR })}
+                  {format(calendarDate(movement.movement_date), "dd/MM/yyyy", { locale: ptBR })}
                 </p>
               </div>
               <div>

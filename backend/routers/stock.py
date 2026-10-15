@@ -26,7 +26,7 @@ from shared import db, get_current_active_user, get_company_settings, validate_a
 from reports import (
     generate_stock_report_excel, generate_stock_report_pdf,
     generate_stock_ledger_report_excel, generate_stock_ledger_report_pdf,
-    now_brt,
+    now_brt, local_datetime,
 )
 from nfe_import import parse_nfe_xml
 
@@ -1318,7 +1318,9 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
 # linha do extrato carrega pra onde foi (OS) ou de onde veio (Nota Fiscal).
 
 def _stock_entry_to_ledger_row(entry: dict) -> dict:
-    date = (entry.get('nfe_issue_date') or '').strip() or str(entry.get('created_at') or '')[:10]
+    # Sem data de emissão: o dia (em Brasília) em que a nota foi lançada
+    launched = local_datetime(entry.get('created_at'))
+    date = (entry.get('nfe_issue_date') or '').strip() or (launched.date().isoformat() if launched else '')
     nfe_number = entry.get('nfe_number')
     return {
         'date': date,

@@ -9,7 +9,7 @@ from models import (
     LoadingOrder, LoadingOrderCreate, LoadingOrderUpdate, LoadingOrderResponse,
 )
 from shared import db, get_current_active_user, get_company_settings
-from reports import merge_company, now_brt
+from reports import fmt_datetime, merge_company, now_brt
 from routers.freight_payments import create_freight_payment_for_order, cancel_pending_freight_payment_for_order
 from routers.movements import validate_loading_order_movements, create_movements_for_loading_order
 from routers.container_purchases import create_purchase_records_for_order
@@ -212,12 +212,8 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
     company = merge_company(await get_company_settings())
 
     def fmt_dt(s):
-        if not s:
-            return ''
-        try:
-            return datetime.fromisoformat(str(s).replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
-        except Exception:
-            return str(s)
+        # Horário de Brasília: o que o servidor carimbou (UTC) é convertido
+        return fmt_datetime(s, empty='')
 
     STATUS_HEX = {
         "APROVADA": "#15803D",

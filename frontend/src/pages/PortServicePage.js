@@ -19,6 +19,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { Anchor, Plus, Eye, Trash2, Printer, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { todayISO } from '../lib/dates';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -29,7 +30,7 @@ function createEmptyForm() {
     driver_id: '',
     driver_name: '',
     cavalo_plate: '',
-    service_date: new Date().toISOString().split('T')[0],
+    service_date: todayISO(),
     turno: 'DIA',
     entry_time: '',
     exit_time: '',

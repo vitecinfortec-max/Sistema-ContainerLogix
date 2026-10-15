@@ -19,6 +19,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, ClipboardCheck, Download, Printer, Clock, CheckCircle2 } from 'lucide-react';
 import { scrollBehavior } from '../lib/reducedMotion';
+import { todayISO } from '../lib/dates';
 
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
@@ -44,7 +45,7 @@ function buildEmpty() {
   return {
     company_id: '', company_name: '',
     requester: '',
-    order_date: new Date().toISOString().split('T')[0],
+    order_date: todayISO(),
     equipment_id: '', equipment_plate: '',
     supplier_id: '', supplier_name: '',
     fuel_type: '',

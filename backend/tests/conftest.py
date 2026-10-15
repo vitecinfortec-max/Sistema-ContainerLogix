@@ -120,7 +120,7 @@ def api(monkeypatch):
     import shared
     from auth import create_access_token
 
-    fake_db = AsyncMongoMockClient()["containerlogix_teste"]
+    fake_db = AsyncMongoMockClient(tz_aware=True)["containerlogix_teste"]  # igual ao cliente real (shared.py)
     real_db = shared.db
     # Cada router fez "from shared import db" - a troca precisa alcançar a
     # referência guardada em cada módulo, não só a de shared.

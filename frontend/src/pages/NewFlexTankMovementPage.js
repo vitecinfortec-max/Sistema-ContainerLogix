@@ -13,6 +13,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Save, Loader2, Package } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
+import { dateInputToISO, todayISO } from '../lib/dates';
 
 export default function NewFlexTankMovementPage() {
   const navigate = useNavigate();
@@ -26,7 +27,7 @@ export default function NewFlexTankMovementPage() {
   const [formData, setFormData] = useState({
     bag_number: '',
     bag_size: '',
-    movement_date: new Date().toISOString().split('T')[0],
+    movement_date: todayISO(),
     movement_type: 'ENTRADA',
     client_id: '',
     client_name: '',
@@ -98,7 +99,7 @@ export default function NewFlexTankMovementPage() {
       await api.createFlexTankMovement({
         bag_number: formData.bag_number,
         bag_size: formData.bag_size,
-        movement_date: new Date(formData.movement_date).toISOString(),
+        movement_date: dateInputToISO(formData.movement_date),
         movement_type: formData.movement_type,
         client_id: formData.client_id || null,
         destination_client_id: formData.destination_client_id || null,

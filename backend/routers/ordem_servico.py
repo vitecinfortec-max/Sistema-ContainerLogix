@@ -11,7 +11,7 @@ from models import (
     OSCategoryCreate, OSCategoryResponse, DailyServiceOrderPoint
 )
 from reports import (
-    today_brt,
+    today_brt, fmt_datetime,
     generate_service_orders_report_pdf, generate_service_orders_report_excel, now_brt, merge_company
 )
 
@@ -204,12 +204,8 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
         return xml_escape(str(value)) if value not in (None, '') else ''
 
     def fmt_dt(s):
-        if not s:
-            return None
-        try:
-            return datetime.fromisoformat(str(s).replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
-        except Exception:
-            return str(s)
+        # Horário de Brasília: o que o servidor carimbou (UTC) é convertido
+        return fmt_datetime(s, empty=None)
 
     def fmt_duration(start_iso, end_iso):
         """Tempo de serviço = Fechamento - Abertura. O layout antigo tinha esse

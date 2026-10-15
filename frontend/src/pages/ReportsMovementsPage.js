@@ -11,11 +11,12 @@ import { toast } from 'sonner';
 import { FileText, FileSpreadsheet, X, BarChart3, Mail } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
+import { toLocalDay } from '../lib/dates';
 
 function yesterdayISO() {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return toLocalDay(d);
 }
 
 const DAILY_SERIES = [

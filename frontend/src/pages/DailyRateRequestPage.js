@@ -20,6 +20,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { Wallet, Plus, Eye, Trash2, Printer, Pencil, X, CheckCircle2, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { todayISO } from '../lib/dates';
 
 function calculateItemTotal(item) {
   const others = parseFloat(item.others_value) || 0;
@@ -64,7 +65,7 @@ export default function DailyRateRequestPage() {
       driver_name: '',
       vehicle_plate: '',
       client_name: '',
-      departure_date: new Date().toISOString().split('T')[0],
+      departure_date: todayISO(),
       others_value: 0,
       commission_value: 0,
       lunch_value: 0,

@@ -11,7 +11,7 @@ from models import (
     FuelSupplyOrderCreate, FuelSupplyOrderUpdate, FuelSupplyOrderResponse, DailyFuelSupplyPoint,
     TankSettings, TankSettingsUpdate, TankRefill, TankRefillCreate, TankRefillResponse
 )
-from reports import today_brt, generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel, now_brt, merge_company
+from reports import fmt_datetime, today_brt, generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel, now_brt, merge_company
 
 from shared import db, get_current_active_user, get_current_admin_user, get_company_settings
 
@@ -441,12 +441,8 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
     company = merge_company(await get_company_settings())
 
     def fmt_dt(s):
-        if not s:
-            return ''
-        try:
-            return datetime.fromisoformat(str(s).replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')
-        except Exception:
-            return str(s)
+        # Horário de Brasília: o que o servidor carimbou (UTC) é convertido
+        return fmt_datetime(s, empty='')
 
     def fmt_date(s):
         if not s:

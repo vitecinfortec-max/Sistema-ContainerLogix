@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, CheckCircle2, RotateCcw, BadgeDollarSign, Clock } from 'lucide-react';
+import { calendarDate } from '../lib/dates';
 
 const STATUS_LABELS = { PENDENTE: 'Pendente', RECEBIDO: 'Recebido' };
 const STATUS_TONES = {
@@ -285,7 +286,7 @@ export default function ContainerSalesPage() {
                       <td className="font-mono whitespace-nowrap cell-strong">{s.container_number}</td>
                       <td className="whitespace-nowrap">{s.booking || '-'}</td>
                       <td><div className="max-w-[180px] truncate" title={s.origin_terminal || ''}>{s.origin_terminal || '-'}</div></td>
-                      <td className="whitespace-nowrap tabular-nums">{s.entry_date ? format(new Date(s.entry_date), 'dd/MM/yyyy') : '-'}</td>
+                      <td className="whitespace-nowrap tabular-nums">{s.entry_date ? format(calendarDate(s.entry_date), 'dd/MM/yyyy') : '-'}</td>
                       <td><div className="max-w-[180px] truncate" title={s.representative_name || ''}>{s.representative_name || '-'}</div></td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(s.sale_value)}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(s.received_value)}</td>

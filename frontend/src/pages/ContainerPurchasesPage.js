@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, ShoppingCart, Package, CheckCircle2, Wallet } from 'lucide-react';
+import { calendarDate, dateInputToISO, toDateInput } from '../lib/dates';
 
 const STATUS_LABELS = { DISPONIVEL: 'Disponível', VENDIDO: 'Vendido' };
 const STATUS_TONES = {
@@ -112,7 +113,7 @@ export default function ContainerPurchasesPage() {
       container_number: purchase.container_number || '',
       booking: purchase.booking || '',
       origin_terminal: purchase.origin_terminal || '',
-      entry_date: purchase.entry_date ? purchase.entry_date.slice(0, 10) : '',
+      entry_date: toDateInput(purchase.entry_date),
       purchase_value: purchase.purchase_value ?? '',
       sale_value: purchase.sale_value ?? '',
       observations: purchase.observations || '',
@@ -131,7 +132,7 @@ export default function ContainerPurchasesPage() {
         container_number: form.container_number,
         booking: form.booking || null,
         origin_terminal: form.origin_terminal || null,
-        entry_date: form.entry_date ? new Date(form.entry_date).toISOString() : null,
+        entry_date: dateInputToISO(form.entry_date),
         purchase_value: form.purchase_value === '' ? null : parseFloat(form.purchase_value),
         sale_value: form.sale_value === '' ? null : parseFloat(form.sale_value),
         observations: form.observations || null,
@@ -265,7 +266,7 @@ export default function ContainerPurchasesPage() {
                       <td className="font-mono whitespace-nowrap cell-strong">{p.container_number}</td>
                       <td className="whitespace-nowrap">{p.booking || '-'}</td>
                       <td><div className="max-w-[200px] truncate" title={p.origin_terminal || ''}>{p.origin_terminal || '-'}</div></td>
-                      <td className="whitespace-nowrap tabular-nums">{p.entry_date ? format(new Date(p.entry_date), 'dd/MM/yyyy') : '-'}</td>
+                      <td className="whitespace-nowrap tabular-nums">{p.entry_date ? format(calendarDate(p.entry_date), 'dd/MM/yyyy') : '-'}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(p.purchase_value)}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(p.sale_value)}</td>
                       <td>

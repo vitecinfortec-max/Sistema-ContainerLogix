@@ -26,6 +26,7 @@ import { Truck, Wrench, Plus, Eye, Trash2, FileText, Printer, Pencil, Car, Check
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { compressImage } from '../lib/imageCompression';
+import { calendarDate, dateInputToISO, todayISO } from '../lib/dates';
 
 const VEHICLE_STATUS_LABELS = { ATIVO: 'Ativo', INATIVO: 'Inativo', MANUTENCAO: 'Manutenção' };
 const VEHICLE_STATUS_TONES = { ATIVO: 'emerald', INATIVO: 'slate', MANUTENCAO: 'amber' };
@@ -60,7 +61,7 @@ export default function FleetPage() {
     vehicle_type_revision: 'CAVALO', // CAVALO ou CARRETA
     vehicle_plate: '',
     vehicle_model: '',
-    revision_date: new Date().toISOString().split('T')[0],
+    revision_date: todayISO(),
     oil_used: '',
     current_km: '',
     next_oil_motor_km: '',
@@ -444,7 +445,7 @@ export default function FleetPage() {
       vehicle_type_revision: 'CAVALO',
       vehicle_plate: '',
       vehicle_model: '',
-      revision_date: new Date().toISOString().split('T')[0],
+      revision_date: todayISO(),
       oil_used: '',
       current_km: '',
       next_oil_motor_km: '',
@@ -504,7 +505,7 @@ export default function FleetPage() {
           vehicle_type_revision: 'CAVALO',
           vehicle_plate: formData.vehicle_plate.toUpperCase(),
           vehicle_model: formData.vehicle_model || null,
-          revision_date: new Date(formData.revision_date).toISOString(),
+          revision_date: dateInputToISO(formData.revision_date),
           oil_used: formData.oil_used,
           current_km: parseInt(formData.current_km),
           next_oil_motor_km: formData.next_oil_motor_km ? parseInt(formData.next_oil_motor_km) : null,
@@ -529,7 +530,7 @@ export default function FleetPage() {
           vehicle_type_revision: 'CARRETA',
           vehicle_plate: formData.vehicle_plate.toUpperCase(),
           vehicle_model: formData.vehicle_model || null,
-          revision_date: new Date(formData.revision_date).toISOString(),
+          revision_date: dateInputToISO(formData.revision_date),
           oil_used: formData.carreta_revision_type, // Usar tipo de revisão como "oil_used" para manter compatibilidade
           current_km: 0, // Carreta não tem KM
           mechanic_name: formData.mechanic_name,
@@ -852,7 +853,7 @@ export default function FleetPage() {
                           <td><PlateTag>{revision.vehicle_plate}</PlateTag></td>
                           <td>{revision.vehicle_model || '-'}</td>
                           <td className="whitespace-nowrap tabular-nums">
-                            {format(new Date(revision.revision_date), 'dd/MM/yyyy', { locale: ptBR })}
+                            {format(calendarDate(revision.revision_date), 'dd/MM/yyyy', { locale: ptBR })}
                           </td>
                           <td className="text-right whitespace-nowrap tabular-nums">{formatKM(revision.current_km)}</td>
                           <td><div className="max-w-[200px] truncate" title={revision.oil_used || ''}>{revision.oil_used || '-'}</div></td>
@@ -1178,7 +1179,7 @@ export default function FleetPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Data</p>
-                  <p className="font-bold">{format(new Date(selectedRevision.revision_date), 'dd/MM/yyyy')}</p>
+                  <p className="font-bold">{format(calendarDate(selectedRevision.revision_date), 'dd/MM/yyyy')}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">KM Atual</p>
