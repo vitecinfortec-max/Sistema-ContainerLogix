@@ -256,26 +256,40 @@ export default function Stage3D({ scene, params, className, fallback = null, ari
       stopStage();
       setStatus('failed');
     };
-    if (!webglAvailable()) {
+    // Sem WebGL, ou aparelho pedindo economia de dados: versão 2D direto
+    if (!webglAvailable() || navigator.connection?.saveData) {
       fail();
       return undefined;
     }
     const animated = !prefersReducedMotion();
-    // Espera a entrada da tela terminar: montar o modelo ocupa a CPU por um
-    // instante e travaria essa animação
-    const timer = setTimeout(() => {
-      loadThree()
-        .then((lib) => {
-          if (cancelled) return;
-          const stage = startStage(lib, mount, scene, paramsRef.current, { animated, onFail: fail });
-          stageRef.current = stage;
-          // (se a montagem falhou, o palco já foi trocado pela versão 2D)
-          stage.ready.then(() => { if (!cancelled && stageRef.current === stage) setStatus('ready'); });
-        })
-        .catch(fail);
-    }, startDelay);
+    let timer = 0;
+    const start = () => {
+      // Espera a entrada da tela terminar: montar o modelo ocupa a CPU por um
+      // instante e travaria essa animação
+      timer = setTimeout(() => {
+        loadThree()
+          .then((lib) => {
+            if (cancelled) return;
+            const stage = startStage(lib, mount, scene, paramsRef.current, { animated, onFail: fail });
+            stageRef.current = stage;
+            // (se a montagem falhou, o palco já foi trocado pela versão 2D)
+            stage.ready.then(() => { if (!cancelled && stageRef.current === stage) setStatus('ready'); });
+          })
+          .catch(fail);
+      }, startDelay);
+    };
+    // Sob demanda: o three.js (~600 KB) só é baixado e a cena só é montada
+    // quando o bloco chega perto da área visível - quem não rola até ele (ex:
+    // o pátio no fim do Dashboard) não paga esse custo.
+    const nearViewport = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      nearViewport.disconnect();
+      start();
+    }, { rootMargin: '200px 0px' });
+    nearViewport.observe(mount);
     return () => {
       cancelled = true;
+      nearViewport.disconnect();
       clearTimeout(timer);
       stopStage();
     };

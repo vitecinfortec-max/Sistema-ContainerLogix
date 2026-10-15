@@ -790,7 +790,8 @@ export default function LoginScene3D({ className = '' }) {
     let loading = false;
 
     const start = () => {
-      if (stop || loading || cancelled || !media.matches) return;
+      // Só no desktop, e não com o aparelho pedindo economia de dados
+      if (stop || loading || cancelled || !media.matches || navigator.connection?.saveData) return;
       loading = true;
       Promise.all([
         import('three'),
