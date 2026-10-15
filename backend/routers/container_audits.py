@@ -14,6 +14,7 @@ from shared import (
     validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR,
 )
 from reports import now_brt, generate_container_audit_pdf
+from routers.movements import in_stock_movements
 
 api_router = APIRouter(prefix="/api")
 
@@ -43,14 +44,8 @@ async def _get_expected_stock_for_client(client_name: str) -> list:
              "created_at": 1, "client_name": 1, "size_type": 1,
              "shipping_line": 1, "booking": 1}
     ).to_list(None)
-    last_by_container = {}
-    for m in sorted(lean, key=lambda x: parse_datetime_value(x['created_at'])):
-        last_by_container[m['container_number']] = m
     target = (client_name or '').strip().lower()
-    return [
-        m for m in last_by_container.values()
-        if m['operation_type'] == 'ENTRADA' and (m.get('client_name') or '').strip().lower() == target
-    ]
+    return [m for m in in_stock_movements(lean) if (m.get('client_name') or '').strip().lower() == target]
 
 
 @api_router.get("/container-audits")
@@ -142,28 +137,28 @@ async def update_container_audit_item(
     if audit["status"] == "CONCLUIDA":
         raise HTTPException(status_code=400, detail="Auditoria já concluída, não pode ser alterada")
 
-    items = audit["items"]
-    found = False
-    for item in items:
-        if item["container_number"] == data.container_number:
-            item["status"] = data.status
-            if data.observations is not None:
-                item["observations"] = data.observations
-            found = True
-            break
-
-    if not found:
-        items.append(AuditedContainerItem(
+    # Altera só o item (operador posicional) ou acrescenta com $push - regravar
+    # a lista inteira fazia uma observação e uma foto salvas ao mesmo tempo
+    # (ou duas pessoas auditando juntas) apagarem uma à outra.
+    now = datetime.now(timezone.utc).isoformat()
+    item_set = {"items.$.status": data.status, "updated_at": now}
+    if data.observations is not None:
+        item_set["items.$.observations"] = data.observations
+    result = await db.container_audits.update_one(
+        {"id": audit_id, "items.container_number": data.container_number},
+        {"$set": item_set}
+    )
+    if result.matched_count == 0:
+        new_item = AuditedContainerItem(
             container_number=data.container_number,
             expected=False,
             status=data.status,
             observations=data.observations,
-        ).model_dump(mode="json"))
-
-    await db.container_audits.update_one(
-        {"id": audit_id},
-        {"$set": {"items": items, "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
+        ).model_dump(mode="json")
+        await db.container_audits.update_one(
+            {"id": audit_id, "items.container_number": {"$ne": data.container_number}},
+            {"$push": {"items": new_item}, "$set": {"updated_at": now}}
+        )
 
     updated = await db.container_audits.find_one({"id": audit_id}, {"_id": 0})
     return ContainerAuditResponse(**updated)
@@ -199,14 +194,14 @@ async def upload_container_audit_photo(
         buffer.write(content)
 
     photo_url = f"/api/uploads/container_audits/{audit_id}/{photo_id}{file_ext}"
-    item["photo"] = {"id": photo_id, "url": photo_url}
+    photo = {"id": photo_id, "url": photo_url}
 
     await db.container_audits.update_one(
-        {"id": audit_id},
-        {"$set": {"items": items, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"id": audit_id, "items.container_number": container_number},
+        {"$set": {"items.$.photo": photo, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
 
-    return item["photo"]
+    return photo
 
 
 @api_router.post("/container-audits/{audit_id}/complete", response_model=ContainerAuditResponse)

@@ -160,6 +160,7 @@ export const api = {
   downloadMovementsPdf: (movementIds, via) => axios.post(`${API}/movements/pdf`, { movement_ids: movementIds, via }, { responseType: 'blob' }),
   
   // Reports
+  getMovementsReportPreview: (params) => axios.get(`${API}/reports/movements/preview`, { params }),
   downloadPDFReport: (params) => axios.get(`${API}/reports/pdf`, { params, responseType: 'blob' }),
   downloadExcelReport: (params) => axios.get(`${API}/reports/excel`, { params, responseType: 'blob' }),
   sendDailyMovementReports: (targetDate) => axios.post(`${API}/reports/send-daily-movements`, null, { params: targetDate ? { target_date: targetDate } : {} }),

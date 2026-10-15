@@ -6,7 +6,7 @@ from typing import Optional, List
 import io
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from models import DailyBillingPoint
@@ -20,7 +20,7 @@ from shared import (
     db, get_current_active_user, get_current_admin_user, get_company_settings, parse_datetime_value,
     round_money
 )
-from routers.movements import _filter_movements_by_period
+from routers.movements import _filter_movements_by_period, in_stock_movements, _movement_response
 from routers.dashboard import _compute_daily_billing_chart
 
 api_router = APIRouter(prefix="/api")
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 async def _get_current_stock_movements(status_filter: Optional[str] = None, client_name: Optional[str] = None) -> list:
     """Movimentação (última entrada) de cada container que ainda está em estoque
-    (mais entradas que saídas) - usado no relatório 'Estoque Atual' (PDF e Excel).
+    (última movimentação = ENTRADA) - usado no relatório 'Estoque Atual' (PDF e Excel).
 
     Otimização: descobrir quais containers estão em estoque exige olhar o histórico
     inteiro (não tem como saber sem contar entradas/saídas de cada um), mas isso é
@@ -39,24 +39,10 @@ async def _get_current_stock_movements(status_filter: Optional[str] = None, clie
     fração pequena do histórico total.
     """
     lean_movements = await db.movements.find(
-        {}, {"_id": 0, "id": 1, "container_number": 1, "operation_type": 1, "created_at": 1}
-    ).sort("created_at", -1).to_list(None)
+        {}, {"_id": 0, "id": 1, "container_number": 1, "operation_type": 1, "created_at": 1, "transaction_id": 1}
+    ).to_list(None)
 
-    container_counts: dict = {}
-    for m in sorted(lean_movements, key=lambda x: parse_datetime_value(x['created_at'])):
-        container = m['container_number']
-        counts = container_counts.setdefault(container, {'entries': 0, 'exits': 0, 'last_entry_id': None})
-        if m['operation_type'] == 'ENTRADA':
-            counts['entries'] += 1
-            counts['last_entry_id'] = m['id']
-        elif m['operation_type'] == 'SAIDA':
-            counts['exits'] += 1
-
-    in_stock_ids = [
-        counts['last_entry_id']
-        for counts in container_counts.values()
-        if counts['entries'] > counts['exits'] and counts['last_entry_id']
-    ]
+    in_stock_ids = [m['id'] for m in in_stock_movements(lean_movements)]
     if not in_stock_ids:
         return []
 
@@ -80,16 +66,9 @@ async def _get_current_stock_movements(status_filter: Optional[str] = None, clie
     return movements
 
 
-@api_router.get("/reports/pdf")
-async def download_pdf_report(
-    operation_type: Optional[str] = None,
-    status_filter: Optional[str] = None,
-    client_name: Optional[str] = None,
-    date_from: Optional[str] = None,
-    date_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_active_user)
-):
-    # Caso especial: Estoque Atual
+async def _report_movements(operation_type, status_filter, client_name, date_from, date_to) -> list:
+    """Movimentações do Relatório de Movimentação com os filtros da tela - a
+    mesma lista vai pro PDF, pro Excel e pra prévia."""
     if operation_type == "ESTOQUE":
         movements = await _get_current_stock_movements(status_filter, client_name)
     else:
@@ -100,11 +79,53 @@ async def download_pdf_report(
             query['status'] = status_filter
         if client_name:
             query['client_name'] = client_name
-        
         movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
-    
-    # Filtrar por data se fornecido
-    movements = _filter_movements_by_period(movements, date_from, date_to)
+    return _filter_movements_by_period(movements, date_from, date_to)
+
+
+@api_router.get("/reports/movements/preview")
+async def preview_movements_report(
+    operation_type: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    client_name: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(15, ge=1, le=200),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Prévia na tela do que o PDF/Excel vão trazer: uma página das linhas e
+    os totais do filtro inteiro."""
+    movements = await _report_movements(operation_type, status_filter, client_name, date_from, date_to)
+    total = len(movements)
+    stats = {
+        "total": total,
+        "entries": sum(1 for m in movements if m.get('operation_type') == 'ENTRADA'),
+        "exits": sum(1 for m in movements if m.get('operation_type') == 'SAIDA'),
+        "full": sum(1 for m in movements if m.get('status') == 'CHEIO'),
+        "empty": sum(1 for m in movements if m.get('status') == 'VAZIO'),
+    }
+    start = (page - 1) * per_page
+    return {
+        "items": [_movement_response(m) for m in movements[start:start + per_page]],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": max(1, (total + per_page - 1) // per_page),
+        "stats": stats,
+    }
+
+
+@api_router.get("/reports/pdf")
+async def download_pdf_report(
+    operation_type: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    client_name: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    movements = await _report_movements(operation_type, status_filter, client_name, date_from, date_to)
     
     # Gerar título do relatório baseado no filtro
     report_title = "Relatório de Movimentações"
@@ -136,22 +157,7 @@ async def download_excel_report(
     date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
-    # Caso especial: Estoque Atual
-    if operation_type == "ESTOQUE":
-        movements = await _get_current_stock_movements(status_filter, client_name)
-    else:
-        query = {}
-        if operation_type:
-            query['operation_type'] = operation_type
-        if status_filter:
-            query['status'] = status_filter
-        if client_name:
-            query['client_name'] = client_name
-
-        movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
-
-    # Filtrar por data se fornecido
-    movements = _filter_movements_by_period(movements, date_from, date_to)
+    movements = await _report_movements(operation_type, status_filter, client_name, date_from, date_to)
     
     # Gerar título do relatório baseado no filtro
     report_title = "Relatório de Movimentações"

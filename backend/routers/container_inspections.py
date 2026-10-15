@@ -197,7 +197,17 @@ async def upload_container_inspection_photo(
     if not inspection:
         raise HTTPException(status_code=404, detail="Registro fotográfico de container não encontrado")
 
-    inspection = migrate_inspection_photos(inspection)
+    if not inspection.get("photos"):
+        # Registro antigo (photo_front/back/...): grava a lista convertida uma
+        # vez, só se ninguém gravou fotos nesse meio tempo, pra o $push abaixo
+        # partir dela.
+        legacy = migrate_inspection_photos(dict(inspection))["photos"]
+        if legacy:
+            await db.container_inspections.update_one(
+                {"id": inspection_id, "$or": [{"photos": {"$exists": False}}, {"photos": None}, {"photos": []}]},
+                {"$set": {"photos": legacy}}
+            )
+        inspection["photos"] = legacy
     if len(inspection["photos"]) >= MAX_CONTAINER_INSPECTION_PHOTOS:
         raise HTTPException(status_code=400, detail=f"Limite de {MAX_CONTAINER_INSPECTION_PHOTOS} fotos por registro atingido")
 
@@ -217,12 +227,16 @@ async def upload_container_inspection_photo(
     # Atualizar banco
     photo_url = f"/api/uploads/container_inspections/{inspection_id}/{photo_id}{file_ext}"
     photo_entry = {"id": photo_id, "type": photo_type, "url": photo_url}
-    await db.container_inspections.update_one(
-        {"id": inspection_id},
-        {
-            "$set": {"photos": inspection["photos"] + [photo_entry], "updated_at": datetime.now(timezone.utc).isoformat()}
-        }
+    # $push (e não regravar a lista lida lá em cima): a tela de novo registro
+    # envia as fotos em paralelo, e duas requisições que leram a mesma lista
+    # apagavam a foto uma da outra. O filtro garante o limite mesmo assim.
+    result = await db.container_inspections.update_one(
+        {"id": inspection_id, f"photos.{MAX_CONTAINER_INSPECTION_PHOTOS - 1}": {"$exists": False}},
+        {"$push": {"photos": photo_entry}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
     )
+    if result.modified_count == 0:
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=f"Limite de {MAX_CONTAINER_INSPECTION_PHOTOS} fotos por registro atingido")
 
     return photo_entry
 
@@ -237,7 +251,9 @@ async def delete_container_inspection_photo(
     if not inspection:
         raise HTTPException(status_code=404, detail="Registro fotográfico de container não encontrado")
 
+    stored_has_list = bool(inspection.get("photos"))
     inspection = migrate_inspection_photos(inspection)
+    inspection["photos_migrated_on_read"] = not stored_has_list
     remaining_photos = [p for p in inspection["photos"] if p["id"] != photo_id]
     if len(remaining_photos) == len(inspection["photos"]):
         raise HTTPException(status_code=404, detail="Foto não encontrada")
@@ -247,11 +263,14 @@ async def delete_container_inspection_photo(
     for file_path in photo_dir.glob(f"{photo_id}.*"):
         file_path.unlink()
 
-    # Atualizar banco
-    await db.container_inspections.update_one(
-        {"id": inspection_id},
-        {"$set": {"photos": remaining_photos, "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
+    # $pull pelo mesmo motivo do $push no envio: não regravar a lista inteira
+    # (registro antigo, ainda sem a lista gravada, recebe a lista convertida)
+    if inspection.get("photos_migrated_on_read"):
+        update = {"$set": {"photos": remaining_photos}}
+    else:
+        update = {"$pull": {"photos": {"id": photo_id}}}
+    update.setdefault("$set", {})["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.container_inspections.update_one({"id": inspection_id}, update)
 
     return {"message": "Foto removida com sucesso"}
 

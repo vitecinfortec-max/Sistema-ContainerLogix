@@ -6,13 +6,45 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from models import FlexTankMovement, FlexTankMovementCreate, FlexTankMovementUpdate, FlexTankMovementResponse
-from reports import now_brt
+from reports import now_brt, local_datetime
 
 from shared import db, get_current_active_user, get_company_settings
 
 api_router = APIRouter(prefix="/api")
 
 # ========== FLEX TANK (CONTROLE DE ESTOQUE DE BOLSAS) ==========
+
+def _filter_day(value: Optional[str], field: str):
+    """'YYYY-MM-DD' (ou ISO completo) recebido num filtro de período."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value[:10]).date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Data inválida em {field}: use o formato AAAA-MM-DD")
+
+
+def _filter_by_movement_day(movements: list, start_date: Optional[str], end_date: Optional[str]) -> list:
+    """Mantém as movimentações cujo dia (data da movimentação, no calendário de
+    Brasília) cai no período, com os dois extremos inclusive. movement_date é
+    gravado como texto ISO - comparar com datetime no Mongo nunca casava."""
+    day_from = _filter_day(start_date, "start_date")
+    day_to = _filter_day(end_date, "end_date")
+    if not day_from and not day_to:
+        return movements
+    kept = []
+    for m in movements:
+        local = local_datetime(m.get("movement_date"))
+        if local is None:
+            continue
+        day = local.date()
+        if day_from and day < day_from:
+            continue
+        if day_to and day > day_to:
+            continue
+        kept.append(m)
+    return kept
+
 
 @api_router.get("/flex-tank/movements")
 async def list_flex_tank_movements(
@@ -28,15 +60,6 @@ async def list_flex_tank_movements(
     """Lista todas as movimentações de Flex Tank com filtros"""
     query = {}
     
-    # Filtro por data
-    if start_date or end_date:
-        date_filter = {}
-        if start_date:
-            date_filter["$gte"] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-        if end_date:
-            date_filter["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-        if date_filter:
-            query["movement_date"] = date_filter
     
     # Filtro por cliente
     if client_id:
@@ -51,9 +74,16 @@ async def list_flex_tank_movements(
         query["movement_type"] = movement_type
     
     skip = (page - 1) * per_page
-    
-    total = await db.flex_tank_movements.count_documents(query)
-    movements = await db.flex_tank_movements.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+
+    if start_date or end_date:
+        # Período filtrado em Python (ver _filter_by_movement_day)
+        rows = await db.flex_tank_movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
+        rows = _filter_by_movement_day(rows, start_date, end_date)
+        total = len(rows)
+        movements = rows[skip:skip + per_page]
+    else:
+        total = await db.flex_tank_movements.count_documents(query)
+        movements = await db.flex_tank_movements.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
     
     return {
         "items": movements,
@@ -255,14 +285,6 @@ async def download_flex_tank_report(
 
     query = {}
 
-    if start_date or end_date:
-        date_filter = {}
-        if start_date:
-            date_filter["$gte"] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-        if end_date:
-            date_filter["$lte"] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-        if date_filter:
-            query["movement_date"] = date_filter
 
     if client_id:
         query["client_id"] = client_id
@@ -271,6 +293,7 @@ async def download_flex_tank_report(
         query["movement_type"] = movement_type
 
     movements = await db.flex_tank_movements.find(query, {"_id": 0}).sort("movement_date", -1).to_list(None)
+    movements = _filter_by_movement_day(movements, start_date, end_date)
 
     company = await get_company_settings()
     excel_bytes = generate_flex_tank_report_excel(movements, company=company)

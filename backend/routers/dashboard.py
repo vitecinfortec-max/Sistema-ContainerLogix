@@ -48,22 +48,21 @@ def _created_at_gte(dt: datetime) -> dict:
 
 
 async def _compute_stock_by_status() -> dict:
-    """Para cada container, soma entradas/saídas e pega o status da última entrada
-    (histórico completo, feito no MongoDB via agregação em vez de carregar todas as
-    movimentações em memória no Python)."""
+    """Containers em estoque (última movimentação = ENTRADA, mesma regra de
+    in_stock_movements em movements.py), por status da entrada - feito no
+    MongoDB via agregação em vez de carregar todas as movimentações no Python."""
     pipeline = [
-        {"$sort": {"created_at": 1}},
+        {"$sort": {"created_at": 1, "transaction_id": 1}},
         {"$group": {
             "_id": "$container_number",
-            "entries": {"$sum": {"$cond": [{"$eq": ["$operation_type", "ENTRADA"]}, 1, 0]}},
-            "exits": {"$sum": {"$cond": [{"$eq": ["$operation_type", "SAIDA"]}, 1, 0]}},
+            "last_op": {"$last": "$operation_type"},
             "last_status": {"$last": "$status"},
         }},
-        {"$match": {"$expr": {"$gt": ["$entries", "$exits"]}}},
+        {"$match": {"last_op": "ENTRADA"}},
         {"$group": {"_id": "$last_status", "count": {"$sum": 1}}},
     ]
     result = {r["_id"]: r["count"] async for r in db.movements.aggregate(pipeline)}
-    return {"VAZIO": result.get("VAZIO", 0), "CHEIO": result.get("CHEIO", 0)}
+    return {"VAZIO": result.get("VAZIO", 0), "CHEIO": result.get("CHEIO", 0), "TOTAL": sum(result.values())}
 
 
 async def _compute_daily_chart(today: datetime) -> list[DailyMovementPoint]:
@@ -198,7 +197,7 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_active_us
         db.movements.find({}, {"_id": 0}).sort("created_at", -1).limit(5).to_list(5),
     )
 
-    current_stock = total_entries - total_exits
+    current_stock = stock_by_status["TOTAL"]
     stock_empty = stock_by_status["VAZIO"]
     stock_full = stock_by_status["CHEIO"]
 

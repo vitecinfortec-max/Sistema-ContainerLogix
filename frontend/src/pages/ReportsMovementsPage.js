@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { FilterCard, FilterField, SearchInput, DataCard, EmptyState } from '../components/DataPage';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, EmptyState, StatCard, StatGrid, StatusPill, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import { FileText, FileSpreadsheet, X, BarChart3, Mail } from 'lucide-react';
+import { FileText, FileSpreadsheet, X, BarChart3, Mail, List, LogIn, LogOut, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 import { toLocalDay } from '../lib/dates';
@@ -37,6 +39,12 @@ export default function ReportsMovementsPage() {
   const [filterClient, setFilterClient] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  // Prévia do relatório: mesma lista que vai pro PDF/Excel, uma página por vez
+  const PREVIEW_PAGE_SIZE = 15;
+  const [preview, setPreview] = useState({ items: [], total: 0, pages: 1, stats: null });
+  const [previewPage, setPreviewPage] = useState(1);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState([]);
   const [dailyChart, setDailyChart] = useState([]);
@@ -132,6 +140,26 @@ export default function ReportsMovementsPage() {
     if (dateTo) params.date_to = dateTo;
     return params;
   };
+
+  useEffect(() => { setPreviewPage(1); }, [filterType, filterStatus, filterClient, dateFrom, dateTo]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadPreview = async () => {
+      setPreviewLoading(true);
+      try {
+        const response = await api.getMovementsReportPreview({ ...buildParams(), page: previewPage, per_page: PREVIEW_PAGE_SIZE });
+        if (!cancelled) setPreview(response.data);
+      } catch (error) {
+        if (!cancelled) toast.error(error.response?.data?.detail || 'Erro ao carregar a prévia do relatório');
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    };
+    loadPreview();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, filterStatus, filterClient, dateFrom, dateTo, previewPage]);
 
   const downloadPDF = async () => {
     setLoading(true);
@@ -315,6 +343,78 @@ export default function ReportsMovementsPage() {
             </div>
           </div>
         </FilterCard>
+
+        <StatGrid>
+          <StatCard label="Movimentações" value={(preview.stats?.total ?? 0).toLocaleString('pt-BR')} icon={List} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'no relatório'} testId="report-preview-total" />
+          <StatCard label="Entradas" value={(preview.stats?.entries ?? 0).toLocaleString('pt-BR')} icon={LogIn} tone="primary" />
+          <StatCard label="Saídas" value={(preview.stats?.exits ?? 0).toLocaleString('pt-BR')} icon={LogOut} tone="amber" />
+          <StatCard label="Cheios / vazios" value={`${(preview.stats?.full ?? 0).toLocaleString('pt-BR')} / ${(preview.stats?.empty ?? 0).toLocaleString('pt-BR')}`} icon={Package} tone="emerald" />
+        </StatGrid>
+
+        <DataCard
+          title="Prévia do relatório"
+          count={previewLoading ? '...' : preview.total}
+          meta={<span className="hidden md:inline text-xs text-slate-400 dark:text-slate-500">as mesmas linhas do PDF e do Excel</span>}
+          footer={(
+            <TablePagination
+              currentPage={previewPage}
+              totalPages={preview.pages || 1}
+              totalItems={preview.total}
+              pageSize={PREVIEW_PAGE_SIZE}
+              onPageChange={setPreviewPage}
+            />
+          )}
+        >
+          {preview.items.length === 0 ? (
+            <EmptyState
+              loading={previewLoading}
+              icon={List}
+              title="Nenhuma movimentação encontrada"
+              hint={hasFilters ? 'Ajuste os filtros' : undefined}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table" data-testid="report-preview-table">
+                <thead>
+                  <tr>
+                    <th>Nº</th>
+                    <th>Data</th>
+                    <th>Operação</th>
+                    <th>Container</th>
+                    <th>Status</th>
+                    <th>Tipo</th>
+                    <th>Cliente</th>
+                    <th>Armador</th>
+                    <th>Motorista</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.items.map((m) => (
+                    <tr key={m.id}>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{m.transaction_id}</td>
+                      <td className="whitespace-nowrap tabular-nums">{m.created_at ? format(new Date(m.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
+                      <td>
+                        <StatusPill tone={m.operation_type === 'ENTRADA' ? 'primary' : 'amber'}>
+                          {m.operation_type === 'ENTRADA' ? 'Entrada' : 'Saída'}
+                        </StatusPill>
+                      </td>
+                      <td className="cell-strong whitespace-nowrap font-mono text-[12px]">{m.container_number || '-'}</td>
+                      <td>
+                        <StatusPill tone={m.status === 'CHEIO' ? 'emerald' : 'slate'}>
+                          {m.status === 'CHEIO' ? 'Cheio' : 'Vazio'}
+                        </StatusPill>
+                      </td>
+                      <td className="whitespace-nowrap">{m.size_type || '-'}</td>
+                      <td><div className="max-w-[200px] truncate" title={m.client_name || ''}>{m.client_name || '-'}</div></td>
+                      <td><div className="max-w-[140px] truncate" title={m.shipping_line || ''}>{m.shipping_line || '-'}</div></td>
+                      <td><div className="max-w-[180px] truncate" title={m.driver_name || ''}>{m.driver_name || '-'}</div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
 
         {/* Entradas e Saídas por Dia */}
         <DataCard

@@ -240,10 +240,13 @@ async def upload_container_vistoria_photo(
     photo_entry = {"id": photo_id, "type": photo_type, "url": photo_url}
     # $push (e não regravar a lista lida acima): a tela envia as fotos em
     # paralelo, e regravar a lista fazia um envio apagar a foto do outro.
-    await db.container_vistorias.update_one(
-        {"id": vistoria_id},
+    result = await db.container_vistorias.update_one(
+        {"id": vistoria_id, f"photos.{MAX_VISTORIA_PHOTOS - 1}": {"$exists": False}},
         {"$push": {"photos": photo_entry}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
     )
+    if result.modified_count == 0:
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=f"Limite de {MAX_VISTORIA_PHOTOS} fotos por vistoria atingido")
 
     return photo_entry
 
@@ -267,9 +270,10 @@ async def delete_container_vistoria_photo(
     for file_path in photo_dir.glob(f"{photo_id}.*"):
         file_path.unlink()
 
+    # $pull: não regravar a lista inteira (um envio em andamento sumiria)
     await db.container_vistorias.update_one(
         {"id": vistoria_id},
-        {"$set": {"photos": remaining_photos, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        {"$pull": {"photos": {"id": photo_id}}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
     )
 
     return {"message": "Foto removida com sucesso"}

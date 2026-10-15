@@ -149,6 +149,18 @@ async def update_unit_segregation(segregation_id: str, data: UnitSegregationUpda
             raise HTTPException(status_code=400, detail="Cliente não encontrado")
         update_data["client_name"] = client["name"]
     
+    # Mesma trava da criação: um container só pode estar segregado (ATIVO)
+    # numa reserva por vez
+    if update_data.get("items"):
+        for item in update_data["items"]:
+            number = ((item.get("container_number") if isinstance(item, dict) else item.container_number) or "").upper()
+            other = await db.unit_segregations.find_one(
+                {"items.container_number": number, "status": "ATIVO", "id": {"$ne": segregation_id}},
+                {"_id": 0, "client_name": 1}
+            )
+            if other:
+                raise HTTPException(status_code=400, detail=f"Container {number} já está segregado para o cliente {other['client_name']}")
+
     # Se atualizou os itens, buscar nomes dos armadores
     if "items" in update_data and update_data["items"]:
         # Baixa (retirada) já registrada num container existente não pode se

@@ -146,6 +146,28 @@ async def _movement_filter_stats(query: dict, total: int) -> dict:
     }
 
 
+def _movement_order_key(m: dict):
+    """Ordem cronológica das movimentações; o Nº da transação desempata
+    registros gravados no mesmo instante."""
+    return (parse_datetime_value(m['created_at']), m.get('transaction_id') or 0)
+
+
+def last_movement_by_container(movements: list) -> dict:
+    """Movimentação mais recente de cada container."""
+    last = {}
+    for m in sorted(movements, key=_movement_order_key):
+        last[m['container_number']] = m
+    return last
+
+
+def in_stock_movements(movements: list) -> list:
+    """Regra única de "Estoque Atual": o container está no pátio quando a
+    última movimentação dele é uma ENTRADA (devolve essa entrada). Contar
+    entradas contra saídas do histórico inteiro errava pra sempre depois de
+    uma entrada lançada em dobro, ou com um número de container reutilizado."""
+    return [m for m in last_movement_by_container(movements).values() if m['operation_type'] == 'ENTRADA']
+
+
 async def _find_last_movement(container_number: str):
     """Movimentação mais recente (qualquer tipo) registrada pra esse container."""
     return await db.movements.find_one(
@@ -610,54 +632,11 @@ async def get_movements(
              "billed": 1, "billed_at": 1, "user_name": 1, "id": 1, "transaction_id": 1}
         ).sort("created_at", -1).to_list(None)
         
-        # Agrupar por container_number e verificar o status
-        container_status = {}
-        for m in all_movements:
-            container = m['container_number']
-            if container not in container_status:
-                container_status[container] = {
-                    'last_movement': m,
-                    'has_entry': False,
-                    'has_exit': False
-                }
-            
-            if m['operation_type'] == 'ENTRADA':
-                container_status[container]['has_entry'] = True
-            elif m['operation_type'] == 'SAIDA':
-                container_status[container]['has_exit'] = True
-        
-        # Filtrar containers em estoque (entrada sem saída correspondente)
-        # Um container está em estoque se a contagem de entradas > contagem de saídas
-        container_counts = {}
-        for m in sorted(all_movements, key=lambda x: parse_datetime_value(x['created_at'])):
-            container = m['container_number']
-            if container not in container_counts:
-                container_counts[container] = {'entries': 0, 'exits': 0, 'last_entry': None}
-            
-            if m['operation_type'] == 'ENTRADA':
-                container_counts[container]['entries'] += 1
-                container_counts[container]['last_entry'] = m
-            elif m['operation_type'] == 'SAIDA':
-                container_counts[container]['exits'] += 1
-        
-        # Coletar as últimas entradas dos containers em estoque
-        in_stock_movements = []
-        for container, counts in container_counts.items():
-            if counts['entries'] > counts['exits'] and counts['last_entry']:
-                m = counts['last_entry']
-                # Aplicar filtro de status se especificado
-                if status_filter and m['status'] != status_filter:
-                    continue
-                in_stock_movements.append(m)
-        
-        # Ordenar por data decrescente
-        in_stock_movements.sort(key=lambda x: parse_datetime_value(x['created_at']), reverse=True)
-        
-        return [
-            _movement_response(m)
-            for m in in_stock_movements
-        ]
-    
+        # Em estoque = última movimentação do container é uma ENTRADA
+        stock = [m for m in in_stock_movements(all_movements) if not status_filter or m['status'] == status_filter]
+        stock.sort(key=_movement_order_key, reverse=True)
+        return [_movement_response(m) for m in stock]
+
     # Fluxo normal para outros tipos de operação
     query = {}
     if operation_type:
@@ -871,6 +850,27 @@ async def get_movement(movement_id: str, current_user: dict = Depends(get_curren
     
     return _movement_response(movement)
 
+async def _edit_duplicate_conflict(container_number: str, operation_type: str, created_at: str, movement_id: str) -> Optional[str]:
+    """Trava de duplicidade na edição: trocar o container ou o tipo de uma EIR
+    não pode deixar duas movimentações do mesmo tipo seguidas no histórico do
+    container (olha a vizinha anterior e a seguinte, pela data da EIR)."""
+    base = {"container_number": container_number.strip().upper(), "id": {"$ne": movement_id}}
+    projection = {"_id": 0, "transaction_id": 1, "operation_type": 1, "created_at": 1}
+    previous = await db.movements.find_one({**base, "created_at": {"$lt": created_at}}, projection, sort=[("created_at", -1)])
+    following = await db.movements.find_one({**base, "created_at": {"$gt": created_at}}, projection, sort=[("created_at", 1)])
+    for neighbor in (previous, following):
+        if neighbor and neighbor.get('operation_type') == operation_type:
+            tipo_label = 'ENTRADA' if operation_type == 'ENTRADA' else 'SAÍDA'
+            neighbor_brt = to_brt(parse_datetime_value(neighbor['created_at']))
+            date_str = neighbor_brt.strftime('%d/%m/%Y %H:%M') if neighbor_brt else '-'
+            return (
+                f"Com essa alteração o container ficaria com duas {tipo_label}s seguidas "
+                f"(a outra é a Transação #{neighbor.get('transaction_id')}, em {date_str}). "
+                f"Confira o número do container e o tipo da movimentação."
+            )
+    return None
+
+
 @api_router.put("/movements/{movement_id}", response_model=ContainerMovementResponse)
 async def update_movement(movement_id: str, movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_active_user)):
     existing = await db.movements.find_one({"id": movement_id}, {"_id": 0})
@@ -923,6 +923,19 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     )
     if segregation_error:
         raise HTTPException(status_code=400, detail=segregation_error)
+
+    # Mesma trava de duplicidade da criação, quando a edição troca o
+    # container ou o tipo (Entrada/Saída)
+    changed_identity = (
+        (update_data['container_number'] or '').strip().upper() != (existing.get('container_number') or '').strip().upper()
+        or update_data['operation_type'] != existing.get('operation_type')
+    )
+    if changed_identity:
+        duplicate_error = await _edit_duplicate_conflict(
+            update_data['container_number'], update_data['operation_type'], str(existing['created_at']), movement_id
+        )
+        if duplicate_error:
+            raise HTTPException(status_code=400, detail=duplicate_error)
 
     await db.movements.replace_one({"id": movement_id}, update_data)
 

@@ -14,7 +14,7 @@ from models import ContainerMovementCreate
 from reports import generate_yard_control_pdf, now_brt, BRT_TZ
 
 from shared import db, get_current_active_user, get_company_settings, parse_datetime_value
-from routers.movements import _create_container_movement, _parse_filter_day
+from routers.movements import _create_container_movement, _parse_filter_day, _movement_order_key
 
 api_router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ async def get_yard_control(
     
     # Agrupar por container - rastrear pares de entrada/saída
     container_data = {}
-    for m in sorted(all_movements, key=lambda x: parse_datetime_value(x['created_at'])):
+    for m in sorted(all_movements, key=_movement_order_key):
         container = m['container_number']
         if container not in container_data:
             container_data[container] = {
@@ -79,13 +79,15 @@ async def get_yard_control(
         num_entries = len(data['entries'])
         num_exits = len(data['exits'])
         
-        # Container ainda em estoque (mais entradas que saídas)
-        if num_entries > num_exits:
+        # Container ainda em estoque: a última movimentação dele é uma ENTRADA
+        # (mesma regra de in_stock_movements em movements.py)
+        last_movement = data['movements'][-1] if data['movements'] else None
+        if last_movement and last_movement['operation_type'] == 'ENTRADA':
             # Filtro por tipo - se for SAIDA, pular containers em estoque
             if movement_type == 'SAIDA':
                 continue
                 
-            m = data['entries'][-1]  # Última entrada
+            m = last_movement
             entry_date = parse_datetime_value(m['created_at'])
             
             # Aplicar filtros básicos primeiro
