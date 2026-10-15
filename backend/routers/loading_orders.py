@@ -10,7 +10,9 @@ from models import (
 )
 from shared import db, get_current_active_user, get_company_settings
 from reports import fmt_datetime, merge_company, now_brt
-from routers.freight_payments import create_freight_payment_for_order, cancel_pending_freight_payment_for_order
+from routers.freight_payments import (
+    create_freight_payment_for_order, cancel_pending_freight_payment_for_order, sync_pending_freight_payment_for_order,
+)
 from routers.movements import validate_loading_order_movements, create_movements_for_loading_order
 from routers.container_purchases import create_purchase_records_for_order
 from routers.container_sales import create_sale_records_for_order
@@ -36,7 +38,12 @@ async def list_loading_orders(
             {"items.container_number": {"$regex": search_escaped, "$options": "i"}},
             {"driver_name": {"$regex": search_escaped, "$options": "i"}},
             {"transport_company": {"$regex": search_escaped, "$options": "i"}},
+            {"booking": {"$regex": search_escaped, "$options": "i"}},
+            {"client_name": {"$regex": search_escaped, "$options": "i"}},
         ]
+        number = search.strip().lstrip('#')
+        if number.isdigit():
+            query["$or"].append({"order_number": int(number)})
     rows = await db.loading_orders.find(query, {"_id": 0}).sort("order_number", -1).to_list(None)
     return rows
 
@@ -139,7 +146,9 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
     if not data.items:
         raise HTTPException(status_code=400, detail="A Ordem de Carregamento deve conter ao menos 1 container")
     old_status = existing.get('status')
-    update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    # Campo enviado vazio (null) apaga o valor salvo (ex.: valor do frete
+    # de uma ordem que deixou de ser Coleta)
+    update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     new_status = update_data.get('status', old_status)
 
@@ -171,6 +180,10 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
         # Compra/Venda de Container nunca são revertidas automaticamente -
         # mesma filosofia de "registro permanente" já usada em Pagamento
         # Frete (Pago) e Movimentação de Estoque.
+    elif new_status == 'APROVADA':
+        # Ordem continua Aprovada mas foi editada: o lançamento ainda
+        # Pendente acompanha valor, motorista e rota.
+        await sync_pending_freight_payment_for_order(updated, current_user)
 
     return updated
 
@@ -180,6 +193,8 @@ async def delete_loading_order(order_id: str, current_user: dict = Depends(get_c
     result = await db.loading_orders.delete_one({"id": order_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Ordem de Carregamento não encontrada")
+    # Lançamento de frete ainda Pendente não pode ser pago sem a ordem
+    await cancel_pending_freight_payment_for_order(order_id, current_user)
     # Compra/Venda de Container nascidas dessa ordem não fazem sentido sem
     # ela - ao contrário de Pagamento Frete e Movimentação de Estoque, que
     # continuam existindo mesmo se a ordem de origem for apagada.

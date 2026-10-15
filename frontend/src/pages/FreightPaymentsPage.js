@@ -29,7 +29,8 @@ const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'cu
 
 export default function FreightPaymentsPage() {
   const [list, setList] = useState([]);
-  const { pageItems, paginationProps } = usePagination(list);
+  const [listKey, setListKey] = useState('');
+  const { pageItems, paginationProps } = usePagination(list, { resetKey: listKey });
   const [loading, setLoading] = useState(false);
   const [drivers, setDrivers] = useState([]);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -52,8 +53,14 @@ export default function FreightPaymentsPage() {
   const [loadingBatches, setLoadingBatches] = useState(false);
 
   useEffect(() => { loadDrivers(); loadBatches(); }, []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadList(); }, [driverFilterId, statusFilter, dateFrom, dateTo]);
+  // Filtro mudou: a seleção é zerada, senão um lançamento marcado e depois
+  // escondido pelo filtro entraria no "Marcar como pago" sem aparecer.
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setListKey(`${driverFilterId}|${statusFilter}|${dateFrom}|${dateTo}`);
+    loadList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [driverFilterId, statusFilter, dateFrom, dateTo]);
 
   const loadDrivers = async () => {
     try {
@@ -150,6 +157,7 @@ export default function FreightPaymentsPage() {
       await api.updateFreightPaymentStatus(id, status);
       toast.success('Marcado como Pendente');
       loadList();
+      loadBatches(); // o lançamento sai da Ordem de Pagamento (recibo refeito)
     } catch (e) {
       toast.error(e?.response?.data?.detail || 'Erro ao atualizar status');
     }
@@ -159,7 +167,7 @@ export default function FreightPaymentsPage() {
     if (!canMarkPaidBatch || markingPaid) return;
     setMarkingPaid(true);
     try {
-      const r = await api.markFreightPaymentsPaidBatch([...selectedIds]);
+      const r = await api.markFreightPaymentsPaidBatch(selectedItems.map((p) => p.id));
       toast.success(`Ordem de Pagamento Nº ${r.data.batch_number} gerada!`);
       setSelectedIds(new Set());
       loadList();
@@ -197,7 +205,7 @@ export default function FreightPaymentsPage() {
     if (!canExportReport || generating) return;
     setGenerating(true);
     try {
-      const params = { payment_ids: [...selectedIds].join(',') };
+      const params = { payment_ids: selectedItems.map((p) => p.id).join(',') };
       const r = kind === 'pdf' ? await api.getFreightPaymentReportPDF(params) : await api.getFreightPaymentReportExcel(params);
       const ext = kind === 'pdf' ? 'pdf' : 'xlsx';
       const driverName = selectedItems[0]?.driver_name || 'motorista';

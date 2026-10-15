@@ -43,6 +43,7 @@ export default function FreightRoutesPage() {
   const [formData, setFormData] = useState(buildEmpty());
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {
@@ -121,7 +122,7 @@ export default function FreightRoutesPage() {
         });
         loadRoutes();
       } catch (error) {
-        toast.error('Erro ao deletar rota');
+        toast.error(error.response?.data?.detail || 'Erro ao deletar rota');
       }
     }
   };
@@ -146,6 +147,7 @@ export default function FreightRoutesPage() {
   };
 
   const filteredRoutes = routes.filter((route) => {
+    if (statusFilter && (route.status || 'ATIVO') !== statusFilter) return false;
     const term = search.trim().toLowerCase();
     if (!term) return true;
     return (
@@ -153,7 +155,7 @@ export default function FreightRoutesPage() {
       route.destination?.toLowerCase().includes(term)
     );
   });
-  const { pageItems, paginationProps } = usePagination(filteredRoutes, { resetKey: search });
+  const { pageItems, paginationProps } = usePagination(filteredRoutes, { resetKey: `${search}|${statusFilter}` });
 
   const singleSelectedRoute = selectedIds.size === 1 ? filteredRoutes.find(r => r.id === [...selectedIds][0]) : null;
 
@@ -248,10 +250,19 @@ export default function FreightRoutesPage() {
             </DialogContent>
           </Dialog>
 
-        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+        <FilterCard hasFilters={!!(search || statusFilter)} onClear={() => { setSearch(''); setStatusFilter(''); }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <FilterField label="Origem ou destino">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-route-input" />
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter || '_all'} onValueChange={(v) => setStatusFilter(v === '_all' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="route-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  {STATUS_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -325,8 +336,8 @@ export default function FreightRoutesPage() {
           ) : (
             <EmptyState
               icon={RouteIcon}
-              title={search ? 'Nenhuma rota encontrada' : 'Nenhuma rota cadastrada'}
-              hint={search ? 'Ajuste a busca' : 'Cadastre a primeira rota pelo botão "Nova rota"'}
+              title={search || statusFilter ? 'Nenhuma rota encontrada' : 'Nenhuma rota cadastrada'}
+              hint={search || statusFilter ? 'Ajuste os filtros' : 'Cadastre a primeira rota pelo botão "Nova rota"'}
               testId="no-routes"
             />
           )}

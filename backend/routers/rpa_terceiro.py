@@ -10,6 +10,7 @@ from models import RPATerceiro, RPATerceiroCreate, RPATerceiroUpdate, RPATerceir
 from reports import now_brt, merge_company
 
 from shared import db, get_current_admin_user, get_company_settings
+from routers.freight_payments import brt_day_range
 
 api_router = APIRouter(prefix="/api")
 
@@ -66,10 +67,9 @@ async def list_rpa_terceiro(
             query["$and"] = [{"$or": existing_or}, {"$or": search_or}]
         else:
             query["$or"] = search_or
-    if date_from:
-        query.setdefault("created_at", {})["$gte"] = date_from
-    if date_to:
-        query.setdefault("created_at", {})["$lte"] = date_to + "T23:59:59"
+    range_q = brt_day_range(date_from, date_to)
+    if range_q:
+        query["created_at"] = range_q
 
     rpas = await db.rpa_terceiro.find(query, {"_id": 0}).sort("rpa_number", -1).to_list(None)
     return [_rpa_serialize(r) for r in rpas]
@@ -170,7 +170,8 @@ async def update_rpa_terceiro(rpa_id: str, data: RPATerceiroUpdate, current_user
     if not existing:
         raise HTTPException(status_code=404, detail="RPA não encontrado")
 
-    update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    # Campo enviado vazio (null) apaga o valor salvo (ex.: pedágio removido)
+    update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None or k not in ("driver_name", "rpa_type")}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.rpa_terceiro.update_one({"id": rpa_id}, {"$set": update_data})
 

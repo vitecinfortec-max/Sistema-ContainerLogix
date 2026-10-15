@@ -39,6 +39,41 @@ const MAINTENANCE_BADGES = {
 
 const VEHICLE_STATUS_TONES = { ATIVO: 'emerald', INATIVO: 'slate', MANUTENCAO: 'amber' };
 
+// Vencimentos do cadastro do veículo - avisa com 30 dias de antecedência
+const VEHICLE_DOCS = [
+  ['crlv_expiry', 'CRLV'],
+  ['licensing_expiry', 'Licenciamento'],
+  ['tachograph_expiry', 'Tacógrafo'],
+  ['inspection_expiry', 'Vistoria'],
+];
+const DOC_ALERT_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Situação dos documentos: o vencimento mais urgente decide (vencido > a vencer > em dia). */
+function vehicleDocsStatus(vehicle, today) {
+  const todayDate = new Date(`${today}T00:00:00`);
+  const docs = VEHICLE_DOCS
+    .map(([field, label]) => {
+      const day = toDateInput(vehicle[field]);
+      if (!day) return null;
+      const days = Math.round((new Date(`${day}T00:00:00`) - todayDate) / DAY_MS);
+      return { label, day, days };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.days - b.days);
+  if (docs.length === 0) return null;
+  const detail = docs.map((d) => `${d.label}: ${format(new Date(`${d.day}T00:00:00`), 'dd/MM/yyyy')}`).join(' | ');
+  const worst = docs[0];
+  if (worst.days < 0) {
+    const expired = docs.filter((d) => d.days < 0).map((d) => d.label);
+    return { status: 'EXPIRED', tone: 'red', label: `Vencido: ${expired.join(', ')}`, detail };
+  }
+  if (worst.days <= DOC_ALERT_DAYS) {
+    return { status: 'SOON', tone: 'amber', label: `${worst.label} vence ${worst.days === 0 ? 'hoje' : `em ${worst.days} dia${worst.days === 1 ? '' : 's'}`}`, detail };
+  }
+  return { status: 'OK', tone: 'emerald', label: 'Em dia', detail };
+}
+
 export default function FleetPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const navigate = useNavigate();
@@ -111,6 +146,8 @@ export default function FleetPage() {
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
   const [vehicleSearch, setVehicleSearch] = useState('');
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useState('');
+  const [vehicleStatusFilter, setVehicleStatusFilter] = useState('');
   const [vehiclePagination, setVehiclePagination] = useState({ page: 1, pages: 1, total: 0 });
   const [selectedVehicleIds, setSelectedVehicleIds] = useState(() => new Set());
   
@@ -213,7 +250,7 @@ export default function FleetPage() {
   useEffect(() => {
     if (activeTab === 'vehicles') loadVehicles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, vehiclePagination.page, debouncedVehicleSearch]);
+  }, [activeTab, vehiclePagination.page, debouncedVehicleSearch, vehicleTypeFilter, vehicleStatusFilter]);
 
   useEffect(() => {
     if (activeTab === 'revisions') loadRevisions();
@@ -272,6 +309,8 @@ export default function FleetPage() {
     try {
       const params = { page: vehiclePagination.page, per_page: 15 };
       if (search) params.search = search;
+      if (vehicleTypeFilter) params.vehicle_type = vehicleTypeFilter;
+      if (vehicleStatusFilter) params.status = vehicleStatusFilter;
       
       const response = await api.getVehicles(params);
       setVehicles(response.data.items);
@@ -375,6 +414,7 @@ export default function FleetPage() {
       setVehicleModalOpen(false);
       resetVehicleForm();
       loadVehicles();
+      loadAllVehiclesForAutocomplete();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao salvar veículo');
     } finally {
@@ -395,6 +435,7 @@ export default function FleetPage() {
         return next;
       });
       loadVehicles();
+      loadAllVehiclesForAutocomplete();
     } catch (error) {
       toast.error('Erro ao excluir veículo');
     }
@@ -421,8 +462,21 @@ export default function FleetPage() {
 
   const clearVehicleSearch = () => {
     setVehicleSearch('');
+    setVehicleTypeFilter('');
+    setVehicleStatusFilter('');
     setVehiclePagination(prev => ({ ...prev, page: 1 }));
   };
+
+  const changeVehicleFilter = (setter) => (value) => {
+    setter(value === '_all' ? '' : value);
+    setVehiclePagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  // Indicadores sobre a frota inteira (a tabela é paginada no servidor)
+  const today = todayISO();
+  const fleetDocs = allVehicles.map((v) => vehicleDocsStatus(v, today));
+  const docsExpiredCount = fleetDocs.filter((d) => d?.status === 'EXPIRED').length;
+  const docsSoonCount = fleetDocs.filter((d) => d?.status === 'SOON').length;
 
   // ========== FUNÇÕES DE REVISÕES ==========
   const loadRevisions = async (plate = debouncedPlate) => {
@@ -742,7 +796,14 @@ export default function FleetPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {/* ========== ABA CADASTRO DE VEÍCULOS ========== */}
           <TabsContent value="vehicles" className="space-y-4 mt-0">
-            <FilterCard hasFilters={!!vehicleSearch} onClear={clearVehicleSearch}>
+            <StatGrid>
+              <StatCard label="Veículos" value={allVehicles.length} icon={Car} tone="blue" hint="cadastrados" />
+              <StatCard label="Ativos" value={allVehicles.filter((v) => v.status === 'ATIVO').length} icon={CheckCircle2} tone="emerald" hint="em operação" />
+              <StatCard label="Documentos a vencer" value={docsSoonCount} icon={Clock} tone="amber" hint={`em até ${DOC_ALERT_DAYS} dias`} testId="vehicle-docs-soon" />
+              <StatCard label="Documentos vencidos" value={docsExpiredCount} icon={AlertTriangle} tone="red" hint="CRLV, licenciamento, tacógrafo, vistoria" testId="vehicle-docs-expired" />
+            </StatGrid>
+
+            <FilterCard hasFilters={!!(vehicleSearch || vehicleTypeFilter || vehicleStatusFilter)} onClear={clearVehicleSearch}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <FilterField label="Placa, modelo ou marca">
                   <SearchInput
@@ -750,6 +811,24 @@ export default function FleetPage() {
                     onChange={(e) => handleVehicleSearchChange(e.target.value.toUpperCase())}
                     data-testid="search-vehicle-input"
                   />
+                </FilterField>
+                <FilterField label="Tipo">
+                  <Select value={vehicleTypeFilter || '_all'} onValueChange={changeVehicleFilter(setVehicleTypeFilter)}>
+                    <SelectTrigger className="h-9 text-sm" data-testid="vehicle-type-filter"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_all">Todos</SelectItem>
+                      {vehicleTypes.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FilterField>
+                <FilterField label="Status">
+                  <Select value={vehicleStatusFilter || '_all'} onValueChange={changeVehicleFilter(setVehicleStatusFilter)}>
+                    <SelectTrigger className="h-9 text-sm" data-testid="vehicle-status-filter"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_all">Todos</SelectItem>
+                      {Object.entries(VEHICLE_STATUS_LABELS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </FilterField>
               </div>
             </FilterCard>
@@ -782,8 +861,8 @@ export default function FleetPage() {
               ) : vehicles.length === 0 ? (
                 <EmptyState
                   icon={Car}
-                  title={vehicleSearch ? 'Nenhum veículo encontrado' : 'Nenhum veículo cadastrado'}
-                  hint={vehicleSearch ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo veículo"'}
+                  title={vehicleSearch || vehicleTypeFilter || vehicleStatusFilter ? 'Nenhum veículo encontrado' : 'Nenhum veículo cadastrado'}
+                  hint={vehicleSearch || vehicleTypeFilter || vehicleStatusFilter ? 'Ajuste os filtros' : 'Cadastre o primeiro pelo botão "Novo veículo"'}
                 />
               ) : (
                 <div className="overflow-x-auto">
@@ -803,6 +882,7 @@ export default function FleetPage() {
                         <th>Modelo</th>
                         <th>Ano</th>
                         <th>Motorista</th>
+                        <th>Documentos</th>
                         <th>Status</th>
                       </tr>
                     </thead>
@@ -827,6 +907,14 @@ export default function FleetPage() {
                           <td>{vehicle.model || '-'}</td>
                           <td className="tabular-nums">{vehicle.year || '-'}</td>
                           <td><div className="max-w-[220px] truncate" title={vehicle.driver_name || ''}>{vehicle.driver_name || '-'}</div></td>
+                          <td className="whitespace-nowrap">
+                            {(() => {
+                              const docs = vehicleDocsStatus(vehicle, today);
+                              return docs
+                                ? <StatusPill tone={docs.tone} title={docs.detail}>{docs.label}</StatusPill>
+                                : <span className="text-slate-400 dark:text-slate-500">-</span>;
+                            })()}
+                          </td>
                           <td>
                             <StatusPill tone={VEHICLE_STATUS_TONES[vehicle.status] || 'emerald'}>
                               {VEHICLE_STATUS_LABELS[vehicle.status] || vehicle.status}

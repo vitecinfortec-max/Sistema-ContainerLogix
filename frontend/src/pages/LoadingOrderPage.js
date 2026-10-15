@@ -20,6 +20,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, PackageCheck, Download, Printer, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
+import { toLocalDay } from '../lib/dates';
 
 const ORDER_TYPE_OPTIONS = [
   ['COLETA', 'Coleta de Container'],
@@ -80,7 +81,22 @@ export default function LoadingOrderPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const { pageItems, paginationProps } = usePagination(list, { resetKey: search });
+  const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  // Status, tipo e período filtram a lista já carregada (a busca vai ao servidor)
+  const filtered = list.filter((o) => {
+    if (statusFilter && o.status !== statusFilter) return false;
+    if (typeFilter && (o.order_type || 'COLETA') !== typeFilter) return false;
+    if (dateFrom || dateTo) {
+      const day = o.created_at ? toLocalDay(new Date(o.created_at)) : '';
+      if (dateFrom && day < dateFrom) return false;
+      if (dateTo && day > dateTo) return false;
+    }
+    return true;
+  });
+  const { pageItems, paginationProps } = usePagination(filtered, { resetKey: `${search}|${statusFilter}|${typeFilter}|${dateFrom}|${dateTo}` });
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [nextNumber, setNextNumber] = useState(null);
@@ -309,8 +325,9 @@ export default function LoadingOrderPage() {
     } finally { setSaving(false); }
   };
 
-  const handleDelete = async (id, num) => {
-    if (!(await confirm(`Excluir Ordem de Carregamento Nº ${num}?`))) return;
+  const handleDelete = async (id, num, status) => {
+    const note = status === 'APROVADA' ? ' O Pagamento Frete ainda pendente desta ordem será cancelado.' : '';
+    if (!(await confirm(`Excluir Ordem de Carregamento Nº ${num}?${note}`))) return;
     try {
       await api.deleteLoadingOrder(id);
       toast.success('Ordem de Carregamento excluída');
@@ -358,7 +375,15 @@ export default function LoadingOrderPage() {
   };
 
   const singleSelectedOrder = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;
-  const countByStatus = (status) => list.filter((o) => o.status === status).length;
+  const countByStatus = (status) => filtered.filter((o) => o.status === status).length;
+  const hasFilters = !!(search || statusFilter || typeFilter || dateFrom || dateTo);
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setTypeFilter('');
+    setDateFrom('');
+    setDateTo('');
+  };
 
   return (
     <Layout>
@@ -366,16 +391,40 @@ export default function LoadingOrderPage() {
         <PageHeader icon={PackageCheck} title="Ordem de Carregamento" subtitle="Minutas de coleta e entrega de container pro motorista" />
 
         <StatGrid>
-          <StatCard label="Ordens" value={list.length} icon={PackageCheck} tone="blue" hint={search ? 'que batem com a busca' : 'cadastradas'} />
+          <StatCard label="Ordens" value={filtered.length} icon={PackageCheck} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'cadastradas'} />
           <StatCard label="Pendentes" value={countByStatus('PENDENTE')} icon={Clock} tone="amber" hint="aguardando aprovação" />
           <StatCard label="Aprovadas" value={countByStatus('APROVADA')} icon={CheckCircle2} tone="primary" hint="movimentação gerada" />
           <StatCard label="Canceladas" value={countByStatus('CANCELADA')} icon={XCircle} tone="red" />
         </StatGrid>
 
-        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Container, motorista ou transportadora">
+        <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <FilterField label="Nº, container, motorista, cliente ou booking" className="col-span-2 lg:col-span-1">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="loading-order-search" />
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter || '_all'} onValueChange={(v) => setStatusFilter(v === '_all' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="loading-order-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  {STATUS_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Tipo">
+              <Select value={typeFilter || '_all'} onValueChange={(v) => setTypeFilter(v === '_all' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="loading-order-type-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  {ORDER_TYPE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Emissão de">
+              <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="loading-order-date-from" />
+            </FilterField>
+            <FilterField label="Até">
+              <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="loading-order-date-to" />
             </FilterField>
           </div>
         </FilterCard>
@@ -383,7 +432,7 @@ export default function LoadingOrderPage() {
         {/* Lista - marque uma ordem pra habilitar as ações da barra */}
         <DataCard
           title="Ordens de carregamento"
-          count={loading ? '...' : list.length}
+          count={loading ? '...' : filtered.length}
           toolbar={(
             <Toolbar
               selectedCount={selectedIds.size}
@@ -391,16 +440,16 @@ export default function LoadingOrderPage() {
             >
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedOrder && openEdit(singleSelectedOrder.id)} disabled={!singleSelectedOrder} />
               <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedOrder && downloadPDF(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
+              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number, singleSelectedOrder.status)} disabled={!singleSelectedOrder} />
             </Toolbar>
           )}
           footer={<TablePagination {...paginationProps} />}
         >
-          {list.length === 0 && !loading ? (
+          {filtered.length === 0 && !loading ? (
             <EmptyState
               icon={PackageCheck}
-              title={search ? 'Nenhuma ordem encontrada' : 'Nenhuma ordem de carregamento cadastrada'}
-              hint={search ? 'Ajuste a busca' : 'Cadastre a primeira pelo botão "Nova ordem"'}
+              title={hasFilters ? 'Nenhuma ordem encontrada' : 'Nenhuma ordem de carregamento cadastrada'}
+              hint={hasFilters ? 'Ajuste os filtros' : 'Cadastre a primeira pelo botão "Nova ordem"'}
             />
           ) : (
             <div className="overflow-x-auto">

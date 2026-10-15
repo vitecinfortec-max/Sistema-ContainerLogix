@@ -1,5 +1,5 @@
 import io
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
@@ -13,6 +13,8 @@ from models import (
     FreightPaymentBatch, FreightPaymentBatchResponse,
 )
 from shared import db, get_current_admin_user, get_company_settings
+from routers.movements import _parse_filter_day
+from reports import BRT_TZ
 from reports import (
     merge_company, generate_freight_payment_report_pdf, generate_freight_payment_report_excel,
     generate_freight_payment_receipt_pdf,
@@ -145,6 +147,68 @@ async def cancel_pending_freight_payment_for_order(loading_order_id: str, curren
     return None
 
 
+async def sync_pending_freight_payment_for_order(order: dict, current_user: dict):
+    """Ordem Aprovada editada: o lançamento ainda Pendente passa a ter o
+    valor, o motorista e a rota atuais da ordem. Pago/Cancelado não mudam.
+    Ordem que ainda não tinha lançamento (ex.: rota escolhida depois) ganha
+    um agora."""
+    fp = await db.freight_payments.find_one({"loading_order_id": order['id']}, {"_id": 0})
+    if not fp:
+        return await create_freight_payment_for_order(order, current_user)
+    if fp.get('status') != 'PENDENTE':
+        return None
+    if order.get('order_type') != 'COLETA' or not order.get('route_id'):
+        # Deixou de ser Coleta em rota cadastrada: não há frete a pagar
+        return await cancel_pending_freight_payment_for_order(order['id'], current_user)
+
+    fields = {
+        "route_id": order.get('route_id'),
+        "route_name": order.get('route_name'),
+        "driver_id": order.get('driver_id'),
+        "driver_name": order.get('driver_name'),
+        "driver_cpf": order.get('driver_cpf'),
+        "transport_company": order.get('transport_company'),
+        "freight_value": order.get('freight_value') or 0,
+    }
+    changes = {k: {"from": fp.get(k), "to": v} for k, v in fields.items() if fp.get(k) != v}
+    if not changes:
+        return None
+    update = {k: fields[k] for k in changes}
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.freight_payments.update_one({"id": fp['id']}, {"$set": update})
+    await log_freight_payment_history(
+        freight_payment_id=fp['id'],
+        payment_number=fp['payment_number'],
+        action="UPDATED",
+        changes={**changes, "reason": "ordem_editada"},
+        user_id=current_user['sub'],
+        user_name=current_user['name'],
+    )
+    return None
+
+
+async def _remove_payment_from_batch(payment: dict) -> None:
+    """Lançamento Pago que volta pra Pendente/Cancelado sai da sua Ordem de
+    Pagamento: o recibo deixa de listá-lo e o total é refeito. Ordem que
+    fica sem nenhum lançamento é apagada."""
+    batch_id = payment.get('batch_id')
+    if not batch_id:
+        return
+    batch = await db.freight_payment_batches.find_one({"id": batch_id}, {"_id": 0})
+    if not batch:
+        return
+    remaining_ids = [i for i in batch.get('payment_ids', []) if i != payment['id']]
+    if not remaining_ids:
+        await db.freight_payment_batches.delete_one({"id": batch_id})
+        return
+    remaining = await db.freight_payments.find({"id": {"$in": remaining_ids}}, {"_id": 0, "freight_value": 1}).to_list(None)
+    await db.freight_payment_batches.update_one({"id": batch_id}, {"$set": {
+        "payment_ids": remaining_ids,
+        "item_count": len(remaining_ids),
+        "total_value": round(sum((p.get('freight_value') or 0) for p in remaining), 2),
+    }})
+
+
 async def _enrich_payments_with_order_data(payments: List[dict]) -> None:
     """Anexa a cada pagamento (in-place) o Nº do Container/Tamanho de cada
     item e as Placas do veículo, lidos da Ordem de Carregamento de origem -
@@ -170,14 +234,25 @@ def _build_freight_payment_query(driver_id: Optional[str], status: Optional[str]
         query['status'] = status
     if route_id:
         query['route_id'] = route_id
-    if date_from or date_to:
-        range_q = {}
-        if date_from:
-            range_q['$gte'] = f"{date_from}T00:00:00"
-        if date_to:
-            range_q['$lte'] = f"{date_to}T23:59:59"
+    range_q = brt_day_range(date_from, date_to)
+    if range_q:
         query['created_at'] = range_q
     return query
+
+
+def brt_day_range(date_from: Optional[str], date_to: Optional[str]) -> dict:
+    """Filtro de período sobre created_at (ISO em UTC): os dias são no
+    horário de Brasília, de 00:00 do primeiro até 00:00 do dia seguinte ao
+    último (fim exclusivo) - senão o que é lançado depois das 21h cai no
+    dia seguinte."""
+    range_q = {}
+    if date_from:
+        day = _parse_filter_day(date_from, "date_from")
+        range_q['$gte'] = datetime.combine(day, datetime.min.time(), tzinfo=BRT_TZ).astimezone(timezone.utc).isoformat()
+    if date_to:
+        day = _parse_filter_day(date_to, "date_to")
+        range_q['$lt'] = datetime.combine(day + timedelta(days=1), datetime.min.time(), tzinfo=BRT_TZ).astimezone(timezone.utc).isoformat()
+    return range_q
 
 
 async def _resolve_report_payments(driver_id: Optional[str], date_from: Optional[str], date_to: Optional[str], payment_ids: Optional[List[str]]):
@@ -306,7 +381,7 @@ async def mark_freight_payments_paid_batch(
     await db.freight_payment_batches.insert_one(batch_doc)
 
     await db.freight_payments.update_many(
-        {"id": {"$in": payment_ids}},
+        {"id": {"$in": payment_ids}, "status": "PENDENTE"},
         {"$set": {
             "status": "PAGO",
             "paid_at": now_iso,
@@ -409,6 +484,8 @@ async def update_freight_payment_status(
         update_data['batch_id'] = None
 
     await db.freight_payments.update_one({"id": payment_id}, {"$set": update_data})
+    if old_status == 'PAGO' and status != 'PAGO':
+        await _remove_payment_from_batch(payment)
 
     if old_status != status:
         await log_freight_payment_history(

@@ -118,8 +118,10 @@ async def update_vehicle(vehicle_id: str, data: VehicleUpdate, current_user: dic
     if not vehicle:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
     
+    # Campo enviado vazio (null) apaga o valor salvo - só placa, tipo e
+    # status não podem ficar vazios.
     update_data = data.model_dump(exclude_unset=True, exclude={"driver_id", "clear_driver"})
-    update_data = {k: v for k, v in update_data.items() if v is not None}
+    update_data = {k: v for k, v in update_data.items() if v is not None or k not in ("plate", "vehicle_type", "status")}
 
     if data.plate is not None:
         # Verificar se placa já existe em outro veículo

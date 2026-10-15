@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState, TablePagination, usePagination,
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
+import { toDateInput, toLocalDay } from '../lib/dates';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -19,7 +20,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import { format } from 'date-fns';
 import {
-  Plus, Pencil, Trash2, FileText, Printer, X, Save, Calculator,
+  Plus, Pencil, Trash2, FileText, Printer, X, Save, Calculator, Banknote, HandCoins, Wallet,
 } from 'lucide-react';
 
 const buildEmptyForm = () => {
@@ -77,7 +78,20 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
   const [rpas, setRpas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const { pageItems, paginationProps } = usePagination(rpas, { resetKey: search });
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  // Período pela data do contrato (coluna "Data"); sem ela, pelo dia do cadastro
+  const contractDay = (r) => (r.service_date ? toDateInput(r.service_date) : (r.created_at ? toLocalDay(new Date(r.created_at)) : ''));
+  const filteredRpas = rpas.filter((r) => {
+    if (!dateFrom && !dateTo) return true;
+    const day = contractDay(r);
+    if (dateFrom && day < dateFrom) return false;
+    if (dateTo && day > dateTo) return false;
+    return true;
+  });
+  const { pageItems, paginationProps } = usePagination(filteredRpas, { resetKey: `${search}|${dateFrom}|${dateTo}` });
+  const sumOf = (field) => filteredRpas.reduce((acc, r) => acc + Number(r[field] || 0), 0);
+  const hasFilters = !!(search || dateFrom || dateTo);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -573,10 +587,23 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       <div className="space-y-4" data-testid="rpa-terceiro-page">
         <PageHeader icon={FileText} title="Contrato de Frete" subtitle="Contrato de Afretamento para motoristas terceiros" />
 
-        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Motorista, cliente, container ou placa">
+        <StatGrid>
+          <StatCard label="Contratos" value={filteredRpas.length} icon={FileText} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'cadastrados'} />
+          <StatCard label="Valor dos serviços" value={fmtMoney(sumOf('service_value'))} icon={Banknote} tone="primary" />
+          <StatCard label="Adiantamentos" value={fmtMoney(sumOf('advance'))} icon={HandCoins} tone="amber" />
+          <StatCard label="Saldo a receber" value={fmtMoney(sumOf('balance'))} icon={Wallet} tone="emerald" hint="dos contratados" />
+        </StatGrid>
+
+        <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Motorista, cliente, container ou placa" className="col-span-2">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="rpa-search-input" />
+            </FilterField>
+            <FilterField label="Data de">
+              <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="rpa-date-from" />
+            </FilterField>
+            <FilterField label="Até">
+              <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="rpa-date-to" />
             </FilterField>
           </div>
         </FilterCard>
@@ -584,7 +611,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
         {/* Lista - marque um contrato pra habilitar as ações da barra */}
         <DataCard
           title="Contratos"
-          count={loading ? '...' : rpas.length}
+          count={loading ? '...' : filteredRpas.length}
           toolbar={(
             <Toolbar
               selectedCount={selectedIds.size}
@@ -597,11 +624,11 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
           )}
           footer={<TablePagination {...paginationProps} />}
         >
-          {rpas.length === 0 && !loading ? (
+          {filteredRpas.length === 0 && !loading ? (
             <EmptyState
               icon={FileText}
-              title={search ? 'Nenhum contrato encontrado' : 'Nenhum contrato cadastrado'}
-              hint={search ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo contrato"'}
+              title={hasFilters ? 'Nenhum contrato encontrado' : 'Nenhum contrato cadastrado'}
+              hint={hasFilters ? 'Ajuste os filtros' : 'Cadastre o primeiro pelo botão "Novo contrato"'}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -646,7 +673,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                       <td><div className="max-w-[220px] truncate" title={r.client_name || ''}>{r.client_name || '-'}</div></td>
                       <td className="font-mono whitespace-nowrap text-slate-700 dark:text-slate-200">{r.container_number || '-'}</td>
                       <td className="whitespace-nowrap tabular-nums">
-                        {r.service_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(r.service_date) ? `${r.service_date}T00:00:00` : r.service_date), 'dd/MM/yyyy') : '-'}
+                        {toDateInput(r.service_date) ? format(new Date(`${toDateInput(r.service_date)}T00:00:00`), 'dd/MM/yyyy') : '-'}
                       </td>
                       <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(r.balance)}</td>
                     </tr>
