@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
+import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import { Anchor, Search, Eye, FileText, FileSpreadsheet, Pencil, Printer, X, Check, Receipt } from 'lucide-react';
 import { format } from 'date-fns';
@@ -41,6 +42,7 @@ const fmtPeriod = (from, to) => {
 };
 
 export default function PortServiceBillingPage() {
+  const { confirm, ConfirmDialog } = useConfirm();
   // Cadastros
   const [clients, setClients] = useState([]);
 
@@ -243,6 +245,8 @@ export default function PortServiceBillingPage() {
 
   const handleUpdateStatus = async (newStatus) => {
     if (!selectedBatch) return;
+    // Cancelar é definitivo: os serviços voltam a ficar livres pra outra fatura
+    if (newStatus === 'CANCELADO' && !(await confirm(`Cancelar a Fatura Nº ${selectedBatch.batch_number}? Os serviços dela voltam para "a faturar" e a fatura não pode ser reaberta.`))) return;
     setUpdatingStatus(true);
     try {
       await api.updatePortServiceBillingBatchStatus(selectedBatch.id, newStatus);
@@ -250,7 +254,7 @@ export default function PortServiceBillingPage() {
       setSelectedBatch(prev => ({ ...prev, status: newStatus }));
       setBatches(prev => prev.map(b => b.id === selectedBatch.id ? { ...b, status: newStatus } : b));
     } catch (error) {
-      toast.error('Erro ao atualizar status');
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar status');
     } finally {
       setUpdatingStatus(false);
     }
@@ -514,7 +518,7 @@ export default function PortServiceBillingPage() {
                 </div>
                 <div className="bg-muted/50 p-3 rounded">
                   <p className="text-sm text-muted-foreground mb-1">Status</p>
-                  <Select value={selectedBatch.status} onValueChange={handleUpdateStatus} disabled={updatingStatus}>
+                  <Select value={selectedBatch.status} onValueChange={handleUpdateStatus} disabled={updatingStatus || selectedBatch.status === 'CANCELADO'}>
                     <SelectTrigger className="h-8 text-sm">
                       <SelectValue />
                     </SelectTrigger>
@@ -638,6 +642,7 @@ export default function PortServiceBillingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

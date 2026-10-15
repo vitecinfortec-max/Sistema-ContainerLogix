@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   StatusPill, PlateTag, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
@@ -16,7 +16,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
-import { Anchor, Plus, Eye, Trash2, Printer, Pencil } from 'lucide-react';
+import { Anchor, Plus, Eye, Trash2, Printer, Pencil, Wallet, Clock, Receipt } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
@@ -45,6 +45,9 @@ export default function PortServicePage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
+  const EMPTY_FILTERS = { date_from: '', date_to: '', turno: '', situacao: '', billed: '' };
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [stats, setStats] = useState({ count: 0, total_value: 0, in_progress: 0, unbilled: 0 });
 
   // Dados para os Autocomplete
   const [clients, setClients] = useState([]);
@@ -77,7 +80,7 @@ export default function PortServicePage() {
     loadServices();
     setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, debouncedSearch]);
+  }, [pagination.page, debouncedSearch, filters]);
 
   const loadSelectData = async () => {
     try {
@@ -102,9 +105,11 @@ export default function PortServicePage() {
     try {
       const params = { page: pagination.page, per_page: 15 };
       if (search) params.search = search;
+      Object.entries(filters).forEach(([key, value]) => { if (value) params[key] = value; });
 
       const response = await api.getPortServices(params);
       setServices(response.data.items);
+      if (response.data.stats) setStats(response.data.stats);
       setPagination(prev => ({
         ...prev,
         pages: response.data.pages,
@@ -119,8 +124,15 @@ export default function PortServicePage() {
 
   const clearSearch = () => {
     setSearchQuery('');
+    setFilters(EMPTY_FILTERS);
     setPagination(prev => ({ ...prev, page: 1 }));
   };
+
+  const setFilter = (key) => (value) => {
+    setFilters(prev => ({ ...prev, [key]: value === '_all' ? '' : value }));
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+  const hasFilters = !!searchQuery || Object.values(filters).some(Boolean);
 
   const handleSearchChange = (value) => {
     setSearchQuery(value);
@@ -195,7 +207,7 @@ export default function PortServicePage() {
       });
       loadServices();
     } catch (error) {
-      toast.error('Erro ao excluir Serviço Portuário');
+      toast.error(error.response?.data?.detail || 'Erro ao excluir Serviço Portuário');
     }
   };
 
@@ -261,14 +273,57 @@ export default function PortServicePage() {
       <div className="space-y-4" data-testid="port-service-page">
         <PageHeader icon={Anchor} title="Serviço Portuário" subtitle="Registre os serviços internos realizados dentro do porto" />
 
-        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Cliente, motorista ou placa">
+        <StatGrid>
+          <StatCard label="Serviços" value={stats.count} icon={Anchor} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'registrados'} testId="port-service-kpi-count" />
+          <StatCard label="Valor total" value={fmtMoney(stats.total_value)} icon={Wallet} tone="emerald" />
+          <StatCard label="No pátio" value={stats.in_progress} icon={Clock} tone="amber" hint="sem horário de saída" />
+          <StatCard label="A faturar" value={stats.unbilled} icon={Receipt} tone="primary" hint="ainda fora de fatura" />
+        </StatGrid>
+
+        <FilterCard hasFilters={hasFilters} onClear={clearSearch}>
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+            <FilterField label="Cliente, motorista ou placa" className="col-span-2 lg:col-span-1">
               <SearchInput
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 data-testid="search-port-service-input"
               />
+            </FilterField>
+            <FilterField label="Data de">
+              <Input type="date" className="h-9 text-sm" value={filters.date_from} onChange={(e) => setFilter('date_from')(e.target.value)} data-testid="port-service-date-from" />
+            </FilterField>
+            <FilterField label="Até">
+              <Input type="date" className="h-9 text-sm" value={filters.date_to} onChange={(e) => setFilter('date_to')(e.target.value)} data-testid="port-service-date-to" />
+            </FilterField>
+            <FilterField label="Turno">
+              <Select value={filters.turno || '_all'} onValueChange={setFilter('turno')}>
+                <SelectTrigger className="h-9 text-sm" data-testid="port-service-turno-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  <SelectItem value="DIA">Dia</SelectItem>
+                  <SelectItem value="NOITE">Noite</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Situação">
+              <Select value={filters.situacao || '_all'} onValueChange={setFilter('situacao')}>
+                <SelectTrigger className="h-9 text-sm" data-testid="port-service-situacao-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todas</SelectItem>
+                  <SelectItem value="EM_ANDAMENTO">No pátio</SelectItem>
+                  <SelectItem value="CONCLUIDO">Concluído</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Faturado">
+              <Select value={filters.billed || '_all'} onValueChange={setFilter('billed')}>
+                <SelectTrigger className="h-9 text-sm" data-testid="port-service-billed-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  <SelectItem value="true">Faturados</SelectItem>
+                  <SelectItem value="false">A faturar</SelectItem>
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -304,7 +359,7 @@ export default function PortServicePage() {
             <EmptyState
               icon={Anchor}
               title="Nenhum Serviço Portuário encontrado"
-              hint={searchQuery ? 'Ajuste a busca' : 'Registre o primeiro pelo botão "Novo serviço"'}
+              hint={hasFilters ? 'Ajuste os filtros' : 'Registre o primeiro pelo botão "Novo serviço"'}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -324,6 +379,7 @@ export default function PortServicePage() {
                     <th>Data</th>
                     <th>Turno</th>
                     <th>Situação</th>
+                    <th>Fatura</th>
                     <th className="!text-right">Valor</th>
                   </tr>
                 </thead>
@@ -356,6 +412,11 @@ export default function PortServicePage() {
                           </StatusPill>
                         </td>
                         <td>{getSituacaoBadge(service.situacao)}</td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {service.billed
+                            ? <StatusPill tone="emerald" dot={false}>{service.billing_batch_number ? `Nº ${service.billing_batch_number}` : 'Faturado'}</StatusPill>
+                            : <span className="text-slate-400 dark:text-slate-500">A faturar</span>}
+                        </td>
                         <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(service.operation_value)}</td>
                       </tr>
                     );

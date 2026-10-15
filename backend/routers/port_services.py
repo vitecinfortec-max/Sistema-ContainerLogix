@@ -41,29 +41,73 @@ async def get_port_services(
     page: int = 1,
     per_page: int = 20,
     search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    turno: Optional[str] = None,
+    situacao: Optional[str] = None,
+    billed: Optional[bool] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Lista Serviços Portuários com paginação e busca por Cliente/Motorista/Placa"""
-    query = {}
+    """Lista Serviços Portuários com paginação, busca por Cliente/Motorista/
+    Placa e filtros de período (service_date), turno, situação e faturado.
+    `stats` resume o filtro inteiro (não só a página)."""
+    conditions = []
     if search:
         search_escaped = re.escape(search)
-        query["$or"] = [
+        conditions.append({"$or": [
             {"client_name": {"$regex": search_escaped, "$options": "i"}},
             {"driver_name": {"$regex": search_escaped, "$options": "i"}},
             {"cavalo_plate": {"$regex": search_escaped, "$options": "i"}},
-        ]
+        ]})
+    if date_from or date_to:
+        date_query = {}
+        if date_from:
+            date_query['$gte'] = date_from
+        if date_to:
+            date_query['$lte'] = date_to
+        conditions.append({"service_date": date_query})
+    if turno:
+        conditions.append({"turno": turno})
+    no_exit = [{"exit_time": {"$exists": False}}, {"exit_time": None}, {"exit_time": ""}]
+    if situacao == 'EM_ANDAMENTO':
+        conditions.append({"$or": no_exit})
+    elif situacao == 'CONCLUIDO':
+        conditions.append({"$nor": no_exit})
+    if billed is not None:
+        # "$ne": True casa também os registros antigos sem o campo
+        conditions.append({"billed": True} if billed else {"billed": {"$ne": True}})
+    query = {"$and": conditions} if conditions else {}
 
-    total = await db.port_services.count_documents(query)
+    all_rows = await db.port_services.find(query, {"_id": 0, "operation_value": 1, "exit_time": 1, "billed": 1}).to_list(None)
+    total = len(all_rows)
     skip = (page - 1) * per_page
 
     services = await db.port_services.find(query, {"_id": 0}).sort("service_number", -1).skip(skip).limit(per_page).to_list(per_page)
 
+    # Nº da fatura de cada serviço faturado (coluna "Fatura")
+    batch_ids = list({s['billing_batch_id'] for s in services if s.get('billing_batch_id')})
+    batch_numbers = {}
+    if batch_ids:
+        async for b in db.port_service_billing_batches.find({"id": {"$in": batch_ids}}, {"_id": 0, "id": 1, "batch_number": 1}):
+            batch_numbers[b['id']] = b['batch_number']
+    items = []
+    for s in services:
+        row = _port_service_serialize(s)
+        row['billing_batch_number'] = batch_numbers.get(s.get('billing_batch_id'))
+        items.append(row)
+
     return {
-        "items": [_port_service_serialize(s) for s in services],
+        "items": items,
         "total": total,
         "page": page,
         "per_page": per_page,
-        "pages": (total + per_page - 1) // per_page
+        "pages": (total + per_page - 1) // per_page,
+        "stats": {
+            "count": total,
+            "total_value": round(sum(r.get('operation_value') or 0 for r in all_rows), 2),
+            "in_progress": sum(1 for r in all_rows if not (r.get('exit_time') or '').strip()),
+            "unbilled": sum(1 for r in all_rows if not r.get('billed')),
+        },
     }
 
 
@@ -147,12 +191,26 @@ async def create_port_service(data: PortServiceCreate, current_user: dict = Depe
     return result
 
 
+async def _billed_message(service: dict, action: str) -> str:
+    batch = await db.port_service_billing_batches.find_one({"id": service.get('billing_batch_id')}, {"_id": 0, "batch_number": 1})
+    ref = f"Nº {batch['batch_number']}" if batch else ""
+    return f"Este Serviço Portuário já está na Fatura de Serviço Portuário {ref}. Para {action}, cancele a fatura primeiro.".replace("  ", " ")
+
+
 @api_router.put("/port-services/{service_id}", response_model=PortServiceResponse)
 async def update_port_service(service_id: str, data: PortServiceCreate, current_user: dict = Depends(get_current_active_user)):
     """Atualiza um Serviço Portuário existente"""
     existing = await db.port_services.find_one({"id": service_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Serviço Portuário não encontrado")
+
+    # Faturado: valor e cliente ficam como na fatura (o total dela não é
+    # refeito); o resto continua editável.
+    if existing.get('billed'):
+        changed_value = round(data.operation_value or 0, 2) != round(existing.get('operation_value') or 0, 2)
+        changed_client = data.client_id != existing.get('client_id')
+        if changed_value or changed_client:
+            raise HTTPException(status_code=400, detail=await _billed_message(existing, "alterar o valor ou o cliente"))
 
     update_data = data.model_dump()
     update_data["updated_at"] = datetime.now(timezone.utc)
@@ -166,6 +224,9 @@ async def update_port_service(service_id: str, data: PortServiceCreate, current_
 @api_router.delete("/port-services/{service_id}")
 async def delete_port_service(service_id: str, current_user: dict = Depends(get_current_active_user)):
     """Deleta um Serviço Portuário"""
+    existing = await db.port_services.find_one({"id": service_id}, {"_id": 0})
+    if existing and existing.get('billed'):
+        raise HTTPException(status_code=400, detail=await _billed_message(existing, "excluir"))
     result = await db.port_services.delete_one({"id": service_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Serviço Portuário não encontrado")
@@ -513,6 +574,10 @@ async def update_port_service_billing_batch_status(
     batch = await db.port_service_billing_batches.find_one({"id": batch_id}, {"_id": 0})
     if not batch:
         raise HTTPException(status_code=404, detail="Fatura de Serviço Portuário não encontrada")
+    # Cancelada é definitiva: o cancelamento liberou os serviços (podem já
+    # estar noutra fatura) - reabrir cobraria o mesmo serviço duas vezes.
+    if batch['status'] == 'CANCELADO' and status != 'CANCELADO':
+        raise HTTPException(status_code=400, detail="Fatura cancelada não pode ser reaberta. Gere uma nova fatura com os serviços.")
 
     update_data = {"status": status}
     update_data["paid_at"] = datetime.now(timezone.utc) if status == "PAGO" else None

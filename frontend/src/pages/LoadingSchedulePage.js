@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, ToolbarDivider,
   StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import { formatContainerNumber } from '../lib/containerNumber';
-import { Calendar, Plus, Eye, Trash2, Printer, Pencil, X, FileText } from 'lucide-react';
+import { Calendar, Plus, Eye, Trash2, Printer, Pencil, X, FileText, Clock, CheckCircle2, XCircle, Ban, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
@@ -32,6 +32,8 @@ export default function LoadingSchedulePage() {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [stats, setStats] = useState({ ATIVO: 0, CONCLUIDO: 0, CANCELADO: 0 });
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
 
   // Dados para selects
@@ -92,7 +94,7 @@ export default function LoadingSchedulePage() {
     loadSchedules();
     setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, debouncedSearch]);
+  }, [pagination.page, debouncedSearch, statusFilter]);
 
   const loadSelectData = async () => {
     try {
@@ -114,9 +116,11 @@ export default function LoadingSchedulePage() {
     try {
       const params = { page: pagination.page, per_page: 15 };
       if (search) params.search = search;
+      if (statusFilter) params.status = statusFilter;
 
       const response = await api.getLoadingSchedules(params);
       setSchedules(response.data.items);
+      if (response.data.stats) setStats(response.data.stats);
       setPagination(prev => ({
         ...prev,
         pages: response.data.pages,
@@ -131,7 +135,29 @@ export default function LoadingSchedulePage() {
 
   const clearSearch = () => {
     setSearchQuery('');
+    setStatusFilter('');
     setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const changeStatusFilter = (value) => {
+    setStatusFilter(value === '_all' ? '' : value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  // Cancelar / reativar - Concluída vem sozinha do Status de Entrega
+  const handleToggleCancel = async (schedule) => {
+    const cancelling = schedule.status !== 'CANCELADO';
+    const question = cancelling
+      ? `Cancelar a Programação Nº ${schedule.schedule_number}?`
+      : `Reativar a Programação Nº ${schedule.schedule_number}?`;
+    if (!(await confirm(question))) return;
+    try {
+      await api.updateLoadingScheduleStatus(schedule.id, cancelling ? 'CANCELADO' : 'ATIVO');
+      toast.success(cancelling ? 'Programação cancelada' : 'Programação reativada');
+      loadSchedules();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao alterar o status');
+    }
   };
 
   const handleSearchChange = (value) => {
@@ -277,7 +303,7 @@ export default function LoadingSchedulePage() {
       });
       loadSchedules();
     } catch (error) {
-      toast.error('Erro ao excluir programação');
+      toast.error(error.response?.data?.detail || 'Erro ao excluir programação');
     }
   };
 
@@ -341,7 +367,14 @@ export default function LoadingSchedulePage() {
       <div className="space-y-4" data-testid="loading-schedule-page">
         <PageHeader icon={Calendar} title="Programação de Carregamento" subtitle="Gerencie as programações de carregamento" />
 
-        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch}>
+        <StatGrid>
+          <StatCard label="Programações" value={stats.ATIVO + stats.CONCLUIDO + stats.CANCELADO} icon={Calendar} tone="blue" hint={searchQuery ? 'que batem com a busca' : 'cadastradas'} />
+          <StatCard label="Ativas" value={stats.ATIVO} icon={Clock} tone="amber" hint="aguardando a entrega" testId="schedule-kpi-active" />
+          <StatCard label="Concluídas" value={stats.CONCLUIDO} icon={CheckCircle2} tone="emerald" hint="pelo Status de Entrega" />
+          <StatCard label="Canceladas" value={stats.CANCELADO} icon={XCircle} tone="red" />
+        </StatGrid>
+
+        <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearSearch}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Cliente, motorista ou container">
               <SearchInput
@@ -349,6 +382,17 @@ export default function LoadingSchedulePage() {
                 onChange={(e) => handleSearchChange(e.target.value)}
                 data-testid="search-schedule-input"
               />
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter || '_all'} onValueChange={changeStatusFilter}>
+                <SelectTrigger className="h-9 text-sm" data-testid="schedule-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  <SelectItem value="ATIVO">Ativo</SelectItem>
+                  <SelectItem value="CONCLUIDO">Concluído</SelectItem>
+                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -366,6 +410,15 @@ export default function LoadingSchedulePage() {
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedSchedule && openEditModal(singleSelectedSchedule)} disabled={!singleSelectedSchedule} />
               <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedSchedule && handlePrintPDF(singleSelectedSchedule.id)} disabled={!singleSelectedSchedule} />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedSchedule && handleDelete(singleSelectedSchedule.id)} disabled={!singleSelectedSchedule} />
+              <ToolbarDivider />
+              <ToolbarButton
+                icon={singleSelectedSchedule?.status === 'CANCELADO' ? RotateCcw : Ban}
+                label={singleSelectedSchedule?.status === 'CANCELADO' ? 'Reativar' : 'Cancelar programação'}
+                tone="amber"
+                onClick={() => singleSelectedSchedule && handleToggleCancel(singleSelectedSchedule)}
+                disabled={!singleSelectedSchedule}
+                testId="schedule-toggle-cancel"
+              />
             </Toolbar>
           )}
           footer={(

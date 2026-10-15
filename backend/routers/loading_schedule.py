@@ -28,7 +28,7 @@ async def get_loading_schedules(
 ):
     """Lista todas as programações de carregamento"""
     query = {}
-    
+
     if search:
         search_escaped = re.escape(search)
         query["$or"] = [
@@ -37,22 +37,30 @@ async def get_loading_schedules(
             {"items.driver_name": {"$regex": search_escaped, "$options": "i"}},
             {"items.container_number": {"$regex": search_escaped, "$options": "i"}}
         ]
-    
+
     if status:
         query["status"] = status
-    
+
     total = await db.loading_schedules.count_documents(query)
     skip = (page - 1) * per_page
-    
+
     cursor = db.loading_schedules.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page)
     schedules = await cursor.to_list(length=per_page)
-    
+
+    # Indicadores pela busca (sem o filtro de status, pra mostrar a divisão)
+    counts_query = {k: v for k, v in query.items() if k != "status"}
+    by_status = {"ATIVO": 0, "CONCLUIDO": 0, "CANCELADO": 0}
+    async for row in db.loading_schedules.aggregate([{"$match": counts_query}, {"$group": {"_id": "$status", "n": {"$sum": 1}}}]):
+        if row["_id"] in by_status:
+            by_status[row["_id"]] = row["n"]
+
     return {
         "items": schedules,
         "total": total,
         "page": page,
         "per_page": per_page,
-        "pages": (total + per_page - 1) // per_page
+        "pages": (total + per_page - 1) // per_page,
+        "stats": by_status,
     }
 
 
@@ -75,7 +83,7 @@ async def create_loading_schedule(data: LoadingScheduleCreate, current_user: dic
         return_document=True
     )
     schedule_number = counter["seq"]
-    
+
     schedule_data = {
         "id": str(uuid.uuid4()),
         "schedule_number": schedule_number,
@@ -93,10 +101,10 @@ async def create_loading_schedule(data: LoadingScheduleCreate, current_user: dic
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": None
     }
-    
+
     await db.loading_schedules.insert_one(schedule_data)
     schedule_data.pop("_id", None)
-    
+
     return schedule_data
 
 
@@ -106,7 +114,7 @@ async def update_loading_schedule(schedule_id: str, data: LoadingScheduleCreate,
     schedule = await db.loading_schedules.find_one({"id": schedule_id})
     if not schedule:
         raise HTTPException(status_code=404, detail="Programação não encontrada")
-    
+
     update_data = {
         "destination_client_id": data.destination_client_id,
         "destination_client_name": data.destination_client_name,
@@ -130,7 +138,13 @@ async def delete_loading_schedule(schedule_id: str, current_user: dict = Depends
     schedule = await db.loading_schedules.find_one({"id": schedule_id})
     if not schedule:
         raise HTTPException(status_code=404, detail="Programação não encontrada")
-    
+    linked = await db.delivery_statuses.find_one({"schedule_id": schedule_id}, {"_id": 0, "status_number": 1})
+    if linked:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Esta Programação tem o Status de Entrega Nº {linked['status_number']}. Exclua o Status de Entrega antes, ou cancele a Programação."
+        )
+
     await db.loading_schedules.delete_one({"id": schedule_id})
     return {"message": "Programação excluída com sucesso"}
 
@@ -140,14 +154,15 @@ async def update_loading_schedule_status(schedule_id: str, new_status: str, curr
     """Atualiza status da programação"""
     if new_status not in ["ATIVO", "CONCLUIDO", "CANCELADO"]:
         raise HTTPException(status_code=400, detail="Status inválido")
-    
+
     result = await db.loading_schedules.update_one(
         {"id": schedule_id},
         {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
-    if result.modified_count == 0:
+    # matched (não modified): repetir o mesmo status não é "não encontrado"
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Programação não encontrada")
-    
+
     return {"message": "Status atualizado"}
 
 

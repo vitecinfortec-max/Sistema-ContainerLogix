@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 import io
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -25,25 +26,40 @@ async def get_delivery_statuses(
     per_page: int = 20,
     status: Optional[str] = None,
     schedule_number: Optional[int] = None,
+    search: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todos os status de entrega com paginação e filtros"""
     query = {}
-    if status:
-        query["status"] = status
     if schedule_number:
         query["schedule_number"] = schedule_number
-    
+    if search:
+        term = re.escape(search.strip())
+        query["$or"] = [
+            {"destination_client_name": {"$regex": term, "$options": "i"}},
+            {"contracting_client_name": {"$regex": term, "$options": "i"}},
+            {"items.driver_name": {"$regex": term, "$options": "i"}},
+            {"items.container_number": {"$regex": term, "$options": "i"}},
+        ]
+    # Indicadores pela busca, sem o filtro de status (mostram a divisão)
+    by_status = {"ATIVO": 0, "CONCLUIDO": 0, "CANCELADO": 0}
+    async for row in db.delivery_statuses.aggregate([{"$match": dict(query)}, {"$group": {"_id": "$status", "n": {"$sum": 1}}}]):
+        if row["_id"] in by_status:
+            by_status[row["_id"]] = row["n"]
+    if status:
+        query["status"] = status
+
     total = await db.delivery_statuses.count_documents(query)
     skip = (page - 1) * per_page
-    
+
     statuses = await db.delivery_statuses.find(query, {"_id": 0}).sort("status_number", -1).skip(skip).limit(per_page).to_list(per_page)
-    
+
     return {
         "items": statuses,
         "total": total,
         "page": page,
-        "pages": (total + per_page - 1) // per_page
+        "pages": (total + per_page - 1) // per_page,
+        "stats": by_status,
     }
 
 @api_router.get("/delivery-status/schedule/{schedule_number}")
@@ -136,6 +152,17 @@ async def create_delivery_status(data: DeliveryStatusCreate, current_user: dict 
     if not schedule:
         raise HTTPException(status_code=404, detail="Programação não encontrada")
 
+    # Um acompanhamento por Programação: um segundo, ainda sem horários,
+    # reabria a Programação já concluída pelo primeiro.
+    other = await db.delivery_statuses.find_one(
+        {"schedule_id": schedule["id"], "status": {"$ne": "CANCELADO"}}, {"_id": 0, "status_number": 1}
+    )
+    if other:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A Programação Nº {schedule['schedule_number']} já tem o Status de Entrega Nº {other['status_number']}. Edite esse registro."
+        )
+
     # Gerar próximo número sequencial de forma atômica (find_one+1 permitia duas
     # requisições concorrentes lerem o mesmo "último número" e gravarem duplicado)
     counter = await db.counters.find_one_and_update(
@@ -198,9 +225,13 @@ async def update_delivery_status(status_id: str, data: DeliveryStatusCreate, cur
 @api_router.delete("/delivery-status/{status_id}")
 async def delete_delivery_status(status_id: str, current_user: dict = Depends(get_current_active_user)):
     """Deleta um status de entrega"""
+    existing = await db.delivery_statuses.find_one({"id": status_id}, {"_id": 0, "schedule_id": 1})
     result = await db.delivery_statuses.delete_one({"id": status_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Status de entrega não encontrado")
+    # A Programação deixa de estar concluída por ele (volta pra Ativa)
+    if existing and existing.get("schedule_id"):
+        await _sync_loading_schedule_status(existing["schedule_id"], "ATIVO")
     return {"message": "Status de entrega deletado com sucesso"}
 
 @api_router.put("/delivery-status/{status_id}/update-status")
@@ -208,12 +239,13 @@ async def update_delivery_status_status(status_id: str, new_status: str, current
     """Atualiza o status (ATIVO, CONCLUIDO, CANCELADO)"""
     if new_status not in ["ATIVO", "CONCLUIDO", "CANCELADO"]:
         raise HTTPException(status_code=400, detail="Status inválido")
-    
+
     result = await db.delivery_statuses.update_one(
         {"id": status_id},
         {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc)}}
     )
-    if result.modified_count == 0:
+    # matched (não modified): repetir o mesmo status não é "não encontrado"
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Status de entrega não encontrado")
     return {"message": "Status atualizado com sucesso"}
 

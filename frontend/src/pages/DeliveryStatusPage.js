@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
+  StatCard, StatGrid, SearchInput,
   FilterCard, FilterField, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
   StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
@@ -15,7 +16,7 @@ import { api } from '../lib/api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { ClipboardCheck, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText, Clock, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { ClipboardCheck, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText, Clock, FileSpreadsheet, CheckCircle2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
@@ -65,20 +66,25 @@ export default function DeliveryStatusPage() {
   // Filtra enquanto se digita (sem botão "Filtrar"); o filtro vale também ao
   // trocar de página e ao recarregar depois de salvar.
   const debouncedNumber = useDebouncedValue(searchQuery.trim());
+  const [textSearch, setTextSearch] = useState('');
+  const debouncedText = useDebouncedValue(textSearch.trim());
+  const [stats, setStats] = useState({ ATIVO: 0, CONCLUIDO: 0, CANCELADO: 0 });
 
   useEffect(() => {
     loadStatuses();
     setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, debouncedNumber, statusFilter]);
+  }, [pagination.page, debouncedNumber, statusFilter, debouncedText]);
 
-  const loadStatuses = async (filters = { number: debouncedNumber, status: statusFilter }) => {
+  const loadStatuses = async (filters = { number: debouncedNumber, status: statusFilter, text: debouncedText }) => {
     try {
       const params = { page: pagination.page, per_page: 20 };
       if (filters.number) params.schedule_number = filters.number;
       if (filters.status) params.status = filters.status;
+      if (filters.text) params.search = filters.text;
       const response = await api.getDeliveryStatuses(params);
       setStatuses(response.data.items);
+      if (response.data.stats) setStats(response.data.stats);
       setPagination(prev => ({ ...prev, pages: response.data.pages, total: response.data.total }));
     } catch (error) {
       toast.error('Erro ao carregar status de entrega');
@@ -89,6 +95,7 @@ export default function DeliveryStatusPage() {
 
   const clearFilters = () => {
     setSearchQuery('');
+    setTextSearch('');
     setStatusFilter('');
     setPagination(prev => ({ ...prev, page: 1 }));
   };
@@ -215,7 +222,7 @@ export default function DeliveryStatusPage() {
       });
       loadStatuses();
     } catch (error) {
-      toast.error('Erro ao excluir');
+      toast.error(error.response?.data?.detail || 'Erro ao excluir');
     }
   };
 
@@ -306,8 +313,22 @@ export default function DeliveryStatusPage() {
       <div className="space-y-4" data-testid="delivery-status-page">
         <PageHeader icon={ClipboardCheck} title="Status de Entrega" subtitle="Controle de horários de entrega por programação" />
 
-        <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearFilters}>
+        <StatGrid>
+          <StatCard label="Status de entrega" value={stats.ATIVO + stats.CONCLUIDO + stats.CANCELADO} icon={ClipboardCheck} tone="blue" hint={searchQuery || textSearch ? 'que batem com a busca' : 'cadastrados'} />
+          <StatCard label="Em andamento" value={stats.ATIVO} icon={Clock} tone="amber" hint="falta a entrega final" testId="delivery-kpi-active" />
+          <StatCard label="Concluídos" value={stats.CONCLUIDO} icon={CheckCircle2} tone="emerald" hint="todos os motoristas entregaram" />
+          <StatCard label="Cancelados" value={stats.CANCELADO} icon={XCircle} tone="red" />
+        </StatGrid>
+
+        <FilterCard hasFilters={!!(searchQuery || statusFilter || textSearch)} onClear={clearFilters}>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Cliente, motorista ou container" className="col-span-2">
+              <SearchInput
+                value={textSearch}
+                onChange={(e) => onFilter(setTextSearch)(e.target.value)}
+                data-testid="search-delivery-text"
+              />
+            </FilterField>
             <FilterField label="Nº programação">
               <Input
                 type="number"

@@ -405,7 +405,7 @@ export const api = {
   createLoadingSchedule: (data) => axios.post(`${API}/loading-schedules`, data),
   updateLoadingSchedule: (id, data) => axios.put(`${API}/loading-schedules/${id}`, data),
   deleteLoadingSchedule: (id) => axios.delete(`${API}/loading-schedules/${id}`),
-  updateLoadingScheduleStatus: (id, status) => axios.put(`${API}/loading-schedules/${id}/status?status=${status}`),
+  updateLoadingScheduleStatus: (id, status) => axios.put(`${API}/loading-schedules/${id}/update-status`, null, { params: { new_status: status } }),
   getLoadingSchedulePDF: (id) => axios.get(`${API}/loading-schedules/${id}/pdf`, { responseType: 'blob' }),
 
   // Financeiro - Solicitação de Diária
