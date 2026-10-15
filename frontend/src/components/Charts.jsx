@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useReducedMotion } from 'motion/react';
 import { AnimatedNumber } from './Motion';
 import { cn } from '../lib/utils';
 
@@ -74,6 +75,7 @@ export function BarsChart({
   data, series, xKey = 'label', valueFormat = fmtChartInt, allowDecimals = false,
   maxBarSize = 28, className = 'h-72', testId,
 }) {
+  const reduceMotion = useReducedMotion(); // "reduzir movimento" no sistema: gráfico já pronto
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const colors = useMemo(() => Object.fromEntries(series.map((s) => [s.key, s.color])), [series]);
   const totals = useMemo(
@@ -121,6 +123,7 @@ export function BarsChart({
                 radius={[5, 5, 0, 0]}
                 maxBarSize={maxBarSize}
                 animationBegin={120 + i * 140}
+                isAnimationActive={!reduceMotion}
                 animationDuration={750}
                 animationEasing="ease-out"
                 activeBar={{ fill: s.color, stroke: s.color, strokeOpacity: 0.22, strokeWidth: 4 }}
@@ -138,6 +141,7 @@ export function BarsChart({
  * que uma fatia vazia deixava). `data`: [{ name, value, color }].
  */
 export function DonutChart({ data, centerLabel = 'Total', className = 'h-52', testId }) {
+  const reduceMotion = useReducedMotion(); // "reduzir movimento" no sistema: gráfico já pronto
   const slices = (data || []).filter((d) => Number(d.value) > 0);
   const total = slices.reduce((sum, d) => sum + Number(d.value), 0);
   const many = slices.length > 1;
@@ -157,6 +161,7 @@ export function DonutChart({ data, centerLabel = 'Total', className = 'h-52', te
             cornerRadius={many ? 6 : 0}
             stroke="none"
             animationBegin={150}
+            isAnimationActive={!reduceMotion}
             animationDuration={900}
             animationEasing="ease-out"
           >
@@ -176,6 +181,7 @@ export function DonutChart({ data, centerLabel = 'Total', className = 'h-52', te
 /** Minigráfico de área (sem eixos) pra mostrar a tendência dentro de um card. */
 export function Sparkline({ data, dataKey, name, color = CHART_COLORS.primary, className = 'h-12 w-32' }) {
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const reduceMotion = useReducedMotion(); // "reduzir movimento" no sistema: gráfico já pronto
   if (!data || data.length < 2) return null;
   return (
     <div className={className}>
@@ -204,6 +210,7 @@ export function Sparkline({ data, dataKey, name, color = CHART_COLORS.primary, c
             dot={false}
             activeDot={{ r: 3, strokeWidth: 0, fill: color }}
             animationBegin={250}
+            isAnimationActive={!reduceMotion}
             animationDuration={900}
             animationEasing="ease-out"
           />

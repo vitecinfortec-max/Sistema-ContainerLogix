@@ -28,6 +28,7 @@ import {
 } from '../components/ui/alert-dialog';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { scrollBehavior } from '../lib/reducedMotion';
 
 const ITEMS_PER_PAGE = 15;
 const STATUS_LABELS = { CHEIO: 'Cheio', VAZIO: 'Vazio' };
@@ -200,7 +201,7 @@ export default function MovementsPage() {
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
     }
   };
 

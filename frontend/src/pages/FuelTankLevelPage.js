@@ -20,6 +20,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Droplet, Plus, Trash2, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { scrollBehavior } from '../lib/reducedMotion';
 
 const fmtLiters = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
 
@@ -149,7 +150,7 @@ export default function FuelTankLevelPage() {
     if (next >= 1 && next <= totalPages) {
       setCurrentPage(next);
       // Volta pro começo do histórico (e não da tela: o medidor fica em cima)
-      if (historyRef.current) historyRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (historyRef.current) historyRef.current.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
     }
   };
 

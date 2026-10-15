@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, Fuel, Droplet, Wallet, Gauge } from 'lucide-react';
+import { scrollBehavior } from '../lib/reducedMotion';
 
 const SOURCE_OPTIONS = [
   ['POSTO_EXTERNO', 'Posto Externo'],
@@ -275,7 +276,7 @@ export default function FuelSupplyPage() {
   const goToPage = (next) => {
     if (next >= 1 && next <= totalPages) {
       setCurrentPage(next);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
     }
   };
 

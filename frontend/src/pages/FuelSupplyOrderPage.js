@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, ClipboardCheck, Download, Printer, Clock, CheckCircle2 } from 'lucide-react';
+import { scrollBehavior } from '../lib/reducedMotion';
 
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
@@ -202,7 +203,7 @@ export default function FuelSupplyOrderPage() {
   const goToPage = (next) => {
     if (next >= 1 && next <= totalPages) {
       setCurrentPage(next);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: scrollBehavior() });
     }
   };
 

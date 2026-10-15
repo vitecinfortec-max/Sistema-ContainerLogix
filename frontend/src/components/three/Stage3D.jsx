@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../lib/utils';
 import { prefilterEnvironment, studioCanvas } from './environment';
+import { prefersReducedMotion } from '../../lib/reducedMotion';
 
 // Palco dos modelos 3D embutidos nas telas (tanque de combustível, mini-pátio
 // do Dashboard). Cuida de tudo que é igual pra qualquer modelo: carregar o
@@ -259,7 +260,7 @@ export default function Stage3D({ scene, params, className, fallback = null, ari
       fail();
       return undefined;
     }
-    const animated = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animated = !prefersReducedMotion();
     // Espera a entrada da tela terminar: montar o modelo ocupa a CPU por um
     // instante e travaria essa animação
     const timer = setTimeout(() => {

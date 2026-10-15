@@ -5,6 +5,7 @@ import { Label } from './ui/label';
 import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, riseIn, staggerParent, AnimatedNumber, EASE, DURATION } from './Motion';
+import { scrollBehavior } from '../lib/reducedMotion';
 
 // Blocos compartilhados das telas de listagem (cabeçalho de filtros,
 // indicadores, card da lista com barra de ações, paginação, selos de status).
@@ -345,8 +346,8 @@ export function usePagination(items, { pageSize = 15, resetKey, scrollRef } = {}
   const onPageChange = (next) => {
     if (next < 1 || next > totalPages) return;
     setCurrentPage(next);
-    if (scrollRef?.current) scrollRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (scrollRef?.current) scrollRef.current.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    else window.scrollTo({ top: 0, behavior: scrollBehavior() });
   };
   return {
     pageItems: items.slice((page - 1) * pageSize, page * pageSize),

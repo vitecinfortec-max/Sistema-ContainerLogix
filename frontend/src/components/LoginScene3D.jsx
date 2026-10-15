@@ -5,6 +5,7 @@ import { rtgMaterials, buildRtg } from './three/rtgCrane';
 import { truckMaterials, buildTruck } from './three/truck';
 import { skyU, paintSky, buildPort } from './three/portBackdrop';
 import { prefilterEnvironment } from './three/environment';
+import { prefersReducedMotion } from '../lib/reducedMotion';
 
 // Cena 3D da tela de login: um terminal de contêineres no fim da tarde. Na
 // quadra do meio, um guindaste de pórtico (RTG) tira um contêiner da pilha e
@@ -783,7 +784,7 @@ export default function LoginScene3D({ className = '' }) {
   useEffect(() => {
     const mount = mountRef.current;
     const media = window.matchMedia(DESKTOP_QUERY);
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduceMotion = prefersReducedMotion();
     let cancelled = false;
     let stop = null;
     let loading = false;
