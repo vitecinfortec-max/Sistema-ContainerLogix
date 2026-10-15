@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { StatCard, StatGrid, FilterCard, FilterField, DataCard, EmptyState } from '../components/DataPage';
+import { StatCard, StatGrid, FilterCard, FilterField, DataCard, EmptyState, StatusPill, PlateTag, TablePagination, usePagination } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Input } from '../components/ui/input';
@@ -19,6 +19,10 @@ const STATUS_OPTIONS = [
   ['CANCELADO', 'Cancelado'],
 ];
 
+const STATUS_TONES = { ABERTO: 'blue', ANDAMENTO: 'amber', FECHADO: 'emerald', CANCELADO: 'red' };
+const STATUS_LABELS = Object.fromEntries(STATUS_OPTIONS);
+const fmtDateTime = (v) => (v ? format(new Date(v), 'dd/MM/yyyy HH:mm') : '-');
+
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const DAILY_SERIES = [
@@ -34,7 +38,8 @@ export default function ReportsServiceOrdersPage() {
   const [loading, setLoading] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [summary, setSummary] = useState({ count: 0, total_value: 0, avg_value: 0, open_count: 0 });
+  const [summary, setSummary] = useState({ count: 0, total_value: 0, avg_value: 0, open_count: 0, rows: [] });
+  const [loadingRows, setLoadingRows] = useState(true);
   const [dailyChart, setDailyChart] = useState([]);
 
   useEffect(() => {
@@ -84,9 +89,11 @@ export default function ReportsServiceOrdersPage() {
   const loadSummary = async () => {
     try {
       const r = await api.getServiceOrdersReportSummary(buildParams());
-      setSummary(r.data);
+      setSummary({ rows: [], ...r.data });
     } catch (e) {
       console.error('Erro ao carregar resumo do relatório de serviços:', e);
+    } finally {
+      setLoadingRows(false);
     }
   };
 
@@ -97,6 +104,9 @@ export default function ReportsServiceOrdersPage() {
     setStatus('all');
     setCategory('all');
   };
+
+  const rows = summary.rows || [];
+  const { pageItems, paginationProps } = usePagination(rows, { resetKey: `${dateFrom}|${dateTo}|${equipmentPlate}|${status}|${category}` });
 
   const hasFilters = dateFrom || dateTo || equipmentPlate || status !== 'all' || category !== 'all';
 
@@ -209,7 +219,7 @@ export default function ReportsServiceOrdersPage() {
         <div data-testid="service-orders-summary-cards">
           <StatGrid>
             <StatCard icon={ClipboardList} label="Ordens de serviço" value={summary.count} tone="blue" testId="service-orders-kpi-count" />
-            <StatCard icon={Wallet} label="Valor total" value={fmtMoney(summary.total_value)} tone="emerald" testId="service-orders-kpi-value" />
+            <StatCard icon={Wallet} label="Valor total" value={fmtMoney(summary.total_value)} tone="emerald" hint="sem as canceladas" testId="service-orders-kpi-value" />
             <StatCard icon={Gauge} label="Valor médio" value={fmtMoney(summary.avg_value)} tone="primary" testId="service-orders-kpi-avg" />
             <StatCard icon={Clock} label="Em aberto" value={summary.open_count} tone="amber" testId="service-orders-kpi-open" />
           </StatGrid>
@@ -217,8 +227,8 @@ export default function ReportsServiceOrdersPage() {
 
         {/* Dashboard: Ordens de Serviço por Dia */}
         <DataCard
-          title={(<span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Ordens de serviço por dia</span>)}
-          meta={<span className="text-xs text-slate-400 dark:text-slate-500">últimos 14 dias</span>}
+          title={(<span className="flex items-center gap-2"><BarChart3 className="w-4 h-4 text-primary" />Valor de serviços por dia</span>)}
+          meta={<span className="text-xs text-slate-400 dark:text-slate-500">últimos 14 dias, sem as canceladas</span>}
           testId="daily-service-orders-chart-card"
         >
           <div className="p-4">
@@ -234,6 +244,46 @@ export default function ReportsServiceOrdersPage() {
               <EmptyState icon={BarChart3} title="Sem dados suficientes para exibir o gráfico" />
             )}
           </div>
+        </DataCard>
+
+        {/* As OS do filtro - o mesmo recorte do PDF e do Excel */}
+        <DataCard title="Ordens de serviço" count={rows.length} footer={<TablePagination {...paginationProps} />} testId="service-orders-report-table">
+          {loadingRows ? (
+            <EmptyState loading />
+          ) : rows.length === 0 ? (
+            <EmptyState icon={ClipboardList} title="Nenhuma ordem de serviço no filtro" hint={hasFilters ? 'Ajuste os filtros' : undefined} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Nº</th>
+                    <th>Abertura</th>
+                    <th>Fechamento</th>
+                    <th>Placa</th>
+                    <th>Categoria</th>
+                    <th>Pessoa</th>
+                    <th>Status</th>
+                    <th className="!text-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageItems.map((o) => (
+                    <tr key={o.id}>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{o.os_number}</td>
+                      <td className="whitespace-nowrap tabular-nums">{fmtDateTime(o.opened_at)}</td>
+                      <td className="whitespace-nowrap tabular-nums">{fmtDateTime(o.closed_at)}</td>
+                      <td>{o.equipment_plate ? <PlateTag>{o.equipment_plate}</PlateTag> : '-'}</td>
+                      <td><div className="max-w-[180px] truncate" title={o.category || ''}>{o.category || '-'}</div></td>
+                      <td><div className="max-w-[220px] truncate" title={o.person_name || ''}>{o.person_name || '-'}</div></td>
+                      <td><StatusPill tone={STATUS_TONES[o.status] || 'slate'}>{STATUS_LABELS[o.status] || o.status}</StatusPill></td>
+                      <td className={`text-right whitespace-nowrap tabular-nums cell-strong ${o.status === 'CANCELADO' ? 'line-through text-slate-400 dark:text-slate-500' : ''}`}>{fmtMoney(o.grand_total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </DataCard>
       </div>
     </Layout>

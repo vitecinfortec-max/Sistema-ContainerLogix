@@ -97,7 +97,7 @@ const PAGE_TITLES = {
   '/tank-settings': 'Configuração de Tanque',
   '/reports/fuel-supply': 'Relatório de Abastecimento',
   '/reports/service-orders': 'Relatório de Serviços',
-  '/fleet/os-categories': 'Cadastro de Categoria',
+  '/fleet/os-categories': 'Categorias de OS',
   '/estoque/cadastros': 'Cadastro',
   '/estoque/servicos': 'Cadastro de Serviço',
   '/estoque/produtos': 'Produto',
@@ -109,7 +109,7 @@ const PAGE_TITLES = {
   '/loading-orders': 'Ordem de Carregamento',
   '/freight-routes': 'Rota',
   '/freight-payments': 'Pagamento Frete',
-  '/fleet/checklist': 'Checklist',
+  '/fleet/checklist': 'Checklist de Veículo',
   '/cadastro': 'Cadastro',
   '/company-settings': 'Dados da Empresa',
   '/users': 'Gestão de Usuários',
@@ -567,7 +567,7 @@ function LayoutFrame({ children }) {
     { path: '/fleet?tab=revisions', label: 'Controle de Revisão', icon: Wrench, moduleKey: 'frota.revisao' },
     { path: '/fleet/hodometro', label: 'Lançamento de Hodômetro', icon: Gauge, moduleKey: 'frota.hodometro' },
     { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList, moduleKey: 'frota.ordem_servico' },
-    { path: '/fleet/checklist', label: 'Checklist', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
+    { path: '/fleet/checklist', label: 'Checklist de Veículo', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
     { path: '/fleet/controle-media', label: 'Controle de Média', icon: TrendingUp, moduleKey: 'frota.controle_media' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
@@ -579,7 +579,7 @@ function LayoutFrame({ children }) {
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const manutencaoCadastroItems = [
-    { path: '/fleet/os-categories', label: 'Cadastro de Categoria', icon: Tag, moduleKey: 'frota.cadastro_categoria' },
+    { path: '/fleet/os-categories', label: 'Categorias de OS', icon: Tag, moduleKey: 'frota.cadastro_categoria' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const manutencaoRelatorioItems = [

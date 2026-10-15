@@ -298,7 +298,7 @@ export default function OrdemServicoPage() {
           <StatCard label="Ordens de serviço" value={list.length} icon={FileText} tone="primary" hint={search || statusFilter !== 'all' ? 'com os filtros atuais' : 'cadastradas'} />
           <StatCard label="Abertas" value={list.filter((o) => o.status === 'ABERTO').length} icon={Clock} tone="blue" />
           <StatCard label="Em andamento" value={list.filter((o) => o.status === 'ANDAMENTO').length} icon={Wrench} tone="amber" />
-          <StatCard label="Valor total" value={fmtMoney(list.reduce((acc, o) => acc + Number(o.grand_total || 0), 0))} icon={Wallet} tone="emerald" />
+          <StatCard label="Valor total" value={fmtMoney(list.reduce((acc, o) => acc + (o.status === 'CANCELADO' ? 0 : Number(o.grand_total || 0)), 0))} icon={Wallet} tone="emerald" hint="sem as canceladas" />
         </StatGrid>
 
         <FilterCard

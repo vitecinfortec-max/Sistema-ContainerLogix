@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  StatCard, StatGrid, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, PlateTag, EmptyState, TablePagination,
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill,
+  PlateTag, EmptyState, TablePagination,
 } from '../components/DataPage';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -14,7 +17,7 @@ import { sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
-import { Gauge, Plus, Trash2, Truck, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { Gauge, Plus, Trash2, Truck, CheckCircle2, Clock, AlertTriangle, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
@@ -29,6 +32,16 @@ const fmtDate = (d) => {
     return d;
   }
 };
+
+// "KM restante" negativo vira "vencido há X km"
+const fmtRemaining = (v) => {
+  if (v === null || v === undefined) return '-';
+  return v <= 0 ? `vencido há ${fmtKm(Math.abs(v))}` : fmtKm(v);
+};
+
+const REMAINING_TONE = { OVERDUE: '!text-red-600 dark:!text-red-400', DUE_SOON: '!text-amber-600 dark:!text-amber-400' };
+
+const STATUS_ORDER = { OVERDUE: 0, DUE_SOON: 1, OK: 2 };
 
 const STATUS_BADGES = {
   OK: { label: 'OK', tone: 'emerald' },
@@ -62,22 +75,39 @@ export default function OdometerReadingsPage() {
   const [vehicles, setVehicles] = useState([]);
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(createEmptyForm());
 
+  // Filtros da lista (filtram enquanto se digita)
+  const [plateFilter, setPlateFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const debouncedPlate = useDebouncedValue(plateFilter.trim());
+
   useEffect(() => {
     loadMaintenanceStatus();
-    loadReadings();
     loadVehicles();
+  }, []);
+
+  useEffect(() => {
+    loadReadings();
     setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page]);
+  }, [pagination.page, debouncedPlate, sourceFilter]);
+
+  const onFilter = (setter) => (value) => {
+    setter(value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
 
   const loadMaintenanceStatus = async () => {
     setLoadingStatus(true);
     try {
       const response = await api.getVehicleMaintenanceStatus();
-      setMaintenanceStatus(response.data || []);
+      // Mais urgente primeiro: vencidos, depois próximos, cada grupo pelo KM restante
+      const list = [...(response.data || [])].sort((a, b) =>
+        (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3) || (a.km_remaining ?? 0) - (b.km_remaining ?? 0));
+      setMaintenanceStatus(list);
     } catch (error) {
       toast.error('Erro ao carregar situação de manutenção');
     } finally {
@@ -86,9 +116,11 @@ export default function OdometerReadingsPage() {
   };
 
   const loadReadings = async () => {
-    setLoading(true);
     try {
-      const response = await api.getOdometerReadings({ page: pagination.page, per_page: 20 });
+      const params = { page: pagination.page, per_page: 20 };
+      if (debouncedPlate) params.vehicle_plate = debouncedPlate;
+      if (sourceFilter !== 'all') params.source = sourceFilter;
+      const response = await api.getOdometerReadings(params);
       setReadings(response.data.items);
       setPagination(prev => ({ ...prev, pages: response.data.pages, total: response.data.total }));
     } catch (error) {
@@ -110,7 +142,23 @@ export default function OdometerReadingsPage() {
   const cavalos = vehicles.filter(v => v.vehicle_type === 'CAVALO' || v.vehicle_type === 'CAMINHÃO');
 
   const openNewModal = () => {
+    setEditingId(null);
     setFormData(createEmptyForm());
+    setModalOpen(true);
+  };
+
+  const singleSelected = selectedIds.size === 1 ? readings.find(r => r.id === [...selectedIds][0]) : null;
+
+  const openEditModal = () => {
+    if (!singleSelected) return;
+    setEditingId(singleSelected.id);
+    setFormData({
+      vehicle_id: singleSelected.vehicle_id,
+      vehicle_plate: singleSelected.vehicle_plate,
+      km: String(singleSelected.km ?? ''),
+      reading_date: singleSelected.reading_date || todayISO(),
+      observations: singleSelected.observations || '',
+    });
     setModalOpen(true);
   };
 
@@ -122,10 +170,16 @@ export default function OdometerReadingsPage() {
 
     setSaving(true);
     try {
-      await api.createOdometerReading({ ...formData, km: Number(formData.km) });
-      toast.success('Lançamento de hodômetro criado com sucesso!');
+      const payload = { ...formData, km: Number(formData.km) };
+      if (editingId) {
+        await api.updateOdometerReading(editingId, payload);
+        toast.success('Lançamento atualizado!');
+      } else {
+        await api.createOdometerReading(payload);
+        toast.success('Lançamento de hodômetro criado com sucesso!');
+        setPagination(prev => ({ ...prev, page: 1 }));
+      }
       setModalOpen(false);
-      setPagination(prev => ({ ...prev, page: 1 }));
       loadReadings();
       loadMaintenanceStatus();
     } catch (error) {
@@ -203,7 +257,8 @@ export default function OdometerReadingsPage() {
                     <th>Placa</th>
                     <th>Modelo</th>
                     <th className="!text-right">KM atual</th>
-                    <th className="!text-right">Próxima manutenção</th>
+                    <th>Próximo item</th>
+                    <th className="!text-right">Vence em</th>
                     <th className="!text-right">KM restante</th>
                     <th>Status</th>
                   </tr>
@@ -216,8 +271,9 @@ export default function OdometerReadingsPage() {
                         <td><PlateTag>{m.vehicle_plate}</PlateTag></td>
                         <td>{m.vehicle_model || '-'}</td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(m.current_km)}</td>
+                        <td><div className="max-w-[240px] truncate" title={(m.next_due_items || []).join(', ')}>{(m.next_due_items || []).join(', ') || '-'}</div></td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(m.next_due_km)}</td>
-                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtKm(m.km_remaining)}</td>
+                        <td className={`text-right whitespace-nowrap tabular-nums cell-strong ${REMAINING_TONE[m.status] || ''}`}>{fmtRemaining(m.km_remaining)}</td>
                         <td><StatusPill tone={badge.tone}>{badge.label}</StatusPill></td>
                       </tr>
                     );
@@ -228,8 +284,26 @@ export default function OdometerReadingsPage() {
           )}
         </DataCard>
 
+        <FilterCard hasFilters={!!plateFilter || sourceFilter !== 'all'} onClear={() => { setPlateFilter(''); onFilter(setSourceFilter)('all'); }}>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <FilterField label="Placa">
+              <SearchInput value={plateFilter} onChange={(e) => onFilter(setPlateFilter)(e.target.value.toUpperCase())} data-testid="odometer-plate-filter" />
+            </FilterField>
+            <FilterField label="Origem">
+              <Select value={sourceFilter} onValueChange={onFilter(setSourceFilter)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="odometer-source-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="MANUAL">Manual</SelectItem>
+                  <SelectItem value="ABASTECIMENTO">Abastecimento</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+          </div>
+        </FilterCard>
+
         {/* Lista - só lançamentos manuais podem ser selecionados (os de
-            Abastecimento são excluídos pela tela de Abastecimento) */}
+            Abastecimento são corrigidos na tela de Abastecimento) */}
         <DataCard
           title="Lançamentos de hodômetro"
           count={pagination.total}
@@ -238,6 +312,7 @@ export default function OdometerReadingsPage() {
               selectedCount={selectedIds.size}
               primary={<ToolbarPrimary icon={Plus} label="Novo lançamento" onClick={openNewModal} testId="new-odometer-reading-btn" />}
             >
+              <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={openEditModal} disabled={!singleSelected} testId="edit-odometer-reading-btn" />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={handleDelete} disabled={selectedIds.size === 0} />
             </Toolbar>
           )}
@@ -254,7 +329,11 @@ export default function OdometerReadingsPage() {
           {loading ? (
             <EmptyState loading />
           ) : readings.length === 0 ? (
-            <EmptyState icon={Gauge} title="Nenhum lançamento de hodômetro registrado ainda" hint='Registre o primeiro pelo botão "Novo lançamento"' />
+            <EmptyState
+              icon={Gauge}
+              title={plateFilter || sourceFilter !== 'all' ? 'Nenhum lançamento encontrado' : 'Nenhum lançamento de hodômetro registrado ainda'}
+              hint={plateFilter || sourceFilter !== 'all' ? 'Ajuste os filtros' : 'Registre o primeiro pelo botão "Novo lançamento"'}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="data-table">
@@ -272,7 +351,7 @@ export default function OdometerReadingsPage() {
                     <th>Data</th>
                     <th>Origem</th>
                     <th>Observações</th>
-                    <th>Criado em</th>
+                    <th>Lançado em</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -289,7 +368,12 @@ export default function OdometerReadingsPage() {
                         <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                           {isManual && <Checkbox checked={isSelected} onCheckedChange={() => toggleSelect(r.id)} />}
                         </td>
-                        <td className="cell-strong whitespace-nowrap tabular-nums">#{r.reading_number}</td>
+                        {/* Leitura de Abastecimento leva o nº do abastecimento - outra numeração */}
+                        <td className="whitespace-nowrap tabular-nums">
+                          {isManual
+                            ? <span className="cell-strong">#{r.reading_number}</span>
+                            : <span className="text-slate-500 dark:text-slate-400" title="Número do abastecimento">Abast. #{r.reading_number}</span>}
+                        </td>
                         <td><PlateTag>{r.vehicle_plate}</PlateTag></td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(r.km)}</td>
                         <td className="whitespace-nowrap tabular-nums">{fmtDate(r.reading_date)}</td>
@@ -300,7 +384,7 @@ export default function OdometerReadingsPage() {
                         </td>
                         <td><div className="max-w-[260px] truncate" title={r.observations || ''}>{r.observations || '-'}</div></td>
                         <td className="whitespace-nowrap tabular-nums">
-                          {r.created_at && format(new Date(r.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                          {r.created_at ? format(new Date(r.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '-'}
                         </td>
                       </tr>
                     );
@@ -318,7 +402,7 @@ export default function OdometerReadingsPage() {
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="flex items-center gap-2 text-base">
               <Gauge className="w-4 h-4 text-primary" />
-              Novo Lançamento de Hodômetro
+              {editingId ? 'Editar Lançamento de Hodômetro' : 'Novo Lançamento de Hodômetro'}
             </DialogTitle>
           </DialogHeader>
 

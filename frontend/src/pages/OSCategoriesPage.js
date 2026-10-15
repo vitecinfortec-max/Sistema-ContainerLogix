@@ -142,7 +142,7 @@ export default function OSCategoriesPage() {
   return (
     <Layout>
       <div className="space-y-4" data-testid="os-categories-page">
-        <PageHeader icon={Tag} title="Cadastro de Categoria" subtitle='Categorias usadas no campo "Categoria" da Ordem de Serviço' />
+        <PageHeader icon={Tag} title="Categorias de OS" subtitle='Categorias usadas no campo "Categoria" da Ordem de Serviço' />
 
         <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
             <DialogContent data-testid="os-category-dialog">

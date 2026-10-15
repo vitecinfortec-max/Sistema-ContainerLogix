@@ -214,9 +214,9 @@ export function ToolbarPrimary({ icon: Icon, label, onClick, disabled, testId })
 }
 
 /** Selo de status (Entrada/Saída, Cheio/Vazio, Pago/Pendente...). */
-export function StatusPill({ tone = 'slate', children, dot = true, className }) {
+export function StatusPill({ tone = 'slate', children, dot = true, className, title }) {
   return (
-    <span className={cn(
+    <span title={title} className={cn(
       'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
       SOFT_TONES[tone] || SOFT_TONES.slate,
       className,

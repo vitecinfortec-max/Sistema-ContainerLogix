@@ -2232,6 +2232,12 @@ _OS_STATUS_LABELS_XLSX = {
 }
 
 
+def service_orders_total(orders: list) -> float:
+    """Valor das Ordens de Serviço sem as canceladas - OS cancelada não é
+    custo de manutenção (antes entrava no "Valor total" e no valor médio)."""
+    return round(sum(o.get('grand_total') or 0 for o in orders if o.get('status') != 'CANCELADO'), 2)
+
+
 def generate_service_orders_report_excel(orders: list, company: dict = None, report_title: str = "Relatório de Serviços") -> bytes:
     """Relatório standalone das Ordens de Serviço: uma linha por OS, com a
     situação colorida e o total de valor."""
@@ -2241,7 +2247,7 @@ def generate_service_orders_report_excel(orders: list, company: dict = None, rep
         ws = wb.active
         ws.title = "Ordens de Serviço"
 
-        total_value = round(sum(o.get('grand_total') or 0 for o in orders), 2)
+        total_value = service_orders_total(orders)
         open_count = sum(1 for o in orders if o.get('status') in ('ABERTO', 'ANDAMENTO'))
         closed_count = sum(1 for o in orders if o.get('status') == 'FECHADO')
         stats_text = (
@@ -2815,7 +2821,7 @@ def generate_service_orders_report_pdf(orders: list, company: dict = None, repor
     logo_buffer = download_logo(company)
     elements.extend(_build_pdf_header(styles, logo_buffer, report_title, company=company, content_width=doc.width))
 
-    total_value = round(sum(o.get('grand_total') or 0 for o in orders), 2)
+    total_value = service_orders_total(orders)
     open_count = sum(1 for o in orders if o.get('status') in ('ABERTO', 'ANDAMENTO'))
     closed_count = sum(1 for o in orders if o.get('status') == 'FECHADO')
     elements.extend(_build_pdf_summary([

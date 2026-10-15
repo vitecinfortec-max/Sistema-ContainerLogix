@@ -367,6 +367,7 @@ export const api = {
 
   getOdometerReadings: (params) => axios.get(`${API}/odometer-readings`, { params }),
   createOdometerReading: (data) => axios.post(`${API}/odometer-readings`, data),
+  updateOdometerReading: (id, data) => axios.put(`${API}/odometer-readings/${id}`, data),
   deleteOdometerReading: (id) => axios.delete(`${API}/odometer-readings/${id}`),
   getVehicleMaintenanceStatus: () => axios.get(`${API}/odometer-readings/maintenance-status`),
 

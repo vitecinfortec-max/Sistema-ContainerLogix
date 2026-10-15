@@ -11,7 +11,7 @@ from models import (
     OSCategoryCreate, OSCategoryResponse, DailyServiceOrderPoint
 )
 from reports import (
-    today_brt, fmt_datetime,
+    today_brt, fmt_datetime, service_orders_total,
     generate_service_orders_report_pdf, generate_service_orders_report_excel, now_brt, merge_company
 )
 
@@ -550,14 +550,23 @@ async def get_service_orders_report_summary(
     current_user: dict = Depends(get_current_admin_user)
 ):
     rows = await _filter_ordem_servico_report(date_from, date_to, equipment_plate, status, category)
-    total_value = round(sum(r.get('grand_total') or 0 for r in rows), 2)
+    total_value = service_orders_total(rows)
     count = len(rows)
+    # Valor médio só entre as OS que contam valor (sem as canceladas)
+    valued = sum(1 for r in rows if r.get('status') != 'CANCELADO')
     open_count = sum(1 for r in rows if r.get('status') in ('ABERTO', 'ANDAMENTO'))
     return {
         "count": count,
         "total_value": total_value,
-        "avg_value": round(total_value / count, 2) if count else 0,
+        "avg_value": round(total_value / valued, 2) if valued else 0,
         "open_count": open_count,
+        # As OS do filtro, pra tabela da tela (o mesmo recorte do PDF/Excel)
+        "rows": [{
+            "id": r.get('id'), "os_number": r.get('os_number'), "opened_at": r.get('opened_at'),
+            "closed_at": r.get('closed_at'), "equipment_plate": r.get('equipment_plate'),
+            "category": r.get('category'), "person_name": r.get('person_name'),
+            "priority": r.get('priority'), "status": r.get('status'), "grand_total": r.get('grand_total') or 0,
+        } for r in rows],
     }
 
 
@@ -570,7 +579,7 @@ async def _compute_daily_service_orders_chart(today: datetime) -> List[DailyServ
     by_day: dict = {}
     for r in rows:
         day = (r.get('opened_at') or '')[:10]
-        if not day or day < day0:
+        if not day or day < day0 or r.get('status') == 'CANCELADO':
             continue
         calc = _os_serialize(r)
         entry = by_day.setdefault(day, {"value": 0.0, "count": 0})

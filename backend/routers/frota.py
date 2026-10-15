@@ -616,7 +616,14 @@ async def update_vehicle_revision(
     if not existing:
         raise HTTPException(status_code=404, detail="Revisão não encontrada")
 
-    update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    # Campo opcional enviado vazio (ex: um "próximo KM" apagado) limpa o valor;
+    # antes os vazios eram ignorados e não dava pra desfazer um preenchimento.
+    update_data = data.model_dump(exclude_unset=True)
+    if update_data.get('revision_date') is not None:
+        # Mesmo formato do cadastro (texto ISO), não data do Mongo
+        update_data['revision_date'] = update_data['revision_date'].isoformat()
+    if 'vehicle_plate' in update_data and update_data['vehicle_plate']:
+        update_data['vehicle_plate'] = update_data['vehicle_plate'].upper()
 
     # Atualizar dados do veículo (placa/modelo) caso vehicle_id tenha mudado
     if 'vehicle_id' in update_data and update_data['vehicle_id']:
@@ -769,6 +776,15 @@ NEXT_KM_FIELDS = [
     "next_gearbox_oil_km", "next_differential_oil_km", "next_lubrication_km", "next_washing_km",
 ]
 
+# Nome de cada item da Revisão, pra dizer na Situação de Manutenção o que vence
+NEXT_KM_LABELS = {
+    "next_oil_motor_km": "Óleo do motor", "next_oil_filter_km": "Filtro de óleo", "next_air_filter_km": "Filtro de ar",
+    "next_ac_filter_km": "Filtro do ar-condicionado", "next_fuel_filter_km": "Filtro de combustível",
+    "next_racor_filter_km": "Filtro racor", "next_apu_filter_km": "Filtro APU", "next_hydraulic_filter_km": "Filtro hidráulico",
+    "next_gearbox_oil_km": "Óleo da caixa", "next_differential_oil_km": "Óleo do diferencial",
+    "next_lubrication_km": "Lubrificação", "next_washing_km": "Lavagem",
+}
+
 MAINTENANCE_ALERT_MARGIN_KM = 1000
 
 
@@ -788,20 +804,25 @@ async def _compute_vehicle_maintenance_status(vehicle: dict) -> Optional[dict]:
     if not revision:
         return None
 
-    next_due_km = min([revision[f] for f in NEXT_KM_FIELDS if revision.get(f) is not None], default=None)
-    if next_due_km is None:
+    due = sorted((revision[f], f) for f in NEXT_KM_FIELDS if revision.get(f) is not None)
+    if not due:
         return None
+    next_due_km = due[0][0]
+    # Todos os itens que vencem nesse mesmo KM (ex: óleo e filtro juntos)
+    next_due_items = [NEXT_KM_LABELS.get(f, f) for km, f in due if km == next_due_km]
 
     current_km = revision.get("current_km") or 0
 
+    # O maior KM lançado (não o último cadastrado: uma leitura antiga lançada
+    # depois tem KM menor e esconderia o KM real do veículo)
     latest_reading = await db.odometer_readings.find_one(
-        {"vehicle_id": vehicle["id"]}, {"_id": 0, "km": 1}, sort=[("created_at", -1)]
+        {"vehicle_id": vehicle["id"]}, {"_id": 0, "km": 1}, sort=[("km", -1)]
     )
     if latest_reading and latest_reading.get("km") is not None:
         current_km = max(current_km, latest_reading["km"])
 
     latest_fuel_supply = await db.fuel_supplies.find_one(
-        {"equipment_id": vehicle["id"], "reading": {"$ne": None}}, {"_id": 0, "reading": 1}, sort=[("created_at", -1)]
+        {"equipment_id": vehicle["id"], "reading": {"$ne": None}}, {"_id": 0, "reading": 1}, sort=[("reading", -1)]
     )
     if latest_fuel_supply and latest_fuel_supply.get("reading") is not None:
         current_km = max(current_km, latest_fuel_supply["reading"])
@@ -820,6 +841,7 @@ async def _compute_vehicle_maintenance_status(vehicle: dict) -> Optional[dict]:
         "vehicle_model": vehicle.get("model"),
         "current_km": current_km,
         "next_due_km": next_due_km,
+        "next_due_items": next_due_items,
         "km_remaining": km_remaining,
         "status": maintenance_status,
     }
@@ -849,6 +871,7 @@ async def get_maintenance_status_route(current_user: dict = Depends(get_current_
 @api_router.get("/odometer-readings")
 async def get_odometer_readings(
     vehicle_plate: Optional[str] = None,
+    source: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
     current_user: dict = Depends(get_current_active_user)
@@ -861,14 +884,14 @@ async def get_odometer_readings(
     if vehicle_plate:
         query["vehicle_plate"] = {"$regex": re.escape(vehicle_plate.upper()), "$options": "i"}
 
-    manual = await db.odometer_readings.find(query, {"_id": 0}).to_list(None)
+    manual = [] if source == "ABASTECIMENTO" else await db.odometer_readings.find(query, {"_id": 0}).to_list(None)
     for r in manual:
         r["source"] = "MANUAL"
 
     fuel_query = {"reading": {"$ne": None}, "equipment_id": {"$ne": None}}
     if vehicle_plate:
         fuel_query["equipment_plate"] = {"$regex": re.escape(vehicle_plate.upper()), "$options": "i"}
-    fuel_supplies = await db.fuel_supplies.find(
+    fuel_supplies = [] if source == "MANUAL" else await db.fuel_supplies.find(
         fuel_query,
         {"_id": 0, "id": 1, "supply_number": 1, "equipment_id": 1, "equipment_plate": 1,
          "reading": 1, "supply_date": 1, "created_at": 1}
@@ -888,7 +911,9 @@ async def get_odometer_readings(
     } for fs in fuel_supplies]
 
     combined = manual + from_fuel
-    combined.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    # Mais recente primeiro pela data da leitura (não pela hora em que foi
+    # lançada); no mesmo dia, o maior KM em cima
+    combined.sort(key=lambda r: (r.get("reading_date") or "", r.get("km") or 0), reverse=True)
 
     total = len(combined)
     skip = (page - 1) * per_page
@@ -935,6 +960,29 @@ async def create_odometer_reading(
     reading_dict.pop('_id', None)
 
     return OdometerReadingResponse(**reading_dict)
+
+
+@api_router.put("/odometer-readings/{reading_id}", response_model=OdometerReadingResponse)
+async def update_odometer_reading(
+    reading_id: str,
+    data: OdometerReadingCreate,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Edita um lançamento manual de hodômetro (os que vêm do Abastecimento
+    são corrigidos no próprio Abastecimento)."""
+    update = {
+        "vehicle_id": data.vehicle_id,
+        "vehicle_plate": data.vehicle_plate.upper(),
+        "km": data.km,
+        "reading_date": data.reading_date,
+        "observations": data.observations,
+    }
+    updated = await db.odometer_readings.find_one_and_update(
+        {"id": reading_id}, {"$set": update}, projection={"_id": 0}, return_document=True
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Lançamento não encontrado")
+    return OdometerReadingResponse(**updated)
 
 
 @api_router.delete("/odometer-readings/{reading_id}")

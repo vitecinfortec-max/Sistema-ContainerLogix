@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   StatusPill, PlateTag, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
@@ -22,13 +22,21 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { cn, sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Truck, Wrench, Plus, Eye, Trash2, FileText, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2 } from 'lucide-react';
+import { Truck, Wrench, Plus, Eye, Trash2, FileText, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { compressImage } from '../lib/imageCompression';
-import { calendarDate, dateInputToISO, todayISO } from '../lib/dates';
+import { calendarDate, dateInputToISO, toDateInput, todayISO } from '../lib/dates';
 
 const VEHICLE_STATUS_LABELS = { ATIVO: 'Ativo', INATIVO: 'Inativo', MANUTENCAO: 'Manutenção' };
+// Mesma margem do backend (MAINTENANCE_ALERT_MARGIN_KM em routers/frota.py)
+const MAINTENANCE_MARGIN_KM = 1000;
+const MAINTENANCE_BADGES = {
+  OK: { label: 'Em dia', tone: 'emerald' },
+  DUE_SOON: { label: 'Próxima', tone: 'amber' },
+  OVERDUE: { label: 'Vencida', tone: 'red' },
+};
+
 const VEHICLE_STATUS_TONES = { ATIVO: 'emerald', INATIVO: 'slate', MANUTENCAO: 'amber' };
 
 export default function FleetPage() {
@@ -56,6 +64,10 @@ export default function FleetPage() {
   
   // Modal de nova revisão
   const [newModalOpen, setNewModalOpen] = useState(false);
+  // Revisão em edição (null = nova)
+  const [editingRevisionId, setEditingRevisionId] = useState(null);
+  // Situação de manutenção por placa (mesma conta do Lançamento de Hodômetro)
+  const [maintenanceByPlate, setMaintenanceByPlate] = useState({});
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     vehicle_type_revision: 'CAVALO', // CAVALO ou CARRETA
@@ -207,6 +219,19 @@ export default function FleetPage() {
     if (activeTab === 'revisions') loadRevisions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, pagination.page, debouncedPlate]);
+
+  useEffect(() => {
+    if (activeTab === 'revisions') loadMaintenanceStatus();
+  }, [activeTab]);
+
+  const loadMaintenanceStatus = async () => {
+    try {
+      const response = await api.getVehicleMaintenanceStatus();
+      setMaintenanceByPlate(Object.fromEntries((response.data || []).map((m) => [m.vehicle_plate, m])));
+    } catch (error) {
+      console.error('Erro ao carregar situação de manutenção:', error);
+    }
+  };
 
   // Carrega a frota inteira uma vez (independente da aba/paginação) para o
   // autocomplete de Placa do Controle de Revisão puxar do cadastro real.
@@ -540,7 +565,9 @@ export default function FleetPage() {
         };
       }
 
-      const response = await api.createVehicleRevision(data);
+      const response = editingRevisionId
+        ? await api.updateVehicleRevision(editingRevisionId, data)
+        : await api.createVehicleRevision(data);
       if (kmPhoto?.file) {
         try {
           await api.uploadVehicleRevisionKmPhoto(response.data.id, kmPhoto.file);
@@ -548,12 +575,14 @@ export default function FleetPage() {
           toast.error('Revisão registrada, mas houve erro ao enviar a foto do Km');
         }
       }
-      toast.success('Revisão registrada com sucesso!');
+      toast.success(editingRevisionId ? 'Revisão atualizada!' : 'Revisão registrada com sucesso!');
       setNewModalOpen(false);
+      setEditingRevisionId(null);
       resetForm();
       loadRevisions();
+      loadMaintenanceStatus();
     } catch (error) {
-      toast.error('Erro ao registrar revisão');
+      toast.error(error.response?.data?.detail || (editingRevisionId ? 'Erro ao atualizar revisão' : 'Erro ao registrar revisão'));
     } finally {
       setSaving(false);
     }
@@ -575,6 +604,49 @@ export default function FleetPage() {
     } catch (error) {
       toast.error('Erro ao excluir revisão');
     }
+  };
+
+  const openNewRevision = () => {
+    setEditingRevisionId(null);
+    resetForm();
+    setNewModalOpen(true);
+  };
+
+  // Abre o mesmo formulário preenchido com a revisão (carreta não tem KM e
+  // guarda o tipo de revisão no campo do óleo, ver handleSubmit)
+  const openEditRevision = (revision) => {
+    if (!revision) return;
+    const vehicle = allVehicles.find((v) => v.plate === revision.vehicle_plate);
+    const isCarreta = vehicle ? vehicle.vehicle_type === 'CARRETA' : !revision.current_km;
+    const km = (v) => (v === null || v === undefined ? '' : String(v));
+    resetForm();
+    setFormData((prev) => ({
+      ...prev,
+      vehicle_type_revision: isCarreta ? 'CARRETA' : 'CAVALO',
+      vehicle_plate: revision.vehicle_plate || '',
+      vehicle_model: revision.vehicle_model || '',
+      revision_date: toDateInput(revision.revision_date) || todayISO(),
+      oil_used: isCarreta ? '' : (revision.oil_used || ''),
+      carreta_revision_type: isCarreta ? (revision.oil_used || '') : '',
+      current_km: isCarreta ? '' : km(revision.current_km),
+      next_oil_motor_km: km(revision.next_oil_motor_km),
+      next_oil_filter_km: km(revision.next_oil_filter_km),
+      next_air_filter_km: km(revision.next_air_filter_km),
+      next_ac_filter_km: km(revision.next_ac_filter_km),
+      next_fuel_filter_km: km(revision.next_fuel_filter_km),
+      next_racor_filter_km: km(revision.next_racor_filter_km),
+      next_apu_filter_km: km(revision.next_apu_filter_km),
+      next_hydraulic_filter_km: km(revision.next_hydraulic_filter_km),
+      next_gearbox_oil_km: km(revision.next_gearbox_oil_km),
+      next_differential_oil_km: km(revision.next_differential_oil_km),
+      next_lubrication_km: km(revision.next_lubrication_km),
+      next_washing_km: km(revision.next_washing_km),
+      mechanic_name: revision.mechanic_name || '',
+      performed_by: revision.performed_by || '',
+      observations: revision.observations || '',
+    }));
+    setEditingRevisionId(revision.id);
+    setNewModalOpen(true);
   };
 
   const handleViewDetails = async (revision) => {
@@ -652,6 +724,8 @@ export default function FleetPage() {
     if (!value) return '-';
     return `${value.toLocaleString('pt-BR')} KM`;
   };
+
+  const maintenanceList = Object.values(maintenanceByPlate);
 
   const singleSelectedRevision = selectedRevisionIds.size === 1 ? revisions.find(r => r.id === [...selectedRevisionIds][0]) : null;
   const singleSelectedVehicle = selectedVehicleIds.size === 1 ? vehicles.find(v => v.id === [...selectedVehicleIds][0]) : null;
@@ -769,6 +843,13 @@ export default function FleetPage() {
 
           {/* ========== ABA CONTROLE DE REVISÃO ========== */}
           <TabsContent value="revisions" className="space-y-4 mt-0">
+            <StatGrid>
+              <StatCard label="Revisões" value={pagination.total} icon={Wrench} tone="blue" hint="registradas" />
+              <StatCard label="Veículos em dia" value={maintenanceList.filter((m) => m.status === 'OK').length} icon={CheckCircle2} tone="emerald" />
+              <StatCard label="Manutenção próxima" value={maintenanceList.filter((m) => m.status === 'DUE_SOON').length} icon={Clock} tone="amber" hint={`até ${MAINTENANCE_MARGIN_KM.toLocaleString('pt-BR')} km`} />
+              <StatCard label="Manutenção vencida" value={maintenanceList.filter((m) => m.status === 'OVERDUE').length} icon={AlertTriangle} tone="red" />
+            </StatGrid>
+
             <FilterCard hasFilters={!!searchPlate} onClear={clearRevisionSearch}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <FilterField label="Placa">
@@ -788,9 +869,10 @@ export default function FleetPage() {
               toolbar={(
                 <Toolbar
                   selectedCount={selectedRevisionIds.size}
-                  primary={<ToolbarPrimary icon={Plus} label="Nova revisão" onClick={() => setNewModalOpen(true)} testId="new-revision-btn" />}
+                  primary={<ToolbarPrimary icon={Plus} label="Nova revisão" onClick={openNewRevision} testId="new-revision-btn" />}
                 >
                   <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedRevision && handleViewDetails(singleSelectedRevision)} disabled={!singleSelectedRevision} />
+                  <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => openEditRevision(singleSelectedRevision)} disabled={!singleSelectedRevision} testId="edit-revision-btn" />
                   <ToolbarButton icon={Printer} label="Imprimir PDF" tone="emerald" onClick={() => singleSelectedRevision && handlePrintPDF(singleSelectedRevision.id)} disabled={!singleSelectedRevision} />
                   <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRevision && handleDelete(singleSelectedRevision.id)} disabled={!singleSelectedRevision} />
                 </Toolbar>
@@ -832,6 +914,7 @@ export default function FleetPage() {
                         <th className="!text-right">KM atual</th>
                         <th>Óleo</th>
                         <th>Mecânico</th>
+                        <th>Situação do veículo</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -858,6 +941,15 @@ export default function FleetPage() {
                           <td className="text-right whitespace-nowrap tabular-nums">{formatKM(revision.current_km)}</td>
                           <td><div className="max-w-[200px] truncate" title={revision.oil_used || ''}>{revision.oil_used || '-'}</div></td>
                           <td><div className="max-w-[200px] truncate" title={revision.mechanic_name || ''}>{revision.mechanic_name || '-'}</div></td>
+                          <td>
+                            {(() => {
+                              const m = maintenanceByPlate[revision.vehicle_plate];
+                              const badge = m && MAINTENANCE_BADGES[m.status];
+                              return badge
+                                ? <StatusPill tone={badge.tone} title={(m.next_due_items || []).join(', ')}>{badge.label}</StatusPill>
+                                : <span className="text-slate-400 dark:text-slate-500">-</span>;
+                            })()}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -870,24 +962,26 @@ export default function FleetPage() {
       </div>
 
       {/* Modal Nova Revisão */}
-      <Dialog open={newModalOpen} onOpenChange={setNewModalOpen}>
+      <Dialog open={newModalOpen} onOpenChange={(open) => { setNewModalOpen(open); if (!open) setEditingRevisionId(null); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wrench className="w-5 h-5" />
-              Nova Revisão de Veículo
+          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <Wrench className="w-4 h-4 text-primary" />
+              {editingRevisionId ? 'Editar Revisão de Veículo' : 'Nova Revisão de Veículo'}
             </DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-6">
-            {/* Seleção do Tipo de Veículo */}
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <Label className="text-base font-semibold mb-1.5 block">Tipo de Veículo *</Label>
-              <Select 
-                value={formData.vehicle_type_revision} 
+
+          <div className="space-y-4">
+            {/* Tipo de Veículo: cavalo tem KM e próximas trocas; carreta, só o tipo de revisão */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+              <Label className="mb-1.5 block">Tipo de Veículo *</Label>
+              <Select
+                value={formData.vehicle_type_revision}
                 onValueChange={(value) => handleInputChange('vehicle_type_revision', value)}
+                disabled={!!editingRevisionId}
               >
-                <SelectTrigger className="mt-2">
+                <SelectTrigger data-testid="revision-vehicle-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -895,6 +989,7 @@ export default function FleetPage() {
                   <SelectItem value="CARRETA">Carreta</SelectItem>
                 </SelectContent>
               </Select>
+              </div>
             </div>
 
             {/* ========== FORMULÁRIO CAVALO MECÂNICO ========== */}
@@ -1153,7 +1248,7 @@ export default function FleetPage() {
               Cancelar
             </Button>
             <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : 'Registrar revisão'}
+              {saving ? 'Salvando...' : editingRevisionId ? 'Salvar alterações' : 'Registrar revisão'}
             </Button>
           </DialogFooter>
         </DialogContent>
