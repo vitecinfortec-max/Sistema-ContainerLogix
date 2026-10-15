@@ -17,6 +17,7 @@ import Stage3D from '../components/three/Stage3D';
 import { tankScene } from '../components/three/tankScene';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
+import { useAuth } from '../context/AuthContext';
 import { Droplet, Plus, Trash2, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -49,6 +50,8 @@ const ITEMS_PER_PAGE = 15;
 
 export default function FuelTankLevelPage() {
   const { confirm, ConfirmDialog } = useConfirm();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const [level, setLevel] = useState(null);
   const [loadingLevel, setLoadingLevel] = useState(true);
@@ -101,6 +104,15 @@ export default function FuelTankLevelPage() {
     if (!formData.refill_date || !formData.liters) {
       toast.error('Preencha Data e Litros');
       return;
+    }
+    const liters = Number(formData.liters);
+    if (level?.configured && liters > freeLiters) {
+      const excess = liters - freeLiters;
+      const ok = await confirm(
+        `Esse reabastecimento passa da capacidade do tanque em ${fmtLiters(excess)} (espaço livre: ${fmtLiters(freeLiters)}). `
+        + 'Confira os litros ou a capacidade em "Configurar tanque". Registrar mesmo assim?'
+      );
+      if (!ok) return;
     }
     setSaving(true);
     try {
@@ -169,11 +181,15 @@ export default function FuelTankLevelPage() {
   };
 
   const isLow = level?.status === 'LOW';
+  const isOver = level?.status === 'OVER';
   const badge = isLow
     ? { label: 'Nível baixo', tone: 'red' }
-    : { label: 'Nível OK', tone: 'emerald' };
+    : isOver
+      ? { label: 'Acima da capacidade', tone: 'amber' }
+      : { label: 'Nível OK', tone: 'emerald' };
   const capacity = Number(level?.capacity_liters) || 0;
   const current = Number(level?.current_liters) || 0;
+  const freeLiters = Math.max(0, capacity - current);
   // Frações de 0 a 1 pro medidor (o saldo pode passar da capacidade ou ficar
   // negativo se os lançamentos não baterem; o desenho não sai do tanque)
   const fillFraction = capacity > 0 ? Math.min(1, Math.max(0, current / capacity)) : 0;
@@ -186,6 +202,13 @@ export default function FuelTankLevelPage() {
           icon={Droplet}
           title="Nível do Tanque"
           subtitle="Combustível disponível no tanque próprio, descontado a cada Abastecimento vindo dele"
+          actions={isAdmin && level?.configured ? (
+            <Link to="/tank-settings">
+              <Button variant="outline" size="sm" className="gap-1.5" data-testid="tank-settings-shortcut">
+                <Settings className="w-4 h-4" /> Configurar tanque
+              </Button>
+            </Link>
+          ) : null}
         />
 
         {/* Medidor */}
@@ -259,7 +282,7 @@ export default function FuelTankLevelPage() {
                   </div>
                   <div className="min-w-0">
                     <dt className="text-[11px] text-slate-500 dark:text-slate-400">Espaço livre</dt>
-                    <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate">{fmtLiters(Math.max(0, capacity - current))}</dd>
+                    <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate">{fmtLiters(freeLiters)}</dd>
                   </div>
                   <div className="min-w-0">
                     <dt className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
@@ -269,6 +292,11 @@ export default function FuelTankLevelPage() {
                     <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate">{fmtLiters(level.minimum_alert_liters)}</dd>
                   </div>
                 </dl>
+                {isOver && (
+                  <p className="text-xs rounded-md px-3 py-2 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" data-testid="tank-over-capacity">
+                    Os lançamentos somam {fmtLiters(current - capacity)} a mais do que cabe no tanque. Confira os reabastecimentos ou a capacidade configurada.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -317,6 +345,7 @@ export default function FuelTankLevelPage() {
                     <th>Nº</th>
                     <th>Data</th>
                     <th className="!text-right">Litros</th>
+                    <th className="!text-right">Saldo</th>
                     <th>Fornecedor/Veículo</th>
                     <th>Observações</th>
                   </tr>
@@ -340,10 +369,18 @@ export default function FuelTankLevelPage() {
                             {isEntrada ? 'Entrada' : 'Saída'}
                           </StatusPill>
                         </td>
-                        <td className="cell-strong whitespace-nowrap tabular-nums">#{item.reference_number}</td>
+                        {/* Entrada = nº do reabastecimento; Saída = nº do Abastecimento (outra numeração) */}
+                        <td className="whitespace-nowrap tabular-nums">
+                          {isEntrada
+                            ? <span className="cell-strong">#{item.reference_number}</span>
+                            : <span className="text-slate-500 dark:text-slate-400" title="Número do abastecimento">Abast. #{item.reference_number}</span>}
+                        </td>
                         <td className="whitespace-nowrap tabular-nums">{fmtDate(item.date)}</td>
                         <td className={`text-right whitespace-nowrap tabular-nums font-medium ${isEntrada ? 'text-primary' : 'text-amber-600 dark:text-amber-400'}`}>
                           {isEntrada ? '+' : '-'}{fmtLiters(item.liters)}
+                        </td>
+                        <td className={`text-right whitespace-nowrap tabular-nums ${item.balance_after > capacity && capacity > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                          {fmtLiters(item.balance_after)}
                         </td>
                         <td><div className="max-w-[240px] truncate" title={item.label || ''}>{item.label}</div></td>
                         <td><div className="max-w-[260px] truncate" title={item.observations || ''}>{item.observations || '-'}</div></td>
@@ -369,6 +406,11 @@ export default function FuelTankLevelPage() {
           </DialogHeader>
 
           <div className="space-y-4">
+            {level?.configured && (
+              <p className="text-xs text-slate-500 dark:text-slate-400" data-testid="tank-refill-free-space">
+                Espaço livre no tanque agora: <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtLiters(freeLiters)}</span>
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="mb-1.5 block">Data *</Label>

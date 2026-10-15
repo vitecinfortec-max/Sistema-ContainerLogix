@@ -522,8 +522,9 @@ async def _filter_ordem_servico_report(
     de Serviços (resumo, gráfico diário, PDF e Excel), sempre a partir de
     opened_at (Data de Abertura, não created_at)."""
     query = {}
+    # Por trecho, sem diferenciar maiúsculas: a tela filtra enquanto se digita
     if equipment_plate and equipment_plate != 'all':
-        query['equipment_plate'] = equipment_plate
+        query['equipment_plate'] = {"$regex": re.escape(equipment_plate.strip()), "$options": "i"}
     if status and status != 'all':
         query['status'] = status
     if category and category != 'all':

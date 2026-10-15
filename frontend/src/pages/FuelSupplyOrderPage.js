@@ -12,6 +12,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
@@ -57,6 +58,16 @@ function buildEmpty() {
 }
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const fmtLiters = (v) => `${Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} L`;
+
+// O que a ordem autoriza: litros, valor, os dois, ou o tanque cheio
+const authorizedLabel = (o) => {
+  const parts = [];
+  if (o.liters) parts.push(fmtLiters(o.liters));
+  if (o.estimated_value) parts.push(fmtMoney(o.estimated_value));
+  if (parts.length) return parts.join(' · ');
+  return o.supply_mode === 'COMPLETAR_TANQUE' ? 'Tanque cheio' : '-';
+};
 
 const ITEMS_PER_PAGE = 15;
 
@@ -65,6 +76,7 @@ export default function FuelSupplyOrderPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all | PENDENTE | LANCADA
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [nextNumber, setNextNumber] = useState(null);
@@ -198,9 +210,13 @@ export default function FuelSupplyOrderPage() {
   // Paginação: a lista vem inteira da API; a tela mostra uma página por vez.
   // Se a página atual deixar de existir (ex.: excluiu o último registro dela),
   // cai na última que existe.
-  const totalPages = Math.max(1, Math.ceil(list.length / ITEMS_PER_PAGE));
+  // Situação filtra a lista que já veio da busca
+  const filtered = statusFilter === 'all' ? list : list.filter((o) => (statusFilter === 'LANCADA') === !!o.is_launched);
+  const hasFilters = !!search || statusFilter !== 'all';
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const page = Math.min(currentPage, totalPages);
-  const pageItems = list.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const pageItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
   const goToPage = (next) => {
     if (next >= 1 && next <= totalPages) {
       setCurrentPage(next);
@@ -246,10 +262,20 @@ export default function FuelSupplyOrderPage() {
           <StatCard label="Lançadas" value={list.filter((o) => o.is_launched).length} icon={CheckCircle2} tone="primary" hint="já viraram abastecimento" />
         </StatGrid>
 
-        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+        <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setStatusFilter('all'); setCurrentPage(1); }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Equipamento, fornecedor, solicitante ou empresa">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="fuel-order-search" />
+            </FilterField>
+            <FilterField label="Situação">
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
+                <SelectTrigger className="h-9 text-sm" data-testid="fuel-order-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="PENDENTE">Pendentes</SelectItem>
+                  <SelectItem value="LANCADA">Lançadas</SelectItem>
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -257,7 +283,7 @@ export default function FuelSupplyOrderPage() {
         {/* Lista - marque uma ordem pra habilitar as ações da barra */}
         <DataCard
           title="Ordens de abastecimento"
-          count={loading ? '...' : list.length}
+          count={loading ? '...' : filtered.length}
           toolbar={(
             <Toolbar
               selectedCount={selectedIds.size}
@@ -272,17 +298,17 @@ export default function FuelSupplyOrderPage() {
             <TablePagination
               currentPage={page}
               totalPages={totalPages}
-              totalItems={list.length}
+              totalItems={filtered.length}
               pageSize={ITEMS_PER_PAGE}
               onPageChange={goToPage}
             />
           )}
         >
-          {list.length === 0 && !loading ? (
+          {filtered.length === 0 && !loading ? (
             <EmptyState
               icon={ClipboardCheck}
-              title={search ? 'Nenhuma ordem encontrada' : 'Nenhuma ordem de abastecimento cadastrada'}
-              hint={search ? 'Ajuste a busca' : 'Cadastre a primeira pelo botão "Nova ordem"'}
+              title={hasFilters ? 'Nenhuma ordem encontrada' : 'Nenhuma ordem de abastecimento cadastrada'}
+              hint={hasFilters ? 'Ajuste os filtros' : 'Cadastre a primeira pelo botão "Nova ordem"'}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -302,6 +328,7 @@ export default function FuelSupplyOrderPage() {
                     <th>Fornecedor</th>
                     <th>Produto</th>
                     <th>Tipo</th>
+                    <th className="!text-right">Autorizado</th>
                     <th>Solicitante</th>
                     <th>Status</th>
                   </tr>
@@ -328,6 +355,7 @@ export default function FuelSupplyOrderPage() {
                       <td><div className="max-w-[220px] truncate" title={o.supplier_name || ''}>{o.supplier_name || '-'}</div></td>
                       <td className="whitespace-nowrap">{FUEL_TYPE_LABELS[o.fuel_type] || o.fuel_type || '-'}</td>
                       <td className="whitespace-nowrap">{SUPPLY_MODE_LABELS[o.supply_mode] || o.supply_mode || '-'}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{authorizedLabel(o)}</td>
                       <td><div className="max-w-[180px] truncate" title={o.requester || ''}>{o.requester || '-'}</div></td>
                       <td>
                         <StatusPill tone={o.is_launched ? 'emerald' : 'amber'}>

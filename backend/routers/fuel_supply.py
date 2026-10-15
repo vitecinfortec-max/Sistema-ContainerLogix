@@ -202,17 +202,21 @@ _FUEL_SUPPLY_FUEL_TYPE_LABELS = {
 async def _filter_fuel_supplies(
     date_from: Optional[str], date_to: Optional[str],
     equipment_plate: Optional[str], supplier_name: Optional[str], fuel_type: Optional[str],
+    source: Optional[str] = None,
 ) -> list:
     """Consulta db.fuel_supplies com os mesmos filtros usados pelo Relatório
     de Abastecimento (resumo, gráfico diário, PDF e Excel), sempre a partir
     de supply_date (data real do abastecimento, não created_at)."""
     query = {}
+    # Por trecho, sem diferenciar maiúsculas: a tela filtra enquanto se digita
     if equipment_plate and equipment_plate != 'all':
-        query['equipment_plate'] = equipment_plate
+        query['equipment_plate'] = {"$regex": re.escape(equipment_plate.strip()), "$options": "i"}
     if supplier_name and supplier_name != 'all':
-        query['supplier_name'] = supplier_name
+        query['supplier_name'] = {"$regex": re.escape(supplier_name.strip()), "$options": "i"}
     if fuel_type and fuel_type != 'all':
         query['fuel_type'] = fuel_type
+    if source and source != 'all':
+        query['source'] = source
     if date_from or date_to:
         date_query = {}
         if date_from:
@@ -233,9 +237,10 @@ async def _filter_fuel_supplies(
 async def get_fuel_supply_report_summary(
     date_from: Optional[str] = None, date_to: Optional[str] = None,
     equipment_plate: Optional[str] = None, supplier_name: Optional[str] = None, fuel_type: Optional[str] = None,
+    source: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    rows = await _filter_fuel_supplies(date_from, date_to, equipment_plate, supplier_name, fuel_type)
+    rows = await _filter_fuel_supplies(date_from, date_to, equipment_plate, supplier_name, fuel_type, source)
     total_liters = round(sum(r.get('liters') or 0 for r in rows), 2)
     total_value = round(sum(r.get('total_value') or 0 for r in rows), 2)
     return {
@@ -243,6 +248,14 @@ async def get_fuel_supply_report_summary(
         "total_liters": total_liters,
         "total_value": total_value,
         "avg_price_per_liter": round(total_value / total_liters, 2) if total_liters else 0,
+        # Os abastecimentos do filtro, pra tabela da tela (o mesmo recorte do PDF/Excel)
+        "rows": [{
+            "id": r.get('id'), "supply_number": r.get('supply_number'), "supply_date": r.get('supply_date'),
+            "equipment_plate": r.get('equipment_plate'), "driver_name": r.get('driver_name'),
+            "supplier_name": r.get('supplier_name'), "source": r.get('source'),
+            "fuel_type_label": r.get('fuel_type_label'), "liters": r.get('liters') or 0,
+            "unit_price": r.get('unit_price') or 0, "total_value": r.get('total_value') or 0,
+        } for r in rows],
     }
 
 
@@ -284,9 +297,10 @@ async def get_fuel_supply_daily_chart(current_user: dict = Depends(get_current_a
 async def download_fuel_supply_report_pdf(
     date_from: Optional[str] = None, date_to: Optional[str] = None,
     equipment_plate: Optional[str] = None, supplier_name: Optional[str] = None, fuel_type: Optional[str] = None,
+    source: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    rows = await _filter_fuel_supplies(date_from, date_to, equipment_plate, supplier_name, fuel_type)
+    rows = await _filter_fuel_supplies(date_from, date_to, equipment_plate, supplier_name, fuel_type, source)
     company = await get_company_settings()
     pdf_buffer = generate_fuel_supply_report_pdf(rows, company=company)
     return StreamingResponse(
@@ -300,9 +314,10 @@ async def download_fuel_supply_report_pdf(
 async def download_fuel_supply_report_excel(
     date_from: Optional[str] = None, date_to: Optional[str] = None,
     equipment_plate: Optional[str] = None, supplier_name: Optional[str] = None, fuel_type: Optional[str] = None,
+    source: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    rows = await _filter_fuel_supplies(date_from, date_to, equipment_plate, supplier_name, fuel_type)
+    rows = await _filter_fuel_supplies(date_from, date_to, equipment_plate, supplier_name, fuel_type, source)
     company = await get_company_settings()
     excel_buffer = generate_fuel_supply_report_excel(rows, company=company)
     return StreamingResponse(
@@ -606,8 +621,11 @@ async def _compute_tank_level() -> Optional[dict]:
         "capacity_liters": capacity,
         "minimum_alert_liters": minimum,
         "current_liters": round(current_liters, 2),
+        "free_liters": round(max(0, capacity - current_liters), 2),
         "percentage": percentage,
-        "status": "LOW" if current_liters <= minimum else "OK",
+        # OVER: as recargas passaram da capacidade configurada (recarga lançada
+        # a mais ou capacidade errada) - antes aparecia como "Nível OK"
+        "status": "LOW" if current_liters <= minimum else "OVER" if current_liters > capacity else "OK",
     }
 
 
@@ -668,7 +686,14 @@ async def get_tank_ledger(current_user: dict = Depends(get_current_active_user))
     } for s in supplies]
 
     combined = entradas + saidas
-    combined.sort(key=lambda x: (x.get("date") or "", x.get("created_at") or ""), reverse=True)
+    # Saldo do tanque depois de cada movimento, em ordem cronológica
+    combined.sort(key=lambda x: (x.get("date") or "", str(x.get("created_at") or "")))
+    balance = 0.0
+    for item in combined:
+        liters = float(item.get("liters") or 0)
+        balance += liters if item["type"] == "ENTRADA" else -liters
+        item["balance_after"] = round(balance, 2)
+    combined.reverse()
     return combined
 
 

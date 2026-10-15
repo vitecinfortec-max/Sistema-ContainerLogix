@@ -88,6 +88,9 @@ export default function FuelSupplyPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [nextNumber, setNextNumber] = useState(null);
@@ -213,14 +216,17 @@ export default function FuelSupplyPage() {
   const totalValue = netValue + (form.has_other_expenses ? Number(form.other_expenses_value || 0) : 0);
 
   const handleSave = async () => {
-    if (!form.equipment_plate || !form.supply_date || !form.entry_date || form.reading === '' || !form.supplier_name || !form.fuel_type || !form.liters || !form.unit_price || !form.gross_value) {
-      toast.error('Preencha os campos obrigatórios (Equipamento, Datas, Leitura, Fornecedor, Combustível, Litros, Valor Unitário e Valor Bruto)');
+    const fromTank = form.source === 'TANQUE_PROPRIO';
+    if (!form.equipment_plate || !form.supply_date || !form.entry_date || form.reading === '' || (!fromTank && !form.supplier_name) || !form.fuel_type || !form.liters || !form.unit_price || !form.gross_value) {
+      toast.error(`Preencha os campos obrigatórios (Equipamento, Datas, Leitura${fromTank ? '' : ', Fornecedor'}, Combustível, Litros, Valor Unitário e Valor Bruto)`);
       return;
     }
     setSaving(true);
     try {
       const payload = {
         ...form,
+        // Tanque próprio não tem fornecedor/cidade (campos escondidos no formulário)
+        ...(fromTank ? { supplier_id: null, supplier_name: null, city: null, state: null } : {}),
         reading: Number(form.reading || 0),
         liters: Number(form.liters || 0),
         unit_price: Number(form.unit_price || 0),
@@ -271,9 +277,19 @@ export default function FuelSupplyPage() {
   // Paginação: a lista vem inteira da API; a tela mostra uma página por vez.
   // Se a página atual deixar de existir (ex.: excluiu o último registro dela),
   // cai na última que existe.
-  const totalPages = Math.max(1, Math.ceil(list.length / ITEMS_PER_PAGE));
+  // Período e fonte filtram a lista que já veio da busca (indicadores e
+  // paginação acompanham o filtro)
+  const filtered = list.filter((f) =>
+    (!dateFrom || (f.supply_date || '') >= dateFrom)
+    && (!dateTo || (f.supply_date || '') <= dateTo)
+    && (sourceFilter === 'all' || (f.source || 'POSTO_EXTERNO') === sourceFilter));
+  const hasFilters = !!(search || dateFrom || dateTo || sourceFilter !== 'all');
+  const clearFilters = () => { setSearch(''); setDateFrom(''); setDateTo(''); setSourceFilter('all'); setCurrentPage(1); };
+  const onFilter = (setter) => (value) => { setter(value); setCurrentPage(1); };
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const page = Math.min(currentPage, totalPages);
-  const pageItems = list.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const pageItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
   const goToPage = (next) => {
     if (next >= 1 && next <= totalPages) {
       setCurrentPage(next);
@@ -293,8 +309,8 @@ export default function FuelSupplyPage() {
   };
 
   const singleSelectedSupply = selectedIds.size === 1 ? list.find((f) => f.id === [...selectedIds][0]) : null;
-  const listLiters = list.reduce((acc, f) => acc + Number(f.liters || 0), 0);
-  const listValue = list.reduce((acc, f) => acc + Number(f.total_value || 0), 0);
+  const listLiters = filtered.reduce((acc, f) => acc + Number(f.liters || 0), 0);
+  const listValue = filtered.reduce((acc, f) => acc + Number(f.total_value || 0), 0);
 
   return (
     <Layout>
@@ -306,16 +322,31 @@ export default function FuelSupplyPage() {
         />
 
         <StatGrid>
-          <StatCard label="Abastecimentos" value={list.length} icon={Fuel} tone="blue" hint={search ? 'que batem com a busca' : 'registrados'} />
+          <StatCard label="Abastecimentos" value={filtered.length} icon={Fuel} tone="blue" hint={hasFilters ? 'no filtro atual' : 'registrados'} />
           <StatCard label="Litros" value={fmtLitersTotal(listLiters)} icon={Droplet} tone="primary" />
           <StatCard label="Valor total" value={fmtMoney(listValue)} icon={Wallet} tone="emerald" />
           <StatCard label="Preço médio/litro" value={fmtMoney(listLiters ? listValue / listLiters : 0)} icon={Gauge} tone="amber" />
         </StatGrid>
 
-        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Equipamento, motorista ou fornecedor">
+        <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <FilterField label="Equipamento, motorista ou fornecedor" className="col-span-2">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="fuel-search" />
+            </FilterField>
+            <FilterField label="Data início">
+              <Input type="date" value={dateFrom} onChange={(e) => onFilter(setDateFrom)(e.target.value)} className="h-9 text-sm" data-testid="fuel-date-from" />
+            </FilterField>
+            <FilterField label="Data fim">
+              <Input type="date" value={dateTo} onChange={(e) => onFilter(setDateTo)(e.target.value)} className="h-9 text-sm" data-testid="fuel-date-to" />
+            </FilterField>
+            <FilterField label="Fonte">
+              <Select value={sourceFilter} onValueChange={onFilter(setSourceFilter)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="fuel-source-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {SOURCE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -323,7 +354,7 @@ export default function FuelSupplyPage() {
         {/* Lista - marque um abastecimento pra habilitar as ações da barra */}
         <DataCard
           title="Abastecimentos"
-          count={loading ? '...' : list.length}
+          count={loading ? '...' : filtered.length}
           toolbar={(
             <Toolbar
               selectedCount={selectedIds.size}
@@ -337,17 +368,17 @@ export default function FuelSupplyPage() {
             <TablePagination
               currentPage={page}
               totalPages={totalPages}
-              totalItems={list.length}
+              totalItems={filtered.length}
               pageSize={ITEMS_PER_PAGE}
               onPageChange={goToPage}
             />
           )}
         >
-          {list.length === 0 && !loading ? (
+          {filtered.length === 0 && !loading ? (
             <EmptyState
               icon={Fuel}
-              title={search ? 'Nenhum abastecimento encontrado' : 'Nenhum abastecimento cadastrado'}
-              hint={search ? 'Ajuste a busca' : 'Registre o primeiro pelo botão "Novo abastecimento"'}
+              title={hasFilters ? 'Nenhum abastecimento encontrado' : 'Nenhum abastecimento cadastrado'}
+              hint={hasFilters ? 'Ajuste os filtros' : 'Registre o primeiro pelo botão "Novo abastecimento"'}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -363,6 +394,7 @@ export default function FuelSupplyPage() {
                     </th>
                     <th>Nº</th>
                     <th>Data</th>
+                    <th>Ordem</th>
                     <th>Equipamento</th>
                     <th>Motorista</th>
                     <th>Fornecedor</th>
@@ -390,6 +422,7 @@ export default function FuelSupplyPage() {
                       </td>
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{f.supply_number}</td>
                       <td className="whitespace-nowrap tabular-nums">{f.supply_date ? format(new Date(`${f.supply_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
+                      <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{f.supply_order || '-'}</td>
                       <td><PlateTag>{f.equipment_plate}</PlateTag></td>
                       <td><div className="max-w-[200px] truncate" title={f.driver_name || ''}>{f.driver_name || '-'}</div></td>
                       <td><div className="max-w-[200px] truncate" title={f.supplier_name || ''}>{f.supplier_name || '-'}</div></td>
@@ -459,23 +492,29 @@ export default function FuelSupplyPage() {
               <Field type="date" label="Data do Abastecimento *" value={form.supply_date} onChange={(v) => onChange('supply_date', v)} testid="fuel-supply-date" />
               <Field type="date" label="Data de Entrada *" value={form.entry_date} onChange={(v) => onChange('entry_date', v)} testid="fuel-entry-date" />
               <DecimalField label="Leitura *" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-reading" />
-              <div>
-                <Label className="mb-1.5 block">Fornecedor <span className="text-destructive">*</span></Label>
-                <Autocomplete
-                  value={form.supplier_name}
-                  onChange={(v) => onChange('supplier_name', v)}
-                  onSelect={(sp) => { onChange('supplier_name', sp.name); onChange('supplier_id', sp.id); }}
-                  options={suppliers}
-                  displayField="name"
-                  className="text-sm"
-                />
-              </div>
-              <CityStateFields
-                flat
-                value={{ city: form.city, state: form.state }}
-                onChange={({ city, state }) => { onChange('city', city); onChange('state', state); }}
-              />
               <SelectField label="Fonte *" value={form.source} onChange={(v) => onChange('source', v)} options={SOURCE_OPTIONS} testid="fuel-source" />
+              {/* Tanque próprio é da empresa: sem fornecedor nem cidade */}
+              {form.source !== 'TANQUE_PROPRIO' && (
+                <>
+                  <div>
+                    <Label className="mb-1.5 block">Fornecedor <span className="text-destructive">*</span></Label>
+                    <Autocomplete
+                      value={form.supplier_name}
+                      onChange={(v) => onChange('supplier_name', v)}
+                      onSelect={(sp) => { onChange('supplier_name', sp.name); onChange('supplier_id', sp.id); }}
+                      options={suppliers}
+                      displayField="name"
+                      className="text-sm"
+                      testId="fuel-supplier"
+                    />
+                  </div>
+                  <CityStateFields
+                    flat
+                    value={{ city: form.city, state: form.state }}
+                    onChange={({ city, state }) => { onChange('city', city); onChange('state', state); }}
+                  />
+                </>
+              )}
             </div>
 
             <SectionTitle>Combustível / ARLA</SectionTitle>
