@@ -1,7 +1,7 @@
 import '@/App.css';
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { ModuleConfigProvider } from './context/ModuleConfigContext';
@@ -38,6 +38,8 @@ const lazyPage = (load) => lazy(async () => {
   }
 });
 
+// A moldura também vem sob demanda (não pesa na tela de login)
+const AppShell = lazyPage(() => import('./components/Layout').then((m) => ({ default: m.AppShell })));
 const ChangePasswordPage = lazyPage(() => import('./pages/ChangePasswordPage'));
 const DashboardPage = lazyPage(() => import('./pages/DashboardPage'));
 const MovementsPage = lazyPage(() => import('./pages/MovementsPage'));
@@ -119,6 +121,20 @@ const PageLoader = () => (
   </div>
 );
 
+// Moldura comum a todas as telas internas (components/Layout.js): o menu e o
+// cabeçalho ficam na tela enquanto o arquivo da próxima tela carrega. Sem
+// sessão, ou com troca de senha pendente, não há moldura - o ProtectedRoute
+// de cada rota manda para o login / troca de senha.
+function ShellRoute() {
+  const { isAuthenticated, loading, user } = useAuth();
+  if (loading || !isAuthenticated || user?.must_change_password) return <Outlet />;
+  return (
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -136,6 +152,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route element={<ShellRoute />}>
           <Route
             path="/dashboard"
             element={
@@ -729,6 +746,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          </Route>
         </Routes>
         </Suspense>
         <Toaster position="top-right" richColors />

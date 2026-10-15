@@ -66,7 +66,8 @@ import {
   TrendingUp,
   Droplet
 } from 'lucide-react';
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Suspense, createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { PageSkeleton } from './DataPage';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from './ui/button';
@@ -181,7 +182,31 @@ const GROUP_COLORS = {
   'Gestão de Container': 'chart-10',
 };
 
+// Moldura do sistema (menu lateral, cabeçalho, sino, busca). Fica montada uma
+// vez só, na rota (AppShell, usado em App.js): trocar de tela troca apenas o
+// conteúdo, sem refazer o menu nem perder as notificações recebidas. As telas
+// continuam escrevendo <Layout>...</Layout>; dentro da moldura ele só repassa
+// o conteúdo.
+const ShellContext = createContext(false);
+
+export function AppShell({ children }) {
+  return (
+    <ShellContext.Provider value>
+      <LayoutFrame>
+        {/* Enquanto o arquivo da próxima tela carrega, só o miolo mostra o esqueleto */}
+        <Suspense fallback={<PageSkeleton testId="page-chunk-loading" />}>{children}</Suspense>
+      </LayoutFrame>
+    </ShellContext.Provider>
+  );
+}
+
 export default function Layout({ children }) {
+  const inShell = useContext(ShellContext);
+  if (inShell) return children;
+  return <LayoutFrame>{children}</LayoutFrame>;
+}
+
+function LayoutFrame({ children }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
   const isSuperadmin = !!user?.is_superadmin;
@@ -369,6 +394,14 @@ export default function Layout({ children }) {
     if (isComercialActive && !comercialOpen) setComercialOpen(true);
     if (isGestaoContainerActive && !gestaoContainerOpen) setGestaoContainerOpen(true);
     if (isTerminalActive && !terminalOpen) setTerminalOpen(true);
+  }, [location.pathname]);
+
+  // A moldura não é mais remontada a cada tela: o que é passageiro fecha ao
+  // navegar (antes fechava por remontar).
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setNotificationsOpen(false);
+    setCommandPaletteOpen(false);
   }, [location.pathname]);
 
   // Atalho global Ctrl+K / Cmd+K abre a busca global (funciona em qualquer tela, sidebar aberta ou não)
@@ -1307,7 +1340,7 @@ export default function Layout({ children }) {
         <main className={`flex-1 min-w-0 transition-all duration-300 ${
           sidebarOpen ? 'md:ml-[225px]' : 'md:ml-16'
         } mt-14 md:mt-12 pb-20 md:pb-0`}>
-          <PageTransition className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
+          <PageTransition key={location.pathname} className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
             {children}
           </PageTransition>
         </main>
