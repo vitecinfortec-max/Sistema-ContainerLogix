@@ -784,8 +784,16 @@ async def find_movement_for_invoice(
     results = []
     for m in movements:
         billed_invoice_number = None
-        if m.get('billed') and m.get('invoice_id'):
-            invoice = await db.invoices.find_one({"id": m['invoice_id']}, {"_id": 0, "invoice_number": 1})
+        if m.get('billed'):
+            # Pelo invoice_id; registros antigos perderam esse campo, então
+            # cai pra lista de movimentações de uma fatura não cancelada.
+            invoice = None
+            if m.get('invoice_id'):
+                invoice = await db.invoices.find_one({"id": m['invoice_id']}, {"_id": 0, "invoice_number": 1})
+            if not invoice:
+                invoice = await db.invoices.find_one(
+                    {"movement_ids": m['id'], "status": {"$ne": "CANCELADO"}}, {"_id": 0, "invoice_number": 1}
+                )
             if invoice:
                 billed_invoice_number = invoice['invoice_number']
 

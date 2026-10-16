@@ -1,17 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
-import { FilterCard, FilterField, SearchInput, DataCard, EmptyState } from '../components/DataPage';
+import {
+  FilterCard, FilterField, SearchInput, DataCard, EmptyState, StatCard, StatGrid, StatusPill, TablePagination,
+} from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { FileText, FileSpreadsheet, X, BarChart3 } from 'lucide-react';
+import { FileText, FileSpreadsheet, X, BarChart3, List, CheckCircle2, Clock, Warehouse } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const fmtValue = (v, currency) => (v == null ? '-' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: currency === 'USD' ? 'USD' : 'BRL' }));
+const PREVIEW_PAGE_SIZE = 15;
 
 const DAILY_SERIES = [
   { key: 'billed', name: 'Faturado', color: CHART_COLORS.primary },
@@ -28,6 +32,9 @@ export default function ReportsBillingPage() {
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState([]);
   const [dailyChart, setDailyChart] = useState([]);
+  const [preview, setPreview] = useState({ items: [], total: 0, pages: 1, stats: null });
+  const [previewPage, setPreviewPage] = useState(1);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Autocomplete de cliente
   const [clientSearch, setClientSearch] = useState('');
@@ -124,7 +131,40 @@ export default function ReportsBillingPage() {
     return params;
   };
 
+  // Início depois do fim: avisa na tela em vez de baixar um relatório vazio
+  const periodError = dateFrom && dateTo && dateFrom > dateTo ? 'A data inicial não pode ser depois da data final.' : '';
+  const blockIfInvalidPeriod = () => {
+    if (periodError) toast.error(periodError);
+    return !!periodError;
+  };
+
+  useEffect(() => { setPreviewPage(1); }, [filterType, filterStatus, filterClient, billedFilter, dateFrom, dateTo]);
+
+  // Prévia na tela: as mesmas linhas do PDF/Excel, recarregada a cada filtro
+  useEffect(() => {
+    if (periodError) {
+      setPreview({ items: [], total: 0, pages: 1, stats: null });
+      return undefined;
+    }
+    let cancelled = false;
+    const loadPreview = async () => {
+      setPreviewLoading(true);
+      try {
+        const response = await api.previewBillingReport({ ...buildParams(), page: previewPage, per_page: PREVIEW_PAGE_SIZE });
+        if (!cancelled) setPreview(response.data);
+      } catch (error) {
+        if (!cancelled) toast.error(error.response?.data?.detail || 'Erro ao carregar a prévia do relatório');
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    };
+    loadPreview();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, filterStatus, filterClient, billedFilter, dateFrom, dateTo, previewPage, periodError]);
+
   const downloadPDF = async () => {
+    if (blockIfInvalidPeriod()) return;
     setLoading(true);
     try {
       const params = buildParams();
@@ -146,6 +186,7 @@ export default function ReportsBillingPage() {
   };
 
   const downloadExcel = async () => {
+    if (blockIfInvalidPeriod()) return;
     setLoading(true);
     try {
       const params = buildParams();
@@ -176,6 +217,7 @@ export default function ReportsBillingPage() {
   };
 
   const downloadStorageOveragePDF = async () => {
+    if (blockIfInvalidPeriod()) return;
     setLoading(true);
     try {
       const params = buildStorageOverageParams();
@@ -197,6 +239,7 @@ export default function ReportsBillingPage() {
   };
 
   const downloadStorageOverageExcel = async () => {
+    if (blockIfInvalidPeriod()) return;
     setLoading(true);
     try {
       const params = buildStorageOverageParams();
@@ -376,12 +419,82 @@ export default function ReportsBillingPage() {
               </Select>
             </FilterField>
           </div>
-          {(dateFrom || dateTo) && (
+          {periodError ? (
+            <p className="text-[12px] text-red-600 dark:text-red-400 mt-2" data-testid="report-billing-period-error">{periodError}</p>
+          ) : (dateFrom || dateTo) && (
             <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">
               O relatório de Diárias de Armazenagem considera só os dias excedentes dentro do período selecionado.
             </p>
           )}
         </FilterCard>
+
+        <StatGrid>
+          <StatCard label="Movimentações" value={(preview.stats?.total ?? 0).toLocaleString('pt-BR')} icon={List} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'no relatório'} testId="billing-preview-total" />
+          <StatCard label="Faturado" value={fmtMoney(preview.stats?.billed_value)} icon={CheckCircle2} tone="emerald" hint={`${preview.stats?.billed_count ?? 0} movimentação(ões)`} testId="billing-preview-billed" />
+          <StatCard label="A faturar" value={fmtMoney(preview.stats?.unbilled_value)} icon={Clock} tone="amber" hint={preview.stats?.usd_value ? `+ ${fmtValue(preview.stats.usd_value, 'USD')} em dólar no total` : `${preview.stats?.unbilled_count ?? 0} movimentação(ões)`} testId="billing-preview-unbilled" />
+          <StatCard label="Diárias de armazenagem" value={fmtMoney(preview.stats?.storage_value)} icon={Warehouse} tone="primary" hint={billedFilter === 'billed' ? 'não entram em "Faturadas"' : `${preview.stats?.storage_count ?? 0} container(s) além do free time`} />
+        </StatGrid>
+
+        <DataCard
+          title="Prévia do relatório"
+          count={previewLoading ? '...' : preview.total}
+          meta={<span className="hidden md:inline text-xs text-slate-400 dark:text-slate-500">as mesmas movimentações do PDF e do Excel</span>}
+          footer={(
+            <TablePagination
+              currentPage={previewPage}
+              totalPages={preview.pages || 1}
+              totalItems={preview.total}
+              pageSize={PREVIEW_PAGE_SIZE}
+              onPageChange={setPreviewPage}
+            />
+          )}
+        >
+          {preview.items.length === 0 ? (
+            <EmptyState
+              loading={previewLoading}
+              icon={List}
+              title={periodError ? 'Período inválido' : 'Nenhuma movimentação encontrada'}
+              hint={periodError || (hasFilters ? 'Ajuste os filtros' : undefined)}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table" data-testid="billing-preview-table">
+                <thead>
+                  <tr>
+                    <th>Nº</th>
+                    <th>Data</th>
+                    <th>Operação</th>
+                    <th>Container</th>
+                    <th>Cliente</th>
+                    <th>Tipo de serviço</th>
+                    <th className="text-right">Valor</th>
+                    <th>Faturado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.items.map((m) => (
+                    <tr key={m.id}>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">#{m.transaction_id}</td>
+                      <td className="whitespace-nowrap tabular-nums">{m.created_at ? format(new Date(m.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
+                      <td>
+                        <StatusPill tone={m.operation_type === 'ENTRADA' ? 'primary' : 'amber'}>
+                          {m.operation_type === 'ENTRADA' ? 'Entrada' : 'Saída'}
+                        </StatusPill>
+                      </td>
+                      <td className="cell-strong whitespace-nowrap font-mono text-[12px]">{m.container_number || '-'}</td>
+                      <td><div className="max-w-[200px] truncate" title={m.client_name || ''}>{m.client_name || '-'}</div></td>
+                      <td><div className="max-w-[180px] truncate" title={m.service_type || ''}>{m.service_type || '-'}</div></td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{fmtValue(m.service_value, m.currency)}</td>
+                      <td>
+                        <StatusPill tone={m.billed ? 'emerald' : 'slate'}>{m.billed ? 'Faturado' : 'A faturar'}</StatusPill>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
 
         {/* Faturamento por Dia */}
         <DataCard

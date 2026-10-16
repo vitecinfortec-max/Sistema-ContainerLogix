@@ -3,13 +3,13 @@ from typing import Optional
 import io
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from models import IntlInvoiceCreate
 from reports import merge_company
 
-from shared import db, get_current_admin_user, get_company_settings
+from shared import db, get_current_admin_user, get_company_settings, round_money
 
 api_router = APIRouter(prefix="/api")
 
@@ -32,10 +32,34 @@ async def build_receiver_data() -> dict:
         "complement": ""
     }
 
+def _build_items(data: IntlInvoiceCreate):
+    """Itens e total da invoice, validados e arredondados a 2 casas - antes
+    aceitava invoice sem item, quantidade zero e preço negativo, e o total
+    era soma de float sem arredondar (ex.: 0.1 + 0.2 = 0.30000000000000004)."""
+    if not data.items:
+        raise HTTPException(status_code=400, detail="Adicione pelo menos um item à invoice")
+    items_data = []
+    for item in data.items:
+        if not (item.description or '').strip():
+            raise HTTPException(status_code=400, detail="Todo item precisa de descrição")
+        if item.quantity <= 0:
+            raise HTTPException(status_code=400, detail="A quantidade de cada item deve ser maior que zero")
+        if item.unit_price < 0:
+            raise HTTPException(status_code=400, detail="O preço unitário não pode ser negativo")
+        items_data.append({
+            "description": item.description,
+            "quantity": item.quantity,
+            "unit_price": round_money(item.unit_price),
+            "total": round_money(item.quantity * item.unit_price),
+        })
+    subtotal = round_money(sum(i["total"] for i in items_data))
+    return items_data, subtotal
+
+
 @api_router.get("/intl-invoices")
 async def get_intl_invoices(
-    page: int = 1,
-    per_page: int = 20,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=200),
     status: Optional[str] = None,
     currency: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
@@ -98,7 +122,10 @@ async def create_intl_invoice(
 ):
     """Cria uma nova invoice internacional"""
     
-    # Gerar número sequencial
+    items_data, subtotal = _build_items(data)
+    total = subtotal
+
+    # Gerar número sequencial (depois de validar, pra não pular número)
     counter = await db.counters.find_one_and_update(
         {"_id": "intl_invoice_number"},
         {"$inc": {"seq": 1}},
@@ -106,21 +133,7 @@ async def create_intl_invoice(
         return_document=True
     )
     invoice_number = counter.get("seq", 1)
-    
-    # Calcular totais
-    subtotal = sum(item.quantity * item.unit_price for item in data.items)
-    total = subtotal
-    
-    # Preparar itens
-    items_data = []
-    for item in data.items:
-        items_data.append({
-            "description": item.description,
-            "quantity": item.quantity,
-            "unit_price": item.unit_price,
-            "total": item.quantity * item.unit_price
-        })
-    
+
     receiver_data = await build_receiver_data()
     invoice_data = {
         "id": str(uuid.uuid4()),
@@ -183,9 +196,10 @@ async def update_intl_invoice_status(
         {"$set": {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     
-    if result.modified_count == 0:
+    # matched, não modified: repetir o status atual não é "não encontrada"
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Invoice não encontrada")
-    
+
     return {"message": "Status atualizado com sucesso"}
 
 @api_router.delete("/intl-invoices/{invoice_id}")
@@ -206,21 +220,12 @@ async def update_intl_invoice(
     invoice = await db.intl_invoices.find_one({"id": invoice_id}, {"_id": 0})
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice não encontrada")
-    
-    # Calcular totais
-    subtotal = sum(item.quantity * item.unit_price for item in data.items)
+    if invoice.get('status') == 'CANCELADA':
+        raise HTTPException(status_code=400, detail="Invoice cancelada não pode ser editada")
+
+    items_data, subtotal = _build_items(data)
     total = subtotal
-    
-    # Preparar itens
-    items_data = []
-    for item in data.items:
-        items_data.append({
-            "description": item.description,
-            "quantity": item.quantity,
-            "unit_price": item.unit_price,
-            "total": item.quantity * item.unit_price
-        })
-    
+
     update_data = {
         "payer_client_id": data.payer_client_id,
         "payer_company": data.payer_company,

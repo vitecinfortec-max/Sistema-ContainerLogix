@@ -266,6 +266,102 @@ async def _compute_storage_overage_charges(
     return charges
 
 
+def _parse_period(date_from: Optional[str], date_to: Optional[str]):
+    """Dias do período (AAAA-MM-DD). Data ilegível ou início depois do fim
+    viram 400 com mensagem - antes o primeiro estourava 500 e o segundo
+    devolvia um relatório vazio sem explicar."""
+    try:
+        day_from = date.fromisoformat(date_from[:10]) if date_from else None
+        day_to = date.fromisoformat(date_to[:10]) if date_to else None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data do período inválida")
+    if day_from and day_to and day_from > day_to:
+        raise HTTPException(status_code=400, detail="A data inicial não pode ser depois da data final")
+    return day_from, day_to
+
+
+async def _billing_report_data(operation_type, status_filter, client_name, billed_filter, date_from, date_to):
+    """Movimentações + Diárias de Armazenagem do Relatório de Faturamento com
+    os filtros da tela - a mesma lista vai pro PDF, pro Excel e pra prévia."""
+    day_from, day_to = _parse_period(date_from, date_to)
+    query = {}
+    if operation_type and operation_type != 'all':
+        query['operation_type'] = operation_type
+    if status_filter and status_filter != 'all':
+        query['status'] = status_filter
+    if client_name and client_name != 'all':
+        query['client_name'] = client_name
+    if billed_filter == 'billed':
+        query['billed'] = True
+    elif billed_filter == 'unbilled':
+        query['billed'] = {"$ne": True}
+
+    movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
+    movements = _filter_movements_by_period(movements, date_from, date_to)
+
+    report_title = "Relatório de Faturamento"
+    if client_name and client_name != 'all':
+        report_title += f" - Cliente: {client_name}"
+
+    storage_charges = []
+    if billed_filter != 'billed':
+        storage_charges = await _compute_storage_overage_charges(
+            client_name if client_name and client_name != 'all' else None,
+            status_filter if status_filter and status_filter != 'all' else None,
+            day_from,
+            day_to,
+        )
+    return movements, storage_charges, report_title
+
+
+@api_router.get("/reports/billing/preview")
+async def preview_billing_report(
+    operation_type: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    client_name: Optional[str] = None,
+    billed_filter: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(15, ge=1, le=200),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Prévia na tela do Relatório de Faturamento: uma página das
+    movimentações e os totais do filtro inteiro (valores em R$; as em dólar
+    somam à parte)."""
+    movements, storage_charges, _ = await _billing_report_data(
+        operation_type, status_filter, client_name, billed_filter, date_from, date_to
+    )
+
+    def money(items, currency):
+        return round_money(sum(
+            (m.get('service_value') or 0) for m in items if (m.get('currency') or 'BRL') == currency
+        ))
+
+    billed = [m for m in movements if m.get('billed')]
+    unbilled = [m for m in movements if not m.get('billed')]
+    total = len(movements)
+    stats = {
+        "total": total,
+        "billed_count": len(billed),
+        "unbilled_count": len(unbilled),
+        "billed_value": money(billed, 'BRL'),
+        "unbilled_value": money(unbilled, 'BRL'),
+        "usd_value": money(movements, 'USD'),
+        "storage_count": len(storage_charges),
+        "storage_value": money(storage_charges, 'BRL'),
+    }
+    start = (page - 1) * per_page
+    return {
+        "items": [_movement_response(m) for m in movements[start:start + per_page]],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": max(1, (total + per_page - 1) // per_page),
+        "stats": stats,
+    }
+
+
 @api_router.get("/reports/billing/daily-chart", response_model=list[DailyBillingPoint])
 async def get_billing_daily_chart(current_user: dict = Depends(get_current_admin_user)):
     today = today_brt()
@@ -282,34 +378,9 @@ async def download_billing_pdf_report(
     date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    query = {}
-    if operation_type and operation_type != 'all':
-        query['operation_type'] = operation_type
-    if status_filter and status_filter != 'all':
-        query['status'] = status_filter
-    if client_name and client_name != 'all':
-        query['client_name'] = client_name
-    if billed_filter == 'billed':
-        query['billed'] = True
-    elif billed_filter == 'unbilled':
-        query['billed'] = {"$ne": True}
-
-    movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
-
-    movements = _filter_movements_by_period(movements, date_from, date_to)
-
-    report_title = "Relatório de Faturamento"
-    if client_name and client_name != 'all':
-        report_title += f" - Cliente: {client_name}"
-
-    storage_charges = []
-    if billed_filter != 'billed':
-        storage_charges = await _compute_storage_overage_charges(
-            client_name if client_name and client_name != 'all' else None,
-            status_filter if status_filter and status_filter != 'all' else None,
-            datetime.fromisoformat(date_from).date() if date_from else None,
-            datetime.fromisoformat(date_to).date() if date_to else None,
-        )
+    movements, storage_charges, report_title = await _billing_report_data(
+        operation_type, status_filter, client_name, billed_filter, date_from, date_to
+    )
 
     company = await get_company_settings()
     pdf_buffer = generate_billing_pdf_report(movements, report_title, company=company, storage_charges=storage_charges)
@@ -331,34 +402,9 @@ async def download_billing_excel_report(
     date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    query = {}
-    if operation_type and operation_type != 'all':
-        query['operation_type'] = operation_type
-    if status_filter and status_filter != 'all':
-        query['status'] = status_filter
-    if client_name and client_name != 'all':
-        query['client_name'] = client_name
-    if billed_filter == 'billed':
-        query['billed'] = True
-    elif billed_filter == 'unbilled':
-        query['billed'] = {"$ne": True}
-
-    movements = await db.movements.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
-
-    movements = _filter_movements_by_period(movements, date_from, date_to)
-
-    report_title = "Relatório de Faturamento"
-    if client_name and client_name != 'all':
-        report_title += f" - Cliente: {client_name}"
-
-    storage_charges = []
-    if billed_filter != 'billed':
-        storage_charges = await _compute_storage_overage_charges(
-            client_name if client_name and client_name != 'all' else None,
-            status_filter if status_filter and status_filter != 'all' else None,
-            datetime.fromisoformat(date_from).date() if date_from else None,
-            datetime.fromisoformat(date_to).date() if date_to else None,
-        )
+    movements, storage_charges, report_title = await _billing_report_data(
+        operation_type, status_filter, client_name, billed_filter, date_from, date_to
+    )
 
     company = await get_company_settings()
     excel_buffer = generate_billing_excel(movements, company=company, storage_charges=storage_charges)
@@ -436,42 +482,6 @@ async def download_storage_overage_excel_report(
     )
 
 
-from pydantic import BaseModel
-
-class BillingRequest(BaseModel):
-    movement_ids: List[str]
-
-@api_router.post("/billing/report")
-async def generate_billing_report(
-    request: BillingRequest,
-    current_user: dict = Depends(get_current_admin_user)
-):
-    from reports import generate_billing_excel
-    
-    # Buscar movimentações pelos IDs
-    movements = await db.movements.find(
-        {"id": {"$in": request.movement_ids}},
-        {"_id": 0}
-    ).to_list(None)
-    
-    if not movements:
-        raise HTTPException(status_code=404, detail="Nenhuma movimentação encontrada")
-    
-    # Marcar movimentações como faturadas
-    billed_at = datetime.now(timezone.utc).isoformat()
-    await db.movements.update_many(
-        {"id": {"$in": request.movement_ids}},
-        {"$set": {"billed": True, "billed_at": billed_at}}
-    )
-    
-    # Ordenar por transaction_id
-    movements.sort(key=lambda x: x.get('transaction_id', 0), reverse=True)
-
-    company = await get_company_settings()
-    excel_buffer = generate_billing_excel(movements, company=company)
-
-    return StreamingResponse(
-        io.BytesIO(excel_buffer),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=faturamento.xlsx"}
-    )
+# POST /billing/report foi removido: marcava movimentações como faturadas sem
+# criar fatura nenhuma (ficavam presas, sem poder entrar numa fatura) e
+# nenhuma tela usava. Faturar é sempre por POST /invoices.

@@ -167,6 +167,7 @@ export const api = {
   downloadBillingPDFReport: (params) => axios.get(`${API}/reports/billing/pdf`, { params, responseType: 'blob' }),
   downloadBillingExcelReport: (params) => axios.get(`${API}/reports/billing/excel`, { params, responseType: 'blob' }),
   getBillingDailyChart: () => axios.get(`${API}/reports/billing/daily-chart`),
+  previewBillingReport: (params) => axios.get(`${API}/reports/billing/preview`, { params }),
   downloadStorageOveragePdfReport: (params) => axios.get(`${API}/reports/storage-overage/pdf`, { params, responseType: 'blob' }),
   downloadStorageOverageExcelReport: (params) => axios.get(`${API}/reports/storage-overage/excel`, { params, responseType: 'blob' }),
   
@@ -179,11 +180,11 @@ export const api = {
   registerQuickExit: (data) => axios.post(`${API}/yard-control/quick-exit`, data),
   
   // Billing
-  generateBillingExcel: (data) => axios.post(`${API}/billing/report`, data, { responseType: 'blob' }),
   
   // Invoices Domésticas (Faturas)
   getInvoices: (params) => axios.get(`${API}/invoices`, { params }),
   getInvoicesCount: (params) => axios.get(`${API}/invoices/count`, { params }),
+  getInvoicesStats: (params) => axios.get(`${API}/invoices/stats`, { params }),
   getInvoice: (id) => axios.get(`${API}/invoices/${id}`),
   createInvoice: (data) => axios.post(`${API}/invoices`, data),
   updateInvoice: (id, data) => axios.put(`${API}/invoices/${id}`, data),

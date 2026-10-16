@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
+  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
   StatusPill, UserTag, EmptyState, TablePagination, PageSkeleton,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '../components/ui/textarea';
 import { api } from '../lib/api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useConfirm } from '../hooks/useConfirm';
 import { toast } from 'sonner';
 import { 
   Receipt, Plus, Search, FileText, Trash2, Eye, 
@@ -63,6 +64,9 @@ export default function BillingPage() {
   // Filtro por cliente da lista: age sozinho enquanto se digita, sem botão "Filtrar"
   const [clientFilter, setClientFilter] = useState('');
   const appliedClient = useDebouncedValue(clientFilter.trim());
+  const [statusFilter, setStatusFilter] = useState('');
+  const [stats, setStats] = useState(null);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   // Estado do Modal de Nova Fatura
   const [showNewInvoice, setShowNewInvoice] = useState(false);
@@ -120,19 +124,22 @@ export default function BillingPage() {
   useEffect(() => {
     loadInvoices();
     setSelectedIds(new Set());
-  }, [currentPage, appliedClient]);
+  }, [currentPage, appliedClient, statusFilter]);
 
   // Só a primeira carga mostra o esqueleto da tela: recarregar (ao filtrar,
   // trocar de página ou salvar) mantém a lista na tela e o foco no filtro.
   const loadInvoices = async () => {
     try {
       const clientParams = appliedClient ? { client_name: appliedClient } : {};
-      const [invoicesRes, countRes] = await Promise.all([
-        api.getInvoices({ page: currentPage, per_page: ITEMS_PER_PAGE, ...clientParams }),
-        api.getInvoicesCount(clientParams)
+      const listParams = statusFilter ? { ...clientParams, status: statusFilter } : clientParams;
+      const [invoicesRes, countRes, statsRes] = await Promise.all([
+        api.getInvoices({ page: currentPage, per_page: ITEMS_PER_PAGE, ...listParams }),
+        api.getInvoicesCount(listParams),
+        api.getInvoicesStats(clientParams),
       ]);
       setInvoices(invoicesRes.data);
       setTotalInvoices(countRes.data.count);
+      setStats(statsRes.data);
     } catch (error) {
       toast.error('Erro ao carregar faturas');
     } finally {
@@ -203,7 +210,9 @@ export default function BillingPage() {
       const alreadyBilled = matches.find(m => m.billed);
       if (alreadyBilled) {
         setIdSearchError(
-          `A movimentação #${alreadyBilled.transaction_id} (${alreadyBilled.container_number}) já está na Fatura Nº ${alreadyBilled.billed_invoice_number}.`
+          alreadyBilled.billed_invoice_number
+            ? `A movimentação #${alreadyBilled.transaction_id} (${alreadyBilled.container_number}) já está na Fatura Nº ${alreadyBilled.billed_invoice_number}.`
+            : `A movimentação #${alreadyBilled.transaction_id} (${alreadyBilled.container_number}) está marcada como faturada, mas não pertence a nenhuma fatura ativa.`
         );
         return;
       }
@@ -511,13 +520,20 @@ export default function BillingPage() {
   };
 
   const handleUpdateInvoiceStatus = async (invoiceId, newStatus) => {
+    const target = invoices.find(inv => inv.id === invoiceId) || selectedInvoice;
+    // Cancelar devolve as movimentações para "a faturar" e não tem volta
+    if (newStatus === 'CANCELADO' && !(await confirm(
+      `Cancelar a Fatura Nº ${target?.invoice_number}? As movimentações dela voltam para "a faturar" e a fatura não pode ser reaberta.`,
+      'Cancelar fatura'
+    ))) return;
     try {
       await api.updateInvoiceStatus(invoiceId, newStatus);
-      toast.success('Status atualizado com sucesso!');
+      toast.success(newStatus === 'CANCELADO' ? 'Fatura cancelada. As movimentações voltaram para "a faturar".' : 'Status atualizado com sucesso!');
       setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: newStatus } : inv));
       setSelectedInvoice(prev => prev && prev.id === invoiceId ? { ...prev, status: newStatus } : prev);
+      loadInvoices();
     } catch (error) {
-      toast.error('Erro ao atualizar status');
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar status');
     }
   };
 
@@ -689,6 +705,7 @@ export default function BillingPage() {
 
   const clearClientFilter = () => {
     setClientFilter('');
+    setStatusFilter('');
     setCurrentPage(1);
   };
 
@@ -711,7 +728,16 @@ export default function BillingPage() {
       <div className="space-y-4" data-testid="billing-page">
         <PageHeader icon={Receipt} title="Faturamento" subtitle="Gerencie as faturas do sistema" />
 
-        <FilterCard hasFilters={!!appliedClient || !!clientFilter} onClear={clearClientFilter}>
+        {stats && (
+          <StatGrid>
+            <StatCard label="Em aberto" value={formatCurrency(stats.PENDENTE.total)} icon={Clock} tone="amber" hint={`${stats.PENDENTE.count} fatura(s) pendente(s)`} testId="invoice-kpi-pending" />
+            <StatCard label="Recebido" value={formatCurrency(stats.PAGO.total)} icon={Check} tone="emerald" hint={`${stats.PAGO.count} fatura(s) paga(s)`} testId="invoice-kpi-paid" />
+            <StatCard label="Cancelado" value={formatCurrency(stats.CANCELADO.total)} icon={X} tone="red" hint={`${stats.CANCELADO.count} fatura(s)`} />
+            <StatCard label="Faturas" value={stats.PENDENTE.count + stats.PAGO.count + stats.CANCELADO.count} icon={Receipt} tone="blue" hint={appliedClient ? 'do cliente filtrado' : 'no total'} />
+          </StatGrid>
+        )}
+
+        <FilterCard hasFilters={!!appliedClient || !!clientFilter || !!statusFilter} onClear={clearClientFilter}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Cliente">
               <SearchInput
@@ -719,6 +745,22 @@ export default function BillingPage() {
                 onChange={(e) => { setClientFilter(e.target.value); setCurrentPage(1); }}
                 data-testid="invoice-client-filter"
               />
+            </FilterField>
+            <FilterField label="Status">
+              <Select
+                value={statusFilter || 'ALL'}
+                onValueChange={(v) => { setStatusFilter(v === 'ALL' ? '' : v); setCurrentPage(1); }}
+              >
+                <SelectTrigger className="h-9 text-[13px]" data-testid="invoice-status-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos</SelectItem>
+                  {INVOICE_STATUS_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -745,7 +787,7 @@ export default function BillingPage() {
                 label="Editar"
                 tone="blue"
                 onClick={() => singleSelectedInvoice && openEditModal(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice}
+                disabled={!singleSelectedInvoice || singleSelectedInvoice.status === 'CANCELADO'}
                 testId={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
               />
               <ToolbarDivider />
@@ -1148,6 +1190,7 @@ export default function BillingPage() {
                 <Select
                   value={selectedInvoice.status || 'PENDENTE'}
                   onValueChange={(val) => handleUpdateInvoiceStatus(selectedInvoice.id, val)}
+                  disabled={selectedInvoice.status === 'CANCELADO'}
                 >
                   <SelectTrigger className="w-40 h-9 text-[13px]" data-testid="invoice-status-select">
                     <SelectValue />
@@ -1579,6 +1622,7 @@ export default function BillingPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDialog />
     </Layout>
   );
 }

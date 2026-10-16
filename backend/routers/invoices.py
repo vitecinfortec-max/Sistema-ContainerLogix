@@ -34,6 +34,18 @@ def _invoice_response(inv: dict) -> InvoiceResponse:
     )
 
 
+def _invoice_list_query(client_name: Optional[str], status: Optional[str]) -> dict:
+    query = {}
+    if client_name:
+        query['client_name'] = {"$regex": re.escape(client_name), "$options": "i"}
+    if status == 'PENDENTE':
+        # Faturas antigas não têm o campo status e contam como pendentes
+        query['status'] = {"$in": ['PENDENTE', None]}
+    elif status:
+        query['status'] = status
+    return query
+
+
 # Função para obter próximo invoice_number (sequencial)
 async def get_next_invoice_number():
     """Obtém o próximo invoice_number usando um contador atômico"""
@@ -44,6 +56,14 @@ async def get_next_invoice_number():
         return_document=True
     )
     return result["seq"]
+
+def _linked_movements_query(invoice: dict) -> dict:
+    """Movimentações da lista da fatura que ainda estão presas a ela. As de
+    registros antigos perderam o invoice_id (None/ausente) e contam como
+    dela; as que já estão em OUTRA fatura (invoice_id diferente) ficam de
+    fora - senão cancelar/excluir esta fatura desfaturava a outra."""
+    return {"id": {"$in": invoice.get('movement_ids', [])}, "invoice_id": {"$in": [invoice['id'], None]}}
+
 
 async def _release_movements(invoice_id: str):
     """Devolve (desfatura) as movimentações que uma criação de fatura chegou
@@ -61,7 +81,9 @@ async def sync_invoice_with_movement(movement: dict, deleted: bool, current_user
     fatura continuava com o total antigo e com o ID de uma movimentação que
     não existia mais. A fatura é localizada pela própria lista de
     movimentações, porque registros antigos perderam o invoice_id."""
-    invoice = await db.invoices.find_one({"movement_ids": movement['id']}, {"_id": 0})
+    invoice = await db.invoices.find_one(
+        {"movement_ids": movement['id'], "status": {"$ne": "CANCELADO"}}, {"_id": 0}
+    )
     if not invoice:
         return
 
@@ -94,7 +116,8 @@ async def sync_invoice_with_movement(movement: dict, deleted: bool, current_user
 
 async def find_invoice_of_movement(movement_id: str):
     return await db.invoices.find_one(
-        {"movement_ids": movement_id}, {"_id": 0, "id": 1, "invoice_number": 1, "movement_ids": 1}
+        {"movement_ids": movement_id, "status": {"$ne": "CANCELADO"}},
+        {"_id": 0, "id": 1, "invoice_number": 1, "movement_ids": 1}
     )
 
 
@@ -216,12 +239,11 @@ async def get_invoices(
     page: int = Query(1, ge=1),
     per_page: int = Query(15, ge=1, le=1000),
     client_name: Optional[str] = None,
+    status: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
     """Lista todas as faturas com paginação"""
-    query = {}
-    if client_name:
-        query['client_name'] = {"$regex": re.escape(client_name), "$options": "i"}
+    query = _invoice_list_query(client_name, status)
     
     skip = (page - 1) * per_page
     
@@ -235,15 +257,34 @@ async def get_invoices(
 @api_router.get("/invoices/count")
 async def get_invoices_count(
     client_name: Optional[str] = None,
+    status: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
     """Retorna a contagem total de faturas"""
-    query = {}
-    if client_name:
-        query['client_name'] = {"$regex": re.escape(client_name), "$options": "i"}
-    
-    count = await db.invoices.count_documents(query)
+    count = await db.invoices.count_documents(_invoice_list_query(client_name, status))
     return {"count": count}
+
+
+@api_router.get("/invoices/stats")
+async def get_invoices_stats(
+    client_name: Optional[str] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Indicadores da tela de Faturas: quantidade e valor por status (o
+    filtro de cliente vale; o de status não, senão os cartões zeravam)."""
+    stats = {s: {"count": 0, "total": 0.0} for s in ("PENDENTE", "PAGO", "CANCELADO")}
+    invoices = await db.invoices.find(
+        _invoice_list_query(client_name, None), {"_id": 0, "status": 1, "total_value": 1}
+    ).to_list(None)
+    for inv in invoices:
+        bucket = stats.get(inv.get('status') or 'PENDENTE')
+        if bucket is None:
+            continue
+        bucket["count"] += 1
+        bucket["total"] += inv.get('total_value') or 0
+    for bucket in stats.values():
+        bucket["total"] = round_money(bucket["total"])
+    return stats
 
 @api_router.get("/invoices/{invoice_id}", response_model=InvoiceResponse)
 async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
@@ -268,15 +309,30 @@ async def update_invoice_status(
     if not invoice:
         raise HTTPException(status_code=404, detail="Fatura não encontrada")
 
-    old_status = invoice.get('status', 'PENDENTE')
+    old_status = invoice.get('status') or 'PENDENTE'
+    # Cancelada é definitiva (mesma regra do Faturamento Portuário): o
+    # cancelamento devolveu as movimentações, que podem já estar em outra
+    # fatura - reabrir cobraria a mesma movimentação duas vezes.
+    if old_status == 'CANCELADO' and status != 'CANCELADO':
+        raise HTTPException(status_code=400, detail="Fatura cancelada não pode ser reaberta. Gere uma nova fatura com as movimentações.")
+
     await db.invoices.update_one({"id": invoice_id}, {"$set": {"status": status}})
 
     if old_status != status:
+        changes = {"status": {"from": old_status, "to": status}}
+        if status == 'CANCELADO':
+            # Antes as movimentações continuavam marcadas como faturadas e não
+            # entravam em nenhuma fatura nova.
+            released = await db.movements.update_many(
+                _linked_movements_query(invoice),
+                {"$set": {"billed": False, "billed_at": None, "invoice_id": None}}
+            )
+            changes["movements_released"] = released.modified_count
         await log_invoice_history(
             invoice_id=invoice_id,
             invoice_number=invoice['invoice_number'],
             action="UPDATED",
-            changes={"status": {"from": old_status, "to": status}},
+            changes=changes,
             user_id=current_user['sub'],
             user_name=current_user['name']
         )
@@ -290,7 +346,9 @@ async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current
     invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
     if not invoice:
         raise HTTPException(status_code=404, detail="Fatura não encontrada")
-    
+    if invoice.get('status') == 'CANCELADO':
+        raise HTTPException(status_code=400, detail="Fatura cancelada não pode ser editada")
+
     # Preparar dados para atualização e rastrear mudanças
     update_data = {}
     changes = {}
@@ -502,9 +560,11 @@ async def delete_invoice(invoice_id: str, current_user: dict = Depends(get_curre
         user_name=current_user['name']
     )
     
-    # Desmarcar movimentações como faturadas
+    # Desmarcar movimentações como faturadas - só as que ainda são desta
+    # fatura. Numa fatura cancelada elas já foram devolvidas e podem estar em
+    # outra fatura; antes a exclusão desfaturava essas também.
     await db.movements.update_many(
-        {"id": {"$in": invoice['movement_ids']}},
+        _linked_movements_query(invoice),
         {"$set": {"billed": False, "billed_at": None}, "$unset": {"invoice_id": ""}}
     )
     

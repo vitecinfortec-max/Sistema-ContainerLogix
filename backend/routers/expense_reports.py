@@ -197,7 +197,8 @@ async def update_expense_report_status(report_id: str, status: str, current_user
         {"id": report_id},
         {"$set": {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
-    if result.modified_count == 0:
+    # matched, não modified: repetir o status atual não é "não encontrada"
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
 
     return {"message": "Status atualizado"}
@@ -216,6 +217,8 @@ async def upload_expense_report_receipt(
     )
     if not report:
         raise HTTPException(status_code=404, detail="Prestação de contas ou lançamento de compra não encontrado")
+    if report.get("status") == "CONCLUIDA":
+        raise HTTPException(status_code=400, detail="Prestação de contas concluída não recebe novos recibos. Reabra antes de anexar.")
 
     file_ext, content = await validate_and_read_upload(file, ALLOWED_RECEIPT_EXTENSIONS)
 
@@ -253,6 +256,8 @@ async def delete_expense_report_receipt(
     report = await db.expense_reports.find_one({"id": report_id}, {"_id": 0})
     if not report:
         raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
+    if report.get("status") == "CONCLUIDA":
+        raise HTTPException(status_code=400, detail="Prestação de contas concluída não pode ter recibos removidos. Reabra antes.")
 
     purchase = next((p for p in report.get("purchases", []) if p["item_id"] == item_id), None)
     if not purchase:

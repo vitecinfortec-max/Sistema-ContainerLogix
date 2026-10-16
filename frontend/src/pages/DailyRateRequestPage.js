@@ -149,13 +149,20 @@ export default function DailyRateRequestPage() {
     if (targets.length === 0 || updatingStatus) return;
     setUpdatingStatus(true);
     try {
-      await Promise.all(targets.map((r) => api.updateDailyRateRequestStatus(r.id, newStatus)));
-      const plural = targets.length > 1;
-      toast.success(newStatus === 'PAGO'
-        ? (plural ? `${targets.length} solicitações marcadas como pagas` : 'Solicitação marcada como paga')
-        : (plural ? `${targets.length} solicitações voltaram para pendente` : 'Solicitação voltou para pendente'));
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar o status');
+      // Uma a uma, sem parar na primeira falha: o aviso diz quantas passaram
+      // e quais não (antes um erro escondia que as outras foram gravadas).
+      const results = await Promise.allSettled(targets.map((r) => api.updateDailyRateRequestStatus(r.id, newStatus)));
+      const failed = targets.filter((_, i) => results[i].status === 'rejected');
+      const done = targets.length - failed.length;
+      if (done > 0) {
+        const plural = done > 1;
+        toast.success(newStatus === 'PAGO'
+          ? (plural ? `${done} solicitações marcadas como pagas` : 'Solicitação marcada como paga')
+          : (plural ? `${done} solicitações voltaram para pendente` : 'Solicitação voltou para pendente'));
+      }
+      if (failed.length > 0) {
+        toast.error(`Não foi possível atualizar: Nº ${failed.map((r) => r.request_number).join(', ')}`);
+      }
     } finally {
       setUpdatingStatus(false);
       loadRequests();
@@ -185,9 +192,10 @@ export default function DailyRateRequestPage() {
   };
 
   const handleItemChange = (index, field, value) => {
-    const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setFormData(prev => ({ ...prev, items: newItems }));
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+    }));
   };
 
   const addItem = () => {
@@ -202,8 +210,7 @@ export default function DailyRateRequestPage() {
       toast.error('A solicitação deve ter pelo menos um item');
       return;
     }
-    const newItems = formData.items.filter((_, i) => i !== index);
-    setFormData(prev => ({ ...prev, items: newItems }));
+    setFormData(prev => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
   };
 
   const handleSubmit = async () => {
@@ -358,7 +365,7 @@ export default function DailyRateRequestPage() {
               primary={<ToolbarPrimary icon={Plus} label="Nova solicitação" onClick={openNewModal} testId="new-daily-rate-btn" />}
             >
               <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedRequest && openDetails(singleSelectedRequest)} disabled={!singleSelectedRequest} />
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedRequest && openEditModal(singleSelectedRequest)} disabled={!singleSelectedRequest} />
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedRequest && openEditModal(singleSelectedRequest)} disabled={!singleSelectedRequest || (singleSelectedRequest.status || 'PENDENTE') !== 'PENDENTE'} />
               <ToolbarDivider />
               <ToolbarButton icon={CheckCircle2} label="Marcar como pago" tone="emerald" onClick={() => markSelectedAs('PAGO')} disabled={!canMarkPaid || updatingStatus} testId="daily-rate-mark-paid" />
               <ToolbarButton icon={RotateCcw} label="Marcar como pendente" tone="amber" onClick={() => markSelectedAs('PENDENTE')} disabled={!canMarkPending || updatingStatus} testId="daily-rate-mark-pending" />

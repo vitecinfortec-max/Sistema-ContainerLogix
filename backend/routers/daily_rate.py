@@ -27,6 +27,29 @@ def calculate_daily_rate_item_total(item: DailyRateRequestItem) -> float:
     )
 
 
+DAILY_RATE_MONEY_FIELDS = (
+    ("others_value", "Outros"), ("commission_value", "Comissão"), ("lunch_value", "Almoço"),
+    ("daily_rate_quantity", "Qtd. Diária"), ("daily_rate_value", "Diária"),
+)
+
+
+def _build_daily_rate_items(data: DailyRateRequestCreate):
+    """Valida e totaliza os itens - antes aceitava solicitação sem item e
+    valores negativos (que abatiam do total)."""
+    if not data.items:
+        raise HTTPException(status_code=400, detail="A solicitação deve ter pelo menos um item")
+    items_data = []
+    total_value = 0.0
+    for idx, item in enumerate(data.items, 1):
+        for field, label in DAILY_RATE_MONEY_FIELDS:
+            if (getattr(item, field) or 0) < 0:
+                raise HTTPException(status_code=400, detail=f"Item {idx}: {label} não pode ser negativo")
+        item.total = calculate_daily_rate_item_total(item)
+        total_value += item.total
+        items_data.append(item.model_dump())
+    return items_data, round(total_value, 2)
+
+
 @api_router.get("/daily-rate-requests")
 async def get_daily_rate_requests(
     search: Optional[str] = None,
@@ -76,6 +99,9 @@ async def get_daily_rate_request(request_id: str, current_user: dict = Depends(g
 @api_router.post("/daily-rate-requests", response_model=DailyRateRequestResponse)
 async def create_daily_rate_request(data: DailyRateRequestCreate, current_user: dict = Depends(get_current_admin_user)):
     """Cria nova solicitação de diária"""
+    items_data, total_value = _build_daily_rate_items(data)
+
+    # Número reservado depois de validar, pra não pular número
     counter = await db.counters.find_one_and_update(
         {"_id": "daily_rate_request_number"},
         {"$inc": {"seq": 1}},
@@ -83,14 +109,6 @@ async def create_daily_rate_request(data: DailyRateRequestCreate, current_user: 
         return_document=True
     )
     request_number = counter["seq"]
-
-    items_data = []
-    total_value = 0.0
-    for item in data.items:
-        item.total = calculate_daily_rate_item_total(item)
-        total_value += item.total
-        items_data.append(item.model_dump())
-    total_value = round(total_value, 2)
 
     request_data = {
         "id": str(uuid.uuid4()),
@@ -117,14 +135,11 @@ async def update_daily_rate_request(request_id: str, data: DailyRateRequestCreat
     daily_request = await db.daily_rate_requests.find_one({"id": request_id})
     if not daily_request:
         raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
+    # Paga ou cancelada não muda mais de valor (volte para Pendente antes)
+    if daily_request.get('status', 'PENDENTE') != 'PENDENTE':
+        raise HTTPException(status_code=400, detail="Só é possível editar solicitação pendente. Volte o status para Pendente antes de editar.")
 
-    items_data = []
-    total_value = 0.0
-    for item in data.items:
-        item.total = calculate_daily_rate_item_total(item)
-        total_value += item.total
-        items_data.append(item.model_dump())
-    total_value = round(total_value, 2)
+    items_data, total_value = _build_daily_rate_items(data)
 
     update_data = {
         "items": items_data,
@@ -159,7 +174,8 @@ async def update_daily_rate_request_status(request_id: str, new_status: str, cur
         {"id": request_id},
         {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
-    if result.modified_count == 0:
+    # matched, não modified: repetir o status atual não é "não encontrada"
+    if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
 
     return {"message": "Status atualizado"}

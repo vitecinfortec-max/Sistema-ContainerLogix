@@ -493,7 +493,7 @@ export default function InternationalInvoicePage() {
         setSelectedInvoice({ ...selectedInvoice, status: newStatus });
       }
     } catch (error) {
-      toast.error('Erro ao atualizar status');
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar status');
     }
   };
 
@@ -640,7 +640,7 @@ export default function InternationalInvoicePage() {
                 label="Editar"
                 tone="blue"
                 onClick={() => singleSelectedInvoice && handleOpenEdit(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice}
+                disabled={!singleSelectedInvoice || singleSelectedInvoice.status === 'CANCELADA'}
                 testId={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
               />
               <ToolbarButton

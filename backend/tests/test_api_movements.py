@@ -323,8 +323,7 @@ class TestReports:
         assert api.get("/api/reports/billing/pdf").content.startswith(b"%PDF")
         assert api.get("/api/reports/billing/excel").content.startswith(b"PK")
         assert api.get("/api/reports/billing/daily-chart").status_code == 200
-        ids = [m["id"] for m in api.get("/api/movements").json()]
-        assert api.post("/api/billing/report", json={"movement_ids": ids}).content.startswith(b"PK")
+        assert api.get("/api/reports/billing/preview").json()["total"] == len(api.get("/api/movements").json())
 
     def test_storage_overage_reports(self, api):
         seed_yard(api)
