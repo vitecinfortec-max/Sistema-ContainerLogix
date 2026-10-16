@@ -117,7 +117,14 @@ export default function NewMovementPage() {
       setMatchedCurrency(null);
       return;
     }
-    const match = servicePriceEntries.find((e) => e.service_type_name === serviceType);
+    // Só preço Ativo de cobrança única: a Diária de Armazenagem não é o
+    // valor do serviço do EIR, e um preço inativo não vale mais.
+    const wanted = serviceType.trim().toLowerCase();
+    const match = servicePriceEntries.find((e) => (
+      (e.status || 'ATIVO') === 'ATIVO'
+      && (e.billing_type || 'UNICO') === 'UNICO'
+      && (e.service_type_name || '').trim().toLowerCase() === wanted
+    ));
     if (match) {
       setValue('service_value', match.value);
       setMatchedCurrency(match.currency || 'BRL');

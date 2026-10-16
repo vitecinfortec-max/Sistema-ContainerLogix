@@ -3,15 +3,37 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState, TablePagination, usePagination,
+  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, EmptyState, TablePagination, usePagination, StatusPill,
 } from '../components/DataPage';
 import { Checkbox } from '../components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Edit, Trash2, FileText, Printer } from 'lucide-react';
+import { Plus, Edit, Trash2, FileText, Printer, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+// Situação: antigas foram gravadas como "ATIVO" = em aberto
+const PROPOSAL_STATUS = {
+  EM_ABERTO: { label: 'Em aberto', tone: 'blue' },
+  ACEITA: { label: 'Aceita', tone: 'emerald' },
+  RECUSADA: { label: 'Recusada', tone: 'red' },
+};
+const proposalStatus = (p) => (PROPOSAL_STATUS[p.status] ? p.status : 'EM_ABERTO');
+
+// Validade conta a partir da data da proposta; só importa enquanto está em aberto
+function validityInfo(p) {
+  if (proposalStatus(p) !== 'EM_ABERTO' || !p.created_at) return null;
+  const created = new Date(p.created_at);
+  const expires = new Date(created.getFullYear(), created.getMonth(), created.getDate() + Number(p.validity_days || 0));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((expires - today) / 86400000);
+  if (days < 0) return { tone: 'red', label: 'Vencida' };
+  if (days <= 3) return { tone: 'amber', label: days === 0 ? 'Vence hoje' : `Vence em ${days}d` };
+  return null;
+}
 
 export default function ComercialProposalsPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -21,6 +43,8 @@ export default function ComercialProposalsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [downloadingId, setDownloadingId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {
     loadProposals();
@@ -50,18 +74,31 @@ export default function ComercialProposalsPage() {
       });
       loadProposals();
     } catch (error) {
-      toast.error('Erro ao excluir proposta');
+      toast.error(error.response?.data?.detail || 'Erro ao excluir proposta');
     }
   };
 
-  const handleDownloadPdf = async (id) => {
+  const handleStatus = async (proposal, status) => {
+    setUpdatingStatus(true);
+    try {
+      await api.updateCommercialProposalStatus(proposal.id, status);
+      toast.success(`Proposta ${proposal.proposal_number}: ${PROPOSAL_STATUS[status].label.toLowerCase()}`);
+      loadProposals();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar a situação');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleDownloadPdf = async (id, number) => {
     setDownloadingId(id);
     try {
       const response = await api.downloadCommercialProposalPdf(id);
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Proposta_${id}.pdf`;
+      link.download = `Proposta_${number || id}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -73,11 +110,12 @@ export default function ComercialProposalsPage() {
     }
   };
 
-  const filteredProposals = proposals.filter(p =>
-    p.proposal_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.recipient_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  const { pageItems, paginationProps } = usePagination(filteredProposals, { resetKey: searchTerm });
+  const filteredProposals = proposals.filter(p => (
+    (statusFilter === 'ALL' || proposalStatus(p) === statusFilter)
+    && (p.proposal_number?.toLowerCase().includes(searchTerm.toLowerCase())
+      || p.recipient_name?.toLowerCase().includes(searchTerm.toLowerCase()))
+  ));
+  const { pageItems, paginationProps } = usePagination(filteredProposals, { resetKey: `${searchTerm}|${statusFilter}` });
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -105,10 +143,21 @@ export default function ComercialProposalsPage() {
       <div className="space-y-4" data-testid="commercial-proposals-page">
         <PageHeader icon={FileText} title="Proposta Comercial" subtitle="Crie e gerencie propostas comerciais para fechar negócio com clientes" />
 
-        <FilterCard hasFilters={!!searchTerm} onClear={() => setSearchTerm('')}>
+        <FilterCard hasFilters={!!searchTerm || statusFilter !== 'ALL'} onClear={() => { setSearchTerm(''); setStatusFilter('ALL'); }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Número ou destinatário">
               <SearchInput value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} data-testid="search-proposal" />
+            </FilterField>
+            <FilterField label="Situação">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger data-testid="proposal-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL" className="text-sm">Todas</SelectItem>
+                  {Object.entries(PROPOSAL_STATUS).map(([value, s]) => (
+                    <SelectItem key={value} value={value} className="text-sm">{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -123,7 +172,10 @@ export default function ComercialProposalsPage() {
               primary={<ToolbarPrimary icon={Plus} label="Nova proposta" onClick={() => navigate('/comercial/proposta/new')} testId="new-proposal-btn" />}
             >
               <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedItem && navigate(`/comercial/proposta/${singleSelectedItem.id}/edit`)} disabled={!singleSelectedItem} />
-              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedItem && handleDownloadPdf(singleSelectedItem.id)} disabled={!singleSelectedItem || downloadingId === singleSelectedItem?.id} />
+              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedItem && handleDownloadPdf(singleSelectedItem.id, singleSelectedItem.proposal_number)} disabled={!singleSelectedItem || downloadingId === singleSelectedItem?.id} />
+              <ToolbarButton icon={ThumbsUp} label="Aceita" tone="emerald" onClick={() => singleSelectedItem && handleStatus(singleSelectedItem, 'ACEITA')} disabled={!singleSelectedItem || updatingStatus || proposalStatus(singleSelectedItem) === 'ACEITA'} />
+              <ToolbarButton icon={ThumbsDown} label="Recusada" tone="red" onClick={() => singleSelectedItem && handleStatus(singleSelectedItem, 'RECUSADA')} disabled={!singleSelectedItem || updatingStatus || proposalStatus(singleSelectedItem) === 'RECUSADA'} />
+              <ToolbarButton icon={RotateCcw} label="Reabrir" tone="blue" onClick={() => singleSelectedItem && handleStatus(singleSelectedItem, 'EM_ABERTO')} disabled={!singleSelectedItem || updatingStatus || proposalStatus(singleSelectedItem) === 'EM_ABERTO'} />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedItem && handleDelete(singleSelectedItem.id)} disabled={!singleSelectedItem} />
             </Toolbar>
           )}
@@ -135,7 +187,7 @@ export default function ComercialProposalsPage() {
             <EmptyState
               icon={FileText}
               title="Nenhuma proposta comercial encontrada"
-              hint={searchTerm ? 'Ajuste a busca' : 'Crie a primeira pelo botão "Nova proposta"'}
+              hint={(searchTerm || statusFilter !== 'ALL') ? 'Ajuste a busca ou o filtro de Situação' : 'Crie a primeira pelo botão "Nova proposta"'}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -153,6 +205,7 @@ export default function ComercialProposalsPage() {
                     <th className="hidden sm:table-cell">Data</th>
                     <th className="hidden sm:table-cell">Validade</th>
                     <th className="hidden sm:table-cell !text-right">Itens</th>
+                    <th>Situação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -171,8 +224,16 @@ export default function ComercialProposalsPage() {
                       <td className="hidden sm:table-cell whitespace-nowrap tabular-nums">
                         {format(new Date(p.created_at), "dd/MM/yyyy", { locale: ptBR })}
                       </td>
-                      <td className="hidden sm:table-cell whitespace-nowrap">{p.validity_days} dias</td>
+                      <td className="hidden sm:table-cell whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5">
+                          {p.validity_days} dias
+                          {validityInfo(p) && <StatusPill tone={validityInfo(p).tone}>{validityInfo(p).label}</StatusPill>}
+                        </span>
+                      </td>
                       <td className="hidden sm:table-cell text-right tabular-nums">{(p.items || []).length}</td>
+                      <td>
+                        <StatusPill tone={PROPOSAL_STATUS[proposalStatus(p)].tone}>{PROPOSAL_STATUS[proposalStatus(p)].label}</StatusPill>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

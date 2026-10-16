@@ -3885,10 +3885,15 @@ def generate_commission_report_pdf(data: dict, company: dict = None) -> bytes:
         f"{fmt_date(data.get('start_date')) if data.get('start_date') else 'Início'} a "
         f"{fmt_date(data.get('end_date')) if data.get('end_date') else 'Hoje'}"
     )
+    # Coluna/total em dólar só quando houve movimentação faturada em US$
+    has_usd = any(cl.get('total_billed_usd') for rep in representatives for cl in rep['clients'])
+    total_text = money(data.get('grand_total', 0))
+    if has_usd:
+        total_text += f" + {format_currency(data.get('grand_total_usd', 0), 'USD')}"
     elements.append(_pdf_info_grid([
         ("Período", period_text),
         ("Representantes", _fmt_int(len(representatives))),
-        ("Comissão total", money(data.get('grand_total', 0))),
+        ("Comissão total", total_text),
     ], doc.width, cols=3))
 
     if not representatives:
@@ -3899,23 +3904,43 @@ def generate_commission_report_pdf(data: dict, company: dict = None) -> bytes:
     for rep in representatives:
         elements.extend(_pdf_section_title(rep['representative_name'], doc.width))
 
-        rows = [_pdf_header_cells(['Cliente', '% Comissão', 'Valor Faturado', 'Comissão'], font_size=8.5)]
-        for cl in rep['clients']:
-            rows.append([
-                cell(cl['client_name']),
-                cell(f"{cl['commission_percentage']:.2f}%".replace('.', ','), 'center'),
-                cell(money(cl['total_billed']), 'right'),
-                cell(money(cl['commission_value']), 'right'),
-            ])
-        rows.append(['', '', cell('TOTAL DO REPRESENTANTE', 'right', bold=True), cell(money(rep['total_commission']), 'right', bold=True)])
+        if has_usd:
+            usd = lambda v: format_currency(v or 0, 'USD')  # noqa: E731
+            rows = [_pdf_header_cells(['Cliente', '% Comissão', 'Faturado R$', 'Comissão R$', 'Faturado US$', 'Comissão US$'], font_size=8.5)]
+            for cl in rep['clients']:
+                rows.append([
+                    cell(cl['client_name']),
+                    cell(f"{cl['commission_percentage']:.2f}%".replace('.', ','), 'center'),
+                    cell(money(cl['total_billed']), 'right'),
+                    cell(money(cl['commission_value']), 'right'),
+                    cell(usd(cl.get('total_billed_usd')), 'right'),
+                    cell(usd(cl.get('commission_value_usd')), 'right'),
+                ])
+            rows.append(['', '', cell('TOTAL', 'right', bold=True), cell(money(rep['total_commission']), 'right', bold=True),
+                         '', cell(usd(rep.get('total_commission_usd')), 'right', bold=True)])
+            col_widths = [doc.width*0.28, doc.width*0.12] + [doc.width*0.15] * 4
+        else:
+            rows = [_pdf_header_cells(['Cliente', '% Comissão', 'Valor Faturado', 'Comissão'], font_size=8.5)]
+            for cl in rep['clients']:
+                rows.append([
+                    cell(cl['client_name']),
+                    cell(f"{cl['commission_percentage']:.2f}%".replace('.', ','), 'center'),
+                    cell(money(cl['total_billed']), 'right'),
+                    cell(money(cl['commission_value']), 'right'),
+                ])
+            rows.append(['', '', cell('TOTAL DO REPRESENTANTE', 'right', bold=True), cell(money(rep['total_commission']), 'right', bold=True)])
+            col_widths = [doc.width*0.40, doc.width*0.15, doc.width*0.225, doc.width*0.225]
 
-        table = Table(rows, colWidths=[doc.width*0.40, doc.width*0.15, doc.width*0.225, doc.width*0.225], repeatRows=1)
+        table = Table(rows, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(table)
 
     if representatives:
         elements.append(Spacer(1, 12))
-        elements.append(_pdf_totals_box([("Total geral", money(data.get('grand_total', 0)))], doc.width))
+        totals = [("Total geral", money(data.get('grand_total', 0)))]
+        if has_usd:
+            totals.append(("Total geral US$", format_currency(data.get('grand_total_usd', 0), 'USD')))
+        elements.append(_pdf_totals_box(totals, doc.width))
 
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)

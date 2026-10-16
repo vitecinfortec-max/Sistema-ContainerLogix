@@ -332,6 +332,7 @@ export const api = {
   createClientRepresentativeLink: (data) => axios.post(`${API}/client-representative-links`, data),
   updateClientRepresentativeLink: (id, data) => axios.put(`${API}/client-representative-links/${id}`, data),
   deleteClientRepresentativeLink: (id) => axios.delete(`${API}/client-representative-links/${id}`),
+  getCommissionReport: (params) => axios.get(`${API}/reports/commission`, { params }),
   downloadCommissionReportPdf: (params) => axios.get(`${API}/reports/commission/pdf`, { params, responseType: 'blob' }),
 
   // Comercial: Proposta Comercial
@@ -340,6 +341,7 @@ export const api = {
   createCommercialProposal: (data) => axios.post(`${API}/commercial-proposals`, data),
   updateCommercialProposal: (id, data) => axios.put(`${API}/commercial-proposals/${id}`, data),
   deleteCommercialProposal: (id) => axios.delete(`${API}/commercial-proposals/${id}`),
+  updateCommercialProposalStatus: (id, status) => axios.put(`${API}/commercial-proposals/${id}/status`, null, { params: { status } }),
   downloadCommercialProposalPdf: (id) => axios.get(`${API}/commercial-proposals/${id}/pdf`, { responseType: 'blob' }),
 
   // Flex Tank (Controle de Estoque de Bolsas)

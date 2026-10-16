@@ -4,11 +4,75 @@ import PageHeader from '../components/PageHeader';
 import { FilterField, DataCard, StatusPill, EmptyState, TablePagination, usePagination } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
+
+const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
+const fmtBRL = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const fmtUSD = (v) => Number(v || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 import { Plus, Trash2, Edit, Link2, FileDown } from 'lucide-react';
+
+function CommissionPreview({ data, loading }) {
+  const reps = data.representatives || [];
+  const hasUsd = reps.some((r) => (r.clients || []).some((c) => c.total_billed_usd));
+  if (!loading && reps.length === 0) {
+    return <EmptyState icon={FileDown} title="Nenhum vínculo ativo com comissão" hint="Vincule um cliente a um representante acima" />;
+  }
+  return (
+    <div className="overflow-x-auto border-t border-slate-100 dark:border-slate-800" data-testid="commission-preview">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Representante / Cliente</th>
+            <th className="!text-right">Comissão (%)</th>
+            <th className="!text-right">Faturado R$</th>
+            <th className="!text-right">Comissão R$</th>
+            {hasUsd && <th className="!text-right">Faturado US$</th>}
+            {hasUsd && <th className="!text-right">Comissão US$</th>}
+          </tr>
+        </thead>
+        <tbody>
+          {reps.map((rep) => [
+            <tr key={`${rep.representative_name}-h`} className="bg-slate-50/70 dark:bg-slate-800/40">
+              <td className="cell-strong">{rep.representative_name}</td>
+              <td />
+              <td />
+              <td className="text-right tabular-nums font-semibold">{fmtBRL(rep.total_commission)}</td>
+              {hasUsd && <td />}
+              {hasUsd && <td className="text-right tabular-nums font-semibold">{fmtUSD(rep.total_commission_usd)}</td>}
+            </tr>,
+            ...(rep.clients || []).map((c) => (
+              <tr key={`${rep.representative_name}-${c.client_name}`}>
+                <td className="pl-8">
+                  <div className="max-w-[300px] truncate" title={c.client_name}>{c.client_name}</div>
+                  {c.has_price_table === false && (
+                    <span className="text-[11px] text-amber-600 dark:text-amber-400">sem Tabela de Serviços: não gera comissão</span>
+                  )}
+                </td>
+                <td className="text-right tabular-nums">{String(c.commission_percentage).replace('.', ',')}%</td>
+                <td className="text-right tabular-nums">{fmtBRL(c.total_billed)}</td>
+                <td className="text-right tabular-nums">{fmtBRL(c.commission_value)}</td>
+                {hasUsd && <td className="text-right tabular-nums">{fmtUSD(c.total_billed_usd)}</td>}
+                {hasUsd && <td className="text-right tabular-nums">{fmtUSD(c.commission_value_usd)}</td>}
+              </tr>
+            )),
+          ])}
+          <tr>
+            <td className="cell-strong">Total geral</td>
+            <td />
+            <td />
+            <td className="text-right tabular-nums font-semibold text-primary">{fmtBRL(data.grand_total)}</td>
+            {hasUsd && <td />}
+            {hasUsd && <td className="text-right tabular-nums font-semibold text-primary">{fmtUSD(data.grand_total_usd)}</td>}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function ClientRepresentativeLinksPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -31,6 +95,10 @@ export default function ClientRepresentativeLinksPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [linkStatus, setLinkStatus] = useState('ATIVO');
+  const [commission, setCommission] = useState(null);
+  const [loadingCommission, setLoadingCommission] = useState(false);
+  const periodError = startDate && endDate && startDate > endDate ? 'A data inicial não pode ser depois da data final.' : '';
 
   useEffect(() => {
     loadAll();
@@ -58,6 +126,7 @@ export default function ClientRepresentativeLinksPage() {
     setRepNameInput('');
     setSelectedRep(null);
     setPercentageInput('');
+    setLinkStatus('ATIVO');
     setEditId(null);
   };
 
@@ -68,21 +137,23 @@ export default function ClientRepresentativeLinksPage() {
     setRepNameInput(link.representative_name);
     setSelectedRep({ id: link.representative_id, name: link.representative_name });
     setPercentageInput(String(link.commission_percentage));
+    setLinkStatus(link.status || 'ATIVO');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedClient || !selectedRep) {
-      toast.error('Selecione o cliente e o representante');
+    // Nome digitado e não escolhido na lista: não salva o cliente/representante anterior
+    if (!selectedClient || !selectedRep || selectedClient.name !== clientNameInput || selectedRep.name !== repNameInput) {
+      toast.error('Selecione o cliente e o representante na lista');
       return;
     }
-    if (percentageInput === '' || Number(percentageInput) < 0) {
-      toast.error('Informe um percentual de comissão válido');
+    if (percentageInput === '' || Number(percentageInput) < 0 || Number(percentageInput) > 100) {
+      toast.error('Informe um percentual de comissão entre 0 e 100');
       return;
     }
     setSubmitting(true);
     try {
-      const payload = { client_id: selectedClient.id, representative_id: selectedRep.id, commission_percentage: Number(percentageInput) };
+      const payload = { client_id: selectedClient.id, representative_id: selectedRep.id, commission_percentage: Number(percentageInput), status: linkStatus };
       if (editId) {
         await api.updateClientRepresentativeLink(editId, payload);
         toast.success('Vínculo atualizado com sucesso');
@@ -92,6 +163,7 @@ export default function ClientRepresentativeLinksPage() {
       }
       resetForm();
       loadAll();
+      loadCommission();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao salvar vínculo');
     } finally {
@@ -106,18 +178,48 @@ export default function ClientRepresentativeLinksPage() {
       toast.success('Vínculo removido com sucesso');
       loadAll();
     } catch (error) {
-      toast.error('Erro ao remover vínculo');
+      toast.error(error.response?.data?.detail || 'Erro ao remover vínculo');
     }
   };
 
+  const reportParams = () => {
+    const params = {};
+    if (reportRep) params.representative_id = reportRep.id;
+    if (startDate) params.start_date = startDate;
+    if (endDate) params.end_date = endDate;
+    return params;
+  };
+
+  // Prévia na tela: os mesmos números do PDF, recalculada a cada filtro
+  const loadCommission = async () => {
+    if (periodError) {
+      setCommission(null);
+      return;
+    }
+    setLoadingCommission(true);
+    try {
+      const response = await api.getCommissionReport(reportParams());
+      setCommission(response.data);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao calcular a comissão');
+    } finally {
+      setLoadingCommission(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCommission();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportRep, startDate, endDate]);
+
   const handleDownloadReport = async () => {
+    if (periodError) {
+      toast.error(periodError);
+      return;
+    }
     setGeneratingReport(true);
     try {
-      const params = {};
-      if (reportRep) params.representative_id = reportRep.id;
-      if (startDate) params.start_date = startDate;
-      if (endDate) params.end_date = endDate;
-      const response = await api.downloadCommissionReportPdf(params);
+      const response = await api.downloadCommissionReportPdf(reportParams());
       const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -127,7 +229,7 @@ export default function ClientRepresentativeLinksPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar relatório de comissão');
+      toast.error(error.response?.data?.detail || 'Erro ao gerar relatório de comissão');
     } finally {
       setGeneratingReport(false);
     }
@@ -165,7 +267,17 @@ export default function ClientRepresentativeLinksPage() {
               />
             </FilterField>
             <FilterField label="Comissão (%)" className="w-36">
-              <Input type="number" step="0.01" min="0" value={percentageInput} onChange={(e) => setPercentageInput(e.target.value)} className="h-9 text-sm" />
+              <Input type="number" step="0.01" min="0" max="100" value={percentageInput} onChange={(e) => setPercentageInput(e.target.value)} className="h-9 text-sm" />
+            </FilterField>
+            <FilterField label="Status" className="w-32">
+              <Select value={linkStatus} onValueChange={setLinkStatus}>
+                <SelectTrigger className="h-9 text-sm" data-testid="client-rep-link-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(([value, label]) => (
+                    <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FilterField>
             <div className="flex items-center gap-2">
               <Button type="submit" disabled={submitting} className="h-9 gap-1.5" data-testid="submit-client-rep-link">
@@ -229,7 +341,7 @@ export default function ClientRepresentativeLinksPage() {
               <FilterField label="Representante (opcional)" className="w-64">
                 <Autocomplete
                   value={reportRepNameInput}
-                  onChange={(v) => { setReportRepNameInput(v); if (!v) setReportRep(null); }}
+                  onChange={(v) => { setReportRepNameInput(v); if (!v || (reportRep && v !== reportRep.name)) setReportRep(null); }}
                   options={representatives}
                   displayField="name"
                   onSelect={(r) => { setReportRep(r); setReportRepNameInput(r.name); }}
@@ -247,10 +359,17 @@ export default function ClientRepresentativeLinksPage() {
                 Baixar PDF
               </Button>
             </div>
-            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-3">
-              A comissão é calculada apenas sobre movimentações já faturadas dentro do período informado.
-            </p>
+            {periodError ? (
+              <p className="text-[12px] text-red-600 dark:text-red-400 mt-3" data-testid="commission-period-error">{periodError}</p>
+            ) : (
+              <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-3">
+                A comissão é calculada apenas sobre movimentações já faturadas dentro do período informado (dias no horário de Brasília), e só dos serviços que o cliente tem na Tabela de Serviços.
+              </p>
+            )}
           </div>
+          {commission && (
+            <CommissionPreview data={commission} loading={loadingCommission} />
+          )}
         </DataCard>
       </div>
       <ConfirmDialog />

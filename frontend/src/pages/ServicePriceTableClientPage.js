@@ -18,6 +18,7 @@ const formatMoney = (value, currency) => `${CURRENCY_SYMBOL[currency] || currenc
 
 const BILLING_TYPE_OPTIONS = [['UNICO', 'Único'], ['DIARIA', 'Diária de Armazenagem']];
 const SIZE_GROUP_OPTIONS = [['_any', 'Qualquer tamanho'], ['20', '20 pés'], ['40', '40 pés']];
+const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 
 export default function ServicePriceTableClientPage() {
   const { clientId } = useParams();
@@ -38,6 +39,7 @@ export default function ServicePriceTableClientPage() {
   const [billingType, setBillingType] = useState('UNICO');
   const [freeTimeDays, setFreeTimeDays] = useState('');
   const [sizeGroup, setSizeGroup] = useState('_any');
+  const [entryStatus, setEntryStatus] = useState('ATIVO');
   const [editId, setEditId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -80,6 +82,7 @@ export default function ServicePriceTableClientPage() {
     setBillingType('UNICO');
     setFreeTimeDays('');
     setSizeGroup('_any');
+    setEntryStatus('ATIVO');
     setEditId(null);
   };
 
@@ -92,12 +95,13 @@ export default function ServicePriceTableClientPage() {
     setBillingType(entry.billing_type || 'UNICO');
     setFreeTimeDays(entry.free_time_days != null ? String(entry.free_time_days) : '');
     setSizeGroup(entry.container_size_group || '_any');
+    setEntryStatus(entry.status || 'ATIVO');
   };
 
   const handleSubmitEntry = async (e) => {
     e.preventDefault();
-    if (!selectedServiceType) {
-      toast.error('Selecione um serviço');
+    if (!selectedServiceType || selectedServiceType.name !== serviceNameInput) {
+      toast.error('Selecione um serviço da lista');
       return;
     }
     if (!valueInput || Number(valueInput) < 0) {
@@ -118,6 +122,7 @@ export default function ServicePriceTableClientPage() {
         billing_type: billingType,
         free_time_days: billingType === 'DIARIA' ? Number(freeTimeDays) : null,
         container_size_group: billingType === 'DIARIA' && sizeGroup !== '_any' ? sizeGroup : null,
+        status: entryStatus,
       };
       if (editId) {
         await api.updateServicePriceEntry(editId, payload);
@@ -142,7 +147,7 @@ export default function ServicePriceTableClientPage() {
       toast.success('Removido com sucesso');
       loadEntries();
     } catch (error) {
-      toast.error('Erro ao remover');
+      toast.error(error.response?.data?.detail || 'Erro ao remover');
     }
   };
 
@@ -251,6 +256,16 @@ export default function ServicePriceTableClientPage() {
                 </FilterField>
               </>
             )}
+            <FilterField label="Status" className="w-32">
+              <Select value={entryStatus} onValueChange={setEntryStatus}>
+                <SelectTrigger className="h-9 text-sm" data-testid="service-price-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(([value, label]) => (
+                    <SelectItem key={value} value={value} className="text-sm">{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
             <div className="flex items-center gap-2">
               <Button type="submit" disabled={submitting} className="h-9 gap-1.5" data-testid="submit-service-price-entry">
                 <Plus className="w-4 h-4" />
@@ -274,6 +289,7 @@ export default function ServicePriceTableClientPage() {
                     <th>Serviço</th>
                     <th>Cobrança</th>
                     <th className="!text-right">Valor</th>
+                    <th>Status</th>
                     <th className="w-24"></th>
                   </tr>
                 </thead>
@@ -295,6 +311,11 @@ export default function ServicePriceTableClientPage() {
                       </td>
                       <td className="text-right whitespace-nowrap tabular-nums">
                         {formatMoney(entry.value, entry.currency || 'BRL')}{entry.billing_type === 'DIARIA' ? '/dia' : ''}
+                      </td>
+                      <td>
+                        <StatusPill tone={(entry.status || 'ATIVO') === 'ATIVO' ? 'emerald' : 'slate'}>
+                          {(entry.status || 'ATIVO') === 'ATIVO' ? 'Ativo' : 'Inativo'}
+                        </StatusPill>
                       </td>
                       <td className="!py-1">
                         <div className="flex items-center justify-end gap-1">

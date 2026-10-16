@@ -882,7 +882,7 @@ class CommercialProposal(BaseModel):
     items: List[CommercialProposalItem] = Field(default_factory=list)
     free_time_text: Optional[str] = None
     payment_terms_text: Optional[str] = None
-    status: str = "ATIVO"
+    status: str = "EM_ABERTO"  # EM_ABERTO / ACEITA / RECUSADA (antigas gravadas como "ATIVO" = em aberto)
     created_by: str
     created_by_name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -896,7 +896,7 @@ class CommercialProposalCreate(BaseModel):
     items: List[CommercialProposalItem] = Field(default_factory=list)
     free_time_text: Optional[str] = None
     payment_terms_text: Optional[str] = None
-    status: str = "ATIVO"
+    status: Optional[str] = None  # None = mantém a situação atual (na edição) / Em aberto (na criação)
 
 class CommercialProposalResponse(BaseModel):
     id: str
