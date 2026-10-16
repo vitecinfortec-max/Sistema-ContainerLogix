@@ -23,6 +23,61 @@ from shared import (
 api_router = APIRouter(prefix="/api")
 
 
+def _digits(value) -> str:
+    return re.sub(r'\D', '', value or '')
+
+
+async def _ensure_unique_document(collection, field, value, exclude_id, message):
+    """CNPJ/CPF repetido: compara só os dígitos (um cadastro antigo pode
+    estar gravado sem máscara e o novo com, ou vice-versa)."""
+    digits = _digits(value)
+    if not digits:
+        return
+    query = {field: {"$nin": [None, ""]}}
+    if exclude_id:
+        query["id"] = {"$ne": exclude_id}
+    for doc in await collection.find(query, {"_id": 0, "id": 1, "name": 1, field: 1}).to_list(None):
+        if _digits(doc.get(field)) == digits:
+            raise HTTPException(status_code=400, detail=f"{message}: {doc.get('name') or '-'}")
+
+
+async def _ensure_unique_client_name(name, exclude_id):
+    """O sistema liga EIR/fatura/relatórios ao cliente pelo nome, então dois
+    clientes com o mesmo nome (ignorando maiúsculas/espaços) viram um só."""
+    target = ' '.join((name or '').split()).lower()
+    query = {"id": {"$ne": exclude_id}} if exclude_id else {}
+    for doc in await db.clients.find(query, {"_id": 0, "name": 1}).to_list(None):
+        if ' '.join((doc.get('name') or '').split()).lower() == target:
+            raise HTTPException(status_code=400, detail="Já existe um cliente cadastrado com este nome")
+
+
+def _name_regex(name):
+    return {"$regex": f"^{re.escape((name or '').strip())}$", "$options": "i"}
+
+
+async def _ensure_not_in_use(checks, label):
+    """Bloqueia a exclusão de um cadastro que outros registros ainda usam
+    (senão eles ficam apontando pra um cadastro que não existe mais).
+    `checks` = lista de (coleção, filtro, descrição)."""
+    used = []
+    for collection, query, description in checks:
+        count = await collection.count_documents(query)
+        if count:
+            used.append(f"{count} {description}")
+    if used:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{label} em uso ({', '.join(used)}). Em vez de excluir, mude o status para Inativo.",
+        )
+
+
+def _list_query(collection, page, per_page):
+    cursor = collection.find({}, {"_id": 0}).sort("created_at", -1)
+    if per_page and per_page > 0:
+        cursor = cursor.skip((max(page, 1) - 1) * per_page).limit(per_page)
+    return cursor.to_list(None)
+
+
 def _incoming_signature(data, kind, person_id, existing_url):
     """Assinatura no create/update do cadastro. Se o campo nem veio no
     corpo (ex.: uma aba antiga do sistema, de antes do campo existir),
@@ -33,9 +88,7 @@ def _incoming_signature(data, kind, person_id, existing_url):
 
 @api_router.post("/drivers", response_model=DriverResponse)
 async def create_driver(driver_input: DriverCreate, current_user: dict = Depends(get_current_active_user)):
-    existing_cpf = await db.drivers.find_one({"cpf": driver_input.cpf}, {"_id": 0, "id": 1})
-    if existing_cpf:
-        raise HTTPException(status_code=400, detail="Já existe uma pessoa cadastrada com este CPF")
+    await _ensure_unique_document(db.drivers, "cpf", driver_input.cpf, None, "Já existe um motorista cadastrado com este CPF")
 
     driver = Driver(**driver_input.model_dump(), created_by=current_user['sub'])
     driver.signature_url = _incoming_signature(driver_input, 'motorista', driver.id, None)
@@ -53,11 +106,7 @@ async def get_drivers(
     current_user: dict = Depends(get_current_active_user)
 ):
     # Se per_page = 0, retorna todos os motoristas
-    if per_page == 0:
-        drivers = await db.drivers.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
-    else:
-        skip = (page - 1) * per_page
-        drivers = await db.drivers.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    drivers = await _list_query(db.drivers, page, per_page)
     return [
         DriverResponse(**{**d, "created_at": datetime.fromisoformat(d['created_at'])})
         for d in drivers
@@ -69,11 +118,7 @@ async def update_driver(driver_id: str, driver_input: DriverCreate, current_user
     if not existing:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
 
-    existing_cpf = await db.drivers.find_one(
-        {"cpf": driver_input.cpf, "id": {"$ne": driver_id}}, {"_id": 0, "id": 1}
-    )
-    if existing_cpf:
-        raise HTTPException(status_code=400, detail="Já existe uma pessoa cadastrada com este CPF")
+    await _ensure_unique_document(db.drivers, "cpf", driver_input.cpf, driver_id, "Já existe um motorista cadastrado com este CPF")
 
     update_data = {
         **driver_input.model_dump(),
@@ -89,6 +134,24 @@ async def update_driver(driver_id: str, driver_input: DriverCreate, current_user
 
 @api_router.delete("/drivers/{driver_id}")
 async def delete_driver(driver_id: str, current_user: dict = Depends(get_current_active_user)):
+    driver = await db.drivers.find_one({"id": driver_id}, {"_id": 0, "cpf": 1})
+    if not driver:
+        raise HTTPException(status_code=404, detail="Motorista não encontrado")
+    cpf_values = [v for v in {driver.get('cpf'), _digits(driver.get('cpf'))} if v]
+    await _ensure_not_in_use([
+        (db.movements, {"driver_cpf": {"$in": cpf_values}}, "movimentação(ões)"),
+        (db.vehicles, {"driver_id": driver_id}, "veículo(s)"),
+        (db.loading_orders, {"driver_id": driver_id}, "ordem(ns) de carregamento"),
+        (db.loading_schedules, {"items.driver_id": driver_id}, "programação(ões) de carregamento"),
+        (db.freight_payments, {"driver_id": driver_id}, "pagamento(s) de frete"),
+        (db.daily_rate_requests, {"items.driver_id": driver_id}, "solicitação(ões) de diária"),
+        (db.delivery_statuses, {"items.driver_id": driver_id}, "status de entrega"),
+        (db.port_services, {"driver_id": driver_id}, "serviço(s) portuário(s)"),
+        (db.fuel_supplies, {"driver_id": driver_id}, "abastecimento(s)"),
+        (db.ordem_servico, {"person_id": driver_id}, "ordem(ns) de serviço"),
+        (db.epi_deliveries, {"recipient_id": driver_id}, "entrega(s) de EPI"),
+        (db.vehicle_checklists, {"driver_id": driver_id}, "checklist(s)"),
+    ], "Motorista")
     result = await db.drivers.delete_one({"id": driver_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Motorista não encontrado")
@@ -96,6 +159,7 @@ async def delete_driver(driver_id: str, current_user: dict = Depends(get_current
 
 @api_router.post("/transport-companies", response_model=TransportCompanyResponse)
 async def create_transport_company(company_input: TransportCompanyCreate, current_user: dict = Depends(get_current_active_user)):
+    await _ensure_unique_document(db.transport_companies, "cnpj", company_input.cnpj, None, "Já existe uma transportadora cadastrada com este CNPJ/CPF")
     company = TransportCompany(**company_input.model_dump(), created_by=current_user['sub'])
 
     doc = company.model_dump()
@@ -110,11 +174,7 @@ async def get_transport_companies(
     per_page: int = 0,  # 0 = sem limite
     current_user: dict = Depends(get_current_active_user)
 ):
-    if per_page == 0:
-        companies = await db.transport_companies.find({}, {"_id": 0}).sort("created_at", -1).to_list(None)
-    else:
-        skip = (page - 1) * per_page
-        companies = await db.transport_companies.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    companies = await _list_query(db.transport_companies, page, per_page)
     return [
         TransportCompanyResponse(**{**c, "created_at": datetime.fromisoformat(c['created_at'])})
         for c in companies
@@ -195,6 +255,7 @@ async def update_transport_company(company_id: str, company_input: TransportComp
     existing = await db.transport_companies.find_one({"id": company_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Transportadora não encontrada")
+    await _ensure_unique_document(db.transport_companies, "cnpj", company_input.cnpj, company_id, "Já existe uma transportadora cadastrada com este CNPJ/CPF")
 
     update_data = {
         **company_input.model_dump(),
@@ -209,6 +270,14 @@ async def update_transport_company(company_id: str, company_input: TransportComp
 
 @api_router.delete("/transport-companies/{company_id}")
 async def delete_transport_company(company_id: str, current_user: dict = Depends(get_current_active_user)):
+    company = await db.transport_companies.find_one({"id": company_id}, {"_id": 0, "name": 1})
+    if not company:
+        raise HTTPException(status_code=404, detail="Transportadora não encontrada")
+    await _ensure_not_in_use([
+        (db.movements, {"transport_company": _name_regex(company['name'])}, "movimentação(ões)"),
+        (db.drivers, {"transport_company": _name_regex(company['name'])}, "motorista(s) vinculado(s)"),
+        (db.vehicle_checklists, {"transport_company_id": company_id}, "checklist(s)"),
+    ], "Transportadora")
     result = await db.transport_companies.delete_one({"id": company_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Transportadora não encontrada")
@@ -217,6 +286,8 @@ async def delete_transport_company(company_id: str, current_user: dict = Depends
 # CRUD de Clientes
 @api_router.post("/clients", response_model=ClientResponse)
 async def create_client(client_input: ClientCreate, current_user: dict = Depends(get_current_active_user)):
+    await _ensure_unique_client_name(client_input.name, None)
+    await _ensure_unique_document(db.clients, "cnpj", client_input.cnpj, None, "Já existe um cliente cadastrado com este CNPJ/CPF")
     client = Client(**client_input.model_dump(), created_by=current_user['sub'])
 
     doc = client.model_dump()
@@ -228,11 +299,10 @@ async def create_client(client_input: ClientCreate, current_user: dict = Depends
 @api_router.get("/clients", response_model=List[ClientResponse])
 async def get_clients(
     page: int = 1,
-    per_page: int = 100,
+    per_page: int = 0,  # 0 = sem limite (antes cortava em 100 e cliente antigo sumia das telas)
     current_user: dict = Depends(get_current_active_user)
 ):
-    skip = (page - 1) * per_page
-    clients = await db.clients.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    clients = await _list_query(db.clients, page, per_page)
     return [
         ClientResponse(**{**c, "created_at": datetime.fromisoformat(c['created_at'])})
         for c in clients
@@ -243,6 +313,8 @@ async def update_client(client_id: str, client_input: ClientCreate, current_user
     existing = await db.clients.find_one({"id": client_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
+    await _ensure_unique_client_name(client_input.name, client_id)
+    await _ensure_unique_document(db.clients, "cnpj", client_input.cnpj, client_id, "Já existe um cliente cadastrado com este CNPJ/CPF")
 
     update_data = {
         **client_input.model_dump(),
@@ -253,10 +325,32 @@ async def update_client(client_id: str, client_input: ClientCreate, current_user
 
     await db.clients.replace_one({"id": client_id}, update_data)
 
+    # Renomeou: a Tabela de Serviços (Diária de Armazenagem) e os Vínculos de
+    # Representante comparam pelo nome guardado neles, então acompanham o
+    # nome novo. EIRs/faturas já lançados ficam com o nome da época.
+    if (existing.get('name') or '').strip() != (client_input.name or '').strip():
+        for collection in (db.service_price_entries, db.client_representative_links):
+            await collection.update_many({"client_id": client_id}, {"$set": {"client_name": client_input.name}})
+
     return ClientResponse(**{**update_data, "created_at": datetime.fromisoformat(update_data['created_at'])})
 
 @api_router.delete("/clients/{client_id}")
 async def delete_client(client_id: str, current_user: dict = Depends(get_current_active_user)):
+    client = await db.clients.find_one({"id": client_id}, {"_id": 0, "name": 1})
+    if not client:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado")
+    by_name = {"client_name": _name_regex(client['name'])}
+    await _ensure_not_in_use([
+        (db.movements, by_name, "movimentação(ões)"),
+        (db.invoices, by_name, "fatura(s)"),
+        (db.service_price_entries, {"client_id": client_id}, "item(ns) da Tabela de Serviços"),
+        (db.client_representative_links, {"client_id": client_id}, "vínculo(s) com representante"),
+        (db.port_services, {"client_id": client_id}, "serviço(s) portuário(s)"),
+        (db.container_inspections, {"client_id": client_id}, "registro(s) fotográfico(s)"),
+        (db.container_audits, {"client_id": client_id}, "auditoria(s)"),
+        (db.flex_tank_movements, {"client_id": client_id}, "movimentação(ões) de Flex Tank"),
+        (db.unit_segregations, {"client_id": client_id}, "segregação(ões) de unidade"),
+    ], "Cliente")
     result = await db.clients.delete_one({"id": client_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -265,6 +359,7 @@ async def delete_client(client_id: str, current_user: dict = Depends(get_current
 # CRUD de Fornecedores
 @api_router.post("/suppliers", response_model=SupplierResponse)
 async def create_supplier(supplier_input: SupplierCreate, current_user: dict = Depends(get_current_active_user)):
+    await _ensure_unique_document(db.suppliers, "cnpj", supplier_input.cnpj, None, "Já existe um fornecedor cadastrado com este CNPJ/CPF")
     supplier = Supplier(**supplier_input.model_dump(), created_by=current_user['sub'])
 
     doc = supplier.model_dump()
@@ -276,11 +371,10 @@ async def create_supplier(supplier_input: SupplierCreate, current_user: dict = D
 @api_router.get("/suppliers", response_model=List[SupplierResponse])
 async def get_suppliers(
     page: int = 1,
-    per_page: int = 100,
+    per_page: int = 0,  # 0 = sem limite
     current_user: dict = Depends(get_current_active_user)
 ):
-    skip = (page - 1) * per_page
-    suppliers = await db.suppliers.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    suppliers = await _list_query(db.suppliers, page, per_page)
     return [
         SupplierResponse(**{**s, "created_at": datetime.fromisoformat(s['created_at'])})
         for s in suppliers
@@ -291,6 +385,7 @@ async def update_supplier(supplier_id: str, supplier_input: SupplierCreate, curr
     existing = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
+    await _ensure_unique_document(db.suppliers, "cnpj", supplier_input.cnpj, supplier_id, "Já existe um fornecedor cadastrado com este CNPJ/CPF")
 
     update_data = {
         **supplier_input.model_dump(),
@@ -305,6 +400,13 @@ async def update_supplier(supplier_id: str, supplier_input: SupplierCreate, curr
 
 @api_router.delete("/suppliers/{supplier_id}")
 async def delete_supplier(supplier_id: str, current_user: dict = Depends(get_current_active_user)):
+    await _ensure_not_in_use([
+        (db.fuel_supplies, {"supplier_id": supplier_id}, "abastecimento(s)"),
+        (db.fuel_supply_orders, {"supplier_id": supplier_id}, "ordem(ns) de abastecimento"),
+        (db.stock_entries, {"supplier_id": supplier_id}, "entrada(s) de estoque"),
+        (db.stock_movements, {"supplier_id": supplier_id}, "movimentação(ões) de estoque"),
+        (db.expense_reports, {"purchases.supplier_id": supplier_id}, "prestação(ões) de contas"),
+    ], "Fornecedor")
     result = await db.suppliers.delete_one({"id": supplier_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
@@ -313,6 +415,7 @@ async def delete_supplier(supplier_id: str, current_user: dict = Depends(get_cur
 # CRUD de Terminal (Cadastro, dentro do grupo Terminal)
 @api_router.post("/terminals", response_model=TerminalResponse)
 async def create_terminal(terminal_input: TerminalCreate, current_user: dict = Depends(get_current_active_user)):
+    await _ensure_unique_document(db.terminals, "cnpj", terminal_input.cnpj, None, "Já existe um terminal cadastrado com este CNPJ")
     terminal = Terminal(**terminal_input.model_dump(), created_by=current_user['sub'])
 
     doc = terminal.model_dump()
@@ -324,11 +427,10 @@ async def create_terminal(terminal_input: TerminalCreate, current_user: dict = D
 @api_router.get("/terminals", response_model=List[TerminalResponse])
 async def get_terminals(
     page: int = 1,
-    per_page: int = 100,
+    per_page: int = 0,  # 0 = sem limite
     current_user: dict = Depends(get_current_active_user)
 ):
-    skip = (page - 1) * per_page
-    terminals = await db.terminals.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    terminals = await _list_query(db.terminals, page, per_page)
     return [
         TerminalResponse(**{**t, "created_at": datetime.fromisoformat(t['created_at'])})
         for t in terminals
@@ -339,6 +441,7 @@ async def update_terminal(terminal_id: str, terminal_input: TerminalCreate, curr
     existing = await db.terminals.find_one({"id": terminal_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Terminal não encontrado")
+    await _ensure_unique_document(db.terminals, "cnpj", terminal_input.cnpj, terminal_id, "Já existe um terminal cadastrado com este CNPJ")
 
     update_data = {
         **terminal_input.model_dump(),
@@ -353,6 +456,12 @@ async def update_terminal(terminal_id: str, terminal_input: TerminalCreate, curr
 
 @api_router.delete("/terminals/{terminal_id}")
 async def delete_terminal(terminal_id: str, current_user: dict = Depends(get_current_active_user)):
+    terminal = await db.terminals.find_one({"id": terminal_id}, {"_id": 0, "name": 1})
+    if not terminal:
+        raise HTTPException(status_code=404, detail="Terminal não encontrado")
+    await _ensure_not_in_use([
+        (db.movements, {"origin_terminal": _name_regex(terminal['name'])}, "movimentação(ões)"),
+    ], "Terminal")
     result = await db.terminals.delete_one({"id": terminal_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Terminal não encontrado")
@@ -361,6 +470,7 @@ async def delete_terminal(terminal_id: str, current_user: dict = Depends(get_cur
 # CRUD de Funcionário
 @api_router.post("/employees", response_model=EmployeeResponse)
 async def create_employee(employee_input: EmployeeCreate, current_user: dict = Depends(get_current_active_user)):
+    await _ensure_unique_document(db.employees, "cpf", employee_input.cpf, None, "Já existe um funcionário cadastrado com este CPF")
     employee = Employee(**employee_input.model_dump(), created_by=current_user['sub'])
     employee.signature_url = _incoming_signature(employee_input, 'funcionario', employee.id, None)
 
@@ -373,11 +483,10 @@ async def create_employee(employee_input: EmployeeCreate, current_user: dict = D
 @api_router.get("/employees", response_model=List[EmployeeResponse])
 async def get_employees(
     page: int = 1,
-    per_page: int = 100,
+    per_page: int = 0,  # 0 = sem limite
     current_user: dict = Depends(get_current_active_user)
 ):
-    skip = (page - 1) * per_page
-    employees = await db.employees.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    employees = await _list_query(db.employees, page, per_page)
     return [
         EmployeeResponse(**{**e, "created_at": datetime.fromisoformat(e['created_at'])})
         for e in employees
@@ -388,6 +497,7 @@ async def update_employee(employee_id: str, employee_input: EmployeeCreate, curr
     existing = await db.employees.find_one({"id": employee_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+    await _ensure_unique_document(db.employees, "cpf", employee_input.cpf, employee_id, "Já existe um funcionário cadastrado com este CPF")
 
     update_data = {
         **employee_input.model_dump(),
@@ -422,6 +532,10 @@ async def update_person_signature(kind: str, person_id: str, data: SignatureUpda
 
 @api_router.delete("/employees/{employee_id}")
 async def delete_employee(employee_id: str, current_user: dict = Depends(get_current_active_user)):
+    await _ensure_not_in_use([
+        (db.ordem_servico, {"person_id": employee_id}, "ordem(ns) de serviço"),
+        (db.epi_deliveries, {"recipient_id": employee_id}, "entrega(s) de EPI"),
+    ], "Funcionário")
     result = await db.employees.delete_one({"id": employee_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
@@ -430,6 +544,7 @@ async def delete_employee(employee_id: str, current_user: dict = Depends(get_cur
 # CRUD de Seguradora
 @api_router.post("/insurance-companies", response_model=InsuranceCompanyResponse)
 async def create_insurance_company(insurance_input: InsuranceCompanyCreate, current_user: dict = Depends(get_current_active_user)):
+    await _ensure_unique_document(db.insurance_companies, "cnpj", insurance_input.cnpj, None, "Já existe uma seguradora cadastrada com este CNPJ")
     insurance = InsuranceCompany(**insurance_input.model_dump(), created_by=current_user['sub'])
 
     doc = insurance.model_dump()
@@ -441,11 +556,10 @@ async def create_insurance_company(insurance_input: InsuranceCompanyCreate, curr
 @api_router.get("/insurance-companies", response_model=List[InsuranceCompanyResponse])
 async def get_insurance_companies(
     page: int = 1,
-    per_page: int = 100,
+    per_page: int = 0,  # 0 = sem limite
     current_user: dict = Depends(get_current_active_user)
 ):
-    skip = (page - 1) * per_page
-    items = await db.insurance_companies.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    items = await _list_query(db.insurance_companies, page, per_page)
     return [
         InsuranceCompanyResponse(**{**i, "created_at": datetime.fromisoformat(i['created_at'])})
         for i in items
@@ -456,6 +570,7 @@ async def update_insurance_company(insurance_id: str, insurance_input: Insurance
     existing = await db.insurance_companies.find_one({"id": insurance_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Seguradora não encontrada")
+    await _ensure_unique_document(db.insurance_companies, "cnpj", insurance_input.cnpj, insurance_id, "Já existe uma seguradora cadastrada com este CNPJ")
 
     update_data = {
         **insurance_input.model_dump(),

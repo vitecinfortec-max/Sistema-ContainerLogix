@@ -455,7 +455,25 @@ async def _create_container_movement_locked(
 
 @api_router.post("/movements", response_model=ContainerMovementResponse)
 async def create_movement(movement_input: ContainerMovementCreate, current_user: dict = Depends(get_current_active_user)):
+    await _ensure_not_blocked(movement_input)
     return await _create_container_movement(movement_input, current_user)
+
+
+async def _ensure_not_blocked(movement_input):
+    """Status Bloqueado no Cadastro: não deixa lançar EIR novo pra esse
+    cliente/motorista (Inativo só some das listas da tela)."""
+    client_name = (movement_input.client_name or '').strip()
+    if client_name:
+        blocked = await db.clients.find_one(
+            {"name": {"$regex": f"^{re.escape(client_name)}$", "$options": "i"}, "status": "BLOQUEADO"}, {"_id": 0, "id": 1}
+        )
+        if blocked:
+            raise HTTPException(status_code=400, detail=f"Cliente {client_name} está bloqueado no Cadastro")
+    cpf_digits = re.sub(r'\D', '', movement_input.driver_cpf or '')
+    if cpf_digits:
+        for driver in await db.drivers.find({"status": "BLOQUEADO"}, {"_id": 0, "name": 1, "cpf": 1}).to_list(None):
+            if re.sub(r'\D', '', driver.get('cpf') or '') == cpf_digits:
+                raise HTTPException(status_code=400, detail=f"Motorista {driver.get('name') or ''} está bloqueado no Cadastro")
 
 
 _LOADING_ORDER_TYPE_TO_OPERATION = {"COLETA": "ENTRADA", "ENTREGA": "SAIDA"}

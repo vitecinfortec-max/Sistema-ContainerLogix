@@ -12,6 +12,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
+import { activeRecords } from '../lib/cadastroStatus';
 import { toast } from 'sonner';
 import { Save, Camera, Upload, X, Loader2, FileText, ShieldCheck } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
@@ -84,12 +85,12 @@ export default function NewContainerVistoriaPage() {
         api.getServiceTypes({ per_page: 1000 }),
         api.getDrivers(),
       ]);
-      setClients(clientsRes.data);
+      setClients(activeRecords(clientsRes.data));
       setShippingLines(shippingLinesRes.data);
       setVehicles(Array.isArray(vehiclesRes.data) ? vehiclesRes.data : (vehiclesRes.data?.items || []));
-      setTransportCompanies(companiesRes.data);
+      setTransportCompanies(activeRecords(companiesRes.data));
       setRepairServices(serviceTypesRes.data?.items || []);
-      setDrivers(Array.isArray(driversRes.data) ? driversRes.data : []);
+      setDrivers(activeRecords(driversRes.data));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados');

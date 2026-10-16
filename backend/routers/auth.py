@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel as PydanticBaseModel
 
-from models import UserLogin, UserResponse, Token, CompanySettings, CompanySettingsUpdate
+from models import UserLogin, UserResponse, Token, CompanySettingsUpdate
 from auth import get_password_hash, verify_password, create_access_token, FILE_TOKEN_SCOPE
 
 from shared import db, get_current_active_user, get_company_settings, check_rate_limit, client_ip
@@ -262,9 +262,10 @@ async def update_company_settings(data: CompanySettingsUpdate, current_user: dic
     if not user_doc or user_doc.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Apenas administradores podem editar os dados da empresa")
 
-    settings = CompanySettings(**data.model_dump(exclude_unset=True))
-    doc = settings.model_dump()
-    doc['updated_at'] = doc['updated_at'].isoformat()
-    await db.company_settings.replace_one({}, doc, upsert=True)
-    return doc
+    # $set só dos campos enviados: antes era replace_one do documento
+    # inteiro, e um PUT parcial apagava todos os outros dados da empresa.
+    changes = data.model_dump(exclude_unset=True)
+    changes['updated_at'] = datetime.now(timezone.utc).isoformat()
+    await db.company_settings.update_one({}, {"$set": changes}, upsert=True)
+    return await get_company_settings()
 

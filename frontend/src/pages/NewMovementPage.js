@@ -10,6 +10,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
+import { activeRecords } from '../lib/cadastroStatus';
 import { ClientNamePicker } from '../components/ClientNamePicker';
 import { toast } from 'sonner';
 import { Save, Check, Container as ContainerIcon } from 'lucide-react';
@@ -140,13 +141,14 @@ export default function NewMovementPage() {
       ]);
 
       // Definir os dados com validação
-      const driversData = Array.isArray(driversRes.data) ? driversRes.data : [];
-      const companiesData = Array.isArray(companiesRes.data) ? companiesRes.data : [];
-      const clientsData = Array.isArray(clientsRes.data) ? clientsRes.data : [];
+      // Inativo/Bloqueado no Cadastro não aparecem pra um EIR novo
+      const driversData = activeRecords(driversRes.data);
+      const companiesData = activeRecords(companiesRes.data);
+      const clientsData = activeRecords(clientsRes.data);
       const shippingLinesData = Array.isArray(shippingLinesRes.data) ? shippingLinesRes.data : [];
       const serviceTypesData = Array.isArray(serviceTypesRes.data?.items) ? serviceTypesRes.data.items : [];
       const vehiclesData = Array.isArray(vehiclesRes.data?.items) ? vehiclesRes.data.items : [];
-      const terminalsData = Array.isArray(terminalsRes.data) ? terminalsRes.data : [];
+      const terminalsData = activeRecords(terminalsRes.data);
 
       setDrivers(driversData);
       setCompanies(companiesData);

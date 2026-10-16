@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -23,7 +23,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
   Plus, Trash2, Edit, Search, Truck, IdCard, Store, ShieldCheck, Users, Warehouse,
-  Building2, ChevronDown, Loader2,
+  Building2, ChevronDown, Loader2, AlertTriangle,
 } from 'lucide-react';
 
 const formatCPF = (value) => {
@@ -72,6 +72,21 @@ const RECORD_STATUS_TONES = { ATIVO: 'emerald', INATIVO: 'slate', BLOQUEADO: 're
 const STATUS_COM_BLOQUEADO = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo'], ['BLOQUEADO', 'Bloqueado']];
 const STATUS_FUNCIONARIO = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo'], ['AFASTADO', 'Afastado'], ['DESLIGADO', 'Desligado']];
 const LOCATION_TYPE_OPTIONS = [['BRASIL', 'Brasil'], ['EXTERIOR', 'Exterior']];
+const onlyDigits = (value) => (value || '').toString().replace(/\D/g, '');
+const normalizeText = (value) => (value || '').toString().toLowerCase();
+
+// Validade da CNH: vencida, vencendo em até 30 dias ou ok (null)
+const CNH_WARNING_DAYS = 30;
+function cnhSituation(expiry) {
+  if (!expiry || !/^\d{4}-\d{2}-\d{2}/.test(expiry)) return null;
+  const [y, m, d] = expiry.slice(0, 10).split('-').map(Number);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((new Date(y, m - 1, d) - today) / 86400000);
+  if (days < 0) return { tone: 'red', label: 'Vencida', days };
+  if (days <= CNH_WARNING_DAYS) return { tone: 'amber', label: days === 0 ? 'Vence hoje' : `Vence em ${days}d`, days };
+  return null;
+}
 
 const TYPES = [
   {
@@ -81,7 +96,7 @@ const TYPES = [
     icon: Truck,
     moduleKey: 'cadastro.pessoas',
     api: { list: api.getDrivers, create: api.createDriver, update: api.updateDriver, remove: api.deleteDriver },
-    listColumns: [['name', 'Nome'], ['cpf', 'CPF'], ['phone', 'Telefone'], ['status', 'Status']],
+    listColumns: [['name', 'Nome'], ['cpf', 'CPF'], ['phone', 'Telefone'], ['cnh_expiry', 'Validade CNH'], ['status', 'Status']],
     fields: [
       { name: 'name', label: 'Nome completo', required: true },
       { name: 'cpf', label: 'CPF', mask: 'cpf', required: true },
@@ -309,8 +324,11 @@ export default function CadastroUnificadoPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [editOriginalName, setEditOriginalName] = useState('');
+  const loadSeq = useRef(0);
   const [formData, setFormData] = useState(() => buildEmptyForm(activeType));
   const [submitting, setSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -319,25 +337,31 @@ export default function CadastroUnificadoPage() {
   useEffect(() => {
     setSearchParams(activeTypeKey === TYPES[0].key ? {} : { type: activeTypeKey }, { replace: true });
     setSelectedIds(new Set());
+    setStatusFilter('ALL');
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTypeKey]);
 
   const loadItems = async () => {
+    // Trocando de tipo rápido, a resposta do tipo anterior pode chegar
+    // depois - só a última chamada grava a lista.
+    const seq = ++loadSeq.current;
     setLoading(true);
+    setItems([]);
     try {
       const response = await activeType.api.list();
-      setItems(response.data);
+      if (seq === loadSeq.current) setItems(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      toast.error(`Erro ao carregar ${activeType.plural.toLowerCase()}`);
+      if (seq === loadSeq.current) toast.error(`Erro ao carregar ${activeType.plural.toLowerCase()}`);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   };
 
   const resetForm = () => {
     setFormData(buildEmptyForm(activeType));
     setEditId(null);
+    setEditOriginalName('');
   };
 
   const openCreateDialog = () => {
@@ -363,6 +387,7 @@ export default function CadastroUnificadoPage() {
     }
     setFormData(form);
     setEditId(item.id);
+    setEditOriginalName(item.name || '');
     setOpen(true);
   };
 
@@ -414,6 +439,11 @@ export default function CadastroUnificadoPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
+    const renamingClient = editId && activeType.key === 'cliente'
+      && (formData.name || '').trim() !== (editOriginalName || '').trim();
+    if (renamingClient && !(await confirm(
+      `Renomear "${editOriginalName}" para "${(formData.name || '').trim()}"? A Tabela de Serviços e os vínculos com representante passam a usar o nome novo. EIRs e faturas já lançados continuam com o nome antigo.`,
+    ))) return;
     setSubmitting(true);
     try {
       if (editId) {
@@ -446,7 +476,7 @@ export default function CadastroUnificadoPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(`Erro ao deletar ${g.este} ${activeType.label.toLowerCase()}`);
+        toast.error(error.response?.data?.detail || `Erro ao deletar ${g.este} ${activeType.label.toLowerCase()}`);
       }
     }
   };
@@ -470,12 +500,25 @@ export default function CadastroUnificadoPage() {
     });
   };
 
+  const statusField = activeType.fields.find((f) => f.name === 'status');
+  const searchFields = [...activeType.listColumns.map(([field]) => field).filter((f) => f !== 'status' && f !== 'cnh_expiry'), 'trade_name'];
   const filteredItems = items.filter((item) => {
+    if (statusFilter !== 'ALL' && (item.status || 'ATIVO') !== statusFilter) return false;
     const term = search.trim().toLowerCase();
     if (!term) return true;
-    return activeType.listColumns.some(([field]) => (item[field] || '').toString().toLowerCase().includes(term));
+    // Só números (CNPJ/CPF/telefone digitado sem pontuação) compara dígito a dígito
+    const termDigits = onlyDigits(term);
+    const numericSearch = termDigits.length >= 3 && termDigits.length === term.replace(/[\s./()-]/g, '').length;
+    return searchFields.some((field) => (
+      normalizeText(item[field]).includes(term) || (numericSearch && onlyDigits(item[field]).includes(termDigits))
+    ));
   });
-  const { pageItems, paginationProps } = usePagination(filteredItems, { resetKey: search });
+  const { pageItems, paginationProps } = usePagination(filteredItems, { resetKey: `${search}|${statusFilter}` });
+  const cnhAlerts = activeType.key === 'motorista'
+    ? items.filter((item) => (item.status || 'ATIVO') === 'ATIVO').map((item) => cnhSituation(item.cnh_expiry)).filter(Boolean)
+    : [];
+  const cnhExpired = cnhAlerts.filter((s) => s.days < 0).length;
+  const cnhExpiring = cnhAlerts.length - cnhExpired;
 
   const singleSelectedItem = selectedIds.size === 1 ? filteredItems.find((item) => item.id === [...selectedIds][0]) : null;
 
@@ -579,13 +622,39 @@ export default function CadastroUnificadoPage() {
             </DialogContent>
           </Dialog>
 
-        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+        <FilterCard hasFilters={!!search || statusFilter !== 'ALL'} onClear={() => { setSearch(''); setStatusFilter('ALL'); }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label={activeType.listColumns.filter(([f]) => f !== 'status').map(([, l]) => l).join(', ')}>
+            <FilterField label={[...activeType.listColumns.filter(([f]) => f !== 'status' && f !== 'cnh_expiry').map(([, l]) => l), 'Nome Fantasia'].join(', ')}>
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-cadastro-input" />
             </FilterField>
+            {statusField && (
+              <FilterField label="Status">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger data-testid="cadastro-status-filter"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL" className="text-sm">Todos</SelectItem>
+                    {statusField.options.map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            )}
           </div>
         </FilterCard>
+
+        {cnhAlerts.length > 0 && (
+          <div
+            className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-3.5 py-2.5 text-[13px] text-amber-800 dark:text-amber-200"
+            data-testid="cnh-alert"
+          >
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>
+              {cnhExpired > 0 && <><strong>{cnhExpired}</strong> motorista(s) ativo(s) com CNH vencida</>}
+              {cnhExpired > 0 && cnhExpiring > 0 && ' e '}
+              {cnhExpiring > 0 && <><strong>{cnhExpiring}</strong> com CNH vencendo em até {CNH_WARNING_DAYS} dias</>}
+              . Veja a coluna Validade CNH.
+            </span>
+          </div>
+        )}
 
         {/* Lista - marque um registro pra habilitar as ações da barra.
             "Novo" abre um menu pra escolher o tipo de cadastro. */}
@@ -667,6 +736,13 @@ export default function CadastroUnificadoPage() {
                             <StatusPill tone={RECORD_STATUS_TONES[item.status] || 'slate'}>
                               {RECORD_STATUS_LABELS[item.status] || item.status || '-'}
                             </StatusPill>
+                          ) : field === 'cnh_expiry' ? (
+                            <span className="inline-flex items-center gap-1.5 tabular-nums">
+                              {item.cnh_expiry ? format(new Date(`${item.cnh_expiry.slice(0, 10)}T12:00:00`), 'dd/MM/yyyy') : '-'}
+                              {cnhSituation(item.cnh_expiry) && (
+                                <StatusPill tone={cnhSituation(item.cnh_expiry).tone}>{cnhSituation(item.cnh_expiry).label}</StatusPill>
+                              )}
+                            </span>
                           ) : colIdx === 0 ? (
                             <div className="max-w-[320px] truncate" title={item[field] || ''}>{item[field] || '-'}</div>
                           ) : (item[field] || '-')}
@@ -680,8 +756,8 @@ export default function CadastroUnificadoPage() {
           ) : (
             <EmptyState
               icon={activeType.icon}
-              loading={loading} title={(search ? 'Nenhum registro encontrado' : `${g.nenhum} ${activeType.label.toLowerCase()} ${g.cadastrado}`)}
-              hint={loading ? undefined : (search ? 'Ajuste a busca' : 'Use o botão "Novo cadastro" para incluir o primeiro')}
+              loading={loading} title={((search || statusFilter !== 'ALL') ? 'Nenhum registro encontrado' : `${g.nenhum} ${activeType.label.toLowerCase()} ${g.cadastrado}`)}
+              hint={loading ? undefined : ((search || statusFilter !== 'ALL') ? 'Ajuste a busca ou o filtro de Status' : 'Use o botão "Novo cadastro" para incluir o primeiro')}
             />
           )}
         </DataCard>

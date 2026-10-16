@@ -12,6 +12,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
+import { activeRecords } from '../lib/cadastroStatus';
 import { toast } from 'sonner';
 import { Save, Camera, Upload, X, Loader2, Plus, ClipboardCheck } from 'lucide-react';
 import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
@@ -72,9 +73,9 @@ export default function NewContainerInspectionPage() {
         api.getShippingLines(),
         api.getTerminals()
       ]);
-      setClients(clientsRes.data);
+      setClients(activeRecords(clientsRes.data));
       setShippingLines(shippingLinesRes.data);
-      setTerminals(Array.isArray(terminalsRes.data) ? terminalsRes.data : []);
+      setTerminals(activeRecords(terminalsRes.data));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados');
