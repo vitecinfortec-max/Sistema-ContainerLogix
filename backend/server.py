@@ -16,6 +16,7 @@ from typing import Optional
 from shared import (
     db, client, manager, UPLOADS_DIR,
     get_disabled_modules, match_module_for_path, is_module_disabled, session_is_current,
+    rate_limit_rule, rate_limit_exceeded, client_ip, RATE_LIMIT_MESSAGE,
 )
 from auth import decode_token, FILE_TOKEN_SCOPE
 
@@ -84,6 +85,27 @@ async def module_gate_middleware(request: Request, call_next):
             if is_module_disabled(module_key, disabled):
                 return JSONResponse(status_code=403, content={"detail": "Este módulo não está disponível no seu plano atual"})
     return await call_next(request)
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Limite geral de requisições (ver rate_limit_rule em shared.py), por
+    usuário logado ou, sem login válido, por IP."""
+    rule = rate_limit_rule(request.method, request.url.path)
+    if rule:
+        bucket, limit, window = rule
+        who = f"ip:{client_ip(request)}"
+        authorization = request.headers.get("authorization", "")
+        if authorization.lower().startswith("bearer "):
+            try:
+                who = f"user:{decode_token(authorization[7:].strip())['sub']}"
+            except Exception:
+                pass  # token inválido: a rota recusa depois, aqui conta pelo IP
+        if rate_limit_exceeded(f"{bucket}:{who}", limit, window):
+            return JSONResponse(status_code=429, content={"detail": RATE_LIMIT_MESSAGE})
+    return await call_next(request)
+
+
 api_router = APIRouter(prefix="/api")
 
 # Pastas de anexos que exigem login mesmo com UPLOADS_REQUIRE_AUTH desligado:

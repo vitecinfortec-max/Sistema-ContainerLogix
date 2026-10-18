@@ -24,23 +24,95 @@ from auth import get_current_user
 # força bruta de senha e contra o endpoint de "esqueci minha senha" sendo usado para
 # spam de email em massa. Chaveado por IP e por email/conta para cobrir os dois cenários.
 _rate_limit_attempts: dict = defaultdict(list)
+_rate_limit_last_sweep = {"at": 0.0}
+_RATE_LIMIT_SWEEP_SECONDS = 600
+_RATE_LIMIT_MAX_WINDOW = 3600  # maior janela usada em qualquer regra
+RATE_LIMIT_MESSAGE = "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente."
+
+
+def _sweep_rate_limits(now: float):
+    """Tira da memória as chaves sem tentativa recente: cada email digitado
+    no login e cada usuário/IP virava uma chave que nunca saía."""
+    if now - _rate_limit_last_sweep["at"] < _RATE_LIMIT_SWEEP_SECONDS:
+        return
+    _rate_limit_last_sweep["at"] = now
+    for key in [k for k, v in _rate_limit_attempts.items() if not v or now - v[-1] >= _RATE_LIMIT_MAX_WINDOW]:
+        _rate_limit_attempts.pop(key, None)
+
+
+def rate_limit_exceeded(key: str, limit: int, window_seconds: int) -> bool:
+    """Registra a tentativa e diz se 'key' passou de 'limit' dentro de
+    'window_seconds' (a tentativa recusada não conta)."""
+    now = time.time()
+    _sweep_rate_limits(now)
+    attempts = _rate_limit_attempts[key]
+    attempts[:] = [t for t in attempts if now - t < window_seconds]
+    if len(attempts) >= limit:
+        return True
+    attempts.append(now)
+    return False
 
 
 def check_rate_limit(key: str, limit: int, window_seconds: int):
     """Levanta 429 se 'key' já tiver 'limit' tentativas dentro de 'window_seconds'."""
-    now = time.time()
-    attempts = _rate_limit_attempts[key]
-    attempts[:] = [t for t in attempts if now - t < window_seconds]
-    if len(attempts) >= limit:
-        raise HTTPException(
-            status_code=429,
-            detail="Muitas tentativas. Aguarde alguns minutos antes de tentar novamente."
-        )
-    attempts.append(now)
+    if rate_limit_exceeded(key, limit, window_seconds):
+        raise HTTPException(status_code=429, detail=RATE_LIMIT_MESSAGE)
+
+
+# Atrás do proxy do Render, request.client é o proxy: todo mundo aparecia com
+# o mesmo IP e dividia o mesmo limite de login. Lá (o Render define RENDER) ou
+# com TRUST_PROXY_HEADERS ligado, vale o último IP do X-Forwarded-For - o que
+# o próprio proxy acrescentou (os anteriores vêm do cliente e podem ser
+# inventados). Sem proxy (instalação local), o cabeçalho é ignorado.
+_TRUST_PROXY_HEADERS = (
+    os.environ.get('TRUST_PROXY_HEADERS', '').strip().lower() in ('1', 'true', 'yes', 'sim')
+    or bool(os.environ.get('RENDER'))
+)
 
 
 def client_ip(request: Request) -> str:
+    if _TRUST_PROXY_HEADERS:
+        forwarded = [ip.strip() for ip in request.headers.get('x-forwarded-for', '').split(',') if ip.strip()]
+        if forwarded:
+            return forwarded[-1]
     return request.client.host if request.client else "unknown"
+
+
+# Limite geral por usuário (ou IP, sem login) - além dos de login/senha.
+# Folgado pra uso normal (inclusive excluir vários selecionados de uma vez),
+# mas barra script em loop e geração de PDF/Excel em massa.
+_EXPORT_SUFFIXES = ("/pdf", "/excel", "/xlsx", "/zip")
+# EIR: o caminho é de lista, mas o download em lote pede um EIR por vez
+_DOCUMENT_EXPORT_PATHS = ("/api/movements/pdf",)
+
+
+def _is_report_export(path: str) -> bool:
+    """Relatório de período/lista (consulta pesada) - /reports/*, */report/*,
+    */ledger/* ou /<recurso>/pdf. O resto é o documento de um registro só
+    (Vistoria, EIR, OS...), que o download em lote pede um por um."""
+    if path in _DOCUMENT_EXPORT_PATHS:
+        return False
+    parts = path[len("/api/"):].split("/")
+    return parts[0] == "reports" or len(parts) == 2 or any(p in ("report", "ledger") for p in parts)
+
+
+def rate_limit_rule(method: str, path: str):
+    """(nome do grupo, limite, janela em segundos) pra requisição, ou None."""
+    if method == "OPTIONS" or not path.startswith("/api/"):
+        return None
+    if path.startswith(("/api/auth/login", "/api/auth/forgot-password")):
+        return None  # já têm limite próprio, mais apertado
+    clean = path.rstrip("/")
+    if clean.endswith(_EXPORT_SUFFIXES) or "/pdf/" in path or "/excel/" in path:
+        if _is_report_export(clean):
+            return ("export", 30, 60)
+        # Folgado pra baixar dezenas de documentos marcados numa lista
+        return ("document", 300, 60)
+    if method in ("POST", "PUT", "PATCH", "DELETE"):
+        if "upload" in path:
+            return ("upload", 120, 60)
+        return ("write", 300, 60)
+    return None
 
 
 # Helper function to parse datetime from MongoDB (handles both string and datetime objects)

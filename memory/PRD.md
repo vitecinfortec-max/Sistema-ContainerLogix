@@ -74,7 +74,163 @@ Sistema completo de entrada, saída e inventário de contêineres para empresas 
 
 ## Histórico de Alterações Recentes
 
-### 23/08/2026 (Sessão Atual)
+### 14/10/2026 a 17/10/2026 (Sessão Atual) - Auditoria grupo a grupo do menu
+Cada grupo do menu foi revisado de ponta a ponta (backend, telas e regras de negócio), com um commit
+e um arquivo de testes por grupo (`backend/tests/test_<grupo>.py`). Padrões aplicados em todos:
+lista sem corte, campo apagado na edição grava vazio, cadastro Inativo/Bloqueado fora das telas de
+lançamento novo (mas visível na edição), exclusão bloqueada quando o registro está em uso (com a
+sugestão de mudar para Inativo), duplicados recusados, filtros aplicados enquanto se digita.
+
+- **Interface e geral (14-15/10) ✅**
+  - Skeleton de carregamento nas listas, aria-labels nos botões só com ícone, variantes de modo
+    escuro em 26 badges, menos animação decorativa, uma política única de movimento reduzido
+  - Telas em branco corrigidas (Ordem de Serviço, Contrato de Frete, Ordem de Carregamento)
+  - EIR: status de rascunho no cabeçalho e erro por campo obrigatório; barra de salvar fixa no celular
+  - Gate com coluna Container e colunas ordenáveis; navegação por teclado nas sugestões
+  - Dashboard ordenado por urgência (alertas no topo); botão "Filtrar" removido de 12 listas
+  - Menu e cabeçalho não recarregam a cada tela; cenas 3D só carregam quando aparecem na tela
+  - **Horário de Brasília em todo o sistema** (itens apareciam 3 horas adiantados): backend, PDFs e
+    datas padrão do frontend
+- **Manutenção ✅**
+  - OS canceladas não entram mais no "Valor total" nem no valor médio (tela de OS, Relatório de
+    Serviços, gráfico, PDF e Excel)
+  - Hodômetro: lista em ordem da data da leitura (era a hora do cadastro); leituras de Abastecimento
+    mostram "Abast. #N" (o número repetia o do lançamento manual); "KM atual" usa o maior KM lançado,
+    não o último cadastrado
+  - Revisão: editar não ignora mais campos apagados e grava a data no mesmo formato do cadastro
+  - Controle de Revisão: indicadores, coluna "Situação do veículo" e botão Editar (o backend já
+    permitia, a tela não)
+  - Hodômetro: filtro por placa e origem, edição de lançamento manual, "Próximo item" que vence,
+    "vencido há X km" e mais urgentes primeiro
+  - Relatório de Serviços: tabela das OS do filtro; gráfico renomeado para "Valor de serviços por dia"
+  - Formulário de Revisão no padrão dos demais; itens de menu "Checklist de Veículo" e "Categorias de
+    OS" iguais aos títulos das telas
+- **Abastecimento ✅**
+  - Nível do Tanque: recargas acima da capacidade mostram "Acima da capacidade" (antes "Nível OK"),
+    com aviso no medidor; o diálogo mostra o espaço livre e pede confirmação se passar dele
+  - Abastecimento do Tanque Próprio não exige mais Fornecedor (nem mostra Cidade/UF)
+  - Histórico do tanque: saídas mostram "Abast. #N" (numeração diferente das recargas) e coluna de
+    saldo após cada movimento
+  - Relatórios de Abastecimento e de Serviços: filtro de Equipamento/Fornecedor por trecho (com o
+    filtro automático, a placa incompleta zerava a lista)
+  - Abastecimento: filtros de período e fonte; coluna da Ordem vinculada
+  - Ordem de Abastecimento: filtro de situação (Pendente/Lançada) e coluna "Autorizado"
+    (litros/valor/tanque cheio)
+  - Relatório de Abastecimento: tabela dos abastecimentos do filtro e filtro de fonte
+  - Nível do Tanque: botão "Configurar tanque" para administradores
+- **Transporte ✅**
+  - Veículo, Contrato de Frete e Ordem de Carregamento: campo esvaziado na edição agora é apagado
+    (antes o valor antigo voltava)
+  - Pagamento Frete: lançamento Pago que volta pra Pendente sai da Ordem de Pagamento (recibo e total
+    refeitos; ordem vazia é apagada); seleção zerada ao filtrar e ações só sobre o que está visível;
+    marcar pago só atinge lançamentos ainda pendentes
+  - Ordem de Carregamento: excluir uma ordem aprovada cancela o frete pendente; editar uma ordem
+    aprovada atualiza valor/motorista/rota do lançamento pendente; filtros de status, tipo e período;
+    busca por Nº, booking e cliente
+  - Filtros de período (Pagamento Frete, Contrato de Frete) no dia de Brasília
+  - Cadastro de Veículo: indicadores, filtros de tipo/status e coluna Documentos com
+    CRLV/licenciamento/tacógrafo/vistoria vencidos ou a vencer
+  - Contrato de Frete: indicadores e filtro de período pela data do contrato
+  - Rota: filtro de status, ordem alfabética, rota já usada não é excluída
+- **Terminal ✅**
+  - **Estoque Atual**: container está no pátio quando a última movimentação dele é uma ENTRADA (regra
+    única em `movements.in_stock_movements`). Antes contava entradas x saídas do histórico inteiro:
+    uma entrada em dobro deixava o container no estoque pra sempre. Vale pro relatório (PDF/Excel),
+    Controle de Pátio, Dashboard e Auditoria
+  - Registro Fotográfico: fotos enviadas em paralelo não se apagam mais (`$push` com limite /
+    `$pull`); Vistoria também passa a usar `$pull` e limite
+  - Flex Tank: filtro De/Até da lista e do Excel comparava data com texto (não trazia nada); agora
+    pelo dia da movimentação, extremos inclusive
+  - Editar EIR: trocar container ou tipo passa pela trava de duplicidade
+  - Editar Segregação: container já segregado pra outro cliente é bloqueado
+  - Auditoria: status/observação/foto alteram só o item, sem regravar a lista
+  - Relatório de Movimentação: prévia na tela (totais + tabela paginada) com as mesmas linhas do
+    PDF/Excel
+- **Operacional ✅**
+  - Faturamento Portuário: fatura cancelada não pode ser reaberta (os serviços já foram liberados e
+    podiam ser cobrados 2x); a tela trava o status e confirma antes de cancelar
+  - Serviço Portuário faturado: não pode ser excluído nem ter valor/cliente trocados sem cancelar a
+    fatura (os demais campos seguem editáveis)
+  - Status de Entrega: um por Programação (salvo se o outro foi cancelado); excluir o Status devolve a
+    Programação pra Ativa; Programação com Status de Entrega não pode ser excluída
+  - update-status: repetir o mesmo status não responde mais "não encontrado"
+  - Programação: indicadores, filtro de status e Cancelar/Reativar (a tela chamava uma rota
+    inexistente)
+  - Serviço Portuário: indicadores, filtros de período/turno/situação/faturado e coluna Fatura (Nº)
+  - Status de Entrega: indicadores e busca por cliente/motorista/container
+- **Financeiro ✅**
+  - Faturas: cancelar devolve as movimentações e é definitivo (sem reabrir nem editar); excluir só
+    desfatura o que ainda é da fatura; buscas de fatura ignoram as canceladas; filtro de Status e
+    indicadores por status
+  - Removida a rota `POST /billing/report` (marcava como faturado sem fatura); aviso claro para
+    movimentação faturada sem fatura ativa
+  - Status repetido não dá mais 404 (Invoice Internacional, Diária, Prestação de Contas)
+  - Prestação de Contas concluída não aceita anexar/remover recibo
+  - Solicitação de Diária: edição só quando pendente, valores negativos e lista vazia recusados,
+    atualização dos itens corrigida, ações em lote com `Promise.allSettled`
+  - Invoice Internacional: itens validados, totais arredondados, número reservado depois da
+    validação, cancelada não é editável
+  - Relatório de Faturamento: prévia na tela com indicadores e validação de período
+- **Cadastro ✅**
+  - Clientes/Fornecedores/Funcionários/Terminais/Seguradoras devolvem todos os registros (antes
+    cortava em 100 e cliente antigo sumia das telas)
+  - CNPJ/CPF repetido recusado em todos os tipos (comparando só dígitos) e nome de cliente repetido
+    recusado
+  - Excluir cadastro em uso é bloqueado, dizendo onde está em uso e sugerindo Inativar
+  - Renomear cliente atualiza Tabela de Serviços e Vínculos de Representante (aviso na tela:
+    EIRs/faturas antigos mantêm o nome)
+  - Inativo/Bloqueado somem das telas de lançamento novo (EIR, Vistoria, Registro Fotográfico); EIR
+    novo recusa cliente/motorista Bloqueado
+  - Dados da Empresa grava só os campos enviados (`$set`, não replace)
+  - Tela Cadastro: filtro de Status, busca por números e Nome Fantasia, troca rápida de tipo sem
+    mostrar a lista do tipo anterior, motivo do erro ao excluir
+  - Motoristas: coluna Validade CNH e aviso de CNH vencida/vencendo
+- **Comercial ✅** (`routers/commercial.py`)
+  - Relatório de Comissão: R$ e US$ em totais separados (antes o dólar entrava somado no real),
+    período em dias de Brasília, data inicial depois da final vira aviso, prévia na tela
+    (`GET /reports/commission`)
+  - Status Ativo/Inativo editável na Tabela de Serviços e no Vínculo; editar não reativa sozinho
+  - EIR (novo e edição) só preenche o valor com preço Ativo de cobrança única (nunca a Diária de
+    Armazenagem), sem diferenciar maiúsculas; preço único ativo duplicado pro mesmo serviço/cliente
+    recusado
+  - Representante em uso não pode ser excluído; renomear atualiza os vínculos
+  - Validação na API: valor/free time negativo, comissão fora de 0-100%, moeda só BRL/USD, proposta
+    sem itens/valor negativo/validade < 1 (o número só é reservado depois de validar)
+  - Proposta Comercial: situação Em aberto/Aceita/Recusada com filtro e ações na barra, etiqueta
+    Vencida/Vence em Xd; editar mantém a situação
+  - Vínculo/Tabela: nome digitado sem escolher da lista não salva o registro anterior; erros de
+    exclusão mostram o motivo
+- **Estoque ✅** (`routers/stock.py`, `routers/epi_deliveries.py`)
+  - Nome repetido em Almoxarifado/Famílias e código de barras repetido no Produto recusados (o código
+    de barras casa o item da NF-e com o produto)
+  - Produto/serviço usado em OS, ou produto ainda com saldo, não pode ser excluído
+  - Almoxarifado/Família digitado sem escolher da lista não grava mais o id anterior
+  - Data da movimentação e da entrega de EPI validada; filtro de data e busca por Nº/produto/fornecedor
+  - Exclusão da Entrega de EPI devolve o material uma vez só (atômica) e vai pra auditoria
+  - Gráfico diário do relatório no horário de Brasília; extrato com código/almoxarifado nas entradas
+    por NF-e; filtro de Status em Estoque e Produto
+- **Gestão de Container ✅** (`routers/container_*.py`)
+  - Excluir a venda devolve a compra para Disponível (antes ficava Vendida para sempre)
+  - Vínculo compra↔venda atômico (duas vendas simultâneas pegavam a mesma compra)
+  - Compra vendida não pode ser excluída nem trocar de container; excluir Ordem de Carregamento
+    desfaz os vínculos antes de apagar
+  - Recebido sem valor usa o Valor da Venda; valores negativos recusados
+  - Representante: CPF/CNPJ duplicado, exclusão em uso, renomear propaga para vendas e ordens,
+    Inativo recusado em venda nova
+  - Script `backend/scripts/fix_container_purchases_sem_venda.py` (dry-run por padrão, backup em
+    JSON com `--apply`) para devolver a Disponível as compras que ficaram Vendidas sem venda
+- **Configurações/Admin ✅** (`routers/users.py`, `module_config.py`, `auth.py`)
+  - **Trava de módulos segue o grupo do catálogo**: os itens de Abastecimento têm chave `frota.*`,
+    então desativar Abastecimento não bloqueava nada (e desativar Manutenção bloqueava junto).
+    `GET /module-config` passou a devolver `module_groups` pro menu usar a mesma regra
+  - Login e recuperação de senha sem diferenciar maiúsculas/espaços no email
+  - Conta do dono do sistema (`is_superadmin`) protegida do admin do cliente
+  - Novo: editar nome/email e redefinir senha de um usuário (encerra as sessões dele)
+  - Dados da Empresa: prefixo do Booking validado, logo aceito só como nome de arquivo
+  - Configuração de Tanque: capacidade > 0 e alerta mínimo entre 0 e a capacidade
+- **Rate limiting ✅** - ver item em Tarefas Pendentes > P2
+
+### 23/08/2026 (Sessão Anterior)
 - **Auditoria completa e correções de segurança/performance/bugs ✅**
   - Backend: path traversal no delete de upload, validação de tipo/tamanho de arquivo faltando em 2
     endpoints, CORS permissivo (`*` com credentials), sem rate limiting em login/forgot-password,
@@ -425,7 +581,11 @@ Sistema completo de entrada, saída e inventário de contêineres para empresas 
       dentro do Capacitor e criando um colors.xml com a paleta da marca.)
 - [x] Remover motoristas duplicados do banco de dados (Verificado - 23/08/2026: checado em produção,
       não há duplicatas reais - item já não se aplicava)
-- [ ] Ativar rate limiting em endpoints adicionais além de login/forgot-password, se necessário
+- [x] Ativar rate limiting em endpoints adicionais além de login/forgot-password (Completo - 17/10/2026:
+      limite geral por usuário/IP via middleware - gravações 300/min, uploads 120/min, relatórios
+      PDF/Excel de período 30/min, PDF de um registro só (Vistoria, EIR, OS...) 300/min pro
+      download em lote de dezenas de marcados não ser barrado; troca de senha 5 tentativas/15 min; IP real atrás do proxy do Render (antes todos
+      dividiam o IP do proxy); limpeza das chaves antigas da memória)
 - [x] Polimento visual do sistema, inspirado numa revisão do TRANSLEO/Bsoft TMS (Completo -
       23/08/2026):
       - Cores de destaque por grupo no menu lateral (Terminal/Frota/Cadastro/Financeiro/
@@ -449,6 +609,13 @@ Sistema completo de entrada, saída e inventário de contêineres para empresas 
       atômica também, só os endpoints de "prévia do próximo número" (`/rpa-terceiro/next-number` e
       `/ordem-servico/next-number`) ainda liam "buscar último + 1" - corrigido pra ler do mesmo
       contador atômico, evitando prévia dessincronizada sob concorrência)
+
+### Próximos passos (17/10/2026)
+- [ ] Rodar os testes novos (`test_estoque`, `test_gestao_container`, `test_configuracoes`,
+      `test_rate_limit`) e a suíte inteira, mais o build do frontend - as mudanças de 16-17/10 foram
+      feitas num ambiente sem Python/Node e ainda não foram executadas
+- [ ] Commitar por grupo e fazer o push (o commit da auditoria Comercial já está pronto localmente)
+- [ ] Depois do deploy: rodar `fix_container_purchases_sem_venda.py` (primeiro sem `--apply`)
 
 ## Credenciais de Teste
 - Email: joao.victor@jalogisticas.com

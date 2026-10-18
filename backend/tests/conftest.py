@@ -129,6 +129,9 @@ def api(monkeypatch):
             monkeypatch.setattr(module, "db", fake_db)
     monkeypatch.setitem(shared._module_config_cache, "value", None)
     monkeypatch.setitem(shared._module_config_cache, "expires_at", 0)
+    # A suíte inteira roda como o mesmo admin, em segundos: sem zerar,
+    # passaria do limite geral de requisições (rate_limit_rule)
+    shared._rate_limit_attempts.clear()
 
     loop = asyncio.new_event_loop()
     users = [
