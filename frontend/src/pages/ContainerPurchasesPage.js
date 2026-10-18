@@ -75,9 +75,9 @@ export default function ContainerPurchasesPage() {
   const filteredList = list.filter((p) => {
     const term = containerFilter.trim().toUpperCase();
     if (!term) return true;
-    return p.container_number?.toUpperCase().includes(term);
+    return p.container_number?.toUpperCase().includes(term) || p.booking?.toUpperCase().includes(term);
   });
-  const { pageItems, paginationProps } = usePagination(filteredList);
+  const { pageItems, paginationProps } = usePagination(filteredList, { resetKey: `${containerFilter}|${statusFilter}` });
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -189,7 +189,7 @@ export default function ContainerPurchasesPage() {
           onClear={() => { setContainerFilter(''); setStatusFilter(''); }}
         >
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <FilterField label="Container">
+            <FilterField label="Container ou booking">
               <SearchInput className="font-mono" value={containerFilter} onChange={(e) => setContainerFilter(e.target.value)} />
             </FilterField>
             <FilterField label="Status">

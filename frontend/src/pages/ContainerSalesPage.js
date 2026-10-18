@@ -48,6 +48,7 @@ export default function ContainerSalesPage() {
 
   const [statusFilter, setStatusFilter] = useState('');
   const [containerFilter, setContainerFilter] = useState('');
+  const [representativeFilter, setRepresentativeFilter] = useState('');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -82,11 +83,13 @@ export default function ContainerSalesPage() {
   };
 
   const filteredList = list.filter((s) => {
+    if (representativeFilter && s.representative_id !== representativeFilter) return false;
     const term = containerFilter.trim().toUpperCase();
     if (!term) return true;
-    return s.container_number?.toUpperCase().includes(term);
+    return s.container_number?.toUpperCase().includes(term) || s.booking?.toUpperCase().includes(term);
   });
-  const { pageItems, paginationProps } = usePagination(filteredList);
+  const hasFilters = !!(containerFilter || statusFilter || representativeFilter);
+  const { pageItems, paginationProps } = usePagination(filteredList, { resetKey: `${containerFilter}|${statusFilter}|${representativeFilter}` });
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -169,7 +172,10 @@ export default function ContainerSalesPage() {
   };
 
   const handleDelete = async (sale) => {
-    if (await confirm('Tem certeza que deseja excluir este Registro de Venda?')) {
+    const message = sale.purchase_id
+      ? 'Tem certeza que deseja excluir este Registro de Venda? A Compra vinculada volta a ficar Disponível.'
+      : 'Tem certeza que deseja excluir este Registro de Venda?';
+    if (await confirm(message)) {
       try {
         await api.deleteContainerSale(sale.id);
         toast.success('Registro de Venda excluído');
@@ -202,11 +208,11 @@ export default function ContainerSalesPage() {
         </StatGrid>
 
         <FilterCard
-          hasFilters={!!(containerFilter || statusFilter)}
-          onClear={() => { setContainerFilter(''); setStatusFilter(''); }}
+          hasFilters={hasFilters}
+          onClear={() => { setContainerFilter(''); setStatusFilter(''); setRepresentativeFilter(''); }}
         >
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <FilterField label="Container">
+            <FilterField label="Container ou booking">
               <SearchInput className="font-mono" value={containerFilter} onChange={(e) => setContainerFilter(e.target.value)} />
             </FilterField>
             <FilterField label="Status">
@@ -216,6 +222,15 @@ export default function ContainerSalesPage() {
                   <SelectItem value="_all">Todos</SelectItem>
                   <SelectItem value="PENDENTE">Pendente</SelectItem>
                   <SelectItem value="RECEBIDO">Recebido</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Vendedor">
+              <Select value={representativeFilter || '_all'} onValueChange={(v) => setRepresentativeFilter(v === '_all' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="sale-representative-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos</SelectItem>
+                  {representatives.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </FilterField>
@@ -243,7 +258,7 @@ export default function ContainerSalesPage() {
             <EmptyState
               icon={BadgeDollarSign}
               title="Nenhuma venda encontrada"
-              hint={containerFilter || statusFilter ? 'Ajuste os filtros' : 'As vendas aparecem aqui quando uma Ordem de Entrega é aprovada, ou pelo botão "Nova venda"'}
+              hint={hasFilters ? 'Ajuste os filtros' : 'As vendas aparecem aqui quando uma Ordem de Entrega é aprovada, ou pelo botão "Nova venda"'}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -332,9 +347,9 @@ export default function ContainerSalesPage() {
               <Label className="block">Representante</Label>
               <Autocomplete
                 value={form.representative_name}
-                onChange={(v) => setForm({ ...form, representative_name: v })}
+                onChange={(v) => setForm({ ...form, representative_name: v, representative_id: '' })}
                 onSelect={(r) => setForm({ ...form, representative_id: r.id, representative_name: r.name })}
-                options={representatives}
+                options={representatives.filter((r) => r.status !== 'INATIVO')}
                 displayField="name"
               />
             </div>

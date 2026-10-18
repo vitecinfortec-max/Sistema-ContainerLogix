@@ -595,9 +595,9 @@ export default function LoadingOrderPage() {
                     <Label className="mb-1.5 block">Representante</Label>
                     <Autocomplete
                       value={form.representative_name}
-                      onChange={(v) => onChange('representative_name', v)}
+                      onChange={(v) => setForm((p) => ({ ...p, representative_name: v, representative_id: '' }))}
                       onSelect={(r) => setForm((p) => ({ ...p, representative_id: r.id, representative_name: r.name }))}
-                      options={representatives}
+                      options={representatives.filter((r) => r.status !== 'INATIVO')}
                       displayField="name"
                       className="h-9 text-sm"
                     />

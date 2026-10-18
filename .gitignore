@@ -37,6 +37,9 @@ dist
 *token.json*
 *credentials.json*
 
+# Backups gerados pelos scripts de correção de dados (dados reais de clientes)
+backend/scripts/backup_*.json
+
 # Logs and debug files
 npm-debug.log*
 yarn-debug.log*

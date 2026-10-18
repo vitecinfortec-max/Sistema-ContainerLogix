@@ -153,7 +153,7 @@ export default function ContainerRepresentativesPage() {
         });
         loadRepresentatives();
       } catch (error) {
-        toast.error('Erro ao deletar representante');
+        toast.error(error.response?.data?.detail || 'Erro ao deletar representante');
       }
     }
   };

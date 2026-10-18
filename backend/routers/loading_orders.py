@@ -15,7 +15,7 @@ from routers.freight_payments import (
 )
 from routers.movements import validate_loading_order_movements, create_movements_for_loading_order
 from routers.container_purchases import create_purchase_records_for_order
-from routers.container_sales import create_sale_records_for_order
+from routers.container_sales import create_sale_records_for_order, release_purchase_of_sale, unlink_sales_of_purchase
 
 api_router = APIRouter(prefix="/api")
 
@@ -197,7 +197,14 @@ async def delete_loading_order(order_id: str, current_user: dict = Depends(get_c
     await cancel_pending_freight_payment_for_order(order_id, current_user)
     # Compra/Venda de Container nascidas dessa ordem não fazem sentido sem
     # ela - ao contrário de Pagamento Frete e Movimentação de Estoque, que
-    # continuam existindo mesmo se a ordem de origem for apagada.
+    # continuam existindo mesmo se a ordem de origem for apagada. Os vínculos
+    # com registros de outras ordens (ou manuais) são desfeitos antes: a
+    # Compra vendida por esta ordem volta a ficar Disponível, e a Venda de
+    # outra ordem perde o vínculo com a Compra que sai daqui.
+    async for sale in db.container_sales.find({"loading_order_id": order_id}, {"_id": 0}):
+        await release_purchase_of_sale(sale)
+    async for purchase in db.container_purchases.find({"loading_order_id": order_id}, {"_id": 0}):
+        await unlink_sales_of_purchase(purchase)
     await db.container_purchases.delete_many({"loading_order_id": order_id})
     await db.container_sales.delete_many({"loading_order_id": order_id})
     return {"message": "Ordem de Carregamento removida"}

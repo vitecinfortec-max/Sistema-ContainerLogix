@@ -1,3 +1,5 @@
+import math
+import re
 from datetime import datetime, timezone
 from typing import Optional, List
 
@@ -17,6 +19,35 @@ api_router = APIRouter(prefix="/api")
 # em movements.py.
 
 
+def _clean_container_number(value: Optional[str]) -> str:
+    number = (value or '').strip().upper()
+    if not number:
+        raise HTTPException(status_code=400, detail="Informe o número do container")
+    return number
+
+
+def _refuse_negative_values(values: dict):
+    for field, label in (("purchase_value", "Valor de Compra"), ("sale_value", "Valor de Venda"),
+                         ("received_value", "Valor Recebido")):
+        value = values.get(field)
+        if value is not None and (not math.isfinite(value) or value < 0):
+            raise HTTPException(status_code=400, detail=f"{label} não pode ser negativo")
+
+
+async def _refuse_duplicate_available(container_number: str, exclude_id: Optional[str] = None):
+    """Dois registros Disponíveis do mesmo container deixavam a Venda escolher
+    um deles no chute (vincula a mais recente) e o outro ficava Disponível
+    pra sempre."""
+    query = {"container_number": container_number, "status": "DISPONIVEL"}
+    if exclude_id:
+        query["id"] = {"$ne": exclude_id}
+    if await db.container_purchases.find_one(query, {"_id": 1}):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Já existe uma Compra Disponível do container {container_number}. Edite a existente em vez de lançar outra.",
+        )
+
+
 async def _create_container_purchase(
     data: ContainerPurchaseCreate,
     current_user: dict,
@@ -25,7 +56,7 @@ async def _create_container_purchase(
     movement_id: Optional[str] = None,
 ) -> ContainerPurchaseResponse:
     purchase = ContainerPurchase(
-        container_number=data.container_number.strip().upper(),
+        container_number=_clean_container_number(data.container_number),
         booking=data.booking,
         origin_terminal=data.origin_terminal,
         entry_date=data.entry_date,
@@ -91,6 +122,8 @@ async def create_purchase_records_for_order(order: dict, current_user: dict) -> 
 async def create_container_purchase(data: ContainerPurchaseCreate, current_user: dict = Depends(get_current_admin_user)):
     """Lançamento manual - container comprado fora do fluxo de Ordem de
     Carregamento (ex: compra em lote direto de um corretor)."""
+    _refuse_negative_values(data.model_dump())
+    await _refuse_duplicate_available(_clean_container_number(data.container_number))
     return await _create_container_purchase(data, current_user)
 
 
@@ -104,8 +137,9 @@ async def list_container_purchases(
     if status:
         query['status'] = status
     if container_number:
-        import re
-        query['container_number'] = {"$regex": re.escape(container_number.strip().upper()), "$options": "i"}
+        # O campo de busca da tela serve pro container ou pro booking
+        rx = {"$regex": re.escape(container_number.strip()), "$options": "i"}
+        query['$or'] = [{"container_number": rx}, {"booking": rx}]
     rows = await db.container_purchases.find(query, {"_id": 0}).sort("created_at", -1).to_list(None)
     return rows
 
@@ -126,13 +160,22 @@ async def update_container_purchase(purchase_id: str, data: ContainerPurchaseUpd
     if not existing:
         raise HTTPException(status_code=404, detail="Compra de Container não encontrada")
 
-    update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
-    if update_data.get('container_number'):
-        update_data['container_number'] = update_data['container_number'].strip().upper()
-    if 'purchase_value' in update_data:
-        update_data['purchase_value'] = round_money(update_data['purchase_value'])
-    if 'sale_value' in update_data:
-        update_data['sale_value'] = round_money(update_data['sale_value'])
+    # Campo enviado vazio (null) apaga o valor salvo; antes era ignorado e não
+    # dava pra limpar um valor ou observação. Só o container é obrigatório.
+    update_data = data.model_dump(exclude_unset=True)
+    if 'container_number' in update_data:
+        number = _clean_container_number(update_data['container_number'])
+        if number != existing.get('container_number'):
+            if existing.get('loading_order_id'):
+                raise HTTPException(status_code=400, detail="O container de uma compra gerada pela Ordem de Coleta não pode ser trocado")
+            if existing.get('status') == 'VENDIDO':
+                raise HTTPException(status_code=400, detail="Esta compra já está vinculada a uma Venda: o container não pode ser trocado")
+            await _refuse_duplicate_available(number, exclude_id=purchase_id)
+        update_data['container_number'] = number
+    _refuse_negative_values(update_data)
+    for field in ('purchase_value', 'sale_value'):
+        if update_data.get(field) is not None:
+            update_data[field] = round_money(update_data[field])
     if update_data.get('entry_date'):
         update_data['entry_date'] = update_data['entry_date'].isoformat()
     update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
@@ -144,9 +187,17 @@ async def update_container_purchase(purchase_id: str, data: ContainerPurchaseUpd
 
 @api_router.delete("/container-purchases/{purchase_id}")
 async def delete_container_purchase(purchase_id: str, current_user: dict = Depends(get_current_admin_user)):
-    """Exclusão manual - não desfaz o vínculo com uma eventual Venda ligada
-    (purchase_id na Venda só é usado no momento da criação, nunca relido
-    depois), nem revalida nada na Ordem de Carregamento de origem."""
+    """Exclusão manual. Compra já vinculada a uma Venda não sai: a Venda
+    ficaria apontando pra uma compra que não existe (e com Booking/Terminal/
+    Data de Entrada copiados dela)."""
+    existing = await db.container_purchases.find_one({"id": purchase_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Compra de Container não encontrada")
+    if existing.get('sale_id') and await db.container_sales.find_one({"id": existing['sale_id']}, {"_id": 1}):
+        raise HTTPException(
+            status_code=409,
+            detail="Esta compra está vinculada a um Registro de Venda. Exclua a venda antes, se for o caso.",
+        )
     result = await db.container_purchases.delete_one({"id": purchase_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Compra de Container não encontrada")
