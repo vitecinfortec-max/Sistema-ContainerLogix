@@ -22,7 +22,7 @@ from models import (
     StockMovement, StockMovementCreate, StockMovementUpdate, StockMovementResponse, StockMovementItem,
     Supplier,
 )
-from shared import db, get_current_active_user, get_company_settings, validate_and_read_upload
+from shared import db, get_current_active_user, get_company_settings, validate_and_read_upload, refuse_negative
 from reports import (
     generate_stock_report_excel, generate_stock_report_pdf,
     generate_stock_ledger_report_excel, generate_stock_ledger_report_pdf,
@@ -345,6 +345,7 @@ async def _validate_product(data: ProductCreate, item_id: Optional[str] = None):
         raise HTTPException(status_code=400, detail="Informe a descrição do produto")
     if not math.isfinite(data.reference_value) or data.reference_value < 0:
         raise HTTPException(status_code=400, detail="O valor de referência não pode ser negativo")
+    refuse_negative(data.model_dump(), {"icms_rate": "Alíquota de ICMS", "other_taxes_rate": "Outros Impostos (%)"})
     # O código de barras é o que casa o item da NF-e com o produto: repetido,
     # a importação somava o estoque no produto errado
     data.barcode = (data.barcode or '').strip() or None
@@ -1612,4 +1613,3 @@ async def download_stock_ledger_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=relatorio_movimentacoes_estoque.xlsx"}
     )
-                                                                                                                                       
