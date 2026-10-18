@@ -437,7 +437,7 @@ export default function FleetPage() {
       loadVehicles();
       loadAllVehiclesForAutocomplete();
     } catch (error) {
-      toast.error('Erro ao excluir veículo');
+      toast.error(error.response?.data?.detail || 'Erro ao excluir veículo');
     }
   };
 
@@ -513,7 +513,7 @@ export default function FleetPage() {
   };
 
   // Campos de KM (Controle de Revisão) digitados como texto em vez de
-  // <input type="number"> - ver sanitizeKmInput em lib/utils.js pro motivo.
+  // <input type="number" min="0"> - ver sanitizeKmInput em lib/utils.js pro motivo.
   const handleKmChange = (field) => (e) => {
     const v = sanitizeKmInput(e.target.value);
     if (v !== null) handleInputChange(field, v);
@@ -1549,7 +1549,7 @@ export default function FleetPage() {
               <div>
                 <Label className="mb-1.5 block">Ano de Fabricação</Label>
                 <Input
-                  type="number"
+                  type="number" min="0"
                   value={vehicleForm.year}
                   onChange={(e) => handleVehicleFormChange('year', e.target.value)}
                   min="1900"
@@ -1559,7 +1559,7 @@ export default function FleetPage() {
               <div>
                 <Label className="mb-1.5 block">Ano Modelo</Label>
                 <Input
-                  type="number"
+                  type="number" min="0"
                   value={vehicleForm.model_year}
                   onChange={(e) => handleVehicleFormChange('model_year', e.target.value)}
                   min="1900"
@@ -1576,7 +1576,7 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label className="mb-1.5 block">Nº de Eixos</Label>
-                <Input type="number" value={vehicleForm.axle_count} onChange={(e) => handleVehicleFormChange('axle_count', e.target.value)} />
+                <Input type="number" min="0" value={vehicleForm.axle_count} onChange={(e) => handleVehicleFormChange('axle_count', e.target.value)} />
               </div>
               <div>
                 <Label className="mb-1.5 block">Tipo de Carroceria/Implemento</Label>

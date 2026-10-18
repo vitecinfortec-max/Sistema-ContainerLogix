@@ -1612,3 +1612,4 @@ async def download_stock_ledger_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=relatorio_movimentacoes_estoque.xlsx"}
     )
+                                                                                                                                       

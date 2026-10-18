@@ -4,7 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 
 from models import FreightRoute, FreightRouteCreate, FreightRouteResponse
-from shared import db, get_current_active_user, get_current_admin_user
+from shared import db, get_current_active_user, get_current_admin_user, refuse_negative
 
 api_router = APIRouter(prefix="/api")
 
@@ -13,6 +13,7 @@ api_router = APIRouter(prefix="/api")
 
 @api_router.post("/freight-routes", response_model=FreightRouteResponse)
 async def create_freight_route(route_input: FreightRouteCreate, current_user: dict = Depends(get_current_admin_user)):
+    refuse_negative(route_input.model_dump(), {"freight_value": "Valor do Frete"})
     route = FreightRoute(**route_input.model_dump(), created_by=current_user['sub'])
 
     doc = route.model_dump()
@@ -36,6 +37,7 @@ async def update_freight_route(route_id: str, route_input: FreightRouteCreate, c
     existing = await db.freight_routes.find_one({"id": route_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
+    refuse_negative(route_input.model_dump(), {"freight_value": "Valor do Frete"})
 
     update_data = {
         **route_input.model_dump(),

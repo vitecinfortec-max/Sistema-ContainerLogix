@@ -629,6 +629,24 @@ sugestão de mudar para Inativo), duplicados recusados, filtros aplicados enquan
       servidor externo antigo (preview da Emergent) - corrigido. Suíte: 430 passando, 0 falhando,
       0 pulados)
 - [x] `regex=` (descontinuado no FastAPI) trocado por `pattern=` em frota, vistorias e inspeções
+- [x] Auditoria geral (Completo - 18/10/2026, `tests/test_auditoria_geral.py`):
+      - Tanque Próprio: abastecimento não tira mais do que há no tanque (o nível ficava negativo);
+        na edição conta os litros que o próprio lançamento já tirava; recarga só com litros > 0
+      - Números negativos recusados (400, `refuse_negative` em shared.py) em Abastecimento, Ordem de
+        Abastecimento, Serviço Portuário (abatia o faturamento), Rota de Frete, RPA (campos
+        digitados; resultado/saldo/complemento/frete líquido calculados podem ser negativos), OS
+        (leituras e itens), Hodômetro, Checklist, Revisão e alíquotas do Produto; `min="0"` nos
+        campos dessas telas
+      - Editar Abastecimento trocando para Tanque Próprio apaga fornecedor/cidade/UF; editar Ordem de
+        Abastecimento trocando o modo apaga os litros/valor do modo anterior (os `null` eram
+        descartados)
+      - Veículo com histórico (hodômetro, revisão, checklist, abastecimento, ordem, OS, estoque) não
+        é excluído - sugere Inativo; a tela mostra o motivo
+      - Verificado sem problemas: login em todas as rotas, anexos fora da pasta, WebSocket, buscas
+        com texto do usuário, `await` em todo acesso ao banco, datas (tela e filtros), numeração;
+        varredura automática sem nenhum 500 em 135 rotas de consulta e 42 módulos com dados
+      - Mantido por decisão: operador pode excluir na maioria das telas; anexos comuns abrem pelo
+        link sem login (`UPLOADS_REQUIRE_AUTH` desligado por causa do app antigo)
 - [ ] Opcional: corrigir os 28 avisos `react-hooks/exhaustive-deps` do build, tela por tela
 
 ## Credenciais de Teste

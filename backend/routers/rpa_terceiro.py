@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from models import RPATerceiro, RPATerceiroCreate, RPATerceiroUpdate, RPATerceiroResponse
 from reports import now_brt, merge_company
 
-from shared import db, get_current_admin_user, get_company_settings
+from shared import db, get_current_admin_user, get_company_settings, refuse_negative
 from routers.freight_payments import brt_day_range
 
 api_router = APIRouter(prefix="/api")
@@ -139,8 +139,26 @@ async def get_rpa_terceiro(rpa_id: str, current_user: dict = Depends(get_current
     return _rpa_serialize(rpa)
 
 
+# Campos digitados. Saldo de combustível, complemento, resultado e frete
+# líquido são calculados e podem ser negativos de verdade (adiantamento
+# maior que o frete, por exemplo), então ficam de fora.
+_RPA_NUMBER_LABELS = {
+    "distance_km": "Km", "axle_count": "Nº de Eixos", "return_km": "Km de Retorno",
+    "minimum_freight": "Frete Mínimo", "tolerance": "Tolerância", "driver_fee": "Tarifa do Motorista",
+    "collection_weight": "Peso de Coleta", "service_value": "Valor dos serviços", "daily_rate": "Diária",
+    "other_discounts": "Outros Descontos", "inss_discount_percent": "Desconto INSS (%)",
+    "sest_senat_discount_percent": "Desconto SEST/SENAT (%)", "ir_calculation_base": "Base de Cálculo IR",
+    "irrf_discount": "Desconto IRRF", "insurance_discount": "Desconto de Seguro", "toll_value": "Valor de Pedágio",
+    "advance": "Adiantamentos", "advance_installments": "Parcelas do Adiantamento", "fuel": "Combustível",
+    "arrival_weight": "Peso de Chegada", "weight_loss_discount": "Desconto de Quebra de Peso",
+    "others": "Outros Acréscimos", "discounts": "Descontos", "inss_ceiling": "Teto do INSS",
+    "contratado_monthly_inss_discount": "Desconto Mensal de INSS do Contratado",
+}
+
+
 @api_router.post("/rpa-terceiro", response_model=RPATerceiroResponse)
 async def create_rpa_terceiro(data: RPATerceiroCreate, current_user: dict = Depends(get_current_admin_user)):
+    refuse_negative(data.model_dump(), _RPA_NUMBER_LABELS)
     # Próximo número - separado por tipo (terceiro / agregado), gerado de forma
     # atômica para não duplicar número com duas criações concorrentes.
     rpa_type = data.rpa_type or "terceiro"
@@ -172,6 +190,7 @@ async def update_rpa_terceiro(rpa_id: str, data: RPATerceiroUpdate, current_user
 
     # Campo enviado vazio (null) apaga o valor salvo (ex.: pedágio removido)
     update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None or k not in ("driver_name", "rpa_type")}
+    refuse_negative(update_data, _RPA_NUMBER_LABELS)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.rpa_terceiro.update_one({"id": rpa_id}, {"$set": update_data})
 

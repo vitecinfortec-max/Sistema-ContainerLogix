@@ -17,7 +17,7 @@ from reports import (
     generate_port_services_report_pdf, generate_port_services_report_excel,
     generate_port_service_invoice_pdf, generate_port_service_invoice_excel
 )
-from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, load_logo_buffer
+from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, load_logo_buffer, refuse_negative
 
 api_router = APIRouter(prefix="/api")
 
@@ -170,6 +170,8 @@ async def get_port_service(service_id: str, current_user: dict = Depends(get_cur
 @api_router.post("/port-services", response_model=PortServiceResponse)
 async def create_port_service(data: PortServiceCreate, current_user: dict = Depends(get_current_active_user)):
     """Cria um novo Serviço Portuário"""
+    # Valor negativo entrava no faturamento e abatia o total cobrado do cliente
+    refuse_negative(data.model_dump(), {"operation_value": "Valor da Operação"})
     counter = await db.counters.find_one_and_update(
         {"_id": "port_service_number"},
         {"$inc": {"seq": 1}},
@@ -203,6 +205,7 @@ async def update_port_service(service_id: str, data: PortServiceCreate, current_
     existing = await db.port_services.find_one({"id": service_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Serviço Portuário não encontrado")
+    refuse_negative(data.model_dump(), {"operation_value": "Valor da Operação"})
 
     # Faturado: valor e cliente ficam como na fatura (o total dela não é
     # refeito); o resto continua editável.

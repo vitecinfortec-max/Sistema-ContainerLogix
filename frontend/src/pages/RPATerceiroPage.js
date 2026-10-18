@@ -943,11 +943,11 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               <Field label="Composição Veicular" value={form.vehicle_composition} onChange={(v) => onChange('vehicle_composition', v)} testid="rpa-vehicle-composition" />
               <Field label="Tabela de Frete" value={form.freight_table} onChange={(v) => onChange('freight_table', v)} testid="rpa-freight-table" />
               <Field label="Tipo de Carga" value={form.cargo_type} onChange={(v) => onChange('cargo_type', v)} testid="rpa-cargo-type" />
-              <Field label="Km" type="number" value={form.distance_km} onChange={(v) => onChange('distance_km', v)} testid="rpa-distance-km" />
-              <Field label="Nº de Eixos" type="number" value={form.axle_count} onChange={(v) => onChange('axle_count', v)} testid="rpa-axle-count" />
+              <Field label="Km" type="number" min="0" value={form.distance_km} onChange={(v) => onChange('distance_km', v)} testid="rpa-distance-km" />
+              <Field label="Nº de Eixos" type="number" min="0" value={form.axle_count} onChange={(v) => onChange('axle_count', v)} testid="rpa-axle-count" />
               <Field label="Frete de Retorno" value={form.return_freight_type} onChange={(v) => onChange('return_freight_type', v)} testid="rpa-return-freight" />
-              <Field label="Km de Retorno" type="number" value={form.return_km} onChange={(v) => onChange('return_km', v)} testid="rpa-return-km" />
-              <Field label="Frete Mínimo (R$)" type="number" value={form.minimum_freight} onChange={(v) => onChange('minimum_freight', v)} testid="rpa-minimum-freight" />
+              <Field label="Km de Retorno" type="number" min="0" value={form.return_km} onChange={(v) => onChange('return_km', v)} testid="rpa-return-km" />
+              <Field label="Frete Mínimo (R$)" type="number" min="0" value={form.minimum_freight} onChange={(v) => onChange('minimum_freight', v)} testid="rpa-minimum-freight" />
             </div>
 
             {/* DEMONSTRATIVO */}
@@ -973,7 +973,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                   <div className="col-span-3">
                     <Label className="mb-1.5 block">Valor (R$)</Label>
                     <Input
-                      type="number"
+                      type="number" min="0"
                       step="0.01"
                       value={s.value}
                       onChange={(e) => updateService(idx, 'value', e.target.value)}
@@ -1029,15 +1029,15 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                     </div>
                     <div className="col-span-1">
                       <Label className="mb-1.5 block">Kg</Label>
-                      <Input type="number" value={c.weight_kg} onChange={(e) => updateCargoItem(idx, 'weight_kg', e.target.value)} className="h-8 text-sm" />
+                      <Input type="number" min="0" value={c.weight_kg} onChange={(e) => updateCargoItem(idx, 'weight_kg', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
                       <Label className="mb-1.5 block">M³</Label>
-                      <Input type="number" value={c.cubage_m3} onChange={(e) => updateCargoItem(idx, 'cubage_m3', e.target.value)} className="h-8 text-sm" />
+                      <Input type="number" min="0" value={c.cubage_m3} onChange={(e) => updateCargoItem(idx, 'cubage_m3', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
                       <Label className="mb-1.5 block">Valor</Label>
-                      <Input type="number" value={c.value} onChange={(e) => updateCargoItem(idx, 'value', e.target.value)} className="h-8 text-sm" />
+                      <Input type="number" min="0" value={c.value} onChange={(e) => updateCargoItem(idx, 'value', e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="col-span-1">
                       <Button title="Excluir" aria-label="Excluir" type="button" variant="ghost" size="sm" onClick={() => removeCargoItem(idx)} className="h-8 px-2 text-destructive hover:text-red-700">
@@ -1062,29 +1062,29 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <SectionHeader title="Valores" />
             <div className="grid grid-cols-3 gap-3">
               <Field label="Regra" value={form.rule} onChange={(v) => onChange('rule', v)} testid="rpa-rule" />
-              <Field label="Tolerância" type="number" value={form.tolerance} onChange={(v) => onChange('tolerance', v)} testid="rpa-tolerance" />
-              <Field label="Tarifa do Motorista (R$)" type="number" value={form.driver_fee} onChange={(v) => onChange('driver_fee', v)} testid="rpa-driver-fee" />
-              <Field label="Peso de Coleta (Kg)" type="number" value={form.collection_weight} onChange={(v) => onChange('collection_weight', v)} testid="rpa-collection-weight" />
-              <Field label="Frete / I. Valor do Serviço (R$)" type="number" value={form.service_value} onChange={(v) => onChange('service_value', Number(v || 0))} testid="rpa-service-value" />
-              <Field label="II. Diária (R$)" type="number" value={form.daily_rate} onChange={(v) => onChange('daily_rate', Number(v || 0))} testid="rpa-daily-rate" />
-              <Field label="Outros Descontos (R$)" type="number" value={form.other_discounts} onChange={(v) => onChange('other_discounts', v)} testid="rpa-other-discounts" />
-              <Field label="Desconto INSS (%)" type="number" value={form.inss_discount_percent} onChange={(v) => onChange('inss_discount_percent', v)} testid="rpa-inss-percent" />
-              <Field label="Desconto SEST/SENAT (%)" type="number" value={form.sest_senat_discount_percent} onChange={(v) => onChange('sest_senat_discount_percent', v)} testid="rpa-sest-senat" />
-              <Field label="Base de Cálculo IR (R$)" type="number" value={form.ir_calculation_base} onChange={(v) => onChange('ir_calculation_base', v)} testid="rpa-ir-base" />
-              <Field label="Desconto IRRF (R$)" type="number" value={form.irrf_discount} onChange={(v) => onChange('irrf_discount', v)} testid="rpa-irrf" />
-              <Field label="Desconto de Seguro (R$)" type="number" value={form.insurance_discount} onChange={(v) => onChange('insurance_discount', v)} testid="rpa-insurance-discount" />
-              <Field label="Valor de Pedágio (R$)" type="number" value={form.toll_value} onChange={(v) => onChange('toll_value', v)} testid="rpa-toll" />
-              <Field label="Frete Líquido (R$)" type="number" value={form.net_freight} onChange={(v) => onChange('net_freight', v)} testid="rpa-net-freight" />
-              <Field label="III. Combustível (R$)" type="number" value={form.fuel} onChange={(v) => onChange('fuel', Number(v || 0))} testid="rpa-fuel" />
-              <Field label="IV. Adiantamento (R$)" type="number" value={form.advance} onChange={(v) => onChange('advance', Number(v || 0))} testid="rpa-advance" />
-              <Field label="Parcelas do Adiantamento" type="number" value={form.advance_installments} onChange={(v) => onChange('advance_installments', v)} testid="rpa-advance-installments" />
-              <Field label="Peso de Chegada (Kg)" type="number" value={form.arrival_weight} onChange={(v) => onChange('arrival_weight', v)} testid="rpa-arrival-weight" />
-              <Field label="Desconto de Quebra de Peso (R$)" type="number" value={form.weight_loss_discount} onChange={(v) => onChange('weight_loss_discount', v)} testid="rpa-weight-loss" />
-              <Field label="Saldo de Combustível (R$)" type="number" value={form.fuel_balance} onChange={(v) => onChange('fuel_balance', v)} testid="rpa-fuel-balance" />
-              <Field label="Complemento (R$)" type="number" value={form.complement} onChange={(v) => onChange('complement', v)} testid="rpa-complement" />
-              <Field label="Resultado (R$)" type="number" value={form.result} onChange={(v) => onChange('result', v)} testid="rpa-result" />
-              <Field label="VI. Outros Acréscimos (R$)" type="number" value={form.others} onChange={(v) => onChange('others', Number(v || 0))} testid="rpa-others" />
-              <Field label="Descontos (R$)" type="number" value={form.discounts} onChange={(v) => onChange('discounts', Number(v || 0))} testid="rpa-discounts" />
+              <Field label="Tolerância" type="number" min="0" value={form.tolerance} onChange={(v) => onChange('tolerance', v)} testid="rpa-tolerance" />
+              <Field label="Tarifa do Motorista (R$)" type="number" min="0" value={form.driver_fee} onChange={(v) => onChange('driver_fee', v)} testid="rpa-driver-fee" />
+              <Field label="Peso de Coleta (Kg)" type="number" min="0" value={form.collection_weight} onChange={(v) => onChange('collection_weight', v)} testid="rpa-collection-weight" />
+              <Field label="Frete / I. Valor do Serviço (R$)" type="number" min="0" value={form.service_value} onChange={(v) => onChange('service_value', Number(v || 0))} testid="rpa-service-value" />
+              <Field label="II. Diária (R$)" type="number" min="0" value={form.daily_rate} onChange={(v) => onChange('daily_rate', Number(v || 0))} testid="rpa-daily-rate" />
+              <Field label="Outros Descontos (R$)" type="number" min="0" value={form.other_discounts} onChange={(v) => onChange('other_discounts', v)} testid="rpa-other-discounts" />
+              <Field label="Desconto INSS (%)" type="number" min="0" value={form.inss_discount_percent} onChange={(v) => onChange('inss_discount_percent', v)} testid="rpa-inss-percent" />
+              <Field label="Desconto SEST/SENAT (%)" type="number" min="0" value={form.sest_senat_discount_percent} onChange={(v) => onChange('sest_senat_discount_percent', v)} testid="rpa-sest-senat" />
+              <Field label="Base de Cálculo IR (R$)" type="number" min="0" value={form.ir_calculation_base} onChange={(v) => onChange('ir_calculation_base', v)} testid="rpa-ir-base" />
+              <Field label="Desconto IRRF (R$)" type="number" min="0" value={form.irrf_discount} onChange={(v) => onChange('irrf_discount', v)} testid="rpa-irrf" />
+              <Field label="Desconto de Seguro (R$)" type="number" min="0" value={form.insurance_discount} onChange={(v) => onChange('insurance_discount', v)} testid="rpa-insurance-discount" />
+              <Field label="Valor de Pedágio (R$)" type="number" min="0" value={form.toll_value} onChange={(v) => onChange('toll_value', v)} testid="rpa-toll" />
+              <Field label="Frete Líquido (R$)" type="number" min="0" value={form.net_freight} onChange={(v) => onChange('net_freight', v)} testid="rpa-net-freight" />
+              <Field label="III. Combustível (R$)" type="number" min="0" value={form.fuel} onChange={(v) => onChange('fuel', Number(v || 0))} testid="rpa-fuel" />
+              <Field label="IV. Adiantamento (R$)" type="number" min="0" value={form.advance} onChange={(v) => onChange('advance', Number(v || 0))} testid="rpa-advance" />
+              <Field label="Parcelas do Adiantamento" type="number" min="0" value={form.advance_installments} onChange={(v) => onChange('advance_installments', v)} testid="rpa-advance-installments" />
+              <Field label="Peso de Chegada (Kg)" type="number" min="0" value={form.arrival_weight} onChange={(v) => onChange('arrival_weight', v)} testid="rpa-arrival-weight" />
+              <Field label="Desconto de Quebra de Peso (R$)" type="number" min="0" value={form.weight_loss_discount} onChange={(v) => onChange('weight_loss_discount', v)} testid="rpa-weight-loss" />
+              <Field label="Saldo de Combustível (R$)" type="number" min="0" value={form.fuel_balance} onChange={(v) => onChange('fuel_balance', v)} testid="rpa-fuel-balance" />
+              <Field label="Complemento (R$)" type="number" min="0" value={form.complement} onChange={(v) => onChange('complement', v)} testid="rpa-complement" />
+              <Field label="Resultado (R$)" type="number" min="0" value={form.result} onChange={(v) => onChange('result', v)} testid="rpa-result" />
+              <Field label="VI. Outros Acréscimos (R$)" type="number" min="0" value={form.others} onChange={(v) => onChange('others', Number(v || 0))} testid="rpa-others" />
+              <Field label="Descontos (R$)" type="number" min="0" value={form.discounts} onChange={(v) => onChange('discounts', Number(v || 0))} testid="rpa-discounts" />
             </div>
 
             {/* SALDO A RECEBER */}
@@ -1101,8 +1101,8 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             {/* CONTRATOS ANTERIORES */}
             <SectionHeader title="Contratos Anteriores" />
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Teto do INSS (R$)" type="number" value={form.inss_ceiling} onChange={(v) => onChange('inss_ceiling', v)} testid="rpa-inss-ceiling" />
-              <Field label="Desconto Mensal de INSS do Contratado (R$)" type="number" value={form.contratado_monthly_inss_discount} onChange={(v) => onChange('contratado_monthly_inss_discount', v)} testid="rpa-contratado-inss" />
+              <Field label="Teto do INSS (R$)" type="number" min="0" value={form.inss_ceiling} onChange={(v) => onChange('inss_ceiling', v)} testid="rpa-inss-ceiling" />
+              <Field label="Desconto Mensal de INSS do Contratado (R$)" type="number" min="0" value={form.contratado_monthly_inss_discount} onChange={(v) => onChange('contratado_monthly_inss_discount', v)} testid="rpa-contratado-inss" />
             </div>
 
             {/* DADOS DE PAGAMENTO */}

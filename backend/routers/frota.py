@@ -18,7 +18,7 @@ from reports import merge_company
 
 from shared import (
     db, get_current_active_user, get_company_settings, parse_datetime_value, load_logo_buffer,
-    validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR
+    validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR, refuse_negative,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -158,7 +158,32 @@ async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_curre
     vehicle = await db.vehicles.find_one({"id": vehicle_id})
     if not vehicle:
         raise HTTPException(status_code=404, detail="Veículo não encontrado")
-    
+    # Com histórico, as leituras de Hodômetro e as Revisões dele ficavam
+    # órfãs (sumiam do Controle de Revisão). Alguns lançamentos guardam o id,
+    # outros só a placa.
+    plate = vehicle.get("plate")
+    by_id_or_plate = lambda id_field, plate_field: {"$or": [{id_field: vehicle_id}, {plate_field: plate}]}
+    checks = [
+        ("odometer_readings", {"vehicle_id": vehicle_id}, "leitura(s) de hodômetro"),
+        ("vehicle_revisions", {"vehicle_plate": plate}, "revisão(ões)"),
+        ("vehicle_checklists", {"$or": [{"vehicle_plate": plate}, {"cavalo_plate": plate},
+                                        {"carreta1_plate": plate}, {"carreta2_plate": plate}]}, "checklist(s)"),
+        ("fuel_supplies", by_id_or_plate("equipment_id", "equipment_plate"), "abastecimento(s)"),
+        ("fuel_supply_orders", by_id_or_plate("equipment_id", "equipment_plate"), "ordem(ns) de abastecimento"),
+        ("ordem_servico", by_id_or_plate("equipment_id", "equipment_plate"), "ordem(ns) de serviço"),
+        ("stock_movements", {"purpose_vehicle_id": vehicle_id}, "movimentação(ões) de estoque"),
+    ]
+    in_use = []
+    for collection, query, label in checks:
+        count = await db[collection].count_documents(query)
+        if count:
+            in_use.append(f"{count} {label}")
+    if in_use:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Este veículo está em uso ({', '.join(in_use)}). Para tirá-lo de uso, mude o Status para Inativo.",
+        )
+
     await db.vehicles.delete_one({"id": vehicle_id})
     return {"message": "Veículo excluído com sucesso"}
 
@@ -302,6 +327,7 @@ async def get_vehicle_checklist(checklist_id: str, current_user: dict = Depends(
 @api_router.post("/vehicle-checklists", response_model=VehicleChecklistResponse)
 async def create_vehicle_checklist(data: VehicleChecklistCreate, current_user: dict = Depends(get_current_active_user)):
     """Cria um novo checklist de veículo"""
+    refuse_negative(data.model_dump(), {"current_km": "KM Atual"})
     counter = await db.counters.find_one_and_update(
         {"_id": "vehicle_checklist_number"},
         {"$inc": {"seq": 1}},
@@ -330,6 +356,7 @@ async def update_vehicle_checklist(checklist_id: str, data: VehicleChecklistCrea
     existing = await db.vehicle_checklists.find_one({"id": checklist_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Checklist não encontrado")
+    refuse_negative(data.model_dump(), {"current_km": "KM Atual"})
 
     update_data = data.model_dump()
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -485,12 +512,20 @@ async def get_vehicle_revision(
         raise HTTPException(status_code=404, detail="Revisão não encontrada")
     return VehicleRevisionResponse(**revision)
 
+# KM atual e os "próximo KM" de cada item da revisão
+_REVISION_KM_LABELS = {
+    "current_km": "KM Atual",
+    **{f: "Próximo KM" for f in VehicleRevisionCreate.model_fields if f.startswith("next_") and f.endswith("_km")},
+}
+
+
 @api_router.post("/vehicle-revisions", response_model=VehicleRevisionResponse)
 async def create_vehicle_revision(
     data: VehicleRevisionCreate,
     current_user: dict = Depends(get_current_active_user)
 ):
     """Cria uma nova revisão de veículo"""
+    refuse_negative(data.model_dump(), _REVISION_KM_LABELS)
     counter = await db.counters.find_one_and_update(
         {"_id": "vehicle_revision_number"},
         {"$inc": {"seq": 1}},
@@ -621,6 +656,7 @@ async def update_vehicle_revision(
     # Campo opcional enviado vazio (ex: um "próximo KM" apagado) limpa o valor;
     # antes os vazios eram ignorados e não dava pra desfazer um preenchimento.
     update_data = data.model_dump(exclude_unset=True)
+    refuse_negative(update_data, _REVISION_KM_LABELS)
     if update_data.get('revision_date') is not None:
         # Mesmo formato do cadastro (texto ISO), não data do Mongo
         update_data['revision_date'] = update_data['revision_date'].isoformat()
@@ -936,6 +972,7 @@ async def create_odometer_reading(
     current_user: dict = Depends(get_current_active_user)
 ):
     """Cria um novo lançamento de hodômetro"""
+    refuse_negative(data.model_dump(), {"km": "KM"})
     counter = await db.counters.find_one_and_update(
         {"_id": "odometer_reading_number"},
         {"$inc": {"seq": 1}},
@@ -972,6 +1009,7 @@ async def update_odometer_reading(
 ):
     """Edita um lançamento manual de hodômetro (os que vêm do Abastecimento
     são corrigidos no próprio Abastecimento)."""
+    refuse_negative(data.model_dump(), {"km": "KM"})
     update = {
         "vehicle_id": data.vehicle_id,
         "vehicle_plate": data.vehicle_plate.upper(),

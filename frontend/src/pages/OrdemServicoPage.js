@@ -553,8 +553,8 @@ export default function OrdemServicoPage() {
 
               <SectionTitle>Controle de Uso</SectionTitle>
               <div className="grid grid-cols-2 gap-3">
-                <Field type="number" label="Leitura Inicial (KM/HR)" value={form.reading_initial} onChange={(v) => onChange('reading_initial', v)} testid="os-rd-ini" />
-                <Field type="number" label="Leitura Final (KM/HR)" value={form.reading_final} onChange={(v) => onChange('reading_final', v)} testid="os-rd-fim" />
+                <Field type="number" min="0" label="Leitura Inicial (KM/HR)" value={form.reading_initial} onChange={(v) => onChange('reading_initial', v)} testid="os-rd-ini" />
+                <Field type="number" min="0" label="Leitura Final (KM/HR)" value={form.reading_final} onChange={(v) => onChange('reading_final', v)} testid="os-rd-fim" />
               </div>
 
               <SectionTitle>Descrição da O.S.</SectionTitle>
@@ -710,7 +710,7 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
             </div>
             <div className="col-span-1">
               <Label className="mb-1.5 block">Qtd</Label>
-              <Input type="number" step="0.01" value={it.quantity ?? ''} onChange={(e) => onChange(idx, 'quantity', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-qty-${idx}`} />
+              <Input type="number" min="0" step="0.01" value={it.quantity ?? ''} onChange={(e) => onChange(idx, 'quantity', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-qty-${idx}`} />
             </div>
             {showUnit && (
               <div className="col-span-1">
@@ -720,11 +720,11 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
             )}
             <div className="col-span-1">
               <Label className="mb-1.5 block">V. Unit.</Label>
-              <Input type="number" step="0.01" value={it.unit_price ?? ''} onChange={(e) => onChange(idx, 'unit_price', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-unitprice-${idx}`} />
+              <Input type="number" min="0" step="0.01" value={it.unit_price ?? ''} onChange={(e) => onChange(idx, 'unit_price', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-unitprice-${idx}`} />
             </div>
             <div className="col-span-1">
               <Label className="mb-1.5 block">Desc.</Label>
-              <Input type="number" step="0.01" value={it.discount ?? ''} onChange={(e) => onChange(idx, 'discount', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-disc-${idx}`} />
+              <Input type="number" min="0" step="0.01" value={it.discount ?? ''} onChange={(e) => onChange(idx, 'discount', e.target.value)} className="h-8 text-sm text-right" data-testid={`${kind}-disc-${idx}`} />
             </div>
             <div className="col-span-1">
               <Label className="mb-1.5 block">Total</Label>

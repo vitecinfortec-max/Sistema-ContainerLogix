@@ -15,7 +15,7 @@ from reports import (
     generate_service_orders_report_pdf, generate_service_orders_report_excel, now_brt, merge_company
 )
 
-from shared import db, get_current_active_user, get_current_admin_user, get_company_settings
+from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, refuse_negative
 
 api_router = APIRouter(prefix="/api")
 
@@ -117,8 +117,18 @@ async def get_ordem_servico(os_id: str, current_user: dict = Depends(get_current
     return _os_serialize(doc)
 
 
+_OS_ITEM_LABELS = {"quantity": "Quantidade", "unit_price": "Valor Unitário", "discount": "Desconto"}
+
+
+def _validate_os_numbers(values: dict):
+    refuse_negative(values, {"reading_initial": "Leitura Inicial", "reading_final": "Leitura Final"})
+    for item in (values.get("products") or []) + (values.get("services") or []):
+        refuse_negative(item, _OS_ITEM_LABELS)
+
+
 @api_router.post("/ordem-servico", response_model=OrdemServicoResponse)
 async def create_ordem_servico(data: OrdemServicoCreate, current_user: dict = Depends(get_current_active_user)):
+    _validate_os_numbers(data.model_dump())
     # Numeração atômica - evita duas OS criadas ao mesmo tempo saírem com o mesmo número
     counter = await db.counters.find_one_and_update(
         {"_id": "os_number"},
@@ -146,6 +156,7 @@ async def update_ordem_servico(os_id: str, data: OrdemServicoUpdate, current_use
     if not existing:
         raise HTTPException(status_code=404, detail="Ordem de Serviço não encontrada")
     update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    _validate_os_numbers(update_data)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.ordem_servico.update_one({"id": os_id}, {"$set": update_data})
     updated = await db.ordem_servico.find_one({"id": os_id}, {"_id": 0})
