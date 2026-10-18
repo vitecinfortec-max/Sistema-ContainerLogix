@@ -37,6 +37,19 @@ def authenticated_session(auth_token):
     return session
 
 
+@pytest.fixture(scope="module", autouse=True)
+def seed_flex_tank(authenticated_session):
+    """Os testes editam uma movimentação existente: cria uma se a lista
+    estiver vazia."""
+    if authenticated_session.get(f"{BASE_URL}/api/flex-tank/movements").json().get("total"):
+        return
+    r = authenticated_session.post(f"{BASE_URL}/api/flex-tank/movements", json={
+        "bag_number": "TESTBAG001", "bag_size": "24000", "movement_date": "2026-10-18T12:00:00+00:00",
+        "movement_type": "ENTRADA", "container_number": "TSTU5555555", "observations": "TEST",
+    })
+    assert r.status_code == 200, f"Seed flex tank failed: {r.text}"
+
+
 class TestFlexTankEndpoints:
     """Tests for Flex Tank movements endpoints"""
     

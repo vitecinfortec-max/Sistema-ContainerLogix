@@ -31,6 +31,26 @@ def auth_headers(auth_token):
         "Content-Type": "application/json"
     }
 
+@pytest.fixture(scope="module", autouse=True)
+def seed_invoice(auth_headers):
+    """Os testes editam uma fatura existente: cria uma (com uma movimentação
+    cobrada) se ainda não houver nenhuma."""
+    if requests.get(f"{BASE_URL}/api/invoices", headers=auth_headers).json():
+        return
+    movement = requests.post(f"{BASE_URL}/api/movements", headers=auth_headers, json={
+        "operation_type": "ENTRADA", "driver_name": "TEST Motorista", "driver_cpf": "11122233344",
+        "truck_plate": "AAA0A00", "trailer_plate_1": "BBB0B00", "transport_company": "TEST Transportadora",
+        "client_name": "TEST Cliente Fatura", "container_number": "TSTU4444444", "status": "CHEIO",
+        "size_type": "20DC", "shipping_line": "TEST Armador", "service_type": "Armazenagem",
+        "service_value": 150.0, "currency": "BRL",
+    })
+    assert movement.status_code == 200, f"Seed movement failed: {movement.text}"
+    invoice = requests.post(f"{BASE_URL}/api/invoices", headers=auth_headers, json={
+        "client_name": "TEST Cliente Fatura", "movement_ids": [movement.json()["id"]],
+    })
+    assert invoice.status_code == 200, f"Seed invoice failed: {invoice.text}"
+
+
 class TestInvoiceHistoryEndpoint:
     """Tests for GET /api/invoices/{id}/history endpoint"""
     

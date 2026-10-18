@@ -199,8 +199,8 @@ class TestUploadAPI:
         
         filename = self.__class__.uploaded_png_filename
         
-        # Try to access the file
-        response = requests.get(f"{BASE_URL}/uploads/{filename}")
+        # Try to access the file (anexos são servidos pela rota /api/uploads)
+        response = requests.get(f"{BASE_URL}/api/uploads/{filename}")
         
         # Should be accessible (may require auth or not based on implementation)
         assert response.status_code in [200, 401, 403], f"Unexpected status: {response.status_code}"
@@ -315,8 +315,9 @@ class TestMovementWithPhotos:
         assert "traseira" in data["container_photos"]
         print(f"Retrieved movement with photos: {movement_id}")
     
-    def test_update_movement_photos(self, auth_headers, shipping_line):
-        """Test updating a movement's photos"""
+    def test_update_movement_keeps_legacy_photos(self, auth_headers, shipping_line):
+        """container_photos é legado (o upload saiu da tela): editar a
+        movimentação não muda nem apaga as fotos já gravadas"""
         if not hasattr(self.__class__, 'created_movement_id'):
             pytest.skip("No movement created")
         
@@ -357,10 +358,7 @@ class TestMovementWithPhotos:
         assert response.status_code == 200, f"Update movement failed: {response.text}"
         
         data = response.json()
-        assert data["container_photos"]["frente"] == "/uploads/test-frente-updated.jpg"
-        assert data["container_photos"]["traseira"] == "/uploads/test-traseira-updated.jpg"
-        assert "esquerda" not in data["container_photos"]
-        assert "direita" not in data["container_photos"]
+        assert data["container_photos"] == current_movement["container_photos"]
         print(f"Updated movement photos: {movement_id}")
     
     def test_create_movement_without_photos(self, auth_headers, shipping_line):

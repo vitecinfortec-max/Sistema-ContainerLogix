@@ -28,7 +28,21 @@ class TestDeliveryStatusAPI:
         assert login_response.status_code == 200, f"Login failed: {login_response.text}"
         token = login_response.json().get("access_token")
         self.session.headers.update({"Authorization": f"Bearer {token}"})
-        
+
+        # Os testes usam a Programação nº 1: cria se ainda não existir
+        if self.session.get(f"{BASE_URL}/api/delivery-status/schedule/1").status_code == 404:
+            created = self.session.post(f"{BASE_URL}/api/loading-schedules", json={
+                "destination_client_id": "cli-destino", "destination_client_name": "TEST Cliente Destino",
+                "contracting_client_id": "cli-contratante", "contracting_client_name": "TEST Cliente Contratante",
+                "booking": "BKTEST001",
+                "items": [{
+                    "operation_type": "ENTREGA", "driver_name": "TEST Motorista", "cavalo_plate": "ABC1D23",
+                    "loading_location": "Porto de Santos", "loading_date": "2026-10-18",
+                    "container_number": "TEST1234567",
+                }],
+            })
+            assert created.status_code == 200, f"Schedule setup failed: {created.text}"
+
         yield
     
     def test_get_delivery_statuses_list(self):
@@ -134,13 +148,31 @@ class TestDeliveryStatusAPI:
         # Cleanup
         self.session.delete(f"{BASE_URL}/api/delivery-status/{created['id']}")
     
+    def _existing_status_items(self):
+        """Lista de Status de Entrega; se estiver vazia, cria um numa
+        Programação só dele (um status por Programação, e a nº 1 é dos testes
+        de criar/editar/excluir)."""
+        items = self.session.get(f"{BASE_URL}/api/delivery-status").json().get("items", [])
+        if items:
+            return items
+        schedule = self.session.post(f"{BASE_URL}/api/loading-schedules", json={
+            "destination_client_id": "cli-destino", "destination_client_name": "TEST Cliente Destino",
+            "contracting_client_id": "cli-contratante", "contracting_client_name": "TEST Cliente Contratante",
+            "items": [{"driver_name": "TEST Motorista", "cavalo_plate": "ABC1D23",
+                       "loading_location": "Porto de Santos", "loading_date": "2026-10-18"}],
+        })
+        assert schedule.status_code == 200, schedule.text
+        created = self.session.post(f"{BASE_URL}/api/delivery-status", json={
+            "schedule_number": schedule.json()["schedule_number"], "status_date": "2026-10-18",
+            "items": [{"driver_name": "TEST Motorista", "cavalo_plate": "ABC1D23", "loading_location": "Porto de Santos"}],
+        })
+        assert created.status_code == 200, created.text
+        return self.session.get(f"{BASE_URL}/api/delivery-status").json().get("items", [])
+
     def test_get_delivery_status_by_id(self):
         """Test GET /api/delivery-status/{id} - existing status #1 from seed data"""
         # First get list to find existing status
-        list_response = self.session.get(f"{BASE_URL}/api/delivery-status")
-        assert list_response.status_code == 200
-        
-        items = list_response.json().get("items", [])
+        items = self._existing_status_items()
         if items:
             status_id = items[0]["id"]
             response = self.session.get(f"{BASE_URL}/api/delivery-status/{status_id}")
@@ -278,10 +310,7 @@ class TestDeliveryStatusAPI:
     def test_generate_delivery_status_pdf(self):
         """Test GET /api/delivery-status/{id}/pdf - generate PDF"""
         # Get existing status from list
-        list_response = self.session.get(f"{BASE_URL}/api/delivery-status")
-        assert list_response.status_code == 200
-        
-        items = list_response.json().get("items", [])
+        items = self._existing_status_items()
         if not items:
             pytest.skip("No existing delivery statuses to test PDF generation")
         

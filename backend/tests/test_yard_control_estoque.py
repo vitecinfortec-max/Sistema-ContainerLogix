@@ -39,6 +39,25 @@ class TestYardControlEstoqueFilter:
         })
         return session
 
+    @pytest.fixture(scope="class", autouse=True)
+    def seed_yard(self, authenticated_client):
+        """Dois containers no pátio e um que já saiu (só cria se o pátio
+        estiver vazio, pra não sujar um servidor que já tenha dados)."""
+        current = authenticated_client.get(f"{BASE_URL}/api/yard-control?movement_type=ESTOQUE")
+        if current.status_code == 200 and current.json().get("containers"):
+            return
+        base = {
+            "driver_name": "TEST Motorista", "driver_cpf": "11122233344", "truck_plate": "AAA0A00",
+            "trailer_plate_1": "BBB0B00", "transport_company": "TEST Transportadora", "client_name": "TEST Cliente",
+            "status": "CHEIO", "size_type": "20DC", "shipping_line": "TEST Armador",
+        }
+        for container, operation in (("TSTU1111111", "ENTRADA"), ("TSTU2222222", "ENTRADA"),
+                                     ("TSTU3333333", "ENTRADA"), ("TSTU3333333", "SAIDA")):
+            r = authenticated_client.post(f"{BASE_URL}/api/movements", json={
+                **base, "container_number": container, "operation_type": operation,
+            })
+            assert r.status_code == 200, f"Seed failed: {r.text}"
+
     def test_estoque_filter_returns_only_in_stock_true(self, authenticated_client):
         """Test that ESTOQUE filter returns only containers with in_stock=true"""
         response = authenticated_client.get(f"{BASE_URL}/api/yard-control?movement_type=ESTOQUE")

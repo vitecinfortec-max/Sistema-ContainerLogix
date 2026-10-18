@@ -9,7 +9,7 @@ import os
 import uuid
 
 # Get the base URL from environment
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://container-mvmt-sys.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test user credentials
 TEST_USER = {

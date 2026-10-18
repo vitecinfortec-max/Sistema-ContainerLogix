@@ -3,7 +3,7 @@ Test suite for CRUD operations including UPDATE endpoints:
 - PUT /api/drivers/{id} - Update driver
 - PUT /api/transport-companies/{id} - Update transport company
 - PUT /api/shipping-lines/{id} - Update shipping line
-- POST /api/billing/report - Generate billing Excel report
+- POST /api/billing/report foi removida (faturamento é pela Fatura)
 """
 import pytest
 import requests
@@ -422,137 +422,13 @@ class TestShippingLinesCRUD(TestAuthAndSetup):
         assert delete_response.status_code == 200
 
 
-class TestBillingReport(TestAuthAndSetup):
-    """Test billing report generation endpoint"""
-    
-    def test_generate_billing_report(self, auth_headers):
-        """Test POST /api/billing/report endpoint"""
-        # First, create a movement to include in billing
-        unique_id = str(uuid.uuid4())[:8]
-        movement_data = {
-            "operation_type": "ENTRADA",
-            "driver_name": f"Test Driver {unique_id}",
-            "driver_cpf": "123.456.789-00",
-            "truck_plate": "ABC1234",
-            "trailer_plate_1": "DEF5678",
-            "trailer_plate_2": "",
-            "transport_company": "Test Company",
-            "container_number": f"TESTBILL{unique_id}",
-            "status": "CHEIO",
-            "size_type": "40HC",
-            "tare": "4200",
-            "shipping_line": "Maersk",
-            "seal": "SEAL123",
-            "genset": "",
-            "booking": "BK123456"
-        }
-        
-        create_response = requests.post(
-            f"{BASE_URL}/api/movements",
-            json=movement_data,
-            headers=auth_headers
-        )
-        assert create_response.status_code == 200
-        movement_id = create_response.json()["id"]
-        
-        # Now generate billing report
-        billing_data = {
-            "movement_ids": [movement_id]
-        }
-        
-        billing_response = requests.post(
-            f"{BASE_URL}/api/billing/report",
-            json=billing_data,
-            headers=auth_headers
-        )
-        
-        assert billing_response.status_code == 200, f"Billing report failed: {billing_response.text}"
-        assert billing_response.headers.get("content-type") == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        assert len(billing_response.content) > 0
-        
-        # Cleanup
-        requests.delete(f"{BASE_URL}/api/movements/{movement_id}", headers=auth_headers)
-    
-    def test_billing_report_empty_list(self, auth_headers):
-        """Test billing report with empty movement list returns 404"""
-        billing_data = {
-            "movement_ids": []
-        }
-        
-        response = requests.post(
-            f"{BASE_URL}/api/billing/report",
-            json=billing_data,
-            headers=auth_headers
-        )
-        
-        # Empty list should return 404 as no movements found
-        assert response.status_code == 404
-    
-    def test_billing_report_invalid_ids(self, auth_headers):
-        """Test billing report with invalid IDs returns 404"""
-        billing_data = {
-            "movement_ids": [str(uuid.uuid4()), str(uuid.uuid4())]
-        }
-        
-        response = requests.post(
-            f"{BASE_URL}/api/billing/report",
-            json=billing_data,
-            headers=auth_headers
-        )
-        
-        # Non-existent IDs should return 404
-        assert response.status_code == 404
-    
-    def test_billing_report_multiple_movements(self, auth_headers):
-        """Test billing report with multiple movements"""
-        unique_id = str(uuid.uuid4())[:8]
-        movement_ids = []
-        
-        # Create 3 movements
-        for i in range(3):
-            movement_data = {
-                "operation_type": "ENTRADA" if i % 2 == 0 else "SAIDA",
-                "driver_name": f"Test Driver {unique_id}_{i}",
-                "driver_cpf": "123.456.789-00",
-                "truck_plate": f"ABC{i}234",
-                "trailer_plate_1": f"DEF{i}678",
-                "trailer_plate_2": "",
-                "transport_company": "Test Company",
-                "container_number": f"BILL{unique_id}{i}",
-                "status": "CHEIO" if i % 2 == 0 else "VAZIO",
-                "size_type": "40HC",
-                "tare": "4200",
-                "shipping_line": "MSC",
-                "seal": f"SEAL{i}",
-                "genset": "",
-                "booking": f"BK{unique_id}{i}"
-            }
-            
-            response = requests.post(
-                f"{BASE_URL}/api/movements",
-                json=movement_data,
-                headers=auth_headers
-            )
-            assert response.status_code == 200
-            movement_ids.append(response.json()["id"])
-        
-        # Generate billing report with multiple IDs
-        billing_data = {
-            "movement_ids": movement_ids
-        }
-        
-        billing_response = requests.post(
-            f"{BASE_URL}/api/billing/report",
-            json=billing_data,
-            headers=auth_headers
-        )
-        
-        assert billing_response.status_code == 200
-        assert len(billing_response.content) > 0
-        
-        # Cleanup
-        for mid in movement_ids:
-            requests.delete(f"{BASE_URL}/api/movements/{mid}", headers=auth_headers)
+class TestBillingReportRemoved(TestAuthAndSetup):
+    """POST /api/billing/report foi removida: marcava movimentações como
+    faturadas sem gerar fatura. O faturamento é feito pela Fatura."""
+
+    def test_billing_report_route_no_longer_exists(self, auth_headers):
+        response = requests.post(f"{BASE_URL}/api/billing/report", json={"movement_ids": []}, headers=auth_headers)
+        assert response.status_code in (404, 405)
 
 
 class TestReportsDownload(TestAuthAndSetup):

@@ -611,11 +611,25 @@ sugestão de mudar para Inativo), duplicados recusados, filtros aplicados enquan
       contador atômico, evitando prévia dessincronizada sob concorrência)
 
 ### Próximos passos (17/10/2026)
-- [ ] Rodar os testes novos (`test_estoque`, `test_gestao_container`, `test_configuracoes`,
-      `test_rate_limit`) e a suíte inteira, mais o build do frontend - as mudanças de 16-17/10 foram
-      feitas num ambiente sem Python/Node e ainda não foram executadas
-- [ ] Commitar por grupo e fazer o push (o commit da auditoria Comercial já está pronto localmente)
-- [ ] Depois do deploy: rodar `fix_container_purchases_sem_venda.py` (primeiro sem `--apply`)
+- [x] Rodar os testes novos e a suíte inteira, mais o build do frontend (Completo - 18/10/2026:
+      testes novos passando; build com `CI=false yarn build` sem erros, só avisos de
+      `react-hooks/exhaustive-deps` já existentes)
+- [x] Commitar por grupo e fazer o push (Completo - 18/10/2026: Comercial, Estoque, Gestão de
+      Container, Configurações/Admin e limite de requisições; o commit do Comercial estava preso num
+      `main.lock` antigo e foi recuperado)
+- [x] Limite de requisições não barra mais o download em lote de PDFs (Completo - 18/10/2026: PDF
+      de um registro só tem limite próprio de 300/min; relatórios de período seguem com 30/min)
+- [ ] Depois do deploy: rodar `fix_container_purchases_sem_venda.py` **em produção** (shell do
+      Render, primeiro sem `--apply`). No banco local já rodou: nada a corrigir
+- [x] Testes antigos (requests + `REACT_APP_BACKEND_URL`) voltaram a rodar sem servidor no ar
+      (Completo - 18/10/2026: ponte em `tests/conftest.py` responde as chamadas pelo próprio app, com
+      banco em memória por arquivo; testes da rota removida `/billing/report`, do campo legado
+      `container_photos` e do caminho antigo `/uploads` atualizados; dados que eles esperavam no
+      servidor agora são criados no próprio teste. `test_clients_api.py` chamava por padrão um
+      servidor externo antigo (preview da Emergent) - corrigido. Suíte: 430 passando, 0 falhando,
+      0 pulados)
+- [x] `regex=` (descontinuado no FastAPI) trocado por `pattern=` em frota, vistorias e inspeções
+- [ ] Opcional: corrigir os 28 avisos `react-hooks/exhaustive-deps` do build, tela por tela
 
 ## Credenciais de Teste
 - Email: joao.victor@jalogisticas.com

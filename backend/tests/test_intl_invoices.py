@@ -76,19 +76,24 @@ class TestReceiverData:
     
     def test_get_receiver_data(self, auth_headers):
         """GET /api/intl-invoices/receiver-data returns company info"""
+        # O recebedor vem de "Dados da Empresa"
+        requests.put(f"{BASE_URL}/api/company-settings", json={
+            "name": "J.A Logística", "address": "Rua Teste, 100\nSantos/SP",
+        }, headers=auth_headers)
         response = requests.get(f"{BASE_URL}/api/intl-invoices/receiver-data", headers=auth_headers)
-        
+
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
-        
+
         data = response.json()
         assert "company" in data, "Response should contain 'company'"
         assert "email" in data, "Response should contain 'email'"
         assert "address" in data, "Response should contain 'address'"
         assert "city_state" in data, "Response should contain 'city_state'"
         assert "zip" in data, "Response should contain 'zip'"
-        
-        # Verify data is from J.A Logística
-        assert "J.A" in data["company"], "Company should be J.A Logística"
+
+        assert data["company"] == "J.A Logística", "Company should come from Dados da Empresa"
+        assert data["address"] == "Rua Teste, 100"
+        assert data["city_state"] == "Santos/SP"
         print(f"✓ Receiver data retrieved: {data['company']}")
 
 
