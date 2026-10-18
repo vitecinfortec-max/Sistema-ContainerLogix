@@ -14,7 +14,7 @@ from models import (
 )
 from reports import fmt_datetime, today_brt, generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel, now_brt, merge_company
 
-from shared import db, get_current_active_user, get_current_admin_user, get_company_settings
+from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, refuse_negative
 
 api_router = APIRouter(prefix="/api")
 
@@ -151,8 +151,41 @@ async def get_fuel_supply(supply_id: str, current_user: dict = Depends(get_curre
     return _fuel_calc(doc)
 
 
+_FUEL_SUPPLY_NUMBER_LABELS = {
+    "reading": "Leitura", "liters": "Litros", "unit_price": "Valor Unitário", "gross_value": "Valor Bruto",
+    "discounts": "Descontos", "additions": "Acréscimos", "other_expenses_value": "Valor de Outras Despesas",
+}
+
+
+async def _check_tank_balance(liters: float, giving_back: float = 0.0):
+    """Abastecimento do Tanque Próprio não pode tirar mais do que há no
+    tanque (antes o nível ficava negativo). `giving_back` são os litros que
+    este mesmo lançamento já tirava, na edição. Sem tanque configurado não
+    há saldo a conferir."""
+    level = await _compute_tank_level()
+    if not level:
+        return
+    available = round(level["current_liters"] + giving_back, 2)
+    if liters > available + 1e-9:
+        raise HTTPException(
+            status_code=400,
+            detail=f"O tanque próprio tem {max(available, 0):g} L disponíveis - não dá para abastecer {liters:g} L. Lance a recarga do tanque antes.",
+        )
+
+
+async def _validate_fuel_supply(values: dict, existing: Optional[dict] = None):
+    refuse_negative(values, _FUEL_SUPPLY_NUMBER_LABELS)
+    source = values.get("source", (existing or {}).get("source"))
+    if source != "TANQUE_PROPRIO":
+        return
+    liters = values.get("liters", (existing or {}).get("liters")) or 0
+    previous = ((existing or {}).get("liters") or 0) if (existing or {}).get("source") == "TANQUE_PROPRIO" else 0
+    await _check_tank_balance(float(liters), float(previous))
+
+
 @api_router.post("/fuel-supplies", response_model=FuelSupplyResponse)
 async def create_fuel_supply(data: FuelSupplyCreate, current_user: dict = Depends(get_current_active_user)):
+    await _validate_fuel_supply(data.model_dump())
     counter = await db.counters.find_one_and_update(
         {"_id": "fuel_supply_number"},
         {"$inc": {"seq": 1}},
@@ -178,7 +211,10 @@ async def update_fuel_supply(supply_id: str, data: FuelSupplyUpdate, current_use
     existing = await db.fuel_supplies.find_one({"id": supply_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
-    update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    # Campo enviado vazio (null) apaga o valor salvo: ao trocar para Tanque
+    # Próprio, a tela manda fornecedor/cidade/UF vazios e antes eles ficavam
+    update_data = data.model_dump(exclude_unset=True)
+    await _validate_fuel_supply(update_data, existing)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.fuel_supplies.update_one({"id": supply_id}, {"$set": update_data})
     updated = await db.fuel_supplies.find_one({"id": supply_id}, {"_id": 0})
@@ -370,8 +406,12 @@ async def get_fuel_supply_order(order_id: str, current_user: dict = Depends(get_
     return doc
 
 
+_FUEL_ORDER_NUMBER_LABELS = {"liters": "Litros", "estimated_value": "Valor"}
+
+
 @api_router.post("/fuel-supply-orders", response_model=FuelSupplyOrderResponse)
 async def create_fuel_supply_order(data: FuelSupplyOrderCreate, current_user: dict = Depends(get_current_active_user)):
+    refuse_negative(data.model_dump(), _FUEL_ORDER_NUMBER_LABELS)
     counter = await db.counters.find_one_and_update(
         {"_id": "fuel_supply_order_number"},
         {"$inc": {"seq": 1}},
@@ -397,7 +437,11 @@ async def update_fuel_supply_order(order_id: str, data: FuelSupplyOrderUpdate, c
     existing = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Ordem de Abastecimento não encontrada")
-    update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
+    # Campo enviado vazio (null) apaga o valor salvo: ao trocar o modo (ex.:
+    # Litros -> Valor) a tela manda os litros vazios e antes eles ficavam, e a
+    # ordem passava a autorizar os dois
+    update_data = data.model_dump(exclude_unset=True)
+    refuse_negative(update_data, _FUEL_ORDER_NUMBER_LABELS)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.fuel_supply_orders.update_one({"id": order_id}, {"$set": update_data})
     updated = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0})
@@ -708,6 +752,9 @@ async def get_tank_ledger(current_user: dict = Depends(get_current_active_user))
 
 @api_router.post("/tank-refills", response_model=TankRefillResponse)
 async def create_tank_refill(data: TankRefillCreate, current_user: dict = Depends(get_current_active_user)):
+    # Recarga negativa baixava o nível do tanque sem nenhum abastecimento
+    if not math.isfinite(data.liters) or data.liters <= 0:
+        raise HTTPException(status_code=400, detail="Os litros da recarga devem ser maiores que zero")
     counter = await db.counters.find_one_and_update(
         {"_id": "tank_refill_number"},
         {"$inc": {"seq": 1}},

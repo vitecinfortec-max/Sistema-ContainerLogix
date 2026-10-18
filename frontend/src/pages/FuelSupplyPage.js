@@ -520,11 +520,11 @@ export default function FuelSupplyPage() {
             <SectionTitle>Combustível / ARLA</SectionTitle>
             <div className="grid grid-cols-3 gap-3">
               <SelectField label="Combustível/ARLA *" value={form.fuel_type} onChange={(v) => onChange('fuel_type', v)} options={FUEL_TYPE_OPTIONS} testid="fuel-type" />
-              <Field type="number" label="Litros *" value={form.liters} onChange={(v) => onLitersOrPriceChange('liters', v)} testid="fuel-liters" />
-              <Field type="number" label="Valor Unitário *" value={form.unit_price} onChange={(v) => onLitersOrPriceChange('unit_price', v)} testid="fuel-unit-price" />
-              <Field type="number" label="Valor Bruto *" value={form.gross_value} onChange={(v) => onChange('gross_value', v)} testid="fuel-gross" />
-              <Field type="number" label="Abatimentos" value={form.discounts} onChange={(v) => onChange('discounts', v)} testid="fuel-discounts" />
-              <Field type="number" label="Acréscimos" value={form.additions} onChange={(v) => onChange('additions', v)} testid="fuel-additions" />
+              <Field type="number" min="0" label="Litros *" value={form.liters} onChange={(v) => onLitersOrPriceChange('liters', v)} testid="fuel-liters" />
+              <Field type="number" min="0" label="Valor Unitário *" value={form.unit_price} onChange={(v) => onLitersOrPriceChange('unit_price', v)} testid="fuel-unit-price" />
+              <Field type="number" min="0" label="Valor Bruto *" value={form.gross_value} onChange={(v) => onChange('gross_value', v)} testid="fuel-gross" />
+              <Field type="number" min="0" label="Abatimentos" value={form.discounts} onChange={(v) => onChange('discounts', v)} testid="fuel-discounts" />
+              <Field type="number" min="0" label="Acréscimos" value={form.additions} onChange={(v) => onChange('additions', v)} testid="fuel-additions" />
               <div>
                 <Label className="mb-1.5 block">Valor Líquido</Label>
                 <Input value={fmtMoney(netValue)} readOnly className="h-9 text-sm text-right font-semibold bg-muted" />
@@ -538,7 +538,7 @@ export default function FuelSupplyPage() {
             </div>
             {form.has_other_expenses && (
               <div className="grid grid-cols-2 gap-3 pl-6">
-                <Field type="number" label="Valor de Outras Despesas" value={form.other_expenses_value} onChange={(v) => onChange('other_expenses_value', v)} testid="fuel-other-expenses-value" />
+                <Field type="number" min="0" label="Valor de Outras Despesas" value={form.other_expenses_value} onChange={(v) => onChange('other_expenses_value', v)} testid="fuel-other-expenses-value" />
                 <Field label="Descrição" value={form.other_expenses_description} onChange={(v) => onChange('other_expenses_description', v)} testid="fuel-other-expenses-desc" />
               </div>
             )}
@@ -607,7 +607,7 @@ function Field({ label, value, onChange, type = 'text', testid, placeholder }) {
   );
 }
 
-// Campo numérico decimal digitado como texto em vez de <input type="number">
+// Campo numérico decimal digitado como texto em vez de <input type="number" min="0">
 // - ver sanitizeKmInput em lib/utils.js pro motivo.
 function DecimalField({ label, value, onChange, testid }) {
   const handleChange = (e) => {

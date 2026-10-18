@@ -140,6 +140,19 @@ def round_money(value):
     return round(float(value), 2)
 
 
+def refuse_negative(values: dict, labels: dict):
+    """Recusa (400) número negativo ou inválido (NaN/infinito) nos campos de
+    `labels` ({campo: rótulo na tela}). Campo ausente ou vazio passa: a
+    obrigatoriedade é conferida em outro lugar."""
+    import math
+    for field, label in labels.items():
+        value = values.get(field)
+        if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        if not math.isfinite(value) or value < 0:
+            raise HTTPException(status_code=400, detail=f'O campo "{label}" não pode ser negativo')
+
+
 def migrate_inspection_photos(inspection: dict) -> dict:
     """Converte vistorias antigas (photo_front/back/left/right/internal) para o formato de lista 'photos'"""
     from models import CONTAINER_INSPECTION_PHOTO_TYPES

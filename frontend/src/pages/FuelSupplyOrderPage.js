@@ -449,10 +449,10 @@ export default function FuelSupplyOrderPage() {
             {form.supply_mode !== 'COMPLETAR_TANQUE' && (
               <div className="grid grid-cols-2 gap-3">
                 {(form.supply_mode === 'LITROS' || form.supply_mode === 'LITROS_VALOR') && (
-                  <Field type="number" label="Litros" value={form.liters} onChange={(v) => onChange('liters', v)} testid="fuel-order-liters" />
+                  <Field type="number" min="0" label="Litros" value={form.liters} onChange={(v) => onChange('liters', v)} testid="fuel-order-liters" />
                 )}
                 {(form.supply_mode === 'VALOR' || form.supply_mode === 'LITROS_VALOR') && (
-                  <Field type="number" label="Valor" value={form.estimated_value} onChange={(v) => onChange('estimated_value', v)} testid="fuel-order-value" />
+                  <Field type="number" min="0" label="Valor" value={form.estimated_value} onChange={(v) => onChange('estimated_value', v)} testid="fuel-order-value" />
                 )}
                 {form.supply_mode === 'LITROS_VALOR' && (
                   <div>
