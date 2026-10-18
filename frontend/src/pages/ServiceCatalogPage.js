@@ -58,7 +58,7 @@ export default function ServiceCatalogPage() {
   const loadFamilies = async () => {
     try {
       const response = await api.getServiceFamilies();
-      setFamilies(response.data.filter((f) => f.status === 'ATIVO'));
+      setFamilies(response.data);
     } catch (error) { /* ignore */ }
   };
 
@@ -95,6 +95,10 @@ export default function ServiceCatalogPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
+    if (!formData.description?.trim()) {
+      toast.error('Preencha a descrição do serviço');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = { ...formData, value: Number(formData.value || 0) };
@@ -127,7 +131,7 @@ export default function ServiceCatalogPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error('Erro ao deletar serviço');
+        toast.error(error.response?.data?.detail || 'Erro ao deletar serviço');
       }
     }
   };
@@ -274,7 +278,8 @@ export default function ServiceCatalogPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_empty">-- Selecione --</SelectItem>
-                  {families.map((f) => <SelectItem key={f.id} value={f.id} className="text-sm">{f.name}</SelectItem>)}
+                  {/* Inativas não aparecem, a não ser a que o serviço já usa */}
+                  {families.filter((f) => f.status === 'ATIVO' || f.id === formData.family_id).map((f) => <SelectItem key={f.id} value={f.id} className="text-sm">{f.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

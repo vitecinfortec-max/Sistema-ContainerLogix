@@ -346,7 +346,7 @@ export default function StockReportPage() {
                 <FilterField label="Data fim">
                   <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="report-stock-ledger-date-to" />
                 </FilterField>
-                <FilterField label="Produto">
+                <FilterField label="Produto, código, NF ou OS">
                   <SearchInput value={ledgerSearch} onChange={(e) => setLedgerSearch(e.target.value)} data-testid="report-stock-ledger-search" />
                 </FilterField>
                 <FilterField label="Tipo">

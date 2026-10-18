@@ -23,6 +23,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Trash2, Save, ArrowLeftRight, Car, ClipboardList, Pencil, Printer, HardHat } from 'lucide-react';
 import { todayISO } from '../lib/dates';
+import { activeRecords } from '../lib/cadastroStatus';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -37,6 +38,8 @@ export default function StockMovementsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [operationFilter, setOperationFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const [warehouses, setWarehouses] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -65,13 +68,15 @@ export default function StockMovementsPage() {
   useEffect(() => {
     loadMovements();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, operationFilter]);
+  }, [debouncedSearch, operationFilter, dateFrom, dateTo]);
 
-  const loadMovements = async (term = debouncedSearch, operation = operationFilter) => {
+  const loadMovements = async (term = debouncedSearch, operation = operationFilter, from = dateFrom, to = dateTo) => {
     try {
       const params = {};
       if (term) params.search = term;
       if (operation) params.operation_type = operation;
+      if (from) params.date_from = from;
+      if (to) params.date_to = to;
       const r = await api.getStockMovements(params);
       setMovements(r.data || []);
     } catch (e) {
@@ -147,7 +152,7 @@ export default function StockMovementsPage() {
     });
   };
 
-  const { pageItems, paginationProps } = usePagination(movements, { resetKey: `${search}|${operationFilter}` });
+  const { pageItems, paginationProps } = usePagination(movements, { resetKey: `${search}|${operationFilter}|${dateFrom}|${dateTo}` });
 
   const toggleSelectAllOnPage = () => {
     const pageIds = pageItems.map((m) => m.id);
@@ -182,6 +187,9 @@ export default function StockMovementsPage() {
     return { ...p, items };
   });
   const productById = Object.fromEntries(products.map((p) => [p.id, p]));
+  // Inativos não aparecem pra escolher no lançamento novo; na edição
+  // continuam, pra não sumir o que já estava na movimentação
+  const productOptions = editingId ? products : activeRecords(products);
   const productLabel = (p) => `${p.description} (saldo: ${qtyWithUnit(p.stock_quantity, p.unit)})`;
   const setItemProduct = (idx, product) => {
     setForm((p) => {
@@ -327,12 +335,15 @@ export default function StockMovementsPage() {
     } finally { setSaving(false); }
   };
 
-  const warehouseOptions = warehouses.map((w) => [w.id, w.name]);
-  const supplierOptions = suppliers.map((s) => [s.id, s.name]);
+  const warehouseOptions = (editingId ? warehouses : activeRecords(warehouses)).map((w) => [w.id, w.name]);
+  const supplierOptions = (editingId ? suppliers : activeRecords(suppliers)).map((s) => [s.id, s.name]);
 
+  const hasFilters = !!(search || operationFilter || dateFrom || dateTo);
   const clearFilters = () => {
     setSearch('');
     setOperationFilter('');
+    setDateFrom('');
+    setDateTo('');
   };
 
   const singleSelectedMovement = selectedIds.size === 1 ? movements.find((m) => m.id === [...selectedIds][0]) : null;
@@ -369,9 +380,9 @@ export default function StockMovementsPage() {
       <div className="space-y-4" data-testid="stock-movements-page">
         <PageHeader icon={ArrowLeftRight} title="Movimentação de Estoque" subtitle="Lançamentos manuais de Entrada e Saída de estoque" />
 
-        <FilterCard hasFilters={!!(search || operationFilter)} onClear={clearFilters}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <FilterField label="Finalidade, placa, nota fiscal ou almoxarifado" className="col-span-2">
+        <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <FilterField label="Nº, produto, finalidade, placa, nota fiscal ou fornecedor" className="col-span-2">
               <SearchInput
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -387,6 +398,12 @@ export default function StockMovementsPage() {
                   <SelectItem value="SAIDA">Saída</SelectItem>
                 </SelectContent>
               </Select>
+            </FilterField>
+            <FilterField label="Data inicial">
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="filter-stock-movement-date-from" />
+            </FilterField>
+            <FilterField label="Data final">
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="filter-stock-movement-date-to" />
             </FilterField>
           </div>
         </FilterCard>
@@ -473,8 +490,8 @@ export default function StockMovementsPage() {
           ) : (
             <EmptyState
               icon={ArrowLeftRight}
-              loading={loading} title={(search || operationFilter ? 'Nenhuma movimentação encontrada' : 'Nenhuma movimentação de estoque registrada')}
-              hint={loading ? undefined : (search || operationFilter ? 'Ajuste os filtros' : 'Registre a primeira pelo botão "Nova movimentação"')}
+              loading={loading} title={(hasFilters ? 'Nenhuma movimentação encontrada' : 'Nenhuma movimentação de estoque registrada')}
+              hint={loading ? undefined : (hasFilters ? 'Ajuste os filtros' : 'Registre a primeira pelo botão "Nova movimentação"')}
             />
           )}
         </DataCard>
@@ -576,7 +593,7 @@ export default function StockMovementsPage() {
                         value={it.product_description || ''}
                         onChange={(v) => onItemInput(idx, v)}
                         onSelect={(prod) => setItemProduct(idx, prod)}
-                        options={products}
+                        options={productOptions}
                         displayField={productLabel}
                         className="h-8 text-sm"
                         testId={`stock-movement-item-product-${idx}`}

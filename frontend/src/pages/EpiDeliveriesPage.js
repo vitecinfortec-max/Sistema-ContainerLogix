@@ -18,6 +18,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { api } from '../lib/api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { qtyWithUnit } from '../lib/productUnits';
+import { todayISO } from '../lib/dates';
+import { activeRecords } from '../lib/cadastroStatus';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import {
@@ -29,12 +31,10 @@ const SIGNATURE_KIND = { MOTORISTA: 'motorista', FUNCIONARIO: 'funcionario' };
 
 const fmtQty = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 const fmtDate = (v) => (v ? format(new Date(`${String(v).slice(0, 10)}T00:00:00`), 'dd/MM/yyyy') : '-');
-const today = () => format(new Date(), 'yyyy-MM-dd');
-
 function buildEmpty() {
   return {
     recipient_type: '', recipient_id: '', recipient_label: '',
-    delivery_date: today(),
+    delivery_date: todayISO(),
     warehouse_id: '', warehouse_name: '',
     items: [emptyItem()],
     observations: '',
@@ -133,9 +133,10 @@ export default function EpiDeliveriesPage() {
   // ===== Diálogo =====
   const openCreate = async () => {
     const empty = buildEmpty();
-    if (warehouses.length === 1) {
-      empty.warehouse_id = warehouses[0].id;
-      empty.warehouse_name = warehouses[0].name;
+    const usableWarehouses = activeRecords(warehouses);
+    if (usableWarehouses.length === 1) {
+      empty.warehouse_id = usableWarehouses[0].id;
+      empty.warehouse_name = usableWarehouses[0].name;
     }
     setForm(empty);
     setEditingId(null);
@@ -206,13 +207,17 @@ export default function EpiDeliveriesPage() {
   const productLabel = (p) => `${p.description} (saldo: ${qtyWithUnit(p.stock_quantity, p.unit)})`;
   // EPI = produto com C.A. no cadastro ou de uma família com "EPI" no nome.
   // Se nenhum produto estiver marcado assim, a lista continua com todos.
+  // Inativos (produto, pessoa, almoxarifado) não aparecem pra escolher na
+  // entrega nova; na edição continuam, pra não sumir o que já estava nela
+  const usableProducts = useMemo(() => (editingId ? products : activeRecords(products)), [products, editingId]);
   const epiProducts = useMemo(
-    () => products.filter((p) => (p.ca_number || '').trim() || /\bEPI/i.test(p.family_name || '')),
-    [products],
+    () => usableProducts.filter((p) => (p.ca_number || '').trim() || /\bEPI/i.test(p.family_name || '')),
+    [usableProducts],
   );
   const [showAllProducts, setShowAllProducts] = useState(false);
   const onlyEpis = epiProducts.length > 0 && !showAllProducts;
-  const pickerProducts = onlyEpis ? epiProducts : products;
+  const pickerProducts = onlyEpis ? epiProducts : usableProducts;
+  const pickerPeople = editingId ? people : activeRecords(people);
 
   const handleSave = async () => {
     if (!form.recipient_id) { toast.error('Selecione o Motorista ou Funcionário na lista'); return; }
@@ -344,7 +349,7 @@ export default function EpiDeliveriesPage() {
   const peopleServed = new Set(deliveries.map((d) => `${d.recipient_type}:${d.recipient_id}`)).size;
   const pendingSignatures = deliveries.filter((d) => !d.has_signature).length;
   const hasFilters = !!(search || dateFrom || dateTo);
-  const warehouseOptions = warehouses.map((w) => [w.id, w.name]);
+  const warehouseOptions = (editingId ? warehouses : activeRecords(warehouses)).map((w) => [w.id, w.name]);
 
   return (
     <Layout>
@@ -483,7 +488,7 @@ export default function EpiDeliveriesPage() {
                   value={form.recipient_label}
                   onChange={onPersonInput}
                   onSelect={onPersonSelect}
-                  options={people}
+                  options={pickerPeople}
                   displayField={personLabel}
                   className="text-sm"
                   testId="epi-person-input"

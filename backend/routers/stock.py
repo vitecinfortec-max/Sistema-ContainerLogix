@@ -99,10 +99,35 @@ async def _refuse_if_in_use(checks: list, what: str, advice: str):
     if in_use:
         raise HTTPException(status_code=409, detail=f"{what} está em uso ({', '.join(in_use)}). {advice}")
 
+
+async def _refuse_duplicate_name(collection: str, name: str, item_id: Optional[str], what: str) -> str:
+    """Nome obrigatório e sem repetir no cadastro (sem diferenciar maiúsculas
+    nem espaços nas pontas): dois "Almoxarifado Central" deixavam a escolha
+    nas telas no chute. Devolve o nome limpo."""
+    clean = (name or '').strip()
+    if not clean:
+        raise HTTPException(status_code=400, detail=f"Informe o nome {what}")
+    query = {"name": {"$regex": f"^\\s*{re.escape(clean)}\\s*$", "$options": "i"}}
+    if item_id:
+        query["id"] = {"$ne": item_id}
+    if await db[collection].find_one(query, {"_id": 1}):
+        raise HTTPException(status_code=409, detail=f"Já existe um cadastro com o nome \"{clean}\"")
+    return clean
+
+
+def _valid_iso_date(value: Optional[str], label: str) -> str:
+    """Datas de lançamento são comparadas como texto nos filtros e relatórios:
+    só aceita AAAA-MM-DD."""
+    try:
+        return datetime.strptime((value or '').strip(), "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{label} inválida")
+
 # ==================== ALMOXARIFADO ====================
 
 @api_router.post("/warehouses", response_model=WarehouseResponse)
 async def create_warehouse(data: WarehouseCreate, current_user: dict = Depends(get_current_active_user)):
+    data.name = await _refuse_duplicate_name("warehouses", data.name, None, "do almoxarifado")
     warehouse = Warehouse(**data.model_dump(), created_by=current_user['sub'])
     doc = warehouse.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
@@ -119,6 +144,7 @@ async def update_warehouse(item_id: str, data: WarehouseCreate, current_user: di
     existing = await db.warehouses.find_one({"id": item_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Almoxarifado não encontrado")
+    data.name = await _refuse_duplicate_name("warehouses", data.name, item_id, "do almoxarifado")
     update_data = {**data.model_dump(), "id": item_id, "created_at": existing['created_at'], "created_by": existing['created_by']}
     await db.warehouses.replace_one({"id": item_id}, update_data)
     if update_data['name'] != existing.get('name'):
@@ -144,6 +170,7 @@ async def delete_warehouse(item_id: str, current_user: dict = Depends(get_curren
 
 @api_router.post("/product-families", response_model=ProductFamilyResponse)
 async def create_product_family(data: ProductFamilyCreate, current_user: dict = Depends(get_current_active_user)):
+    data.name = await _refuse_duplicate_name("product_families", data.name, None, "da família")
     family = ProductFamily(**data.model_dump(), created_by=current_user['sub'])
     doc = family.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
@@ -160,6 +187,7 @@ async def update_product_family(item_id: str, data: ProductFamilyCreate, current
     existing = await db.product_families.find_one({"id": item_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Família de Produto não encontrada")
+    data.name = await _refuse_duplicate_name("product_families", data.name, item_id, "da família")
     update_data = {**data.model_dump(), "id": item_id, "created_at": existing['created_at'], "created_by": existing['created_by']}
     await db.product_families.replace_one({"id": item_id}, update_data)
     if update_data['name'] != existing.get('name'):
@@ -182,6 +210,7 @@ async def delete_product_family(item_id: str, current_user: dict = Depends(get_c
 
 @api_router.post("/service-families", response_model=ServiceFamilyResponse)
 async def create_service_family(data: ServiceFamilyCreate, current_user: dict = Depends(get_current_active_user)):
+    data.name = await _refuse_duplicate_name("service_families", data.name, None, "da família")
     family = ServiceFamily(**data.model_dump(), created_by=current_user['sub'])
     doc = family.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
@@ -198,6 +227,7 @@ async def update_service_family(item_id: str, data: ServiceFamilyCreate, current
     existing = await db.service_families.find_one({"id": item_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Família de Serviço não encontrada")
+    data.name = await _refuse_duplicate_name("service_families", data.name, item_id, "da família")
     update_data = {**data.model_dump(), "id": item_id, "created_at": existing['created_at'], "created_by": existing['created_by']}
     await db.service_families.replace_one({"id": item_id}, update_data)
     if update_data['name'] != existing.get('name'):
@@ -223,8 +253,17 @@ async def get_next_service_code(current_user: dict = Depends(get_current_active_
     counter = await db.counters.find_one({"_id": "service_catalog_code"})
     return {"next_code": (counter["seq"] + 1) if counter else 1}
 
+def _validate_service_catalog_item(data: ServiceCatalogItemCreate):
+    data.description = (data.description or '').strip()
+    if not data.description:
+        raise HTTPException(status_code=400, detail="Informe a descrição do serviço")
+    if not math.isfinite(data.value) or data.value < 0:
+        raise HTTPException(status_code=400, detail="O valor do serviço não pode ser negativo")
+
+
 @api_router.post("/service-catalog", response_model=ServiceCatalogItemResponse)
 async def create_service_catalog_item(data: ServiceCatalogItemCreate, current_user: dict = Depends(get_current_active_user)):
+    _validate_service_catalog_item(data)
     counter = await db.counters.find_one_and_update(
         {"_id": "service_catalog_code"},
         {"$inc": {"seq": 1}},
@@ -247,6 +286,7 @@ async def update_service_catalog_item(item_id: str, data: ServiceCatalogItemCrea
     existing = await db.service_catalog.find_one({"id": item_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Serviço não encontrado")
+    _validate_service_catalog_item(data)
     update_data = {
         **data.model_dump(), "id": item_id, "code": existing['code'],
         "created_at": existing['created_at'], "created_by": existing['created_by']
@@ -256,6 +296,14 @@ async def update_service_catalog_item(item_id: str, data: ServiceCatalogItemCrea
 
 @api_router.delete("/service-catalog/{item_id}")
 async def delete_service_catalog_item(item_id: str, current_user: dict = Depends(get_current_active_user)):
+    existing = await db.service_catalog.find_one({"id": item_id}, {"_id": 0, "code": 1})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Serviço não encontrado")
+    # A OS guarda uma cópia do serviço (código + descrição), não o id
+    await _refuse_if_in_use(
+        [("ordem_servico", {"services.code": str(existing.get('code'))}, "ordem(ns) de serviço")],
+        "Este serviço", "Para tirá-lo de uso, desmarque \"Ativo\".",
+    )
     result = await db.service_catalog.delete_one({"id": item_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Serviço não encontrado")
@@ -291,11 +339,33 @@ def _single_item_movement(product: dict, operation_type: str, quantity: float, p
     )
 
 
+async def _validate_product(data: ProductCreate, item_id: Optional[str] = None):
+    data.description = (data.description or '').strip()
+    if not data.description:
+        raise HTTPException(status_code=400, detail="Informe a descrição do produto")
+    if not math.isfinite(data.reference_value) or data.reference_value < 0:
+        raise HTTPException(status_code=400, detail="O valor de referência não pode ser negativo")
+    # O código de barras é o que casa o item da NF-e com o produto: repetido,
+    # a importação somava o estoque no produto errado
+    data.barcode = (data.barcode or '').strip() or None
+    if data.barcode:
+        query = {"barcode": data.barcode}
+        if item_id:
+            query["id"] = {"$ne": item_id}
+        other = await db.products.find_one(query, {"_id": 0, "code": 1, "description": 1})
+        if other:
+            raise HTTPException(
+                status_code=409,
+                detail=f"O código de barras {data.barcode} já está no produto {other.get('code')} - {other.get('description')}",
+            )
+
+
 @api_router.post("/products", response_model=ProductResponse)
 async def create_product(data: ProductCreate, current_user: dict = Depends(get_current_active_user)):
     initial_quantity = float(data.stock_quantity or 0)
-    if initial_quantity < 0:
+    if not math.isfinite(initial_quantity) or initial_quantity < 0:
         raise HTTPException(status_code=400, detail="A quantidade em estoque não pode ser negativa")
+    await _validate_product(data)
     counter = await db.counters.find_one_and_update(
         {"_id": "product_code"},
         {"$inc": {"seq": 1}},
@@ -338,6 +408,7 @@ async def update_product(item_id: str, data: ProductCreate, current_user: dict =
     # Só os dados do cadastro: o saldo fica de fora (a tela pode estar com um
     # número antigo, e gravá-lo desfazia as movimentações feitas nesse meio
     # tempo). Saldo se corrige por movimentação ou pelo ajuste abaixo.
+    await _validate_product(data, item_id)
     result = await db.products.update_one({"id": item_id}, {"$set": data.model_dump(exclude={"stock_quantity"})})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
@@ -379,11 +450,24 @@ async def adjust_product_stock(item_id: str, data: ProductStockAdjust, current_u
 
 @api_router.delete("/products/{item_id}")
 async def delete_product(item_id: str, current_user: dict = Depends(get_current_active_user)):
+    product = await db.products.find_one({"id": item_id}, {"_id": 0, "code": 1, "stock_quantity": 1})
+    if not product:
+        raise HTTPException(status_code=404, detail="Produto não encontrado")
     await _refuse_if_in_use([
         ("stock_entries", {"product_id": item_id}, "entrada(s) por NF-e"),
         ("stock_movements", {"items.product_id": item_id}, "movimentação(ões)"),
         ("epi_deliveries", {"items.product_id": item_id}, "entrega(s) de EPI"),
+        # A OS guarda uma cópia do produto (código + descrição), não o id
+        ("ordem_servico", {"products.code": str(product.get('code'))}, "ordem(ns) de serviço"),
     ], "Este produto", "Para tirá-lo de uso, mude o Status para Inativo.")
+    # Produto antigo pode ter saldo sem nenhuma movimentação: excluir sumia
+    # com o material do estoque sem deixar registro
+    balance = float(product.get('stock_quantity') or 0)
+    if abs(balance) > _QTY_EPS:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Este produto ainda tem saldo em estoque ({balance:g}). Para tirá-lo de uso, mude o Status para Inativo.",
+        )
     result = await db.products.delete_one({"id": item_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
@@ -944,6 +1028,7 @@ async def _create_stock_movement(
     """Lança a movimentação e aplica o efeito no saldo. `origin` marca as
     geradas pelo sistema (EPI, SALDO_INICIAL, AJUSTE); as lançadas na tela
     ficam sem origem."""
+    data.movement_date = _valid_iso_date(data.movement_date, "Data da movimentação")
     _validate_movement_items(data.items)
 
     # Carrega os produtos e confere saldo ANTES de gravar qualquer coisa -
@@ -1002,6 +1087,7 @@ async def _update_stock_movement(movement_id: str, data: StockMovementUpdate, cu
     existing = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
+    data.movement_date = _valid_iso_date(data.movement_date, "Data da movimentação")
     _validate_movement_items(data.items)
 
     old_effect = _stock_movement_effect_by_product(existing.get('operation_type'), existing.get('items') or [])
@@ -1127,19 +1213,32 @@ async def delete_stock_movement(movement_id: str, current_user: dict = Depends(g
 async def get_stock_movements(
     search: Optional[str] = None,
     operation_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
     query = {}
     if operation_type:
         query['operation_type'] = operation_type
+    if date_from or date_to:
+        query['movement_date'] = {}
+        if date_from:
+            query['movement_date']['$gte'] = date_from
+        if date_to:
+            query['movement_date']['$lte'] = date_to
     if search:
+        search = search.strip()
         search_escaped = re.escape(search)
         query["$or"] = [
             {"purpose_text": {"$regex": search_escaped, "$options": "i"}},
             {"purpose_vehicle_plate": {"$regex": search_escaped, "$options": "i"}},
             {"nfe_number": {"$regex": search_escaped, "$options": "i"}},
             {"warehouse_name": {"$regex": search_escaped, "$options": "i"}},
+            {"supplier_name": {"$regex": search_escaped, "$options": "i"}},
+            {"items.product_description": {"$regex": search_escaped, "$options": "i"}},
         ]
+        if search.lstrip('#').isdigit():
+            query["$or"].append({"movement_number": int(search.lstrip('#'))})
     items = await db.stock_movements.find(query, {"_id": 0}).sort("movement_number", -1).to_list(None)
     epi_numbers = await _epi_numbers_for([i['id'] for i in items])
     return [_stock_movement_serialize(i, epi_numbers) for i in items]
@@ -1384,7 +1483,20 @@ async def _build_stock_ledger(
 
     if operation_type != 'SAIDA':
         entries = await db.stock_entries.find({}, {"_id": 0}).to_list(None)
-        rows.extend(_stock_entry_to_ledger_row(e) for e in entries)
+        # A entrada por NF-e não guarda o código nem o almoxarifado do
+        # produto: vêm do cadastro atual, pra coluna não sair em branco
+        products = {
+            p['id']: p async for p in db.products.find(
+                {"id": {"$in": list({e.get('product_id') for e in entries})}},
+                {"_id": 0, "id": 1, "code": 1, "warehouse_name": 1},
+            )
+        }
+        for e in entries:
+            row = _stock_entry_to_ledger_row(e)
+            product = products.get(e.get('product_id')) or {}
+            row['product_code'] = product.get('code')
+            row['warehouse_name'] = product.get('warehouse_name')
+            rows.append(row)
 
     if operation_type:
         rows = [r for r in rows if r['operation_type'] == operation_type]
@@ -1394,7 +1506,12 @@ async def _build_stock_ledger(
         rows = [r for r in rows if (r['date'] or '') <= date_to]
     if search:
         needle = search.strip().lower()
-        rows = [r for r in rows if needle in (r['product_name'] or '').lower()]
+        rows = [
+            r for r in rows
+            if needle in (r['product_name'] or '').lower()
+            or needle == str(r.get('product_code') or '')
+            or needle in (r.get('reference_label') or '').lower()
+        ]
     if reference_type:
         if reference_type == 'SEM_REFERENCIA':
             rows = [r for r in rows if not r['reference_type']]
@@ -1406,7 +1523,9 @@ async def _build_stock_ledger(
 
 
 def _compute_daily_stock_ledger_chart(rows: list) -> list:
-    today = datetime.now(timezone.utc).date()
+    # Em Brasília: a partir das 21h o dia em UTC já é o seguinte, e o gráfico
+    # perdia o dia de hoje
+    today = now_brt().date()
     days = [today - timedelta(days=i) for i in range(13, -1, -1)]
     by_date = {d.isoformat(): {"date": d.isoformat(), "entrada_value": 0.0, "saida_value": 0.0} for d in days}
     for r in rows:

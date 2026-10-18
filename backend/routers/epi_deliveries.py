@@ -17,7 +17,10 @@ from models import (
 )
 from shared import db, get_current_active_user, get_company_settings, signature_file_path
 from reports import generate_epi_delivery_pdf, generate_epi_ficha_pdf
-from routers.stock import _create_stock_movement, _update_stock_movement
+from routers.stock import (
+    _create_stock_movement, _update_stock_movement, _apply_stock_deltas, _stock_movement_effect_by_product,
+    _log_stock_audit, _valid_iso_date,
+)
 
 api_router = APIRouter(prefix="/api")
 
@@ -139,18 +142,24 @@ def _serialize(doc: dict, current_signatures: dict) -> dict:
     return out
 
 
-async def _reverse_stock_movement(movement_id: Optional[str]):
-    """Desfaz a Saída gerada pela entrega: devolve as quantidades ao estoque
-    e apaga a movimentação."""
+async def _reverse_stock_movement(movement_id: Optional[str]) -> Optional[dict]:
+    """Desfaz a Saída gerada pela entrega: apaga a movimentação e devolve as
+    quantidades ao estoque. Retira a movimentação num passo só, então de duas
+    exclusões ao mesmo tempo só uma devolve o material. Devolve a
+    movimentação retirada (pra desfazer, se preciso)."""
     if not movement_id:
-        return
-    movement = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
+        return None
+    movement = await db.stock_movements.find_one_and_delete({"id": movement_id}, projection={"_id": 0})
     if not movement:
-        return
-    sign = 1 if movement.get('operation_type') == 'SAIDA' else -1
-    for it in movement.get('items') or []:
-        await db.products.update_one({"id": it['product_id']}, {"$inc": {"stock_quantity": sign * float(it.get('quantity') or 0)}})
-    await db.stock_movements.delete_one({"id": movement_id})
+        return None
+    effect = _stock_movement_effect_by_product(movement.get('operation_type'), movement.get('items') or [])
+    existing_ids = {p['id'] async for p in db.products.find({"id": {"$in": list(effect)}}, {"_id": 0, "id": 1})}
+    try:
+        await _apply_stock_deltas({pid: -delta for pid, delta in effect.items() if pid in existing_ids})
+    except BaseException:
+        await db.stock_movements.insert_one(dict(movement))
+        raise
+    return movement
 
 
 @api_router.get("/epi-deliveries/next-number")
@@ -237,6 +246,7 @@ async def get_epi_delivery(delivery_id: str, current_user: dict = Depends(get_cu
 async def create_epi_delivery(data: EpiDeliveryCreate, current_user: dict = Depends(get_current_active_user)):
     if not data.delivery_date:
         raise HTTPException(status_code=400, detail="Informe a data da entrega")
+    data.delivery_date = _valid_iso_date(data.delivery_date, "Data da entrega")
     if not data.warehouse_id:
         raise HTTPException(status_code=400, detail="Selecione o Almoxarifado")
     person = await _load_recipient(data.recipient_type, data.recipient_id)
@@ -274,7 +284,12 @@ async def create_epi_delivery(data: EpiDeliveryCreate, current_user: dict = Depe
     )
     doc = delivery.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
-    await db.epi_deliveries.insert_one(doc)
+    try:
+        await db.epi_deliveries.insert_one(doc)
+    except Exception:
+        # Sem a entrega, a Saída ficaria travada (só muda pela entrega)
+        await _reverse_stock_movement(movement['id'])
+        raise
     doc.pop('_id', None)
     return EpiDeliveryResponse(**_serialize(doc, {(data.recipient_type, data.recipient_id): person.get('signature_url')}))
 
@@ -284,6 +299,7 @@ async def update_epi_delivery(delivery_id: str, data: EpiDeliveryCreate, current
     existing = await db.epi_deliveries.find_one({"id": delivery_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Entrega de EPI não encontrada")
+    data.delivery_date = _valid_iso_date(data.delivery_date, "Data da entrega")
     if not data.warehouse_id:
         raise HTTPException(status_code=400, detail="Selecione o Almoxarifado")
     person = await _load_recipient(data.recipient_type, data.recipient_id)
@@ -335,11 +351,20 @@ async def update_epi_delivery(delivery_id: str, data: EpiDeliveryCreate, current
 
 @api_router.delete("/epi-deliveries/{delivery_id}")
 async def delete_epi_delivery(delivery_id: str, current_user: dict = Depends(get_current_active_user)):
-    existing = await db.epi_deliveries.find_one({"id": delivery_id}, {"_id": 0})
+    # Retira a entrega primeiro: de duas exclusões simultâneas, só uma segue
+    existing = await db.epi_deliveries.find_one_and_delete({"id": delivery_id}, projection={"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Entrega de EPI não encontrada")
-    await _reverse_stock_movement(existing.get('stock_movement_id'))
-    await db.epi_deliveries.delete_one({"id": delivery_id})
+    try:
+        movement = await _reverse_stock_movement(existing.get('stock_movement_id'))
+    except BaseException:
+        await db.epi_deliveries.insert_one(dict(existing))
+        raise
+    await _log_stock_audit(
+        "EPI_DELIVERY_DELETED", current_user,
+        f"Exclusão da Entrega de EPI Nº {existing.get('delivery_number')} ({existing.get('recipient_name')})",
+        {"delivery": existing, "movement": movement},
+    )
     return {"message": "Entrega de EPI excluída e itens devolvidos ao estoque"}
 
 

@@ -16,6 +16,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { normalizeUnit, unitOptionsFor, qtyWithUnit, fmtQty } from '../lib/productUnits';
+import { activeRecords } from '../lib/cadastroStatus';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, Edit, Package, Scale } from 'lucide-react';
@@ -42,6 +43,7 @@ export default function ProductPage() {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [nextCode, setNextCode] = useState(null);
@@ -74,14 +76,14 @@ export default function ProductPage() {
   const loadWarehouses = async () => {
     try {
       const response = await api.getWarehouses();
-      setWarehouses(response.data.filter((w) => w.status === 'ATIVO'));
+      setWarehouses(response.data);
     } catch (error) { /* ignore */ }
   };
 
   const loadFamilies = async () => {
     try {
       const response = await api.getProductFamilies();
-      setFamilies(response.data.filter((f) => f.status === 'ATIVO'));
+      setFamilies(response.data);
     } catch (error) { /* ignore */ }
   };
 
@@ -104,12 +106,14 @@ export default function ProductPage() {
   };
 
   const openEditDialog = (item) => {
+    // Cadastro antigo pode ter só o nome: acha o id pelo nome
+    const byName = (list, name) => list.find((x) => (x.name || '').trim().toLowerCase() === (name || '').trim().toLowerCase())?.id || '';
     setFormData({
       description: item.description || '',
       stock_quantity: item.stock_quantity?.toString() || '',
-      warehouse_id: item.warehouse_id || '', warehouse_name: item.warehouse_name || '',
+      warehouse_id: item.warehouse_id || byName(warehouses, item.warehouse_name), warehouse_name: item.warehouse_name || '',
       barcode: item.barcode || '', ncm: item.ncm || '', cfop: item.cfop || '',
-      unit: normalizeUnit(item.unit) || 'UNIDADE', family_id: item.family_id || '', family_name: item.family_name || '',
+      unit: normalizeUnit(item.unit) || 'UNIDADE', family_id: item.family_id || byName(families, item.family_name), family_name: item.family_name || '',
       reference_value: item.reference_value?.toString() || '', icms_rate: item.icms_rate?.toString() || '',
       other_taxes_rate: item.other_taxes_rate?.toString() || '', origin: item.origin || 'NACIONAL',
       linked_party_name: item.linked_party_name || '', status: item.status || 'ATIVO', observations: item.observations || '',
@@ -127,6 +131,16 @@ export default function ProductPage() {
     if (submitting) return;
     if (!formData.description) {
       toast.error('Preencha a descrição do produto');
+      return;
+    }
+    // Texto digitado sem escolher da lista gravava o nome sem o cadastro
+    // (ou com o id do almoxarifado/família anterior)
+    if (formData.warehouse_name?.trim() && !formData.warehouse_id) {
+      toast.error('Selecione o Almoxarifado na lista (ou deixe em branco)');
+      return;
+    }
+    if (formData.family_name?.trim() && !formData.family_id) {
+      toast.error('Selecione a Família na lista (ou deixe em branco)');
       return;
     }
     setSubmitting(true);
@@ -206,12 +220,14 @@ export default function ProductPage() {
   };
 
   const filteredItems = items.filter((item) => {
+    if (statusFilter !== 'all' && (item.status || 'ATIVO') !== statusFilter) return false;
     const term = search.trim().toLowerCase();
     if (!term) return true;
     return item.description?.toLowerCase().includes(term) || item.barcode?.toLowerCase().includes(term) || String(item.code).includes(term);
   });
+  const hasFilters = !!search || statusFilter !== 'all';
 
-  const { pageItems, paginationProps } = usePagination(filteredItems, { resetKey: search });
+  const { pageItems, paginationProps } = usePagination(filteredItems, { resetKey: `${search}|${statusFilter}` });
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -243,10 +259,20 @@ export default function ProductPage() {
       <div className="space-y-4" data-testid="product-page">
         <PageHeader icon={Package} title="Produto" subtitle="Cadastro de produtos do Estoque" />
 
-        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+        <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setStatusFilter('all'); }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Código, descrição ou código de barras">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-product-input" />
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 text-sm" data-testid="product-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                  <SelectItem value="ATIVO" className="text-[13px]">Ativo</SelectItem>
+                  <SelectItem value="INATIVO" className="text-[13px]">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -324,8 +350,8 @@ export default function ProductPage() {
           ) : (
             <EmptyState
               icon={Package}
-              loading={loading} title={(search ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado')}
-              hint={loading ? undefined : (search ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo produto" ou importe uma NF-e em Entradas de Estoque')}
+              loading={loading} title={(hasFilters ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado')}
+              hint={loading ? undefined : (hasFilters ? 'Ajuste os filtros' : 'Cadastre o primeiro pelo botão "Novo produto" ou importe uma NF-e em Entradas de Estoque')}
             />
           )}
         </DataCard>
@@ -428,9 +454,9 @@ export default function ProductPage() {
                 <Label className="block">Almoxarifado</Label>
                 <Autocomplete
                   value={formData.warehouse_name}
-                  onChange={(v) => setField('warehouse_name', v)}
+                  onChange={(v) => { setField('warehouse_name', v); setField('warehouse_id', ''); }}
                   onSelect={(w) => { setField('warehouse_name', w.name); setField('warehouse_id', w.id); }}
-                  options={warehouses}
+                  options={activeRecords(warehouses)}
                   displayField="name"
                 />
               </div>
@@ -438,9 +464,9 @@ export default function ProductPage() {
                 <Label className="block">Categoria/Família do Produto</Label>
                 <Autocomplete
                   value={formData.family_name}
-                  onChange={(v) => setField('family_name', v)}
+                  onChange={(v) => { setField('family_name', v); setField('family_id', ''); }}
                   onSelect={(f) => { setField('family_name', f.name); setField('family_id', f.id); }}
-                  options={families}
+                  options={activeRecords(families)}
                   displayField="name"
                 />
               </div>

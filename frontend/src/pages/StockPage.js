@@ -25,6 +25,7 @@ export default function StockPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [balance, setBalance] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => { loadItems(); }, []);
 
@@ -44,16 +45,17 @@ export default function StockPage() {
     const qty = Number(item.stock_quantity) || 0;
     if (balance === 'in' && qty <= 0) return false;
     if (balance === 'out' && qty > 0) return false;
+    if (statusFilter !== 'all' && (item.status || 'ATIVO') !== statusFilter) return false;
     const term = search.trim().toLowerCase();
     if (!term) return true;
     return item.description?.toLowerCase().includes(term) || item.warehouse_name?.toLowerCase().includes(term) || String(item.code).includes(term);
   });
 
-  const { pageItems, paginationProps } = usePagination(filteredItems, { resetKey: `${search}|${balance}` });
+  const { pageItems, paginationProps } = usePagination(filteredItems, { resetKey: `${search}|${balance}|${statusFilter}` });
 
   const totalValue = filteredItems.reduce((acc, i) => acc + (Number(i.stock_quantity) || 0) * (Number(i.reference_value) || 0), 0);
   const outOfStock = filteredItems.filter((i) => (Number(i.stock_quantity) || 0) <= 0).length;
-  const hasFilters = !!search || balance !== 'all';
+  const hasFilters = !!search || balance !== 'all' || statusFilter !== 'all';
 
   return (
     <Layout>
@@ -68,7 +70,7 @@ export default function StockPage() {
           <StatCard label="Sem estoque" value={outOfStock} icon={AlertTriangle} tone={outOfStock > 0 ? 'amber' : 'slate'} hint="saldo zerado ou negativo" />
         </StatGrid>
 
-        <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setBalance('all'); }}>
+        <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setBalance('all'); setStatusFilter('all'); }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Código, produto ou almoxarifado">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-stock-input" />
@@ -82,6 +84,16 @@ export default function StockPage() {
                   {BALANCE_OPTIONS.map(([value, label]) => (
                     <SelectItem key={value} value={value} className="text-[13px]">{label}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-9 text-sm" data-testid="stock-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                  <SelectItem value="ATIVO" className="text-[13px]">Ativo</SelectItem>
+                  <SelectItem value="INATIVO" className="text-[13px]">Inativo</SelectItem>
                 </SelectContent>
               </Select>
             </FilterField>
@@ -134,7 +146,7 @@ export default function StockPage() {
             <EmptyState
               icon={Boxes}
               title={hasFilters ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado'}
-              hint={hasFilters ? 'Ajuste a busca ou o filtro de saldo' : 'Os produtos são cadastrados em Almoxarifado > Produto ou pela importação de NF-e'}
+              hint={hasFilters ? 'Ajuste a busca ou os filtros' : 'Os produtos são cadastrados em Almoxarifado > Produto ou pela importação de NF-e'}
             />
           )}
         </DataCard>
