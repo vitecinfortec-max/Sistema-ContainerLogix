@@ -221,6 +221,8 @@ export const api = {
   createUser: (data) => axios.post(`${API}/users`, data),
   updateUserRole: (userId, role) => axios.put(`${API}/users/${userId}/role`, { role }),
   updateUserStatus: (userId, active) => axios.put(`${API}/users/${userId}/status`, { active }),
+  updateUserProfile: (userId, data) => axios.put(`${API}/users/${userId}`, data),
+  resetUserPassword: (userId, data) => axios.put(`${API}/users/${userId}/password`, data),
 
   // Módulos Contratados (superadmin)
   getModuleConfig: () => axios.get(`${API}/module-config`),

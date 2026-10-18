@@ -1,6 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 import io
+import math
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -638,6 +639,14 @@ async def get_tank_settings(current_user: dict = Depends(get_current_active_user
 @api_router.put("/tank-settings")
 async def update_tank_settings(data: TankSettingsUpdate, current_user: dict = Depends(get_current_admin_user)):
     """Define a capacidade e o alerta mínimo do tanque próprio. Restrito a administradores."""
+    # Capacidade zero/negativa zerava o percentual do medidor; alerta mínimo
+    # igual ou acima da capacidade deixava o tanque sempre em "Nível baixo"
+    if not math.isfinite(data.capacity_liters) or data.capacity_liters <= 0:
+        raise HTTPException(status_code=400, detail="A capacidade do tanque deve ser maior que zero")
+    if not math.isfinite(data.minimum_alert_liters) or data.minimum_alert_liters < 0:
+        raise HTTPException(status_code=400, detail="O alerta mínimo não pode ser negativo")
+    if data.minimum_alert_liters >= data.capacity_liters:
+        raise HTTPException(status_code=400, detail="O alerta mínimo deve ser menor que a capacidade do tanque")
     settings = TankSettings(**data.model_dump())
     doc = settings.model_dump()
     doc["updated_at"] = doc["updated_at"].isoformat()

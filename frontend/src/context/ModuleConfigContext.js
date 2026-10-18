@@ -10,12 +10,16 @@ const ModuleConfigContext = createContext();
 export const ModuleConfigProvider = ({ children }) => {
   const { isAuthenticated } = useAuth();
   const [disabledModules, setDisabledModules] = useState([]);
+  // Item -> grupo do catálogo (vem do backend): o grupo nem sempre é o
+  // prefixo da chave (os itens de Abastecimento são "frota.*")
+  const [moduleGroups, setModuleGroups] = useState({});
   const [loaded, setLoaded] = useState(false);
 
   const reload = useCallback(async () => {
     try {
       const response = await api.getModuleConfig();
       setDisabledModules(response.data.disabled_modules || []);
+      setModuleGroups(response.data.module_groups || {});
     } catch (error) {
       // Se falhar, não bloqueia nada por segurança contra travar o app -
       // o backend ainda aplica a trava real em cada rota de qualquer forma.
@@ -36,7 +40,7 @@ export const ModuleConfigProvider = ({ children }) => {
 
   const isModuleEnabled = (moduleKey) => {
     if (!moduleKey) return true;
-    const group = moduleKey.split('.')[0];
+    const group = moduleGroups[moduleKey] || moduleKey.split('.')[0];
     if (disabledModules.includes(group)) return false;
     if (disabledModules.includes(moduleKey)) return false;
     return true;

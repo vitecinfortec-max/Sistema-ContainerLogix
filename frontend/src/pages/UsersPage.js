@@ -13,7 +13,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../hooks/useConfirm';
-import { Users, ShieldCheck, User as UserIcon, UserX, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { Users, ShieldCheck, User as UserIcon, UserX, UserPlus, Eye, EyeOff, Pencil, KeyRound } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -35,6 +35,12 @@ export default function UsersPage() {
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [showPassword, setShowPassword] = useState(false);
   const [creating, setCreating] = useState(false);
+  // Editar nome/email e redefinir senha de quem já tem acesso
+  const [editing, setEditing] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', email: '' });
+  const [resetting, setResetting] = useState(null);
+  const [resetForm, setResetForm] = useState({ password: '', must_change_password: true });
+  const [savingDialog, setSavingDialog] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -122,6 +128,54 @@ export default function UsersPage() {
     }
   };
 
+  const openEdit = (targetUser) => {
+    setEditForm({ name: targetUser.name, email: targetUser.email });
+    setEditing(targetUser);
+  };
+
+  const handleEdit = async (e) => {
+    e.preventDefault();
+    setSavingDialog(true);
+    try {
+      const response = await api.updateUserProfile(editing.id, {
+        name: editForm.name.trim(),
+        email: editForm.email.trim(),
+      });
+      setUsers((prev) => prev.map((u) => (u.id === editing.id ? response.data : u)));
+      setEditing(null);
+      toast.success('Usuário atualizado');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar usuário');
+    } finally {
+      setSavingDialog(false);
+    }
+  };
+
+  const openReset = (targetUser) => {
+    setResetForm({ password: '', must_change_password: true });
+    setShowPassword(false);
+    setResetting(targetUser);
+  };
+
+  const handleReset = async (e) => {
+    e.preventDefault();
+    if (resetForm.password.length < 6) {
+      toast.error('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+    setSavingDialog(true);
+    try {
+      const response = await api.resetUserPassword(resetting.id, resetForm);
+      setUsers((prev) => prev.map((u) => (u.id === resetting.id ? response.data : u)));
+      setResetting(null);
+      toast.success('Senha redefinida. Passe a nova senha para a pessoa.');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao redefinir a senha');
+    } finally {
+      setSavingDialog(false);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -164,12 +218,15 @@ export default function UsersPage() {
                     <th>Nível de acesso</th>
                     <th>Cadastrado em</th>
                     <th>Acesso ativo</th>
+                    <th className="!text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pageItems.map((u) => {
                     const isSelf = u.id === currentUser?.id;
                     const isSaving = savingId === u.id;
+                    // A conta do dono do sistema só é alterada por ele mesmo
+                    const isLocked = u.is_superadmin && !currentUser?.is_superadmin;
                     return (
                       <tr key={u.id} data-testid="user-row">
                         <td>
@@ -183,7 +240,7 @@ export default function UsersPage() {
                           <Select
                             value={u.role}
                             onValueChange={(value) => handleRoleChange(u, value)}
-                            disabled={isSelf || isSaving}
+                            disabled={isSelf || isSaving || isLocked}
                           >
                             <SelectTrigger className="h-8 w-[160px] text-[13px]" data-testid="user-role-select">
                               <SelectValue>{ROLE_LABELS[u.role] || u.role}</SelectValue>
@@ -202,13 +259,32 @@ export default function UsersPage() {
                             <Switch
                               checked={u.active !== false}
                               onCheckedChange={(checked) => handleStatusToggle(u, checked)}
-                              disabled={isSelf || isSaving}
+                              disabled={isSelf || isSaving || isLocked}
                               data-testid="user-active-switch"
                             />
                             <StatusPill tone={u.active !== false ? 'emerald' : 'slate'}>
                               {u.active !== false ? 'Ativo' : 'Desativado'}
                             </StatusPill>
                           </div>
+                        </td>
+                        <td className="!py-1.5 text-right whitespace-nowrap">
+                          <Button
+                            variant="ghost" size="sm" className="h-8 px-2"
+                            title="Editar nome e email" aria-label="Editar nome e email"
+                            onClick={() => openEdit(u)} disabled={isLocked}
+                            data-testid="user-edit-button"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost" size="sm" className="h-8 px-2"
+                            title={isSelf ? 'Use "Alterar senha" para a sua própria senha' : 'Redefinir senha'}
+                            aria-label="Redefinir senha"
+                            onClick={() => openReset(u)} disabled={isSelf || isLocked}
+                            data-testid="user-reset-password-button"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                          </Button>
                         </td>
                       </tr>
                     );
@@ -307,6 +383,94 @@ export default function UsersPage() {
             </label>
             <Button type="submit" className="w-full font-semibold" disabled={creating} data-testid="new-user-submit">
               {creating ? 'Cadastrando...' : 'Cadastrar usuário'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editing} onOpenChange={(isOpen) => !savingDialog && !isOpen && setEditing(null)}>
+        <DialogContent data-testid="edit-user-dialog">
+          <DialogHeader>
+            <DialogTitle className="text-base">Editar Usuário</DialogTitle>
+            <DialogDescription className="text-[13px]">
+              O email é o que a pessoa usa para entrar no sistema
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEdit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-user-name" className="block">Nome completo *</Label>
+              <Input
+                id="edit-user-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                required
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-user-email" className="block">Email *</Label>
+              <Input
+                id="edit-user-email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                required
+                autoComplete="off"
+              />
+            </div>
+            <Button type="submit" className="w-full font-semibold" disabled={savingDialog} data-testid="edit-user-submit">
+              {savingDialog ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!resetting} onOpenChange={(isOpen) => !savingDialog && !isOpen && setResetting(null)}>
+        <DialogContent data-testid="reset-password-dialog">
+          <DialogHeader>
+            <DialogTitle className="text-base">Redefinir Senha</DialogTitle>
+            <DialogDescription className="text-[13px]">
+              {resetting ? `Nova senha para "${resetting.name}". As sessões abertas dessa pessoa serão encerradas.` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleReset} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="reset-password" className="block">Nova senha *</Label>
+              <div className="relative">
+                <Input
+                  id="reset-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={resetForm.password}
+                  onChange={(e) => setResetForm({ ...resetForm, password: e.target.value })}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="pr-10"
+                  data-testid="reset-password-input"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Mínimo de 6 caracteres</p>
+            </div>
+            <label className="flex items-start gap-2.5 rounded-md border border-slate-200 dark:border-slate-700 p-3 cursor-pointer">
+              <Checkbox
+                checked={resetForm.must_change_password}
+                onCheckedChange={(checked) => setResetForm({ ...resetForm, must_change_password: checked === true })}
+                className="mt-0.5"
+              />
+              <span className="text-[13px] leading-snug">
+                <span className="font-medium text-slate-800 dark:text-slate-100">Pedir nova senha no próximo acesso</span>
+              </span>
+            </label>
+            <Button type="submit" className="w-full font-semibold" disabled={savingDialog} data-testid="reset-password-submit">
+              {savingDialog ? 'Salvando...' : 'Redefinir senha'}
             </Button>
           </form>
         </DialogContent>

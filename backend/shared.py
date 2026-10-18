@@ -535,6 +535,14 @@ def match_module_for_path(path: str):
     return None
 
 
+# Item -> grupo do catálogo. O grupo não é sempre o prefixo da chave: os
+# itens de Abastecimento são "frota.*" - pelo prefixo, desativar
+# Abastecimento não bloqueava esses itens, e desativar Manutenção ("frota")
+# bloqueava junto o Abastecimento.
+MODULE_GROUP_OF = {item["key"]: group["key"] for group in MODULE_CATALOG for item in group["items"]}
+MODULE_KEYS = set(MODULE_GROUP_OF) | {group["key"] for group in MODULE_CATALOG}
+
+
 def is_module_disabled(module_key: str, disabled_modules: list) -> bool:
-    group = module_key.split(".")[0]
+    group = MODULE_GROUP_OF.get(module_key, module_key.split(".")[0])
     return group in disabled_modules or module_key in disabled_modules

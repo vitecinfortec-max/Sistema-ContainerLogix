@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timedelta, timezone
 import logging
 
@@ -9,6 +10,7 @@ from models import UserLogin, UserResponse, Token, CompanySettingsUpdate
 from auth import get_password_hash, verify_password, create_access_token, FILE_TOKEN_SCOPE
 
 from shared import db, get_current_active_user, get_company_settings, check_rate_limit, client_ip
+from routers.users import email_query
 
 api_router = APIRouter(prefix="/api")
 
@@ -71,9 +73,9 @@ class ChangePasswordRequest(PydanticBaseModel):
 async def forgot_password(request: ForgotPasswordRequest, http_request: Request):
     """Envia senha provisória por email"""
     check_rate_limit(f"forgot-password:ip:{client_ip(http_request)}", limit=5, window_seconds=900)
-    check_rate_limit(f"forgot-password:email:{request.email.lower()}", limit=3, window_seconds=900)
+    check_rate_limit(f"forgot-password:email:{request.email.strip().lower()}", limit=3, window_seconds=900)
 
-    user_doc = await db.users.find_one({"email": request.email}, {"_id": 0})
+    user_doc = await db.users.find_one(email_query(request.email), {"_id": 0})
     if not user_doc:
         # Não revelamos se o email existe ou não (segurança)
         return {"message": "Se o email estiver cadastrado, você receberá uma senha provisória."}
@@ -118,7 +120,7 @@ async def forgot_password(request: ForgotPasswordRequest, http_request: Request)
         
         params = {
             "from": SENDER_EMAIL,
-            "to": [request.email],
+            "to": [user_doc['email']],
             "subject": "ContainerLogix - Recuperação de Senha",
             "html": html_content
         }
@@ -128,7 +130,7 @@ async def forgot_password(request: ForgotPasswordRequest, http_request: Request)
 
         # Só depois de o e-mail ter saído é que a senha provisória é guardada.
         await db.users.update_one(
-            {"email": request.email},
+            {"id": user_doc['id']},
             {"$set": {
                 "temp_password_hash": get_password_hash(temp_password),
                 "temp_password_expires_at": (datetime.now(timezone.utc) + TEMP_PASSWORD_VALIDITY).isoformat(),
@@ -144,6 +146,8 @@ async def forgot_password(request: ForgotPasswordRequest, http_request: Request)
 @api_router.post("/auth/change-password")
 async def change_password(request: ChangePasswordRequest, current_user: dict = Depends(get_current_active_user)):
     """Altera a senha do usuário logado"""
+    # Quem pegou uma sessão aberta não pode ficar testando a "senha atual"
+    check_rate_limit(f"change-password:user:{current_user['sub']}", limit=5, window_seconds=900)
     user_doc = await db.users.find_one({"id": current_user['sub']}, {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
@@ -179,9 +183,9 @@ async def change_password(request: ChangePasswordRequest, current_user: dict = D
 @api_router.post("/auth/login", response_model=Token)
 async def login(credentials: UserLogin, http_request: Request):
     check_rate_limit(f"login:ip:{client_ip(http_request)}", limit=10, window_seconds=300)
-    check_rate_limit(f"login:email:{credentials.email.lower()}", limit=5, window_seconds=300)
+    check_rate_limit(f"login:email:{credentials.email.strip().lower()}", limit=5, window_seconds=300)
 
-    user_doc = await db.users.find_one({"email": credentials.email}, {"_id": 0})
+    user_doc = await db.users.find_one(email_query(credentials.email), {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
@@ -265,6 +269,23 @@ async def update_company_settings(data: CompanySettingsUpdate, current_user: dic
     # $set só dos campos enviados: antes era replace_one do documento
     # inteiro, e um PUT parcial apagava todos os outros dados da empresa.
     changes = data.model_dump(exclude_unset=True)
+    for field, value in list(changes.items()):
+        if isinstance(value, str):
+            changes[field] = value.strip() or None
+    if changes.get('logo_filename'):
+        # Só o nome de um arquivo enviado pelo upload (o logo é lido de
+        # uploads/ ao gerar os PDFs): caminho com pasta não é aceito
+        name = changes['logo_filename']
+        if name != os.path.basename(name) or name.startswith('.') or '\\' in name:
+            raise HTTPException(status_code=400, detail="Arquivo de logo inválido")
+    if changes.get('auto_booking_prefix'):
+        # Vira o começo do Booking das Ordens de Entrega (ex.: TLL00001)
+        prefix = changes['auto_booking_prefix'].upper()
+        if not re.fullmatch(r"[A-Z0-9/-]{1,10}", prefix):
+            raise HTTPException(status_code=400, detail="O prefixo do Booking deve ter só letras, números, - ou / (até 10, sem espaços)")
+        changes['auto_booking_prefix'] = prefix
+    if changes.get('email') and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", changes['email']):
+        raise HTTPException(status_code=400, detail="Email da empresa inválido")
     changes['updated_at'] = datetime.now(timezone.utc).isoformat()
     await db.company_settings.update_one({}, {"$set": changes}, upsert=True)
     return await get_company_settings()
