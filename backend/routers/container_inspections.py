@@ -188,7 +188,7 @@ async def update_container_inspection(
 @api_router.post("/container-inspections/{inspection_id}/upload-photo")
 async def upload_container_inspection_photo(
     inspection_id: str,
-    photo_type: str = Query(..., alias="type", regex="^(front|back|left|right|internal)$"),
+    photo_type: str = Query(..., alias="type", pattern="^(front|back|left|right|internal)$"),
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_active_user)
 ):

@@ -191,7 +191,7 @@ async def get_vehicle_checklist_template(current_user: dict = Depends(get_curren
 
 @api_router.get("/vehicle-checklists/simple-template")
 async def get_simple_vehicle_checklist_template(
-    vehicle_type: str = Query(..., regex="^(CAMINHAO|CARRETA|CARRO)$"),
+    vehicle_type: str = Query(..., pattern="^(CAMINHAO|CARRETA|CARRO)$"),
     current_user: dict = Depends(get_current_active_user)
 ):
     """Retorna as seções/itens de verificação do checklist simplificado pro tipo de veículo informado"""
@@ -260,7 +260,7 @@ async def get_vehicle_checklist_stats(
 @api_router.get("/vehicle-checklists")
 async def get_vehicle_checklists(
     search: Optional[str] = None,
-    result: Optional[str] = Query(None, regex="^(APROVADO|REPROVADO|PENDENTE)$"),
+    result: Optional[str] = Query(None, pattern="^(APROVADO|REPROVADO|PENDENTE)$"),
     page: int = 1,
     per_page: int = 20,
     current_user: dict = Depends(get_current_active_user)
@@ -358,7 +358,7 @@ async def delete_vehicle_checklist(checklist_id: str, current_user: dict = Depen
 @api_router.post("/vehicle-checklists/{checklist_id}/upload-photo")
 async def upload_vehicle_checklist_photo(
     checklist_id: str,
-    photo_type: str = Query(..., alias="type", regex="^(front|back|left_side|right_side|speedometer|tires)$"),
+    photo_type: str = Query(..., alias="type", pattern="^(front|back|left_side|right_side|speedometer|tires)$"),
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_active_user)
 ):

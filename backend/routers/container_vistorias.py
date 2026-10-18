@@ -213,7 +213,7 @@ async def update_container_vistoria(
 @api_router.post("/container-vistorias/{vistoria_id}/upload-photo")
 async def upload_container_vistoria_photo(
     vistoria_id: str,
-    photo_type: str = Query(..., alias="type", regex="^(front|back|left|right|internal|csc_plate)$"),
+    photo_type: str = Query(..., alias="type", pattern="^(front|back|left|right|internal|csc_plate)$"),
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_active_user)
 ):
