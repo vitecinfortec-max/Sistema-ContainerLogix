@@ -21,6 +21,10 @@ import { Wallet, Plus, Eye, Trash2, Printer, Pencil, X, CheckCircle2, RotateCcw 
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
+import PeriodReportDialog from '../components/PeriodReportDialog';
+import { FileBarChart } from 'lucide-react';
+
+const brl = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 function calculateItemTotal(item) {
   const others = parseFloat(item.others_value) || 0;
@@ -33,6 +37,7 @@ function calculateItemTotal(item) {
 
 export default function DailyRateRequestPage() {
   const { confirm, ConfirmDialog } = useConfirm();
+  const [reportOpen, setReportOpen] = useState(false);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -330,7 +335,16 @@ export default function DailyRateRequestPage() {
   return (
     <Layout>
       <div className="space-y-4">
-        <PageHeader icon={Wallet} title="Solicitação de Diária" subtitle="Gerencie as solicitações de diária, comissão e almoço dos motoristas" />
+        <PageHeader
+          icon={Wallet}
+          title="Solicitação de Diária"
+          subtitle="Gerencie as solicitações de diária, comissão e almoço dos motoristas"
+          actions={(
+            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="daily-rate-period-report">
+              <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
+            </Button>
+          )}
+        />
 
         <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearSearch}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -631,6 +645,23 @@ export default function DailyRateRequestPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PeriodReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        title="Relatório de Diárias"
+        description="Diárias, comissões e almoços pela data de saída, por motorista e item a item."
+        periodLabel="Saída"
+        statuses={[{ value: '', label: 'Pendentes e pagas' }, { value: 'PENDENTE', label: 'Pendentes' }, { value: 'PAGO', label: 'Pagas' }, { value: 'CANCELADO', label: 'Canceladas' }]}
+        textFilters={[{ key: 'driver', label: 'Motorista' }, { key: 'client', label: 'Cliente' }]}
+        load={api.getDailyRatesReport}
+        summarize={(d) => [
+          ['Viagens', d.summary.count], ['Motoristas', d.drivers.length],
+          ['Total', brl(d.summary.total)], ['A pagar', brl(d.summary.pending)],
+        ]}
+        downloadPdf={api.downloadDailyRatesReportPdf}
+        downloadExcel={api.downloadDailyRatesReportExcel}
+        filename="relatorio_diarias"
+      />
       <ConfirmDialog />
     </Layout>
   );

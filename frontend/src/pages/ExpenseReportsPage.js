@@ -1,4 +1,6 @@
 import { FormSectionTitle } from '../components/FormKit';
+import PeriodReportDialog from '../components/PeriodReportDialog';
+import { FileBarChart } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -52,8 +54,11 @@ function balanceInfo(balance) {
   return { label: 'Quitado', className: 'text-emerald-600 dark:text-emerald-400', value: 0 };
 }
 
+const brl = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 export default function ExpenseReportsPage() {
   const { confirm, ConfirmDialog } = useConfirm();
+  const [reportOpen, setReportOpen] = useState(false);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -414,7 +419,16 @@ export default function ExpenseReportsPage() {
   return (
     <Layout>
       <div className="space-y-4" data-testid="expense-reports-page">
-        <PageHeader icon={Calculator} title="Prestação de Contas" subtitle="Controle de depósitos recebidos e compras realizadas por período" />
+        <PageHeader
+          icon={Calculator}
+          title="Prestação de Contas"
+          subtitle="Controle de depósitos recebidos e compras realizadas por período"
+          actions={(
+            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="expense-period-report">
+              <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
+            </Button>
+          )}
+        />
 
         <FilterCard hasFilters={!!searchQuery} onClear={clearSearch}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -807,6 +821,25 @@ export default function ExpenseReportsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PeriodReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        title="Relatório de Prestação de Contas"
+        description="Compras e depósitos do período, por fornecedor, com a lista das compras sem recibo anexado."
+        periodLabel="Data da compra/depósito"
+        statuses={[{ value: '', label: 'Todas' }, { value: 'EM_ANDAMENTO', label: 'Em andamento' }, { value: 'CONCLUIDA', label: 'Concluídas' }]}
+        textFilters={[{ key: 'supplier', label: 'Fornecedor' }]}
+        checkboxes={[{ key: 'only_without_receipt', label: 'Só compras sem recibo anexado' }]}
+        load={api.getExpensesReport}
+        summarize={(d) => [
+          ['Compras', brl(d.summary.total_purchases)], ['Depósitos', brl(d.summary.total_deposits)],
+          ['Saldo (compras - depósitos)', brl(d.summary.balance)],
+          ['Sem recibo', `${d.summary.without_receipt_count} · ${brl(d.summary.without_receipt_total)}`],
+        ]}
+        downloadPdf={api.downloadExpensesReportPdf}
+        downloadExcel={api.downloadExpensesReportExcel}
+        filename="relatorio_prestacao_contas"
+      />
       <ConfirmDialog />
     </Layout>
   );

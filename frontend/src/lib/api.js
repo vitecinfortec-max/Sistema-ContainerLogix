@@ -441,6 +441,14 @@ export const api = {
   updateCheckStatus: (id, data) => axios.put(`${API}/checks/${id}/status`, data),
   getChecksReportPDF: (params) => axios.get(`${API}/checks/report/pdf`, { params, responseType: 'blob' }),
 
+  // Financeiro - Relatórios do período (conferência)
+  getDailyRatesReport: (params) => axios.get(`${API}/reports/daily-rates`, { params }),
+  downloadDailyRatesReportPdf: (params) => axios.get(`${API}/reports/daily-rates/pdf`, { params, responseType: 'blob' }),
+  downloadDailyRatesReportExcel: (params) => axios.get(`${API}/reports/daily-rates/excel`, { params, responseType: 'blob' }),
+  getExpensesReport: (params) => axios.get(`${API}/reports/expenses`, { params }),
+  downloadExpensesReportPdf: (params) => axios.get(`${API}/reports/expenses/pdf`, { params, responseType: 'blob' }),
+  downloadExpensesReportExcel: (params) => axios.get(`${API}/reports/expenses/excel`, { params, responseType: 'blob' }),
+
   // Financeiro - Prestação de Contas
   getExpenseReports: (params) => axios.get(`${API}/expense-reports`, { params }),
   getExpenseReport: (id) => axios.get(`${API}/expense-reports/${id}`),
