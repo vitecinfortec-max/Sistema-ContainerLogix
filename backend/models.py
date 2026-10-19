@@ -930,6 +930,8 @@ class Invoice(BaseModel):
     notes: Optional[str] = None
     due_date: Optional[str] = None  # Vencimento (YYYY-MM-DD) - opcional; faturas antigas não têm
     paid_date: Optional[str] = None  # Dia em que foi marcada como paga (YYYY-MM-DD)
+    credit_applied: float = 0  # Crédito do cliente já usado nesta fatura (ver routers/client_credits.py)
+    paid_by_credit: bool = False  # Quitada pelo crédito (estornar o crédito reabre a fatura)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
     user_name: str
@@ -960,6 +962,9 @@ class InvoiceResponse(BaseModel):
     notes: Optional[str] = None
     due_date: Optional[str] = None
     paid_date: Optional[str] = None
+    credit_applied: float = 0
+    open_value: float = 0  # total - crédito usado (o que falta receber, se Pendente)
+    paid_by_credit: bool = False
     created_at: datetime
     user_name: str
 
@@ -1918,6 +1923,42 @@ class DailyRateRequestResponse(BaseModel):
     created_by_name: str
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+
+# ==================== FINANCEIRO - CRÉDITO DE CLIENTE ====================
+
+# Conta corrente de crédito do cliente (adiantamento / pagamento a maior).
+# Lançamentos nunca são apagados: correção é feita por ESTORNO, que devolve o
+# efeito do lançamento original. CREDITO soma; USO (baixa numa fatura) e
+# DEVOLUCAO (dinheiro devolvido ao cliente) subtraem.
+CLIENT_CREDIT_ENTRY_TYPES = ["CREDITO", "USO", "DEVOLUCAO", "ESTORNO"]
+CLIENT_CREDIT_PAYMENT_METHODS = ["PIX", "TED", "BOLETO", "DEPOSITO", "DINHEIRO", "CHEQUE", "OUTRO"]
+
+
+class ClientCreditCreate(BaseModel):
+    client_id: str
+    entry_type: str = "CREDITO"  # CREDITO | DEVOLUCAO
+    amount: float
+    entry_date: str  # YYYY-MM-DD
+    payment_method: Optional[str] = None
+    reference: Optional[str] = None  # documento, comprovante, nº do PIX...
+    notes: Optional[str] = None
+
+
+class ClientCreditAllocation(BaseModel):
+    invoice_id: str
+    amount: float
+
+
+class ClientCreditApply(BaseModel):
+    client_id: str
+    entry_date: str
+    allocations: List[ClientCreditAllocation]
+    notes: Optional[str] = None
+
+
+class ClientCreditReverse(BaseModel):
+    reason: str
 
 
 # ==================== FINANCEIRO - CONTROLE DE CHEQUE ====================

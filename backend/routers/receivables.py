@@ -78,6 +78,9 @@ async def build_receivables(status=None, client_name=None, date_field="issue", d
             "due_date": due.isoformat() if due else None,
             "paid_date": paid.isoformat() if paid else None,
             "total_value": round(inv.get("total_value") or 0, 2),
+            # Crédito de Cliente já usado: em aberto conta só o que falta
+            "credit_applied": round(inv.get("credit_applied") or 0, 2),
+            "open_value": round((inv.get("total_value") or 0) - (inv.get("credit_applied") or 0), 2) if is_open else 0,
             "status": "PENDENTE" if is_open else "PAGO",
             "days_overdue": None,
             "aging": None,
@@ -98,12 +101,12 @@ async def build_receivables(status=None, client_name=None, date_field="issue", d
         c = clients.setdefault(r["client_name"], {"client_name": r["client_name"], "count": 0, "open": 0.0, "overdue": 0.0, "paid": 0.0})
         c["count"] += 1
         if r["status"] == "PENDENTE":
-            open_total += r["total_value"]
-            c["open"] += r["total_value"]
+            open_total += r["open_value"]
+            c["open"] += r["open_value"]
             aging[r["aging"]]["count"] += 1
-            aging[r["aging"]]["total"] += r["total_value"]
+            aging[r["aging"]]["total"] += r["open_value"]
             if r["aging"] != "current":
-                c["overdue"] += r["total_value"]
+                c["overdue"] += r["open_value"]
         else:
             paid_total += r["total_value"]
             c["paid"] += r["total_value"]
@@ -233,10 +236,12 @@ async def get_receivables_pdf(
                 situation = AGING_LABELS[r["aging"]] if r["aging"] == "current" else "Vencida"
             else:
                 late, situation = "-", "Recebida"
+            if r["credit_applied"]:
+                situation += f" (crédito {money(r['credit_applied'])})"
             detail.append([
                 cell(r["invoice_number"], "center", bold=True), cell(r["client_name"]), cell(_fmt_day(r["issue_date"]), "center"),
                 cell(_fmt_day(r["due_date"]), "center"), cell(late, "center"), cell(_fmt_day(r["paid_date"]), "center"),
-                cell(situation, "center"), cell(money(r["total_value"]), "right", bold=True),
+                cell(situation, "center"), cell(money(r["open_value"] if r["status"] == "PENDENTE" else r["total_value"]), "right", bold=True),
             ])
         scale = width / 760
         table = Table(detail, colWidths=[w * scale for w in [45, 245, 70, 70, 85, 75, 75, 95]], repeatRows=1)
@@ -282,7 +287,7 @@ async def get_receivables_excel(
                 (AGING_LABELS[r["aging"]] + (" (emissão)" if r["aging_from_issue"] else "")) if is_open else "-",
                 _xl_date(r["paid_date"]) if r["paid_date"] else "-",
                 ("A vencer" if r["aging"] == "current" else "Vencida") if is_open else "Recebida",
-                r["total_value"],
+                r["open_value"] if is_open else r["total_value"],
             ])
         stats = (f"{_report_subtitle(status, client_name, date_field, date_from, date_to)}   •   Em aberto: {format_currency(s['open_total'], 'BRL')}"
                  f"   •   Vencido: {format_currency(s['overdue_total'], 'BRL')}   •   Recebido: {format_currency(s['paid_total'], 'BRL')}")

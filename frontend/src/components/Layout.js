@@ -60,6 +60,7 @@ import {
   Briefcase,
   Route,
   HandCoins,
+  Coins,
   ShoppingBag,
   ShoppingCart,
   BadgeDollarSign,
@@ -152,6 +153,7 @@ const PAGE_TITLES = {
   '/checks': 'Controle de Cheque',
   '/reports/receivables': 'Contas a Receber',
   '/financial-summary': 'Resumo Financeiro',
+  '/client-credits': 'Crédito de Cliente',
   '/port-services-billing': 'Faturamento Portuário',
 };
 
@@ -367,7 +369,7 @@ function LayoutFrame({ children }) {
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname === '/unit-segregation';
   const isCadastroActive = location.pathname === '/cadastro' || location.pathname === '/company-settings';
-  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/checks' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/port-services-billing';
+  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/checks' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/client-credits' || location.pathname === '/port-services-billing';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
   // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
@@ -654,6 +656,7 @@ function LayoutFrame({ children }) {
   const financeiroItems = [
     { path: '/financial-summary', label: 'Resumo Financeiro', icon: Scale, moduleKey: 'financeiro' },
     { path: '/billing', label: 'Faturas', icon: Receipt, moduleKey: 'financeiro.faturas' },
+    { path: '/client-credits', label: 'Crédito de Cliente', icon: Coins, moduleKey: 'financeiro.credito_cliente' },
     { path: '/international-invoices', label: 'Invoice Internacional', icon: Globe, moduleKey: 'financeiro.invoice_internacional' },
     { path: '/reports/billing', label: 'Relatório de Faturamento', icon: BarChart3, moduleKey: 'financeiro.relatorio_faturamento' },
     { path: '/reports/receivables', label: 'Contas a Receber', icon: PiggyBank, moduleKey: 'financeiro.faturas' },

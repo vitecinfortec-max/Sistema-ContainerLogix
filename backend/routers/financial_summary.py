@@ -54,6 +54,16 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
     daily_open = await find("daily_rate_requests", {"status": "PENDENTE"}, "financeiro.diaria")
     expense_reports = await find("expense_reports", {}, "financeiro.prestacao_contas")
     purchases = await find("container_purchases", {}, "gestao_container.compra")
+    credit_entries = await find("client_credit_entries", {}, "financeiro.credito_cliente")
+    credit_accounts = await find("client_credit_accounts", {}, "financeiro.credito_cliente")
+
+    # Crédito de Cliente: o dinheiro entra quando o crédito é lançado. A parte
+    # de uma fatura paga com crédito já entrou ali - na fatura conta só o resto.
+    credit_in = credit_out = None
+    if credit_entries is not None:
+        net = lambda e: (e.get("amount") or 0) - (e.get("reversed_amount") or 0)
+        credit_in = [e for e in credit_entries if e["entry_type"] == "CREDITO"]
+        credit_out = [e for e in credit_entries if e["entry_type"] == "DEVOLUCAO"]
 
     deposits = None
     if expense_reports is not None:
@@ -62,12 +72,15 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
     legacy_paid_invoices = sum(1 for i in invoices_paid or [] if not i.get("paid_date"))
 
     inflows = [
-        _line("invoices", "Faturas recebidas", "financeiro.faturas", invoices_paid, lambda d: d.get("total_value"), lambda d: d.get("paid_date"),
+        _line("invoices", "Faturas recebidas", "financeiro.faturas", invoices_paid,
+              lambda d: (d.get("total_value") or 0) - (d.get("credit_applied") or 0), lambda d: d.get("paid_date"),
               note=f"{legacy_paid_invoices} fatura(s) paga(s) antes da data de recebimento existir ficam de fora" if legacy_paid_invoices else None),
         _line("port_billing", "Faturamento Portuário recebido", "financeiro.faturamento_portuario", port_paid,
               lambda d: d.get("net_total", d.get("total_value")), lambda d: _day(d.get("paid_at"))),
         _line("container_sales", "Vendas de container recebidas", "gestao_container.venda", sales_received,
               lambda d: d.get("received_value") if d.get("received_value") is not None else d.get("sale_value"), lambda d: _day(d.get("received_at"))),
+        _line("client_credits", "Créditos de clientes recebidos", "financeiro.credito_cliente", credit_in,
+              lambda d: net(d), lambda d: d.get("entry_date"), note="adiantamentos: abatidos depois nas faturas, que contam só o restante"),
     ]
     outflows = [
         _line("checks", "Cheques compensados", "financeiro.controle_cheque", checks_comp, lambda d: d.get("amount"), lambda d: d.get("compensation_date"),
@@ -78,9 +91,12 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
         _line("expense_deposits", "Depósitos para Prestação de Contas", "financeiro.prestacao_contas", deposits, lambda d: d.get("amount"), lambda d: d.get("date")),
         _line("container_purchases", "Compras de container", "gestao_container.compra", purchases, lambda d: d.get("purchase_value"),
               lambda d: _day(d.get("entry_date") or d.get("created_at"))),
+        _line("client_credit_refunds", "Créditos devolvidos a clientes", "financeiro.credito_cliente", credit_out,
+              lambda d: net(d), lambda d: d.get("entry_date")),
     ]
     receivable = [
-        _line("invoices_open", "Faturas em aberto", "financeiro.faturas", invoices_open, lambda d: d.get("total_value")),
+        _line("invoices_open", "Faturas em aberto", "financeiro.faturas", invoices_open,
+              lambda d: (d.get("total_value") or 0) - (d.get("credit_applied") or 0)),
         _line("port_open", "Faturamento Portuário pendente", "financeiro.faturamento_portuario", port_open, lambda d: d.get("net_total", d.get("total_value"))),
         _line("sales_open", "Vendas de container a receber", "gestao_container.venda", sales_open,
               lambda d: (d.get("sale_value") or 0) - (d.get("received_value") or 0)),
@@ -89,6 +105,8 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
         _line("checks_open", "Cheques emitidos a compensar", "financeiro.controle_cheque", checks_open, lambda d: d.get("amount")),
         _line("freight_open", "Fretes a pagar", "financeiro.pagamento_frete", freight_open, lambda d: d.get("freight_value")),
         _line("daily_open", "Diárias a pagar", "financeiro.diaria", daily_open, lambda d: d.get("total_value")),
+        _line("client_credit_balance", "Saldo de crédito de clientes", "financeiro.credito_cliente", credit_accounts,
+              lambda d: (d.get("balance_cents") or 0) / 100, note="já recebido; será abatido em faturas ou devolvido"),
     ]
 
     def resolve(lines, use_period):

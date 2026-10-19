@@ -202,6 +202,19 @@ export const api = {
   downloadFinancialSummaryPdf: (params) => axios.get(`${API}/reports/financial-summary/pdf`, { params, responseType: 'blob' }),
   downloadFinancialSummaryExcel: (params) => axios.get(`${API}/reports/financial-summary/excel`, { params, responseType: 'blob' }),
 
+  // Financeiro - Crédito de Cliente (conta corrente de adiantamentos)
+  getClientCreditSummary: () => axios.get(`${API}/client-credits/summary`),
+  getClientCreditAccounts: (params) => axios.get(`${API}/client-credits/accounts`, { params }),
+  getClientCreditEntries: (params) => axios.get(`${API}/client-credits/entries`, { params }),
+  createClientCreditEntry: (data) => axios.post(`${API}/client-credits/entries`, data),
+  getClientCreditOpenInvoices: (clientId) => axios.get(`${API}/client-credits/open-invoices`, { params: { client_id: clientId } }),
+  applyClientCredit: (data) => axios.post(`${API}/client-credits/apply`, data),
+  reverseClientCreditEntry: (id, reason) => axios.post(`${API}/client-credits/entries/${id}/reverse`, { reason }),
+  getInvoiceCredits: (invoiceId) => axios.get(`${API}/client-credits/invoice/${invoiceId}`),
+  getClientCreditStatement: (clientId, params) => axios.get(`${API}/client-credits/statement/${clientId}`, { params }),
+  downloadClientCreditStatementPdf: (clientId, params) => axios.get(`${API}/client-credits/statement/${clientId}/pdf`, { params, responseType: 'blob' }),
+  downloadClientCreditStatementExcel: (clientId, params) => axios.get(`${API}/client-credits/statement/${clientId}/excel`, { params, responseType: 'blob' }),
+
   // Financeiro - Contas a Receber (conferência das Faturas)
   getReceivables: (params) => axios.get(`${API}/reports/receivables`, { params }),
   downloadReceivablesPdf: (params) => axios.get(`${API}/reports/receivables/pdf`, { params, responseType: 'blob' }),

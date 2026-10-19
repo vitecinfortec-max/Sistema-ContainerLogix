@@ -33,6 +33,9 @@ def _invoice_response(inv: dict) -> InvoiceResponse:
         notes=inv.get('notes'),
         due_date=inv.get('due_date'),
         paid_date=inv.get('paid_date'),
+        credit_applied=inv.get('credit_applied') or 0,
+        open_value=round_money((inv.get('total_value') or 0) - (inv.get('credit_applied') or 0)),
+        paid_by_credit=bool(inv.get('paid_by_credit')),
         created_at=parse_datetime_value(inv['created_at']),
         user_name=inv['user_name'],
     )
@@ -87,6 +90,21 @@ def _linked_movements_query(invoice: dict) -> dict:
     return {"id": {"$in": invoice.get('movement_ids', [])}, "invoice_id": {"$in": [invoice['id'], None]}}
 
 
+async def _sync_credit(invoice: dict, new_total: float, current_user: dict) -> dict:
+    """Total da fatura mudou: o crédito do cliente que passar do novo total
+    volta ao saldo dele, e a situação (quitada pelo crédito ou não) é refeita"""
+    if not invoice.get('credit_applied'):
+        return {}
+    from routers.client_credits import sync_invoice_total
+    return await sync_invoice_total(invoice, new_total, f"Total da fatura #{invoice['invoice_number']} alterado", current_user)
+
+
+def _credit_changes(invoice: dict, credit_update: dict, changes: dict) -> None:
+    for field in ('credit_applied', 'status', 'paid_date'):
+        if field in credit_update and credit_update[field] != invoice.get(field):
+            changes[field] = {'from': invoice.get(field), 'to': credit_update[field]}
+
+
 async def _release_movements(invoice_id: str):
     """Devolve (desfatura) as movimentações que uma criação de fatura chegou
     a reservar mas não concluiu."""
@@ -123,8 +141,10 @@ async def sync_invoice_with_movement(movement: dict, deleted: bool, current_user
     if not changes:
         return
 
+    credit_update = await _sync_credit(invoice, new_total, current_user) if new_total != invoice.get('total_value') else {}
+    _credit_changes(invoice, credit_update, changes)
     await db.invoices.update_one(
-        {"id": invoice['id']}, {"$set": {"movement_ids": movement_ids, "total_value": new_total}}
+        {"id": invoice['id']}, {"$set": {"movement_ids": movement_ids, "total_value": new_total, **credit_update}}
     )
     await log_invoice_history(
         invoice_id=invoice['id'],
@@ -346,7 +366,12 @@ async def update_invoice_status(
     if old_status == 'CANCELADO' and status != 'CANCELADO':
         raise HTTPException(status_code=400, detail="Fatura cancelada não pode ser reaberta. Gere uma nova fatura com as movimentações.")
 
-    update = {"status": status}
+    credit_cents = round((invoice.get('credit_applied') or 0) * 100)
+    total_cents = round((invoice.get('total_value') or 0) * 100)
+    if status == 'PENDENTE' and credit_cents and credit_cents >= total_cents:
+        raise HTTPException(status_code=400, detail="Esta fatura foi quitada com crédito do cliente: para reabri-la, estorne a baixa em Crédito de Cliente")
+
+    update = {"status": status, "paid_by_credit": bool(invoice.get('paid_by_credit')) and status == 'PAGO'}
     if status == 'PAGO':
         today = datetime.now(BRT_TZ).date()
         received = today
@@ -368,6 +393,11 @@ async def update_invoice_status(
         changes = {"status": {"from": old_status, "to": status}}
         if update["paid_date"] != invoice.get('paid_date'):
             changes["paid_date"] = {"from": invoice.get('paid_date'), "to": update["paid_date"]}
+        if status == 'CANCELADO' and credit_cents:
+            from routers.client_credits import return_invoice_credit
+            returned = await return_invoice_credit(invoice, None, f"Fatura #{invoice['invoice_number']} cancelada", current_user)
+            await db.invoices.update_one({"id": invoice_id}, {"$set": {"credit_applied": 0, "paid_by_credit": False}})
+            changes["credit_returned"] = round(returned / 100, 2)
         if status == 'CANCELADO':
             # Antes as movimentações continuavam marcadas como faturadas e não
             # entravam em nenhuma fatura nova.
@@ -401,6 +431,12 @@ async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current
     update_data = {}
     changes = {}
     
+    if invoice.get('credit_applied') and (
+        (invoice_update.client_name is not None and invoice_update.client_name != invoice.get('client_name'))
+        or (invoice_update.client_cnpj is not None and invoice_update.client_cnpj != invoice.get('client_cnpj'))
+    ):
+        raise HTTPException(status_code=400, detail="Esta fatura tem crédito do cliente usado: estorne a baixa antes de trocar o cliente")
+
     # Atualizar campos básicos se fornecidos
     if invoice_update.client_name is not None and invoice_update.client_name != invoice.get('client_name'):
         changes['client_name'] = {'from': invoice.get('client_name'), 'to': invoice_update.client_name}
@@ -496,6 +532,9 @@ async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current
 
     if new_total != invoice.get('total_value'):
         changes['total_value'] = {'from': invoice.get('total_value'), 'to': new_total}
+        credit_update = await _sync_credit(invoice, new_total, current_user)
+        _credit_changes(invoice, credit_update, changes)
+        update_data.update(credit_update)
     update_data['total_value'] = new_total
 
     # Aplicar atualização
@@ -599,6 +638,10 @@ async def delete_invoice(invoice_id: str, current_user: dict = Depends(get_curre
     if not invoice:
         raise HTTPException(status_code=404, detail="Fatura não encontrada")
     
+    if invoice.get('credit_applied') and (invoice.get('status') or 'PENDENTE') != 'CANCELADO':
+        from routers.client_credits import return_invoice_credit
+        await return_invoice_credit(invoice, None, f"Fatura #{invoice['invoice_number']} excluída", current_user)
+
     # Registrar no histórico antes de deletar
     await log_invoice_history(
         invoice_id=invoice_id,

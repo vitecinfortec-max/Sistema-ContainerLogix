@@ -44,6 +44,7 @@ from routers.freight_reports import api_router as freight_reports_router
 from routers.photo_record_reports import api_router as photo_record_reports_router
 from routers.fleet_reports import api_router as fleet_reports_router
 from routers.delivery_reports import api_router as delivery_reports_router
+from routers.client_credits import api_router as client_credits_router
 from routers.financial_summary import api_router as financial_summary_router
 from routers.delivery_status import api_router as delivery_status_router
 from routers.port_services import api_router as port_services_router
@@ -195,6 +196,7 @@ app.include_router(freight_reports_router)
 app.include_router(photo_record_reports_router)
 app.include_router(fleet_reports_router)
 app.include_router(delivery_reports_router)
+app.include_router(client_credits_router)
 app.include_router(financial_summary_router)
 app.include_router(delivery_status_router)
 app.include_router(port_services_router)
@@ -387,9 +389,17 @@ async def startup_event():
     # consulta mais comum de detalhe/edição/exclusão nessas coleções.
     for collection_name in (
         "movements", "invoices", "products", "stock_movements", "stock_entries",
-        "fuel_supplies", "fuel_supply_orders", "checks",
+        "fuel_supplies", "fuel_supply_orders", "checks", "client_credit_entries",
     ):
         await db[collection_name].create_index("id")
+    # Crédito de Cliente: um saldo por cliente (a baixa usa $inc condicionado
+    # nele - dois documentos do mesmo cliente furariam essa trava).
+    try:
+        await db.client_credit_accounts.create_index("client_id", unique=True)
+    except Exception as e:
+        logger.warning(f"Não foi possível criar índice único em client_credit_accounts.client_id: {e}")
+    await db.client_credit_entries.create_index([("client_id", 1), ("entry_date", 1), ("entry_number", 1)])
+    await db.client_credit_entries.create_index("invoice_id", sparse=True)
     # Controle de Média km/L: abastecimentos de vários veículos em ordem cronológica.
     await db.fuel_supplies.create_index([("equipment_id", 1), ("supply_date", 1), ("created_at", 1)])
     await db.drivers.create_index("cpf")

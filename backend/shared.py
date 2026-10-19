@@ -482,6 +482,7 @@ MODULE_CATALOG = [
     ]},
     {"key": "financeiro", "label": "Financeiro", "items": [
         {"key": "financeiro.faturas", "label": "Faturas"},
+        {"key": "financeiro.credito_cliente", "label": "Crédito de Cliente"},
         {"key": "financeiro.invoice_internacional", "label": "Invoice Internacional"},
         {"key": "financeiro.relatorio_faturamento", "label": "Relatório de Faturamento"},
         {"key": "financeiro.diaria", "label": "Solicitação de Diária"},
@@ -565,6 +566,7 @@ PATH_MODULE_MAP = [
     ("/api/freight-routes", "cadastro.rota"),
     ("/api/reports/billing", "financeiro.relatorio_faturamento"),
     ("/api/invoices", "financeiro.faturas"),
+    ("/api/client-credits", "financeiro.credito_cliente"),
     ("/api/reports/receivables", "financeiro.faturas"),
     ("/api/intl-invoices", "financeiro.invoice_internacional"),
     ("/api/daily-rate-requests", "financeiro.diaria"),

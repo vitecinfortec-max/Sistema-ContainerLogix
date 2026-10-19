@@ -41,12 +41,12 @@ def test_inflows_outflows_and_positions(api):
     data = api.get("/api/reports/financial-summary", params=PERIOD).json()
     ins = {r["key"]: r["total"] for r in data["inflows"]}
     outs = {r["key"]: r["total"] for r in data["outflows"]}
-    assert ins == {"invoices": 1000, "port_billing": 400, "container_sales": 7500}
-    assert outs == {"checks": 300, "freight": 900, "daily": 200, "expense_deposits": 500, "container_purchases": 5000}
+    assert ins == {"invoices": 1000, "port_billing": 400, "container_sales": 7500, "client_credits": 0}
+    assert outs == {"checks": 300, "freight": 900, "daily": 200, "expense_deposits": 500, "container_purchases": 5000, "client_credit_refunds": 0}
     s = data["summary"]
     assert s["inflow_total"] == 8900 and s["outflow_total"] == 6900 and s["balance"] == 2000
     assert {r["key"]: r["total"] for r in data["receivable"]} == {"invoices_open": 700, "port_open": 0, "sales_open": 2000}
-    assert {r["key"]: r["total"] for r in data["payable"]} == {"checks_open": 120, "freight_open": 250, "daily_open": 80}
+    assert {r["key"]: r["total"] for r in data["payable"]} == {"checks_open": 120, "freight_open": 250, "daily_open": 80, "client_credit_balance": 0}
     invoices_line = next(r for r in data["inflows"] if r["key"] == "invoices")
     assert "1 fatura" in invoices_line["note"]
 

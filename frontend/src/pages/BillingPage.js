@@ -620,6 +620,15 @@ export default function BillingPage() {
         items.push(`Valor: ${formatCurrency(changes.total_value)}`);
       }
     }
+    if (changes.credit_applied) {
+      items.push(`Crédito do cliente usado: ${formatCurrency(changes.credit_applied.from)} → ${formatCurrency(changes.credit_applied.to)}`);
+    }
+    if (changes.credit_returned) {
+      items.push(`${formatCurrency(changes.credit_returned)} de crédito devolvido ao cliente`);
+    }
+    if (changes.reason && (changes.credit_applied || changes.credit_returned)) {
+      items.push(changes.reason);
+    }
     if (changes.movements_count) {
       items.push(`${changes.movements_count} movimentação(ões)`);
     }
@@ -911,7 +920,14 @@ export default function BillingPage() {
                         <td><div className="max-w-[260px] truncate font-medium text-slate-700 dark:text-slate-200" title={invoice.client_name || ''}>{invoice.client_name}</div></td>
                         <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{invoice.client_cnpj || '-'}</td>
                         <td className="text-right tabular-nums">{invoice.movement_ids.length}</td>
-                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{formatCurrency(invoice.total_value)}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">
+                          {formatCurrency(invoice.total_value)}
+                          {invoice.credit_applied > 0 && invoice.status === 'PENDENTE' && (
+                            <div className="text-[11px] font-normal text-muted-foreground" title={`Crédito do cliente usado: ${formatCurrency(invoice.credit_applied)}`}>
+                              falta {formatCurrency(invoice.open_value)}
+                            </div>
+                          )}
+                        </td>
                         <td><StatusPill tone={badge.tone}>{badge.label}</StatusPill></td>
                         <td><UserTag name={invoice.user_name ? shortenName(invoice.user_name) : null} /></td>
                       </tr>
@@ -1286,7 +1302,20 @@ export default function BillingPage() {
                     <Label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                       <Check className="w-3 h-3" /> Recebida em
                     </Label>
-                    <p className="font-medium">{formatDay(selectedInvoice.paid_date)}</p>
+                    <p className="font-medium">{formatDay(selectedInvoice.paid_date)}{selectedInvoice.paid_by_credit ? ' (com crédito)' : ''}</p>
+                  </div>
+                )}
+                {selectedInvoice.credit_applied > 0 && (
+                  <div data-testid="invoice-credit-applied">
+                    <Label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <DollarSign className="w-3 h-3" /> Crédito do cliente usado
+                    </Label>
+                    <p className="font-medium">
+                      {formatCurrency(selectedInvoice.credit_applied)}
+                      {selectedInvoice.status === 'PENDENTE' && (
+                        <span className="text-xs text-muted-foreground"> · falta receber {formatCurrency(selectedInvoice.open_value)}</span>
+                      )}
+                    </p>
                   </div>
                 )}
               </div>

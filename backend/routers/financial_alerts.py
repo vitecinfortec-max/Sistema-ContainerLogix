@@ -66,11 +66,11 @@ async def build_financial_alerts() -> list:
         count, total, oldest = 0, 0.0, None
         cursor = db.invoices.find(
             {"status": {"$in": ["PENDENTE", None]}, "due_date": {"$lt": today_iso, "$nin": [None, ""]}},
-            {"_id": 0, "total_value": 1, "due_date": 1},
+            {"_id": 0, "total_value": 1, "credit_applied": 1, "due_date": 1},
         )
         async for inv in cursor:
             count += 1
-            total += inv.get("total_value") or 0
+            total += (inv.get("total_value") or 0) - (inv.get("credit_applied") or 0)
             oldest = min(oldest or inv["due_date"], inv["due_date"])
         if count:
             days = (today - datetime.fromisoformat(oldest[:10]).date()).days

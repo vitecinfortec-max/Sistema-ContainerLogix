@@ -228,7 +228,14 @@ export default function ReceivablesPage() {
                       </td>
                       <td className="whitespace-nowrap tabular-nums">{formatDay(r.paid_date)}</td>
                       <td>{situation(r)}</td>
-                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{formatMoney(r.total_value)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">
+                        {formatMoney(r.status === 'PENDENTE' ? r.open_value : r.total_value)}
+                        {r.credit_applied > 0 && (
+                          <div className="text-[11px] font-normal text-muted-foreground">
+                            {r.status === 'PENDENTE' ? `de ${formatMoney(r.total_value)} · ` : ''}crédito {formatMoney(r.credit_applied)}
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
