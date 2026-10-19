@@ -15,7 +15,8 @@ from reports import (
     today_brt,
     _build_pdf_header, _make_pdf_footer, merge_company, format_currency,
     generate_port_services_report_pdf, generate_port_services_report_excel,
-    generate_port_service_invoice_pdf, generate_port_service_invoice_excel
+    generate_port_service_invoice_pdf, generate_port_service_invoice_excel,
+    generate_port_service_shifts_pdf, generate_port_service_shifts_excel,
 )
 from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, load_logo_buffer, refuse_negative
 
@@ -422,6 +423,157 @@ async def download_port_services_report_excel(
         io.BytesIO(excel_buffer),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=relatorio_servico_portuario.xlsx"}
+    )
+
+
+# ==================== CONFERÊNCIA DE TURNOS ====================
+# Horário previsto de cada turno (Noite termina no dia seguinte). Os dois
+# têm 11h30 de jornada.
+SHIFT_SCHEDULE = {"DIA": ("08:30", "20:00"), "NOITE": ("20:30", "08:00")}
+_DAY = 24 * 60
+
+
+def _clock_minutes(value: Optional[str]) -> Optional[int]:
+    """'HH:MM' (ou 'HH:MM:SS') -> minutos desde a meia-noite; None se vazio
+    ou inválido."""
+    m = re.fullmatch(r"\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*", value or "")
+    if not m:
+        return None
+    hours, minutes = int(m.group(1)), int(m.group(2))
+    if hours > 23 or minutes > 59:
+        return None
+    return hours * 60 + minutes
+
+
+def shift_check(turno: Optional[str], entry_time: Optional[str], exit_time: Optional[str]) -> dict:
+    """Confere entrada/saída com o horário previsto do turno.
+
+    entry_diff: minutos que chegou ANTES do previsto (negativo = atraso).
+    exit_diff: minutos que saiu DEPOIS do previsto (negativo = saiu antes).
+    balance: entry_diff + exit_diff = tempo trabalhado - jornada prevista.
+    No turno Noite, horários antes do meio-dia são do dia seguinte; no Dia,
+    uma saída antes da entrada passou da meia-noite."""
+    start_txt, end_txt = SHIFT_SCHEDULE.get(turno, (None, None))
+    result = {
+        "expected_entry": start_txt, "expected_exit": end_txt,
+        "entry_diff": None, "exit_diff": None, "worked": None, "balance": None,
+        "shift_status": "SEM_HORARIO",
+    }
+    if not start_txt:
+        return result
+    start, end = _clock_minutes(start_txt), _clock_minutes(end_txt)
+    entry, exit_ = _clock_minutes(entry_time), _clock_minutes(exit_time)
+    if turno == "NOITE":
+        end += _DAY
+        if entry is not None and entry < 12 * 60:
+            entry += _DAY
+        if exit_ is not None and exit_ < 12 * 60:
+            exit_ += _DAY
+    if entry is not None:
+        result["entry_diff"] = start - entry
+    if exit_ is not None:
+        if entry is not None and exit_ < entry:
+            exit_ += _DAY
+        result["exit_diff"] = exit_ - end
+    if entry is None or exit_ is None:
+        return result
+    result["worked"] = exit_ - entry
+    result["balance"] = result["entry_diff"] + result["exit_diff"]
+    if result["balance"] == 0:
+        result["shift_status"] = "NO_HORARIO"
+    else:
+        result["shift_status"] = "A_MAIS" if result["balance"] > 0 else "A_MENOS"
+    return result
+
+
+def _valid_period(date_from: Optional[str], date_to: Optional[str]):
+    if not date_from or not date_to:
+        raise HTTPException(status_code=400, detail="Informe o período (data inicial e final)")
+    try:
+        start = datetime.strptime(date_from, "%Y-%m-%d")
+        end = datetime.strptime(date_to, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Data do período inválida")
+    if start > end:
+        raise HTTPException(status_code=400, detail="A data inicial é posterior à data final")
+
+
+async def _port_service_shifts(date_from, date_to, turno, client_id) -> tuple:
+    """Serviços do período com a conferência de horário de cada um, em ordem
+    de data, turno (Dia antes da Noite) e entrada, mais os totais."""
+    _valid_period(date_from, date_to)
+    rows = await _filter_port_services_report(date_from, date_to, client_id, turno)
+    items = []
+    for r in rows:
+        check = shift_check(r.get("turno"), r.get("entry_time"), r.get("exit_time"))
+        items.append({
+            "id": r.get("id"), "service_number": r.get("service_number"), "service_date": r.get("service_date"),
+            "turno": r.get("turno"), "client_name": r.get("client_name"), "driver_name": r.get("driver_name"),
+            "cavalo_plate": r.get("cavalo_plate"), "entry_time": r.get("entry_time"), "exit_time": r.get("exit_time"),
+            "observations": (r.get("observations") or "").strip() or None,
+            **check,
+        })
+    items.sort(key=lambda i: (
+        i["service_date"] or "", 0 if i["turno"] == "DIA" else 1, i["entry_time"] or "99:99", i["service_number"] or 0,
+    ))
+    extra = [i["balance"] for i in items if (i["balance"] or 0) > 0]
+    less = [i["balance"] for i in items if (i["balance"] or 0) < 0]
+    summary = {
+        "count": len(items),
+        "day_count": sum(1 for i in items if i["turno"] == "DIA"),
+        "night_count": sum(1 for i in items if i["turno"] == "NOITE"),
+        "on_time_count": sum(1 for i in items if i["shift_status"] == "NO_HORARIO"),
+        "extra_count": len(extra), "extra_minutes": sum(extra),
+        "less_count": len(less), "less_minutes": sum(less),
+        "missing_count": sum(1 for i in items if i["shift_status"] == "SEM_HORARIO"),
+        "with_observations_count": sum(1 for i in items if i["observations"]),
+        "balance_minutes": sum(extra) + sum(less),
+        "schedule": {k: {"entry": v[0], "exit": v[1]} for k, v in SHIFT_SCHEDULE.items()},
+    }
+    return items, summary
+
+
+@api_router.get("/reports/port-service-shifts")
+async def get_port_service_shifts(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    turno: Optional[str] = None, client_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Conferência de Turnos: horário de entrada/saída de cada Serviço
+    Portuário do período comparado com o horário previsto do turno, com as
+    observações lançadas. Sem valores financeiros (aberto a operadores)."""
+    items, summary = await _port_service_shifts(date_from, date_to, turno, client_id)
+    return {"items": items, "summary": summary}
+
+
+@api_router.get("/reports/port-service-shifts/pdf")
+async def download_port_service_shifts_pdf(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    turno: Optional[str] = None, client_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    items, summary = await _port_service_shifts(date_from, date_to, turno, client_id)
+    company = await get_company_settings()
+    pdf_buffer = generate_port_service_shifts_pdf(items, summary, date_from, date_to, company=company)
+    return StreamingResponse(
+        io.BytesIO(pdf_buffer), media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=conferencia_turnos.pdf"}
+    )
+
+
+@api_router.get("/reports/port-service-shifts/excel")
+async def download_port_service_shifts_excel(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    turno: Optional[str] = None, client_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_active_user)
+):
+    items, summary = await _port_service_shifts(date_from, date_to, turno, client_id)
+    company = await get_company_settings()
+    excel_buffer = generate_port_service_shifts_excel(items, summary, date_from, date_to, company=company)
+    return StreamingResponse(
+        io.BytesIO(excel_buffer),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=conferencia_turnos.xlsx"}
     )
 
 

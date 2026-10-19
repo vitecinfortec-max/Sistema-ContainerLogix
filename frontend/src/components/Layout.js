@@ -64,7 +64,8 @@ import {
   ArrowLeftRight,
   Gauge,
   TrendingUp,
-  Droplet
+  Droplet,
+  Timer
 } from 'lucide-react';
 import { Suspense, createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageSkeleton } from './DataPage';
@@ -140,6 +141,7 @@ const PAGE_TITLES = {
   '/delivery-status': 'Status de Entrega',
   '/port-services': 'Serviço Portuário',
   '/reports/port-services': 'Relatório de Serviço Portuário',
+  '/reports/port-service-shifts': 'Conferência de Turnos',
   '/daily-rate-requests': 'Solicitação de Diária',
   '/expense-reports': 'Prestação de Contas',
   '/port-services-billing': 'Faturamento Portuário',
@@ -370,7 +372,7 @@ function LayoutFrame({ children }) {
   const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/modules' || location.pathname === '/tank-settings';
-  const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status' || location.pathname === '/port-services' || location.pathname === '/reports/port-services';
+  const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status' || location.pathname === '/port-services' || location.pathname === '/reports/port-services' || location.pathname === '/reports/port-service-shifts';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
   const isTerminalCadastroActive = location.pathname === '/shipping-lines' || location.pathname === '/service-types';
@@ -651,6 +653,7 @@ function LayoutFrame({ children }) {
     { path: '/delivery-status', label: 'Status de Entrega', icon: ClipboardCheck, moduleKey: 'operacional.status_entrega' },
     { path: '/port-services', label: 'Serviço Portuário', icon: Anchor, moduleKey: 'operacional.servico_portuario' },
     { path: '/reports/port-services', label: 'Relatório de Serviço Portuário', icon: BarChart3, moduleKey: 'operacional.relatorio_servico_portuario' },
+    { path: '/reports/port-service-shifts', label: 'Conferência de Turnos', icon: Timer, moduleKey: 'operacional.conferencia_turnos' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   // Esconde o grupo inteiro do menu quando todo módulo dentro dele foi

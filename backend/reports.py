@@ -2937,6 +2937,160 @@ def generate_port_services_report_pdf(services: list, company: dict = None, repo
     return buffer.getvalue()
 
 
+# ==================== CONFERÊNCIA DE TURNOS ====================
+
+_SHIFT_STATUS_LABELS = {"NO_HORARIO": "No horário", "A_MAIS": "A mais", "A_MENOS": "A menos", "SEM_HORARIO": "Sem horário"}
+_SHIFT_HEADERS = ['Nº', 'Data', 'Turno', 'Cliente', 'Motorista', 'Placa', 'Entrada', 'Saída',
+                  'Dif. entrada', 'Dif. saída', 'Saldo', 'Observações']
+
+
+def fmt_shift_minutes(minutes, signed=True):
+    """Minutos -> '+01:15' / '-00:30' / '00:00'; None -> '-'."""
+    if minutes is None:
+        return '-'
+    sign = '' if not signed or minutes == 0 else ('+' if minutes > 0 else '-')
+    m = abs(int(minutes))
+    return f"{sign}{m // 60:02d}:{m % 60:02d}"
+
+
+def _shift_tone(minutes):
+    if minutes is None or minutes == 0:
+        return 'slate'
+    return 'emerald' if minutes > 0 else 'red'
+
+
+def _shift_period_text(date_from, date_to):
+    def fmt(d):
+        try:
+            return datetime.strptime(d, '%Y-%m-%d').strftime('%d/%m/%Y')
+        except (TypeError, ValueError):
+            return d or '-'
+    return f"{fmt(date_from)} a {fmt(date_to)}"
+
+
+def _shift_schedule_text(summary):
+    sched = (summary or {}).get('schedule') or {}
+    day = sched.get('DIA') or {}
+    night = sched.get('NOITE') or {}
+    return (f"Horário previsto - Dia: {day.get('entry', '-')} às {day.get('exit', '-')}  •  "
+            f"Noite: {night.get('entry', '-')} às {night.get('exit', '-')} (dia seguinte)")
+
+
+def _shift_summary_items(summary):
+    return [
+        ("Serviços", _fmt_int(summary.get('count', 0))),
+        ("No horário", _fmt_int(summary.get('on_time_count', 0))),
+        ("A mais", f"{_fmt_int(summary.get('extra_count', 0))}  ({fmt_shift_minutes(summary.get('extra_minutes', 0))})"),
+        ("A menos", f"{_fmt_int(summary.get('less_count', 0))}  ({fmt_shift_minutes(summary.get('less_minutes', 0))})"),
+        ("Sem horário", _fmt_int(summary.get('missing_count', 0))),
+    ]
+
+
+def generate_port_service_shifts_pdf(items: list, summary: dict, date_from: str, date_to: str, company: dict = None) -> bytes:
+    """Conferência de Turnos (Operacional): entrada/saída de cada Serviço
+    Portuário comparada com o horário previsto do turno, diferenças em
+    horas (verde = a mais, vermelho = a menos) e as observações lançadas."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=10*mm, leftMargin=10*mm,
+                            topMargin=12*mm, bottomMargin=15*mm)
+    elements = []
+    styles = getSampleStyleSheet()
+    title = f"Conferência de Turnos - {_shift_period_text(date_from, date_to)}"
+    elements.extend(_build_pdf_header(styles, download_logo(company), title, generation_info=_shift_schedule_text(summary),
+                                      company=company, content_width=doc.width))
+    elements.extend(_build_pdf_summary(_shift_summary_items(summary), doc.width))
+
+    if items:
+        cell = _pdf_cell_factory(styles, font_size=7)
+        rows = [_pdf_header_cells(_SHIFT_HEADERS, font_size=7)]
+        for i in items:
+            date_display = _shift_period_text(i.get('service_date'), None).split(' a ')[0]
+            rows.append([
+                cell(i.get('service_number') or '-', 'center', bold=True),
+                cell(date_display, 'center'),
+                cell(_TURNO_LABELS_PDF.get(i.get('turno'), i.get('turno') or '-'), 'center'),
+                cell(i.get('client_name') or '-'),
+                cell(i.get('driver_name') or '-'),
+                cell(i.get('cavalo_plate') or '-', 'center'),
+                cell(i.get('entry_time') or '-', 'center'),
+                cell(i.get('exit_time') or '-', 'center'),
+                cell(None, 'center', markup=_pdf_tone_markup(fmt_shift_minutes(i.get('entry_diff')), _shift_tone(i.get('entry_diff')), bold=False)),
+                cell(None, 'center', markup=_pdf_tone_markup(fmt_shift_minutes(i.get('exit_diff')), _shift_tone(i.get('exit_diff')), bold=False)),
+                cell(None, 'center', markup=_pdf_tone_markup(
+                    fmt_shift_minutes(i.get('balance')) if i.get('balance') is not None else _SHIFT_STATUS_LABELS['SEM_HORARIO'],
+                    _shift_tone(i.get('balance')) if i.get('balance') is not None else 'amber')),
+                cell(i.get('observations') or '-'),
+            ])
+        rows.append([''] * 9 + [
+            cell('SALDO', 'right', bold=True),
+            cell(None, 'center', markup=_pdf_tone_markup(fmt_shift_minutes(summary.get('balance_minutes', 0)), _shift_tone(summary.get('balance_minutes', 0)))),
+            '',
+        ])
+        w = doc.width
+        col_widths = [w*0.05, w*0.07, w*0.05, w*0.12, w*0.12, w*0.06, w*0.055, w*0.055, w*0.065, w*0.065, w*0.065, w*0.21]
+        table = Table(rows, colWidths=col_widths, repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
+        elements.append(table)
+    else:
+        elements.append(_pdf_empty_state("Nenhum serviço portuário encontrado no período selecionado.", doc.width))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
+def generate_port_service_shifts_excel(items: list, summary: dict, date_from: str, date_to: str, company: dict = None) -> bytes:
+    """Conferência de Turnos em Excel: as mesmas linhas do PDF, mais a coluna
+    Situação (No horário / A mais / A menos / Sem horário)."""
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Conferência de Turnos"
+        s = summary or {}
+        stats_text = (
+            f"Período: {_shift_period_text(date_from, date_to)}   •   Serviços: {_fmt_int(s.get('count', 0))}   •   "
+            f"No horário: {_fmt_int(s.get('on_time_count', 0))}   •   "
+            f"A mais: {_fmt_int(s.get('extra_count', 0))} ({fmt_shift_minutes(s.get('extra_minutes', 0))})   •   "
+            f"A menos: {_fmt_int(s.get('less_count', 0))} ({fmt_shift_minutes(s.get('less_minutes', 0))})   •   "
+            f"Sem horário: {_fmt_int(s.get('missing_count', 0))}   •   {_shift_schedule_text(s)}"
+        )
+        headers = _SHIFT_HEADERS[:11] + ['Situação', 'Observações']
+        data_rows = [[
+            i.get('service_number'), _xl_date(i.get('service_date')),
+            _TURNO_LABELS_XLSX.get(i.get('turno'), i.get('turno') or '-'),
+            i.get('client_name') or '-', i.get('driver_name') or '-', i.get('cavalo_plate') or '-',
+            i.get('entry_time') or '-', i.get('exit_time') or '-',
+            fmt_shift_minutes(i.get('entry_diff')), fmt_shift_minutes(i.get('exit_diff')), fmt_shift_minutes(i.get('balance')),
+            _SHIFT_STATUS_LABELS.get(i.get('shift_status'), '-'), i.get('observations') or '',
+        ] for i in items]
+        _bsoft_style_excel(
+            ws, "Conferência de Turnos", stats_text, headers, data_rows,
+            {'B': 8, 'C': 12, 'D': 9, 'E': 26, 'F': 26, 'G': 11, 'H': 9, 'I': 9, 'J': 12, 'K': 12, 'L': 10, 'M': 13, 'N': 60},
+            center_cols={0, 1, 2, 5, 6, 7, 8, 9, 10, 11},
+            number_fmt_cols={1: XL_DATE},
+            stats_text=stats_text,
+            company_name=c['name'],
+            logo_buffer=download_logo(company),
+            company=company,
+            autofilter=True,
+            empty_message="Nenhum serviço portuário encontrado no período selecionado.",
+        )
+        if items:
+            _xl_color_column(ws, 10, [_shift_tone(i.get('balance')) if i.get('balance') is not None else 'amber' for i in items])
+            status_tone = {"NO_HORARIO": 'slate', "A_MAIS": 'emerald', "A_MENOS": 'red', "SEM_HORARIO": 'amber'}
+            _xl_color_column(ws, 11, [status_tone.get(i.get('shift_status')) for i in items])
+            for offset in range(len(items)):
+                ws.cell(row=9 + offset, column=2 + 12).alignment = Alignment(wrap_text=True, vertical='center')
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+    except Exception as e:
+        logger.error(f"Error generating port service shifts Excel: {e}")
+        return _xl_error_workbook()
+
+
 def generate_port_service_invoice_pdf(batch: dict, services: list, company: dict = None) -> bytes:
     """Fatura de Serviço Portuário (Financeiro): quadro com os dados da fatura
     (cliente, período, serviços), tabela dos serviços faturados, quadro de

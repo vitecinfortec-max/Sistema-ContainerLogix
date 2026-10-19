@@ -462,6 +462,10 @@ export const api = {
   getPortServicesDailyChart: () => axios.get(`${API}/reports/port-services/daily-chart`),
   downloadPortServicesPDFReport: (params) => axios.get(`${API}/reports/port-services/pdf`, { params, responseType: 'blob' }),
   downloadPortServicesExcelReport: (params) => axios.get(`${API}/reports/port-services/excel`, { params, responseType: 'blob' }),
+  // Conferência de Turnos (horários dos Serviços Portuários x turno previsto)
+  getPortServiceShifts: (params) => axios.get(`${API}/reports/port-service-shifts`, { params }),
+  downloadPortServiceShiftsPDF: (params) => axios.get(`${API}/reports/port-service-shifts/pdf`, { params, responseType: 'blob' }),
+  downloadPortServiceShiftsExcel: (params) => axios.get(`${API}/reports/port-service-shifts/excel`, { params, responseType: 'blob' }),
 
   // Financeiro - Faturamento de Serviço Portuário
   getPortServiceBillingCandidates: (params) => axios.get(`${API}/port-services/billing-candidates`, { params }),

@@ -647,6 +647,14 @@ sugestão de mudar para Inativo), duplicados recusados, filtros aplicados enquan
         varredura automática sem nenhum 500 em 135 rotas de consulta e 42 módulos com dados
       - Mantido por decisão: operador pode excluir na maioria das telas; anexos comuns abrem pelo
         link sem login (`UPLOADS_REQUIRE_AUTH` desligado por causa do app antigo)
+- [x] Conferência de Turnos (Completo - 18/10/2026): item novo no grupo Operacional
+      (`/reports/port-service-shifts`, módulo `operacional.conferencia_turnos`). Por período
+      (obrigatório; abre no mês atual), turno e cliente: entrada/saída de cada Serviço Portuário x
+      horário previsto (`SHIFT_SCHEDULE` em routers/port_services.py: Dia 08:30-20:00, Noite
+      20:30-08:00 do dia seguinte), diferença na entrada (chegou antes = a mais), na saída (saiu
+      depois = a mais) e saldo (= trabalhado - 11h30), com as observações. Indicadores (no horário,
+      a mais, a menos, sem horário), tabela no computador e cartões no celular, PDF e Excel. Sem
+      valores financeiros: aberto a operadores. Testes em `tests/test_conferencia_turnos.py`
 - [ ] Opcional: corrigir os 28 avisos `react-hooks/exhaustive-deps` do build, tela por tela
 
 ## Credenciais de Teste
