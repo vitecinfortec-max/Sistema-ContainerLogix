@@ -431,6 +431,10 @@ async def download_port_services_report_excel(
 # têm 11h30 de jornada.
 SHIFT_SCHEDULE = {"DIA": ("08:30", "20:00"), "NOITE": ("20:30", "08:00")}
 _DAY = 24 * 60
+# Valor de um turno completo (Dia ou Noite). O desconto possível é
+# proporcional aos minutos a menos do saldo: valor / jornada x minutos.
+SHIFT_VALUE = 3200.0
+SHIFT_MINUTES = 690  # 11h30
 
 
 def _clock_minutes(value: Optional[str]) -> Optional[int]:
@@ -457,7 +461,7 @@ def shift_check(turno: Optional[str], entry_time: Optional[str], exit_time: Opti
     result = {
         "expected_entry": start_txt, "expected_exit": end_txt,
         "entry_diff": None, "exit_diff": None, "worked": None, "balance": None,
-        "shift_status": "SEM_HORARIO",
+        "shift_status": "SEM_HORARIO", "discount": None,
     }
     if not start_txt:
         return result
@@ -483,7 +487,19 @@ def shift_check(turno: Optional[str], entry_time: Optional[str], exit_time: Opti
         result["shift_status"] = "NO_HORARIO"
     else:
         result["shift_status"] = "A_MAIS" if result["balance"] > 0 else "A_MENOS"
+    result["discount"] = shift_discount(result["balance"])
     return result
+
+
+def shift_discount(balance: Optional[int]) -> Optional[float]:
+    """Desconto possível sobre o valor do turno: só quando o saldo é negativo
+    (trabalhou menos que a jornada), proporcional aos minutos que faltaram.
+    Chegar antes compensa sair antes - vale o saldo, não cada ponta."""
+    if balance is None:
+        return None
+    if balance >= 0:
+        return 0.0
+    return round(SHIFT_VALUE * min(-balance, SHIFT_MINUTES) / SHIFT_MINUTES, 2)
 
 
 def _valid_period(date_from: Optional[str], date_to: Optional[str]):
@@ -529,6 +545,9 @@ async def _port_service_shifts(date_from, date_to, turno, client_id) -> tuple:
         "with_observations_count": sum(1 for i in items if i["observations"]),
         "balance_minutes": sum(extra) + sum(less),
         "schedule": {k: {"entry": v[0], "exit": v[1]} for k, v in SHIFT_SCHEDULE.items()},
+        "shift_value": SHIFT_VALUE,
+        "shift_minutes": SHIFT_MINUTES,
+        "discount_total": round(sum(i["discount"] or 0 for i in items), 2),
     }
     return items, summary
 

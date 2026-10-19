@@ -654,7 +654,11 @@ sugestão de mudar para Inativo), duplicados recusados, filtros aplicados enquan
       20:30-08:00 do dia seguinte), diferença na entrada (chegou antes = a mais), na saída (saiu
       depois = a mais) e saldo (= trabalhado - 11h30), com as observações. Indicadores (no horário,
       a mais, a menos, sem horário), tabela no computador e cartões no celular, PDF e Excel. Sem
-      valores financeiros: aberto a operadores. Testes em `tests/test_conferencia_turnos.py`
+      valor faturado (só o desconto possível): aberto a operadores. Testes em `tests/test_conferencia_turnos.py`
+      - Desconto possível (18/10/2026): sobre R$ 3.200,00 por turno (`SHIFT_VALUE`), proporcional aos
+        minutos a menos do saldo (valor / 690 min x minutos; teto = valor do turno). Chegar antes
+        compensa sair antes; a mais ou no horário = sem desconto; sem horário = sem cálculo. Indicador
+        "Desconto possível", desconto embaixo do saldo, coluna e total no PDF/Excel
 - [ ] Opcional: corrigir os 28 avisos `react-hooks/exhaustive-deps` do build, tela por tela
 
 ## Credenciais de Teste

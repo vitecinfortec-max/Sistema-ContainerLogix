@@ -12,7 +12,7 @@ import { api } from '../lib/api';
 import { todayISO } from '../lib/dates';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { FileText, FileSpreadsheet, Timer, Anchor, CheckCircle2, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { FileText, FileSpreadsheet, Timer, Anchor, CheckCircle2, TrendingUp, TrendingDown, AlertTriangle, BadgeDollarSign } from 'lucide-react';
 
 const TURNO_OPTIONS = [
   ['DIA', 'Dia'],
@@ -49,13 +49,21 @@ function Balance({ item }) {
   return <span title={status.label}><Diff minutes={item.balance} strong /></span>;
 }
 
+const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** Desconto possível do turno (só quando o saldo é negativo). */
+function Discount({ value, className = '' }) {
+  if (!value) return null;
+  return <div className={`text-[11px] font-medium text-red-600 dark:text-red-400 tabular-nums ${className}`}>- {fmtMoney(value)}</div>;
+}
+
 const fmtDay = (iso) => (iso ? format(new Date(`${iso}T00:00:00`), 'dd/MM/yyyy') : '-');
 
 const firstDayOfMonth = () => `${todayISO().slice(0, 8)}01`;
 
 const EMPTY_SUMMARY = {
   count: 0, on_time_count: 0, extra_count: 0, extra_minutes: 0, less_count: 0, less_minutes: 0, missing_count: 0,
-  with_observations_count: 0, balance_minutes: 0, schedule: null,
+  with_observations_count: 0, balance_minutes: 0, schedule: null, shift_value: 0, discount_total: 0,
 };
 
 export default function PortServiceShiftsPage() {
@@ -204,16 +212,24 @@ export default function PortServiceShiftsPage() {
               Horário previsto — <span className="font-semibold text-slate-700 dark:text-slate-200">Dia: {sched.DIA.entry} às {sched.DIA.exit}</span>
               {' • '}
               <span className="font-semibold text-slate-700 dark:text-slate-200">Noite: {sched.NOITE.entry} às {sched.NOITE.exit}</span> (dia seguinte)
+              {summary.shift_value > 0 && (
+                <>
+                  {' • '}
+                  Valor do turno: <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtMoney(summary.shift_value)}</span>
+                  {' '}(desconto proporcional aos minutos a menos)
+                </>
+              )}
             </p>
           )}
         </FilterCard>
 
-        <StatGrid className="lg:grid-cols-5">
+        <StatGrid className="lg:grid-cols-3 2xl:grid-cols-6">
           <StatCard icon={Anchor} label="Serviços" value={summary.count} tone="blue" hint={`${summary.with_observations_count} com observação`} testId="shifts-kpi-count" />
           <StatCard icon={CheckCircle2} label="No horário" value={summary.on_time_count} tone="primary" testId="shifts-kpi-on-time" />
           <StatCard icon={TrendingUp} label="A mais" value={summary.extra_count} tone="emerald" hint={`${fmtMinutes(summary.extra_minutes)} no total`} testId="shifts-kpi-extra" />
           <StatCard icon={TrendingDown} label="A menos" value={summary.less_count} tone="red" hint={`${fmtMinutes(summary.less_minutes)} no total`} testId="shifts-kpi-less" />
           <StatCard icon={AlertTriangle} label="Sem horário" value={summary.missing_count} tone="amber" hint="entrada ou saída não lançada" testId="shifts-kpi-missing" />
+          <StatCard icon={BadgeDollarSign} label="Desconto possível" value={fmtMoney(summary.discount_total)} tone="red" hint={`sobre ${fmtMoney(summary.shift_value)} por turno`} testId="shifts-kpi-discount" />
         </StatGrid>
 
         <DataCard
@@ -222,6 +238,9 @@ export default function PortServiceShiftsPage() {
           meta={items.length > 0 && (
             <span className="text-xs text-slate-500 dark:text-slate-400">
               Saldo do período: <span className={`font-semibold tabular-nums ${diffClass(summary.balance_minutes)}`}>{fmtMinutes(summary.balance_minutes)}</span>
+              {summary.discount_total > 0 && (
+                <> • Desconto: <span className="font-semibold tabular-nums text-red-600 dark:text-red-400">{fmtMoney(summary.discount_total)}</span></>
+              )}
             </span>
           )}
           footer={<TablePagination {...paginationProps} />}
@@ -249,7 +268,7 @@ export default function PortServiceShiftsPage() {
                     <th className="text-center">Saída</th>
                     <th className="text-center">Dif. entrada</th>
                     <th className="text-center">Dif. saída</th>
-                    <th className="text-center">Saldo</th>
+                    <th className="text-center" title="Saldo de horas e, embaixo, o desconto possível">Saldo</th>
                     <th>Observações</th>
                   </tr>
                 </thead>
@@ -276,7 +295,10 @@ export default function PortServiceShiftsPage() {
                         </td>
                         <td className="text-center whitespace-nowrap"><Diff minutes={i.entry_diff} /></td>
                         <td className="text-center whitespace-nowrap"><Diff minutes={i.exit_diff} /></td>
-                        <td className="text-center whitespace-nowrap"><Balance item={i} /></td>
+                        <td className="text-center whitespace-nowrap">
+                          <Balance item={i} />
+                          <Discount value={i.discount} className="mt-0.5" />
+                        </td>
                         <td className="min-w-[170px] max-w-[300px] whitespace-pre-wrap text-[12px] text-slate-600 dark:text-slate-300">
                           {i.observations || <span className="text-slate-400">-</span>}
                         </td>
@@ -295,7 +317,10 @@ export default function PortServiceShiftsPage() {
                       <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">{fmtDay(i.service_date)}</span>
                       <StatusPill tone={i.turno === 'NOITE' ? 'violet' : 'blue'}>{i.turno === 'NOITE' ? 'Noite' : 'Dia'}</StatusPill>
                     </div>
-                    <Balance item={i} />
+                    <div className="text-right">
+                      <Balance item={i} />
+                      <Discount value={i.discount} />
+                    </div>
                   </div>
                   <div className="text-xs text-slate-600 dark:text-slate-300 truncate">
                     {i.client_name || '-'} · {i.driver_name || '-'} · {i.cavalo_plate || '-'}

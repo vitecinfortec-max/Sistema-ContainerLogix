@@ -1,9 +1,10 @@
 """Conferência de Turnos (Operacional): horários de entrada/saída dos
 Serviços Portuários comparados com o turno previsto (Dia 08:30-20:00,
-Noite 20:30-08:00), com as observações."""
+Noite 20:30-08:00), com as observações e o desconto possível sobre o valor
+do turno (R$ 3.200,00, proporcional aos minutos a menos)."""
 import pytest
 
-from routers.port_services import shift_check
+from routers.port_services import shift_check, shift_discount, SHIFT_VALUE, SHIFT_MINUTES
 from reports import fmt_shift_minutes
 
 
@@ -41,6 +42,36 @@ def test_shift_check_missing_or_invalid_times():
     assert shift_check("DIA", "25:00", "20:00")["entry_diff"] is None
     assert shift_check("DIA", "08:30:00", "20:00:00")["shift_status"] == "NO_HORARIO"
     assert shift_check(None, "08:30", "20:00")["shift_status"] == "SEM_HORARIO"
+
+
+# ---------- Desconto ----------
+
+def test_shift_value_and_journey():
+    assert SHIFT_VALUE == 3200.0
+    assert SHIFT_MINUTES == 690
+
+
+@pytest.mark.parametrize("balance, discount", [
+    (-55, 255.07),     # 55 x 3200 / 690
+    (-30, 139.13),
+    (-1, 4.64),
+    (-690, 3200.0),    # turno inteiro
+    (-900, 3200.0),    # nunca passa do valor do turno
+    (0, 0.0),
+    (45, 0.0),         # tempo a mais não gera desconto (nem acréscimo)
+    (None, None),      # sem horário: sem cálculo
+])
+def test_shift_discount(balance, discount):
+    assert shift_discount(balance) == discount
+
+
+def test_early_entry_compensates_early_exit():
+    # chegou 30 min antes e saiu 30 min antes: cumpriu as 11h30, sem desconto
+    r = shift_check("DIA", "08:00", "19:30")
+    assert r["balance"] == 0 and r["discount"] == 0.0
+    # atrasou 55 min e saiu no horário
+    assert shift_check("NOITE", "21:25", "08:00")["discount"] == 255.07
+    assert shift_check("DIA", "08:30", None)["discount"] is None
 
 
 def test_fmt_shift_minutes():
@@ -90,6 +121,10 @@ def test_report_by_period_with_observations_and_totals(api):
     assert s["with_observations_count"] == 2
     assert s["balance_minutes"] == 30
     assert s["schedule"]["DIA"] == {"entry": "08:30", "exit": "20:00"}
+    # desconto: só o serviço de 11/10 (30 min a menos)
+    assert [i["discount"] for i in items] == [0.0, 0.0, 139.13, None]
+    assert s["discount_total"] == 139.13
+    assert s["shift_value"] == 3200.0 and s["shift_minutes"] == 690
 
 
 def test_report_filters_by_turno_and_client(api):
@@ -127,6 +162,7 @@ def test_pdf_and_excel(api):
     ws = load_workbook(BytesIO(xl.content)).active
     values = [c.value for row in ws.iter_rows() for c in row if c.value is not None]
     assert "+01:00" in values and "Sem horário" in values
+    assert "Desconto (R$)" in values
     assert "Observação com <caracteres> & acentuação" in values
     # período vazio também gera os arquivos
     empty = {"date_from": "2026-01-01", "date_to": "2026-01-02"}
