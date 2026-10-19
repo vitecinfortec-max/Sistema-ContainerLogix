@@ -449,6 +449,11 @@ export const api = {
   downloadExpensesReportPdf: (params) => axios.get(`${API}/reports/expenses/pdf`, { params, responseType: 'blob' }),
   downloadExpensesReportExcel: (params) => axios.get(`${API}/reports/expenses/excel`, { params, responseType: 'blob' }),
 
+  // Gestão de Container - relatório de compra e venda
+  getContainersReport: (params) => axios.get(`${API}/reports/containers`, { params }),
+  downloadContainersReportPdf: (params) => axios.get(`${API}/reports/containers/pdf`, { params, responseType: 'blob' }),
+  downloadContainersReportExcel: (params) => axios.get(`${API}/reports/containers/excel`, { params, responseType: 'blob' }),
+
   // Financeiro - Prestação de Contas
   getExpenseReports: (params) => axios.get(`${API}/expense-reports`, { params }),
   getExpenseReport: (id) => axios.get(`${API}/expense-reports/${id}`),

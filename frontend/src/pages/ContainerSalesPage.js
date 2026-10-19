@@ -17,7 +17,8 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Trash2, CheckCircle2, RotateCcw, BadgeDollarSign, Clock } from 'lucide-react';
+import { Plus, Pencil, Trash2, CheckCircle2, RotateCcw, BadgeDollarSign, Clock, FileBarChart } from 'lucide-react';
+import PeriodReportDialog from '../components/PeriodReportDialog';
 import { calendarDate } from '../lib/dates';
 
 const STATUS_LABELS = { PENDENTE: 'Pendente', RECEBIDO: 'Recebido' };
@@ -41,6 +42,7 @@ function buildEmpty() {
 
 export default function ContainerSalesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
+  const [reportOpen, setReportOpen] = useState(false);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [representatives, setRepresentatives] = useState([]);
@@ -199,6 +201,11 @@ export default function ContainerSalesPage() {
           icon={BadgeDollarSign}
           title="Registro de Venda"
           subtitle="Lançamentos gerados a partir das Ordens de Entrega aprovadas, ou cadastrados manualmente, para controle de comissão dos vendedores"
+          actions={(
+            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="container-period-report">
+              <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório de compra e venda
+            </Button>
+          )}
         />
 
         <StatGrid className="lg:grid-cols-3">
@@ -394,6 +401,24 @@ export default function ContainerSalesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PeriodReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        title="Relatório de Compra e Venda de Container"
+        description="Vendas do período com a margem sobre a compra, o que falta receber, totais por representante, o estoque de containers comprados ainda sem venda e as vendas com cadastro incompleto."
+        periodLabel="Data da venda"
+        textFilters={[{ key: 'representative', label: 'Representante' }]}
+        load={api.getContainersReport}
+        summarize={(d) => [
+          ['Vendas no período', `${d.summary.sales_count} · ${formatMoney(d.summary.sales_total)}`],
+          ['Margem', formatMoney(d.summary.margin_total)],
+          ['A receber', formatMoney(d.summary.open_total)],
+          ['Em estoque', `${d.summary.stock_count} · ${formatMoney(d.summary.stock_value)}`],
+        ]}
+        downloadPdf={api.downloadContainersReportPdf}
+        downloadExcel={api.downloadContainersReportExcel}
+        filename="relatorio_containers"
+      />
       <ConfirmDialog />
     </Layout>
   );

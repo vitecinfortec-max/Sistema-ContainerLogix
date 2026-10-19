@@ -545,6 +545,7 @@ PATH_MODULE_MAP = [
     ("/api/container-purchases", "gestao_container.compra"),
     ("/api/container-representatives", "gestao_container.representante"),
     ("/api/container-sales", "gestao_container.venda"),
+    ("/api/reports/containers", "gestao_container.venda"),
     ("/api/vehicle-revisions", "frota.revisao"),
     ("/api/odometer-readings", "frota.hodometro"),
     ("/api/vehicle-checklists", "frota.checklist"),
