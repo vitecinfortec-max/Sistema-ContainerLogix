@@ -39,3 +39,20 @@ def test_operator_and_disabled_modules(api):
     api.run(api.db.module_config.insert_one({"disabled_modules": ["financeiro.controle_cheque"]}))
     keys = [a["key"] for a in api.get("/api/alerts/summary").json()["financial"]]
     assert keys == ["invoices_overdue"]
+
+
+def test_freight_and_expense_alerts(api):
+    today = _today()
+    ts = lambda n: f"{(today - timedelta(days=n)).isoformat()}T15:00:00+00:00"
+    api.run(api.db.loading_orders.insert_many([
+        {"id": "o1", "order_number": 1, "order_type": "COLETA", "status": "APROVADA", "route_id": "r1", "freight_value": 100, "created_at": ts(5)},
+        {"id": "o2", "order_number": 2, "order_type": "COLETA", "status": "APROVADA", "route_id": "r1", "freight_value": 100, "created_at": ts(200)},
+    ]))
+    api.run(api.db.expense_reports.insert_many([
+        {"id": "e1", "status": "EM_ANDAMENTO", "created_at": ts(31)},
+        {"id": "e2", "status": "EM_ANDAMENTO", "created_at": ts(30)},  # exatamente 30 dias: ainda não
+        {"id": "e3", "status": "CONCLUIDA", "created_at": ts(90)},
+    ]))
+    alerts = {a["key"]: a for a in api.get("/api/alerts/summary").json()["financial"]}
+    assert alerts["freight_issues"]["title"] == "1 divergência entre Ordens e Pagamento Frete"  # a ordem de 200 dias fica fora
+    assert alerts["expenses_open"]["title"] == "1 prestação de contas aberta há mais de 30 dias"

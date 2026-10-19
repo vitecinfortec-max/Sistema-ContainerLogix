@@ -1,11 +1,18 @@
 """Alertas financeiros do sino do topo (só para administradores): cheques
-vencidos sem compensar, cheques vencendo nos próximos dias, cheques devolvidos
-e faturas vencidas. Módulo não contratado pelo cliente não gera alerta."""
+vencidos sem compensar, cheques vencendo nos próximos dias, cheques devolvidos,
+faturas vencidas, divergências entre Ordens de Coleta e Pagamento Frete e
+prestações de contas abertas há muito tempo. Módulo não contratado pelo
+cliente não gera alerta."""
 from datetime import datetime, timedelta
 
 from reports import BRT_TZ
+from list_filters import period_query
 from shared import db, get_disabled_modules, is_module_disabled
 from routers.checks import DUE_SOON_DAYS
+from routers.freight_reports import build_freight_reconciliation
+
+FREIGHT_CHECK_DAYS = 90  # janela da conferência Ordens x Pagamento Frete
+EXPENSE_OPEN_DAYS = 30   # prestação de contas em andamento há mais que isso
 
 
 def _brl(value: float) -> str:
@@ -73,6 +80,33 @@ async def build_financial_alerts() -> list:
                 "description": f"Total de {_brl(total)} · a mais antiga venceu há {_plural(days, 'dia', 'dias')}",
                 "path": "/reports/receivables",
                 "tone": "red",
+            })
+
+    if not is_module_disabled("financeiro.pagamento_frete", disabled) and not is_module_disabled("operacional.ordem_carregamento", disabled):
+        since = (today - timedelta(days=FREIGHT_CHECK_DAYS)).isoformat()
+        issues = (await build_freight_reconciliation(date_from=since))["issues"]
+        if issues:
+            alerts.append({
+                "key": "freight_issues",
+                "title": f"{_plural(len(issues), 'divergência', 'divergências')} entre Ordens e Pagamento Frete",
+                "description": f"Nos últimos {FREIGHT_CHECK_DAYS} dias · veja a Conferência com as ordens",
+                "path": "/freight-payments",
+                "tone": "amber",
+            })
+
+    if not is_module_disabled("financeiro.prestacao_contas", disabled):
+        # aberta até este dia (inclusive) = há mais de EXPENSE_OPEN_DAYS dias
+        cutoff = (today - timedelta(days=EXPENSE_OPEN_DAYS + 1)).isoformat()
+        old_open = await db.expense_reports.count_documents(
+            {"status": "EM_ANDAMENTO", **period_query("created_at", None, cutoff)}
+        )
+        if old_open:
+            alerts.append({
+                "key": "expenses_open",
+                "title": f"{_plural(old_open, 'prestação de contas aberta', 'prestações de contas abertas')} há mais de {EXPENSE_OPEN_DAYS} dias",
+                "description": "Em andamento: confira o saldo e conclua",
+                "path": "/expense-reports",
+                "tone": "amber",
             })
 
     return alerts

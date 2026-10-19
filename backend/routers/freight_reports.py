@@ -3,6 +3,7 @@ import re
 
 from fastapi import APIRouter, Depends
 
+from list_filters import combine, period_query
 from period_reports import Column, Section, MONEY, DAY, INT, pdf_response, excel_response, period_text
 from reports import format_currency
 from routers.container_reports import _day
@@ -30,10 +31,21 @@ ISSUE_ORDER_MISSING = "Frete ativo com a ordem excluída"
 
 async def build_freight_reconciliation(date_from=None, date_to=None, transport_company=None) -> dict:
     company_re = re.compile(re.escape(transport_company.strip()), re.I) if transport_company else None
-    orders = await db.loading_orders.find({"order_type": "COLETA"}, {"_id": 0, "items": 0}).sort("order_number", 1).to_list(None)
-    payments = await db.freight_payments.find({}, {"_id": 0}).to_list(None)
-    payment_by_order = {p["loading_order_id"]: p for p in payments if p.get("loading_order_id")}
+    # O período já filtra no banco (o sino roda esta conferência a cada poucos
+    # minutos); _in_period abaixo continua valendo para o dia em Brasília
+    period = period_query("created_at", date_from, date_to)
+    orders = await db.loading_orders.find(combine({"order_type": "COLETA"}, period), {"_id": 0, "items": 0}).sort("order_number", 1).to_list(None)
+    payments = await db.freight_payments.find(period, {"_id": 0}).to_list(None)
+    # Frete de uma ordem do período pode ter sido lançado depois do período
     order_ids = {o["id"] for o in orders}
+    missing = [o["id"] for o in orders if o["id"] not in {p.get("loading_order_id") for p in payments}]
+    if missing:
+        payments += await db.freight_payments.find({"loading_order_id": {"$in": missing}}, {"_id": 0}).to_list(None)
+    payment_by_order = {p["loading_order_id"]: p for p in payments if p.get("loading_order_id")}
+    # Frete do período cuja ordem é de outro período não é "ordem excluída"
+    other_ids = [p["loading_order_id"] for p in payments if p.get("loading_order_id") and p["loading_order_id"] not in order_ids]
+    if other_ids:
+        order_ids |= {o["id"] for o in await db.loading_orders.find({"id": {"$in": other_ids}}, {"_id": 0, "id": 1}).to_list(None)}
 
     rows, issues, companies = [], [], {}
 

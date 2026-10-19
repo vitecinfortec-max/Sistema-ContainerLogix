@@ -7,6 +7,7 @@ import {
   StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
+import PeriodReportDialog from '../components/PeriodReportDialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
@@ -16,7 +17,11 @@ import { api } from '../lib/api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { ClipboardCheck, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText, Clock, FileSpreadsheet, CheckCircle2, XCircle } from 'lucide-react';
+import { ClipboardCheck, Plus, Eye, Trash2, Search, Printer, Pencil, X, FileText, Clock, FileSpreadsheet, CheckCircle2, XCircle, FileBarChart } from 'lucide-react';
+
+// Minutos -> "1h05" (prévia do relatório do período)
+const hhmm = (minutes) => (minutes == null ? '-' : `${Math.floor(Math.round(minutes) / 60)}h${String(Math.round(minutes) % 60).padStart(2, '0')}`);
+
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
@@ -69,6 +74,7 @@ export default function DeliveryStatusPage() {
   const [textSearch, setTextSearch] = useState('');
   const debouncedText = useDebouncedValue(textSearch.trim());
   const [stats, setStats] = useState({ ATIVO: 0, CONCLUIDO: 0, CANCELADO: 0 });
+  const [reportOpen, setReportOpen] = useState(false);
 
   const [period, setPeriod] = useState(['', '']);
   const changePeriod = (value) => { setPeriod(value); setPagination(prev => ({ ...prev, page: 1 })); };
@@ -317,7 +323,16 @@ export default function DeliveryStatusPage() {
   return (
     <Layout>
       <div className="space-y-4" data-testid="delivery-status-page">
-        <PageHeader icon={ClipboardCheck} title="Status de Entrega" subtitle="Controle de horários de entrega por programação" />
+        <PageHeader
+          icon={ClipboardCheck}
+          title="Status de Entrega"
+          subtitle="Controle de horários de entrega por programação"
+          actions={(
+            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="delivery-period-report">
+              <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
+            </Button>
+          )}
+        />
 
         <StatGrid>
           <StatCard label="Status de entrega" value={stats.ATIVO + stats.CONCLUIDO + stats.CANCELADO} icon={ClipboardCheck} tone="blue" hint={searchQuery || textSearch ? 'que batem com a busca' : 'cadastrados'} />
@@ -790,6 +805,30 @@ export default function DeliveryStatusPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PeriodReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        title="Relatório de Status de Entrega"
+        description="Viagens do período por cliente e por motorista, com o tempo médio no cliente e de carregamento, e as pendências de lançamento (status concluído sem entrega finalizada, status ativo de dia que já passou, horários sem lançar)."
+        periodLabel="Data do status"
+        statuses={[
+          { value: '', label: 'Ativos e concluídos' },
+          { value: 'ATIVO', label: 'Ativos' },
+          { value: 'CONCLUIDO', label: 'Concluídos' },
+          { value: 'CANCELADO', label: 'Cancelados' },
+        ]}
+        textFilters={[{ key: 'search', label: 'Cliente, motorista ou container' }]}
+        load={api.getDeliveryReport}
+        summarize={(d) => [
+          ['Viagens', `${d.summary.trips} em ${d.summary.statuses} status`],
+          ['Média no cliente', hhmm(d.summary.avg_at_client)],
+          ['Média de carregamento', hhmm(d.summary.avg_loading)],
+          ['Pendências', d.summary.issues],
+        ]}
+        downloadPdf={api.getDeliveryReportPdf}
+        downloadExcel={api.getDeliveryReportExcel}
+        filename="relatorio_status_entrega"
+      />
       <ConfirmDialog />
     </Layout>
   );

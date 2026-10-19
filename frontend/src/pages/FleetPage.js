@@ -8,6 +8,7 @@ import {
   StatusPill, PlateTag, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
+import PeriodReportDialog from '../components/PeriodReportDialog';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsContent } from '../components/ui/tabs';
@@ -22,7 +23,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { cn, sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Truck, Wrench, Plus, Eye, Trash2, FileText, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { Truck, Wrench, Plus, Eye, Trash2, FileText, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2, CheckCircle2, Clock, AlertTriangle, FileBarChart } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { compressImage } from '../lib/imageCompression';
@@ -79,6 +80,7 @@ export default function FleetPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tabFromUrl = searchParams.get('tab');
+  const [revisionReportOpen, setRevisionReportOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(tabFromUrl === 'revisions' ? 'revisions' : 'vehicles');
   
   // Atualizar aba quando URL mudar
@@ -791,6 +793,11 @@ export default function FleetPage() {
           icon={activeTab === 'revisions' ? Wrench : Car}
           title={activeTab === 'revisions' ? 'Controle de Revisão' : 'Cadastro de Veículo'}
           subtitle={activeTab === 'revisions' ? 'Registro de revisões e trocas de óleo dos veículos' : 'Cadastro e gerenciamento da frota de veículos'}
+          actions={activeTab === 'revisions' && (
+            <Button variant="outline" size="sm" onClick={() => setRevisionReportOpen(true)} data-testid="revision-period-report">
+              <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório de revisões
+            </Button>
+          )}
         />
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -1786,6 +1793,24 @@ export default function FleetPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PeriodReportDialog
+        open={revisionReportOpen}
+        onOpenChange={setRevisionReportOpen}
+        title="Relatório de Revisões da Frota"
+        description="Revisões do período por veículo, a situação de manutenção de hoje de cada veículo ativo (troca vencida, próxima ou em dia) e os veículos que ainda não têm nenhuma revisão lançada."
+        periodLabel="Data da revisão"
+        textFilters={[{ key: 'plate', label: 'Placa ou modelo' }]}
+        load={api.getRevisionsReport}
+        summarize={(d) => [
+          ['Revisões no período', `${d.summary.revisions} em ${d.summary.vehicles_revised} veículo(s)`],
+          ['Troca vencida', d.summary.overdue],
+          ['Troca próxima', d.summary.due_soon],
+          ['Sem revisão lançada', d.summary.without_revision],
+        ]}
+        downloadPdf={api.getRevisionsReportPdf}
+        downloadExcel={api.getRevisionsReportExcel}
+        filename="relatorio_revisoes"
+      />
       <ConfirmDialog />
     </Layout>
   );

@@ -378,6 +378,12 @@ export const api = {
   
   // Fleet - Vehicle Revisions (Frota - Controle de Revisão)
   getVehicleRevisions: (params) => axios.get(`${API}/vehicle-revisions`, { params }),
+  getRevisionsReport: (params) => axios.get(`${API}/reports/vehicle-revisions`, { params }),
+  getRevisionsReportPdf: (params) => axios.get(`${API}/reports/vehicle-revisions/pdf`, { params, responseType: 'blob' }),
+  getRevisionsReportExcel: (params) => axios.get(`${API}/reports/vehicle-revisions/excel`, { params, responseType: 'blob' }),
+  getDeliveryReport: (params) => axios.get(`${API}/reports/delivery-status`, { params }),
+  getDeliveryReportPdf: (params) => axios.get(`${API}/reports/delivery-status/pdf`, { params, responseType: 'blob' }),
+  getDeliveryReportExcel: (params) => axios.get(`${API}/reports/delivery-status/excel`, { params, responseType: 'blob' }),
   getVehicleRevision: (id) => axios.get(`${API}/vehicle-revisions/${id}`),
   createVehicleRevision: (data) => axios.post(`${API}/vehicle-revisions`, data),
   updateVehicleRevision: (id, data) => axios.put(`${API}/vehicle-revisions/${id}`, data),

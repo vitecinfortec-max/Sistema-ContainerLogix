@@ -70,3 +70,15 @@ def test_company_filter_files_and_admin_only(api):
     wb = load_workbook(io.BytesIO(api.get("/api/reports/freight-reconciliation/excel", params=PERIOD).content))
     assert wb.sheetnames == ["Divergências", "Por transportadora", "Ordens"]
     assert api.get("/api/reports/freight-reconciliation", as_user="operator").status_code == 403
+
+
+def test_period_edges(api):
+    # ordem de outubro com frete lançado em novembro; frete de outubro de uma ordem de setembro
+    api.run(api.db.loading_orders.insert_many([_order("a", 1), _order("b", 2, created_at="2026-09-20T15:00:00+00:00")]))
+    api.run(api.db.freight_payments.insert_many([
+        {**_payment("fa", 1, "a", 1), "created_at": "2026-11-03T15:00:00+00:00"},
+        _payment("fb", 2, "b", 2),
+    ]))
+    data = api.get("/api/reports/freight-reconciliation", params=PERIOD).json()
+    assert data["issues"] == []
+    assert [r["order_number"] for r in data["rows"]] == [1] and data["rows"][0]["situation"] == "OK"

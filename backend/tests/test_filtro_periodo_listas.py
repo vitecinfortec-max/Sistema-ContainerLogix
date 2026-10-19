@@ -19,7 +19,6 @@ def _count(response, key):
 @pytest.mark.parametrize("path,collection,key,extra", [
     ("/api/container-audits", "container_audits", "total", lambda i: {"audit_code": f"A{i}", "client_name": "C", "audit_seq": i}),
     ("/api/daily-rate-requests", "daily_rate_requests", "total", lambda i: {"request_number": i, "items": []}),
-    ("/api/delivery-status", "delivery_statuses", "total", lambda i: {"status_number": i, "status": "ATIVO", "items": []}),
     ("/api/unit-segregations", "unit_segregations", "total", lambda i: {"items": []}),
     ("/api/intl-invoices", "intl_invoices", "total", lambda i: {}),
     ("/api/expense-reports", "expense_reports", "total", lambda i: {"deposits": [], "purchases": []}),
@@ -31,6 +30,14 @@ def test_period_filter(api, path, collection, key, extra):
     assert _count(api.get(path, params=PERIOD), key) == 2
     assert _count(api.get(path, params={"date_from": "2026-11-01"}), key) == 1
     assert api.get(path, params={"date_to": "31/10/2026"}).status_code == 400
+
+
+def test_delivery_status_uses_status_date(api):
+    days = ["2026-10-01", "2026-10-31", "2026-09-30", "2026-11-01"]
+    api.run(api.db.delivery_statuses.insert_many([{"id": f"d{i}", "status_number": i, "status": "ATIVO", "items": [],
+                                                   "status_date": d, "created_at": "2026-12-01T12:00:00+00:00"} for i, d in enumerate(days)]))
+    assert api.get("/api/delivery-status", params=PERIOD).json()["total"] == 2
+    assert api.get("/api/delivery-status", params={"date_to": "2026-09-30"}).json()["total"] == 1
 
 
 def test_invoices_list_and_count(api):

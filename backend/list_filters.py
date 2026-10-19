@@ -33,6 +33,16 @@ def period_query(field: str, date_from: Optional[str], date_to: Optional[str]) -
     return {"$or": [{field: as_text}, {field: bounds}]}
 
 
+def day_query(field: str, date_from: Optional[str], date_to: Optional[str]) -> dict:
+    """Mesmo filtro, para campo gravado só com o dia ('YYYY-MM-DD', sem hora nem fuso)"""
+    bounds = {}
+    if date_from:
+        bounds["$gte"] = _parse_filter_day(date_from, "date_from").isoformat()
+    if date_to:
+        bounds["$lte"] = _parse_filter_day(date_to, "date_to").isoformat()
+    return {field: bounds} if bounds else {}
+
+
 def text_query(fields: Iterable[str], search: Optional[str]) -> dict:
     search = (search or "").strip()
     if not search:
