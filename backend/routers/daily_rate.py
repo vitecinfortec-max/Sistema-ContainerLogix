@@ -170,13 +170,18 @@ async def update_daily_rate_request_status(request_id: str, new_status: str, cur
     if new_status not in ["PENDENTE", "PAGO", "CANCELADO"]:
         raise HTTPException(status_code=400, detail="Status inválido")
 
-    result = await db.daily_rate_requests.update_one(
-        {"id": request_id},
-        {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
-    )
-    # matched, não modified: repetir o status atual não é "não encontrada"
-    if result.matched_count == 0:
+    daily_request = await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0, "status": 1, "paid_at": 1})
+    if not daily_request:
         raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
+
+    now = datetime.now(timezone.utc).isoformat()
+    update = {"status": new_status, "updated_at": now}
+    # Quando foi paga (Resumo Financeiro); repetir "Pago" não muda a data
+    if new_status != "PAGO":
+        update["paid_at"] = None
+    elif daily_request.get("status") != "PAGO" or not daily_request.get("paid_at"):
+        update["paid_at"] = now
+    await db.daily_rate_requests.update_one({"id": request_id}, {"$set": update})
 
     return {"message": "Status atualizado"}
 

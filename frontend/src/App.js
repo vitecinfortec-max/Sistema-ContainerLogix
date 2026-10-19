@@ -90,6 +90,7 @@ const LoadingSchedulePage = lazyPage(() => import('./pages/LoadingSchedulePage')
 const DailyRateRequestPage = lazyPage(() => import('./pages/DailyRateRequestPage'));
 const CheckControlPage = lazyPage(() => import('./pages/CheckControlPage'));
 const ReceivablesPage = lazyPage(() => import('./pages/ReceivablesPage'));
+const FinancialSummaryPage = lazyPage(() => import('./pages/FinancialSummaryPage'));
 const ExpenseReportsPage = lazyPage(() => import('./pages/ExpenseReportsPage'));
 const DeliveryStatusPage = lazyPage(() => import('./pages/DeliveryStatusPage'));
 const PortServicePage = lazyPage(() => import('./pages/PortServicePage'));
@@ -699,6 +700,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.diaria">
                 <DailyRateRequestPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/financial-summary"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro">
+                <FinancialSummaryPage />
               </ProtectedRoute>
             }
           />

@@ -19,6 +19,7 @@ import {
   DollarSign,
   Banknote,
   PiggyBank,
+  Scale,
   History,
   Search,
   Bell,
@@ -150,6 +151,7 @@ const PAGE_TITLES = {
   '/expense-reports': 'Prestação de Contas',
   '/checks': 'Controle de Cheque',
   '/reports/receivables': 'Contas a Receber',
+  '/financial-summary': 'Resumo Financeiro',
   '/port-services-billing': 'Faturamento Portuário',
 };
 
@@ -363,7 +365,7 @@ function LayoutFrame({ children }) {
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname === '/unit-segregation';
   const isCadastroActive = location.pathname === '/cadastro' || location.pathname === '/company-settings';
-  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/checks' || location.pathname === '/reports/receivables' || location.pathname === '/port-services-billing';
+  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/checks' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/port-services-billing';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
   // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
@@ -646,7 +648,9 @@ function LayoutFrame({ children }) {
     isAdmin && isModuleEnabled('abastecimento.configuracao_tanque') ? [{ path: '/tank-settings', label: 'Configuração de Tanque', icon: Settings }] : [],
   ].flat();
 
+  // Resumo Financeiro soma vários módulos (o backend tira os não contratados): some só com o grupo inteiro desativado
   const financeiroItems = [
+    { path: '/financial-summary', label: 'Resumo Financeiro', icon: Scale, moduleKey: 'financeiro' },
     { path: '/billing', label: 'Faturas', icon: Receipt, moduleKey: 'financeiro.faturas' },
     { path: '/international-invoices', label: 'Invoice Internacional', icon: Globe, moduleKey: 'financeiro.invoice_internacional' },
     { path: '/reports/billing', label: 'Relatório de Faturamento', icon: BarChart3, moduleKey: 'financeiro.relatorio_faturamento' },

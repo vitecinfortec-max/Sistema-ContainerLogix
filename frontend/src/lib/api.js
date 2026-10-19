@@ -197,6 +197,11 @@ export const api = {
   downloadInvoicePdf: (id) => axios.get(`${API}/invoices/${id}/pdf`, { responseType: 'blob' }),
   downloadInvoiceExcel: (id) => axios.get(`${API}/invoices/${id}/excel`, { responseType: 'blob' }),
   
+  // Financeiro - Resumo Financeiro (entradas e saídas de todos os módulos)
+  getFinancialSummary: (params) => axios.get(`${API}/reports/financial-summary`, { params }),
+  downloadFinancialSummaryPdf: (params) => axios.get(`${API}/reports/financial-summary/pdf`, { params, responseType: 'blob' }),
+  downloadFinancialSummaryExcel: (params) => axios.get(`${API}/reports/financial-summary/excel`, { params, responseType: 'blob' }),
+
   // Financeiro - Contas a Receber (conferência das Faturas)
   getReceivables: (params) => axios.get(`${API}/reports/receivables`, { params }),
   downloadReceivablesPdf: (params) => axios.get(`${API}/reports/receivables/pdf`, { params, responseType: 'blob' }),

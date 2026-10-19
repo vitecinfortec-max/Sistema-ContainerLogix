@@ -40,6 +40,7 @@ from routers.checks import api_router as checks_router
 from routers.receivables import api_router as receivables_router
 from routers.financial_reports import api_router as financial_reports_router
 from routers.container_reports import api_router as container_reports_router
+from routers.financial_summary import api_router as financial_summary_router
 from routers.delivery_status import api_router as delivery_status_router
 from routers.port_services import api_router as port_services_router
 from routers.unit_segregation import api_router as unit_segregation_router
@@ -186,6 +187,7 @@ app.include_router(checks_router)
 app.include_router(receivables_router)
 app.include_router(financial_reports_router)
 app.include_router(container_reports_router)
+app.include_router(financial_summary_router)
 app.include_router(delivery_status_router)
 app.include_router(port_services_router)
 app.include_router(unit_segregation_router)
