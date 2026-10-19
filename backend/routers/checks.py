@@ -175,12 +175,28 @@ async def get_checks_summary(current_user: dict = Depends(get_current_admin_user
     for value in summary.values():
         value["total"] = round(value["total"], 2)
     summary["due_soon_days"] = DUE_SOON_DAYS
-    # Talão em uso: o cadastro de um cheque novo já vem com banco/conta e a
-    # folha seguinte a esta
-    summary["last_check"] = await db.checks.find_one(
-        {}, {"_id": 0, "check_number": 1, "bank": 1, "agency": 1, "account": 1}, sort=[("created_at", -1)],
-    )
+    summary["default_account"] = await _default_account()
     return summary
+
+
+async def _default_account() -> Optional[dict]:
+    """Conta que o cadastro de um cheque novo já traz preenchida: os Dados
+    Bancários de "Dados da Empresa" (sem eles, a do último cheque lançado),
+    com o número da última folha usada nessa conta - a tela sugere a seguinte."""
+    projection = {"_id": 0, "check_number": 1, "bank": 1, "agency": 1, "account": 1}
+    company = await get_company_settings()
+    bank = _clean(company.get("bank_name"))
+    if bank:
+        account = {"bank": bank, "agency": _clean(company.get("bank_agency")), "account": _clean(company.get("bank_account"))}
+        last = await db.checks.find_one(
+            {"bank": {"$regex": f"^{re.escape(bank)}$", "$options": "i"}, "agency": account["agency"], "account": account["account"]},
+            projection, sort=[("created_at", -1)],
+        )
+        return {**account, "source": "company", "last_check_number": last["check_number"] if last else None}
+    last = await db.checks.find_one({}, projection, sort=[("created_at", -1)])
+    if not last:
+        return None
+    return {"bank": last["bank"], "agency": last.get("agency"), "account": last.get("account"), "source": "last_check", "last_check_number": last["check_number"]}
 
 
 @api_router.get("/checks/report/pdf")

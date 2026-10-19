@@ -49,12 +49,14 @@ function nextCheckNumber(number) {
   return String(Number(number) + 1).padStart(number.length, '0');
 }
 
-function emptyForm(last) {
+// `account`: conta padrão vinda do backend (Dados Bancários da empresa ou a
+// do último cheque) com a última folha usada nela
+function emptyForm(account) {
   return {
-    check_number: nextCheckNumber(last?.check_number),
-    bank: last?.bank || '',
-    agency: last?.agency || '',
-    account: last?.account || '',
+    check_number: nextCheckNumber(account?.last_check_number),
+    bank: account?.bank || '',
+    agency: account?.agency || '',
+    account: account?.account || '',
     payee: '',
     amount: '',
     issue_date: todayISO(),
@@ -172,8 +174,7 @@ export default function CheckControlPage() {
   // ---------- Cadastro ----------
   const openNewModal = () => {
     setEditingCheck(null);
-    // Puxa banco/agência/conta e a próxima folha do último cheque lançado
-    setFormData(emptyForm(summary?.last_check));
+    setFormData(emptyForm(summary?.default_account));
     setModalOpen(true);
   };
 
@@ -501,6 +502,13 @@ export default function CheckControlPage() {
             <Field label="Conta">
               <Input className="h-9" value={formData.account} onChange={(e) => setField('account')(e.target.value)} />
             </Field>
+            {!editingCheck && summary?.default_account && (
+              <p className="col-span-2 md:col-span-4 -mt-1 text-xs text-muted-foreground" data-testid="check-account-source">
+                {summary.default_account.source === 'company'
+                  ? 'Conta preenchida com os Dados Bancários de "Dados da Empresa" - altere se o cheque for de outra conta.'
+                  : 'Conta do último cheque lançado. Cadastre os Dados Bancários em "Dados da Empresa" para usá-los como padrão.'}
+              </p>
+            )}
 
             <Field label="Favorecido (nominal a)" required className="col-span-2">
               <Autocomplete

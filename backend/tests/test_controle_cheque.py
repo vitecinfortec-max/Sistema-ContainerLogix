@@ -114,7 +114,8 @@ def test_filters_overdue_and_summary(api):
     assert s["overdue"] == {"count": 1, "total": 100}
     assert s["due_soon"] == {"count": 1, "total": 200}
     assert s["returned"] == {"count": 1, "total": 400}
-    assert s["last_check"]["check_number"] == "4" and s["last_check"]["account"] == "56789-0"
+    assert s["default_account"] == {"bank": "Banco do Brasil", "agency": "1234", "account": "56789-0",
+                                    "source": "last_check", "last_check_number": "4"}
 
 
 def test_pdf_report_and_admin_only(api):
@@ -124,3 +125,16 @@ def test_pdf_report_and_admin_only(api):
     assert api.get("/api/checks/report/pdf", params={"status": "COMPENSADO"}).content[:4] == b"%PDF"
     assert api.get("/api/checks", as_user="operator").status_code == 403
     assert api.post("/api/checks", json=_body(check_number="9"), as_user="operator").status_code == 403
+
+
+def test_default_account_comes_from_company_bank_details(api):
+    assert api.get("/api/checks/summary").json()["default_account"] is None
+    company = {"name": "Empresa", "bank_name": "Itaú", "bank_agency": "0001", "bank_account": "12345-6"}
+    assert api.put("/api/company-settings", json=company).status_code == 200
+    s = api.get("/api/checks/summary").json()
+    assert s["default_account"] == {"bank": "Itaú", "agency": "0001", "account": "12345-6",
+                                    "source": "company", "last_check_number": None}
+    # a última folha é a da conta da empresa, não a do último cheque de outra conta
+    _create(api, check_number="000050", bank="ITAÚ", agency="0001", account="12345-6")
+    _create(api, check_number="900", bank="Bradesco", agency="9", account="9")
+    assert api.get("/api/checks/summary").json()["default_account"]["last_check_number"] == "000050"
