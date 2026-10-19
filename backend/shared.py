@@ -561,6 +561,7 @@ PATH_MODULE_MAP = [
     ("/api/freight-routes", "cadastro.rota"),
     ("/api/reports/billing", "financeiro.relatorio_faturamento"),
     ("/api/invoices", "financeiro.faturas"),
+    ("/api/reports/receivables", "financeiro.faturas"),
     ("/api/intl-invoices", "financeiro.invoice_internacional"),
     ("/api/daily-rate-requests", "financeiro.diaria"),
     ("/api/expense-reports", "financeiro.prestacao_contas"),

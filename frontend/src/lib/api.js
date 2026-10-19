@@ -188,7 +188,7 @@ export const api = {
   getInvoice: (id) => axios.get(`${API}/invoices/${id}`),
   createInvoice: (data) => axios.post(`${API}/invoices`, data),
   updateInvoice: (id, data) => axios.put(`${API}/invoices/${id}`, data),
-  updateInvoiceStatus: (id, status) => axios.put(`${API}/invoices/${id}/status?status=${status}`),
+  updateInvoiceStatus: (id, status, paidDate) => axios.put(`${API}/invoices/${id}/status`, null, { params: { status, paid_date: paidDate || undefined } }),
   deleteInvoice: (id) => axios.delete(`${API}/invoices/${id}`),
   getInvoiceMovements: (id) => axios.get(`${API}/invoices/${id}/movements`),
   getInvoiceHistory: (id) => axios.get(`${API}/invoices/${id}/history`),
@@ -197,6 +197,11 @@ export const api = {
   downloadInvoicePdf: (id) => axios.get(`${API}/invoices/${id}/pdf`, { responseType: 'blob' }),
   downloadInvoiceExcel: (id) => axios.get(`${API}/invoices/${id}/excel`, { responseType: 'blob' }),
   
+  // Financeiro - Contas a Receber (conferência das Faturas)
+  getReceivables: (params) => axios.get(`${API}/reports/receivables`, { params }),
+  downloadReceivablesPdf: (params) => axios.get(`${API}/reports/receivables/pdf`, { params, responseType: 'blob' }),
+  downloadReceivablesExcel: (params) => axios.get(`${API}/reports/receivables/excel`, { params, responseType: 'blob' }),
+
   // International Invoices (Faturas Internacionais)
   getIntlInvoices: (params) => axios.get(`${API}/intl-invoices`, { params }),
   getIntlInvoice: (id) => axios.get(`${API}/intl-invoices/${id}`),

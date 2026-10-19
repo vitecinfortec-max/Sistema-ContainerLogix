@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional, List
 import io
 import re
@@ -12,6 +12,7 @@ from models import (
 )
 
 from shared import db, get_current_admin_user, get_company_settings, parse_datetime_value, round_money
+from reports import BRT_TZ
 
 api_router = APIRouter(prefix="/api")
 
@@ -29,9 +30,28 @@ def _invoice_response(inv: dict) -> InvoiceResponse:
         total_value=inv['total_value'],
         status=inv.get('status') or 'PENDENTE',
         notes=inv.get('notes'),
+        due_date=inv.get('due_date'),
+        paid_date=inv.get('paid_date'),
         created_at=parse_datetime_value(inv['created_at']),
         user_name=inv['user_name'],
     )
+
+
+def _issue_day(invoice: dict) -> date:
+    return parse_datetime_value(invoice['created_at']).astimezone(BRT_TZ).date()
+
+
+def _parse_due_date(value: Optional[str], issued: date) -> Optional[str]:
+    """Vencimento opcional (YYYY-MM-DD), nunca antes do dia da emissão."""
+    if not value:
+        return None
+    try:
+        due = date.fromisoformat(value[:10])
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Vencimento inválido: use o formato AAAA-MM-DD")
+    if due < issued:
+        raise HTTPException(status_code=400, detail="O vencimento não pode ser antes da emissão da fatura")
+    return due.isoformat()
 
 
 def _invoice_list_query(client_name: Optional[str], status: Optional[str]) -> dict:
@@ -184,6 +204,7 @@ async def create_invoice(
         movement_ids=movement_ids,
         total_value=total_value,
         notes=invoice_input.notes,
+        due_date=_parse_due_date(invoice_input.due_date, datetime.now(BRT_TZ).date()),
         created_by=current_user['sub'],
         user_name=current_user['name']
     )
@@ -224,6 +245,7 @@ async def create_invoice(
         changes={
             "client_name": invoice.client_name,
             "client_cnpj": invoice.client_cnpj,
+            "due_date": invoice.due_date,
             "total_value": total_value,
             "movements_count": len(movement_ids),
             "movement_ids": movement_ids
@@ -299,9 +321,11 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
 async def update_invoice_status(
     invoice_id: str,
     status: str,
+    paid_date: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Atualiza o status de pagamento de uma fatura (Pendente/Pago/Cancelado)"""
+    """Atualiza o status de pagamento de uma fatura (Pendente/Pago/Cancelado).
+    `paid_date` é o dia do recebimento (padrão: hoje) - base do Contas a Receber."""
     if status not in ["PENDENTE", "PAGO", "CANCELADO"]:
         raise HTTPException(status_code=400, detail="Status inválido")
 
@@ -316,10 +340,28 @@ async def update_invoice_status(
     if old_status == 'CANCELADO' and status != 'CANCELADO':
         raise HTTPException(status_code=400, detail="Fatura cancelada não pode ser reaberta. Gere uma nova fatura com as movimentações.")
 
-    await db.invoices.update_one({"id": invoice_id}, {"$set": {"status": status}})
+    update = {"status": status}
+    if status == 'PAGO':
+        today = datetime.now(BRT_TZ).date()
+        received = today
+        if paid_date:
+            try:
+                received = date.fromisoformat(paid_date[:10])
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Data de pagamento inválida: use o formato AAAA-MM-DD")
+        if received > today:
+            raise HTTPException(status_code=400, detail="A data de pagamento não pode ser no futuro")
+        if received < _issue_day(invoice):
+            raise HTTPException(status_code=400, detail="A data de pagamento não pode ser antes da emissão da fatura")
+        update["paid_date"] = received.isoformat()
+    else:
+        update["paid_date"] = None
+    await db.invoices.update_one({"id": invoice_id}, {"$set": update})
 
-    if old_status != status:
+    if old_status != status or update["paid_date"] != invoice.get('paid_date'):
         changes = {"status": {"from": old_status, "to": status}}
+        if update["paid_date"] != invoice.get('paid_date'):
+            changes["paid_date"] = {"from": invoice.get('paid_date'), "to": update["paid_date"]}
         if status == 'CANCELADO':
             # Antes as movimentações continuavam marcadas como faturadas e não
             # entravam em nenhuma fatura nova.
@@ -363,6 +405,11 @@ async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current
     if invoice_update.notes is not None and invoice_update.notes != invoice.get('notes'):
         changes['notes'] = {'from': invoice.get('notes'), 'to': invoice_update.notes}
         update_data['notes'] = invoice_update.notes
+    if invoice_update.due_date is not None:
+        new_due = _parse_due_date(invoice_update.due_date, _issue_day(invoice))
+        if new_due != invoice.get('due_date'):
+            changes['due_date'] = {'from': invoice.get('due_date'), 'to': new_due}
+            update_data['due_date'] = new_due
     
     # Processar movimentações. Primeiro valida o resultado final inteiro, sem
     # gravar nada; só depois aplica. Antes cada passo já gravava, e um erro no

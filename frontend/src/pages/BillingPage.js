@@ -24,6 +24,11 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { todayISO, calendarDate } from '../lib/dates';
+
+const formatDay = (value) => (value ? format(calendarDate(value), 'dd/MM/yyyy') : '-');
+// Em aberto e com vencimento já passado
+const isOverdue = (invoice) => (invoice.status || 'PENDENTE') === 'PENDENTE' && !!invoice.due_date && invoice.due_date < todayISO();
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 
 const ITEMS_PER_PAGE = 15;
@@ -76,6 +81,9 @@ export default function BillingPage() {
   const [clientSearchQuery, setClientSearchQuery] = useState('');
   const [clients, setClients] = useState([]);
   const [invoiceNotes, setInvoiceNotes] = useState('');
+  const [invoiceDueDate, setInvoiceDueDate] = useState('');
+  // Marcar como paga pede o dia do recebimento: { invoiceId, date }
+  const [payDialog, setPayDialog] = useState(null);
   const [creating, setCreating] = useState(false);
   const [loadingMovements, setLoadingMovements] = useState(false);
   const [addedMovements, setAddedMovements] = useState([]); // Movimentações adicionadas via busca por ID
@@ -97,7 +105,8 @@ export default function BillingPage() {
   const [editFormData, setEditFormData] = useState({
     client_name: '',
     client_cnpj: '',
-    notes: ''
+    notes: '',
+    due_date: ''
   });
   const [saving, setSaving] = useState(false);
   const [editMovements, setEditMovements] = useState([]); // Movimentações atuais da fatura
@@ -178,6 +187,7 @@ export default function BillingPage() {
     setSearchQuery('');
     setClientSearchQuery('');
     setInvoiceNotes('');
+    setInvoiceDueDate('');
     setAddedMovements([]);
     setUnbilledMovements([]);
     setTargetClientName('');
@@ -357,7 +367,8 @@ export default function BillingPage() {
         client_name: clientName,
         client_cnpj: getSelectedClientCnpj(),
         movement_ids: Array.from(selectedMovements),
-        notes: invoiceNotes || null
+        notes: invoiceNotes || null,
+        due_date: invoiceDueDate || null
       });
       
       toast.success('Fatura gerada com sucesso!');
@@ -377,7 +388,8 @@ export default function BillingPage() {
     setEditFormData({
       client_name: invoice.client_name || '',
       client_cnpj: invoice.client_cnpj || '',
-      notes: invoice.notes || ''
+      notes: invoice.notes || '',
+      due_date: invoice.due_date || ''
     });
     setMovementsToAdd(new Set());
     setMovementsToRemove(new Set());
@@ -519,18 +531,25 @@ export default function BillingPage() {
     }
   };
 
-  const handleUpdateInvoiceStatus = async (invoiceId, newStatus) => {
+  const handleUpdateInvoiceStatus = async (invoiceId, newStatus, paidDate) => {
     const target = invoices.find(inv => inv.id === invoiceId) || selectedInvoice;
+    // Paga: primeiro pergunta o dia do recebimento (base do Contas a Receber)
+    if (newStatus === 'PAGO' && !paidDate) {
+      setPayDialog({ invoiceId, date: todayISO() });
+      return;
+    }
     // Cancelar devolve as movimentações para "a faturar" e não tem volta
     if (newStatus === 'CANCELADO' && !(await confirm(
       `Cancelar a Fatura Nº ${target?.invoice_number}? As movimentações dela voltam para "a faturar" e a fatura não pode ser reaberta.`,
       'Cancelar fatura'
     ))) return;
     try {
-      await api.updateInvoiceStatus(invoiceId, newStatus);
+      await api.updateInvoiceStatus(invoiceId, newStatus, paidDate);
+      setPayDialog(null);
       toast.success(newStatus === 'CANCELADO' ? 'Fatura cancelada. As movimentações voltaram para "a faturar".' : 'Status atualizado com sucesso!');
-      setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: newStatus } : inv));
-      setSelectedInvoice(prev => prev && prev.id === invoiceId ? { ...prev, status: newStatus } : prev);
+      const paid_date = newStatus === 'PAGO' ? paidDate : null;
+      setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: newStatus, paid_date } : inv));
+      setSelectedInvoice(prev => prev && prev.id === invoiceId ? { ...prev, status: newStatus, paid_date } : prev);
       loadInvoices();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao atualizar status');
@@ -579,6 +598,14 @@ export default function BillingPage() {
     }
     if (changes.notes) {
       items.push(`Observações alteradas`);
+    }
+    if (changes.due_date) {
+      items.push(changes.due_date.from !== undefined
+        ? `Vencimento: ${formatDay(changes.due_date.from)} → ${formatDay(changes.due_date.to)}`
+        : `Vencimento: ${formatDay(changes.due_date)}`);
+    }
+    if (changes.paid_date && changes.paid_date.to) {
+      items.push(`Recebida em ${formatDay(changes.paid_date.to)}`);
     }
     if (changes.total_value) {
       if (changes.total_value.from !== undefined) {
@@ -840,6 +867,7 @@ export default function BillingPage() {
                     </th>
                     <th>Nº fatura</th>
                     <th>Data</th>
+                    <th>Vencimento</th>
                     <th>Cliente</th>
                     <th>CNPJ</th>
                     <th className="!text-right">Qtd. movim.</th>
@@ -868,6 +896,9 @@ export default function BillingPage() {
                         <td className="cell-strong whitespace-nowrap tabular-nums">#{invoice.invoice_number}</td>
                         <td className="whitespace-nowrap tabular-nums">
                           {format(new Date(invoice.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                        </td>
+                        <td className={`whitespace-nowrap tabular-nums ${isOverdue(invoice) ? 'text-destructive font-semibold' : ''}`} title={isOverdue(invoice) ? 'Vencida' : undefined}>
+                          {formatDay(invoice.due_date)}
                         </td>
                         <td><div className="max-w-[260px] truncate font-medium text-slate-700 dark:text-slate-200" title={invoice.client_name || ''}>{invoice.client_name}</div></td>
                         <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{invoice.client_cnpj || '-'}</td>
@@ -1128,6 +1159,11 @@ export default function BillingPage() {
                   </div>
                 </div>
 
+                <div className="mt-4 max-w-[220px]">
+                  <Label className="mb-1.5 block">Vencimento (opcional)</Label>
+                  <Input type="date" className="h-9" min={todayISO()} value={invoiceDueDate} onChange={(e) => setInvoiceDueDate(e.target.value)} data-testid="invoice-due-date" />
+                </div>
+
                 <div className="mt-4">
                   <Label className="mb-1.5 block">Observações (opcional)</Label>
                   <Textarea
@@ -1229,6 +1265,22 @@ export default function BillingPage() {
                   </Label>
                   <p className="font-bold text-emerald-700 text-lg">{formatCurrency(selectedInvoice.total_value)}</p>
                 </div>
+                <div>
+                  <Label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                    <Calendar className="w-3 h-3" /> Vencimento
+                  </Label>
+                  <p className={`font-medium ${isOverdue(selectedInvoice) ? 'text-destructive' : ''}`}>
+                    {formatDay(selectedInvoice.due_date)}{isOverdue(selectedInvoice) ? ' (vencida)' : ''}
+                  </p>
+                </div>
+                {selectedInvoice.paid_date && (
+                  <div>
+                    <Label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <Check className="w-3 h-3" /> Recebida em
+                    </Label>
+                    <p className="font-medium">{formatDay(selectedInvoice.paid_date)}</p>
+                  </div>
+                )}
               </div>
 
               {selectedInvoice.notes && (
@@ -1431,6 +1483,18 @@ export default function BillingPage() {
                 </div>
               </div>
               
+              <div className="space-y-1.5 max-w-[220px]">
+                <Label htmlFor="edit-due-date" className="block">Vencimento</Label>
+                <Input
+                  id="edit-due-date"
+                  type="date"
+                  className="h-9"
+                  data-testid="edit-due-date-input"
+                  value={editFormData.due_date}
+                  onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
+                />
+              </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="edit-notes" className="block">Observações</Label>
                 <Textarea
@@ -1618,6 +1682,34 @@ export default function BillingPage() {
               data-testid="confirm-delete-invoice"
             >
               {deleting ? 'Excluindo...' : 'Excluir fatura'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Dia do recebimento ao marcar como paga */}
+      <Dialog open={!!payDialog} onOpenChange={(open) => !open && setPayDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Marcar fatura como paga</DialogTitle>
+            <DialogDescription>Informe o dia em que o pagamento foi recebido.</DialogDescription>
+          </DialogHeader>
+          {payDialog && (
+            <div className="space-y-1.5">
+              <Label htmlFor="invoice-paid-date" className="block">Recebida em *</Label>
+              <Input
+                id="invoice-paid-date" type="date" className="h-9" max={todayISO()}
+                value={payDialog.date} onChange={(e) => setPayDialog((prev) => ({ ...prev, date: e.target.value }))}
+                data-testid="invoice-paid-date"
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPayDialog(null)}>Cancelar</Button>
+            <Button
+              onClick={() => (payDialog?.date ? handleUpdateInvoiceStatus(payDialog.invoiceId, 'PAGO', payDialog.date) : toast.error('Informe a data do recebimento'))}
+              data-testid="invoice-paid-confirm"
+            >
+              Confirmar
             </Button>
           </DialogFooter>
         </DialogContent>

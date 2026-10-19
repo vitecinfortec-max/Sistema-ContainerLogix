@@ -928,6 +928,8 @@ class Invoice(BaseModel):
     total_value: float
     status: str = "PENDENTE"  # PENDENTE, PAGO, CANCELADO
     notes: Optional[str] = None
+    due_date: Optional[str] = None  # Vencimento (YYYY-MM-DD) - opcional; faturas antigas não têm
+    paid_date: Optional[str] = None  # Dia em que foi marcada como paga (YYYY-MM-DD)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
     user_name: str
@@ -937,11 +939,13 @@ class InvoiceCreate(BaseModel):
     client_cnpj: Optional[str] = None
     movement_ids: List[str]
     notes: Optional[str] = None
+    due_date: Optional[str] = None
 
 class InvoiceUpdate(BaseModel):
     client_name: Optional[str] = None
     client_cnpj: Optional[str] = None
     notes: Optional[str] = None
+    due_date: Optional[str] = None  # "" apaga o vencimento
     movement_ids_to_add: Optional[List[str]] = None
     movement_ids_to_remove: Optional[List[str]] = None
 
@@ -954,6 +958,8 @@ class InvoiceResponse(BaseModel):
     total_value: float
     status: str = "PENDENTE"
     notes: Optional[str] = None
+    due_date: Optional[str] = None
+    paid_date: Optional[str] = None
     created_at: datetime
     user_name: str
 
