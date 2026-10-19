@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../components/ui/input';
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { todayISO } from '../lib/dates';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -67,6 +68,9 @@ const EMPTY_SUMMARY = {
 };
 
 export default function PortServiceShiftsPage() {
+  // O desconto (e o valor do turno) só vem do servidor para administradores
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [dateFrom, setDateFrom] = useState(firstDayOfMonth);
   const [dateTo, setDateTo] = useState(todayISO);
   const [clientName, setClientName] = useState('');
@@ -212,7 +216,7 @@ export default function PortServiceShiftsPage() {
               Horário previsto — <span className="font-semibold text-slate-700 dark:text-slate-200">Dia: {sched.DIA.entry} às {sched.DIA.exit}</span>
               {' • '}
               <span className="font-semibold text-slate-700 dark:text-slate-200">Noite: {sched.NOITE.entry} às {sched.NOITE.exit}</span> (dia seguinte)
-              {summary.shift_value > 0 && (
+              {isAdmin && summary.shift_value > 0 && (
                 <>
                   {' • '}
                   Valor do turno: <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtMoney(summary.shift_value)}</span>
@@ -223,13 +227,15 @@ export default function PortServiceShiftsPage() {
           )}
         </FilterCard>
 
-        <StatGrid className="lg:grid-cols-3 2xl:grid-cols-6">
+        <StatGrid className={isAdmin ? "lg:grid-cols-3 2xl:grid-cols-6" : "lg:grid-cols-5"}>
           <StatCard icon={Anchor} label="Serviços" value={summary.count} tone="blue" hint={`${summary.with_observations_count} com observação`} testId="shifts-kpi-count" />
           <StatCard icon={CheckCircle2} label="No horário" value={summary.on_time_count} tone="primary" testId="shifts-kpi-on-time" />
           <StatCard icon={TrendingUp} label="A mais" value={summary.extra_count} tone="emerald" hint={`${fmtMinutes(summary.extra_minutes)} no total`} testId="shifts-kpi-extra" />
           <StatCard icon={TrendingDown} label="A menos" value={summary.less_count} tone="red" hint={`${fmtMinutes(summary.less_minutes)} no total`} testId="shifts-kpi-less" />
           <StatCard icon={AlertTriangle} label="Sem horário" value={summary.missing_count} tone="amber" hint="entrada ou saída não lançada" testId="shifts-kpi-missing" />
-          <StatCard icon={BadgeDollarSign} label="Desconto possível" value={fmtMoney(summary.discount_total)} tone="red" hint={`sobre ${fmtMoney(summary.shift_value)} por turno`} testId="shifts-kpi-discount" />
+          {isAdmin && (
+            <StatCard icon={BadgeDollarSign} label="Desconto possível" value={fmtMoney(summary.discount_total)} tone="red" hint={`sobre ${fmtMoney(summary.shift_value)} por turno`} testId="shifts-kpi-discount" />
+          )}
         </StatGrid>
 
         <DataCard
@@ -238,7 +244,7 @@ export default function PortServiceShiftsPage() {
           meta={items.length > 0 && (
             <span className="text-xs text-slate-500 dark:text-slate-400">
               Saldo do período: <span className={`font-semibold tabular-nums ${diffClass(summary.balance_minutes)}`}>{fmtMinutes(summary.balance_minutes)}</span>
-              {summary.discount_total > 0 && (
+              {isAdmin && summary.discount_total > 0 && (
                 <> • Desconto: <span className="font-semibold tabular-nums text-red-600 dark:text-red-400">{fmtMoney(summary.discount_total)}</span></>
               )}
             </span>
@@ -268,7 +274,7 @@ export default function PortServiceShiftsPage() {
                     <th className="text-center">Saída</th>
                     <th className="text-center">Dif. entrada</th>
                     <th className="text-center">Dif. saída</th>
-                    <th className="text-center" title="Saldo de horas e, embaixo, o desconto possível">Saldo</th>
+                    <th className="text-center" title={isAdmin ? 'Saldo de horas e, embaixo, o desconto possível' : undefined}>Saldo</th>
                     <th>Observações</th>
                   </tr>
                 </thead>

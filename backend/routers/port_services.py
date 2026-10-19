@@ -514,9 +514,22 @@ def _valid_period(date_from: Optional[str], date_to: Optional[str]):
         raise HTTPException(status_code=400, detail="A data inicial é posterior à data final")
 
 
-async def _port_service_shifts(date_from, date_to, turno, client_id) -> tuple:
+_DISCOUNT_ITEM_FIELDS = ("discount",)
+_DISCOUNT_SUMMARY_FIELDS = ("discount_total", "shift_value", "shift_minutes")
+
+
+async def _can_see_shift_discount(current_user: dict) -> bool:
+    """O desconto possível (e o valor do turno) só aparece para
+    administradores; operadores veem só a conferência de horários. O token
+    não traz o perfil, então ele é lido do cadastro."""
+    user = await db.users.find_one({"id": current_user.get("sub")}, {"_id": 0, "role": 1})
+    return (user or {}).get("role") == "admin"
+
+
+async def _port_service_shifts(date_from, date_to, turno, client_id, current_user: dict) -> tuple:
     """Serviços do período com a conferência de horário de cada um, em ordem
-    de data, turno (Dia antes da Noite) e entrada, mais os totais."""
+    de data, turno (Dia antes da Noite) e entrada, mais os totais. Para quem
+    não é administrador, sai sem desconto nem valor do turno."""
     _valid_period(date_from, date_to)
     rows = await _filter_port_services_report(date_from, date_to, client_id, turno)
     items = []
@@ -549,6 +562,12 @@ async def _port_service_shifts(date_from, date_to, turno, client_id) -> tuple:
         "shift_minutes": SHIFT_MINUTES,
         "discount_total": round(sum(i["discount"] or 0 for i in items), 2),
     }
+    if not await _can_see_shift_discount(current_user):
+        for i in items:
+            for field in _DISCOUNT_ITEM_FIELDS:
+                i.pop(field, None)
+        for field in _DISCOUNT_SUMMARY_FIELDS:
+            summary.pop(field, None)
     return items, summary
 
 
@@ -560,8 +579,9 @@ async def get_port_service_shifts(
 ):
     """Conferência de Turnos: horário de entrada/saída de cada Serviço
     Portuário do período comparado com o horário previsto do turno, com as
-    observações lançadas. Sem valores financeiros (aberto a operadores)."""
-    items, summary = await _port_service_shifts(date_from, date_to, turno, client_id)
+    observações lançadas. Aberto a operadores; o desconto possível sobre o
+    valor do turno só vem para administradores."""
+    items, summary = await _port_service_shifts(date_from, date_to, turno, client_id, current_user)
     return {"items": items, "summary": summary}
 
 
@@ -571,7 +591,7 @@ async def download_port_service_shifts_pdf(
     turno: Optional[str] = None, client_id: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
-    items, summary = await _port_service_shifts(date_from, date_to, turno, client_id)
+    items, summary = await _port_service_shifts(date_from, date_to, turno, client_id, current_user)
     company = await get_company_settings()
     pdf_buffer = generate_port_service_shifts_pdf(items, summary, date_from, date_to, company=company)
     return StreamingResponse(
@@ -586,7 +606,7 @@ async def download_port_service_shifts_excel(
     turno: Optional[str] = None, client_id: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
-    items, summary = await _port_service_shifts(date_from, date_to, turno, client_id)
+    items, summary = await _port_service_shifts(date_from, date_to, turno, client_id, current_user)
     company = await get_company_settings()
     excel_buffer = generate_port_service_shifts_excel(items, summary, date_from, date_to, company=company)
     return StreamingResponse(

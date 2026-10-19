@@ -2990,8 +2990,13 @@ def _shift_summary_items(summary):
         ("A mais", f"{_fmt_int(summary.get('extra_count', 0))}  ({fmt_shift_minutes(summary.get('extra_minutes', 0))})"),
         ("A menos", f"{_fmt_int(summary.get('less_count', 0))}  ({fmt_shift_minutes(summary.get('less_minutes', 0))})"),
         ("Sem horário", _fmt_int(summary.get('missing_count', 0))),
-        ("Desconto possível", format_currency(summary.get('discount_total', 0), 'BRL')),
-    ]
+    ] + ([("Desconto possível", format_currency(summary.get('discount_total', 0), 'BRL'))]
+         if _shift_shows_discount(summary) else [])
+
+
+def _shift_shows_discount(summary):
+    # Só vem no resumo para administradores (ver routers/port_services.py)
+    return 'discount_total' in (summary or {})
 
 
 def generate_port_service_shifts_pdf(items: list, summary: dict, date_from: str, date_to: str, company: dict = None) -> bytes:
@@ -3010,11 +3015,15 @@ def generate_port_service_shifts_pdf(items: list, summary: dict, date_from: str,
                                       company=company, content_width=doc.width))
     elements.extend(_build_pdf_summary(_shift_summary_items(summary), doc.width))
 
+    show_discount = _shift_shows_discount(summary)
     if items:
         cell = _pdf_cell_factory(styles, font_size=7)
-        rows = [_pdf_header_cells(_SHIFT_HEADERS, font_size=7)]
+        headers = _SHIFT_HEADERS if show_discount else [h for h in _SHIFT_HEADERS if h != 'Desconto']
+        rows = [_pdf_header_cells(headers, font_size=7)]
         for i in items:
             date_display = _shift_period_text(i.get('service_date'), None).split(' a ')[0]
+            discount_cell = [cell(None, 'right', markup=_pdf_tone_markup(
+                _shift_discount_text(i.get('discount')), 'red' if (i.get('discount') or 0) > 0 else 'slate', bold=False))]
             rows.append([
                 cell(i.get('service_number') or '-', 'center', bold=True),
                 cell(date_display, 'center'),
@@ -3029,19 +3038,22 @@ def generate_port_service_shifts_pdf(items: list, summary: dict, date_from: str,
                 cell(None, 'center', markup=_pdf_tone_markup(
                     fmt_shift_minutes(i.get('balance')) if i.get('balance') is not None else _SHIFT_STATUS_LABELS['SEM_HORARIO'],
                     _shift_tone(i.get('balance')) if i.get('balance') is not None else 'amber')),
-                cell(None, 'right', markup=_pdf_tone_markup(
-                    _shift_discount_text(i.get('discount')), 'red' if (i.get('discount') or 0) > 0 else 'slate', bold=False)),
+                *(discount_cell if show_discount else []),
                 cell(i.get('observations') or '-'),
             ])
         discount_total = summary.get('discount_total', 0) or 0
         rows.append([''] * 9 + [
             cell('TOTAL', 'right', bold=True),
             cell(None, 'center', markup=_pdf_tone_markup(fmt_shift_minutes(summary.get('balance_minutes', 0)), _shift_tone(summary.get('balance_minutes', 0)))),
-            cell(None, 'right', markup=_pdf_tone_markup(_shift_discount_text(discount_total), 'red' if discount_total > 0 else 'slate')),
+            *([cell(None, 'right', markup=_pdf_tone_markup(_shift_discount_text(discount_total), 'red' if discount_total > 0 else 'slate'))]
+              if show_discount else []),
             '',
         ])
         w = doc.width
-        col_widths = [w*0.05, w*0.07, w*0.05, w*0.115, w*0.115, w*0.06, w*0.05, w*0.05, w*0.06, w*0.06, w*0.06, w*0.075, w*0.185]
+        if show_discount:
+            col_widths = [w*0.05, w*0.07, w*0.05, w*0.115, w*0.115, w*0.06, w*0.05, w*0.05, w*0.06, w*0.06, w*0.06, w*0.075, w*0.185]
+        else:
+            col_widths = [w*0.05, w*0.07, w*0.05, w*0.12, w*0.12, w*0.06, w*0.055, w*0.055, w*0.065, w*0.065, w*0.065, w*0.21]
         table = Table(rows, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(table)
@@ -3069,24 +3081,31 @@ def generate_port_service_shifts_excel(items: list, summary: dict, date_from: st
             f"A mais: {_fmt_int(s.get('extra_count', 0))} ({fmt_shift_minutes(s.get('extra_minutes', 0))})   •   "
             f"A menos: {_fmt_int(s.get('less_count', 0))} ({fmt_shift_minutes(s.get('less_minutes', 0))})   •   "
             f"Sem horário: {_fmt_int(s.get('missing_count', 0))}   •   "
-            f"Desconto possível: {format_currency(s.get('discount_total', 0), 'BRL')}   •   {_shift_schedule_text(s)}"
+            + (f"Desconto possível: {format_currency(s.get('discount_total', 0), 'BRL')}   •   " if _shift_shows_discount(s) else "")
+            + _shift_schedule_text(s)
         )
-        headers = _SHIFT_HEADERS[:11] + ['Desconto (R$)', 'Situação', 'Observações']
+        show_discount = _shift_shows_discount(s)
+        headers = _SHIFT_HEADERS[:11] + (['Desconto (R$)'] if show_discount else []) + ['Situação', 'Observações']
         data_rows = [[
             i.get('service_number'), _xl_date(i.get('service_date')),
             _TURNO_LABELS_XLSX.get(i.get('turno'), i.get('turno') or '-'),
             i.get('client_name') or '-', i.get('driver_name') or '-', i.get('cavalo_plate') or '-',
             i.get('entry_time') or '-', i.get('exit_time') or '-',
             fmt_shift_minutes(i.get('entry_diff')), fmt_shift_minutes(i.get('exit_diff')), fmt_shift_minutes(i.get('balance')),
-            i.get('discount'),
+            *([i.get('discount')] if show_discount else []),
             _SHIFT_STATUS_LABELS.get(i.get('shift_status'), '-'), i.get('observations') or '',
         ] for i in items]
+        # Colunas depois do Saldo andam uma posição quando há Desconto
+        situacao_col = 12 if show_discount else 11
+        obs_col = situacao_col + 1
+        widths = {'B': 8, 'C': 12, 'D': 9, 'E': 26, 'F': 26, 'G': 11, 'H': 9, 'I': 9, 'J': 12, 'K': 12, 'L': 10}
+        widths.update({'M': 15, 'N': 13, 'O': 60} if show_discount else {'M': 13, 'N': 60})
         _bsoft_style_excel(
             ws, "Conferência de Turnos", stats_text, headers, data_rows,
-            {'B': 8, 'C': 12, 'D': 9, 'E': 26, 'F': 26, 'G': 11, 'H': 9, 'I': 9, 'J': 12, 'K': 12, 'L': 10, 'M': 15, 'N': 13, 'O': 60},
-            center_cols={0, 1, 2, 5, 6, 7, 8, 9, 10, 12},
-            number_fmt_cols={1: XL_DATE, 11: 'R$ #,##0.00'},
-            total_col=11,
+            widths,
+            center_cols={0, 1, 2, 5, 6, 7, 8, 9, 10, situacao_col},
+            number_fmt_cols={1: XL_DATE, **({11: 'R$ #,##0.00'} if show_discount else {})},
+            total_col=11 if show_discount else None,
             stats_text=stats_text,
             company_name=c['name'],
             logo_buffer=download_logo(company),
@@ -3097,10 +3116,11 @@ def generate_port_service_shifts_excel(items: list, summary: dict, date_from: st
         if items:
             _xl_color_column(ws, 10, [_shift_tone(i.get('balance')) if i.get('balance') is not None else 'amber' for i in items])
             status_tone = {"NO_HORARIO": 'slate', "A_MAIS": 'emerald', "A_MENOS": 'red', "SEM_HORARIO": 'amber'}
-            _xl_color_column(ws, 11, ['red' if (i.get('discount') or 0) > 0 else None for i in items], bold=False)
-            _xl_color_column(ws, 12, [status_tone.get(i.get('shift_status')) for i in items])
+            if show_discount:
+                _xl_color_column(ws, 11, ['red' if (i.get('discount') or 0) > 0 else None for i in items], bold=False)
+            _xl_color_column(ws, situacao_col, [status_tone.get(i.get('shift_status')) for i in items])
             for offset in range(len(items)):
-                ws.cell(row=9 + offset, column=2 + 13).alignment = Alignment(wrap_text=True, vertical='center')
+                ws.cell(row=9 + offset, column=2 + obs_col).alignment = Alignment(wrap_text=True, vertical='center')
         buffer = io.BytesIO()
         wb.save(buffer)
         return buffer.getvalue()

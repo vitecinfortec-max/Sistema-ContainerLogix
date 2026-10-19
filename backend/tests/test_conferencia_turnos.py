@@ -148,6 +148,47 @@ def test_operator_can_open_report(api):
     assert api.get("/api/reports/port-service-shifts", params=params, as_user="operator").status_code == 200
 
 
+def _xl_values(content):
+    from io import BytesIO
+    from openpyxl import load_workbook
+    ws = load_workbook(BytesIO(content)).active
+    return [c.value for row in ws.iter_rows() for c in row if c.value is not None]
+
+
+def test_discount_only_for_admins(api):
+    service(api, "2026-10-11", "DIA", "09:00", "20:00", obs="Atraso")  # 30 min a menos = R$ 139,13
+    params = {"date_from": "2026-10-11", "date_to": "2026-10-11"}
+
+    admin = api.get("/api/reports/port-service-shifts", params=params).json()
+    assert admin["items"][0]["discount"] == 139.13
+    assert admin["summary"]["discount_total"] == 139.13 and admin["summary"]["shift_value"] == 3200.0
+
+    oper = api.get("/api/reports/port-service-shifts", params=params, as_user="operator").json()
+    item, summary = oper["items"][0], oper["summary"]
+    assert "discount" not in item
+    assert not {"discount_total", "shift_value", "shift_minutes"} & set(summary)
+    # a conferência de horário continua igual
+    assert item["balance"] == -30 and item["shift_status"] == "A_MENOS" and item["observations"] == "Atraso"
+
+    # Excel: operador sem a coluna nem o valor
+    oper_xl = _xl_values(api.get("/api/reports/port-service-shifts/excel", params=params, as_user="operator").content)
+    assert "Desconto (R$)" not in oper_xl and 139.13 not in oper_xl
+    assert not any("3.200" in str(v) or "Desconto" in str(v) for v in oper_xl)
+    assert "Atraso" in oper_xl and "-00:30" in oper_xl
+    admin_xl = _xl_values(api.get("/api/reports/port-service-shifts/excel", params=params).content)
+    assert "Desconto (R$)" in admin_xl and 139.13 in admin_xl
+
+    # PDF: operador sem o desconto
+    import pymupdf
+    def pdf_text(as_user):
+        r = api.get("/api/reports/port-service-shifts/pdf", params=params, as_user=as_user)
+        assert r.status_code == 200
+        return "".join(page.get_text() for page in pymupdf.open(stream=r.content, filetype="pdf"))
+    oper_pdf, admin_pdf = pdf_text("operator"), pdf_text("admin")
+    assert "Desconto" not in oper_pdf and "139,13" not in oper_pdf and "3.200" not in oper_pdf
+    assert "Desconto" in admin_pdf and "139,13" in admin_pdf
+
+
 def test_pdf_and_excel(api):
     service(api, "2026-10-10", "DIA", "08:15", "20:45", obs="Observação com <caracteres> & acentuação")
     service(api, "2026-10-10", "NOITE", "20:30", None)
