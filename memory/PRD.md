@@ -619,8 +619,10 @@ sugestão de mudar para Inativo), duplicados recusados, filtros aplicados enquan
       `main.lock` antigo e foi recuperado)
 - [x] Limite de requisições não barra mais o download em lote de PDFs (Completo - 18/10/2026: PDF
       de um registro só tem limite próprio de 300/min; relatórios de período seguem com 30/min)
-- [ ] Depois do deploy: rodar `fix_container_purchases_sem_venda.py` **em produção** (shell do
-      Render, primeiro sem `--apply`). No banco local já rodou: nada a corrigir
+- [x] Rodar `fix_container_purchases_sem_venda.py` em produção (Completo - 19/10/2026, via SSH nos 3
+      backends: principal e J.A Logística sem nada a corrigir; TLL Containers: 1 compra (ZGXU612117-0,
+      Ordem nº 82) Vendida sem venda devolvida a Disponível. Backup em
+      `backend/scripts/backup_tll_compras_sem_venda_20261019_013326.json` no C:\Projetos, fora do git)
 - [x] Testes antigos (requests + `REACT_APP_BACKEND_URL`) voltaram a rodar sem servidor no ar
       (Completo - 18/10/2026: ponte em `tests/conftest.py` responde as chamadas pelo próprio app, com
       banco em memória por arquivo; testes da rota removida `/billing/report`, do campo legado
