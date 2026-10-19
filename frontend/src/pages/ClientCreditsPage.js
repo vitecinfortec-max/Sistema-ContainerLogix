@@ -27,6 +27,7 @@ const PAGE_SIZE = 15;
 const TYPES = {
   CREDITO: { label: 'Crédito', tone: 'emerald' },
   USO: { label: 'Uso em fatura', tone: 'blue' },
+  SERVICO: { label: 'Serviço fora do sistema', tone: 'amber' },
   DEVOLUCAO: { label: 'Devolução', tone: 'violet' },
   ESTORNO: { label: 'Estorno', tone: 'slate' },
 };
@@ -55,8 +56,9 @@ async function saveBlob(request, filename) {
 // Texto da coluna "Histórico" de um lançamento
 function describe(entry) {
   if (entry.entry_type === 'USO') return `Baixa na fatura #${entry.invoice_number}`;
+  if (entry.entry_type === 'SERVICO') return entry.description || 'Serviço fora do sistema';
   if (entry.entry_type === 'ESTORNO') {
-    const of = `Estorno do lançamento #${entry.reverses_entry_number}${entry.invoice_number ? ` (fatura #${entry.invoice_number})` : ''}`;
+    const of = `Estorno do lançamento #${entry.reverses_entry_number}${entry.invoice_number ? ` (fatura #${entry.invoice_number})` : ''}${entry.description ? ` (${entry.description})` : ''}`;
     return entry.reason ? `${of} - ${entry.reason}` : of;
   }
   return [METHODS[entry.payment_method], entry.reference].filter(Boolean).join(' · ') || TYPES[entry.entry_type].label;
@@ -176,16 +178,22 @@ export default function ClientCreditsPage() {
   const openApply = async (account) => {
     try {
       const r = await api.getClientCreditOpenInvoices(account.client_id);
-      setApplyState({ ...r.data, amounts: {}, entry_date: todayISO(), notes: '' });
+      setApplyState({ ...r.data, amounts: {}, services: [], entry_date: todayISO(), notes: '' });
     } catch (error) {
       toast.error(errorText(error, 'Erro ao carregar as faturas'));
     }
   };
-  const applyTotalCents = applyState ? Object.values(applyState.amounts).reduce((acc, v) => acc + toCents(v), 0) : 0;
+  const servicesCents = applyState ? applyState.services.reduce((acc, s) => acc + toCents(s.amount), 0) : 0;
+  const applyTotalCents = applyState ? Object.values(applyState.amounts).reduce((acc, v) => acc + toCents(v), 0) + servicesCents : 0;
+  const addService = () => setApplyState((prev) => ({ ...prev, services: [...prev.services, { key: Date.now(), description: '', amount: '' }] }));
+  const setService = (key, field, value) => setApplyState((prev) => ({
+    ...prev, services: prev.services.map((s) => (s.key === key ? { ...s, [field]: value } : s)),
+  }));
+  const removeService = (key) => setApplyState((prev) => ({ ...prev, services: prev.services.filter((s) => s.key !== key) }));
   const setAmount = (invoiceId, value) => setApplyState((prev) => ({ ...prev, amounts: { ...prev.amounts, [invoiceId]: value } }));
-  // Usa o saldo nas faturas mais antigas primeiro, até acabar
+  // Usa o saldo (depois dos serviços) nas faturas mais antigas primeiro, até acabar
   const distribute = () => {
-    let left = toCents(applyState.balance);
+    let left = toCents(applyState.balance) - servicesCents;
     const amounts = {};
     applyState.invoices.forEach((inv) => {
       const part = Math.min(left, toCents(inv.open_value));
@@ -198,12 +206,17 @@ export default function ClientCreditsPage() {
     const allocations = Object.entries(applyState.amounts)
       .filter(([, v]) => toCents(v) > 0)
       .map(([invoice_id, v]) => ({ invoice_id, amount: Number(v) }));
-    if (!allocations.length) return toast.error('Informe quanto usar em pelo menos uma fatura');
+    const services = applyState.services
+      .filter((s) => s.description.trim() || toCents(s.amount) > 0)
+      .map((s) => ({ description: s.description.trim(), amount: Number(s.amount) || 0 }));
+    if (!allocations.length && !services.length) return toast.error('Informe quanto usar em pelo menos uma fatura ou serviço');
+    if (services.some((s) => !s.description)) return toast.error('Descreva o serviço feito fora do sistema');
+    if (services.some((s) => toCents(s.amount) <= 0)) return toast.error('Informe o valor de cada serviço');
     if (applyTotalCents > toCents(applyState.balance)) return toast.error('A baixa passa do saldo do cliente');
     setSaving(true);
     try {
-      await api.applyClientCredit({ client_id: applyState.client.id, entry_date: applyState.entry_date, notes: applyState.notes, allocations });
-      toast.success('Baixa registrada nas faturas');
+      await api.applyClientCredit({ client_id: applyState.client.id, entry_date: applyState.entry_date, notes: applyState.notes, allocations, services });
+      toast.success('Baixa registrada');
       setApplyState(null);
       reloadAll();
     } catch (error) {
@@ -515,10 +528,10 @@ export default function ClientCreditsPage() {
           {applyState && (
             <>
               <DialogHeader>
-                <DialogTitle>Usar crédito em faturas</DialogTitle>
+                <DialogTitle>Usar crédito em faturas e serviços</DialogTitle>
                 <DialogDescription>
                   {applyState.client.name} · saldo disponível <span className="font-semibold text-emerald-700 dark:text-emerald-400">{formatMoney(applyState.balance)}</span>.
-                  {' '}A fatura coberta por inteiro passa a Paga na data da baixa.
+                  {' '}A fatura coberta por inteiro passa a Paga na data da baixa. Serviço feito fora do sistema (sem fatura) entra em "Serviços fora do sistema".
                 </DialogDescription>
               </DialogHeader>
               {applyState.invoices.length === 0 ? (
@@ -571,6 +584,28 @@ export default function ClientCreditsPage() {
                   </table>
                 </div>
               )}
+              <div className="rounded-md border border-slate-200 dark:border-slate-700 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold">Serviços fora do sistema</div>
+                    <div className="text-xs text-muted-foreground">Algo feito para o cliente que não tem fatura no sistema e será pago com o crédito.</div>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="h-8 shrink-0" onClick={addService} data-testid="add-credit-service-btn">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar serviço
+                  </Button>
+                </div>
+                {applyState.services.map((s, index) => (
+                  <div key={s.key} className="flex items-center gap-2">
+                    <Input className="h-8 flex-1" placeholder="Descrição do serviço (ex.: lavagem do container ABCU1234567)" value={s.description}
+                      onChange={(e) => setService(s.key, 'description', e.target.value)} data-testid={`credit-service-description-${index}`} />
+                    <Input className="h-8 w-28 text-right" type="number" step="0.01" min="0" placeholder="Valor" value={s.amount}
+                      onChange={(e) => setService(s.key, 'amount', e.target.value)} data-testid={`credit-service-amount-${index}`} />
+                    <Button type="button" variant="ghost" size="sm" className="h-8 px-2" title="Remover" onClick={() => removeService(s.key)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div className="flex items-end gap-3">
                   <Field label="Data da baixa">
@@ -608,6 +643,8 @@ export default function ClientCreditsPage() {
                 <DialogDescription>
                   {reverseState.entry.entry_type === 'USO'
                     ? `O valor volta ao saldo do cliente e a fatura #${reverseState.entry.invoice_number} volta a ter esse valor em aberto.`
+                    : reverseState.entry.entry_type === 'SERVICO'
+                      ? 'O valor do serviço volta ao saldo do cliente.'
                     : reverseState.entry.entry_type === 'CREDITO'
                       ? 'O crédito sai do saldo. Só é possível se ele ainda não foi usado em faturas.'
                       : 'O valor devolvido volta ao saldo do cliente.'}

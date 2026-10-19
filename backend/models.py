@@ -1930,8 +1930,9 @@ class DailyRateRequestResponse(BaseModel):
 # Conta corrente de crédito do cliente (adiantamento / pagamento a maior).
 # Lançamentos nunca são apagados: correção é feita por ESTORNO, que devolve o
 # efeito do lançamento original. CREDITO soma; USO (baixa numa fatura) e
-# DEVOLUCAO (dinheiro devolvido ao cliente) subtraem.
-CLIENT_CREDIT_ENTRY_TYPES = ["CREDITO", "USO", "DEVOLUCAO", "ESTORNO"]
+# DEVOLUCAO (dinheiro devolvido ao cliente) subtraem, assim como SERVICO
+# (serviço prestado fora do sistema, sem fatura, pago com o crédito).
+CLIENT_CREDIT_ENTRY_TYPES = ["CREDITO", "USO", "SERVICO", "DEVOLUCAO", "ESTORNO"]
 CLIENT_CREDIT_PAYMENT_METHODS = ["PIX", "TED", "BOLETO", "DEPOSITO", "DINHEIRO", "CHEQUE", "OUTRO"]
 
 
@@ -1950,10 +1951,16 @@ class ClientCreditAllocation(BaseModel):
     amount: float
 
 
+class ClientCreditService(BaseModel):
+    description: str  # o que foi feito fora do sistema
+    amount: float
+
+
 class ClientCreditApply(BaseModel):
     client_id: str
     entry_date: str
-    allocations: List[ClientCreditAllocation]
+    allocations: List[ClientCreditAllocation] = []
+    services: List[ClientCreditService] = []
     notes: Optional[str] = None
 
 

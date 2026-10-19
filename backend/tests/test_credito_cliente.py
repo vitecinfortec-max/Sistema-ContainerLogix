@@ -167,3 +167,33 @@ def test_statement_reports_and_summary(api):
     outs = {r["key"]: r["total"] for r in summary["outflows"]}
     assert ins["invoices"] == 0 and ins["client_credits"] == 1000 and outs["client_credit_refunds"] == 100
     assert next(r for r in summary["payable"] if r["key"] == "client_credit_balance")["total"] == 400
+
+
+def test_service_outside_system(api):
+    _seed(api)
+    _credit(api, 1000)
+    # baixa só de serviço, sem fatura
+    r = api.post("/api/client-credits/apply", json={"client_id": "cA", "entry_date": DAY(),
+                                                     "services": [{"description": "Lavagem do container", "amount": 150}]})
+    assert r.status_code == 200 and r.json()["entries"][0]["entry_type"] == "SERVICO"
+    assert _balance(api) == 850
+    # fatura + serviço na mesma baixa; o total não pode passar do saldo
+    body = {"client_id": "cA", "entry_date": DAY(), "allocations": [{"invoice_id": "i1", "amount": 500}],
+            "services": [{"description": "Reparo", "amount": 400}]}
+    assert "insuficiente" in api.post("/api/client-credits/apply", json=body).json()["detail"]
+    body["services"][0]["amount"] = 300
+    assert api.post("/api/client-credits/apply", json=body).status_code == 200
+    assert _balance(api) == 50 and _invoice(api, "i1")["status"] == "PAGO"
+    # serviço sem descrição ou sem valor
+    for svc in ({"description": " ", "amount": 10}, {"description": "Algo", "amount": 0}):
+        assert api.post("/api/client-credits/apply", json={"client_id": "cA", "entry_date": DAY(), "services": [svc]}).status_code == 400
+    row = next(r for r in api.get("/api/client-credits/accounts").json() if r["client_id"] == "cA")
+    assert row["total_used"] == 950
+    services = api.get("/api/client-credits/entries", params={"entry_type": "SERVICO", "search": "lavagem"}).json()
+    assert services["total"] == 1
+    # estorno devolve ao saldo e aparece no extrato
+    rev = api.post(f"/api/client-credits/entries/{services['items'][0]['id']}/reverse", json={"reason": "não foi feito"})
+    assert rev.status_code == 200 and _balance(api) == 200
+    st = api.get("/api/client-credits/statement/cA").json()
+    assert st["closing_balance"] == 200
+    assert api.get("/api/client-credits/statement/cA/pdf").content[:4] == b"%PDF"

@@ -18,6 +18,7 @@ api_router = APIRouter(prefix="/api")
 # devolução de cobrança...). O saldo é a soma dos lançamentos:
 #   CREDITO   (+) dinheiro recebido do cliente que ainda não virou fatura
 #   USO       (-) baixa do crédito numa fatura (parcial ou total)
+#   SERVICO   (-) serviço prestado fora do sistema (sem fatura) pago com o crédito
 #   DEVOLUCAO (-) crédito devolvido em dinheiro ao cliente
 #   ESTORNO   (±) desfaz um lançamento (o efeito contrário), com motivo
 # Lançamento nunca é apagado nem editado - errado, estorna e lança de novo.
@@ -31,8 +32,10 @@ api_router = APIRouter(prefix="/api")
 # paid_by_credit (quitada pelo crédito). Cancelar/excluir a fatura, ou o
 # total dela cair abaixo do crédito usado, devolve a diferença ao saldo.
 
-SIGN = {"CREDITO": 1, "USO": -1, "DEVOLUCAO": -1}
-TYPE_LABELS = {"CREDITO": "Crédito", "USO": "Uso em fatura", "DEVOLUCAO": "Devolução", "ESTORNO": "Estorno"}
+SIGN = {"CREDITO": 1, "USO": -1, "SERVICO": -1, "DEVOLUCAO": -1}
+TYPE_LABELS = {"CREDITO": "Crédito", "USO": "Uso em fatura", "SERVICO": "Serviço fora do sistema", "DEVOLUCAO": "Devolução",
+               "ESTORNO": "Estorno"}
+USE_TYPES = ("USO", "SERVICO")  # o que conta como crédito usado
 METHOD_LABELS = {"PIX": "PIX", "TED": "TED/DOC", "BOLETO": "Boleto", "DEPOSITO": "Depósito", "DINHEIRO": "Dinheiro",
                  "CHEQUE": "Cheque", "OUTRO": "Outro"}
 
@@ -130,7 +133,7 @@ async def _insert_entry(client: dict, entry_type: str, cents: int, entry_date: s
         "signed_amount": _money(cents * extra.pop("sign")),
         "entry_date": entry_date,
         "payment_method": None, "reference": None, "notes": None,
-        "invoice_id": None, "invoice_number": None,
+        "invoice_id": None, "invoice_number": None, "description": None,
         "reversed_amount": 0, "reverses_entry_id": None, "reverses_entry_number": None, "reason": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": user["sub"], "created_by_name": user.get("name"),
@@ -184,7 +187,8 @@ async def _reverse(entry: dict, cents: int, reason: str, user: dict, entry_date:
         raise HTTPException(status_code=409, detail="Este lançamento acabou de ser estornado. Atualize a lista.")
     return await _insert_entry(client, "ESTORNO", cents, entry_date or _today().isoformat(), user, sign=sign,
                                reverses_entry_id=entry["id"], reverses_entry_number=entry["entry_number"],
-                               invoice_id=entry.get("invoice_id"), invoice_number=entry.get("invoice_number"), reason=reason)
+                               invoice_id=entry.get("invoice_id"), invoice_number=entry.get("invoice_number"),
+                               description=entry.get("description"), reason=reason)
 
 
 async def return_invoice_credit(invoice: dict, cents: Optional[int], reason: str, user: dict) -> int:
@@ -252,14 +256,14 @@ async def get_summary(current_user: dict = Depends(get_current_admin_user)):
         cents = _cents(e["amount"])
         if e["entry_type"] == "CREDITO":
             received += cents
-        elif e["entry_type"] == "USO":
+        elif e["entry_type"] in USE_TYPES:
             used += cents
         elif e["entry_type"] == "ESTORNO":
             original = by_id.get(e["reverses_entry_id"]) or await db.client_credit_entries.find_one(
                 {"id": e["reverses_entry_id"]}, {"_id": 0, "entry_type": 1}) or {}
             if original.get("entry_type") == "CREDITO":
                 received -= cents
-            elif original.get("entry_type") == "USO":
+            elif original.get("entry_type") in USE_TYPES:
                 used -= cents
     return {
         "balance_total": _money(sum(a.get("balance_cents", 0) for a in accounts.values())),
@@ -280,7 +284,7 @@ async def list_accounts(search: Optional[str] = None, only_with_balance: bool = 
                                                        "reversed_amount": 1, "entry_date": 1}):
         t = totals.setdefault(e["client_id"], {"credited": 0, "used": 0, "refunded": 0, "last_date": None})
         net = _cents(e["amount"]) - _cents(e.get("reversed_amount"))
-        key = {"CREDITO": "credited", "USO": "used", "DEVOLUCAO": "refunded"}.get(e["entry_type"])
+        key = {"CREDITO": "credited", "USO": "used", "SERVICO": "used", "DEVOLUCAO": "refunded"}.get(e["entry_type"])
         if key:
             t[key] += net
         t["last_date"] = max(t["last_date"] or "", e["entry_date"] or "") or None
@@ -311,13 +315,13 @@ async def list_accounts(search: Optional[str] = None, only_with_balance: bool = 
 
 @api_router.get("/client-credits/entries")
 async def list_entries(
-    client_id: Optional[str] = None, entry_type: Optional[str] = Query(None, pattern="^(CREDITO|USO|DEVOLUCAO|ESTORNO)$"),
+    client_id: Optional[str] = None, entry_type: Optional[str] = Query(None, pattern="^(CREDITO|USO|SERVICO|DEVOLUCAO|ESTORNO)$"),
     date_from: Optional[str] = None, date_to: Optional[str] = None, search: Optional[str] = None,
     page: int = Query(1, ge=1), per_page: int = Query(20, ge=1, le=200),
     current_user: dict = Depends(get_current_admin_user),
 ):
     """Lançamentos (mais recentes primeiro), com filtros e paginação"""
-    search_q = text_query(("client_name", "reference", "notes", "reason"), search)
+    search_q = text_query(("client_name", "reference", "description", "notes", "reason"), search)
     if search and search.strip().lstrip("#").isdigit():
         number = int(search.strip().lstrip("#"))
         search_q = {"$or": search_q["$or"] + [{"invoice_number": number}, {"entry_number": number}]}
@@ -381,14 +385,25 @@ async def create_entry(data: ClientCreditCreate, current_user: dict = Depends(ge
 
 @api_router.post("/client-credits/apply")
 async def apply_credit(data: ClientCreditApply, current_user: dict = Depends(get_current_admin_user)):
-    """Dá baixa do crédito do cliente em uma ou mais faturas em aberto dele.
-    Cada fatura recebe no máximo o que falta dela; o total, no máximo o saldo.
-    Fatura totalmente coberta passa a Paga na data informada."""
+    """Dá baixa do crédito do cliente em uma ou mais faturas em aberto dele e,
+    se houver, em serviços prestados fora do sistema (sem fatura). Cada fatura
+    recebe no máximo o que falta dela; o total, no máximo o saldo. Fatura
+    totalmente coberta passa a Paga na data informada."""
     client = await _get_client(data.client_id)
     day = _parse_day(data.entry_date)
     allocations = [(a.invoice_id, _cents(a.amount)) for a in data.allocations if _cents(a.amount) > 0]
-    if not allocations:
-        raise HTTPException(status_code=400, detail="Informe o valor a usar em pelo menos uma fatura")
+    services = []
+    for s in data.services:
+        description, cents = (s.description or "").strip(), _cents(s.amount)
+        if not description and cents <= 0:
+            continue
+        if not description:
+            raise HTTPException(status_code=400, detail="Descreva o serviço feito fora do sistema")
+        if cents <= 0:
+            raise HTTPException(status_code=400, detail=f"Informe o valor do serviço \"{description}\"")
+        services.append((description, cents))
+    if not allocations and not services:
+        raise HTTPException(status_code=400, detail="Informe o valor a usar em pelo menos uma fatura ou serviço")
     if len({i for i, _ in allocations}) != len(allocations):
         raise HTTPException(status_code=400, detail="A mesma fatura aparece duas vezes")
 
@@ -409,7 +424,7 @@ async def apply_credit(data: ClientCreditApply, current_user: dict = Depends(get
         if day < _invoice_day(inv):
             raise HTTPException(status_code=400, detail=f"{label}: a data da baixa não pode ser antes da emissão")
         invoices[invoice_id] = inv
-    total = sum(c for _, c in allocations)
+    total = sum(c for _, c in allocations) + sum(c for _, c in services)
     account = await db.client_credit_accounts.find_one({"client_id": client["id"]}, {"_id": 0}) or {}
     if total > account.get("balance_cents", 0):
         raise HTTPException(status_code=400, detail=f"Saldo de crédito insuficiente: o cliente tem {_brl(account.get('balance_cents', 0))} e a baixa soma {_brl(total)}")
@@ -427,6 +442,10 @@ async def apply_credit(data: ClientCreditApply, current_user: dict = Depends(get
         created.append(await _insert_entry(client, "USO", cents, day.isoformat(), current_user, sign=-1,
                                            invoice_id=inv["id"], invoice_number=inv["invoice_number"],
                                            notes=(data.notes or "").strip() or None))
+    for description, cents in services:
+        await _move_balance(client, -cents)
+        created.append(await _insert_entry(client, "SERVICO", cents, day.isoformat(), current_user, sign=-1,
+                                           description=description, notes=(data.notes or "").strip() or None))
     return {"entries": created, "balance": _money((await db.client_credit_accounts.find_one({"client_id": client["id"]}))["balance_cents"])}
 
 
@@ -490,8 +509,11 @@ async def build_statement(client_id: str, date_from: Optional[str], date_to: Opt
 def _entry_text(r: dict) -> str:
     if r["entry_type"] == "USO":
         text = f"Baixa na fatura #{r['invoice_number']}"
+    elif r["entry_type"] == "SERVICO":
+        text = f"Serviço fora do sistema: {r.get('description') or '-'}"
     elif r["entry_type"] == "ESTORNO":
         text = f"Estorno do lançamento #{r['reverses_entry_number']}" + (f" (fatura #{r['invoice_number']})" if r.get("invoice_number") else "")
+        text += f" ({r['description']})" if r.get("description") else ""
         text += f" - {r['reason']}" if r.get("reason") else ""
     else:
         text = TYPE_LABELS[r["entry_type"]] + (f" · {METHOD_LABELS.get(r['payment_method'], r['payment_method'])}" if r.get("payment_method") else "")
