@@ -422,6 +422,15 @@ export const api = {
   updateDailyRateRequestStatus: (id, status) => axios.put(`${API}/daily-rate-requests/${id}/update-status?new_status=${status}`),
   getDailyRateRequestPDF: (id) => axios.get(`${API}/daily-rate-requests/${id}/pdf`, { responseType: 'blob' }),
 
+  // Financeiro - Controle de Cheque
+  getChecks: (params) => axios.get(`${API}/checks`, { params }),
+  getChecksSummary: () => axios.get(`${API}/checks/summary`),
+  createCheck: (data) => axios.post(`${API}/checks`, data),
+  updateCheck: (id, data) => axios.put(`${API}/checks/${id}`, data),
+  deleteCheck: (id) => axios.delete(`${API}/checks/${id}`),
+  updateCheckStatus: (id, data) => axios.put(`${API}/checks/${id}/status`, data),
+  getChecksReportPDF: (params) => axios.get(`${API}/checks/report/pdf`, { params, responseType: 'blob' }),
+
   // Financeiro - Prestação de Contas
   getExpenseReports: (params) => axios.get(`${API}/expense-reports`, { params }),
   getExpenseReport: (id) => axios.get(`${API}/expense-reports/${id}`),

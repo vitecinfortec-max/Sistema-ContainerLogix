@@ -36,6 +36,7 @@ from routers.flex_tank import api_router as flex_tank_router
 from routers.frota import api_router as frota_router
 from routers.loading_schedule import api_router as loading_schedule_router
 from routers.daily_rate import api_router as daily_rate_router
+from routers.checks import api_router as checks_router
 from routers.delivery_status import api_router as delivery_status_router
 from routers.port_services import api_router as port_services_router
 from routers.unit_segregation import api_router as unit_segregation_router
@@ -177,6 +178,7 @@ app.include_router(flex_tank_router)
 app.include_router(frota_router)
 app.include_router(loading_schedule_router)
 app.include_router(daily_rate_router)
+app.include_router(checks_router)
 app.include_router(delivery_status_router)
 app.include_router(port_services_router)
 app.include_router(unit_segregation_router)
@@ -356,7 +358,7 @@ async def startup_event():
     # consulta mais comum de detalhe/edição/exclusão nessas coleções.
     for collection_name in (
         "movements", "invoices", "products", "stock_movements", "stock_entries",
-        "fuel_supplies", "fuel_supply_orders",
+        "fuel_supplies", "fuel_supply_orders", "checks",
     ):
         await db[collection_name].create_index("id")
     # Controle de Média km/L: abastecimentos de vários veículos em ordem cronológica.

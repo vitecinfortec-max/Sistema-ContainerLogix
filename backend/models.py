@@ -1914,6 +1914,62 @@ class DailyRateRequestResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+# ==================== FINANCEIRO - CONTROLE DE CHEQUE ====================
+
+# EMITIDO = entregue ao favorecido e ainda não descontado (em aberto);
+# COMPENSADO = descontado na conta; DEVOLVIDO = voltou do banco (sem fundos,
+# divergência...); CANCELADO = inutilizado/sustado.
+CHECK_STATUS_OPTIONS = ["EMITIDO", "COMPENSADO", "DEVOLVIDO", "CANCELADO"]
+
+
+class CheckCreate(BaseModel):
+    check_number: str
+    bank: str
+    agency: Optional[str] = None
+    account: Optional[str] = None
+    payee: str  # Favorecido (nominal a)
+    amount: float
+    issue_date: str  # Data de emissão (YYYY-MM-DD)
+    due_date: str  # Data de vencimento / "bom para" (YYYY-MM-DD)
+    description: Optional[str] = None  # Finalidade / referência (ex: NF 123)
+    observations: Optional[str] = None
+
+
+class CheckStatusUpdate(BaseModel):
+    status: str
+    compensation_date: Optional[str] = None  # obrigatório para COMPENSADO
+    return_reason: Optional[str] = None  # obrigatório para DEVOLVIDO
+
+
+class CheckHistoryEntry(BaseModel):
+    status: str
+    at: datetime
+    by_name: str
+    note: Optional[str] = None
+
+
+class CheckResponse(BaseModel):
+    id: str
+    check_number: str
+    bank: str
+    agency: Optional[str] = None
+    account: Optional[str] = None
+    payee: str
+    amount: float
+    issue_date: str
+    due_date: str
+    description: Optional[str] = None
+    observations: Optional[str] = None
+    status: str
+    compensation_date: Optional[str] = None
+    return_reason: Optional[str] = None
+    history: List[CheckHistoryEntry] = []
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
 # ==================== INTERNATIONAL INVOICE ====================
 
 class IntlInvoiceItem(BaseModel):

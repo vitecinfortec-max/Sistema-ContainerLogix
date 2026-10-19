@@ -88,6 +88,7 @@ const FleetPage = lazyPage(() => import('./pages/FleetPage'));
 const VehicleChecklistPage = lazyPage(() => import('./pages/VehicleChecklistPage'));
 const LoadingSchedulePage = lazyPage(() => import('./pages/LoadingSchedulePage'));
 const DailyRateRequestPage = lazyPage(() => import('./pages/DailyRateRequestPage'));
+const CheckControlPage = lazyPage(() => import('./pages/CheckControlPage'));
 const ExpenseReportsPage = lazyPage(() => import('./pages/ExpenseReportsPage'));
 const DeliveryStatusPage = lazyPage(() => import('./pages/DeliveryStatusPage'));
 const PortServicePage = lazyPage(() => import('./pages/PortServicePage'));
@@ -688,6 +689,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.diaria">
                 <DailyRateRequestPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/checks"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.controle_cheque">
+                <CheckControlPage />
               </ProtectedRoute>
             }
           />
