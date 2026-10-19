@@ -6,12 +6,14 @@ import shutil
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
+from typing import Optional
 
 from models import (
     ContainerVistoria, ContainerVistoriaCreate, ContainerVistoriaUpdate, ContainerVistoriaResponse,
     MAX_VISTORIA_PHOTOS, Driver, TransportCompany, VehicleCreate
 )
 
+from list_filters import combine, period_query, text_query
 from reports import generate_container_photo_document_pdf, photo_document_filename
 
 from shared import (
@@ -22,6 +24,24 @@ from shared import (
 api_router = APIRouter(prefix="/api")
 
 # ========== VISTORIA DE CONTAINER ==========
+
+VISTORIA_SEARCH_FIELDS = ("container_number", "client_name", "driver_name", "transport_company", "truck_plate", "shipping_line")
+DAMAGE_PATTERN = "^(COM_AVARIA|SEM_AVARIA|NAO_INFORMADO)$"
+
+
+def damage_query(damage: Optional[str]) -> dict:
+    """Estado marcado na vistoria: com avaria (algum item), sem avarias, ou nenhum dos dois"""
+    if damage == "SEM_AVARIA":
+        return {"no_damage": True}
+    if damage == "COM_AVARIA":
+        return {"no_damage": {"$ne": True}, "damage_items.0": {"$exists": True}}
+    if damage == "NAO_INFORMADO":
+        return {"no_damage": {"$ne": True}, "damage_items.0": {"$exists": False}}
+    return {}
+
+
+def vistoria_query(search=None, date_from=None, date_to=None, damage=None) -> dict:
+    return combine(text_query(VISTORIA_SEARCH_FIELDS, search), period_query("created_at", date_from, date_to), damage_query(damage))
 
 def _same_text(a, b) -> bool:
     return (a or '').strip().casefold() == (b or '').strip().casefold()
@@ -97,13 +117,19 @@ async def _pre_register_cadastros(vistoria: dict, current_user: dict) -> list:
 async def list_container_vistorias(
     page: int = 1,
     per_page: int = 20,
+    search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    damage: Optional[str] = Query(None, pattern=DAMAGE_PATTERN),
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Lista todas as vistorias de container"""
+    """Lista as vistorias de container. A busca e o período são feitos no
+    banco - antes a busca só olhava as vistorias da página aberta."""
     skip = (page - 1) * per_page
+    query = vistoria_query(search, date_from, date_to, damage)
 
-    total = await db.container_vistorias.count_documents({})
-    vistorias = await db.container_vistorias.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    total = await db.container_vistorias.count_documents(query)
+    vistorias = await db.container_vistorias.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
 
     return {
         "items": vistorias,

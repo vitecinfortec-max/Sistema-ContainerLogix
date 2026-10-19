@@ -7,13 +7,25 @@ import {
   StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Checkbox } from '../components/ui/checkbox';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import PeriodReportDialog from '../components/PeriodReportDialog';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { api } from '../lib/api';
 import { documentFilename, downloadDocumentsInBatch } from '../lib/batchDownload';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Plus, Eye, Printer, Trash2, Download, ShieldCheck } from 'lucide-react';
+import { Plus, Eye, Printer, Trash2, Download, ShieldCheck, FileBarChart } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+const DAMAGE_OPTIONS = [
+  { value: '', label: 'Todos' },
+  { value: 'COM_AVARIA', label: 'Com avaria' },
+  { value: 'SEM_AVARIA', label: 'Sem avarias' },
+  { value: 'NAO_INFORMADO', label: 'Estado não marcado' },
+];
 
 export default function ContainerVistoriasPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -21,6 +33,15 @@ export default function ContainerVistoriasPage() {
   const [vistorias, setVistorias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [damageFilter, setDamageFilter] = useState('');
+  const [reportOpen, setReportOpen] = useState(false);
+  const debouncedSearch = useDebouncedValue(searchTerm);
+  // Busca e período rodam no servidor: a lista vem paginada, e filtrar só a
+  // página aberta escondia os registros das outras páginas
+  const filterKey = `${debouncedSearch}|${dateFrom}|${dateTo}|${damageFilter}`;
+  const requestSeq = useRef(0);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [isDownloading, setIsDownloading] = useState(false);
   // Container e número de cada vistoria já listada - a seleção pode incluir
@@ -34,15 +55,24 @@ export default function ContainerVistoriasPage() {
   });
 
   useEffect(() => {
+    setPagination(prev => (prev.page === 1 ? prev : { ...prev, page: 1 }));
+  }, [filterKey]);
+
+  useEffect(() => {
     loadVistorias();
-  }, [pagination.page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, filterKey]);
 
   const loadVistorias = async () => {
     try {
-      const response = await api.getContainerVistorias({
-        page: pagination.page,
-        per_page: pagination.perPage
-      });
+      const seq = ++requestSeq.current;
+      const params = { page: pagination.page, per_page: pagination.perPage };
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+      if (damageFilter) params.damage = damageFilter;
+      const response = await api.getContainerVistorias(params);
+      if (seq !== requestSeq.current) return;
       setVistorias(response.data.items);
       response.data.items.forEach((item) => knownItems.current.set(item.id, item));
       setPagination(prev => ({
@@ -77,10 +107,7 @@ export default function ContainerVistoriasPage() {
 
   const getPhotoCount = (vistoria) => (vistoria.photos || []).length;
 
-  const filteredVistorias = vistorias.filter(v =>
-    v.container_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    v.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredVistorias = vistorias;
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -127,12 +154,34 @@ export default function ContainerVistoriasPage() {
           icon={ShieldCheck}
           title="Vistoria de Container"
           subtitle="Gerenciamento de vistorias de container"
+          actions={(
+            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="vistoria-period-report">
+              <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
+            </Button>
+          )}
         />
 
-        <FilterCard hasFilters={!!searchTerm} onClear={() => setSearchTerm('')}>
+        <FilterCard
+          hasFilters={!!(searchTerm || dateFrom || dateTo || damageFilter)}
+          onClear={() => { setSearchTerm(''); setDateFrom(''); setDateTo(''); setDamageFilter(''); }}
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <FilterField label="Container ou cliente" className="sm:col-span-2">
               <SearchInput value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} data-testid="search-vistoria" />
+            </FilterField>
+            <FilterField label="De">
+              <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="vistoria-date-from" />
+            </FilterField>
+            <FilterField label="Até">
+              <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="vistoria-date-to" />
+            </FilterField>
+            <FilterField label="Estado">
+              <Select value={damageFilter || 'ALL'} onValueChange={(v) => setDamageFilter(v === 'ALL' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="vistoria-damage-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DAMAGE_OPTIONS.map((o) => <SelectItem key={o.value || 'ALL'} value={o.value || 'ALL'}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </FilterField>
           </div>
         </FilterCard>
@@ -229,6 +278,27 @@ export default function ContainerVistoriasPage() {
           )}
         </DataCard>
       </div>
+      <PeriodReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        title="Relatório de Vistorias de Container"
+        description="Vistorias do período por cliente, com e sem avaria, os serviços mais frequentes e as vistorias incompletas (estado não marcado, sem fotos ou sem a EIR de entrada)."
+        periodLabel="Data do registro"
+        statuses={DAMAGE_OPTIONS}
+        statusParam="damage"
+        statusLabel="Estado"
+        textFilters={[{ key: 'search', label: 'Container, cliente, motorista ou placa' }]}
+        load={api.getVistoriasReport}
+        summarize={(d) => [
+          ['Registros', d.summary.count],
+          ['Sem avarias / com avaria', `${d.summary.SEM_AVARIA} / ${d.summary.COM_AVARIA}`],
+          ['Estado não marcado', d.summary.NAO_INFORMADO],
+          ['Sem fotos / sem EIR', `${d.summary.without_photos} / ${d.summary.without_eir}`],
+        ]}
+        downloadPdf={api.getVistoriasReportPdf}
+        downloadExcel={api.getVistoriasReportExcel}
+        filename="relatorio_vistorias"
+      />
       <ConfirmDialog />
     </Layout>
   );

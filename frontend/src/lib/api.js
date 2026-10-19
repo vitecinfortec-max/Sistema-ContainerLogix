@@ -285,6 +285,9 @@ export const api = {
   
   // Container Inspections (Registro Fotográfico)
   getContainerInspections: (params) => axios.get(`${API}/container-inspections`, { params }),
+  getInspectionsReport: (params) => axios.get(`${API}/reports/container-inspections`, { params }),
+  getInspectionsReportPdf: (params) => axios.get(`${API}/reports/container-inspections/pdf`, { params, responseType: 'blob' }),
+  getInspectionsReportExcel: (params) => axios.get(`${API}/reports/container-inspections/excel`, { params, responseType: 'blob' }),
   getContainerInspection: (id) => axios.get(`${API}/container-inspections/${id}`),
   getContainerInspectionPDF: (id) => axios.get(`${API}/container-inspections/${id}/pdf`, { responseType: 'blob' }),
   createContainerInspection: (data) => axios.post(`${API}/container-inspections`, data),
@@ -301,6 +304,9 @@ export const api = {
 
   // Vistoria de Container
   getContainerVistorias: (params) => axios.get(`${API}/container-vistorias`, { params }),
+  getVistoriasReport: (params) => axios.get(`${API}/reports/container-vistorias`, { params }),
+  getVistoriasReportPdf: (params) => axios.get(`${API}/reports/container-vistorias/pdf`, { params, responseType: 'blob' }),
+  getVistoriasReportExcel: (params) => axios.get(`${API}/reports/container-vistorias/excel`, { params, responseType: 'blob' }),
   getContainerVistoria: (id) => axios.get(`${API}/container-vistorias/${id}`),
   getContainerVistoriaPDF: (id) => axios.get(`${API}/container-vistorias/${id}/pdf`, { responseType: 'blob' }),
   createContainerVistoria: (data) => axios.post(`${API}/container-vistorias`, data),
@@ -455,6 +461,9 @@ export const api = {
   downloadExpensesReportExcel: (params) => axios.get(`${API}/reports/expenses/excel`, { params, responseType: 'blob' }),
 
   // Gestão de Container - relatório de compra e venda
+  getFreightReconciliation: (params) => axios.get(`${API}/reports/freight-reconciliation`, { params }),
+  downloadFreightReconciliationPdf: (params) => axios.get(`${API}/reports/freight-reconciliation/pdf`, { params, responseType: 'blob' }),
+  downloadFreightReconciliationExcel: (params) => axios.get(`${API}/reports/freight-reconciliation/excel`, { params, responseType: 'blob' }),
   getContainersReport: (params) => axios.get(`${API}/reports/containers`, { params }),
   downloadContainersReportPdf: (params) => axios.get(`${API}/reports/containers/pdf`, { params, responseType: 'blob' }),
   downloadContainersReportExcel: (params) => axios.get(`${API}/reports/containers/excel`, { params, responseType: 'blob' }),

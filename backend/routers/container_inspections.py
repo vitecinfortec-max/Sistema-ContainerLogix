@@ -6,13 +6,16 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
+from typing import Optional
 
 from models import (
     ContainerInspection, ContainerInspectionCreate, ContainerInspectionUpdate,
     ContainerInspectionResponse, MAX_CONTAINER_INSPECTION_PHOTOS
 )
 
+from list_filters import combine, period_query, text_query
 from reports import generate_container_photo_document_pdf, photo_document_filename
+from routers.container_vistorias import DAMAGE_PATTERN, damage_query
 
 from shared import (
     db, get_current_active_user, migrate_inspection_photos, validate_and_read_upload,
@@ -23,17 +26,28 @@ api_router = APIRouter(prefix="/api")
 
 # ========== REGISTRO FOTOGRÁFICO ==========
 
+INSPECTION_SEARCH_FIELDS = ("container_number", "client_name", "booking", "shipping_line_name", "container_seal")
+
+
+def inspection_query(search=None, date_from=None, date_to=None, damage=None) -> dict:
+    return combine(text_query(INSPECTION_SEARCH_FIELDS, search), period_query("created_at", date_from, date_to), damage_query(damage))
+
 @api_router.get("/container-inspections")
 async def list_container_inspections(
     page: int = 1,
     per_page: int = 20,
+    search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    damage: Optional[str] = Query(None, pattern=DAMAGE_PATTERN),
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Lista todos os registros fotográficos de container"""
+    """Lista os registros fotográficos de container, com busca e período feitos no banco"""
     skip = (page - 1) * per_page
-    
-    total = await db.container_inspections.count_documents({})
-    inspections = await db.container_inspections.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    query = inspection_query(search, date_from, date_to, damage)
+
+    total = await db.container_inspections.count_documents(query)
+    inspections = await db.container_inspections.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
     inspections = [migrate_inspection_photos(i) for i in inspections]
 
     return {

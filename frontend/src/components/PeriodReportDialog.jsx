@@ -34,13 +34,14 @@ async function saveBlob(request, params, filename) {
  * Relatório de conferência de um período (Diárias, Prestação de Contas...):
  * período (padrão: mês atual), situação, filtros de texto e opções, prévia
  * dos totais e download em PDF/Excel com os mesmos filtros.
- * - `statuses`: [{ value, label }] - o primeiro é o padrão ('' = sem filtro)
+ * - `statuses`: [{ value, label }] - o primeiro é o padrão ('' = sem filtro);
+ *   vai no parâmetro `statusParam`, com o rótulo `statusLabel`
  * - `textFilters`: [{ key, label }]; `checkboxes`: [{ key, label }]
  * - `load(params)`: busca a prévia; `summarize(data)`: [[rótulo, valor], ...]
  */
 export default function PeriodReportDialog({
   open, onOpenChange, title, description, periodLabel = 'Período', statuses = [], textFilters = [], checkboxes = [],
-  load, summarize, downloadPdf, downloadExcel, filename,
+  load, summarize, downloadPdf, downloadExcel, filename, statusParam = 'status', statusLabel = 'Situação',
 }) {
   const [[dateFrom, dateTo], setPeriod] = useState(currentMonth);
   const [status, setStatus] = useState(statuses[0]?.value ?? '');
@@ -54,7 +55,7 @@ export default function PeriodReportDialog({
     const p = {};
     if (dateFrom) p.date_from = dateFrom;
     if (dateTo) p.date_to = dateTo;
-    if (status) p.status = status;
+    if (status) p[statusParam] = status;
     Object.entries(debouncedTexts).forEach(([k, v]) => { if (v && v.trim()) p[k] = v.trim(); });
     Object.entries(flags).forEach(([k, v]) => { if (v) p[k] = true; });
     return p;
@@ -99,7 +100,7 @@ export default function PeriodReportDialog({
             <Input type="date" className="h-9" value={dateTo} onChange={(e) => setPeriod([dateFrom, e.target.value])} data-testid="period-report-to" />
           </Field>
           {statuses.length > 0 && (
-            <Field label="Situação">
+            <Field label={statusLabel}>
               <Select value={status || 'ALL'} onValueChange={(v) => setStatus(v === 'ALL' ? '' : v)}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>

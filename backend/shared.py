@@ -530,6 +530,8 @@ MODULE_CATALOG = [
 PATH_MODULE_MAP = [
     ("/api/container-inspections", "terminal.vistoria"),
     ("/api/container-vistorias", "terminal.vistoria_container"),
+    ("/api/reports/container-inspections", "terminal.vistoria"),
+    ("/api/reports/container-vistorias", "terminal.vistoria_container"),
     ("/api/reports/movements", "terminal.movimentacoes"),
     ("/api/movements", "terminal.movimentacoes"),
     ("/api/yard-control", "terminal.movimentacoes"),
@@ -571,6 +573,7 @@ PATH_MODULE_MAP = [
     ("/api/checks", "financeiro.controle_cheque"),
     ("/api/rpa-terceiro", "financeiro.rpa_terceiro"),
     ("/api/freight-payments", "financeiro.pagamento_frete"),
+    ("/api/reports/freight-reconciliation", "financeiro.pagamento_frete"),
     ("/api/ordem-servico", "frota.ordem_servico"),
     ("/api/os-categories", "frota.cadastro_categoria"),
     ("/api/fuel-supply-orders", "frota.ordem_abastecimento"),

@@ -13,10 +13,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
+import PeriodReportDialog from '../components/PeriodReportDialog';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { HandCoins, CheckCircle2, RotateCcw, Pencil, Download, FileText, FileSpreadsheet, Receipt, Clock, ListChecks } from 'lucide-react';
+import { HandCoins, CheckCircle2, RotateCcw, Pencil, Download, FileText, FileSpreadsheet, Receipt, Clock, ListChecks, FileBarChart } from 'lucide-react';
 
 const STATUS_LABELS = { PENDENTE: 'Pendente', PAGO: 'Pago', CANCELADO: 'Cancelado' };
 const STATUS_TONES = {
@@ -47,6 +48,7 @@ export default function FreightPaymentsPage() {
   const [saving, setSaving] = useState(false);
 
   const [generating, setGenerating] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
 
   const [batches, setBatches] = useState([]);
@@ -244,6 +246,11 @@ export default function FreightPaymentsPage() {
           icon={HandCoins}
           title="Pagamento Frete"
           subtitle="Lançamentos gerados a partir das Ordens de Coleta aprovadas em rotas cadastradas"
+          actions={(
+            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="freight-reconciliation-report">
+              <FileBarChart className="w-4 h-4 mr-1.5" /> Conferência com as ordens
+            </Button>
+          )}
         />
 
         <StatGrid>
@@ -450,6 +457,24 @@ export default function FreightPaymentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PeriodReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        title="Conferência de Ordens x Pagamento Frete"
+        description="Confere as Ordens de Coleta com os lançamentos de frete: ordem aprovada sem frete, coleta sem rota, valor diferente do da ordem e frete ativo de ordem cancelada ou excluída. Traz também os totais por transportadora."
+        periodLabel="Data da ordem"
+        textFilters={[{ key: 'transport_company', label: 'Transportadora' }]}
+        load={api.getFreightReconciliation}
+        summarize={(d) => [
+          ['Ordens de coleta', d.summary.orders],
+          ['Frete', formatMoney(d.summary.total)],
+          ['Pago / a pagar', `${formatMoney(d.summary.paid)} / ${formatMoney(d.summary.pending)}`],
+          ['Divergências', d.summary.issues],
+        ]}
+        downloadPdf={api.downloadFreightReconciliationPdf}
+        downloadExcel={api.downloadFreightReconciliationExcel}
+        filename="conferencia_frete"
+      />
     </Layout>
   );
 }

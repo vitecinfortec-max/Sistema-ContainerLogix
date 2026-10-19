@@ -249,6 +249,7 @@ function LayoutFrame({ children }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsRef = useRef(null);
   const [yardAlert, setYardAlert] = useState({ over_60: 0, over_90: 0 });
+  const [financialAlerts, setFinancialAlerts] = useState([]);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -261,6 +262,7 @@ function LayoutFrame({ children }) {
             over_60: res.data.yard_over_60_days || 0,
             over_90: res.data.yard_over_90_days || 0,
           });
+          setFinancialAlerts(res.data.financial || []);
         }
       } catch (err) {
         // Falha ao buscar alertas não deve quebrar a navegação — só não mostra o aviso
@@ -304,7 +306,7 @@ function LayoutFrame({ children }) {
   useWebSocket(handleWsNotification);
 
   const hasYardAlert = yardAlert.over_60 > 0;
-  const unreadNotificationsCount = notifications.filter((n) => !n.read).length + (hasYardAlert ? 1 : 0);
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length + (hasYardAlert ? 1 : 0) + financialAlerts.length;
 
   const toggleNotifications = () => {
     setNotificationsOpen((prev) => {
@@ -958,7 +960,20 @@ function LayoutFrame({ children }) {
                     )}
                   </button>
                 )}
-                {notifications.length === 0 && !hasYardAlert ? (
+                {financialAlerts.map((a) => (
+                  <button
+                    key={a.key}
+                    onClick={() => { navigate(a.path); setNotificationsOpen(false); }}
+                    className={`w-full text-left px-4 py-3 border-b border-slate-100 dark:border-slate-800 transition-colors ${
+                      a.tone === 'red' ? 'bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50' : 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-950/50'
+                    }`}
+                    data-testid={`financial-alert-${a.key}`}
+                  >
+                    <p className={`text-sm font-medium ${a.tone === 'red' ? 'text-red-800 dark:text-red-300' : 'text-amber-800 dark:text-amber-300'}`}>{a.title}</p>
+                    <p className={`text-xs mt-0.5 ${a.tone === 'red' ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>{a.description}</p>
+                  </button>
+                ))}
+                {notifications.length === 0 && !hasYardAlert && financialAlerts.length === 0 ? (
                   <p className="px-4 py-6 text-sm text-slate-400 dark:text-slate-500 text-center">Nenhuma notificação por enquanto</p>
                 ) : (
                   notifications.map((n) => (
