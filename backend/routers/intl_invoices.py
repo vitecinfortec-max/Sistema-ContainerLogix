@@ -4,6 +4,7 @@ import io
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
 from models import IntlInvoiceCreate
@@ -62,15 +63,19 @@ async def get_intl_invoices(
     per_page: int = Query(20, ge=1, le=200),
     status: Optional[str] = None,
     currency: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Lista todas as invoices internacionais"""
+    """Lista as invoices internacionais (período pela data de emissão)"""
     query = {}
     if status:
         query["status"] = status
     if currency:
         query["currency"] = currency
     
+    query = combine(query, period_query("created_at", date_from, date_to))
+
     total = await db.intl_invoices.count_documents(query)
     skip = (page - 1) * per_page
     

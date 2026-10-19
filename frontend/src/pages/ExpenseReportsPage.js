@@ -5,7 +5,7 @@ import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  FilterCard, PeriodFilterFields, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
@@ -92,11 +92,14 @@ export default function ExpenseReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [period, setPeriod] = useState(['', '']);
+  const changePeriod = (value) => { setPeriod(value); setPagination(prev => ({ ...prev, page: 1 })); };
+
   useEffect(() => {
     loadReports();
     setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, debouncedSearch]);
+  }, [pagination.page, debouncedSearch, period]);
 
   const loadSuppliers = async () => {
     try {
@@ -112,6 +115,8 @@ export default function ExpenseReportsPage() {
     try {
       const params = { page: pagination.page, per_page: 15 };
       if (search) params.search = search;
+      if (period[0]) params.date_from = period[0];
+      if (period[1]) params.date_to = period[1];
 
       const response = await api.getExpenseReports(params);
       setReports(response.data.items);
@@ -129,6 +134,7 @@ export default function ExpenseReportsPage() {
 
   const clearSearch = () => {
     setSearchQuery('');
+    setPeriod(['', '']);
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
@@ -430,7 +436,7 @@ export default function ExpenseReportsPage() {
           )}
         />
 
-        <FilterCard hasFilters={!!searchQuery} onClear={clearSearch}>
+        <FilterCard hasFilters={!!(searchQuery || period[0] || period[1])} onClear={clearSearch}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <FilterField label="Número ou fornecedor">
               <SearchInput
@@ -439,6 +445,7 @@ export default function ExpenseReportsPage() {
                 data-testid="search-expense-report-input"
               />
             </FilterField>
+            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="expense" />
           </div>
         </FilterCard>
 

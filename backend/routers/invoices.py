@@ -4,6 +4,7 @@ import io
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
 from models import (
@@ -54,8 +55,9 @@ def _parse_due_date(value: Optional[str], issued: date) -> Optional[str]:
     return due.isoformat()
 
 
-def _invoice_list_query(client_name: Optional[str], status: Optional[str]) -> dict:
-    query = {}
+def _invoice_list_query(client_name: Optional[str], status: Optional[str],
+                        date_from: Optional[str] = None, date_to: Optional[str] = None) -> dict:
+    query = period_query("created_at", date_from, date_to)
     if client_name:
         query['client_name'] = {"$regex": re.escape(client_name), "$options": "i"}
     if status == 'PENDENTE':
@@ -262,10 +264,12 @@ async def get_invoices(
     per_page: int = Query(15, ge=1, le=1000),
     client_name: Optional[str] = None,
     status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Lista todas as faturas com paginação"""
-    query = _invoice_list_query(client_name, status)
+    """Lista as faturas com paginação (período pela data de emissão)"""
+    query = _invoice_list_query(client_name, status, date_from, date_to)
     
     skip = (page - 1) * per_page
     
@@ -280,10 +284,12 @@ async def get_invoices(
 async def get_invoices_count(
     client_name: Optional[str] = None,
     status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user)
 ):
     """Retorna a contagem total de faturas"""
-    count = await db.invoices.count_documents(_invoice_list_query(client_name, status))
+    count = await db.invoices.count_documents(_invoice_list_query(client_name, status, date_from, date_to))
     return {"count": count}
 
 

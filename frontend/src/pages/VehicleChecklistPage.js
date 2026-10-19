@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  FilterCard, PeriodFilterFields, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   StatusPill, PlateTag, EmptyState, TablePagination, StatCard, StatGrid,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
@@ -214,10 +214,13 @@ export default function VehicleChecklistPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  const [period, setPeriod] = useState(['', '']);
+  const changePeriod = (value) => { setPeriod(value); setPagination(prev => (prev.page === 1 ? prev : { ...prev, page: 1 })); };
+
   useEffect(() => {
     loadChecklists();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, appliedSearch, resultFilter]);
+  }, [pagination.page, appliedSearch, resultFilter, period]);
 
   const loadSelectData = async () => {
     try {
@@ -247,6 +250,8 @@ export default function VehicleChecklistPage() {
       const params = { page: pagination.page, per_page: PAGE_SIZE };
       if (appliedSearch) params.search = appliedSearch;
       if (resultFilter) params.result = resultFilter;
+      if (period[0]) params.date_from = period[0];
+      if (period[1]) params.date_to = period[1];
       const [response, statsResponse] = await Promise.all([
         api.getVehicleChecklists(params),
         // Os indicadores são um extra: se falharem, a lista continua funcionando
@@ -266,6 +271,7 @@ export default function VehicleChecklistPage() {
   const clearFilters = () => {
     setSearchQuery('');
     setResultFilter('');
+    setPeriod(['', '']);
   };
 
   const applyResultFilter = (value) => {
@@ -466,7 +472,7 @@ export default function VehicleChecklistPage() {
   };
 
   const singleSelectedChecklist = selectedIds.size === 1 ? checklists.find((c) => c.id === [...selectedIds][0]) : null;
-  const hasFilters = !!searchQuery || !!resultFilter;
+  const hasFilters = !!searchQuery || !!resultFilter || !!period[0] || !!period[1];
   const detailIsSimple = selectedChecklist?.checklist_kind === 'simple';
 
   return (
@@ -524,6 +530,7 @@ export default function VehicleChecklistPage() {
                 })}
               </div>
             </FilterField>
+            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="checklist" />
           </div>
         </FilterCard>
 

@@ -4,8 +4,18 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Iterable, Optional
 import re
 
+from fastapi import HTTPException
+
 from reports import BRT_TZ
-from routers.movements import _parse_filter_day
+
+
+def _parse_filter_day(value: str, field: str):
+    """Mesma regra de routers.movements._parse_filter_day (copiada para este
+    módulo não depender dos routers): data inválida vira 400."""
+    try:
+        return datetime.fromisoformat(value).date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Data inválida em {field}: use o formato AAAA-MM-DD")
 
 
 def period_query(field: str, date_from: Optional[str], date_to: Optional[str]) -> dict:

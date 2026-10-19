@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
 import uuid
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 import io
 
@@ -52,13 +55,23 @@ async def _get_expected_stock_for_client(client_name: str) -> list:
 async def list_container_audits(
     page: int = 1,
     per_page: int = 20,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
-    """Lista todas as auditorias de estoque"""
+    """Lista as auditorias de estoque. Busca (código, cliente, container) e
+    período rodam no banco - antes a busca só olhava a página aberta."""
     skip = (page - 1) * per_page
+    query = combine(
+        text_query(("audit_code", "client_name", "items.container_number"), search),
+        {"status": status} if status else {},
+        period_query("created_at", date_from, date_to),
+    )
 
-    total = await db.container_audits.count_documents({})
-    audits = await db.container_audits.find({}, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
+    total = await db.container_audits.count_documents(query)
+    audits = await db.container_audits.find(query, {"_id": 0}).sort("created_at", -1).skip(skip).limit(per_page).to_list(per_page)
 
     return {
         "items": audits,

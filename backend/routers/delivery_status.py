@@ -4,6 +4,7 @@ import io
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
+from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
 from models import DeliveryStatus, DeliveryStatusCreate, DeliveryStatusResponse
@@ -27,6 +28,8 @@ async def get_delivery_statuses(
     status: Optional[str] = None,
     schedule_number: Optional[int] = None,
     search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todos os status de entrega com paginação e filtros"""
@@ -41,6 +44,7 @@ async def get_delivery_statuses(
             {"items.driver_name": {"$regex": term, "$options": "i"}},
             {"items.container_number": {"$regex": term, "$options": "i"}},
         ]
+    query = combine(query, period_query("created_at", date_from, date_to))
     # Indicadores pela busca, sem o filtro de status (mostram a divisão)
     by_status = {"ATIVO": 0, "CONCLUIDO": 0, "CANCELADO": 0}
     async for row in db.delivery_statuses.aggregate([{"$match": dict(query)}, {"$group": {"_id": "$status", "n": {"$sum": 1}}}]):

@@ -4,6 +4,7 @@ import io
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
+from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel as PydanticBaseModel
 
@@ -40,6 +41,8 @@ async def get_unit_segregations(
     status: Optional[str] = None,
     client_id: Optional[str] = None,
     container_number: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     current_user: dict = Depends(get_current_active_user)
 ):
     """Lista todas as segregações de unidade com filtros"""
@@ -52,6 +55,8 @@ async def get_unit_segregations(
     if container_number:
         # Buscar nos itens
         query["items.container_number"] = {"$regex": re.escape(container_number), "$options": "i"}
+
+    query = combine(query, period_query("created_at", date_from, date_to))
 
     total = await db.unit_segregations.count_documents(query)
     skip = (page - 1) * per_page

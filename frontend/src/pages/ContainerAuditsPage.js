@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
+  FilterCard, PeriodFilterFields, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Checkbox } from '../components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -29,16 +31,37 @@ export default function ContainerAuditsPage() {
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [period, setPeriod] = useState(['', '']);
+  const debouncedSearch = useDebouncedValue(searchTerm.trim());
+  // Busca e período rodam no servidor: filtrar só a página aberta escondia
+  // as auditorias das outras páginas
+  const filterKey = `${debouncedSearch}|${statusFilter}|${period.join('|')}`;
+  const requestSeq = useRef(0);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [pagination, setPagination] = useState({ page: 1, perPage: 20, total: 0, totalPages: 0 });
 
   useEffect(() => {
+    setPagination(prev => (prev.page === 1 ? prev : { ...prev, page: 1 }));
+  }, [filterKey]);
+
+  useEffect(() => {
     loadAudits();
-  }, [pagination.page]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, filterKey]);
+
+  const changePeriod = (value) => setPeriod(value);
 
   const loadAudits = async () => {
     try {
-      const response = await api.getContainerAudits({ page: pagination.page, per_page: pagination.perPage });
+      const seq = ++requestSeq.current;
+      const params = { page: pagination.page, per_page: pagination.perPage };
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (statusFilter) params.status = statusFilter;
+      if (period[0]) params.date_from = period[0];
+      if (period[1]) params.date_to = period[1];
+      const response = await api.getContainerAudits(params);
+      if (seq !== requestSeq.current) return;
       setAudits(response.data.items);
       setPagination(prev => ({ ...prev, total: response.data.total, totalPages: response.data.total_pages }));
     } catch (error) {
@@ -67,10 +90,7 @@ export default function ContainerAuditsPage() {
 
   const getDivergenceCount = (audit) => (audit.items || []).filter(i => i.status === 'FALTANTE' || i.status === 'NAO_ESPERADO').length;
 
-  const filteredAudits = audits.filter(a =>
-    a.audit_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAudits = audits;
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -102,11 +122,24 @@ export default function ContainerAuditsPage() {
           subtitle="Confronto entre o estoque do sistema e o que foi encontrado fisicamente no pátio"
         />
 
-        <FilterCard hasFilters={!!searchTerm} onClear={() => setSearchTerm('')}>
+        <FilterCard
+          hasFilters={!!(searchTerm || statusFilter || period[0] || period[1])}
+          onClear={() => { setSearchTerm(''); setStatusFilter(''); setPeriod(['', '']); }}
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <FilterField label="Código ou cliente" className="sm:col-span-2">
+            <FilterField label="Código, cliente ou container" className="sm:col-span-2">
               <SearchInput value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} data-testid="search-audit" />
             </FilterField>
+            <FilterField label="Status">
+              <Select value={statusFilter || 'ALL'} onValueChange={(v) => setStatusFilter(v === 'ALL' ? '' : v)}>
+                <SelectTrigger className="h-9 text-sm" data-testid="audit-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos</SelectItem>
+                  {Object.entries(STATUS_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="audit" />
           </div>
         </FilterCard>
 

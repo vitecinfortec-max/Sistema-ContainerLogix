@@ -6,6 +6,7 @@ import shutil
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
 from models import ExpenseReportPurchase, ExpenseReportCreate, ExpenseReportResponse
@@ -61,11 +62,13 @@ async def resolve_expense_report_purchases(purchases: list) -> list:
 async def get_expense_reports(
     search: Optional[str] = None,
     status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Lista as prestações de contas"""
+    """Lista as prestações de contas (período pela data de abertura)"""
     query = {}
 
     if search:
@@ -77,6 +80,8 @@ async def get_expense_reports(
 
     if status:
         query["status"] = status
+
+    query = combine(query, period_query("created_at", date_from, date_to))
 
     total = await db.expense_reports.count_documents(query)
     skip = (page - 1) * per_page

@@ -132,6 +132,21 @@ export function FilterField({ label, children, className }) {
 }
 
 /** Campo de busca com lupa - o padrão "digite para filtrar" dos filtros. */
+/** Campos "De" / "Até" (dia) de um FilterCard. `value` = [de, até] em 'YYYY-MM-DD'. */
+export function PeriodFilterFields({ value, onChange, testIdPrefix = 'period' }) {
+  const [from, to] = value;
+  return (
+    <>
+      <FilterField label="De">
+        <Input type="date" className="h-9 text-sm" value={from} onChange={(e) => onChange([e.target.value, to])} data-testid={`${testIdPrefix}-date-from`} />
+      </FilterField>
+      <FilterField label="Até">
+        <Input type="date" className="h-9 text-sm" value={to} onChange={(e) => onChange([from, e.target.value])} data-testid={`${testIdPrefix}-date-to`} />
+      </FilterField>
+    </>
+  );
+}
+
 export function SearchInput({ value, onChange, className, ...props }) {
   return (
     <div className="relative">

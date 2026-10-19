@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  FilterCard, FilterField, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState, TablePagination,
+  FilterCard, PeriodFilterFields, FilterField, DataCard, Toolbar, ToolbarButton, ToolbarPrimary, StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -108,12 +108,15 @@ export default function InternationalInvoicePage() {
   // Estado de Seleção (toolbar)
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
+  const [period, setPeriod] = useState(['', '']);
+  const changePeriod = (value) => { setPeriod(value); setCurrentPage(1); };
+
   useEffect(() => {
     loadInvoices();
     loadClients();
     loadReceiverData();
     setSelectedIds(new Set());
-  }, [currentPage, filterStatus, filterCurrency]);
+  }, [currentPage, filterStatus, filterCurrency, period]);
 
   // Fecha os dropdowns de autocomplete de cliente ao clicar fora - sem isso eles
   // ficavam abertos sobre o formulário até o usuário selecionar um cliente.
@@ -136,6 +139,8 @@ export default function InternationalInvoicePage() {
       const params = { page: currentPage, per_page: ITEMS_PER_PAGE };
       if (filterStatus) params.status = filterStatus;
       if (filterCurrency) params.currency = filterCurrency;
+      if (period[0]) params.date_from = period[0];
+      if (period[1]) params.date_to = period[1];
       
       const res = await api.getIntlInvoices(params);
       setInvoices(res.data.items || []);
@@ -585,8 +590,8 @@ export default function InternationalInvoicePage() {
         <PageHeader icon={Globe} title="Invoices Internacionais" subtitle="Gerencie suas faturas para clientes internacionais" />
 
         <FilterCard
-          hasFilters={!!(filterStatus || filterCurrency)}
-          onClear={() => { setFilterStatus(''); setFilterCurrency(''); }}
+          hasFilters={!!(filterStatus || filterCurrency || period[0] || period[1])}
+          onClear={() => { setFilterStatus(''); setFilterCurrency(''); setPeriod(['', '']); }}
         >
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <FilterField label="Status">
@@ -615,6 +620,7 @@ export default function InternationalInvoicePage() {
                 </SelectContent>
               </Select>
             </FilterField>
+            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="intl-invoice" />
           </div>
         </FilterCard>
 

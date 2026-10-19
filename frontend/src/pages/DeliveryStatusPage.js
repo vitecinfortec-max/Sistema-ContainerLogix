@@ -3,7 +3,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, SearchInput,
-  FilterCard, FilterField, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
+  FilterCard, PeriodFilterFields, FilterField, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
   StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
@@ -70,11 +70,14 @@ export default function DeliveryStatusPage() {
   const debouncedText = useDebouncedValue(textSearch.trim());
   const [stats, setStats] = useState({ ATIVO: 0, CONCLUIDO: 0, CANCELADO: 0 });
 
+  const [period, setPeriod] = useState(['', '']);
+  const changePeriod = (value) => { setPeriod(value); setPagination(prev => ({ ...prev, page: 1 })); };
+
   useEffect(() => {
     loadStatuses();
     setSelectedIds(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, debouncedNumber, statusFilter, debouncedText]);
+  }, [pagination.page, debouncedNumber, statusFilter, debouncedText, period]);
 
   const loadStatuses = async (filters = { number: debouncedNumber, status: statusFilter, text: debouncedText }) => {
     try {
@@ -82,6 +85,8 @@ export default function DeliveryStatusPage() {
       if (filters.number) params.schedule_number = filters.number;
       if (filters.status) params.status = filters.status;
       if (filters.text) params.search = filters.text;
+      if (period[0]) params.date_from = period[0];
+      if (period[1]) params.date_to = period[1];
       const response = await api.getDeliveryStatuses(params);
       setStatuses(response.data.items);
       if (response.data.stats) setStats(response.data.stats);
@@ -97,6 +102,7 @@ export default function DeliveryStatusPage() {
     setSearchQuery('');
     setTextSearch('');
     setStatusFilter('');
+    setPeriod(['', '']);
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
@@ -320,7 +326,7 @@ export default function DeliveryStatusPage() {
           <StatCard label="Cancelados" value={stats.CANCELADO} icon={XCircle} tone="red" />
         </StatGrid>
 
-        <FilterCard hasFilters={!!(searchQuery || statusFilter || textSearch)} onClear={clearFilters}>
+        <FilterCard hasFilters={!!(searchQuery || statusFilter || textSearch || period[0] || period[1])} onClear={clearFilters}>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <FilterField label="Cliente, motorista ou container" className="col-span-2">
               <SearchInput
@@ -351,6 +357,7 @@ export default function DeliveryStatusPage() {
                 </SelectContent>
               </Select>
             </FilterField>
+            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="delivery-status" />
           </div>
         </FilterCard>
 

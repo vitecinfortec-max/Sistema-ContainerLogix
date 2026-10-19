@@ -6,6 +6,7 @@ import shutil
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
 from models import (
@@ -286,12 +287,14 @@ async def get_vehicle_checklist_stats(
 async def get_vehicle_checklists(
     search: Optional[str] = None,
     result: Optional[str] = Query(None, pattern="^(APROVADO|REPROVADO|PENDENTE)$"),
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
     current_user: dict = Depends(get_current_active_user)
 ):
     """Lista os checklists de veículo com paginação, busca por placa/motorista/vistoriador/cliente e filtro por resultado"""
-    query = _vehicle_checklist_search_query(search)
+    query = combine(_vehicle_checklist_search_query(search), period_query("created_at", date_from, date_to))
     skip = (page - 1) * per_page
 
     if result:

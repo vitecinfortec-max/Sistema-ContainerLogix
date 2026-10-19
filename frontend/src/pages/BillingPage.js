@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
-  StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
+  StatCard, StatGrid, FilterCard, PeriodFilterFields, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
   StatusPill, UserTag, EmptyState, TablePagination, PageSkeleton,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
@@ -130,17 +130,23 @@ export default function BillingPage() {
     loadClients();
   }, []);
 
+  const [period, setPeriod] = useState(['', '']);
+  const changePeriod = (value) => { setPeriod(value); setCurrentPage(1); };
+
   useEffect(() => {
     loadInvoices();
     setSelectedIds(new Set());
-  }, [currentPage, appliedClient, statusFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, appliedClient, statusFilter, period]);
 
   // Só a primeira carga mostra o esqueleto da tela: recarregar (ao filtrar,
   // trocar de página ou salvar) mantém a lista na tela e o foco no filtro.
   const loadInvoices = async () => {
     try {
       const clientParams = appliedClient ? { client_name: appliedClient } : {};
-      const listParams = statusFilter ? { ...clientParams, status: statusFilter } : clientParams;
+      const listParams = statusFilter ? { ...clientParams, status: statusFilter } : { ...clientParams };
+      if (period[0]) listParams.date_from = period[0];
+      if (period[1]) listParams.date_to = period[1];
       const [invoicesRes, countRes, statsRes] = await Promise.all([
         api.getInvoices({ page: currentPage, per_page: ITEMS_PER_PAGE, ...listParams }),
         api.getInvoicesCount(listParams),
@@ -733,6 +739,7 @@ export default function BillingPage() {
   const clearClientFilter = () => {
     setClientFilter('');
     setStatusFilter('');
+    setPeriod(['', '']);
     setCurrentPage(1);
   };
 
@@ -764,7 +771,7 @@ export default function BillingPage() {
           </StatGrid>
         )}
 
-        <FilterCard hasFilters={!!appliedClient || !!clientFilter || !!statusFilter} onClear={clearClientFilter}>
+        <FilterCard hasFilters={!!appliedClient || !!clientFilter || !!statusFilter || !!period[0] || !!period[1]} onClear={clearClientFilter}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <FilterField label="Cliente">
               <SearchInput
@@ -789,6 +796,7 @@ export default function BillingPage() {
                 </SelectContent>
               </Select>
             </FilterField>
+            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="invoice" />
           </div>
         </FilterCard>
 

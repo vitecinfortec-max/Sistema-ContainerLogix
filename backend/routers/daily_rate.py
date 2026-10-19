@@ -5,6 +5,7 @@ import re
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
 from models import DailyRateRequestItem, DailyRateRequestCreate, DailyRateRequestResponse
@@ -54,11 +55,13 @@ def _build_daily_rate_items(data: DailyRateRequestCreate):
 async def get_daily_rate_requests(
     search: Optional[str] = None,
     status: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     page: int = 1,
     per_page: int = 20,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Lista todas as solicitações de diária"""
+    """Lista as solicitações de diária (período pela data de lançamento)"""
     query = {}
 
     if search:
@@ -71,6 +74,7 @@ async def get_daily_rate_requests(
 
     if status:
         query["status"] = status
+    query = combine(query, period_query("created_at", date_from, date_to))
 
     total = await db.daily_rate_requests.count_documents(query)
     skip = (page - 1) * per_page
