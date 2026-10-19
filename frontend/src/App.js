@@ -115,6 +115,7 @@ const ContainerPurchasesPage = lazyPage(() => import('./pages/ContainerPurchases
 const ContainerSalesPage = lazyPage(() => import('./pages/ContainerSalesPage'));
 const CompanySettingsPage = lazyPage(() => import('./pages/CompanySettingsPage'));
 const UsersPage = lazyPage(() => import('./pages/UsersPage'));
+const AuditLogPage = lazyPage(() => import('./pages/AuditLogPage'));
 const ModulesPage = lazyPage(() => import('./pages/ModulesPage'));
 
 const PageLoader = () => (
@@ -365,6 +366,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <CompanySettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/audit-log"
+            element={
+              <ProtectedRoute adminOnly>
+                <AuditLogPage />
               </ProtectedRoute>
             }
           />

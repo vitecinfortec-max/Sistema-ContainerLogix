@@ -17,6 +17,7 @@ from collections import defaultdict
 from fastapi import Depends, HTTPException, Request, UploadFile, WebSocket, status
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+from audit import AuditedDatabase, set_actor
 
 from auth import get_current_user
 
@@ -196,7 +197,8 @@ mongo_url = os.environ['MONGO_URL']
 # voltavam "sem fuso", a API as mandava sem o "+00:00" e o navegador as lia
 # como hora local - tudo aparecia 3 horas adiantado.
 client = AsyncIOMotorClient(mongo_url, tz_aware=True, tzinfo=timezone.utc)
-db = client[os.environ['DB_NAME']]
+# Toda gravação feita por um usuário logado entra no log de auditoria (audit.py)
+db = AuditedDatabase(client[os.environ['DB_NAME']])
 
 
 # Quem ainda precisa trocar a senha provisória só alcança o necessário pra
@@ -243,6 +245,9 @@ async def _load_session_user(request: Request, current_user: dict, extra_fields:
         )
     if user_doc.get('must_change_password') and not request.url.path.startswith(_PASSWORD_CHANGE_ALLOWED_PREFIXES):
         raise HTTPException(status_code=403, detail="Troque sua senha provisória para continuar usando o sistema")
+    # Daqui em diante, o que esta requisição gravar no banco sai no log em nome dele
+    set_actor(current_user['sub'], current_user.get('name') or current_user.get('email') or 'Usuário',
+              client_ip(request), request.method, request.url.path)
     return user_doc
 
 

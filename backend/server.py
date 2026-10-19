@@ -56,6 +56,7 @@ from routers.stock import api_router as stock_router
 from routers.epi_deliveries import api_router as epi_deliveries_router
 from routers.expense_reports import api_router as expense_reports_router
 from routers.users import api_router as users_router
+from routers.audit_log import api_router as audit_log_router
 from routers.module_config import api_router as module_config_router
 from scheduled_reports import api_router as scheduled_reports_router, start_scheduler, stop_scheduler
 
@@ -198,6 +199,7 @@ app.include_router(stock_router)
 app.include_router(epi_deliveries_router)
 app.include_router(expense_reports_router)
 app.include_router(users_router)
+app.include_router(audit_log_router)
 app.include_router(module_config_router)
 app.include_router(scheduled_reports_router)
 
@@ -331,6 +333,17 @@ async def startup_event():
         await _seed_counter(
             f"rpa_number:{existing_rpa_type}", db.rpa_terceiro, "rpa_number", {"rpa_type": existing_rpa_type}
         )
+
+    # Log de auditoria (audit.py): consultas por data, usuário e registro, e
+    # limpeza automática do que passar do prazo de guarda (padrão: 2 anos).
+    try:
+        retention_days = int(os.environ.get("AUDIT_LOG_RETENTION_DAYS", "730"))
+        await db.audit_log.create_index("at", expireAfterSeconds=retention_days * 86400)
+        await db.audit_log.create_index([("user_id", 1), ("at", -1)])
+        await db.audit_log.create_index("doc_id")
+        await db.audit_log.create_index("id")
+    except Exception as e:
+        logger.warning(f"Não foi possível criar os índices do log de auditoria: {e}")
 
     # Índices para os campos mais consultados — sem eles, toda busca por e-mail,
     # contêiner ou data faz varredura completa da coleção, e isso fica cada vez

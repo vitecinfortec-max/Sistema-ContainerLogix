@@ -218,6 +218,11 @@ export const api = {
 
   // Gestão de Usuários (admin)
   getUsers: () => axios.get(`${API}/users`),
+  // Opções do Sistema - Log de Auditoria
+  getAuditLog: (params) => axios.get(`${API}/audit-log`, { params }),
+  getAuditLogFilters: () => axios.get(`${API}/audit-log/filters`),
+  getAuditLogEntry: (id) => axios.get(`${API}/audit-log/${id}`),
+  getRecordHistory: (docId) => axios.get(`${API}/audit-log/record/${docId}`),
   createUser: (data) => axios.post(`${API}/users`, data),
   updateUserRole: (userId, role) => axios.put(`${API}/users/${userId}/role`, { role }),
   updateUserStatus: (userId, active) => axios.put(`${API}/users/${userId}/status`, { active }),

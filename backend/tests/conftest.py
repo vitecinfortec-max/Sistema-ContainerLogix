@@ -120,7 +120,9 @@ def api(monkeypatch):
     import shared
     from auth import create_access_token
 
-    fake_db = AsyncMongoMockClient(tz_aware=True)["containerlogix_teste"]  # igual ao cliente real (shared.py)
+    from audit import AuditedDatabase
+    # igual ao cliente real (shared.py), inclusive o log de auditoria
+    fake_db = AuditedDatabase(AsyncMongoMockClient(tz_aware=True)["containerlogix_teste"])
     real_db = shared.db
     # Cada router fez "from shared import db" - a troca precisa alcançar a
     # referência guardada em cada módulo, não só a de shared.
@@ -226,7 +228,8 @@ def _legacy_http_tests(request):
     import server
     import shared
 
-    fake_db = AsyncMongoMockClient(tz_aware=True)["containerlogix_teste_legado"]
+    from audit import AuditedDatabase
+    fake_db = AuditedDatabase(AsyncMongoMockClient(tz_aware=True)["containerlogix_teste_legado"])
     real_db = shared.db
     loop = asyncio.new_event_loop()
     bridge = _LegacyHttpBridge(server.app, fake_db, loop)
