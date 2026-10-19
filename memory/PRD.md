@@ -662,6 +662,20 @@ sugestão de mudar para Inativo), duplicados recusados, filtros aplicados enquan
         compensa sair antes; a mais ou no horário = sem desconto; sem horário = sem cálculo. Indicador
         "Desconto possível", desconto embaixo do saldo, coluna e total no PDF/Excel. **Só para
         administradores**: para os demais a API tira desconto e valor do turno, e o PDF/Excel saem sem eles
+- [x] Testes automáticos antes de publicar (Completo - 19/10/2026): workflow `Testes`
+      (.github/workflows/testes.yml) roda pytest e o build do frontend a cada push; os 3 serviços do
+      Render com Auto-Deploy "After CI Checks Pass" (autoDeployTrigger=checksPass). Build do desktop
+      passou a ser só manual/por tag (falhava em todo push: ações v3 desativadas)
+- [x] Script `scripts_servico/clonar_fora_do_drive.bat` para os outros computadores (clona em
+      C:\Projetos\ContainerLogix, copia .env/.vercel/keystore do Drive, cria backendenv e instala o frontend)
+- [ ] Rodar o `clonar_fora_do_drive.bat` nos computadores dos usuários "victo" e "João victor"
+- [ ] Backup dos bancos: os 3 bancos estão no MongoDB Atlas, mesmo cluster `cluster0`
+      (containerlogix, containerlogix_jalogistica, containerlogix_tll-containers; 11 MB no total em
+      19/10/2026). Conferir no painel do Atlas se o plano tem backup (o gratuito M0 não tem). Anexos:
+      disco permanente de 10 GB por serviço no Render, com snapshot diário automático
+- [ ] Repositório do GitHub é PÚBLICO: avaliar torná-lo privado (as credenciais de teste deste PRD
+      ficam visíveis)
+- [ ] Decidir: restringir exclusões a administradores; tolerância de minutos na Conferência de Turnos
 - [ ] Opcional: corrigir os 28 avisos `react-hooks/exhaustive-deps` do build, tela por tela
 
 ## Credenciais de Teste
