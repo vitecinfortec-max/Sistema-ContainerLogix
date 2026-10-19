@@ -1,10 +1,11 @@
 name: Build ContainerLogix Desktop
 
+# Só manual (Actions > Build ContainerLogix Desktop > Run workflow) ou ao
+# criar uma tag de versão (v1.2.3). Antes rodava a cada push e falhava sempre
+# (ações v3 desativadas pelo GitHub).
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    tags: [ 'v*' ]
   workflow_dispatch:
     inputs:
       platform:
@@ -26,10 +27,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'yarn'
@@ -46,14 +47,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload Windows MSI
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ContainerLogix-Windows-MSI
           path: desktop/dist/*.msi
           if-no-files-found: warn
       
       - name: Upload Windows EXE
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ContainerLogix-Windows-EXE
           path: desktop/dist/*.exe
@@ -66,10 +67,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'yarn'
@@ -84,7 +85,7 @@ jobs:
         run: yarn build:linux
       
       - name: Upload Linux AppImage
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ContainerLogix-Linux-AppImage
           path: desktop/dist/*.AppImage
@@ -96,10 +97,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'yarn'
@@ -114,7 +115,7 @@ jobs:
         run: yarn build:mac
       
       - name: Upload macOS DMG
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ContainerLogix-macOS-DMG
           path: desktop/dist/*.dmg
@@ -127,10 +128,10 @@ jobs:
     
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             ContainerLogix-Windows-MSI/*.msi
