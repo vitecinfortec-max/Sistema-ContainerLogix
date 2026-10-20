@@ -18,7 +18,7 @@ import { tankScene } from '../components/three/tankScene';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { useAuth } from '../context/AuthContext';
-import { Droplet, Plus, Trash2, Settings } from 'lucide-react';
+import { Droplet, Plus, Trash2, Settings, Gauge, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { scrollBehavior } from '../lib/reducedMotion';
@@ -36,6 +36,77 @@ const fmtDate = (d) => {
     return d;
   }
 };
+
+const fmtNumber = (v, digits = 0) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: digits });
+
+// Consumo médio diário do tanque nos últimos 30 dias (só as Saídas) e a
+// autonomia que o saldo atual dá nesse ritmo. Sem saída no período, não há
+// como estimar.
+const CONSUMPTION_DAYS = 30;
+function consumptionStats(ledger, current) {
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  since.setDate(since.getDate() - CONSUMPTION_DAYS);
+  const used = ledger
+    .filter((l) => l.type !== 'ENTRADA' && l.date && new Date(l.date + 'T00:00:00') >= since)
+    .reduce((sum, l) => sum + (Number(l.liters) || 0), 0);
+  const perDay = used / CONSUMPTION_DAYS;
+  return { perDay, days: perDay > 0 ? Math.max(0, current) / perDay : null };
+}
+
+// Versão 2D do tanque (sem WebGL): o mesmo tanque deitado, com o nível, a
+// régua 25/50/75% e a linha do alerta mínimo
+function TankFallback({ fraction, minFraction, low }) {
+  const W = 320;
+  const H = 150;
+  const x0 = 34;
+  const y0 = 18;
+  const w = W - 2 * x0;
+  const h = 104;
+  const r = h / 2;
+  const fillTop = y0 + h * (1 - fraction);
+  const minY = y0 + h * (1 - minFraction);
+  const fuel = low ? '#ef4444' : '#d6961c';
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full max-h-72" role="presentation">
+      <defs>
+        <clipPath id="tank-fallback-clip">
+          <rect x={x0} y={y0} width={w} height={h} rx={r} />
+        </clipPath>
+        <linearGradient id="tank-fallback-fuel" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={fuel} stopOpacity="0.95" />
+          <stop offset="1" stopColor={fuel} stopOpacity="0.7" />
+        </linearGradient>
+      </defs>
+      <rect x="10" y={H - 14} width={W - 20} height="6" rx="3" className="fill-slate-200 dark:fill-slate-700" />
+      {[0.28, 0.72].map((p) => (
+        <rect key={p} x={x0 + w * p - 14} y={y0 + h - 6} width="28" height={H - 14 - (y0 + h - 6)} rx="2" className="fill-slate-400 dark:fill-slate-500" />
+      ))}
+      <rect x={x0} y={y0} width={w} height={h} rx={r} className="fill-slate-100 dark:fill-slate-800" />
+      <g clipPath="url(#tank-fallback-clip)">
+        <motion.rect
+          x={x0} width={w} fill="url(#tank-fallback-fuel)"
+          initial={{ y: y0 + h, height: 0 }}
+          animate={{ y: fillTop, height: y0 + h - fillTop }}
+          transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
+        />
+      </g>
+      {[0.25, 0.5, 0.75].map((f) => {
+        const y = y0 + h * (1 - f);
+        return (
+          <g key={f}>
+            <line x1={x0 + 16} x2={x0 + 24} y1={y} y2={y} className="stroke-slate-400 dark:stroke-slate-500" strokeWidth="1" />
+            <text x={x0 + 27} y={y + 2.5} fontSize="7" className="fill-slate-500 dark:fill-slate-400">{f * 100}%</text>
+          </g>
+        );
+      })}
+      {minFraction > 0 && minFraction < 1 && (
+        <line x1={x0 + 6} x2={x0 + w - 6} y1={minY} y2={minY} stroke="#ef4444" strokeWidth="2" strokeDasharray="6 4" />
+      )}
+      <rect x={x0} y={y0} width={w} height={h} rx={r} fill="none" className="stroke-slate-300 dark:stroke-slate-600" strokeWidth="2.5" />
+    </svg>
+  );
+}
 
 function createEmptyForm() {
   return {
@@ -187,6 +258,11 @@ export default function FuelTankLevelPage() {
     : isOver
       ? { label: 'Acima da capacidade', tone: 'amber' }
       : { label: 'Nível OK', tone: 'emerald' };
+  const statusTone = isLow
+    ? { box: 'bg-red-50 dark:bg-red-950/40', text: 'text-red-600 dark:text-red-400' }
+    : isOver
+      ? { box: 'bg-amber-50 dark:bg-amber-950/40', text: 'text-amber-600 dark:text-amber-400' }
+      : { box: 'bg-primary/10', text: 'text-primary' };
   const capacity = Number(level?.capacity_liters) || 0;
   const current = Number(level?.current_liters) || 0;
   const freeLiters = Math.max(0, capacity - current);
@@ -194,6 +270,7 @@ export default function FuelTankLevelPage() {
   // negativo se os lançamentos não baterem; o desenho não sai do tanque)
   const fillFraction = capacity > 0 ? Math.min(1, Math.max(0, current / capacity)) : 0;
   const minFraction = capacity > 0 ? Math.min(1, Math.max(0, (Number(level?.minimum_alert_liters) || 0) / capacity)) : 0;
+  const consumption = consumptionStats(ledger, current);
 
   return (
     <Layout>
@@ -237,61 +314,99 @@ export default function FuelTankLevelPage() {
               <Stage3D
                 scene={tankScene}
                 params={{ fraction: fillFraction, minFraction, low: isLow }}
-                className="h-56 sm:h-72 w-full md:w-[56%] shrink-0"
+                className="h-56 sm:h-80 w-full md:w-[56%] shrink-0"
+                fallback={(
+                  <div className="h-56 sm:h-80 w-full md:w-[56%] shrink-0 flex items-center justify-center px-2" data-testid="tank-2d">
+                    <TankFallback fraction={fillFraction} minFraction={minFraction} low={isLow} />
+                  </div>
+                )}
                 ariaLabel={`Tanque de combustível com ${fmtPercent(level.percentage)} da capacidade`}
                 testId="tank-3d"
               />
               <div className="flex-1 min-w-0 w-full space-y-4">
-                <div className="flex items-end justify-between gap-3 flex-wrap">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Disponível agora</p>
-                    <span className="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100" data-testid="tank-current-liters">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Disponível agora</p>
+                    <span className="block text-4xl font-semibold tracking-tight tabular-nums text-slate-900 dark:text-slate-50" data-testid="tank-current-liters">
                       <AnimatedNumber value={fmtLiters(level.current_liters)} />
                     </span>
+                    <p className="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                      de {fmtLiters(level.capacity_liters)}
+                    </p>
                   </div>
-                  <span className={`text-2xl font-semibold tabular-nums ${isLow ? 'text-red-600 dark:text-red-400' : 'text-primary'}`} data-testid="tank-percentage">
-                    <AnimatedNumber value={fmtPercent(level.percentage)} />
-                  </span>
+                  <div className={`shrink-0 rounded-xl px-3 py-2 text-right ${statusTone.box}`}>
+                    <span className={`block text-2xl font-semibold tabular-nums leading-tight ${statusTone.text}`} data-testid="tank-percentage">
+                      <AnimatedNumber value={fmtPercent(level.percentage)} />
+                    </span>
+                    <span className="flex items-center justify-end gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                      {isLow || isOver ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                      {badge.label}
+                    </span>
+                  </div>
                 </div>
                 <div>
-                  <div className="relative w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div className="relative w-full h-4 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                     <motion.div
-                      className={`h-full rounded-full bg-gradient-to-r ${isLow ? 'from-red-400 to-red-500' : 'from-primary/70 to-primary'}`}
+                      className={`h-full rounded-full bg-gradient-to-r ${isLow ? 'from-red-400 to-red-500' : 'from-amber-400 to-amber-500'}`}
                       initial={{ width: 0 }}
                       animate={{ width: `${fillFraction * 100}%` }}
                       transition={{ duration: 0.9, ease: EASE, delay: 0.25 }}
                     />
-                    {minFraction > 0 && (
-                      // Marca do alerta mínimo em cima da barra
-                      <div
-                        className="absolute -top-1 -bottom-1 w-0.5 rounded-full bg-red-500"
+                    {/* Divisões de 25% em 25% */}
+                    {[25, 50, 75].map((p) => (
+                      <span key={p} className="absolute top-0 bottom-0 w-px bg-white/70 dark:bg-slate-900/60" style={{ left: `${p}%` }} />
+                    ))}
+                  </div>
+                  <div className="relative h-4 mt-1 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+                    <span className="absolute left-0">0</span>
+                    {[25, 50, 75].map((p) => (
+                      <span key={p} className="absolute -translate-x-1/2" style={{ left: `${p}%` }}>{p}%</span>
+                    ))}
+                    <span className="absolute right-0">100%</span>
+                  </div>
+                  {minFraction > 0 && (
+                    // Marca do alerta mínimo embaixo da régua da barra
+                    <div className="relative h-4 mt-0.5" title="Alerta mínimo">
+                      <span
+                        className="absolute flex flex-col items-center -translate-x-1/2 text-[10px] font-semibold leading-none text-red-600 dark:text-red-400"
                         style={{ left: `${minFraction * 100}%` }}
-                        title="Alerta mínimo"
-                      />
-                    )}
-                  </div>
-                  <div className="flex justify-between mt-1.5 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
-                    <span>0 L</span>
-                    <span>{fmtLiters(level.capacity_liters)}</span>
-                  </div>
+                      >
+                        <span className="w-0 h-0 border-x-4 border-x-transparent border-b-[5px] border-b-red-500" />
+                        Mín.
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <dl className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <div className="min-w-0">
-                    <dt className="text-[11px] text-slate-500 dark:text-slate-400">Capacidade</dt>
-                    <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate">{fmtLiters(level.capacity_liters)}</dd>
-                  </div>
-                  <div className="min-w-0">
-                    <dt className="text-[11px] text-slate-500 dark:text-slate-400">Espaço livre</dt>
-                    <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate">{fmtLiters(freeLiters)}</dd>
-                  </div>
-                  <div className="min-w-0">
-                    <dt className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="inline-block w-2.5 h-0.5 rounded-full bg-red-500 shrink-0" />
-                      Alerta mínimo
-                    </dt>
-                    <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate">{fmtLiters(level.minimum_alert_liters)}</dd>
-                  </div>
+                <dl className="grid grid-cols-2 gap-2.5">
+                  {[
+                    { label: 'Espaço livre', value: fmtLiters(freeLiters) },
+                    {
+                      label: 'Alerta mínimo',
+                      icon: <span className="inline-block w-2.5 h-0.5 rounded-full bg-red-500 shrink-0" />,
+                      value: fmtLiters(level.minimum_alert_liters),
+                    },
+                    {
+                      label: 'Consumo médio',
+                      icon: <Gauge className="w-3 h-3 shrink-0" />,
+                      value: consumption.perDay > 0 ? `${fmtNumber(consumption.perDay)} L/dia` : '-',
+                      testId: 'tank-avg-consumption',
+                    },
+                    {
+                      label: 'Autonomia estimada',
+                      icon: <Clock className="w-3 h-3 shrink-0" />,
+                      value: consumption.days === null ? '-' : `${fmtNumber(consumption.days, consumption.days < 10 ? 1 : 0)} dias`,
+                      testId: 'tank-autonomy',
+                    },
+                  ].map((tile) => (
+                    <div key={tile.label} className="min-w-0 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 px-3 py-2">
+                      <dt className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">{tile.icon}{tile.label}</dt>
+                      <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate" data-testid={tile.testId}>{tile.value}</dd>
+                    </div>
+                  ))}
                 </dl>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  Consumo e autonomia pela média das saídas do tanque nos últimos {CONSUMPTION_DAYS} dias.
+                </p>
                 {isOver && (
                   <p className="text-xs rounded-md px-3 py-2 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" data-testid="tank-over-capacity">
                     Os lançamentos somam {fmtLiters(current - capacity)} a mais do que cabe no tanque. Confira os reabastecimentos ou a capacidade configurada.

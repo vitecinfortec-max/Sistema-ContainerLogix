@@ -57,9 +57,73 @@ export function tankScene(ctx, initial) {
   scene.add(sun);
 
   const mat = (opts) => track(new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.3, ...opts }));
-  const concrete = mat({ color: 0x9da6ae, roughness: 0.95, metalness: 0 });
+  const concrete = mat({ color: 0x8c959d, roughness: 0.95, metalness: 0 });
+
+  // Etiquetas desenhadas num canvas (régua de nível, placa do produto). Texto
+  // escuro sobre fundo claro: lê bem no tema claro e no escuro.
+  const canvasTexture = (width, height, draw) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    draw(canvas.getContext('2d'), width, height);
+    const texture = track(new THREE.CanvasTexture(canvas));
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 4;
+    return texture;
+  };
+  const roundRect = (g, x, y, w, h, r) => {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.arcTo(x + w, y, x + w, y + h, r);
+    g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r);
+    g.arcTo(x, y, x + w, y, r);
+    g.closePath();
+  };
+  const tag = (text, { fg = '#1e293b', bg = 'rgba(255,255,255,0.92)', border = null } = {}) => {
+    const map = canvasTexture(256, 112, (g, w, h) => {
+      roundRect(g, 6, 6, w - 12, h - 12, 24);
+      g.fillStyle = bg;
+      g.fill();
+      if (border) {
+        g.lineWidth = 6;
+        g.strokeStyle = border;
+        g.stroke();
+      }
+      g.fillStyle = fg;
+      g.font = '700 54px Inter, "Segoe UI", system-ui, sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(text, w / 2, h / 2 + 1);
+    });
+    const sprite = new THREE.Sprite(track(new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false, depthTest: false, toneMapped: false })));
+    sprite.scale.set(0.74, 0.324, 1);
+    sprite.renderOrder = 5;
+    return sprite;
+  };
+  // Faixa zebrada amarela e preta da mureta da bacia de contenção
+  const hazard = (repeat) => {
+    const map = canvasTexture(128, 32, (g, w, h) => {
+      g.fillStyle = '#f2b705';
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = '#1f2328';
+      for (let x = -h; x < w + h; x += 32) {
+        g.beginPath();
+        g.moveTo(x, h);
+        g.lineTo(x + 16, h);
+        g.lineTo(x + 16 + h, 0);
+        g.lineTo(x + h, 0);
+        g.closePath();
+        g.fill();
+      }
+    });
+    map.wrapS = THREE.RepeatWrapping;
+    map.repeat.set(repeat, 1);
+    return mat({ map, roughness: 0.7, metalness: 0 });
+  };
   const steel = mat({ color: 0xc2cad0, roughness: 0.28, metalness: 0.9 });
   const darkSteel = mat({ color: 0x3b4750, roughness: 0.6, metalness: 0.5 });
+  const saddleSteel = mat({ color: 0x6b7780, roughness: 0.5, metalness: 0.55 });
   const paint = mat({ color: 0x008b7b, roughness: 0.38, metalness: 0.25 });
   const white = mat({ color: 0xf2f5f7, roughness: 0.45, metalness: 0.1 });
   const rubber = mat({ color: 0x15181b, roughness: 0.85, metalness: 0 });
@@ -93,9 +157,14 @@ export function tankScene(ctx, initial) {
   const SLAB_D = 3.5;
   box(root, concrete, SLAB_W, 0.16, SLAB_D, 0, -0.08, 0);
   const WALL = 0.2;
+  const STRIPE = 0.05; // faixa zebrada pintada no alto da mureta
+  const longCurb = hazard(SLAB_W / 0.6);
+  const shortCurb = hazard((SLAB_D - 0.2) / 0.6);
   [-1, 1].forEach((s) => {
-    box(root, concrete, SLAB_W, WALL, 0.1, 0, WALL / 2, s * (SLAB_D / 2 - 0.05));
-    box(root, concrete, 0.1, WALL, SLAB_D - 0.2, s * (SLAB_W / 2 - 0.05), WALL / 2, 0);
+    box(root, concrete, SLAB_W, WALL - STRIPE, 0.1, 0, (WALL - STRIPE) / 2, s * (SLAB_D / 2 - 0.05));
+    box(root, concrete, 0.1, WALL - STRIPE, SLAB_D - 0.2, s * (SLAB_W / 2 - 0.05), (WALL - STRIPE) / 2, 0);
+    box(root, longCurb, SLAB_W, STRIPE, 0.1, 0, WALL - STRIPE / 2, s * (SLAB_D / 2 - 0.05));
+    box(root, shortCurb, 0.1, STRIPE, SLAB_D - 0.2, s * (SLAB_W / 2 - 0.05), WALL - STRIPE / 2, 0);
   });
 
   // ----- Berços (com o recorte curvo onde o tanque apoia) -----
@@ -116,7 +185,7 @@ export function tankScene(ctx, initial) {
   saddleGeometry.rotateY(Math.PI / 2);
   track(saddleGeometry);
   [-1, 1].forEach((s) => {
-    const saddle = new THREE.Mesh(saddleGeometry, darkSteel);
+    const saddle = new THREE.Mesh(saddleGeometry, saddleSteel);
     saddle.position.x = s * L * 0.29;
     saddle.castShadow = true;
     saddle.receiveShadow = true;
@@ -126,8 +195,8 @@ export function tankScene(ctx, initial) {
   // ----- Líquido: um cilindro cheio, cortado na altura do nível -----
   const cut = new THREE.Plane(new THREE.Vector3(0, -1, 0), CY - RI);
   const fuel = track(new THREE.MeshStandardMaterial({
-    color: 0xb26c06, roughness: 0.38, metalness: 0, side: THREE.DoubleSide,
-    emissive: 0x6a3d00, emissiveIntensity: 0.35, clippingPlanes: [cut], envMapIntensity: 0.5,
+    color: 0xc98510, roughness: 0.3, metalness: 0, side: THREE.DoubleSide,
+    emissive: 0x7a4300, emissiveIntensity: 0.45, clippingPlanes: [cut], envMapIntensity: 0.6,
   }));
   const liquidGeometry = new THREE.CylinderGeometry(RI, RI, L - 0.02, 56, 1, false);
   liquidGeometry.rotateZ(Math.PI / 2);
@@ -140,8 +209,8 @@ export function tankScene(ctx, initial) {
   const surfaceGeometry = new THREE.PlaneGeometry(L - 0.02, 1, SEG_X, SEG_Z);
   surfaceGeometry.rotateX(-Math.PI / 2);
   const surface = mesh(tank, surfaceGeometry, track(new THREE.MeshStandardMaterial({
-    color: 0xd9951a, roughness: 0.16, metalness: 0.05, side: THREE.DoubleSide,
-    emissive: 0x6b4600, emissiveIntensity: 0.3, envMapIntensity: 0.7,
+    color: 0xf0b43c, roughness: 0.08, metalness: 0.05, side: THREE.DoubleSide,
+    emissive: 0x8a5a00, emissiveIntensity: 0.35, envMapIntensity: 1.1,
   })), { cast: false, receive: false });
   const surfacePos = surfaceGeometry.attributes.position;
 
@@ -149,7 +218,7 @@ export function tankScene(ctx, initial) {
   const glassGeometry = new THREE.CylinderGeometry(R, R, L, 64, 1, true);
   glassGeometry.rotateZ(Math.PI / 2);
   const glass = mesh(tank, glassGeometry, track(new THREE.MeshStandardMaterial({
-    color: 0xb9dcd9, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.3,
+    color: 0xd4ebf2, roughness: 0.03, metalness: 0, transparent: true, opacity: 0.2,
     side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 2.2,
   })), { cast: false, receive: false });
   glass.position.y = CY;
@@ -163,8 +232,6 @@ export function tankScene(ctx, initial) {
   };
   band(-L / 2, 0.06);
   band(L / 2, 0.06);
-  band(-L / 6, 0.035);
-  band(L / 6, 0.035);
 
   // Tampos abaulados; pintados dos dois lados porque o lado de dentro aparece
   // através do vidro
@@ -192,6 +259,55 @@ export function tankScene(ctx, initial) {
     const bar = mesh(tank, new THREE.BoxGeometry(L * 0.97, 0.045, 0.04), alertMaterial, { cast: false, receive: false });
     return bar;
   });
+
+  // Etiqueta "MÍN" na ponta da régua do alerta, do lado de quem olha
+  const minTag = tag('MÍN', { fg: '#ffffff', bg: 'rgba(220,38,38,0.95)' });
+  minTag.scale.multiplyScalar(0.8);
+  tank.add(minTag);
+
+  // ----- Régua de nível na frente do costado -----
+  // Um arco fino do fundo ao topo, com traços em 25/50/75% do VOLUME (a altura
+  // de cada traço vem do mesmo cálculo do líquido, então 50% fica no meio)
+  const SCALE_X = -L / 2 + 0.42;
+  const scaleMaterial = mat({ color: 0xf8fafc, roughness: 0.4, metalness: 0.1 });
+  const arcGeometry = new THREE.TorusGeometry(R + 0.012, 0.009, 6, 48, Math.PI);
+  arcGeometry.rotateZ(-Math.PI / 2);
+  arcGeometry.rotateY(-Math.PI / 2);
+  const arc = mesh(tank, arcGeometry, scaleMaterial, { cast: false, receive: false });
+  arc.position.set(SCALE_X, CY, 0);
+  [0.25, 0.5, 0.75].forEach((f) => {
+    const y = CY - R + levelHeight(f, R);
+    const a = Math.asin((y - CY) / R); // ângulo do traço no costado (0 = meio)
+    const tick = mesh(tank, new THREE.BoxGeometry(0.16, 0.018, 0.018), scaleMaterial, { cast: false, receive: false });
+    tick.position.set(SCALE_X + 0.07, y, Math.cos(a) * (R + 0.014));
+    const label = tag(`${Math.round(f * 100)}%`);
+    label.position.set(SCALE_X - 0.36, y, Math.cos(a) * (R + 0.08));
+    tank.add(label);
+  });
+
+  // Placa do produto no costado (encostada na curva, virada pra frente)
+  const PLATE_ANGLE = 0.62;
+  const plateMap = canvasTexture(256, 96, (g, w, h) => {
+    roundRect(g, 3, 3, w - 6, h - 6, 10);
+    g.fillStyle = '#ffffff';
+    g.fill();
+    g.lineWidth = 6;
+    g.strokeStyle = '#f2b705';
+    g.stroke();
+    g.fillStyle = '#0f172a';
+    g.font = '700 40px Inter, "Segoe UI", system-ui, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('DIESEL S-10', w / 2, h / 2 + 2);
+  });
+  const plate = new THREE.Mesh(
+    track(new THREE.PlaneGeometry(1.2, 0.45)),
+    track(new THREE.MeshStandardMaterial({ map: plateMap, roughness: 0.5, metalness: 0, transparent: true })),
+  );
+  plate.position.set(L * 0.12, CY + Math.sin(PLATE_ANGLE) * (R + 0.02), Math.cos(PLATE_ANGLE) * (R + 0.02));
+  plate.rotation.x = -PLATE_ANGLE;
+  plate.renderOrder = 3;
+  tank.add(plate);
 
   // ----- Bomba de abastecimento -----
   const pump = new THREE.Group();
@@ -236,6 +352,8 @@ export function tankScene(ctx, initial) {
       bar.visible = show;
       bar.position.set(0, y, (i ? 1 : -1) * half);
     });
+    minTag.visible = show;
+    minTag.position.set(L / 2 - 0.15, y, half + 0.12);
   };
   placeAlert();
 
@@ -265,7 +383,7 @@ export function tankScene(ctx, initial) {
   let distance = 12;
   const resize = (aspect) => {
     const tan = Math.tan((camera.fov * Math.PI) / 360);
-    distance = Math.max(2.45 / tan, 4.6 / (tan * aspect)) * 1.04;
+    distance = Math.max(2.2 / tan, 4.85 / (tan * aspect)) * 1.02;
   };
 
   const update = (time, delta) => {
