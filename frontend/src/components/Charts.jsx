@@ -74,6 +74,9 @@ export function ChartTooltip({ active, payload, label, valueFormat = fmtChartInt
 export function BarsChart({
   data, series, xKey = 'label', valueFormat = fmtChartInt, allowDecimals = false,
   maxBarSize = 28, className = 'h-72', testId,
+  // false quando a quantidade de colunas muda com o filtro: a animação do
+  // recharts deixa as barras nas posições antigas quando a lista encolhe
+  animated = true,
 }) {
   const reduceMotion = useReducedMotion(); // "reduzir movimento" no sistema: gráfico já pronto
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -123,7 +126,7 @@ export function BarsChart({
                 radius={[5, 5, 0, 0]}
                 maxBarSize={maxBarSize}
                 animationBegin={120 + i * 140}
-                isAnimationActive={!reduceMotion}
+                isAnimationActive={animated && !reduceMotion}
                 animationDuration={750}
                 animationEasing="ease-out"
                 activeBar={{ fill: s.color, stroke: s.color, strokeOpacity: 0.22, strokeWidth: 4 }}

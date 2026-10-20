@@ -96,6 +96,7 @@ const ExpenseReportsPage = lazyPage(() => import('./pages/ExpenseReportsPage'));
 const DeliveryStatusPage = lazyPage(() => import('./pages/DeliveryStatusPage'));
 const PortServicePage = lazyPage(() => import('./pages/PortServicePage'));
 const ReportsPortServicesPage = lazyPage(() => import('./pages/ReportsPortServicesPage'));
+const VehicleResultsPage = lazyPage(() => import('./pages/VehicleResultsPage'));
 const PortServiceShiftsPage = lazyPage(() => import('./pages/PortServiceShiftsPage'));
 const PortServiceBillingPage = lazyPage(() => import('./pages/PortServiceBillingPage'));
 const InternationalInvoicePage = lazyPage(() => import('./pages/InternationalInvoicePage'));
@@ -765,6 +766,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="operacional.relatorio_servico_portuario">
                 <ReportsPortServicesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports/vehicle-results"
+            element={
+              <ProtectedRoute adminOnly moduleKey="operacional.custo_faturamento_veiculo">
+                <VehicleResultsPage />
               </ProtectedRoute>
             }
           />

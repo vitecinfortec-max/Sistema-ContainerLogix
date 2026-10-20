@@ -5447,3 +5447,152 @@ def generate_epi_ficha_pdf(person: dict, rows: list, company: dict = None, date_
     footer = _make_pdf_footer(c['name'])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
+
+
+# ==================== CUSTO E FATURAMENTO POR VEÍCULO ====================
+
+def _vehicle_results_period(date_from, date_to):
+    if not date_from and not date_to:
+        return "Todo o período"
+    return _shift_period_text(date_from, date_to)
+
+
+def _fmt_margin(margin):
+    return f"{margin:.1f}%".replace('.', ',') if margin is not None else '-'
+
+
+def _vehicle_results_summary_items(data):
+    return [
+        ("Faturamento", format_currency(data.get('revenue') or 0, 'BRL')),
+        ("Custo", format_currency(data.get('cost') or 0, 'BRL')),
+        ("Resultado", format_currency(data.get('result') or 0, 'BRL')),
+        ("Margem", _fmt_margin(data.get('margin'))),
+    ]
+
+
+def generate_vehicle_results_report_pdf(data: dict, date_from=None, date_to=None, company: dict = None) -> bytes:
+    """Custo e Faturamento por Veículo: com placa, os lançamentos dela; sem
+    placa, o resultado de cada placa da frota."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=10*mm, leftMargin=10*mm,
+                            topMargin=12*mm, bottomMargin=15*mm)
+    styles = getSampleStyleSheet()
+    elements = []
+    plate = data.get('plate')
+    title = f"Custo e Faturamento - {plate}" if plate else "Custo e Faturamento por Veículo"
+    elements.extend(_build_pdf_header(styles, download_logo(company), title, company=company, content_width=doc.width))
+    info = [("Período", _vehicle_results_period(date_from, date_to))]
+    if plate and data.get('vehicle'):
+        info.append(("Veículo", data['vehicle']))
+    elements.extend(_build_pdf_summary(info + _vehicle_results_summary_items(data), doc.width))
+
+    cell = _pdf_cell_factory(styles, font_size=8)
+    w = doc.width
+
+    def money_cell(value, tone=None):
+        text = format_currency(value or 0, 'BRL')
+        return cell(None, 'right', markup=_pdf_tone_markup(text, tone)) if tone else cell(text, 'right')
+
+    # Resumo por categoria
+    cat_rows = [_pdf_header_cells(['Categoria', 'Tipo', 'Lançamentos', 'Valor'], font_size=8)]
+    for cat in data.get('by_category') or []:
+        if not cat['count']:
+            continue
+        revenue = cat['kind'] == 'RECEITA'
+        cat_rows.append([
+            cell(cat['category']), cell('Faturamento' if revenue else 'Custo', 'center'),
+            cell(_fmt_int(cat['count']), 'center'), money_cell(cat['value'], 'emerald' if revenue else 'red'),
+        ])
+    if len(cat_rows) > 1:
+        table = Table(cat_rows, colWidths=[w*0.4, w*0.2, w*0.15, w*0.25], repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style()))
+        elements.append(table)
+        elements.append(Spacer(1, 10))
+
+    if plate:
+        rows = data.get('rows') or []
+        if rows:
+            table_rows = [_pdf_header_cells(['Data', 'Categoria', 'Documento', 'Descrição', 'Faturamento', 'Custo'], font_size=8)]
+            for r in rows:
+                revenue = r['kind'] == 'RECEITA'
+                table_rows.append([
+                    cell(fmt_date(r.get('date')), 'center'), cell(r['category']), cell(r['document']),
+                    cell(r.get('description')),
+                    money_cell(r['value'], 'emerald') if revenue else cell(None, 'right'),
+                    cell(None, 'right') if revenue else money_cell(r['value'], 'red'),
+                ])
+            table_rows.append(['', '', '', cell('TOTAL', 'right', bold=True),
+                               cell(format_currency(data.get('revenue') or 0), 'right', bold=True),
+                               cell(format_currency(data.get('cost') or 0), 'right', bold=True)])
+            table = Table(table_rows, colWidths=[w*0.09, w*0.16, w*0.13, w*0.32, w*0.15, w*0.15], repeatRows=1)
+            table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
+            elements.append(table)
+        else:
+            elements.append(_pdf_empty_state("Nenhum lançamento desta placa no período.", w))
+    else:
+        vehicles = data.get('vehicles') or []
+        if vehicles:
+            table_rows = [_pdf_header_cells(['Placa', 'Veículo', 'Lançamentos', 'Faturamento', 'Custo', 'Resultado', 'Margem'], font_size=8)]
+            for v in vehicles:
+                table_rows.append([
+                    cell(v['plate'], bold=True), cell(v.get('vehicle')), cell(_fmt_int(v['count']), 'center'),
+                    money_cell(v['revenue']), money_cell(v['cost']),
+                    money_cell(v['result'], 'emerald' if v['result'] >= 0 else 'red'),
+                    cell(_fmt_margin(v.get('margin')), 'right'),
+                ])
+            table = Table(table_rows, colWidths=[w*0.1, w*0.24, w*0.1, w*0.15, w*0.15, w*0.15, w*0.11], repeatRows=1)
+            table.setStyle(TableStyle(_pdf_table_style()))
+            elements.append(table)
+        else:
+            elements.append(_pdf_empty_state("Nenhum lançamento com placa no período.", w))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
+def generate_vehicle_results_report_excel(data: dict, date_from=None, date_to=None, company: dict = None) -> bytes:
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        ws = wb.active
+        plate = data.get('plate')
+        ws.title = plate or "Frota"
+        title = f"Custo e Faturamento - {plate}" if plate else "Custo e Faturamento por Veículo"
+        stats_text = f"Período: {_vehicle_results_period(date_from, date_to)}   •   " + "   •   ".join(
+            f"{label}: {value}" for label, value in _vehicle_results_summary_items(data)
+        )
+        if plate:
+            headers = ['Data', 'Categoria', 'Documento', 'Descrição', 'Faturamento', 'Custo']
+            rows = [[
+                _xl_date(r.get('date')), r['category'], r['document'], r.get('description'),
+                r['value'] if r['kind'] == 'RECEITA' else None,
+                r['value'] if r['kind'] == 'CUSTO' else None,
+            ] for r in data.get('rows') or []]
+            widths = {'B': 12, 'C': 22, 'D': 16, 'E': 40, 'F': 16, 'G': 16}
+            number_fmt = {0: XL_DATE, 4: 'R$ #,##0.00', 5: 'R$ #,##0.00'}
+            center = {0}
+            empty = "Nenhum lançamento desta placa no período."
+        else:
+            headers = ['Placa', 'Veículo', 'Lançamentos', 'Faturamento', 'Custo', 'Resultado', 'Margem (%)']
+            rows = [[
+                v['plate'], v.get('vehicle'), v['count'], v['revenue'], v['cost'], v['result'], v.get('margin'),
+            ] for v in data.get('vehicles') or []]
+            widths = {'B': 12, 'C': 28, 'D': 13, 'E': 16, 'F': 16, 'G': 16, 'H': 12}
+            number_fmt = {3: 'R$ #,##0.00', 4: 'R$ #,##0.00', 5: 'R$ #,##0.00', 6: '0.0'}
+            center = {0, 2}
+            empty = "Nenhum lançamento com placa no período."
+
+        _bsoft_style_excel(
+            ws, title, stats_text, headers, rows, widths,
+            center_cols=center, number_fmt_cols=number_fmt, stats_text=stats_text,
+            company_name=c['name'], logo_buffer=download_logo(company), company=company,
+            autofilter=True, empty_message=empty,
+        )
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+    except Exception as e:
+        logger.error(f"Error generating vehicle results Excel: {e}")
+        return _xl_error_workbook()

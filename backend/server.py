@@ -48,6 +48,7 @@ from routers.client_credits import api_router as client_credits_router
 from routers.financial_summary import api_router as financial_summary_router
 from routers.delivery_status import api_router as delivery_status_router
 from routers.port_services import api_router as port_services_router
+from routers.vehicle_results import api_router as vehicle_results_router
 from routers.unit_segregation import api_router as unit_segregation_router
 from routers.intl_invoices import api_router as intl_invoices_router
 from routers.rpa_terceiro import api_router as rpa_terceiro_router
@@ -200,6 +201,7 @@ app.include_router(client_credits_router)
 app.include_router(financial_summary_router)
 app.include_router(delivery_status_router)
 app.include_router(port_services_router)
+app.include_router(vehicle_results_router)
 app.include_router(unit_segregation_router)
 app.include_router(intl_invoices_router)
 app.include_router(rpa_terceiro_router)

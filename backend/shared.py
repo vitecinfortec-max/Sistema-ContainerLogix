@@ -499,6 +499,7 @@ MODULE_CATALOG = [
         {"key": "operacional.servico_portuario", "label": "Serviço Portuário"},
         {"key": "operacional.relatorio_servico_portuario", "label": "Relatório de Serviço Portuário"},
         {"key": "operacional.conferencia_turnos", "label": "Conferência de Turnos"},
+        {"key": "operacional.custo_faturamento_veiculo", "label": "Custo e Faturamento por Veículo"},
     ]},
     {"key": "estoque", "label": "Almoxarifado", "items": [
         {"key": "estoque.almoxarifado", "label": "Almoxarifado"},
@@ -606,6 +607,7 @@ PATH_MODULE_MAP = [
     ("/api/reports/delivery-status", "operacional.status_entrega"),
     ("/api/reports/port-services", "operacional.relatorio_servico_portuario"),
     ("/api/reports/port-service-shifts", "operacional.conferencia_turnos"),
+    ("/api/reports/vehicle-results", "operacional.custo_faturamento_veiculo"),
     ("/api/port-services/billing-batches", "financeiro.faturamento_portuario"),
     ("/api/port-services/billing-candidates", "financeiro.faturamento_portuario"),
     ("/api/port-services", "operacional.servico_portuario"),
