@@ -10,11 +10,14 @@ from fastapi.responses import StreamingResponse
 from models import (
     FuelSupply, FuelSupplyCreate, FuelSupplyUpdate, FuelSupplyResponse, FuelSupplyOrder,
     FuelSupplyOrderCreate, FuelSupplyOrderUpdate, FuelSupplyOrderResponse, DailyFuelSupplyPoint,
-    TankSettings, TankSettingsUpdate, TankRefill, TankRefillCreate, TankRefillResponse
+    TankSettings, TankSettingsUpdate, TankRefill, TankRefillCreate, TankRefillResponse,
+    StockMovementCreate, StockMovementItem,
 )
+from pymongo.errors import DuplicateKeyError
 from reports import fmt_datetime, today_brt, generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel, now_brt, merge_company
 
 from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, refuse_negative
+from routers.stock import _create_stock_movement, _delete_stock_movement
 
 api_router = APIRouter(prefix="/api")
 
@@ -677,7 +680,7 @@ async def _compute_tank_level() -> Optional[dict]:
 @api_router.get("/tank-settings")
 async def get_tank_settings(current_user: dict = Depends(get_current_active_user)):
     settings = await db.tank_settings.find_one({}, {"_id": 0})
-    return settings or {"capacity_liters": None, "minimum_alert_liters": None}
+    return settings or {"capacity_liters": None, "minimum_alert_liters": None, "fuel_warehouse_id": None}
 
 
 @api_router.put("/tank-settings")
@@ -691,7 +694,18 @@ async def update_tank_settings(data: TankSettingsUpdate, current_user: dict = De
         raise HTTPException(status_code=400, detail="O alerta mínimo não pode ser negativo")
     if data.minimum_alert_liters >= data.capacity_liters:
         raise HTTPException(status_code=400, detail="O alerta mínimo deve ser menor que a capacidade do tanque")
-    settings = TankSettings(**data.model_dump())
+    warehouse_name = None
+    if data.fuel_warehouse_id:
+        warehouse = await db.warehouses.find_one({"id": data.fuel_warehouse_id}, {"_id": 0, "name": 1})
+        if not warehouse:
+            raise HTTPException(status_code=400, detail="Almoxarifado do posto não encontrado")
+        warehouse_name = warehouse.get("name")
+    settings = TankSettings(
+        capacity_liters=data.capacity_liters,
+        minimum_alert_liters=data.minimum_alert_liters,
+        fuel_warehouse_id=data.fuel_warehouse_id or None,
+        fuel_warehouse_name=warehouse_name,
+    )
     doc = settings.model_dump()
     doc["updated_at"] = doc["updated_at"].isoformat()
     await db.tank_settings.replace_one({}, doc, upsert=True)
@@ -718,6 +732,7 @@ async def get_tank_ledger(current_user: dict = Depends(get_current_active_user))
         "liters": r.get("liters"),
         "label": r.get("supplier_name") or "-",
         "reference_number": r.get("refill_number"),
+        "nfe_number": r.get("nfe_number"),
         "observations": r.get("observations"),
         "created_at": r.get("created_at"),
     } for r in refills]
@@ -750,33 +765,157 @@ async def get_tank_ledger(current_user: dict = Depends(get_current_active_user))
     return combined
 
 
+async def _fuel_warehouse() -> dict:
+    """Almoxarifado do posto definido em Configuração de Tanque."""
+    settings = await db.tank_settings.find_one({}, {"_id": 0, "fuel_warehouse_id": 1, "fuel_warehouse_name": 1}) or {}
+    return {"id": settings.get("fuel_warehouse_id"), "name": settings.get("fuel_warehouse_name")}
+
+
+@api_router.get("/tank-refills/nfe-options")
+async def get_tank_refill_nfe_options(current_user: dict = Depends(get_current_active_user)):
+    """Itens de NF-e importados (Entradas de Estoque) de produtos do
+    almoxarifado do posto que ainda não foram usados num reabastecimento -
+    o 'Puxar de NF-e' do Reabastecer Tanque."""
+    warehouse = await _fuel_warehouse()
+    if not warehouse["id"]:
+        return {"warehouse_id": None, "warehouse_name": None, "items": []}
+    products = {
+        p["id"]: p async for p in db.products.find(
+            {"warehouse_id": warehouse["id"]},
+            {"_id": 0, "id": 1, "description": 1, "unit": 1, "stock_quantity": 1},
+        )
+    }
+    used = {
+        r["stock_entry_id"] async for r in db.tank_refills.find(
+            {"stock_entry_id": {"$nin": [None, ""]}}, {"_id": 0, "stock_entry_id": 1},
+        )
+    }
+    entries = await db.stock_entries.find(
+        {"product_id": {"$in": list(products)}}, {"_id": 0}
+    ).sort("created_at", -1).to_list(500)
+    items = []
+    for e in entries:
+        if e["id"] in used:
+            continue
+        product = products[e["product_id"]]
+        items.append({
+            "stock_entry_id": e["id"],
+            "nfe_number": e.get("nfe_number"),
+            "nfe_issue_date": e.get("nfe_issue_date"),
+            "supplier_name": e.get("supplier_name"),
+            "product_id": e["product_id"],
+            "product_name": product.get("description") or e.get("product_name"),
+            "unit": product.get("unit"),
+            "quantity": e.get("quantity"),
+            "unit_value": e.get("unit_value"),
+            "available_stock": product.get("stock_quantity"),
+        })
+    return {"warehouse_id": warehouse["id"], "warehouse_name": warehouse["name"], "items": items}
+
+
+async def _nfe_refill_source(stock_entry_id: str, liters: float) -> dict:
+    """Confere a NF-e escolhida no Reabastecer Tanque: é de um produto do
+    almoxarifado do posto, ainda não foi usada e cobre os litros."""
+    warehouse = await _fuel_warehouse()
+    if not warehouse["id"]:
+        raise HTTPException(status_code=400, detail='Defina o "Almoxarifado do posto" em Configuração de Tanque para puxar de NF-e')
+    entry = await db.stock_entries.find_one({"id": stock_entry_id}, {"_id": 0})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Nota (entrada de estoque) não encontrada")
+    product = await db.products.find_one({"id": entry["product_id"]}, {"_id": 0})
+    if not product or product.get("warehouse_id") != warehouse["id"]:
+        raise HTTPException(status_code=400, detail=f'Esta nota não é de um produto do almoxarifado "{warehouse["name"]}"')
+    used = await db.tank_refills.find_one({"stock_entry_id": stock_entry_id}, {"_id": 0, "refill_number": 1})
+    if used:
+        raise HTTPException(status_code=409, detail=f"Esta nota já foi usada no Reabastecimento Nº {used.get('refill_number')}")
+    if liters > float(entry.get("quantity") or 0) + 1e-9:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Os litros passam da quantidade da nota ({float(entry.get('quantity') or 0):g})",
+        )
+    return {"entry": entry, "product": product}
+
+
 @api_router.post("/tank-refills", response_model=TankRefillResponse)
 async def create_tank_refill(data: TankRefillCreate, current_user: dict = Depends(get_current_active_user)):
     # Recarga negativa baixava o nível do tanque sem nenhum abastecimento
     if not math.isfinite(data.liters) or data.liters <= 0:
         raise HTTPException(status_code=400, detail="Os litros da recarga devem ser maiores que zero")
-    counter = await db.counters.find_one_and_update(
-        {"_id": "tank_refill_number"},
-        {"$inc": {"seq": 1}},
-        upsert=True,
-        return_document=True
-    )
-    refill_number = counter["seq"]
+    source = await _nfe_refill_source(data.stock_entry_id, data.liters) if data.stock_entry_id else None
+    if source:
+        # Reserva a nota antes de dar baixa: de dois reabastecimentos
+        # simultâneos com a mesma nota, só um passa daqui
+        try:
+            await db.tank_refill_nfe_links.insert_one({"_id": data.stock_entry_id})
+        except DuplicateKeyError:
+            raise HTTPException(status_code=409, detail="Esta nota já foi usada em outro reabastecimento")
 
-    refill = TankRefill(
-        refill_number=refill_number,
-        refill_date=data.refill_date,
-        liters=data.liters,
-        supplier_name=data.supplier_name,
-        observations=data.observations,
-        created_by=current_user["sub"],
-        created_by_name=current_user["name"]
-    )
+    try:
+        counter = await db.counters.find_one_and_update(
+            {"_id": "tank_refill_number"},
+            {"$inc": {"seq": 1}},
+            upsert=True,
+            return_document=True
+        )
+        refill_number = counter["seq"]
 
-    refill_dict = refill.model_dump()
-    refill_dict["created_at"] = refill_dict["created_at"].isoformat()
+        refill = TankRefill(
+            refill_number=refill_number,
+            refill_date=data.refill_date,
+            liters=data.liters,
+            supplier_name=data.supplier_name,
+            observations=data.observations,
+            created_by=current_user["sub"],
+            created_by_name=current_user["name"]
+        )
 
-    await db.tank_refills.insert_one(refill_dict)
+        if source:
+            entry, product = source["entry"], source["product"]
+            label = f"Reabastecimento do Tanque Nº {refill_number}"
+            unit_value = float(entry.get("unit_value") or 0)
+            # Baixa do diesel no almoxarifado do posto (recusa sem saldo)
+            movement = await _create_stock_movement(
+                StockMovementCreate(
+                    operation_type="SAIDA",
+                    movement_date=data.refill_date,
+                    nfe_number=entry.get("nfe_number"),
+                    warehouse_id=product.get("warehouse_id") or "",
+                    warehouse_name=product.get("warehouse_name") or "",
+                    supplier_id=entry.get("supplier_id"),
+                    supplier_name=entry.get("supplier_name"),
+                    purpose_type="OUTRO",
+                    purpose_text=label,
+                    observations=data.observations,
+                    items=[StockMovementItem(
+                        product_id=product["id"],
+                        product_code=product.get("code"),
+                        product_description=product.get("description") or "",
+                        quantity=data.liters,
+                        unit_value=unit_value,
+                        total_value=round(data.liters * unit_value, 2),
+                    )],
+                ),
+                current_user, origin="TANQUE", origin_id=refill.id, origin_label=label,
+            )
+            refill.stock_entry_id = entry["id"]
+            refill.nfe_number = entry.get("nfe_number")
+            refill.product_id = product["id"]
+            refill.product_name = product.get("description")
+            refill.stock_movement_id = movement["id"]
+            refill.supplier_name = refill.supplier_name or entry.get("supplier_name")
+
+        refill_dict = refill.model_dump()
+        refill_dict["created_at"] = refill_dict["created_at"].isoformat()
+        try:
+            await db.tank_refills.insert_one(refill_dict)
+        except Exception:
+            if refill.stock_movement_id:
+                await _delete_stock_movement(refill.stock_movement_id, current_user)
+            raise
+    except BaseException:
+        if source:
+            await db.tank_refill_nfe_links.delete_one({"_id": data.stock_entry_id})
+        raise
     refill_dict.pop('_id', None)
 
     return TankRefillResponse(**refill_dict)
@@ -784,7 +923,22 @@ async def create_tank_refill(data: TankRefillCreate, current_user: dict = Depend
 
 @api_router.delete("/tank-refills/{refill_id}")
 async def delete_tank_refill(refill_id: str, current_user: dict = Depends(get_current_active_user)):
-    result = await db.tank_refills.delete_one({"id": refill_id})
-    if result.deleted_count == 0:
+    """Exclui o reabastecimento; se veio de uma NF-e, devolve o diesel ao
+    almoxarifado do posto (exclui a Saída gerada) e libera a nota."""
+    removed = await db.tank_refills.find_one_and_delete({"id": refill_id}, projection={"_id": 0})
+    if not removed:
         raise HTTPException(status_code=404, detail="Reabastecimento não encontrado")
+    if removed.get("stock_movement_id"):
+        try:
+            await _delete_stock_movement(removed["stock_movement_id"], current_user)
+        except HTTPException as error:
+            # Saída já apagada por fora: nada a devolver
+            if error.status_code != 404:
+                await db.tank_refills.insert_one(dict(removed))
+                raise
+        except BaseException:
+            await db.tank_refills.insert_one(dict(removed))
+            raise
+    if removed.get("stock_entry_id"):
+        await db.tank_refill_nfe_links.delete_one({"_id": removed["stock_entry_id"]})
     return {"message": "Reabastecimento excluído com sucesso"}

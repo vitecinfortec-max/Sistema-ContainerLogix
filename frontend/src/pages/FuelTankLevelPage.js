@@ -18,7 +18,8 @@ import { tankScene } from '../components/three/tankScene';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { useAuth } from '../context/AuthContext';
-import { Droplet, Plus, Trash2, Settings, Gauge, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Autocomplete } from '../components/Autocomplete';
+import { Droplet, Plus, Trash2, Settings, Gauge, Clock, AlertTriangle, CheckCircle2, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { scrollBehavior } from '../lib/reducedMotion';
@@ -119,6 +120,17 @@ function createEmptyForm() {
 
 const ITEMS_PER_PAGE = 15;
 
+const EMPTY_NFE_OPTIONS = { warehouse_id: null, warehouse_name: null, items: [] };
+
+// Como cada nota aparece na busca do "Puxar de NF-e"
+const nfeLabel = (item) => [
+  `NF ${item.nfe_number || '-'}`,
+  item.product_name,
+  fmtLiters(item.quantity),
+  item.supplier_name,
+  item.nfe_issue_date ? fmtDate(item.nfe_issue_date) : null,
+].filter(Boolean).join(' · ');
+
 export default function FuelTankLevelPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const { user } = useAuth();
@@ -136,6 +148,11 @@ export default function FuelTankLevelPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(createEmptyForm());
+  const [refillSource, setRefillSource] = useState('MANUAL'); // MANUAL | NFE
+  const [nfeOptions, setNfeOptions] = useState(EMPTY_NFE_OPTIONS);
+  const [loadingNfe, setLoadingNfe] = useState(false);
+  const [selectedNfe, setSelectedNfe] = useState(null);
+  const [nfeText, setNfeText] = useState('');
 
   useEffect(() => {
     loadLevel();
@@ -168,10 +185,50 @@ export default function FuelTankLevelPage() {
 
   const openNewModal = () => {
     setFormData(createEmptyForm());
+    setRefillSource('MANUAL');
+    setSelectedNfe(null);
+    setNfeText('');
     setModalOpen(true);
+    loadNfeOptions();
+  };
+
+  // Notas importadas do almoxarifado do posto ainda não usadas no tanque
+  const loadNfeOptions = async () => {
+    setLoadingNfe(true);
+    try {
+      const response = await api.getTankRefillNfeOptions();
+      setNfeOptions({ ...EMPTY_NFE_OPTIONS, ...response.data });
+    } catch (error) {
+      setNfeOptions(EMPTY_NFE_OPTIONS);
+    } finally {
+      setLoadingNfe(false);
+    }
+  };
+
+  const pickNfe = (item) => {
+    setSelectedNfe(item);
+    if (item) setNfeText(nfeLabel(item));
+    setFormData(prev => ({
+      ...prev,
+      liters: item ? String(item.quantity ?? '') : '',
+      supplier_name: item ? (item.supplier_name || '') : '',
+      observations: item ? `NF-e Nº ${item.nfe_number || '-'}` : '',
+    }));
+  };
+
+  const switchRefillSource = (source) => {
+    if (source === refillSource) return;
+    setRefillSource(source);
+    setSelectedNfe(null);
+    setNfeText('');
+    setFormData(prev => ({ ...createEmptyForm(), refill_date: prev.refill_date }));
   };
 
   const handleSubmit = async () => {
+    if (refillSource === 'NFE' && !selectedNfe) {
+      toast.error('Escolha a nota fiscal');
+      return;
+    }
     if (!formData.refill_date || !formData.liters) {
       toast.error('Preencha Data e Litros');
       return;
@@ -187,7 +244,11 @@ export default function FuelTankLevelPage() {
     }
     setSaving(true);
     try {
-      await api.createTankRefill({ ...formData, liters: Number(formData.liters) });
+      await api.createTankRefill({
+        ...formData,
+        liters: Number(formData.liters),
+        stock_entry_id: refillSource === 'NFE' ? selectedNfe.stock_entry_id : null,
+      });
       toast.success('Reabastecimento registrado com sucesso!');
       setModalOpen(false);
       setCurrentPage(1); // o lançamento novo entra no topo do histórico
@@ -487,7 +548,12 @@ export default function FuelTankLevelPage() {
                         {/* Entrada = nº do reabastecimento; Saída = nº do Abastecimento (outra numeração) */}
                         <td className="whitespace-nowrap tabular-nums">
                           {isEntrada
-                            ? <span className="cell-strong">#{item.reference_number}</span>
+                            ? (
+                              <span className="cell-strong">
+                                #{item.reference_number}
+                                {item.nfe_number && <span className="ml-1.5 text-[11px] font-normal text-slate-500 dark:text-slate-400" title="Puxado da NF-e">NF {item.nfe_number}</span>}
+                              </span>
+                            )
                             : <span className="text-slate-500 dark:text-slate-400" title="Número do abastecimento">Abast. #{item.reference_number}</span>}
                         </td>
                         <td className="whitespace-nowrap tabular-nums">{fmtDate(item.date)}</td>
@@ -521,6 +587,72 @@ export default function FuelTankLevelPage() {
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Origem: digitado à mão ou puxado de uma NF-e importada no
+                almoxarifado do posto (essa dá baixa no estoque) */}
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800" role="tablist">
+              {[
+                { key: 'MANUAL', label: 'Lançamento manual', icon: Droplet },
+                { key: 'NFE', label: `Puxar de NF-e${nfeOptions.items.length ? ` (${nfeOptions.items.length})` : ''}`, icon: FileText },
+              ].map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={refillSource === key}
+                  onClick={() => switchRefillSource(key)}
+                  className={`flex items-center justify-center gap-1.5 h-8 rounded-md text-xs font-medium transition-colors ${refillSource === key
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+                  data-testid={`tank-refill-source-${key.toLowerCase()}`}
+                >
+                  <Icon className="w-3.5 h-3.5" /> {label}
+                </button>
+              ))}
+            </div>
+
+            {refillSource === 'NFE' && (
+              loadingNfe ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">Carregando notas...</p>
+              ) : !nfeOptions.warehouse_id ? (
+                <p className="text-xs rounded-md px-3 py-2 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" data-testid="tank-refill-no-warehouse">
+                  Defina o "Almoxarifado do posto" em Configuração de Tanque para puxar as notas importadas.
+                  {isAdmin && <> <Link to="/tank-settings" className="font-semibold underline">Configurar agora</Link></>}
+                </p>
+              ) : nfeOptions.items.length === 0 ? (
+                <p className="text-xs rounded-md px-3 py-2 bg-slate-50 text-slate-600 dark:bg-slate-800/60 dark:text-slate-300" data-testid="tank-refill-no-nfe">
+                  Nenhuma nota disponível no almoxarifado "{nfeOptions.warehouse_name}". Importe a NF-e em Entradas de Estoque (produto nesse almoxarifado); notas já usadas num reabastecimento não aparecem.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <div>
+                    <Label className="mb-1.5 block">Nota fiscal *</Label>
+                    <Autocomplete
+                      value={nfeText}
+                      onChange={(text) => {
+                        setNfeText(text);
+                        if (selectedNfe && text !== nfeLabel(selectedNfe)) pickNfe(null);
+                      }}
+                      onSelect={pickNfe}
+                      options={nfeOptions.items}
+                      displayField={nfeLabel}
+                      valueField="stock_entry_id"
+                      testId="tank-refill-nfe-input"
+                    />
+                  </div>
+                  {selectedNfe && (
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 px-3 py-2 text-xs" data-testid="tank-refill-nfe-summary">
+                      <div className="col-span-2 flex gap-1.5"><dt className="text-slate-500 dark:text-slate-400">Produto:</dt><dd className="font-medium text-slate-800 dark:text-slate-100 truncate">{selectedNfe.product_name}</dd></div>
+                      <div className="flex gap-1.5"><dt className="text-slate-500 dark:text-slate-400">Na nota:</dt><dd className="font-medium tabular-nums text-slate-800 dark:text-slate-100">{fmtLiters(selectedNfe.quantity)}</dd></div>
+                      <div className="flex gap-1.5"><dt className="text-slate-500 dark:text-slate-400">Saldo no almox.:</dt><dd className="font-medium tabular-nums text-slate-800 dark:text-slate-100">{fmtLiters(selectedNfe.available_stock)}</dd></div>
+                      <p className="col-span-2 pt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                        Ao salvar, os litros saem do almoxarifado "{nfeOptions.warehouse_name}" (Movimentação de Estoque de Saída). Excluir o reabastecimento devolve.
+                      </p>
+                    </dl>
+                  )}
+                </div>
+              )
+            )}
+
             {level?.configured && (
               <p className="text-xs text-slate-500 dark:text-slate-400" data-testid="tank-refill-free-space">
                 Espaço livre no tanque agora: <span className="font-semibold text-slate-700 dark:text-slate-200">{fmtLiters(freeLiters)}</span>
@@ -554,6 +686,7 @@ export default function FuelTankLevelPage() {
                 <Input
                   className="h-9"
                   value={formData.supplier_name}
+                  readOnly={refillSource === 'NFE'}
                   onChange={(e) => setFormData(prev => ({ ...prev, supplier_name: e.target.value }))}
                 />
               </div>

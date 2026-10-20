@@ -21,7 +21,7 @@ import { qtyWithUnit } from '../lib/productUnits';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Trash2, Save, ArrowLeftRight, Car, ClipboardList, Pencil, Printer, HardHat } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowLeftRight, Car, ClipboardList, Pencil, Printer, HardHat, Droplet } from 'lucide-react';
 import { todayISO } from '../lib/dates';
 import { activeRecords } from '../lib/cadastroStatus';
 
@@ -348,7 +348,9 @@ export default function StockMovementsPage() {
 
   const singleSelectedMovement = selectedIds.size === 1 ? movements.find((m) => m.id === [...selectedIds][0]) : null;
   // A saída gerada por uma Entrega de EPI só muda pela própria entrega
-  const lockedByEpi = singleSelectedMovement?.origin === 'EPI';
+  // Saídas geradas pela Entrega de EPI ou pelo Reabastecer Tanque só mudam por lá
+  const lockedBy = { EPI: "a tela Entrega de EPI's", TANQUE: 'a tela Nível do Tanque' }[singleSelectedMovement?.origin];
+  const lockedByEpi = !!lockedBy;
 
   const handleDelete = async () => {
     const movement = singleSelectedMovement;
@@ -418,9 +420,9 @@ export default function StockMovementsPage() {
               selectedCount={selectedIds.size}
               primary={<ToolbarPrimary icon={Plus} label="Nova movimentação" onClick={openCreate} testId="stock-movement-new-btn" />}
             >
-              <ToolbarButton icon={Pencil} label={lockedByEpi ? 'Editar: use a tela Entrega de EPI\'s' : 'Editar'} tone="blue" onClick={() => singleSelectedMovement && openEdit(singleSelectedMovement.id)} disabled={!singleSelectedMovement || lockedByEpi} testId="stock-movement-edit-btn" />
+              <ToolbarButton icon={Pencil} label={lockedBy ? `Editar: use ${lockedBy}` : 'Editar'} tone="blue" onClick={() => singleSelectedMovement && openEdit(singleSelectedMovement.id)} disabled={!singleSelectedMovement || lockedByEpi} testId="stock-movement-edit-btn" />
               <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedMovement && downloadPDF(singleSelectedMovement.id, singleSelectedMovement.movement_number)} disabled={!singleSelectedMovement} testId="stock-movement-pdf-btn" />
-              <ToolbarButton icon={Trash2} label={lockedByEpi ? 'Excluir: use a tela Entrega de EPI\'s' : 'Excluir (acerta o saldo do estoque)'} tone="red" onClick={handleDelete} disabled={!singleSelectedMovement || lockedByEpi || deleting} testId="stock-movement-delete-btn" />
+              <ToolbarButton icon={Trash2} label={lockedBy ? `Excluir: use ${lockedBy}` : 'Excluir (acerta o saldo do estoque)'} tone="red" onClick={handleDelete} disabled={!singleSelectedMovement || lockedByEpi || deleting} testId="stock-movement-delete-btn" />
             </Toolbar>
           )}
         >
@@ -476,7 +478,9 @@ export default function StockMovementsPage() {
                           {(!m.purpose_type || m.purpose_type === 'OUTRO') && (
                             m.origin === 'EPI'
                               ? <span className="inline-flex items-center gap-1" title="Gerada pela Entrega de EPI's: só muda por lá"><HardHat className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>
-                              : (m.purpose_text || '-')
+                              : m.origin === 'TANQUE'
+                                ? <span className="inline-flex items-center gap-1" title="Gerada pelo Reabastecer Tanque: só muda pela tela Nível do Tanque"><Droplet className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>
+                                : (m.purpose_text || '-')
                           )}
                         </div>
                       </td>

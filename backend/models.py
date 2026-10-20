@@ -3032,12 +3032,17 @@ class TankSettings(BaseModel):
 
     capacity_liters: float
     minimum_alert_liters: float
+    # Almoxarifado do posto: o Reabastecer Tanque lista as NF-e importadas de
+    # produtos desse almoxarifado e dá baixa nele ao usar uma
+    fuel_warehouse_id: Optional[str] = None
+    fuel_warehouse_name: Optional[str] = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class TankSettingsUpdate(BaseModel):
     capacity_liters: float
     minimum_alert_liters: float
+    fuel_warehouse_id: Optional[str] = None
 
 
 class TankRefill(BaseModel):
@@ -3051,6 +3056,14 @@ class TankRefill(BaseModel):
     supplier_name: Optional[str] = None
     observations: Optional[str] = None
 
+    # Puxado de uma NF-e importada (Entrada de Estoque) do almoxarifado do
+    # posto: a nota usada, o produto e a Saída que deu baixa nele
+    stock_entry_id: Optional[str] = None
+    nfe_number: Optional[str] = None
+    product_id: Optional[str] = None
+    product_name: Optional[str] = None
+    stock_movement_id: Optional[str] = None
+
     created_by: str
     created_by_name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -3061,6 +3074,7 @@ class TankRefillCreate(BaseModel):
     liters: float
     supplier_name: Optional[str] = None
     observations: Optional[str] = None
+    stock_entry_id: Optional[str] = None
 
 
 class TankRefillResponse(BaseModel):
@@ -3070,6 +3084,11 @@ class TankRefillResponse(BaseModel):
     liters: float
     supplier_name: Optional[str] = None
     observations: Optional[str] = None
+    stock_entry_id: Optional[str] = None
+    nfe_number: Optional[str] = None
+    product_id: Optional[str] = None
+    product_name: Optional[str] = None
+    stock_movement_id: Optional[str] = None
     created_by: str
     created_by_name: str
     created_at: datetime

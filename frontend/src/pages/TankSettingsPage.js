@@ -6,17 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { OptionAutocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { Fuel, Settings } from 'lucide-react';
 
-const EMPTY_FORM = { capacity_liters: '', minimum_alert_liters: '' };
+const EMPTY_FORM = { capacity_liters: '', minimum_alert_liters: '', fuel_warehouse_id: '' };
 
 export default function TankSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
+  const [warehouses, setWarehouses] = useState([]);
 
   useEffect(() => {
     loadSettings();
@@ -24,12 +26,14 @@ export default function TankSettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const response = await api.getTankSettings();
+      const [response, warehousesResponse] = await Promise.all([api.getTankSettings(), api.getWarehouses()]);
       const data = response.data || {};
       setFormData({
         capacity_liters: data.capacity_liters ?? '',
         minimum_alert_liters: data.minimum_alert_liters ?? '',
+        fuel_warehouse_id: data.fuel_warehouse_id || '',
       });
+      setWarehouses(warehousesResponse.data || []);
     } catch (error) {
       toast.error('Erro ao carregar configuração do tanque');
     } finally {
@@ -54,6 +58,7 @@ export default function TankSettingsPage() {
       await api.updateTankSettings({
         capacity_liters: Number(formData.capacity_liters),
         minimum_alert_liters: Number(formData.minimum_alert_liters),
+        fuel_warehouse_id: formData.fuel_warehouse_id || null,
       });
       toast.success('Configuração do tanque salva com sucesso');
     } catch (error) {
@@ -110,6 +115,20 @@ export default function TankSettingsPage() {
                     data-testid="tank-minimum-input"
                   />
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="block">Almoxarifado do posto</Label>
+                <OptionAutocomplete
+                  value={formData.fuel_warehouse_id}
+                  onChange={(v) => setFormData(prev => ({ ...prev, fuel_warehouse_id: v }))}
+                  options={warehouses
+                    .filter(w => w.status !== 'INATIVO' || w.id === formData.fuel_warehouse_id)
+                    .map(w => [w.id, w.name])}
+                  testId="tank-fuel-warehouse-input"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  No "Reabastecer tanque", o botão "Puxar de NF-e" lista as notas importadas de produtos deste almoxarifado e dá baixa nele.
+                </p>
               </div>
               <Button type="submit" className="text-[13px] font-semibold" disabled={saving} data-testid="save-tank-settings-button">
                 {saving ? 'Salvando...' : 'Salvar'}

@@ -589,6 +589,7 @@ export const api = {
   getTankLedger: () => axios.get(`${API}/tank-ledger`),
   createTankRefill: (data) => axios.post(`${API}/tank-refills`, data),
   deleteTankRefill: (id) => axios.delete(`${API}/tank-refills/${id}`),
+  getTankRefillNfeOptions: () => axios.get(`${API}/tank-refills/nfe-options`),
 
   // Ordem de Abastecimento (Frota)
   getFuelSupplyOrders: (params) => axios.get(`${API}/fuel-supply-orders`, { params }),

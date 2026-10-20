@@ -919,6 +919,15 @@ async def reverse_stock_entry_import(entry_id: str, current_user: dict = Depends
         raise HTTPException(status_code=404, detail="Entrada de estoque não encontrada")
     query = _same_import_query(entry)
     entries = await db.stock_entries.find(query, {"_id": 0}).to_list(None)
+    used = await db.tank_refills.find_one(
+        {"stock_entry_id": {"$in": [e['id'] for e in entries]}}, {"_id": 0, "refill_number": 1},
+    )
+    if used:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Esta nota foi usada no Reabastecimento do Tanque Nº {used.get('refill_number')}. "
+                   "Exclua o reabastecimento na tela Nível do Tanque antes de estornar a importação.",
+        )
 
     deltas = {}
     for e in entries:
@@ -985,6 +994,17 @@ async def _refuse_if_generated_by_epi(movement: dict, action: str):
             status_code=409,
             detail=f"Esta saída foi gerada pela Entrega de EPI Nº {numbers[movement['id']]}. "
                    f"Para {action}, use a tela Entrega de EPI's.",
+        )
+
+
+def _refuse_if_generated_by_tank(movement: dict, action: str):
+    """A Saída que deu baixa no diesel usado num Reabastecimento do Tanque só
+    muda por lá - senão o nível do tanque e o almoxarifado deixam de bater."""
+    if movement.get('origin') == 'TANQUE':
+        raise HTTPException(
+            status_code=409,
+            detail=f"Esta saída foi gerada pelo {movement.get('origin_label') or 'Reabastecimento do Tanque'}. "
+                   f"Para {action}, use a tela Nível do Tanque.",
         )
 
 
@@ -1163,10 +1183,11 @@ async def create_stock_movement(data: StockMovementCreate, current_user: dict = 
 
 @api_router.put("/stock/movements/{movement_id}", response_model=StockMovementResponse)
 async def update_stock_movement(movement_id: str, data: StockMovementUpdate, current_user: dict = Depends(get_current_active_user)):
-    existing = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0, "id": 1})
+    existing = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0, "id": 1, "origin": 1, "origin_label": 1})
     if not existing:
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
     await _refuse_if_generated_by_epi(existing, "alterar")
+    _refuse_if_generated_by_tank(existing, "alterar")
     return await _update_stock_movement(movement_id, data, current_user)
 
 
@@ -1179,7 +1200,14 @@ async def delete_stock_movement(movement_id: str, current_user: dict = Depends(g
     if not existing:
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
     await _refuse_if_generated_by_epi(existing, "excluir")
+    _refuse_if_generated_by_tank(existing, "excluir")
+    await _delete_stock_movement(movement_id, current_user)
+    return {"message": "Movimentação excluída e saldo do estoque acertado"}
 
+
+async def _delete_stock_movement(movement_id: str, current_user: dict):
+    """Exclui a movimentação e desfaz o efeito no saldo, sem as travas de
+    origem - quem chama (a tela ou o Reabastecimento do Tanque) já conferiu."""
     # Retira o registro primeiro, num passo só: de duas exclusões
     # simultâneas, apenas uma recebe o documento e acerta o saldo - antes as
     # duas liam a movimentação e as duas devolviam o material ao estoque. O
@@ -1207,7 +1235,6 @@ async def delete_stock_movement(movement_id: str, current_user: dict = Depends(g
         await _revert_stock_deltas(applied)
         await db.stock_movements.insert_one(dict(removed))
         raise
-    return {"message": "Movimentação excluída e saldo do estoque acertado"}
 
 
 @api_router.get("/stock/movements", response_model=List[StockMovementResponse])
