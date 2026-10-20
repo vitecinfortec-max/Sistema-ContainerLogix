@@ -20,7 +20,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { toast } from 'sonner';
 import {
   FileWarning, Plus, Eye, Pencil, Trash2, Printer, CheckCircle2, XCircle, RotateCcw, Ban, Clock, AlertTriangle, ThumbsUp, ThumbsDown,
-  Download, X, ShieldCheck,
+  Download, X, ShieldCheck, Search, Loader2,
 } from 'lucide-react';
 import { addDays, format } from 'date-fns';
 import { todayISO } from '../lib/dates';
@@ -79,7 +79,6 @@ export default function RepairEstimatesPage() {
   const [lastPrices, setLastPrices] = useState({});
   const [clients, setClients] = useState([]);
   const [shippingLines, setShippingLines] = useState([]);
-  const [vistorias, setVistorias] = useState([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -91,6 +90,8 @@ export default function RepairEstimatesPage() {
   const [editingEstimate, setEditingEstimate] = useState(null);
   const [formData, setFormData] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [vistoriaNumber, setVistoriaNumber] = useState('');
+  const [lookingUpVistoria, setLookingUpVistoria] = useState(false);
 
   const [detailEstimate, setDetailEstimate] = useState(null);
   // Aprovar / reprovar: { status, target, responded_by, note }
@@ -155,17 +156,35 @@ export default function RepairEstimatesPage() {
     }
   };
 
-  // Preços sugeridos e vistorias com avaria: recarregados a cada abertura do
-  // formulário, pra já trazer o que foi lançado desde a última vez
+  // Preços sugeridos: recarregados a cada abertura do formulário, pra já
+  // trazer o que foi lançado desde a última vez
   const refreshAuxiliary = async () => {
-    const [pricesRes, vistoriasRes] = await Promise.allSettled([
-      api.getRepairEstimatesLastPrices(),
-      api.getContainerVistorias({ damage: 'COM_AVARIA', per_page: 100 }),
-    ]);
-    const prices = pricesRes.status === 'fulfilled' ? pricesRes.value.data : {};
+    const prices = await api.getRepairEstimatesLastPrices().then((res) => res.data).catch(() => ({}));
     setLastPrices(prices);
-    setVistorias(vistoriasRes.status === 'fulfilled' ? vistoriasRes.value.data.items : []);
     return prices;
+  };
+
+  // Digita o nº da vistoria (123 ou VC000123) e Enter: puxa container,
+  // cliente, armador, tamanho e os serviços marcados nela
+  const lookupVistoria = async () => {
+    const number = vistoriaNumber.trim();
+    if (!number || lookingUpVistoria) return;
+    setLookingUpVistoria(true);
+    try {
+      const res = await api.getContainerVistoriaByNumber(number);
+      const vistoria = res.data;
+      setFormData((prev) => fillFromVistoria(prev, vistoria));
+      setVistoriaNumber('');
+      if (vistoria.no_damage || !(vistoria.damage_items || []).length) {
+        toast.warning(`${vistoriaCode(vistoria.vistoria_number)} não tem serviços de reparo marcados - inclua os itens manualmente`);
+      } else {
+        toast.success(`${vistoriaCode(vistoria.vistoria_number)}: ${vistoria.damage_items.length} serviço(s) incluído(s)`);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Vistoria não encontrada');
+    } finally {
+      setLookingUpVistoria(false);
+    }
   };
 
   const suggestedPrice = (description, prices = lastPrices) => {
@@ -236,6 +255,7 @@ export default function RepairEstimatesPage() {
     setEditingEstimate(null);
     setFormData(emptyForm());
     setModalOpen(true);
+    setVistoriaNumber('');
     refreshAuxiliary();
   };
 
@@ -412,8 +432,6 @@ export default function RepairEstimatesPage() {
 
   const kpi = (key) => summary?.[key] || { count: 0, total: 0 };
 
-  const vistoriaLabel = (v) => [vistoriaCode(v.vistoria_number), v.container_number, v.client_name].filter(Boolean).join(' · ');
-
   return (
     <Layout>
       <div className="space-y-4">
@@ -571,7 +589,7 @@ export default function RepairEstimatesPage() {
               label="Vistoria de Container de origem"
               hint={formData.vistoria_id
                 ? 'Os serviços marcados na vistoria entraram como itens, com o último preço usado em cada um.'
-                : 'Opcional: escolha uma vistoria com avarias para trazer o container e os serviços.'}
+                : 'Opcional: digite o nº da vistoria (ex: 123 ou VC000123) e tecle Enter para puxar o container e os serviços.'}
             >
               {formData.vistoria_id ? (
                 <div className="flex items-center gap-2 h-9 px-3 rounded-md border border-slate-200 dark:border-slate-700 text-sm">
@@ -586,15 +604,26 @@ export default function RepairEstimatesPage() {
                   </button>
                 </div>
               ) : (
-                <Autocomplete
-                  value=""
-                  onChange={() => {}}
-                  options={vistorias}
-                  displayField={vistoriaLabel}
-                  valueField="id"
-                  onSelect={(vistoria) => setFormData((prev) => fillFromVistoria(prev, vistoria))}
-                  testId="estimate-vistoria-input"
-                />
+                <div className="flex gap-2 max-w-sm">
+                  <Input
+                    className="h-9 font-mono uppercase"
+                    value={vistoriaNumber}
+                    placeholder="Nº da vistoria"
+                    autoFocus={!editingEstimate}
+                    onChange={(e) => setVistoriaNumber(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        lookupVistoria();
+                      }
+                    }}
+                    data-testid="estimate-vistoria-number-input"
+                  />
+                  <Button type="button" variant="outline" className="h-9" onClick={lookupVistoria} disabled={!vistoriaNumber.trim() || lookingUpVistoria} data-testid="estimate-vistoria-lookup">
+                    {lookingUpVistoria ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Search className="w-4 h-4 mr-1.5" />}
+                    Puxar
+                  </Button>
+                </div>
               )}
             </Field>
 

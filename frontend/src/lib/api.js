@@ -321,6 +321,7 @@ export const api = {
   getVistoriasReportPdf: (params) => axios.get(`${API}/reports/container-vistorias/pdf`, { params, responseType: 'blob' }),
   getVistoriasReportExcel: (params) => axios.get(`${API}/reports/container-vistorias/excel`, { params, responseType: 'blob' }),
   getContainerVistoria: (id) => axios.get(`${API}/container-vistorias/${id}`),
+  getContainerVistoriaByNumber: (number) => axios.get(`${API}/container-vistorias/by-number/${encodeURIComponent(number)}`),
   getContainerVistoriaPDF: (id) => axios.get(`${API}/container-vistorias/${id}/pdf`, { responseType: 'blob' }),
   createContainerVistoria: (data) => axios.post(`${API}/container-vistorias`, data),
   updateContainerVistoria: (id, data) => axios.put(`${API}/container-vistorias/${id}`, data),

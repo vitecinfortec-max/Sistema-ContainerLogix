@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import asyncio
 import io
 import uuid
+import re
 import shutil
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
@@ -138,6 +139,16 @@ async def list_container_vistorias(
         "per_page": per_page,
         "total_pages": (total + per_page - 1) // per_page
     }
+
+@api_router.get("/container-vistorias/by-number/{number}", response_model=ContainerVistoriaResponse)
+async def get_container_vistoria_by_number(number: str, current_user: dict = Depends(get_current_active_user)):
+    """Vistoria pela numeração ("123" ou "VC000123") - o Orçamento de Reparo
+    puxa os dados digitando só o número"""
+    match = re.fullmatch(r"(?i)\s*(?:VC)?0*(\d+)\s*", number or "")
+    vistoria = await db.container_vistorias.find_one({"vistoria_number": int(match.group(1))}, {"_id": 0}) if match else None
+    if not vistoria:
+        raise HTTPException(status_code=404, detail=f"Vistoria de container nº {number.strip()} não encontrada")
+    return ContainerVistoriaResponse(**vistoria)
 
 @api_router.get("/container-vistorias/{vistoria_id}", response_model=ContainerVistoriaResponse)
 async def get_container_vistoria(vistoria_id: str, current_user: dict = Depends(get_current_active_user)):

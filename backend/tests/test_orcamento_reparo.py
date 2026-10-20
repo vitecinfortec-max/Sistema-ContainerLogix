@@ -126,3 +126,14 @@ def test_pdf(api):
     r = api.get(f"/api/repair-estimates/{estimate['id']}/pdf")
     assert r.status_code == 200
     assert r.content[:4] == b"%PDF"
+
+
+def test_vistoria_lookup_by_number(api):
+    r = api.post("/api/container-vistorias", json={"container_number": "MSKU1234567", "damage_items": ["Reparo de painel lateral"]})
+    vistoria = r.json()
+    code = f"VC{vistoria['vistoria_number']:06d}"
+    for number in (str(vistoria["vistoria_number"]), code, code.lower()):
+        found = api.get(f"/api/container-vistorias/by-number/{number}")
+        assert found.status_code == 200 and found.json()["id"] == vistoria["id"]
+    assert api.get("/api/container-vistorias/by-number/999").status_code == 404
+    assert api.get("/api/container-vistorias/by-number/abc").status_code == 404
