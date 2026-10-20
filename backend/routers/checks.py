@@ -2,15 +2,19 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 import io
 import re
+import shutil
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
-from models import CHECK_STATUS_OPTIONS, CheckCreate, CheckStatusUpdate, CheckResponse
+from models import CHECK_PHOTO_SIDES, CHECK_STATUS_OPTIONS, CheckCreate, CheckStatusUpdate, CheckResponse
 from reports import BRT_TZ, merge_company
 from routers.movements import _parse_filter_day
-from shared import db, get_current_admin_user, get_company_settings, load_logo_buffer
+from shared import (
+    db, get_current_admin_user, get_company_settings, load_logo_buffer,
+    validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR,
+)
 
 api_router = APIRouter(prefix="/api")
 
@@ -311,6 +315,7 @@ async def create_check(data: CheckCreate, current_user: dict = Depends(get_curre
         "compensation_date": None,
         "return_reason": None,
         "history": [{"status": "EMITIDO", "at": now, "by_name": by_name, "note": None}],
+        "photos": [],
         "created_by": current_user["sub"],
         "created_by_name": by_name,
         "created_at": now,
@@ -386,4 +391,70 @@ async def delete_check(check_id: str, current_user: dict = Depends(get_current_a
     if check["status"] in ("COMPENSADO", "DEVOLVIDO"):
         raise HTTPException(status_code=400, detail=f"Cheque {STATUS_LABELS[check['status']].lower()} não pode ser excluído. Volte para Emitido antes, se foi engano.")
     await db.checks.delete_one({"id": check_id})
+    shutil.rmtree(UPLOADS_DIR / "checks" / check_id, ignore_errors=True)
     return {"message": "Cheque excluído com sucesso"}
+
+
+# Foto do cheque (frente e verso) como registro da folha emitida. Vale em
+# qualquer status: o verso costuma ser fotografado depois, já compensado.
+SIDE_PATTERN = f"^({'|'.join(CHECK_PHOTO_SIDES)})$"
+
+
+def _remove_photo_file(url: Optional[str]):
+    if not url or "/api/uploads/" not in url:
+        return
+    path = UPLOADS_DIR / url.split("/api/uploads/", 1)[1]
+    if path.is_file():
+        path.unlink()
+
+
+@api_router.post("/checks/{check_id}/photo", response_model=CheckResponse)
+async def upload_check_photo(
+    check_id: str,
+    side: str = Query("FRENTE", pattern=SIDE_PATTERN),
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Envia a foto de um lado do cheque - substitui a anterior desse lado."""
+    check = await db.checks.find_one({"id": check_id}, {"_id": 0, "photos": 1})
+    if not check:
+        raise HTTPException(status_code=404, detail="Cheque não encontrado")
+
+    file_ext, content = await validate_and_read_upload(file, ALLOWED_EXTENSIONS)
+    photo_dir = UPLOADS_DIR / "checks" / check_id
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    photo_id = str(uuid.uuid4())
+    with open(photo_dir / f"{photo_id}{file_ext}", "wb") as buffer:
+        buffer.write(content)
+
+    previous = [p for p in check.get("photos") or [] if p.get("side") == side]
+    now = datetime.now(timezone.utc).isoformat()
+    photo = {"side": side, "url": f"/api/uploads/checks/{check_id}/{photo_id}{file_ext}", "uploaded_at": now, "by_name": current_user.get("name", "Sistema")}
+    await db.checks.update_one({"id": check_id}, {"$pull": {"photos": {"side": side}}})
+    await db.checks.update_one({"id": check_id}, {"$push": {"photos": photo}, "$set": {"updated_at": now}})
+    for old in previous:
+        _remove_photo_file(old.get("url"))
+    return await db.checks.find_one({"id": check_id}, {"_id": 0})
+
+
+@api_router.delete("/checks/{check_id}/photo/{side}", response_model=CheckResponse)
+async def delete_check_photo(
+    check_id: str,
+    side: str,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    if side not in CHECK_PHOTO_SIDES:
+        raise HTTPException(status_code=400, detail="Lado inválido: use FRENTE ou VERSO")
+    check = await db.checks.find_one({"id": check_id}, {"_id": 0, "photos": 1})
+    if not check:
+        raise HTTPException(status_code=404, detail="Cheque não encontrado")
+    removed = [p for p in check.get("photos") or [] if p.get("side") == side]
+    if not removed:
+        raise HTTPException(status_code=404, detail="Esse lado do cheque não tem foto")
+    await db.checks.update_one(
+        {"id": check_id},
+        {"$pull": {"photos": {"side": side}}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    for old in removed:
+        _remove_photo_file(old.get("url"))
+    return await db.checks.find_one({"id": check_id}, {"_id": 0})

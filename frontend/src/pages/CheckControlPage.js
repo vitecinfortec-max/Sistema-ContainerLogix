@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
@@ -19,9 +19,11 @@ import { useConfirm } from '../hooks/useConfirm';
 import { toast } from 'sonner';
 import {
   Banknote, Plus, Eye, Pencil, Trash2, Printer, CheckCircle2, RotateCcw, Undo2, Ban, Clock, AlertTriangle, CalendarClock,
+  Camera, Upload, X, Loader2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { todayISO, calendarDate } from '../lib/dates';
+import { compressImage } from '../lib/imageCompression';
 
 const PAGE_SIZE = 15;
 
@@ -47,6 +49,50 @@ function daysUntil(day) {
 function nextCheckNumber(number) {
   if (!/^\d+$/.test(number || '')) return '';
   return String(Number(number) + 1).padStart(number.length, '0');
+}
+
+const PHOTO_SIDES = { FRENTE: 'Frente', VERSO: 'Verso' };
+
+const photoOf = (check, side) => (check?.photos || []).find((p) => p.side === side);
+
+// Um lado do cheque: a foto (clique abre em tamanho real) ou os botões de
+// câmera/galeria para enviar
+function CheckPhotoSlot({ label, src, busy, onPick, onRemove, testId }) {
+  const cameraRef = useRef(null);
+  const galleryRef = useRef(null);
+  const pick = (e) => { onPick(e.target.files?.[0]); e.target.value = ''; };
+  return (
+    <div data-testid={testId}>
+      <p className="text-xs text-muted-foreground mb-1.5">{label}</p>
+      {src ? (
+        <div className="relative inline-block">
+          <a href={src} target="_blank" rel="noreferrer" title="Abrir foto">
+            <img src={src} alt={`Cheque - ${label}`} className="w-56 h-28 object-cover rounded-lg border" />
+          </a>
+          {onRemove && (
+            <Button
+              title="Remover" aria-label="Remover" type="button" variant="destructive" size="icon"
+              className="absolute top-1 right-1 h-6 w-6" onClick={onRemove} disabled={busy}
+            >
+              <X className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => cameraRef.current?.click()}>
+            {busy ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Camera className="w-4 h-4 mr-1.5" />}
+            Câmera
+          </Button>
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => galleryRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-1.5" /> Galeria
+          </Button>
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={pick} />
+          <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={pick} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // `account`: conta padrão vinda do backend (Dados Bancários da empresa ou a
@@ -86,8 +132,11 @@ export default function CheckControlPage() {
   const [editingCheck, setEditingCheck] = useState(null);
   const [formData, setFormData] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
+  // Fotos escolhidas no formulário, enviadas ao salvar: { [side]: { file, previewUrl } | { removed: true } }
+  const [photoDraft, setPhotoDraft] = useState({});
 
   const [detailCheck, setDetailCheck] = useState(null);
+  const [detailPhotoBusy, setDetailPhotoBusy] = useState(null); // lado sendo enviado/removido
   // Compensar (data) ou devolver (motivo): { status, targets, compensation_date, return_reason }
   const [statusDialog, setStatusDialog] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -172,14 +221,65 @@ export default function CheckControlPage() {
   const canDelete = !!single && ['EMITIDO', 'CANCELADO'].includes(single.status);
 
   // ---------- Cadastro ----------
+  const resetPhotoDraft = () => {
+    setPhotoDraft((prev) => {
+      Object.values(prev).forEach((d) => d.previewUrl && URL.revokeObjectURL(d.previewUrl));
+      return {};
+    });
+  };
+
+  const draftPhoto = async (side, file) => {
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setPhotoDraft((prev) => {
+      if (prev[side]?.previewUrl) URL.revokeObjectURL(prev[side].previewUrl);
+      return { ...prev, [side]: { file: compressed, previewUrl: URL.createObjectURL(compressed) } };
+    });
+  };
+
+  const removeDraftPhoto = (side) => {
+    setPhotoDraft((prev) => {
+      if (prev[side]?.previewUrl) URL.revokeObjectURL(prev[side].previewUrl);
+      // Foto nova descartada volta ao que estava salvo; foto salva fica marcada para remover
+      const next = { ...prev };
+      if (prev[side]?.file) delete next[side];
+      else next[side] = { removed: true };
+      return next;
+    });
+  };
+
+  const formPhotoSrc = (side) => {
+    const draft = photoDraft[side];
+    if (draft?.removed) return null;
+    if (draft?.previewUrl) return draft.previewUrl;
+    const saved = photoOf(editingCheck, side);
+    return saved ? api.getFileUrl(saved.url) : null;
+  };
+
+  // Envia/remove as fotos do formulário; devolve os lados que falharam
+  const savePhotoDraft = async (checkId) => {
+    const failed = [];
+    for (const [side, draft] of Object.entries(photoDraft)) {
+      try {
+        if (draft.file) await api.uploadCheckPhoto(checkId, side, draft.file);
+        else if (draft.removed && photoOf(editingCheck, side)) await api.deleteCheckPhoto(checkId, side);
+      } catch (error) {
+        failed.push(PHOTO_SIDES[side].toLowerCase());
+      }
+    }
+    return failed;
+  };
+
   const openNewModal = () => {
     setEditingCheck(null);
     setFormData(emptyForm(summary?.default_account));
+    resetPhotoDraft();
     setModalOpen(true);
   };
 
   const openEditModal = (check) => {
     setEditingCheck(check);
+    resetPhotoDraft();
     setFormData({
       check_number: check.check_number,
       bank: check.bank,
@@ -214,13 +314,15 @@ export default function CheckControlPage() {
     setSaving(true);
     try {
       const payload = { ...formData, amount: parseFloat(amount) };
-      if (editingCheck) {
-        await api.updateCheck(editingCheck.id, payload);
-        toast.success('Cheque atualizado');
-      } else {
-        await api.createCheck(payload);
-        toast.success('Cheque cadastrado');
+      const response = editingCheck
+        ? await api.updateCheck(editingCheck.id, payload)
+        : await api.createCheck(payload);
+      const failedPhotos = await savePhotoDraft(response.data.id);
+      toast.success(editingCheck ? 'Cheque atualizado' : 'Cheque cadastrado');
+      if (failedPhotos.length > 0) {
+        toast.error(`Não foi possível salvar a foto (${failedPhotos.join(' e ')}). Tente de novo em "Ver detalhes".`);
       }
+      resetPhotoDraft();
       setModalOpen(false);
       loadChecks();
     } catch (error) {
@@ -238,6 +340,28 @@ export default function CheckControlPage() {
       loadChecks();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao excluir cheque');
+    }
+  };
+
+  // ---------- Fotos (detalhes) ----------
+  // Aqui a foto vai direto, em qualquer status - o verso costuma ser
+  // fotografado depois que o cheque já foi compensado
+  // `file` null = remover; undefined = seletor fechado sem escolher
+  const changeDetailPhoto = async (side, file) => {
+    if (!detailCheck || file === undefined) return;
+    if (file === null && !(await confirm(`Remover a foto do ${PHOTO_SIDES[side].toLowerCase()} do cheque?`))) return;
+    setDetailPhotoBusy(side);
+    try {
+      const response = file
+        ? await api.uploadCheckPhoto(detailCheck.id, side, await compressImage(file))
+        : await api.deleteCheckPhoto(detailCheck.id, side);
+      setDetailCheck(response.data);
+      setChecks((prev) => prev.map((c) => (c.id === response.data.id ? response.data : c)));
+      toast.success(file ? 'Foto do cheque salva' : 'Foto do cheque removida');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao salvar a foto do cheque');
+    } finally {
+      setDetailPhotoBusy(null);
     }
   };
 
@@ -450,7 +574,14 @@ export default function CheckControlPage() {
                       <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selectedIds.has(check.id)} onCheckedChange={() => toggleSelect(check.id)} />
                       </td>
-                      <td className="cell-strong whitespace-nowrap tabular-nums">{check.check_number}</td>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">
+                        {check.check_number}
+                        {check.photos?.length > 0 && (
+                          <span title={`Foto: ${check.photos.map((p) => PHOTO_SIDES[p.side]).join(' e ')}`}>
+                            <Camera className="inline w-3.5 h-3.5 ml-1.5 text-muted-foreground" aria-label="Com foto" />
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <div className="whitespace-nowrap">{check.bank}</div>
                         {(check.agency || check.account) && (
@@ -539,6 +670,19 @@ export default function CheckControlPage() {
             <Field label="Observações" className="col-span-2 md:col-span-4">
               <Textarea rows={2} value={formData.observations} onChange={(e) => setField('observations')(e.target.value)} />
             </Field>
+
+            <div className="col-span-2 md:col-span-4 border-t border-slate-100 dark:border-slate-800 pt-3">
+              <p className="text-sm font-medium mb-2">Foto do cheque</p>
+              <div className="flex flex-wrap gap-6">
+                {Object.entries(PHOTO_SIDES).map(([side, label]) => (
+                  <CheckPhotoSlot
+                    key={side} label={label} src={formPhotoSrc(side)}
+                    onPick={(file) => draftPhoto(side, file)} onRemove={() => removeDraftPhoto(side)}
+                    testId={`check-form-photo-${side.toLowerCase()}`}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
 
           <DialogFooter>
@@ -632,6 +776,22 @@ export default function CheckControlPage() {
                   <p className="whitespace-pre-line">{detailCheck.observations}</p>
                 </div>
               )}
+              <div>
+                <h4 className="font-semibold mb-2">Foto do cheque</h4>
+                <div className="flex flex-wrap gap-6">
+                  {Object.entries(PHOTO_SIDES).map(([side, label]) => {
+                    const photo = photoOf(detailCheck, side);
+                    return (
+                      <CheckPhotoSlot
+                        key={side} label={label} src={photo ? api.getFileUrl(photo.url) : null}
+                        busy={detailPhotoBusy === side}
+                        onPick={(file) => changeDetailPhoto(side, file)} onRemove={() => changeDetailPhoto(side, null)}
+                        testId={`check-detail-photo-${side.toLowerCase()}`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
               <div>
                 <h4 className="font-semibold mb-2">Histórico</h4>
                 <ol className="space-y-2 border-l border-slate-200 dark:border-slate-700 pl-4">

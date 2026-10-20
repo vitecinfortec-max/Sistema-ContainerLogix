@@ -138,3 +138,54 @@ def test_default_account_comes_from_company_bank_details(api):
     _create(api, check_number="000050", bank="ITAÚ", agency="0001", account="12345-6")
     _create(api, check_number="900", bank="Bradesco", agency="9", account="9")
     assert api.get("/api/checks/summary").json()["default_account"]["last_check_number"] == "000050"
+
+
+PNG = bytes.fromhex("89504e470d0a1a0a") + b"x" * 32
+
+
+def _upload(api, check_id, side, **kw):
+    return api.post(f"/api/checks/{check_id}/photo", params={"side": side},
+                    files={"file": ("cheque.png", PNG, "image/png")}, **kw)
+
+
+def test_check_photo_front_and_back(api, tmp_path, monkeypatch):
+    from routers import checks
+    monkeypatch.setattr(checks, "UPLOADS_DIR", tmp_path)
+    check = _create(api)
+    assert check["photos"] == []
+
+    first = _upload(api, check["id"], "FRENTE").json()
+    assert [p["side"] for p in first["photos"]] == ["FRENTE"]
+    first_file = tmp_path / first["photos"][0]["url"].split("/api/uploads/", 1)[1]
+    assert first_file.is_file()
+
+    # a nova foto da frente substitui a anterior (e apaga o arquivo antigo)
+    replaced = _upload(api, check["id"], "FRENTE").json()
+    assert len(replaced["photos"]) == 1 and not first_file.exists()
+
+    # verso vale mesmo com o cheque já compensado
+    api.put(f"/api/checks/{check['id']}/status", json={"status": "COMPENSADO", "compensation_date": _day(0)})
+    both = _upload(api, check["id"], "VERSO").json()
+    assert sorted(p["side"] for p in both["photos"]) == ["FRENTE", "VERSO"]
+    # editar os dados não apaga as fotos
+    api.put(f"/api/checks/{check['id']}/status", json={"status": "EMITIDO"})
+    assert len(api.put(f"/api/checks/{check['id']}", json=_body(amount=10)).json()["photos"]) == 2
+
+    r = api.delete(f"/api/checks/{check['id']}/photo/FRENTE")
+    assert r.status_code == 200 and [p["side"] for p in r.json()["photos"]] == ["VERSO"]
+    assert api.delete(f"/api/checks/{check['id']}/photo/FRENTE").status_code == 404
+
+    # excluir o cheque leva a pasta de fotos junto
+    assert api.delete(f"/api/checks/{check['id']}").status_code == 200
+    assert not (tmp_path / "checks" / check["id"]).exists()
+
+
+def test_check_photo_validation(api, tmp_path, monkeypatch):
+    from routers import checks
+    monkeypatch.setattr(checks, "UPLOADS_DIR", tmp_path)
+    check = _create(api)
+    assert _upload(api, check["id"], "LATERAL").status_code == 422
+    assert _upload(api, "nao-existe", "FRENTE").status_code == 404
+    r = api.post(f"/api/checks/{check['id']}/photo", files={"file": ("cheque.pdf", b"%PDF-1.4", "application/pdf")})
+    assert r.status_code == 400
+    assert _upload(api, check["id"], "FRENTE", as_user="operator").status_code == 403

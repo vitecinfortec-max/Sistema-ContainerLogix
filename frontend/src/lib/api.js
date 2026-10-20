@@ -480,6 +480,15 @@ export const api = {
   updateCheck: (id, data) => axios.put(`${API}/checks/${id}`, data),
   deleteCheck: (id) => axios.delete(`${API}/checks/${id}`),
   updateCheckStatus: (id, data) => axios.put(`${API}/checks/${id}/status`, data),
+  uploadCheckPhoto: (id, side, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/checks/${id}/photo`, formData, {
+      params: { side },
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteCheckPhoto: (id, side) => axios.delete(`${API}/checks/${id}/photo/${side}`),
   getChecksReportPDF: (params) => axios.get(`${API}/checks/report/pdf`, { params, responseType: 'blob' }),
 
   // Financeiro - Relatórios do período (conferência)

@@ -2074,6 +2074,16 @@ class CheckHistoryEntry(BaseModel):
     note: Optional[str] = None
 
 
+CHECK_PHOTO_SIDES = ["FRENTE", "VERSO"]
+
+
+class CheckPhoto(BaseModel):
+    side: str  # FRENTE ou VERSO - uma foto por lado, a nova substitui a anterior
+    url: str
+    uploaded_at: datetime
+    by_name: str
+
+
 class CheckResponse(BaseModel):
     id: str
     check_number: str
@@ -2090,6 +2100,7 @@ class CheckResponse(BaseModel):
     compensation_date: Optional[str] = None
     return_reason: Optional[str] = None
     history: List[CheckHistoryEntry] = []
+    photos: List[CheckPhoto] = []
     created_by: str
     created_by_name: str
     created_at: datetime
