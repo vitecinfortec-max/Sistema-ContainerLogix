@@ -37,6 +37,7 @@ from routers.frota import api_router as frota_router
 from routers.loading_schedule import api_router as loading_schedule_router
 from routers.daily_rate import api_router as daily_rate_router
 from routers.checks import api_router as checks_router
+from routers.repair_estimates import api_router as repair_estimates_router
 from routers.receivables import api_router as receivables_router
 from routers.financial_reports import api_router as financial_reports_router
 from routers.container_reports import api_router as container_reports_router
@@ -190,6 +191,7 @@ app.include_router(frota_router)
 app.include_router(loading_schedule_router)
 app.include_router(daily_rate_router)
 app.include_router(checks_router)
+app.include_router(repair_estimates_router)
 app.include_router(receivables_router)
 app.include_router(financial_reports_router)
 app.include_router(container_reports_router)
@@ -391,7 +393,7 @@ async def startup_event():
     # consulta mais comum de detalhe/edição/exclusão nessas coleções.
     for collection_name in (
         "movements", "invoices", "products", "stock_movements", "stock_entries",
-        "fuel_supplies", "fuel_supply_orders", "checks", "client_credit_entries",
+        "fuel_supplies", "fuel_supply_orders", "checks", "repair_estimates", "client_credit_entries",
     ):
         await db[collection_name].create_index("id")
     # Crédito de Cliente: um saldo por cliente (a baixa usa $inc condicionado

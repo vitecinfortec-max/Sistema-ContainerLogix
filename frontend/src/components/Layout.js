@@ -18,6 +18,7 @@ import {
   BarChart3,
   DollarSign,
   Banknote,
+  FileWarning,
   PiggyBank,
   Scale,
   History,
@@ -152,6 +153,7 @@ const PAGE_TITLES = {
   '/daily-rate-requests': 'Solicitação de Diária',
   '/expense-reports': 'Prestação de Contas',
   '/checks': 'Controle de Cheque',
+  '/repair-estimates': 'Orçamento de Reparo',
   '/reports/receivables': 'Contas a Receber',
   '/financial-summary': 'Resumo Financeiro',
   '/client-credits': 'Crédito de Cliente',
@@ -368,7 +370,7 @@ function LayoutFrame({ children }) {
     if (savedOpcoesSistema !== null) setOpcoesSistemaOpen(JSON.parse(savedOpcoesSistema));
   }, []);
 
-  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname === '/unit-segregation';
+  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/repair-estimates' || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname === '/unit-segregation';
   const isCadastroActive = location.pathname === '/cadastro' || location.pathname === '/company-settings';
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/checks' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/client-credits' || location.pathname === '/port-services-billing';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
@@ -564,6 +566,7 @@ function LayoutFrame({ children }) {
     { path: '/movements', label: 'Emitir EIR', icon: List, moduleKey: 'terminal.movimentacoes' },
     { path: '/container-inspections', label: 'Registro Fotográfico', icon: ClipboardCheck, moduleKey: 'terminal.vistoria' },
     { path: '/container-vistorias', label: 'Vistoria de Container', icon: ShieldCheck, moduleKey: 'terminal.vistoria_container' },
+    { path: '/repair-estimates', label: 'Orçamento de Reparo', icon: FileWarning, moduleKey: 'terminal.orcamento_reparo' },
     { path: '/unit-segregation', label: 'Segregação de Unidade', icon: Package, moduleKey: 'terminal.movimentacoes' },
     { path: '/yard-control', label: 'Controle de Pátio', icon: Clock, moduleKey: 'terminal.movimentacoes' },
     { path: '/reports/movements', label: 'Relatório de Movimentação', icon: BarChart3, moduleKey: 'terminal.movimentacoes' },

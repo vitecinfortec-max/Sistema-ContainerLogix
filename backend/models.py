@@ -766,6 +766,78 @@ class ContainerVistoriaResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+# ===== ORÇAMENTO DE REPARO (Terminal) =====
+# Orçamento dos reparos de um container que chegou avariado, pra mandar ao
+# cliente/armador aprovar antes de executar. Pode nascer de uma Vistoria de
+# Container (os "Tipo de Serviços" marcados viram os itens) ou ser digitado.
+# EM_ABERTO = aguardando a resposta; APROVADO / REPROVADO = resposta do
+# cliente; CANCELADO = descartado (ex.: lançado em duplicidade).
+REPAIR_ESTIMATE_STATUS_OPTIONS = ["EM_ABERTO", "APROVADO", "REPROVADO", "CANCELADO"]
+
+
+class RepairEstimateItem(BaseModel):
+    description: str  # Serviço (nome do catálogo de reparo ou texto livre)
+    quantity: float = 1
+    unit_price: float = 0
+
+
+class RepairEstimateCreate(BaseModel):
+    container_number: str
+    vistoria_id: Optional[str] = None  # Vistoria de Container de origem
+    client_name: Optional[str] = None
+    shipping_line: Optional[str] = None  # Armador
+    size_type: Optional[str] = None
+    items: List[RepairEstimateItem] = Field(default_factory=list)
+    discount: float = 0  # Desconto em R$ sobre o subtotal
+    validity_days: int = 15  # Validade da proposta, em dias a partir da emissão
+    execution_days: Optional[int] = None  # Prazo de execução após aprovação
+    observations: Optional[str] = None
+
+
+class RepairEstimateStatusUpdate(BaseModel):
+    status: str
+    responded_by: Optional[str] = None  # Quem aprovou/reprovou do lado do cliente
+    note: Optional[str] = None  # Motivo da reprovação / observação
+
+
+class RepairEstimateHistoryEntry(BaseModel):
+    status: str
+    at: datetime
+    by_name: str
+    note: Optional[str] = None
+
+
+class RepairEstimateItemResponse(RepairEstimateItem):
+    total: float = 0
+
+
+class RepairEstimateResponse(BaseModel):
+    id: str
+    estimate_number: int
+    container_number: str
+    vistoria_id: Optional[str] = None
+    vistoria_number: Optional[int] = None
+    client_name: Optional[str] = None
+    shipping_line: Optional[str] = None
+    size_type: Optional[str] = None
+    items: List[RepairEstimateItemResponse] = []
+    subtotal: float = 0
+    discount: float = 0
+    total: float = 0
+    validity_days: int = 15
+    execution_days: Optional[int] = None
+    observations: Optional[str] = None
+    status: str
+    responded_by: Optional[str] = None
+    responded_at: Optional[datetime] = None
+    response_note: Optional[str] = None
+    history: List[RepairEstimateHistoryEntry] = []
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
 # ===== COMERCIAL: Representante, Tabela de Serviços, Vínculo de Clientes =====
 class Representative(BaseModel):
     model_config = ConfigDict(extra="ignore")

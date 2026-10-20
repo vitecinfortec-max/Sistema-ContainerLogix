@@ -89,6 +89,7 @@ const VehicleChecklistPage = lazyPage(() => import('./pages/VehicleChecklistPage
 const LoadingSchedulePage = lazyPage(() => import('./pages/LoadingSchedulePage'));
 const DailyRateRequestPage = lazyPage(() => import('./pages/DailyRateRequestPage'));
 const CheckControlPage = lazyPage(() => import('./pages/CheckControlPage'));
+const RepairEstimatesPage = lazyPage(() => import('./pages/RepairEstimatesPage'));
 const ReceivablesPage = lazyPage(() => import('./pages/ReceivablesPage'));
 const FinancialSummaryPage = lazyPage(() => import('./pages/FinancialSummaryPage'));
 const ClientCreditsPage = lazyPage(() => import('./pages/ClientCreditsPage'));
@@ -566,6 +567,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="terminal.vistoria_container">
                 <ContainerVistoriaDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/repair-estimates"
+            element={
+              <ProtectedRoute moduleKey="terminal.orcamento_reparo">
+                <RepairEstimatesPage />
               </ProtectedRoute>
             }
           />

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Printer, Download, Camera, Upload, X, Edit, Loader2, FileText, ShieldCheck } from 'lucide-react';
+import { Printer, Download, Camera, Upload, X, Edit, Loader2, FileText, ShieldCheck, FileWarning } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import JsBarcode from 'jsbarcode';
@@ -16,6 +16,7 @@ import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings
 import { PrintHeader, PrintSection, PrintFieldGrid, PrintText, PrintPhotoGrid, PrintClosing } from '../components/PrintDocument';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Label } from '../components/ui/label';
+import { useModuleConfig } from '../context/ModuleConfigContext';
 
 const PHOTO_LABELS = VISTORIA_PHOTO_TYPES.reduce((acc, { value, label }) => {
   acc[value] = label;
@@ -38,6 +39,7 @@ function generateBarcodeImage(value) {
 export default function ContainerVistoriaDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isModuleEnabled } = useModuleConfig();
   const [searchParams] = useSearchParams();
   const company = useCompanySettings();
   const [vistoria, setVistoria] = useState(null);
@@ -265,6 +267,12 @@ export default function ContainerVistoriaDetailPage() {
                   <Button variant="outline" onClick={() => navigate(`/movements/new?vistoria=${id}`)} data-testid="generate-eir-btn">
                     <FileText className="w-4 h-4 mr-2" />
                     Gerar EIR de entrada
+                  </Button>
+                )}
+                {!vistoria.no_damage && vistoria.damage_items?.length > 0 && isModuleEnabled('terminal.orcamento_reparo') && (
+                  <Button variant="outline" onClick={() => navigate(`/repair-estimates?vistoria=${id}`)} data-testid="generate-estimate-btn">
+                    <FileWarning className="w-4 h-4 mr-2" />
+                    Gerar orçamento
                   </Button>
                 )}
                 <Button variant="outline" onClick={() => navigate(`/container-vistorias/${id}/edit`)} data-testid="edit-btn">

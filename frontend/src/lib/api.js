@@ -334,6 +334,16 @@ export const api = {
   },
   deleteContainerVistoriaPhoto: (id, photoId) => axios.delete(`${API}/container-vistorias/${id}/photo/${photoId}`),
 
+  // Terminal - Orçamento de Reparo
+  getRepairEstimates: (params) => axios.get(`${API}/repair-estimates`, { params }),
+  getRepairEstimatesSummary: () => axios.get(`${API}/repair-estimates/summary`),
+  getRepairEstimatesLastPrices: () => axios.get(`${API}/repair-estimates/last-prices`),
+  createRepairEstimate: (data) => axios.post(`${API}/repair-estimates`, data),
+  updateRepairEstimate: (id, data) => axios.put(`${API}/repair-estimates/${id}`, data),
+  deleteRepairEstimate: (id) => axios.delete(`${API}/repair-estimates/${id}`),
+  updateRepairEstimateStatus: (id, data) => axios.put(`${API}/repair-estimates/${id}/status`, data),
+  getRepairEstimatePDF: (id) => axios.get(`${API}/repair-estimates/${id}/pdf`, { responseType: 'blob' }),
+
   // Auditoria de Estoque (Terminal)
   getContainerAudits: (params) => axios.get(`${API}/container-audits`, { params }),
   getContainerAudit: (id) => axios.get(`${API}/container-audits/${id}`),
