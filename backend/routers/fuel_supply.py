@@ -61,11 +61,20 @@ async def get_next_fuel_supply_number(current_user: dict = Depends(get_current_a
     return {"next_number": (counter["seq"] + 1) if counter else 1}
 
 
+# ARLA 32 não é combustível: abastece junto com o diesel e entrava na média
+# como se fosse, gerando médias absurdas (centenas de km/L)
+_NON_FUEL_TYPES = ["ARLA_32"]
+
+
 async def _compute_fuel_consumption_pairs() -> list:
-    """Calcula a média (km/L) de cada par de abastecimentos consecutivos de um mesmo
-    veículo (CAVALO/CAMINHÃO, ATIVO). Média do par = (KM do abastecimento atual - KM do
-    anterior) / litros do abastecimento atual. Pares com KM igual/menor que o anterior
-    (erro de digitação) ou sem litros são pulados - nunca gera média negativa/zero."""
+    """Calcula a média (km/L) de cada veículo (CAVALO/CAMINHÃO, ATIVO) pelo método
+    do tanque cheio: de um abastecimento com Tanque Cheio até o próximo, média =
+    KM rodado / soma dos litros abastecidos no intervalo (os parciais do meio
+    entram na soma). Antes cada par usava só os litros do último abastecimento,
+    e um parcial distorcia a média. Abastecimento antigo sem o campo full_tank
+    conta como tanque cheio (era o padrão da tela). KM igual/menor que o do
+    tanque cheio anterior (erro de digitação) descarta o intervalo e recomeça
+    dele - nunca gera média negativa/zero."""
     vehicles = await db.vehicles.find(
         {"vehicle_type": {"$in": ["CAVALO", "CAMINHÃO"]}, "status": "ATIVO"},
         {"_id": 0, "id": 1, "plate": 1, "model": 1}
@@ -74,39 +83,54 @@ async def _compute_fuel_consumption_pairs() -> list:
     # Uma consulta só pra todos os veículos (antes era uma por veículo), já na
     # ordem cronológica - o agrupamento abaixo preserva essa ordem.
     all_supplies = await db.fuel_supplies.find(
-        {"equipment_id": {"$in": [v["id"] for v in vehicles]}, "reading": {"$ne": None}},
-        {"_id": 0, "id": 1, "equipment_id": 1, "supply_number": 1, "supply_date": 1, "created_at": 1, "reading": 1, "liters": 1}
-    ).sort([("supply_date", 1), ("created_at", 1)]).to_list(None)
+        {"equipment_id": {"$in": [v["id"] for v in vehicles]}, "reading": {"$ne": None},
+         "fuel_type": {"$nin": _NON_FUEL_TYPES}},
+        {"_id": 0, "id": 1, "equipment_id": 1, "supply_number": 1, "supply_date": 1, "created_at": 1,
+         "reading": 1, "liters": 1, "full_tank": 1}
+    ).sort([("supply_date", 1), ("created_at", 1), ("reading", 1)]).to_list(None)
     supplies_by_vehicle = {}
     for supply in all_supplies:
         supplies_by_vehicle.setdefault(supply["equipment_id"], []).append(supply)
 
     all_pairs = []
     for vehicle in vehicles:
-        supplies = supplies_by_vehicle.get(vehicle["id"], [])
-
-        for i in range(1, len(supplies)):
-            prev, curr = supplies[i - 1], supplies[i]
-            prev_reading, curr_reading = prev.get("reading"), curr.get("reading")
-            liters = curr.get("liters") or 0
-            if prev_reading is None or curr_reading is None:
+        anchor = None  # último abastecimento com tanque cheio
+        liters_since = 0.0
+        partial_count = 0
+        for curr in supplies_by_vehicle.get(vehicle["id"], []):
+            curr_reading = curr.get("reading")
+            full = curr.get("full_tank", True) is not False
+            if anchor is not None and curr_reading <= anchor["reading"]:
+                # Leitura fora de ordem: o intervalo não tem como ser medido
+                anchor = curr if full else None
+                liters_since, partial_count = 0.0, 0
                 continue
-            if curr_reading <= prev_reading or liters <= 0:
+            if anchor is None:
+                if full:
+                    anchor = curr
                 continue
-            km_traveled = curr_reading - prev_reading
-            all_pairs.append({
-                "vehicle_id": vehicle["id"],
-                "vehicle_plate": vehicle.get("plate"),
-                "vehicle_model": vehicle.get("model"),
-                "supply_id": curr["id"],
-                "supply_number": curr.get("supply_number"),
-                "supply_date": curr.get("supply_date"),
-                "previous_reading": prev_reading,
-                "current_reading": curr_reading,
-                "km_traveled": km_traveled,
-                "liters": liters,
-                "average": round(km_traveled / liters, 2),
-            })
+            liters_since += float(curr.get("liters") or 0)
+            if not full:
+                partial_count += 1
+                continue
+            km_traveled = curr_reading - anchor["reading"]
+            if liters_since > 0:
+                all_pairs.append({
+                    "vehicle_id": vehicle["id"],
+                    "vehicle_plate": vehicle.get("plate"),
+                    "vehicle_model": vehicle.get("model"),
+                    "supply_id": curr["id"],
+                    "supply_number": curr.get("supply_number"),
+                    "supply_date": curr.get("supply_date"),
+                    "previous_reading": anchor["reading"],
+                    "current_reading": curr_reading,
+                    "km_traveled": km_traveled,
+                    "liters": round(liters_since, 2),
+                    "partial_count": partial_count,
+                    "average": round(km_traveled / liters_since, 2),
+                })
+            anchor = curr
+            liters_since, partial_count = 0.0, 0
 
     all_pairs.sort(key=lambda p: (p["supply_date"] or "", p["supply_number"] or 0), reverse=True)
     return all_pairs
@@ -176,8 +200,79 @@ async def _check_tank_balance(liters: float, giving_back: float = 0.0):
         )
 
 
-async def _validate_fuel_supply(values: dict, existing: Optional[dict] = None):
+def _fmt_km(value) -> str:
+    return f"{float(value):,.0f}".replace(",", ".")
+
+
+async def _check_reading_order(merged: dict, supply_id: Optional[str]):
+    """A Leitura tem que caber entre a dos abastecimentos de dias anteriores e
+    a dos dias seguintes do mesmo veículo - antes um KM digitado errado era
+    aceito calado e só sumia do Controle de Média. No mesmo dia não confere
+    (diesel e ARLA saem com a mesma leitura). Responde 409: a tela pergunta se
+    salva assim mesmo e reenvia com confirm_reading."""
+    reading, supply_date = merged.get("reading"), merged.get("supply_date")
+    if reading is None or not supply_date:
+        return
+    if merged.get("equipment_id"):
+        vehicle_query = {"equipment_id": merged["equipment_id"]}
+    elif merged.get("equipment_plate"):
+        vehicle_query = {"equipment_plate": merged["equipment_plate"]}
+    else:
+        return
+    base = {**vehicle_query, "reading": {"$ne": None}, "id": {"$ne": supply_id}}
+    previous = await db.fuel_supplies.find_one(
+        {**base, "supply_date": {"$lt": supply_date}}, {"_id": 0, "reading": 1, "supply_number": 1},
+        sort=[("reading", -1)],
+    )
+    if previous and reading < previous["reading"]:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A leitura {_fmt_km(reading)} é menor que a do Abastecimento Nº {previous.get('supply_number')} "
+                   f"({_fmt_km(previous['reading'])}), de data anterior.",
+        )
+    following = await db.fuel_supplies.find_one(
+        {**base, "supply_date": {"$gt": supply_date}}, {"_id": 0, "reading": 1, "supply_number": 1},
+        sort=[("reading", 1)],
+    )
+    if following and reading > following["reading"]:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A leitura {_fmt_km(reading)} é maior que a do Abastecimento Nº {following.get('supply_number')} "
+                   f"({_fmt_km(following['reading'])}), de data posterior.",
+        )
+
+
+async def _validate_fuel_supply(values: dict, existing: Optional[dict] = None, confirm_reading: bool = False):
     refuse_negative(values, _FUEL_SUPPLY_NUMBER_LABELS)
+    merged = {**(existing or {}), **values}
+    # Só a tela conferia: pela API dava pra gravar abastecimento sem veículo ou sem litros
+    missing = [label for field, label in (
+        ("equipment_plate", "Equipamento"), ("supply_date", "Data do Abastecimento"), ("fuel_type", "Combustível/ARLA"),
+    ) if not merged.get(field)]
+    if not float(merged.get("liters") or 0) > 0:
+        missing.append("Litros")
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Preencha: {', '.join(missing)}")
+
+    order_id = merged.get("fuel_supply_order_id")
+    if order_id and order_id != (existing or {}).get("fuel_supply_order_id"):
+        order = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0, "order_number": 1})
+        if not order:
+            raise HTTPException(status_code=400, detail="Ordem de Abastecimento não encontrada")
+        # A tela escondia as ordens já lançadas, mas a API aceitava a mesma ordem de novo
+        used = await db.fuel_supplies.find_one(
+            {"fuel_supply_order_id": order_id, "id": {"$ne": (existing or {}).get("id")}},
+            {"_id": 0, "supply_number": 1},
+        )
+        if used:
+            raise HTTPException(
+                status_code=400,
+                detail=f"A Ordem de Abastecimento Nº {order['order_number']} já foi lançada no Abastecimento Nº {used.get('supply_number')}",
+            )
+
+    if not confirm_reading:
+        await _check_reading_order(merged, (existing or {}).get("id"))
+
     source = values.get("source", (existing or {}).get("source"))
     if source != "TANQUE_PROPRIO":
         return
@@ -188,7 +283,7 @@ async def _validate_fuel_supply(values: dict, existing: Optional[dict] = None):
 
 @api_router.post("/fuel-supplies", response_model=FuelSupplyResponse)
 async def create_fuel_supply(data: FuelSupplyCreate, current_user: dict = Depends(get_current_active_user)):
-    await _validate_fuel_supply(data.model_dump())
+    await _validate_fuel_supply(data.model_dump(exclude={"confirm_reading"}), confirm_reading=data.confirm_reading)
     counter = await db.counters.find_one_and_update(
         {"_id": "fuel_supply_number"},
         {"$inc": {"seq": 1}},
@@ -216,8 +311,8 @@ async def update_fuel_supply(supply_id: str, data: FuelSupplyUpdate, current_use
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
     # Campo enviado vazio (null) apaga o valor salvo: ao trocar para Tanque
     # Próprio, a tela manda fornecedor/cidade/UF vazios e antes eles ficavam
-    update_data = data.model_dump(exclude_unset=True)
-    await _validate_fuel_supply(update_data, existing)
+    update_data = data.model_dump(exclude_unset=True, exclude={"confirm_reading"})
+    await _validate_fuel_supply(update_data, existing, confirm_reading=data.confirm_reading)
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.fuel_supplies.update_one({"id": supply_id}, {"$set": update_data})
     updated = await db.fuel_supplies.find_one({"id": supply_id}, {"_id": 0})
@@ -716,7 +811,20 @@ async def update_tank_settings(data: TankSettingsUpdate, current_user: dict = De
 async def get_tank_level_route(current_user: dict = Depends(get_current_active_user)):
     """Nível atual do tanque, pro medidor visual de 'Nível do Tanque'."""
     level = await _compute_tank_level()
-    return level or {"configured": False}
+    if not level:
+        return {"configured": False}
+    # Custo do litro da última recarga puxada de NF-e: o Abastecimento do
+    # Tanque Próprio usa como Valor Unitário sugerido
+    level["last_unit_cost"] = None
+    last_refill = await db.tank_refills.find_one(
+        {"stock_entry_id": {"$nin": [None, ""]}}, {"_id": 0, "stock_entry_id": 1},
+        sort=[("refill_date", -1), ("created_at", -1)],
+    )
+    if last_refill:
+        entry = await db.stock_entries.find_one({"id": last_refill["stock_entry_id"]}, {"_id": 0, "unit_value": 1})
+        if entry and entry.get("unit_value"):
+            level["last_unit_cost"] = float(entry["unit_value"])
+    return level
 
 
 @api_router.get("/tank-ledger")

@@ -185,7 +185,15 @@ export default function FuelConsumptionPage() {
                       <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(h.previous_reading)}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(h.current_reading)}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(h.km_traveled)}</td>
-                      <td className="text-right whitespace-nowrap tabular-nums">{fmtLiters(h.liters)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">
+                        {fmtLiters(h.liters)}
+                        {/* Média de tanque cheio a tanque cheio: os parciais do meio somam nos litros */}
+                        {h.partial_count > 0 && (
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {`inclui ${h.partial_count} parcia${h.partial_count > 1 ? 'is' : 'l'}`}
+                          </div>
+                        )}
+                      </td>
                       <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtAvg(h.average)}</td>
                     </tr>
                   ))}

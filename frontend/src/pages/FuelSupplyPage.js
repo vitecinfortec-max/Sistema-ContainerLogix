@@ -155,16 +155,24 @@ export default function FuelSupplyPage() {
   // Ao selecionar uma Ordem de Abastecimento já cadastrada, puxa os dados que
   // ela já tem (equipamento, fornecedor, combustível) pro Abastecimento atual.
   const onSelectFuelOrder = (order) => {
-    setForm((p) => ({
-      ...p,
-      supply_order: `Nº ${order.order_number}`,
-      fuel_supply_order_id: order.id,
-      equipment_plate: order.equipment_plate || p.equipment_plate,
-      equipment_id: order.equipment_id || p.equipment_id,
-      supplier_name: order.supplier_name || p.supplier_name,
-      supplier_id: order.supplier_id || p.supplier_id,
-      fuel_type: order.fuel_type || p.fuel_type,
-    }));
+    setForm((p) => {
+      // Litros e preço autorizados na ordem também vêm (Completar Tanque não tem litros)
+      const liters = order.liters ?? p.liters;
+      const unitPrice = order.estimated_value ?? p.unit_price;
+      return {
+        ...p,
+        supply_order: `Nº ${order.order_number}`,
+        fuel_supply_order_id: order.id,
+        equipment_plate: order.equipment_plate || p.equipment_plate,
+        equipment_id: order.equipment_id || p.equipment_id,
+        supplier_name: order.supplier_name || p.supplier_name,
+        supplier_id: order.supplier_id || p.supplier_id,
+        fuel_type: order.fuel_type || p.fuel_type,
+        liters,
+        unit_price: unitPrice,
+        gross_value: Number(liters) && Number(unitPrice) ? Number((Number(liters) * Number(unitPrice)).toFixed(2)) : p.gross_value,
+      };
+    });
     toast.success('Dados da Ordem de Abastecimento preenchidos automaticamente');
   };
 
@@ -206,6 +214,18 @@ export default function FuelSupplyPage() {
     });
   };
 
+  // Tanque Próprio: sugere o custo do litro da última recarga puxada de NF-e
+  // (só se o Valor Unitário ainda estiver vazio)
+  const onSourceChange = async (val) => {
+    onChange('source', val);
+    if (val !== 'TANQUE_PROPRIO' || Number(form.unit_price)) return;
+    try {
+      const r = await api.getTankLevel();
+      const cost = r.data?.last_unit_cost;
+      if (cost) onLitersOrPriceChange('unit_price', cost);
+    } catch (e) { /* ignore */ }
+  };
+
   const netValue = (() => {
     const gross = Number(form.gross_value || 0);
     const discounts = Number(form.discounts || 0);
@@ -235,13 +255,16 @@ export default function FuelSupplyPage() {
         additions: Number(form.additions || 0),
         other_expenses_value: form.has_other_expenses ? Number(form.other_expenses_value || 0) : 0,
       };
-      if (editingId) {
-        await api.updateFuelSupply(editingId, payload);
-        toast.success('Abastecimento atualizado!');
-      } else {
-        await api.createFuelSupply(payload);
-        toast.success('Abastecimento criado!');
+      const send = (body) => (editingId ? api.updateFuelSupply(editingId, body) : api.createFuelSupply(body));
+      try {
+        await send(payload);
+      } catch (e) {
+        // 409: Leitura fora de ordem em relação aos outros abastecimentos do veículo
+        if (e?.response?.status !== 409) throw e;
+        if (!(await confirm(`${e.response.data?.detail} Salvar mesmo assim?`))) return;
+        await send({ ...payload, confirm_reading: true });
       }
+      toast.success(editingId ? 'Abastecimento atualizado!' : 'Abastecimento criado!');
       setDialogOpen(false);
       loadList();
       loadFuelOrders();
@@ -492,7 +515,7 @@ export default function FuelSupplyPage() {
               <Field type="date" label="Data do Abastecimento *" value={form.supply_date} onChange={(v) => onChange('supply_date', v)} testid="fuel-supply-date" />
               <Field type="date" label="Data de Entrada *" value={form.entry_date} onChange={(v) => onChange('entry_date', v)} testid="fuel-entry-date" />
               <DecimalField label="Leitura *" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-reading" />
-              <SelectField label="Fonte *" value={form.source} onChange={(v) => onChange('source', v)} options={SOURCE_OPTIONS} testid="fuel-source" />
+              <SelectField label="Fonte *" value={form.source} onChange={onSourceChange} options={SOURCE_OPTIONS} testid="fuel-source" />
               {/* Tanque próprio é da empresa: sem fornecedor nem cidade */}
               {form.source !== 'TANQUE_PROPRIO' && (
                 <>
@@ -558,9 +581,9 @@ export default function FuelSupplyPage() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <SelectField label="Tipo do Documento *" value={form.document_type} onChange={(v) => onChange('document_type', v)} options={DOCUMENT_TYPE_OPTIONS} testid="fuel-doc-type" />
+              <SelectField label="Tipo do Documento" value={form.document_type} onChange={(v) => onChange('document_type', v)} options={DOCUMENT_TYPE_OPTIONS} testid="fuel-doc-type" />
               <Field label="Número" value={form.document_number} onChange={(v) => onChange('document_number', v)} testid="fuel-doc-number" />
-              <Field label="Apropriação *" value={form.allocation} onChange={(v) => onChange('allocation', v)} testid="fuel-allocation" />
+              <Field label="Apropriação" value={form.allocation} onChange={(v) => onChange('allocation', v)} testid="fuel-allocation" />
             </div>
             <TextAreaField label="Observações" value={form.observations} onChange={(v) => onChange('observations', v)} testid="fuel-observations" />
             <div className="grid grid-cols-2 gap-3">

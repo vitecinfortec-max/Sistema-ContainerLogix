@@ -3092,6 +3092,9 @@ class FuelSupplyCreate(BaseModel):
     observations: Optional[str] = None
     linked_to_batch: bool = False
     define_company: bool = False
+    # Só da requisição, não é gravado: o usuário confirmou salvar com a
+    # Leitura fora de ordem (ver _check_reading_order em routers/fuel_supply.py)
+    confirm_reading: bool = False
 
 
 class FuelSupplyUpdate(FuelSupplyCreate):
