@@ -3053,10 +3053,9 @@ class FuelSupply(BaseModel):
     payment_type: str = "PAGO_MOTORISTA"
     document_type: Optional[str] = None
     document_number: Optional[str] = None
-    allocation: Optional[str] = None  # Apropriação
     observations: Optional[str] = None
-    linked_to_batch: bool = False  # Vinculado ao Lote
-    define_company: bool = False  # Definir Empresa
+    # Apropriação, Vinculado ao Lote e Definir Empresa (vindos do modelo do
+    # Bsoft) saíram em 21/10/2026: eram gravados e nada no sistema usava
 
     created_by: str
     created_by_name: str
@@ -3101,10 +3100,7 @@ class FuelSupplyCreate(BaseModel):
     payment_type: str = "PAGO_MOTORISTA"
     document_type: Optional[str] = None
     document_number: Optional[str] = None
-    allocation: Optional[str] = None
     observations: Optional[str] = None
-    linked_to_batch: bool = False
-    define_company: bool = False
     # Só da requisição, não é gravado: o usuário confirmou salvar com a
     # Leitura fora de ordem (ver _check_reading_order em routers/fuel_supply.py)
     confirm_reading: bool = False

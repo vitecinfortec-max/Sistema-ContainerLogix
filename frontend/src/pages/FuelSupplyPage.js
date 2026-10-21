@@ -76,9 +76,8 @@ function buildEmpty() {
     full_tank: true,
     has_other_expenses: false, other_expenses_value: '', other_expenses_description: '',
     payment_type: 'PAGO_MOTORISTA',
-    document_type: '', document_number: '', allocation: '',
+    document_type: '', document_number: '',
     observations: '',
-    linked_to_batch: false, define_company: false,
   };
 }
 
@@ -630,17 +629,12 @@ export default function FuelSupplyPage() {
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <SelectField label="Tipo do Documento" value={form.document_type} onChange={(v) => onChange('document_type', v)} options={DOCUMENT_TYPE_OPTIONS} testid="fuel-doc-type" />
               <Field label="Número" value={form.document_number} onChange={(v) => onChange('document_number', v)} testid="fuel-doc-number" />
-              <Field label="Apropriação" value={form.allocation} onChange={(v) => onChange('allocation', v)} testid="fuel-allocation" />
             </div>
             <ReceiptSlot view={receiptView} busy={saving} onPick={pickReceipt} onRemove={removeReceipt} />
             <TextAreaField label="Observações" value={form.observations} onChange={(v) => onChange('observations', v)} testid="fuel-observations" />
-            <div className="grid grid-cols-2 gap-3">
-              <RadioField label="Vinculado ao Lote" value={form.linked_to_batch} onChange={(v) => onChange('linked_to_batch', v)} testid="fuel-linked-batch" />
-              <RadioField label="Definir Empresa" value={form.define_company} onChange={(v) => onChange('define_company', v)} testid="fuel-define-company" />
-            </div>
           </div>
 
           <DialogFooter>
