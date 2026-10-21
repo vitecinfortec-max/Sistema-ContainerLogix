@@ -7,6 +7,7 @@ Nível do Tanque informa o custo do litro da última recarga de NF-e."""
 def _vehicle(api, plate="ABC1D23"):
     api.run(api.db.vehicles.insert_one({
         "id": f"v-{plate}", "plate": plate, "model": "FH 540", "vehicle_type": "CAVALO", "status": "ATIVO",
+        "created_by": "admin-1", "created_by_name": "Admin", "created_at": "2026-10-01T10:00:00+00:00",
     }))
     return f"v-{plate}"
 
@@ -115,3 +116,66 @@ def test_tank_level_reports_last_nfe_unit_cost(api):
         "created_at": "2026-10-10T10:00:00",
     }))
     assert api.get("/api/tank-level").json()["last_unit_cost"] == 5.89
+
+
+def test_average_below_vehicle_target(api):
+    vid = _vehicle(api)
+    _supply(api, vid, "2026-10-01", 10000, 500)
+    _supply(api, vid, "2026-10-03", 11000, 500)  # 2,0 km/L
+    summary = api.get("/api/fuel-supplies/consumption-summary").json()
+    assert summary[0]["target"] is None and summary[0]["below_target"] is False
+    assert api.put(f"/api/vehicles/{vid}", json={"fuel_target_km_l": 2.3}).status_code == 200
+    summary = api.get("/api/fuel-supplies/consumption-summary").json()
+    assert summary[0]["target"] == 2.3 and summary[0]["below_target"] is True
+    assert _history(api)[0]["target"] == 2.3
+    # meta zerada/negativa não vale; vazia apaga
+    assert api.put(f"/api/vehicles/{vid}", json={"fuel_target_km_l": 0}).status_code == 422
+    assert api.put(f"/api/vehicles/{vid}", json={"fuel_target_km_l": None}).status_code == 200
+    assert api.get("/api/fuel-supplies/consumption-summary").json()[0]["target"] is None
+
+
+# ---------- Comprovante ----------
+
+PNG = bytes.fromhex("89504e470d0a1a0a") + b"x" * 32
+
+
+def _upload(api, supply_id, name="cupom.png", content=PNG, mime="image/png"):
+    return api.post(f"/api/fuel-supplies/{supply_id}/receipt", files={"file": (name, content, mime)})
+
+
+def test_receipt_upload_replace_and_delete(api, tmp_path, monkeypatch):
+    from routers import fuel_supply
+    monkeypatch.setattr(fuel_supply, "UPLOADS_DIR", tmp_path)
+    vid = _vehicle(api)
+    supply = _supply(api, vid, "2026-10-01", 1000, 100).json()
+    assert supply["receipt"] is None
+
+    first = _upload(api, supply["id"]).json()["receipt"]
+    first_file = tmp_path / first["url"].split("/api/uploads/", 1)[1]
+    assert first_file.is_file() and first["file_name"] == "cupom.png"
+
+    # PDF da nota também vale e substitui o anterior
+    pdf = _upload(api, supply["id"], "nota.pdf", b"%PDF-1.4 teste", "application/pdf")
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.json()["receipt"]["url"].endswith(".pdf") and not first_file.exists()
+
+    # editar o abastecimento não apaga o comprovante
+    r = api.put(f"/api/fuel-supplies/{supply['id']}", json={**supply, "liters": 90, "gross_value": 540})
+    assert r.json()["receipt"]["file_name"] == "nota.pdf"
+
+    r = api.delete(f"/api/fuel-supplies/{supply['id']}/receipt")
+    assert r.status_code == 200 and r.json()["receipt"] is None
+    assert api.delete(f"/api/fuel-supplies/{supply['id']}/receipt").status_code == 404
+
+    _upload(api, supply["id"])
+    assert api.delete(f"/api/fuel-supplies/{supply['id']}").status_code == 200
+    assert not (tmp_path / "fuel_supplies" / supply["id"]).exists()
+
+
+def test_receipt_validation(api, tmp_path, monkeypatch):
+    from routers import fuel_supply
+    monkeypatch.setattr(fuel_supply, "UPLOADS_DIR", tmp_path)
+    vid = _vehicle(api)
+    supply = _supply(api, vid, "2026-10-01", 1000, 100).json()
+    assert _upload(api, "nao-existe").status_code == 404
+    assert _upload(api, supply["id"], "planilha.xlsx", b"PK", "application/octet-stream").status_code == 400

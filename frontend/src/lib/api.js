@@ -604,6 +604,14 @@ export const api = {
   createFuelSupply: (data) => axios.post(`${API}/fuel-supplies`, data),
   updateFuelSupply: (id, data) => axios.put(`${API}/fuel-supplies/${id}`, data),
   deleteFuelSupply: (id) => axios.delete(`${API}/fuel-supplies/${id}`),
+  uploadFuelSupplyReceipt: (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/fuel-supplies/${id}/receipt`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteFuelSupplyReceipt: (id) => axios.delete(`${API}/fuel-supplies/${id}/receipt`),
   getFuelConsumptionSummary: () => axios.get(`${API}/fuel-supplies/consumption-summary`),
   getFuelConsumptionHistory: (params) => axios.get(`${API}/fuel-supplies/consumption-history`, { params }),
   getTankSettings: () => axios.get(`${API}/tank-settings`),

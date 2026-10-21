@@ -20,7 +20,8 @@ import { sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Trash2, Save, Fuel, Droplet, Wallet, Gauge } from 'lucide-react';
+import { Plus, Pencil, Trash2, Save, Fuel, Droplet, Wallet, Gauge, Camera, Upload, X, Paperclip, FileText } from 'lucide-react';
+import { compressImage } from '../lib/imageCompression';
 import { scrollBehavior } from '../lib/reducedMotion';
 import { todayISO } from '../lib/dates';
 
@@ -96,6 +97,8 @@ export default function FuelSupplyPage() {
   const [nextNumber, setNextNumber] = useState(null);
   const [form, setForm] = useState(buildEmpty());
   const [saving, setSaving] = useState(false);
+  // Comprovante escolhido no formulário, enviado ao salvar: { file, previewUrl } | { removed: true } | null
+  const [receiptDraft, setReceiptDraft] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [vehicles, setVehicles] = useState([]);
@@ -176,7 +179,39 @@ export default function FuelSupplyPage() {
     toast.success('Dados da Ordem de Abastecimento preenchidos automaticamente');
   };
 
-  const reset = () => setForm(buildEmpty());
+  const resetReceiptDraft = () => setReceiptDraft((prev) => {
+    if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+    return null;
+  });
+  const reset = () => { setForm(buildEmpty()); resetReceiptDraft(); };
+
+  const pickReceipt = async (file) => {
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setReceiptDraft((prev) => {
+      if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+      return { file: compressed, previewUrl: URL.createObjectURL(compressed) };
+    });
+  };
+  // Arquivo novo descartado volta ao salvo; o salvo fica marcado para remover
+  const removeReceipt = () => setReceiptDraft((prev) => {
+    if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+    return prev?.file ? null : { removed: true };
+  });
+  const receiptView = (() => {
+    if (receiptDraft?.removed) return null;
+    if (receiptDraft?.file) return { src: receiptDraft.previewUrl, isPdf: receiptDraft.file.type === 'application/pdf', name: receiptDraft.file.name };
+    if (form.receipt?.url) return { src: api.getFileUrl(form.receipt.url), isPdf: form.receipt.url.endsWith('.pdf'), name: form.receipt.file_name };
+    return null;
+  })();
+  // Envia/remove o comprovante depois de salvar o abastecimento; false se falhou
+  const saveReceiptDraft = async (supplyId) => {
+    try {
+      if (receiptDraft?.file) await api.uploadFuelSupplyReceipt(supplyId, receiptDraft.file);
+      else if (receiptDraft?.removed && form.receipt) await api.deleteFuelSupplyReceipt(supplyId);
+      return true;
+    } catch (e) { return false; }
+  };
 
   const openCreate = async () => {
     reset();
@@ -194,6 +229,7 @@ export default function FuelSupplyPage() {
       const d = r.data;
       setEditingId(id);
       setNextNumber(d.supply_number);
+      resetReceiptDraft();
       setForm({ ...buildEmpty(), ...d });
       setDialogOpen(true);
     } catch (e) { toast.error('Erro ao carregar abastecimento'); }
@@ -256,15 +292,19 @@ export default function FuelSupplyPage() {
         other_expenses_value: form.has_other_expenses ? Number(form.other_expenses_value || 0) : 0,
       };
       const send = (body) => (editingId ? api.updateFuelSupply(editingId, body) : api.createFuelSupply(body));
+      let response;
       try {
-        await send(payload);
+        response = await send(payload);
       } catch (e) {
         // 409: Leitura fora de ordem em relação aos outros abastecimentos do veículo
         if (e?.response?.status !== 409) throw e;
         if (!(await confirm(`${e.response.data?.detail} Salvar mesmo assim?`))) return;
-        await send({ ...payload, confirm_reading: true });
+        response = await send({ ...payload, confirm_reading: true });
       }
+      const receiptSaved = await saveReceiptDraft(response.data.id);
       toast.success(editingId ? 'Abastecimento atualizado!' : 'Abastecimento criado!');
+      if (!receiptSaved) toast.error('Não foi possível salvar o comprovante. Edite o abastecimento e tente de novo.');
+      resetReceiptDraft();
       setDialogOpen(false);
       loadList();
       loadFuelOrders();
@@ -443,7 +483,17 @@ export default function FuelSupplyPage() {
                           data-testid={`fuel-row-checkbox-${f.supply_number}`}
                         />
                       </td>
-                      <td className="cell-strong whitespace-nowrap tabular-nums">#{f.supply_number}</td>
+                      <td className="cell-strong whitespace-nowrap tabular-nums">
+                        #{f.supply_number}
+                        {f.receipt?.url && (
+                          <a
+                            href={api.getFileUrl(f.receipt.url)} target="_blank" rel="noreferrer"
+                            title="Abrir comprovante" onClick={(e) => e.stopPropagation()}
+                          >
+                            <Paperclip className="inline w-3.5 h-3.5 ml-1.5 text-muted-foreground" aria-label="Com comprovante" />
+                          </a>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap tabular-nums">{f.supply_date ? format(new Date(`${f.supply_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
                       <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{f.supply_order || '-'}</td>
                       <td><PlateTag>{f.equipment_plate}</PlateTag></td>
@@ -585,6 +635,7 @@ export default function FuelSupplyPage() {
               <Field label="Número" value={form.document_number} onChange={(v) => onChange('document_number', v)} testid="fuel-doc-number" />
               <Field label="Apropriação" value={form.allocation} onChange={(v) => onChange('allocation', v)} testid="fuel-allocation" />
             </div>
+            <ReceiptSlot view={receiptView} busy={saving} onPick={pickReceipt} onRemove={removeReceipt} />
             <TextAreaField label="Observações" value={form.observations} onChange={(v) => onChange('observations', v)} testid="fuel-observations" />
             <div className="grid grid-cols-2 gap-3">
               <RadioField label="Vinculado ao Lote" value={form.linked_to_batch} onChange={(v) => onChange('linked_to_batch', v)} testid="fuel-linked-batch" />
@@ -602,6 +653,49 @@ export default function FuelSupplyPage() {
       </Dialog>
       <ConfirmDialog />
     </Layout>
+  );
+}
+
+// Comprovante do abastecimento: foto do cupom (câmera/galeria) ou PDF da nota
+function ReceiptSlot({ view, busy, onPick, onRemove }) {
+  const cameraRef = useRef(null);
+  const fileRef = useRef(null);
+  const pick = (e) => { onPick(e.target.files?.[0]); e.target.value = ''; };
+  return (
+    <div data-testid="fuel-receipt">
+      <Label className="mb-1.5 block">Comprovante (cupom ou nota)</Label>
+      {view ? (
+        <div className="relative inline-block">
+          <a href={view.src} target="_blank" rel="noreferrer" title="Abrir comprovante">
+            {view.isPdf ? (
+              <div className="flex items-center gap-2 h-16 px-4 rounded-lg border text-sm text-slate-700 dark:text-slate-300">
+                <FileText className="w-5 h-5 text-primary" />
+                <span className="max-w-[220px] truncate">{view.name || 'Nota (PDF)'}</span>
+              </div>
+            ) : (
+              <img src={view.src} alt="Comprovante do abastecimento" className="w-40 h-28 object-cover rounded-lg border" />
+            )}
+          </a>
+          <Button
+            title="Remover" aria-label="Remover" type="button" variant="destructive" size="icon"
+            className="absolute -top-2 -right-2 h-6 w-6" onClick={onRemove} disabled={busy}
+          >
+            <X className="w-3 h-3" />
+          </Button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => cameraRef.current?.click()}>
+            <Camera className="w-4 h-4 mr-1.5" /> Câmera
+          </Button>
+          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-1.5" /> Arquivo
+          </Button>
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={pick} />
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={pick} />
+        </div>
+      )}
+    </div>
   );
 }
 

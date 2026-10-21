@@ -1310,6 +1310,7 @@ class Vehicle(BaseModel):
     body_type: Optional[str] = None  # prancha, sider, graneleiro, etc.
     fuel_type: Optional[str] = None  # diesel, gasolina, elétrico, GLP
     tank_capacity: Optional[str] = None
+    fuel_target_km_l: Optional[float] = Field(default=None, gt=0)  # Meta de consumo (km/L) do Controle de Média
     engine_power: Optional[str] = None
     tare_weight: Optional[str] = None
     gross_weight: Optional[str] = None  # PBT
@@ -1351,6 +1352,7 @@ class VehicleCreate(BaseModel):
     body_type: Optional[str] = None
     fuel_type: Optional[str] = None
     tank_capacity: Optional[str] = None
+    fuel_target_km_l: Optional[float] = Field(default=None, gt=0)
     engine_power: Optional[str] = None
     tare_weight: Optional[str] = None
     gross_weight: Optional[str] = None
@@ -1385,6 +1387,7 @@ class VehicleUpdate(BaseModel):
     body_type: Optional[str] = None
     fuel_type: Optional[str] = None
     tank_capacity: Optional[str] = None
+    fuel_target_km_l: Optional[float] = Field(default=None, gt=0)
     engine_power: Optional[str] = None
     tare_weight: Optional[str] = None
     gross_weight: Optional[str] = None
@@ -1421,6 +1424,7 @@ class VehicleResponse(BaseModel):
     body_type: Optional[str] = None
     fuel_type: Optional[str] = None
     tank_capacity: Optional[str] = None
+    fuel_target_km_l: Optional[float] = Field(default=None, gt=0)
     engine_power: Optional[str] = None
     tare_weight: Optional[str] = None
     gross_weight: Optional[str] = None
@@ -3060,6 +3064,15 @@ class FuelSupply(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class FuelSupplyReceipt(BaseModel):
+    """Foto do cupom ou PDF da nota do abastecimento - um por lançamento, o
+    novo substitui o anterior (ver /fuel-supplies/{id}/receipt)."""
+    url: str
+    file_name: Optional[str] = None
+    uploaded_at: datetime
+    by_name: str
+
+
 class FuelSupplyCreate(BaseModel):
     supply_order: Optional[str] = None
     fuel_supply_order_id: Optional[str] = None
@@ -3104,6 +3117,7 @@ class FuelSupplyUpdate(FuelSupplyCreate):
 class FuelSupplyResponse(FuelSupply):
     net_value: float = 0.0  # calculado
     total_value: float = 0.0  # calculado
+    receipt: Optional[FuelSupplyReceipt] = None  # gravado só pelos endpoints de comprovante
 
 
 # ==================== FROTA - TANQUE PRÓPRIO ====================

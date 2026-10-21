@@ -174,6 +174,7 @@ export default function FleetPage() {
     body_type: '',
     fuel_type: '',
     tank_capacity: '',
+    fuel_target_km_l: '',
     engine_power: '',
     tare_weight: '',
     gross_weight: '',
@@ -387,6 +388,7 @@ export default function FleetPage() {
         body_type: vehicleForm.body_type || null,
         fuel_type: vehicleForm.fuel_type || null,
         tank_capacity: vehicleForm.tank_capacity || null,
+        fuel_target_km_l: Number(String(vehicleForm.fuel_target_km_l).replace(',', '.')) > 0 ? Number(String(vehicleForm.fuel_target_km_l).replace(',', '.')) : null,
         engine_power: vehicleForm.engine_power || null,
         tare_weight: vehicleForm.tare_weight || null,
         gross_weight: vehicleForm.gross_weight || null,
@@ -1605,6 +1607,10 @@ export default function FleetPage() {
               <div>
                 <Label className="mb-1.5 block">Capacidade do Tanque</Label>
                 <Input value={vehicleForm.tank_capacity} onChange={(e) => handleVehicleFormChange('tank_capacity', e.target.value)} />
+              </div>
+              <div>
+                <Label className="mb-1.5 block">Meta de Consumo (km/L)</Label>
+                <Input inputMode="decimal" placeholder="Ex.: 2,5" value={vehicleForm.fuel_target_km_l} onChange={(e) => handleVehicleFormChange('fuel_target_km_l', e.target.value)} />
               </div>
               <div>
                 <Label className="mb-1.5 block">Potência do Motor</Label>

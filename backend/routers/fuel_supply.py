@@ -3,8 +3,10 @@ from typing import Optional, List
 import io
 import math
 import re
+import shutil
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from models import (
@@ -16,7 +18,10 @@ from models import (
 from pymongo.errors import DuplicateKeyError
 from reports import fmt_datetime, today_brt, generate_fuel_supply_report_pdf, generate_fuel_supply_report_excel, now_brt, merge_company
 
-from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, refuse_negative
+from shared import (
+    db, get_current_active_user, get_current_admin_user, get_company_settings, refuse_negative,
+    validate_and_read_upload, ALLOWED_RECEIPT_EXTENSIONS, UPLOADS_DIR,
+)
 from routers.stock import _create_stock_movement, _delete_stock_movement
 
 api_router = APIRouter(prefix="/api")
@@ -77,7 +82,7 @@ async def _compute_fuel_consumption_pairs() -> list:
     dele - nunca gera média negativa/zero."""
     vehicles = await db.vehicles.find(
         {"vehicle_type": {"$in": ["CAVALO", "CAMINHÃO"]}, "status": "ATIVO"},
-        {"_id": 0, "id": 1, "plate": 1, "model": 1}
+        {"_id": 0, "id": 1, "plate": 1, "model": 1, "fuel_target_km_l": 1}
     ).to_list(None)
 
     # Uma consulta só pra todos os veículos (antes era uma por veículo), já na
@@ -128,6 +133,7 @@ async def _compute_fuel_consumption_pairs() -> list:
                     "liters": round(liters_since, 2),
                     "partial_count": partial_count,
                     "average": round(km_traveled / liters_since, 2),
+                    "target": vehicle.get("fuel_target_km_l"),
                 })
             anchor = curr
             liters_since, partial_count = 0.0, 0
@@ -152,6 +158,10 @@ async def get_fuel_consumption_summary(current_user: dict = Depends(get_current_
                 "current_average": p["average"],
                 "last_supply_date": p["supply_date"],
                 "pair_count": 0,
+                # Meta de km/L do veículo: abaixo dela a tela destaca (consumo alto
+                # pode ser desvio de combustível ou problema mecânico)
+                "target": p["target"],
+                "below_target": bool(p["target"]) and p["average"] < p["target"],
             }
         by_vehicle[vid]["pair_count"] += 1
     return list(by_vehicle.values())
@@ -324,7 +334,63 @@ async def delete_fuel_supply(supply_id: str, current_user: dict = Depends(get_cu
     result = await db.fuel_supplies.delete_one({"id": supply_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
+    shutil.rmtree(UPLOADS_DIR / "fuel_supplies" / supply_id, ignore_errors=True)
     return {"message": "Abastecimento removido"}
+
+
+# Comprovante do abastecimento (foto do cupom ou PDF da nota): um por
+# lançamento, o novo substitui o anterior - mesmo esquema da foto do cheque
+def _remove_receipt_file(receipt: Optional[dict]):
+    url = (receipt or {}).get("url")
+    if not url or "/api/uploads/" not in url:
+        return
+    path = UPLOADS_DIR / url.split("/api/uploads/", 1)[1]
+    if path.is_file():
+        path.unlink()
+
+
+@api_router.post("/fuel-supplies/{supply_id}/receipt", response_model=FuelSupplyResponse)
+async def upload_fuel_supply_receipt(
+    supply_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_active_user)
+):
+    # Projeção com "id": sem comprovante ainda, só "receipt" voltaria {} (falso)
+    supply = await db.fuel_supplies.find_one({"id": supply_id}, {"_id": 0, "id": 1, "receipt": 1})
+    if not supply:
+        raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
+
+    file_ext, content = await validate_and_read_upload(file, ALLOWED_RECEIPT_EXTENSIONS)
+    receipt_dir = UPLOADS_DIR / "fuel_supplies" / supply_id
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    file_id = str(uuid.uuid4())
+    with open(receipt_dir / f"{file_id}{file_ext}", "wb") as buffer:
+        buffer.write(content)
+
+    now = datetime.now(timezone.utc).isoformat()
+    receipt = {
+        "url": f"/api/uploads/fuel_supplies/{supply_id}/{file_id}{file_ext}",
+        "file_name": file.filename, "uploaded_at": now, "by_name": current_user.get("name", "Sistema"),
+    }
+    await db.fuel_supplies.update_one({"id": supply_id}, {"$set": {"receipt": receipt, "updated_at": now}})
+    _remove_receipt_file(supply.get("receipt"))
+    return _fuel_calc(await db.fuel_supplies.find_one({"id": supply_id}, {"_id": 0}))
+
+
+@api_router.delete("/fuel-supplies/{supply_id}/receipt", response_model=FuelSupplyResponse)
+async def delete_fuel_supply_receipt(supply_id: str, current_user: dict = Depends(get_current_active_user)):
+    # Projeção com "id": sem comprovante ainda, só "receipt" voltaria {} (falso)
+    supply = await db.fuel_supplies.find_one({"id": supply_id}, {"_id": 0, "id": 1, "receipt": 1})
+    if not supply:
+        raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
+    if not supply.get("receipt"):
+        raise HTTPException(status_code=404, detail="Este abastecimento não tem comprovante")
+    await db.fuel_supplies.update_one(
+        {"id": supply_id},
+        {"$set": {"receipt": None, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    _remove_receipt_file(supply["receipt"])
+    return _fuel_calc(await db.fuel_supplies.find_one({"id": supply_id}, {"_id": 0}))
 
 
 _FUEL_SUPPLY_FUEL_TYPE_LABELS = {
