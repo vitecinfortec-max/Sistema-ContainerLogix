@@ -406,6 +406,9 @@ async def startup_event():
     await db.client_credit_entries.create_index("invoice_id", sparse=True)
     # Controle de Média km/L: abastecimentos de vários veículos em ordem cronológica.
     await db.fuel_supplies.create_index([("equipment_id", 1), ("supply_date", 1), ("created_at", 1)])
+    # Lista paginada do Abastecimento: mais recente primeiro, com filtro por período.
+    await db.fuel_supplies.create_index("supply_number")
+    await db.fuel_supplies.create_index("supply_date")
     await db.drivers.create_index("cpf")
     await db.clients.create_index("cnpj")
     await db.transport_companies.create_index("cnpj")

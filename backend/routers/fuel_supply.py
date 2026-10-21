@@ -6,7 +6,7 @@ import re
 import shutil
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
 from models import (
@@ -42,11 +42,30 @@ def _fuel_calc(doc: dict) -> dict:
     return out
 
 
-@api_router.get("/fuel-supplies", response_model=List[FuelSupplyResponse])
+# Valor Total no banco, igual a _fuel_calc: bruto - abatimentos + acréscimos
+# (+ outras despesas, se marcadas) - pros totais da lista paginada
+_TOTAL_VALUE_EXPR = {"$add": [
+    {"$ifNull": ["$gross_value", 0]},
+    {"$multiply": [-1, {"$ifNull": ["$discounts", 0]}]},
+    {"$ifNull": ["$additions", 0]},
+    {"$cond": [{"$eq": ["$has_other_expenses", True]}, {"$ifNull": ["$other_expenses_value", 0]}, 0]},
+]}
+
+
+@api_router.get("/fuel-supplies")
 async def list_fuel_supplies(
     search: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    source: Optional[str] = None,
+    page: Optional[int] = Query(None, ge=1),
+    per_page: int = Query(15, ge=1, le=200),
     current_user: dict = Depends(get_current_active_user)
 ):
+    """Sem `page`, devolve a lista inteira (formato antigo). Com `page`, filtra
+    e pagina no servidor - antes a tela baixava todos os abastecimentos e
+    filtrava período/fonte no navegador - e devolve os totais do filtro
+    inteiro pros indicadores."""
     query = {}
     if search:
         search_escaped = re.escape(search)
@@ -55,8 +74,34 @@ async def list_fuel_supplies(
             {"driver_name": {"$regex": search_escaped, "$options": "i"}},
             {"supplier_name": {"$regex": search_escaped, "$options": "i"}},
         ]
-    rows = await db.fuel_supplies.find(query, {"_id": 0}).sort("supply_number", -1).to_list(None)
-    return [_fuel_calc(r) for r in rows]
+    if date_from or date_to:
+        query["supply_date"] = {**({"$gte": date_from} if date_from else {}), **({"$lte": date_to} if date_to else {})}
+    if source == "TANQUE_PROPRIO":
+        query["source"] = source
+    elif source == "POSTO_EXTERNO":
+        # Lançamento antigo sem fonte conta como posto externo (o padrão)
+        query["source"] = {"$ne": "TANQUE_PROPRIO"}
+
+    cursor = db.fuel_supplies.find(query, {"_id": 0}).sort("supply_number", -1)
+    if page is None:
+        return [FuelSupplyResponse(**_fuel_calc(r)) for r in await cursor.to_list(None)]
+
+    total = await db.fuel_supplies.count_documents(query)
+    rows = await cursor.skip((page - 1) * per_page).limit(per_page).to_list(per_page)
+    totals = await db.fuel_supplies.aggregate([
+        {"$match": query},
+        {"$group": {"_id": None, "liters": {"$sum": {"$ifNull": ["$liters", 0]}}, "value": {"$sum": _TOTAL_VALUE_EXPR}}},
+    ]).to_list(1)
+    totals = totals[0] if totals else {}
+    return {
+        "items": [FuelSupplyResponse(**_fuel_calc(r)) for r in rows],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": max(1, (total + per_page - 1) // per_page),
+        "total_liters": round(totals.get("liters") or 0, 2),
+        "total_value": round(totals.get("value") or 0, 2),
+    }
 
 
 @api_router.get("/fuel-supplies/next-number")

@@ -179,3 +179,31 @@ def test_receipt_validation(api, tmp_path, monkeypatch):
     supply = _supply(api, vid, "2026-10-01", 1000, 100).json()
     assert _upload(api, "nao-existe").status_code == 404
     assert _upload(api, supply["id"], "planilha.xlsx", b"PK", "application/octet-stream").status_code == 400
+
+
+# ---------- Lista paginada ----------
+
+def test_list_paginates_and_filters_on_server(api):
+    vid = _vehicle(api)
+    for day in range(1, 21):
+        _supply(api, vid, f"2026-10-{day:02d}", 1000 * day, 10, source="TANQUE_PROPRIO" if day % 2 == 0 else "POSTO_EXTERNO",
+                has_other_expenses=day == 1, other_expenses_value=5)
+    # lançamento antigo sem fonte conta como posto externo
+    api.run(api.db.fuel_supplies.insert_one({"id": "old", "supply_number": 99, "supply_date": "2026-09-01", "liters": 1, "gross_value": 2,
+                                               "created_by": "admin-1", "created_by_name": "Admin"}))
+
+    data = api.get("/api/fuel-supplies", params={"page": 1, "per_page": 15}).json()
+    assert data["total"] == 21 and data["pages"] == 2 and len(data["items"]) == 15
+    assert data["items"][0]["supply_number"] == 99
+    assert data["total_liters"] == 201 and data["total_value"] == 20 * 60 + 5 + 2
+    assert len(api.get("/api/fuel-supplies", params={"page": 2, "per_page": 15}).json()["items"]) == 6
+
+    data = api.get("/api/fuel-supplies", params={"page": 1, "date_from": "2026-10-05", "date_to": "2026-10-10"}).json()
+    assert data["total"] == 6 and data["total_liters"] == 60
+    data = api.get("/api/fuel-supplies", params={"page": 1, "source": "TANQUE_PROPRIO"}).json()
+    assert data["total"] == 10
+    data = api.get("/api/fuel-supplies", params={"page": 1, "source": "POSTO_EXTERNO"}).json()
+    assert data["total"] == 11
+
+    # sem page continua devolvendo a lista inteira
+    assert len(api.get("/api/fuel-supplies").json()) == 21

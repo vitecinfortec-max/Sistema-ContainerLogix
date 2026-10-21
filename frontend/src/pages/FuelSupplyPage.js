@@ -85,9 +85,12 @@ const ITEMS_PER_PAGE = 15;
 
 export default function FuelSupplyPage() {
   const { confirm, ConfirmDialog } = useConfirm();
+  // Só a página atual: filtro e paginação são feitos no servidor
   const [list, setList] = useState([]);
+  const [listMeta, setListMeta] = useState({ total: 0, pages: 1, total_liters: 0, total_value: 0 });
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sourceFilter, setSourceFilter] = useState('all');
@@ -104,28 +107,41 @@ export default function FuelSupplyPage() {
   const [drivers, setDrivers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [fuelOrders, setFuelOrders] = useState([]);
-  const debounceRef = useRef(null);
+  const requestRef = useRef(0);
 
-  useEffect(() => { loadList(); loadVehicles(); loadDrivers(); loadSuppliers(); loadFuelOrders(); }, []);
+  useEffect(() => { loadVehicles(); loadDrivers(); loadSuppliers(); loadFuelOrders(); }, []);
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    setCurrentPage(1);
-    debounceRef.current = setTimeout(() => { loadList(); }, 350);
-    return () => debounceRef.current && clearTimeout(debounceRef.current);
+    const timer = setTimeout(() => { setDebouncedSearch(search); setCurrentPage(1); }, 350);
+    return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => { loadList(); }, [debouncedSearch, dateFrom, dateTo, sourceFilter, currentPage]);
+
   const loadList = async () => {
+    const requestId = ++requestRef.current;
     setLoading(true);
     try {
-      const params = {};
-      if (search) params.search = search;
+      const params = { page: currentPage, per_page: ITEMS_PER_PAGE };
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (dateFrom) params.date_from = dateFrom;
+      if (dateTo) params.date_to = dateTo;
+      if (sourceFilter !== 'all') params.source = sourceFilter;
       const r = await api.getFuelSupplies(params);
-      setList(r.data || []);
+      // Resposta de uma busca anterior chegando depois da atual: descarta
+      if (requestId !== requestRef.current) return;
+      const data = r.data || {};
+      // A página deixou de existir (ex.: excluiu o último registro dela): vai pra última
+      if (!data.items?.length && currentPage > 1 && data.pages < currentPage) {
+        setCurrentPage(data.pages);
+        return;
+      }
+      setList(data.items || []);
+      setListMeta({ total: data.total || 0, pages: data.pages || 1, total_liters: data.total_liters || 0, total_value: data.total_value || 0 });
     } catch (e) {
-      toast.error('Erro ao carregar abastecimentos');
+      if (requestId === requestRef.current) toast.error('Erro ao carregar abastecimentos');
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) setLoading(false);
     }
   };
 
@@ -336,22 +352,13 @@ export default function FuelSupplyPage() {
     });
   };
 
-  // Paginação: a lista vem inteira da API; a tela mostra uma página por vez.
-  // Se a página atual deixar de existir (ex.: excluiu o último registro dela),
-  // cai na última que existe.
-  // Período e fonte filtram a lista que já veio da busca (indicadores e
-  // paginação acompanham o filtro)
-  const filtered = list.filter((f) =>
-    (!dateFrom || (f.supply_date || '') >= dateFrom)
-    && (!dateTo || (f.supply_date || '') <= dateTo)
-    && (sourceFilter === 'all' || (f.source || 'POSTO_EXTERNO') === sourceFilter));
   const hasFilters = !!(search || dateFrom || dateTo || sourceFilter !== 'all');
   const clearFilters = () => { setSearch(''); setDateFrom(''); setDateTo(''); setSourceFilter('all'); setCurrentPage(1); };
   const onFilter = (setter) => (value) => { setter(value); setCurrentPage(1); };
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-  const page = Math.min(currentPage, totalPages);
-  const pageItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const totalPages = listMeta.pages;
+  const page = currentPage;
+  const pageItems = list;
   const goToPage = (next) => {
     if (next >= 1 && next <= totalPages) {
       setCurrentPage(next);
@@ -371,8 +378,9 @@ export default function FuelSupplyPage() {
   };
 
   const singleSelectedSupply = selectedIds.size === 1 ? list.find((f) => f.id === [...selectedIds][0]) : null;
-  const listLiters = filtered.reduce((acc, f) => acc + Number(f.liters || 0), 0);
-  const listValue = filtered.reduce((acc, f) => acc + Number(f.total_value || 0), 0);
+  // Totais do filtro inteiro (não só da página), calculados no servidor
+  const listLiters = listMeta.total_liters;
+  const listValue = listMeta.total_value;
 
   return (
     <Layout>
@@ -384,7 +392,7 @@ export default function FuelSupplyPage() {
         />
 
         <StatGrid>
-          <StatCard label="Abastecimentos" value={filtered.length} icon={Fuel} tone="blue" hint={hasFilters ? 'no filtro atual' : 'registrados'} />
+          <StatCard label="Abastecimentos" value={listMeta.total} icon={Fuel} tone="blue" hint={hasFilters ? 'no filtro atual' : 'registrados'} />
           <StatCard label="Litros" value={fmtLitersTotal(listLiters)} icon={Droplet} tone="primary" />
           <StatCard label="Valor total" value={fmtMoney(listValue)} icon={Wallet} tone="emerald" />
           <StatCard label="Preço médio/litro" value={fmtMoney(listLiters ? listValue / listLiters : 0)} icon={Gauge} tone="amber" />
@@ -416,7 +424,7 @@ export default function FuelSupplyPage() {
         {/* Lista - marque um abastecimento pra habilitar as ações da barra */}
         <DataCard
           title="Abastecimentos"
-          count={loading ? '...' : filtered.length}
+          count={loading ? '...' : listMeta.total}
           toolbar={(
             <Toolbar
               selectedCount={selectedIds.size}
@@ -430,13 +438,13 @@ export default function FuelSupplyPage() {
             <TablePagination
               currentPage={page}
               totalPages={totalPages}
-              totalItems={filtered.length}
+              totalItems={listMeta.total}
               pageSize={ITEMS_PER_PAGE}
               onPageChange={goToPage}
             />
           )}
         >
-          {filtered.length === 0 && !loading ? (
+          {list.length === 0 && !loading ? (
             <EmptyState
               icon={Fuel}
               title={hasFilters ? 'Nenhum abastecimento encontrado' : 'Nenhum abastecimento cadastrado'}
