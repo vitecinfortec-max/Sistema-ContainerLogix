@@ -724,14 +724,15 @@ async def read_document_file(
 ):
     """Lê uma CNH, RG/CIN ou CRLV (foto ou PDF) e devolve os campos para o
     formulário de cadastro, que o usuário confere antes de salvar. Lido o
-    documento, o arquivo fica guardado e a URL volta em file_url, para ir
-    junto com o cadastro em document_attachments."""
+    documento, o arquivo fica guardado (menos a CNH, da qual só os dados
+    interessam) e a URL volta em file_url, para ir junto com o cadastro em
+    document_attachments."""
     if kind not in DOCUMENT_KINDS:
         raise HTTPException(status_code=400, detail="Tipo de documento inválido")
     file_ext, content = await validate_and_read_upload(file, ALLOWED_RECEIPT_EXTENSIONS)
     reading = await read_document(kind, content, file_ext)
     reading["file_url"] = None
-    if reading["found"]:
+    if reading["found"] and DOCUMENT_KINDS[kind].get("keep_file", True):
         filename = f"{uuid.uuid4()}{file_ext}"
         with open(UPLOADS_DIR / filename, 'wb') as f:
             f.write(content)

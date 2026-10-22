@@ -5,15 +5,22 @@ placa e do chassi), porque é isso que denuncia um caractere lido errado.
 
 - CRLV-e em PDF (o da Carteira Digital de Trânsito) traz o texto embutido:
   é lido aqui mesmo, pela posição de cada rótulo, sem custo e sem chave.
-- Foto, PDF escaneado, CNH-e (cujo PDF só tem imagens) e RG vão para a API da
-  Anthropic (Claude) - precisa de ANTHROPIC_API_KEY. A chamada fica em
-  claude_reader.py; o modelo pode ser trocado por DOCUMENT_OCR_MODEL.
+- CNH-e em PDF traz a frente da CNH como imagem gerada pelo sistema (nítida e
+  sempre igual): passa por um OCR local (RapidOCR, em ocr_worker.py) e os
+  campos são achados pela posição de cada rótulo, também sem custo e sem chave.
+- Foto, PDF escaneado e RG vão para a API da Anthropic (Claude) - precisa de
+  ANTHROPIC_API_KEY. A chamada fica em claude_reader.py; o modelo pode ser
+  trocado por DOCUMENT_OCR_MODEL.
 """
 import asyncio
+import io
+import json
 import logging
 import os
 import re
+import sys
 import unicodedata
+from pathlib import Path
 from datetime import date, datetime
 from typing import Optional
 
@@ -78,6 +85,8 @@ _COMMON_RULES = (
 DOCUMENT_KINDS = {
     "cnh": {
         "label": "CNH",
+        # Da CNH só os dados vão para o cadastro; o arquivo não é guardado
+        "keep_file": False,
         "schema": _schema(_CNH_FIELDS),
         "prompt": (
             "This file is a Brazilian driver's license (CNH, printed card or the digital CNH-e PDF). "
@@ -348,10 +357,134 @@ def crlv_from_pdf_text(content: bytes) -> Optional[dict]:
     return data
 
 
+_OCR_WORKER = Path(__file__).with_name("ocr_worker.py")
+_OCR_TIMEOUT = 120
+# Uma leitura por vez: cada OCR soma uns 230 MB ao servidor
+_ocr_slot = asyncio.Semaphore(1)
+
+
+async def _ocr_lines(image: bytes) -> Optional[list]:
+    """Trechos lidos pelo OCR local ([esquerda, topo, altura, texto, confiança]).
+    None se o OCR não está instalado, falhou ou demorou demais."""
+    async with _ocr_slot:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                sys.executable, str(_OCR_WORKER),
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+        except OSError as error:
+            logger.warning("OCR local não iniciou: %s", error)
+            return None
+        try:
+            out, err = await asyncio.wait_for(process.communicate(image), timeout=_OCR_TIMEOUT)
+        except asyncio.TimeoutError:
+            process.kill()
+            await process.wait()
+            logger.warning("OCR local passou de %ss", _OCR_TIMEOUT)
+            return None
+    if process.returncode != 0:
+        logger.warning("OCR local falhou: %s", err.decode(errors="replace")[-500:])
+        return None
+    try:
+        return json.loads(out)
+    except ValueError:
+        return None
+
+
+def _pdf_card_images(content: bytes) -> list:
+    """Imagens do tamanho e formato de um cartão (frente/verso da CNH-e) na
+    1ª página do PDF, na ordem em que aparecem."""
+    from pypdf import PdfReader
+
+    try:
+        page = PdfReader(io.BytesIO(content)).pages[0]
+        images = []
+        for image in page.images:
+            width, height = image.image.size
+            if width >= 600 and 1.3 <= width / height <= 1.6:
+                images.append(image.data)
+        return images
+    except Exception as error:  # PDF corrompido, protegido etc.
+        logger.info("PDF sem imagem de cartão: %s", error)
+        return []
+
+
+def _label_key(text: str) -> str:
+    return re.sub(r'[^A-Z]', '', _plain(text))
+
+
+# Rótulo da CNH (só letras, sem acento) -> campo da leitura
+_CNH_LABELS = [
+    (lambda k: k == "NOME", "full_name"),
+    (lambda k: k.startswith("DOCIDENTIDADE"), "rg_composite"),
+    (lambda k: k == "CPF", "cpf"),
+    (lambda k: k == "DATANASCIMENTO", "birth_date"),
+    (lambda k: k.startswith("CATHAB"), "cnh_category"),
+    (lambda k: k.endswith("REGISTRO") and len(k) <= 12, "cnh_registration_number"),
+    (lambda k: k == "VALIDADE", "cnh_expiry"),
+]
+
+
+def _split_rg(value: str) -> tuple:
+    """"12345678 SSP SP" (ou colado, "12345678SSPSP") -> (RG, órgão, UF)."""
+    text = _plain(value)
+    match = re.match(r'^([0-9X.\-/]+?)\s*([A-Z][A-Z/ ]*?)\s*([A-Z]{2})$', text)
+    if not match:
+        return text, '', ''
+    return match.group(1), match.group(2).replace(' ', ''), match.group(3)
+
+
+def cnh_from_ocr_lines(lines: list) -> Optional[dict]:
+    """Campos da CNH pela posição: o valor fica logo abaixo do rótulo, na
+    mesma coluna. None se a imagem não for a frente de uma CNH."""
+    if not any('HABILITA' in _plain(line[3]) for line in lines):
+        return None
+    found = []
+    for left, top, height, text, score in lines:
+        key = _label_key(text)
+        field = next((f for test, f in _CNH_LABELS if test(key)), None)
+        found.append((left, top, text, field))
+    data = {key: "" for key in _CNH_FIELDS}
+    taken = set()
+    for left, top, _, field in found:
+        if not field or field in taken:
+            continue
+        below = [(v_top - top, text) for v_left, v_top, text, v_field in found
+                 if not v_field and abs(v_left - left) <= 30 and 0 < v_top - top <= 50]
+        if not below:
+            continue
+        taken.add(field)
+        value = min(below)[1]
+        if field == "rg_composite":
+            data["rg_number"], data["rg_issuer"], data["rg_uf"] = _split_rg(value)
+        else:
+            data[field] = value
+    if not (data["cpf"] or data["cnh_registration_number"]):
+        return None
+    data["document_found"] = True
+    return data
+
+
+async def cnh_from_pdf(content: bytes) -> Optional[dict]:
+    """CNH-e em PDF lida pelo OCR local; tenta a frente e, se não for, o verso
+    (a ordem das imagens no PDF pode mudar). None se não deu para ler."""
+    for image in (await asyncio.to_thread(_pdf_card_images, content))[:2]:
+        lines = await _ocr_lines(image)
+        if lines is None:
+            return None
+        data = cnh_from_ocr_lines(lines)
+        if data:
+            return data
+    return None
+
+
 def _no_api_key_message(kind: str) -> str:
     if kind == "crlv":
         return ("Este arquivo precisa da leitura automática (ANTHROPIC_API_KEY não configurada no servidor). "
                 "Sem ela, só o CRLV-e em PDF baixado da Carteira Digital de Trânsito é lido. Preencha os campos.")
+    if kind == "cnh":
+        return ("Este arquivo precisa da leitura automática (ANTHROPIC_API_KEY não configurada no servidor). "
+                "Sem ela, só a CNH-e em PDF baixada da Carteira Digital de Trânsito é lida. Preencha os campos.")
     return (f"A leitura da {DOCUMENT_KINDS[kind]['label']} precisa da leitura automática "
             "(ANTHROPIC_API_KEY não configurada no servidor). Preencha os campos.")
 
@@ -361,6 +494,8 @@ async def read_document(kind: str, content: bytes, file_ext: str) -> dict:
     data = None
     if kind == "crlv" and file_ext == ".pdf":
         data = await asyncio.to_thread(crlv_from_pdf_text, content)
+    elif kind == "cnh" and file_ext == ".pdf":
+        data = await cnh_from_pdf(content)
     if data is None:
         if not os.environ.get('ANTHROPIC_API_KEY', '').strip():
             raise HTTPException(status_code=503, detail=_no_api_key_message(kind))
