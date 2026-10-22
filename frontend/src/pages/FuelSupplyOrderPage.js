@@ -48,6 +48,7 @@ function buildEmpty() {
     requester: '',
     order_date: todayISO(),
     equipment_id: '', equipment_plate: '',
+    reading: '',
     supplier_id: '', supplier_name: '',
     fuel_type: '',
     supply_mode: 'LITROS',
@@ -169,6 +170,7 @@ export default function FuelSupplyOrderPage() {
         ...form,
         liters: ['LITROS', 'LITROS_VALOR'].includes(form.supply_mode) && form.liters !== '' ? Number(form.liters) : null,
         estimated_value: ['VALOR', 'LITROS_VALOR'].includes(form.supply_mode) && form.estimated_value !== '' ? Number(form.estimated_value) : null,
+        reading: form.reading !== '' && form.reading !== null ? Number(form.reading) : null,
       };
       if (editingId) {
         await api.updateFuelSupplyOrder(editingId, payload);
@@ -325,6 +327,7 @@ export default function FuelSupplyOrderPage() {
                     <th>Nº</th>
                     <th>Data</th>
                     <th>Equipamento</th>
+                    <th className="!text-right">KM</th>
                     <th>Fornecedor</th>
                     <th>Produto</th>
                     <th>Tipo</th>
@@ -352,6 +355,7 @@ export default function FuelSupplyOrderPage() {
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{o.order_number}</td>
                       <td className="whitespace-nowrap tabular-nums">{o.order_date ? format(new Date(`${o.order_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
                       <td><PlateTag>{o.equipment_plate}</PlateTag></td>
+                      <td className="text-right whitespace-nowrap tabular-nums">{o.reading != null ? Number(o.reading).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '-'}</td>
                       <td><div className="max-w-[220px] truncate" title={o.supplier_name || ''}>{o.supplier_name || '-'}</div></td>
                       <td className="whitespace-nowrap">{FUEL_TYPE_LABELS[o.fuel_type] || o.fuel_type || '-'}</td>
                       <td className="whitespace-nowrap">{SUPPLY_MODE_LABELS[o.supply_mode] || o.supply_mode || '-'}</td>
@@ -396,7 +400,7 @@ export default function FuelSupplyOrderPage() {
               </div>
               <Field label="Solicitante" value={form.requester} onChange={(v) => onChange('requester', v)} testid="fuel-order-requester" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Field type="date" label="Data *" value={form.order_date} onChange={(v) => onChange('order_date', v)} testid="fuel-order-date" />
               <div>
                 <Label className="mb-1.5 block">Equipamento <span className="text-destructive">*</span></Label>
@@ -409,6 +413,7 @@ export default function FuelSupplyOrderPage() {
                   className="text-sm font-mono"
                 />
               </div>
+              <Field type="number" min="0" label="KM" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-order-reading" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

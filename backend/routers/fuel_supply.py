@@ -615,7 +615,7 @@ async def get_fuel_supply_order(order_id: str, current_user: dict = Depends(get_
     return doc
 
 
-_FUEL_ORDER_NUMBER_LABELS = {"liters": "Litros", "estimated_value": "Valor"}
+_FUEL_ORDER_NUMBER_LABELS = {"liters": "Litros", "estimated_value": "Valor", "reading": "KM"}
 
 
 @api_router.post("/fuel-supply-orders", response_model=FuelSupplyOrderResponse)
@@ -790,8 +790,10 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
         # ========== DADOS PARA CONFERÊNCIA (preenchimento manual) + OBSERVAÇÃO ==========
         manual_style = ParagraphStyle('Manual', parent=styles['Normal'], fontSize=7.5, leading=10, fontName='Helvetica', textColor=_hex(BRAND_TEXT))
         obs_style = ParagraphStyle('ObsCell', parent=styles['Normal'], fontSize=7.5, leading=9.5, fontName='Helvetica', textColor=_hex(BRAND_TEXT))
+        # KM informado na ordem já sai impresso; sem ele a linha fica pra preencher à mão
+        km_text = f" <b>{_fmt_km(order['reading'])}</b>" if order.get('reading') is not None else ''
         obs_block = Table([[
-            Paragraph("Data abastecimento:<br/>Km de abastecimento:<br/>Quantidade em litros:<br/>"
+            Paragraph(f"Data abastecimento:<br/>Km de abastecimento:{km_text}<br/>Quantidade em litros:<br/>"
                       "Km último abastecimento:<br/>Média:", manual_style),
             Paragraph(f"<b>OBS:</b> {(order.get('observations') or '').replace(chr(10), '<br/>')}", obs_style),
         ]], colWidths=[WIDTH / 2, WIDTH / 2])

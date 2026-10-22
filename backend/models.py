@@ -3211,6 +3211,7 @@ class FuelSupplyOrder(BaseModel):
 
     equipment_id: Optional[str] = None
     equipment_plate: Optional[str] = None
+    reading: Optional[float] = None  # KM do equipamento no ato do abastecimento - vai pro Abastecimento lançado a partir da ordem
     supplier_id: Optional[str] = None
     supplier_name: Optional[str] = None
     fuel_type: Optional[str] = None  # Produto
@@ -3233,6 +3234,7 @@ class FuelSupplyOrderCreate(BaseModel):
     order_date: Optional[str] = None
     equipment_id: Optional[str] = None
     equipment_plate: Optional[str] = None
+    reading: Optional[float] = None
     supplier_id: Optional[str] = None
     supplier_name: Optional[str] = None
     fuel_type: Optional[str] = None

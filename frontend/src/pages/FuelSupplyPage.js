@@ -171,7 +171,7 @@ export default function FuelSupplyPage() {
   };
 
   // Ao selecionar uma Ordem de Abastecimento já cadastrada, puxa os dados que
-  // ela já tem (equipamento, fornecedor, combustível) pro Abastecimento atual.
+  // ela já tem (equipamento, KM, fornecedor, combustível) pro Abastecimento atual.
   const onSelectFuelOrder = (order) => {
     setForm((p) => {
       // Litros e preço autorizados na ordem também vêm (Completar Tanque não tem litros)
@@ -183,6 +183,8 @@ export default function FuelSupplyPage() {
         fuel_supply_order_id: order.id,
         equipment_plate: order.equipment_plate || p.equipment_plate,
         equipment_id: order.equipment_id || p.equipment_id,
+        // KM anotado no ato do abastecimento, na ordem
+        reading: order.reading ?? p.reading,
         supplier_name: order.supplier_name || p.supplier_name,
         supplier_id: order.supplier_id || p.supplier_id,
         fuel_type: order.fuel_type || p.fuel_type,
