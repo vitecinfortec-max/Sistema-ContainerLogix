@@ -1200,8 +1200,9 @@ class ContainerAuditCreate(BaseModel):
 
 class ContainerAuditItemUpdate(BaseModel):
     container_number: str
-    status: str  # CONFIRMADO | FALTANTE | NAO_ESPERADO
+    status: str  # PENDENTE | CONFIRMADO | FALTANTE | NAO_ESPERADO
     observations: Optional[str] = None
+    size_type: Optional[str] = None  # só preenche quando o item ainda não tem (ex.: lido da foto)
 
 class ContainerAuditResponse(BaseModel):
     id: str

@@ -357,6 +357,16 @@ export const api = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  deleteContainerAuditPhoto: (id, containerNumber) => axios.delete(`${API}/container-audits/${id}/items/${encodeURIComponent(containerNumber)}/photo`),
+  deleteContainerAuditItem: (id, containerNumber) => axios.delete(`${API}/container-audits/${id}/items/${encodeURIComponent(containerNumber)}`),
+  // Lê número e tamanho/tipo do container na foto (não grava nada)
+  scanContainerAuditPhoto: (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/container-audits/${id}/scan`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
   completeContainerAudit: (id) => axios.post(`${API}/container-audits/${id}/complete`),
   deleteContainerAudit: (id) => axios.delete(`${API}/container-audits/${id}`),
   downloadContainerAuditPdf: (id) => axios.get(`${API}/container-audits/${id}/pdf`, { responseType: 'blob' }),

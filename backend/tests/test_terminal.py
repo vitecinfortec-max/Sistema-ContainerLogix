@@ -147,5 +147,6 @@ def test_audit_item_updates_do_not_overwrite_each_other(api, stock_history):
 
     r = api.put(f"/api/container-audits/{aid}/items", json={"container_number": "EXTR4444444", "status": "CONFIRMADO"})
     assert r.status_code == 200
-    extra = [i for i in r.json()["items"] if i["container_number"] == "EXTR4444444"]
-    assert len(extra) == 1 and extra[0]["expected"] is False
+    # O servidor padroniza o número (XXXX999999-9) e, fora da lista, grava como Não Esperado
+    extra = [i for i in r.json()["items"] if i["container_number"].startswith("EXTR444444-")]
+    assert len(extra) == 1 and extra[0]["expected"] is False and extra[0]["status"] == "NAO_ESPERADO"
