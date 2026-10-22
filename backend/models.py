@@ -120,6 +120,7 @@ class Driver(BaseModel):
     cnh_photo_front_url: Optional[str] = None
     cnh_photo_back_url: Optional[str] = None
     signature_url: Optional[str] = None  # assinatura (imagem) - impressa no Termo/Ficha de Entrega de EPI
+    document_attachments: Optional[List[str]] = None  # CNH, RG... importados (URLs em /api/uploads)
     status: str = "ATIVO"
     observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -145,6 +146,7 @@ class DriverCreate(BaseModel):
     cnh_photo_front_url: Optional[str] = None
     cnh_photo_back_url: Optional[str] = None
     signature_url: Optional[str] = None  # assinatura (imagem) - impressa no Termo/Ficha de Entrega de EPI
+    document_attachments: Optional[List[str]] = None  # CNH, RG... importados (URLs em /api/uploads)
     status: str = "ATIVO"
     observations: Optional[str] = None
 
@@ -357,6 +359,7 @@ class Employee(BaseModel):
     address_details: Optional[dict] = None
     access_level: Optional[str] = None  # informativo (administrador, portaria, pátio, financeiro, etc.)
     signature_url: Optional[str] = None  # assinatura (imagem) - impressa no Termo/Ficha de Entrega de EPI
+    document_attachments: Optional[List[str]] = None  # CNH, RG... importados (URLs em /api/uploads)
     status: str = "ATIVO"
     observations: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -376,6 +379,7 @@ class EmployeeCreate(BaseModel):
     address_details: Optional[dict] = None
     access_level: Optional[str] = None
     signature_url: Optional[str] = None
+    document_attachments: Optional[List[str]] = None
     status: str = "ATIVO"
     observations: Optional[str] = None
 

@@ -15,6 +15,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { AddressFields } from '../components/AddressFields';
 import { SignatureField } from '../components/SignaturePad';
+import {
+  DocumentImportButton, DocumentImportNotice, DocumentAttachments, applyDocumentFields, addAttachment,
+  DOCUMENT_KIND_LABELS, IMPORTED_FIELD_CLASS,
+} from '../components/DocumentImport';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -95,6 +99,7 @@ const TYPES = [
     plural: 'Motoristas',
     icon: Truck,
     moduleKey: 'cadastro.pessoas',
+    documentKinds: ['cnh', 'rg'],
     api: { list: api.getDrivers, create: api.createDriver, update: api.updateDriver, remove: api.deleteDriver },
     listColumns: [['name', 'Nome'], ['cpf', 'CPF'], ['phone', 'Telefone'], ['cnh_expiry', 'Validade CNH'], ['status', 'Status']],
     fields: [
@@ -114,6 +119,7 @@ const TYPES = [
       { name: 'default_truck_plate', label: 'Placa do Cavalo (padrão)' },
       { name: 'default_trailer_plate', label: 'Placa da Carreta (padrão)' },
       { name: 'signature_url', label: "Assinatura (sai no Termo e na Ficha de Entrega de EPI's)", type: 'signature' },
+      { name: 'document_attachments', label: 'Documentos anexados (CNH, RG...)', type: 'documents' },
       { name: 'status', label: 'Status', type: 'select', options: STATUS_COM_BLOQUEADO },
       { name: 'observations', label: 'Observações', type: 'textarea' },
     ],
@@ -157,6 +163,7 @@ const TYPES = [
     plural: 'Funcionários',
     icon: IdCard,
     moduleKey: 'cadastro.funcionario',
+    documentKinds: ['rg', 'cnh'],
     api: { list: api.getEmployees, create: api.createEmployee, update: api.updateEmployee, remove: api.deleteEmployee },
     listColumns: [['name', 'Nome'], ['cpf', 'CPF'], ['position', 'Cargo'], ['status', 'Status']],
     fields: [
@@ -173,6 +180,7 @@ const TYPES = [
       { name: 'address_details', label: 'Endereço', type: 'address' },
       { name: 'access_level', label: 'Nível de Acesso (informativo)', placeholder: 'Ex: administrador, portaria, pátio, financeiro...' },
       { name: 'signature_url', label: "Assinatura (sai no Termo e na Ficha de Entrega de EPI's)", type: 'signature' },
+      { name: 'document_attachments', label: 'Documentos anexados (RG, CNH...)', type: 'documents' },
       { name: 'status', label: 'Status', type: 'select', options: STATUS_FUNCIONARIO },
       { name: 'observations', label: 'Observações', type: 'textarea' },
     ],
@@ -297,7 +305,7 @@ function genderWords(type) {
 function buildEmptyForm(type) {
   const form = {};
   for (const f of type.fields) {
-    form[f.name] = f.type === 'address' ? null : '';
+    form[f.name] = f.type === 'address' ? null : f.type === 'documents' ? [] : '';
   }
   if (form.status === '') {
     const statusField = type.fields.find((f) => f.name === 'status');
@@ -333,6 +341,8 @@ export default function CadastroUnificadoPage() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [importedFields, setImportedFields] = useState(() => new Set());
+  const [importNotice, setImportNotice] = useState(null);
 
   useEffect(() => {
     setSearchParams(activeTypeKey === TYPES[0].key ? {} : { type: activeTypeKey }, { replace: true });
@@ -358,10 +368,16 @@ export default function CadastroUnificadoPage() {
     }
   };
 
+  const clearImport = () => {
+    setImportedFields(new Set());
+    setImportNotice(null);
+  };
+
   const resetForm = () => {
     setFormData(buildEmptyForm(activeType));
     setEditId(null);
     setEditOriginalName('');
+    clearImport();
   };
 
   const openCreateDialog = () => {
@@ -377,6 +393,7 @@ export default function CadastroUnificadoPage() {
     setActiveTypeKey(typeKey);
     setFormData(buildEmptyForm(type));
     setEditId(null);
+    clearImport();
     setOpen(true);
   };
 
@@ -388,10 +405,37 @@ export default function CadastroUnificadoPage() {
     setFormData(form);
     setEditId(item.id);
     setEditOriginalName(item.name || '');
+    clearImport();
     setOpen(true);
   };
 
-  const setField = (name, value) => setFormData((p) => ({ ...p, [name]: value }));
+  const setField = (name, value) => {
+    setFormData((p) => ({ ...p, [name]: value }));
+    setImportedFields((prev) => {
+      if (!prev.has(name)) return prev;
+      const next = new Set(prev);
+      next.delete(name);
+      return next;
+    });
+  };
+
+  // Campos lidos da CNH/RG vão para o formulário, destacados para conferência
+  const handleDocumentRead = (reading) => {
+    const label = DOCUMENT_KIND_LABELS[reading.kind];
+    const warnings = [...reading.warnings];
+    const readCpf = onlyDigits(reading.fields.cpf);
+    const formCpf = onlyDigits(formData.cpf);
+    if (editId && readCpf && formCpf && readCpf !== formCpf) {
+      warnings.unshift(`O CPF do documento (${reading.fields.cpf}) é diferente do CPF deste cadastro: confira se é a pessoa certa`);
+    }
+    const { next, applied } = applyDocumentFields(formData, reading.fields);
+    if ('document_attachments' in next) next.document_attachments = addAttachment(next.document_attachments, reading.file_url);
+    setFormData(next);
+    setImportedFields(new Set(applied));
+    setImportNotice({ label, count: applied.length, warnings });
+    if (!applied.length) toast.error(`Nenhum campo deste cadastro foi encontrado na ${label}`);
+  };
+  const importedClass = (name) => (importedFields.has(name) ? IMPORTED_FIELD_CLASS : '');
 
   // Preenche nome/contato/endereço a partir do CNPJ digitado, usando os
   // dados públicos da Receita Federal (via BrasilAPI). Só escreve em campos
@@ -559,6 +603,14 @@ export default function CadastroUnificadoPage() {
                   {editId ? `Atualize os dados ${g.do} ${activeType.label.toLowerCase()}` : `Adicione ${g.umNovo} ${activeType.label.toLowerCase()} ao sistema`}
                 </DialogDescription>
               </DialogHeader>
+              {activeType.documentKinds && (
+                <div className="space-y-2">
+                  <div className="flex flex-col items-start gap-1">
+                    <DocumentImportButton kinds={activeType.documentKinds} onRead={handleDocumentRead} disabled={submitting} />
+                  </div>
+                  <DocumentImportNotice notice={importNotice} onClose={() => setImportNotice(null)} />
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-4">
                 {activeType.fields.map((f) => {
                   if (f.showIf && !f.showIf(formData)) return null;
@@ -575,11 +627,13 @@ export default function CadastroUnificadoPage() {
                       />
                     ) : f.type === 'select' ? (
                       <Select value={formData[f.name] || f.options[0][0]} onValueChange={(v) => setField(f.name, v)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger className={importedClass(f.name)}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {f.options.map(([v, l]) => <SelectItem key={v} value={v} className="text-sm">{l}</SelectItem>)}
                         </SelectContent>
                       </Select>
+                    ) : f.type === 'documents' ? (
+                      <DocumentAttachments value={formData[f.name]} onChange={(v) => setField(f.name, v)} />
                     ) : f.type === 'signature' ? (
                       <SignatureField value={formData[f.name]} onChange={(v) => setField(f.name, v)} personName={formData.name} />
                     ) : f.type === 'textarea' ? (
@@ -610,6 +664,7 @@ export default function CadastroUnificadoPage() {
                         value={formData[f.name] || ''}
                         onChange={(e) => setField(f.name, f.mask ? MASKS[f.mask](e.target.value) : e.target.value)}
                         required={f.required}
+                        className={importedClass(f.name)}
                       />
                     )}
                   </div>

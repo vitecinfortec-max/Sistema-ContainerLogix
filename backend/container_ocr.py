@@ -3,31 +3,19 @@ partir de uma foto, usada na Auditoria de Estoque. A imagem vai para a API da
 Anthropic (Claude); o dígito verificador lido é conferido aqui, porque é ele
 que denuncia uma letra ou número lido errado.
 
-Configuração (variáveis de ambiente):
-- ANTHROPIC_API_KEY: sem ela a leitura fica desligada (503 com aviso na tela)
-- CONTAINER_OCR_MODEL: modelo usado (padrão claude-opus-5-5)
+A chamada fica em claude_reader.py; o modelo pode ser trocado pela variável
+de ambiente CONTAINER_OCR_MODEL.
 """
-import base64
-import json
-import logging
-import os
 import re
 from typing import Optional
 
-from fastapi import HTTPException
-
-logger = logging.getLogger(__name__)
-
-DEFAULT_MODEL = "claude-opus-5-5"
-_FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
+from claude_reader import read_structured
 
 _LETTER_VALUES = {
     'A': 10, 'B': 12, 'C': 13, 'D': 14, 'E': 15, 'F': 16, 'G': 17, 'H': 18, 'I': 19, 'J': 20,
     'K': 21, 'L': 23, 'M': 24, 'N': 25, 'O': 26, 'P': 27, 'Q': 28, 'R': 29, 'S': 30, 'T': 31,
     'U': 32, 'V': 34, 'W': 35, 'X': 36, 'Y': 37, 'Z': 38,
 }
-
-_MEDIA_TYPES = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}
 
 _PROMPT = (
     "This photo was taken in a container yard during a stock audit. Read the ISO 6346 "
@@ -93,58 +81,10 @@ def size_type_from_iso(code: Optional[str]) -> Optional[str]:
 
 
 async def read_container_photo(content: bytes, file_ext: str) -> dict:
-    api_key = os.environ.get('ANTHROPIC_API_KEY', '').strip()
-    if not api_key:
-        raise HTTPException(
-            status_code=503,
-            detail="Leitura por foto não configurada: defina ANTHROPIC_API_KEY no servidor",
-        )
-    import anthropic
-
-    model = os.environ.get('CONTAINER_OCR_MODEL', '').strip() or DEFAULT_MODEL
-    # Recusa indevida do modelo principal é refeita em outro modelo - só os
-    # modelos abaixo aceitam esse parâmetro (o Haiku, por exemplo, recusa)
-    fallback = (
-        {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
-        if model in _FALLBACK_MODELS else {}
+    data = await read_structured(
+        content, file_ext, _PROMPT, _SCHEMA, model_env='CONTAINER_OCR_MODEL',
+        feature="Leitura por foto", unreadable="Não foi possível ler a foto, digite o número",
     )
-    client = anthropic.AsyncAnthropic(api_key=api_key, timeout=60.0)
-    try:
-        response = await client.beta.messages.create(
-            model=model,
-            max_tokens=4000,
-            **fallback,
-            output_config={"effort": "low", "format": {"type": "json_schema", "schema": _SCHEMA}},
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {
-                        "type": "base64",
-                        "media_type": _MEDIA_TYPES.get(file_ext, 'image/jpeg'),
-                        "data": base64.standard_b64encode(content).decode('ascii'),
-                    }},
-                    {"type": "text", "text": _PROMPT},
-                ],
-            }],
-        )
-    except anthropic.AuthenticationError:
-        raise HTTPException(status_code=503, detail="Chave da API de leitura por foto inválida")
-    except anthropic.RateLimitError:
-        raise HTTPException(status_code=503, detail="Leitura por foto sobrecarregada, tente de novo em instantes")
-    except anthropic.APIConnectionError:
-        raise HTTPException(status_code=503, detail="Sem conexão com o serviço de leitura por foto")
-    except anthropic.APIStatusError as error:
-        logger.warning("Leitura de container por foto falhou: %s %s", error.status_code, error.message)
-        raise HTTPException(status_code=502, detail="O serviço de leitura por foto falhou, tente de novo")
-
-    if response.stop_reason != "end_turn":
-        logger.warning("Leitura de container por foto parou com %s", response.stop_reason)
-        raise HTTPException(status_code=422, detail="Não foi possível ler a foto, digite o número")
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    try:
-        data = json.loads(text)
-    except ValueError:
-        raise HTTPException(status_code=422, detail="Não foi possível ler a foto, digite o número")
 
     raw = f"{data.get('owner_and_category') or ''}{data.get('serial_number') or ''}"
     number = format_container_number(raw)

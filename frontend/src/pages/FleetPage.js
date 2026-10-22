@@ -27,6 +27,9 @@ import { Truck, Wrench, Plus, Eye, Trash2, FileText, Printer, Pencil, Car, Check
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { compressImage } from '../lib/imageCompression';
+import {
+  DocumentImportButton, DocumentImportNotice, DocumentAttachments, applyDocumentFields, addAttachment, IMPORTED_FIELD_CLASS,
+} from '../components/DocumentImport';
 import { calendarDate, dateInputToISO, toDateInput, todayISO } from '../lib/dates';
 
 const VEHICLE_STATUS_LABELS = { ATIVO: 'Ativo', INATIVO: 'Inativo', MANUTENCAO: 'Manutenção' };
@@ -189,9 +192,12 @@ export default function FleetPage() {
     transport_company: '',
     status: 'ATIVO',
     observations: '',
-    driver_id: ''
+    driver_id: '',
+    document_attachments: []
   });
   const [vehicleForm, setVehicleForm] = useState(buildEmptyVehicleForm());
+  const [vehicleImportedFields, setVehicleImportedFields] = useState(() => new Set());
+  const [vehicleImportNotice, setVehicleImportNotice] = useState(null);
   const [drivers, setDrivers] = useState([]);
   const [driverPopoverOpen, setDriverPopoverOpen] = useState(false);
   const [transportCompanies, setTransportCompanies] = useState([]);
@@ -336,12 +342,46 @@ export default function FleetPage() {
 
   const handleVehicleFormChange = (field, value) => {
     setVehicleForm(prev => ({ ...prev, [field]: value }));
+    setVehicleImportedFields(prev => {
+      if (!prev.has(field)) return prev;
+      const next = new Set(prev);
+      next.delete(field);
+      return next;
+    });
+  };
+
+  const clearVehicleImport = () => {
+    setVehicleImportedFields(new Set());
+    setVehicleImportNotice(null);
   };
 
   const resetVehicleForm = () => {
     setVehicleForm(buildEmptyVehicleForm());
     setEditingVehicle(null);
+    clearVehicleImport();
   };
+
+  // Campos lidos do CRLV vão para o formulário, destacados para conferência.
+  // Tipo e Categoria são deduzidos da Espécie/Tipo do documento, então só
+  // entram se ainda estiverem vazios.
+  const handleCrlvRead = (reading) => {
+    const warnings = [...reading.warnings];
+    const readPlate = reading.fields.plate;
+    if (editingVehicle && readPlate && vehicleForm.plate && readPlate !== vehicleForm.plate.replace(/[^A-Z0-9]/gi, '').toUpperCase()) {
+      warnings.unshift(`A placa do documento (${readPlate}) é diferente da placa deste cadastro: confira se é o veículo certo`);
+    }
+    const { next, applied } = applyDocumentFields(vehicleForm, reading.fields, { onlyIfEmpty: ['vehicle_type', 'category'] });
+    next.document_attachments = addAttachment(next.document_attachments, reading.file_url);
+    const info = [];
+    if (reading.info.licensing_year) info.push(['Exercício do licenciamento', reading.info.licensing_year]);
+    if (reading.info.owner_name) {
+      info.push(['Proprietário', [reading.info.owner_name, reading.info.owner_document].filter(Boolean).join(' - ')]);
+    }
+    setVehicleForm(next);
+    setVehicleImportedFields(new Set(applied));
+    setVehicleImportNotice({ label: 'CRLV', count: applied.length, warnings, info });
+  };
+  const importedClass = (field) => (vehicleImportedFields.has(field) ? IMPORTED_FIELD_CLASS : '');
 
   const openNewVehicleModal = () => {
     resetVehicleForm();
@@ -360,6 +400,7 @@ export default function FleetPage() {
       }
     }
     setVehicleForm(form);
+    clearVehicleImport();
     setVehicleModalOpen(true);
   };
 
@@ -403,7 +444,8 @@ export default function FleetPage() {
         transport_company: vehicleForm.transport_company || null,
         status: vehicleForm.status,
         observations: vehicleForm.observations || null,
-        driver_id: vehicleForm.driver_id || null
+        driver_id: vehicleForm.driver_id || null,
+        document_attachments: vehicleForm.document_attachments || []
       };
 
       if (editingVehicle) {
@@ -1484,6 +1526,12 @@ export default function FleetPage() {
               {editingVehicle ? 'Editar Veículo' : 'Novo Veículo'}
             </DialogTitle>
           </DialogHeader>
+          <div className="space-y-2">
+            <div className="flex flex-col items-start gap-1">
+              <DocumentImportButton kinds={['crlv']} onRead={handleCrlvRead} disabled={vehicleSaving} />
+            </div>
+            <DocumentImportNotice notice={vehicleImportNotice} onClose={() => setVehicleImportNotice(null)} />
+          </div>
 
           <div className="space-y-5">
             <FormSectionTitle>Identificação</FormSectionTitle>
@@ -1491,7 +1539,7 @@ export default function FleetPage() {
               <div>
                 <Label className="mb-1.5 block">Placa *</Label>
                 <Input
-                  value={vehicleForm.plate}
+                  className={importedClass('plate')} value={vehicleForm.plate}
                   onChange={(e) => handleVehicleFormChange('plate', e.target.value.toUpperCase())}
                   data-testid="input-vehicle-plate-form"
                 />
@@ -1502,7 +1550,7 @@ export default function FleetPage() {
                   value={vehicleForm.vehicle_type}
                   onValueChange={(value) => handleVehicleFormChange('vehicle_type', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={importedClass('vehicle_type')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1519,7 +1567,7 @@ export default function FleetPage() {
               <div>
                 <Label className="mb-1.5 block">Categoria</Label>
                 <Select value={vehicleForm.category} onValueChange={(value) => handleVehicleFormChange('category', value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className={importedClass('category')}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {categoryOptions.map(option => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -1529,7 +1577,7 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label className="mb-1.5 block">Cor</Label>
-                <Input value={vehicleForm.color} onChange={(e) => handleVehicleFormChange('color', e.target.value)} />
+                <Input className={importedClass('color')} value={vehicleForm.color} onChange={(e) => handleVehicleFormChange('color', e.target.value)} />
               </div>
               <div>
                 <Label className="mb-1.5 block">Nº Patrimônio/Cód. Interno</Label>
@@ -1541,14 +1589,14 @@ export default function FleetPage() {
               <div>
                 <Label className="mb-1.5 block">Marca</Label>
                 <Input
-                  value={vehicleForm.brand}
+                  className={importedClass('brand')} value={vehicleForm.brand}
                   onChange={(e) => handleVehicleFormChange('brand', e.target.value)}
                 />
               </div>
               <div>
                 <Label className="mb-1.5 block">Modelo</Label>
                 <Input
-                  value={vehicleForm.model}
+                  className={importedClass('model')} value={vehicleForm.model}
                   onChange={(e) => handleVehicleFormChange('model', e.target.value)}
                 />
               </div>
@@ -1559,7 +1607,7 @@ export default function FleetPage() {
                 <Label className="mb-1.5 block">Ano de Fabricação</Label>
                 <Input
                   type="number" min="0"
-                  value={vehicleForm.year}
+                  className={importedClass('year')} value={vehicleForm.year}
                   onChange={(e) => handleVehicleFormChange('year', e.target.value)}
                   min="1900"
                   max="2100"
@@ -1569,7 +1617,7 @@ export default function FleetPage() {
                 <Label className="mb-1.5 block">Ano Modelo</Label>
                 <Input
                   type="number" min="0"
-                  value={vehicleForm.model_year}
+                  className={importedClass('model_year')} value={vehicleForm.model_year}
                   onChange={(e) => handleVehicleFormChange('model_year', e.target.value)}
                   min="1900"
                   max="2100"
@@ -1581,22 +1629,22 @@ export default function FleetPage() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label className="mb-1.5 block">Capacidade de Carga</Label>
-                <Input value={vehicleForm.load_capacity} onChange={(e) => handleVehicleFormChange('load_capacity', e.target.value)} />
+                <Input className={importedClass('load_capacity')} value={vehicleForm.load_capacity} onChange={(e) => handleVehicleFormChange('load_capacity', e.target.value)} />
               </div>
               <div>
                 <Label className="mb-1.5 block">Nº de Eixos</Label>
-                <Input type="number" min="0" value={vehicleForm.axle_count} onChange={(e) => handleVehicleFormChange('axle_count', e.target.value)} />
+                <Input type="number" min="0" className={importedClass('axle_count')} value={vehicleForm.axle_count} onChange={(e) => handleVehicleFormChange('axle_count', e.target.value)} />
               </div>
               <div>
                 <Label className="mb-1.5 block">Tipo de Carroceria/Implemento</Label>
-                <Input value={vehicleForm.body_type} onChange={(e) => handleVehicleFormChange('body_type', e.target.value)} />
+                <Input className={importedClass('body_type')} value={vehicleForm.body_type} onChange={(e) => handleVehicleFormChange('body_type', e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label className="mb-1.5 block">Combustível</Label>
                 <Select value={vehicleForm.fuel_type} onValueChange={(value) => handleVehicleFormChange('fuel_type', value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className={importedClass('fuel_type')}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {fuelOptions.map(option => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
@@ -1614,7 +1662,7 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label className="mb-1.5 block">Potência do Motor</Label>
-                <Input value={vehicleForm.engine_power} onChange={(e) => handleVehicleFormChange('engine_power', e.target.value)} />
+                <Input className={importedClass('engine_power')} value={vehicleForm.engine_power} onChange={(e) => handleVehicleFormChange('engine_power', e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1624,7 +1672,7 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label className="mb-1.5 block">PBT (Peso Bruto Total)</Label>
-                <Input value={vehicleForm.gross_weight} onChange={(e) => handleVehicleFormChange('gross_weight', e.target.value)} />
+                <Input className={importedClass('gross_weight')} value={vehicleForm.gross_weight} onChange={(e) => handleVehicleFormChange('gross_weight', e.target.value)} />
               </div>
             </div>
 
@@ -1632,17 +1680,17 @@ export default function FleetPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="mb-1.5 block">RENAVAM</Label>
-                <Input value={vehicleForm.renavam} onChange={(e) => handleVehicleFormChange('renavam', e.target.value)} />
+                <Input className={importedClass('renavam')} value={vehicleForm.renavam} onChange={(e) => handleVehicleFormChange('renavam', e.target.value)} />
               </div>
               <div>
                 <Label className="mb-1.5 block">Chassi</Label>
-                <Input value={vehicleForm.chassis} onChange={(e) => handleVehicleFormChange('chassis', e.target.value)} />
+                <Input className={importedClass('chassis')} value={vehicleForm.chassis} onChange={(e) => handleVehicleFormChange('chassis', e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="mb-1.5 block">CRLV - Número</Label>
-                <Input value={vehicleForm.crlv_number} onChange={(e) => handleVehicleFormChange('crlv_number', e.target.value)} />
+                <Input className={importedClass('crlv_number')} value={vehicleForm.crlv_number} onChange={(e) => handleVehicleFormChange('crlv_number', e.target.value)} />
               </div>
               <div>
                 <Label className="mb-1.5 block">CRLV - Validade</Label>
@@ -1668,6 +1716,13 @@ export default function FleetPage() {
                 <Label className="mb-1.5 block">Validade da Vistoria</Label>
                 <Input type="date" value={vehicleForm.inspection_expiry} onChange={(e) => handleVehicleFormChange('inspection_expiry', e.target.value)} />
               </div>
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Documentos anexados (CRLV...)</Label>
+              <DocumentAttachments
+                value={vehicleForm.document_attachments}
+                onChange={(v) => handleVehicleFormChange('document_attachments', v)}
+              />
             </div>
 
             <FormSectionTitle>Vínculo</FormSectionTitle>

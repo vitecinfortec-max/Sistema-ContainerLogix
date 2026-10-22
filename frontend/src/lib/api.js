@@ -266,6 +266,15 @@ export const api = {
     });
   },
   deleteFile: (filename) => axios.delete(`${API}/upload/${filename}`),
+  // Lê CNH / RG / CRLV (foto ou PDF) e devolve os campos para o cadastro
+  readDocument: (kind, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/documents/read`, formData, {
+      params: { kind },
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
   // Anexos (fotos, recibos) são pedidos pelo navegador direto de um <img>,
   // sem cabeçalho de autorização - o token de arquivos vai na URL. Ver
   // /auth/file-token no backend.

@@ -30,6 +30,7 @@ services:
       - key: SENDER_EMAIL
         sync: false
       # Opcional: liga a leitura do container pela foto na Auditoria de Estoque
-      # (CONTAINER_OCR_MODEL troca o modelo, padrão claude-opus-5-5).
+      # e a importação de CNH/RG/CRLV nos cadastros (CONTAINER_OCR_MODEL e
+      # DOCUMENT_OCR_MODEL trocam o modelo, padrão claude-opus-5-5).
       - key: ANTHROPIC_API_KEY
         sync: false

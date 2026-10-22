@@ -17,8 +17,9 @@ from models import (
 
 from shared import (
     db, get_current_active_user, get_current_admin_user, validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR,
-    save_signature_value
+    ALLOWED_RECEIPT_EXTENSIONS, save_signature_value
 )
+from document_ocr import DOCUMENT_KINDS, read_document
 
 api_router = APIRouter(prefix="/api")
 
@@ -120,8 +121,11 @@ async def update_driver(driver_id: str, driver_input: DriverCreate, current_user
 
     await _ensure_unique_document(db.drivers, "cpf", driver_input.cpf, driver_id, "Já existe um motorista cadastrado com este CPF")
 
+    # Campo que nem veio no corpo mantém o valor salvo (fotos e anexos que
+    # o formulário não mostra eram apagados a cada edição)
     update_data = {
-        **driver_input.model_dump(),
+        **{k: v for k, v in existing.items() if k in DriverCreate.model_fields and k not in driver_input.model_fields_set},
+        **driver_input.model_dump(exclude_unset=True),
         "id": driver_id,
         "created_at": existing['created_at'],
         "created_by": existing['created_by']
@@ -499,8 +503,11 @@ async def update_employee(employee_id: str, employee_input: EmployeeCreate, curr
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
     await _ensure_unique_document(db.employees, "cpf", employee_input.cpf, employee_id, "Já existe um funcionário cadastrado com este CPF")
 
+    # Campo que nem veio no corpo mantém o valor salvo (fotos e anexos que
+    # o formulário não mostra eram apagados a cada edição)
     update_data = {
-        **employee_input.model_dump(),
+        **{k: v for k, v in existing.items() if k in EmployeeCreate.model_fields and k not in employee_input.model_fields_set},
+        **employee_input.model_dump(exclude_unset=True),
         "id": employee_id,
         "created_at": existing['created_at'],
         "created_by": existing['created_by']
@@ -708,6 +715,29 @@ async def upload_file(file: UploadFile = File(...), current_user: dict = Depends
         "size": len(content),
         "content_type": file.content_type
     }
+
+@api_router.post("/documents/read")
+async def read_document_file(
+    kind: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Lê uma CNH, RG/CIN ou CRLV (foto ou PDF) e devolve os campos para o
+    formulário de cadastro, que o usuário confere antes de salvar. Lido o
+    documento, o arquivo fica guardado e a URL volta em file_url, para ir
+    junto com o cadastro em document_attachments."""
+    if kind not in DOCUMENT_KINDS:
+        raise HTTPException(status_code=400, detail="Tipo de documento inválido")
+    file_ext, content = await validate_and_read_upload(file, ALLOWED_RECEIPT_EXTENSIONS)
+    reading = await read_document(kind, content, file_ext)
+    reading["file_url"] = None
+    if reading["found"]:
+        filename = f"{uuid.uuid4()}{file_ext}"
+        with open(UPLOADS_DIR / filename, 'wb') as f:
+            f.write(content)
+        reading["file_url"] = f"/api/uploads/{filename}"
+    return reading
+
 
 @api_router.delete("/upload/{filename}")
 async def delete_file(filename: str, current_user: dict = Depends(get_current_admin_user)):
