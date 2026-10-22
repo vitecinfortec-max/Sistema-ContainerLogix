@@ -1,7 +1,8 @@
 """Importação de documentos nos cadastros: leitura da CNH, RG e CRLV (a
-chamada ao Claude é trocada por uma resposta pronta), conferência dos dígitos
-do CPF/RENAVAM, arquivo guardado só quando o documento foi lido, e a edição
-do Motorista mantendo os campos que o formulário não envia."""
+chamada ao Claude é trocada por uma resposta pronta), CRLV-e lido pelo texto
+do PDF sem chave, conferência dos dígitos do CPF/RENAVAM, arquivo guardado
+só quando o documento foi lido, e a edição do Motorista mantendo os campos
+que o formulário não envia."""
 import io
 
 import pytest
@@ -35,6 +36,7 @@ def _valid_renavam(base10):
 @pytest.fixture
 def fake_reader(monkeypatch):
     calls = {}
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "chave-de-teste")
 
     def use(answer):
         async def read_structured(content, file_ext, prompt, schema, **kwargs):
@@ -142,3 +144,61 @@ def test_driver_edit_keeps_fields_the_form_does_not_send(api):
     # enviado vazio, apaga
     api.put(f"/api/drivers/{driver_id}", json={"name": "Zé Silva", "cpf": "529.982.247-25", "document_attachments": []})
     assert api.run(api.db.drivers.find_one({"id": driver_id}))["document_attachments"] == []
+
+
+def _crlv_e_pdf(values):
+    """PDF com o layout do CRLV-e: rótulo em fonte 5,8 e o valor em fonte 10
+    logo abaixo, na mesma coluna (posições do documento real)."""
+    from reportlab.pdfgen import canvas
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=(595, 842))
+    pdf.setFont("Helvetica", 6.4)
+    pdf.drawString(31, 842 - 70, "CERTIFICADO DE REGISTRO E LICENCIAMENTO DE VEÍCULO - DIGITAL")
+    for label, x, top, gap, value in values:
+        pdf.setFont("Helvetica", 5.8)
+        pdf.drawString(x, 842 - top - 5, label)
+        pdf.setFont("Helvetica", 10)
+        pdf.drawString(x, 842 - top - gap - 8, value)
+    pdf.save()
+    return buffer.getvalue()
+
+
+def test_crlv_e_pdf_is_read_from_text_without_api_key(api, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    renavam = _valid_renavam("0012345678")
+    content = _crlv_e_pdf([
+        ("CÓDIGO RENAVAM", 31, 91, 10, renavam), ("PLACA", 31, 117, 10, "ABC1D23"),
+        ("EXERCÍCIO", 103, 117, 10, "2026"), ("POTÊNCIA/CILINDRADA", 317, 103, 10, "540CV/****"),
+        ("PESO BRUTO TOTAL", 510, 103, 10, "23.00"), ("CAPACIDADE", 510, 65, 22, "*.*"),
+        ("EIXOS", 504, 130, 10, "3"), ("ANO FABRICAÇÃO", 31, 144, 10, "2021"), ("ANO MODELO", 103, 144, 10, "2022"),
+        ("NÚMERO DO CRV", 31, 170, 10, "***"), ("MARCA / MODELO / VERSÃO", 31, 274, 19, "VOLVO/FH 540 6X4T"),
+        ("ESPÉCIE / TIPO", 31, 309, 19, "CARGA/CAMINHAO TRATOR"), ("CHASSI", 130, 344, 19, "9BVABC12345678901"),
+        ("COR PREDOMINANTE", 31, 379, 19, "BRANCA"), ("COMBUSTÍVEL", 102, 379, 19, "DIESEL"),
+        ("NOME", 317, 182, 8, "TRANSPORTES ALFA"),
+    ])
+    r = _upload(api, "crlv", content=content)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    _remove(body["file_url"])
+    assert body["found"] is True and body["warnings"] == [] and body["file_url"]
+    assert body["fields"] == {
+        "plate": "ABC1D23", "renavam": renavam, "chassis": "9BVABC12345678901", "brand": "VOLVO",
+        "model": "FH 540 6X4T", "year": 2021, "model_year": 2022, "color": "BRANCA", "fuel_type": "DIESEL",
+        "vehicle_type": "CAVALO", "category": "TRACAO", "engine_power": "540CV", "gross_weight": "23.00",
+        "axle_count": 3,
+    }
+    assert body["info"] == {"licensing_year": 2026, "owner_name": "TRANSPORTES ALFA"}
+
+
+def test_without_api_key_photos_and_cnh_explain_what_is_missing(api, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    r = _upload(api, "cnh")
+    assert r.status_code == 503 and "ANTHROPIC_API_KEY" in r.json()["detail"]
+    r = _upload(api, "crlv")  # PDF sem texto (escaneado)
+    assert r.status_code == 503 and "CRLV-e em PDF" in r.json()["detail"]
+
+
+def test_brand_without_slash_and_trailer_prefix():
+    warnings = []
+    fields = document_ocr._crlv_fields({**CRLV, "brand_model": "SR/RANDON SR CS 3E", "power_displacement": "0CV/****"}, warnings)
+    assert fields["brand"] == "RANDON" and fields["model"] == "SR CS 3E" and fields["engine_power"] is None

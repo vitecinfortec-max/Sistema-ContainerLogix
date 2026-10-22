@@ -1,18 +1,27 @@
 """Leitura de documentos (CNH, RG/CIN e CRLV) para preencher os cadastros de
-Motorista, Funcionário e Veículo. O arquivo (foto ou PDF) vai para a API da
-Anthropic (Claude); aqui os valores lidos são passados para o formato dos
-cadastros e conferidos (dígitos do CPF e do RENAVAM, formato da placa e do
-chassi), porque é isso que denuncia um caractere lido errado.
+Motorista, Funcionário e Veículo. Os valores lidos são passados para o
+formato dos cadastros e conferidos (dígitos do CPF e do RENAVAM, formato da
+placa e do chassi), porque é isso que denuncia um caractere lido errado.
 
-A chamada fica em claude_reader.py; o modelo pode ser trocado pela variável
-de ambiente DOCUMENT_OCR_MODEL.
+- CRLV-e em PDF (o da Carteira Digital de Trânsito) traz o texto embutido:
+  é lido aqui mesmo, pela posição de cada rótulo, sem custo e sem chave.
+- Foto, PDF escaneado, CNH-e (cujo PDF só tem imagens) e RG vão para a API da
+  Anthropic (Claude) - precisa de ANTHROPIC_API_KEY. A chamada fica em
+  claude_reader.py; o modelo pode ser trocado por DOCUMENT_OCR_MODEL.
 """
+import asyncio
+import logging
+import os
 import re
 import unicodedata
 from datetime import date, datetime
 from typing import Optional
 
+from fastapi import HTTPException
+
 from claude_reader import read_structured
+
+logger = logging.getLogger(__name__)
 
 _TEXT = {"type": "string"}
 
@@ -237,9 +246,11 @@ def _crlv_fields(data: dict, warnings: list) -> dict:
         if not re.fullmatch(r'[A-HJ-NPR-Z0-9]{17}', chassis):
             warnings.append(f"O chassi lido ({chassis}) está fora do padrão de 17 caracteres: confira no documento")
 
-    brand_model = re.sub(r'^(I|IMP)\s*/\s*', '', _clean(data.get("brand_model")).upper())
+    # I/ = importado; SR/ e R/ = semirreboque e reboque
+    brand_model = re.sub(r'^(I|IMP|SR|R)\s*/\s*', '', _clean(data.get("brand_model")).upper())
     if brand_model:
-        brand, _, model = brand_model.partition('/')
+        # Sem "/" (ex.: "RANDON SR CS 3E"), a marca é a primeira palavra
+        brand, _, model = brand_model.partition('/') if '/' in brand_model else brand_model.partition(' ')
         fields["brand"] = brand.strip() or None
         fields["model"] = model.replace('/', ' ').strip() or None
     fields["year"] = _year(data.get("manufacture_year"))
@@ -249,8 +260,9 @@ def _crlv_fields(data: dict, warnings: list) -> dict:
     fields["vehicle_type"], fields["category"] = _vehicle_type(data.get("species_type"))
     body = data.get("body_type")
     fields["body_type"] = None if _not_applicable(body) else _clean(body).upper()
-    power = data.get("power_displacement")
-    fields["engine_power"] = None if _not_applicable(power) else _clean(power).upper()
+    # "540CV/12800"; a cilindrada vem como "****" quando não informada
+    power = re.sub(r'/\s*\**$', '', _clean(data.get("power_displacement")))
+    fields["engine_power"] = None if _not_applicable(power) or re.fullmatch(r'0+\s*CV', power.upper()) else power.upper()
     gross = data.get("gross_weight")
     fields["gross_weight"] = None if _not_applicable(gross) else _clean(gross)
     capacity = data.get("load_capacity")
@@ -271,12 +283,91 @@ def _crlv_info(data: dict) -> dict:
     }
 
 
+# Rótulo do CRLV-e (sem acento e sem espaços) -> campo da leitura
+_CRLV_PDF_LABELS = {
+    "CODIGORENAVAM": "renavam", "PLACA": "plate", "EXERCICIO": "licensing_year",
+    "ANOFABRICACAO": "manufacture_year", "ANOMODELO": "model_year", "NUMERODOCRV": "crv_number",
+    "MARCA/MODELO/VERSAO": "brand_model", "ESPECIE/TIPO": "species_type", "CHASSI": "chassis",
+    "CORPREDOMINANTE": "color", "COMBUSTIVEL": "fuel", "CAPACIDADE": "load_capacity",
+    "POTENCIA/CILINDRADA": "power_displacement", "PESOBRUTOTOTAL": "gross_weight", "EIXOS": "axles",
+    "CARROCERIA": "body_type", "NOME": "owner_name", "CPF/CNPJ": "owner_document",
+}
+
+
+def _pdf_text_lines(content: bytes) -> list:
+    """(topo, esquerda, tamanho da fonte, texto) de cada linha de texto da
+    1ª página. Vazio quando o PDF não tem texto (só imagem) ou não abre."""
+    import io
+    from pdfminer.high_level import extract_pages
+    from pdfminer.layout import LAParams, LTChar, LTTextLine
+
+    lines = []
+
+    def walk(obj, height):
+        if isinstance(obj, LTTextLine):
+            text = obj.get_text().strip()
+            sizes = [c.size for c in obj if isinstance(c, LTChar)]
+            if text and sizes:
+                lines.append((height - obj.y1, obj.x0, max(sizes), text))
+        elif hasattr(obj, '__iter__'):
+            for child in obj:
+                walk(child, height)
+
+    try:
+        for page in extract_pages(io.BytesIO(content), maxpages=1,
+                                  laparams=LAParams(char_margin=1.0, line_margin=0.1, boxes_flow=None)):
+            walk(page, page.height)
+    except Exception as error:  # PDF corrompido, protegido etc. - segue para a leitura pelo Claude
+        logger.info("PDF sem texto legível: %s", error)
+        return []
+    return lines
+
+
+def crlv_from_pdf_text(content: bytes) -> Optional[dict]:
+    """Lê o CRLV-e pelo texto embutido: cada rótulo (fonte pequena) tem o
+    valor logo abaixo, na mesma coluna. None se o PDF não for um CRLV-e com
+    texto - aí a leitura vai para o Claude."""
+    lines = _pdf_text_lines(content)
+    if not any('LICENCIAMENTO DE VEICULO' in _plain(t) for _, _, _, t in lines):
+        return None
+    labels = [(top, left, _CRLV_PDF_LABELS.get(re.sub(r'\s', '', _plain(t)))) for top, left, size, t in lines if size < 7.5]
+    values = [(top, left, t) for top, left, size, t in lines if size >= 8.5]
+    data = {key: "" for key in _CRLV_FIELDS}
+    for top, left, key in labels:
+        if not key or data[key]:
+            continue
+        below = [(v_top - top, text) for v_top, v_left, text in values
+                 if abs(v_left - left) <= 4 and 0 < v_top - top <= 22]
+        if below:
+            text = min(below)[1]
+            # "*", "***", "*.*" = campo não se aplica / não informado
+            data[key] = '' if not re.sub(r'[*.\s]', '', text) else text
+    if not (data["plate"] or data["renavam"]):
+        return None
+    data["document_found"] = True
+    return data
+
+
+def _no_api_key_message(kind: str) -> str:
+    if kind == "crlv":
+        return ("Este arquivo precisa da leitura automática (ANTHROPIC_API_KEY não configurada no servidor). "
+                "Sem ela, só o CRLV-e em PDF baixado da Carteira Digital de Trânsito é lido. Preencha os campos.")
+    return (f"A leitura da {DOCUMENT_KINDS[kind]['label']} precisa da leitura automática "
+            "(ANTHROPIC_API_KEY não configurada no servidor). Preencha os campos.")
+
+
 async def read_document(kind: str, content: bytes, file_ext: str) -> dict:
     spec = DOCUMENT_KINDS[kind]
-    data = await read_structured(
-        content, file_ext, spec["prompt"], spec["schema"], model_env='DOCUMENT_OCR_MODEL',
-        feature="Leitura de documento", unreadable="Não foi possível ler o documento, preencha os campos",
-    )
+    data = None
+    if kind == "crlv" and file_ext == ".pdf":
+        data = await asyncio.to_thread(crlv_from_pdf_text, content)
+    if data is None:
+        if not os.environ.get('ANTHROPIC_API_KEY', '').strip():
+            raise HTTPException(status_code=503, detail=_no_api_key_message(kind))
+        data = await read_structured(
+            content, file_ext, spec["prompt"], spec["schema"], model_env='DOCUMENT_OCR_MODEL',
+            feature="Leitura de documento", unreadable="Não foi possível ler o documento, preencha os campos",
+        )
     warnings = []
     if kind == "crlv":
         fields, info = _crlv_fields(data, warnings), _crlv_info(data)
