@@ -1972,6 +1972,10 @@ class DailyRateRequestItem(BaseModel):
     daily_rate_quantity: float = 0
     daily_rate_value: float = 0
     total: float = 0  # Calculado no backend: others + commission + lunch + quantity * daily_rate_value
+    # Pagamento por motorista: gravado só pelo backend (None = solicitação
+    # anterior a isso, vale o status dela)
+    paid: Optional[bool] = None
+    paid_at: Optional[str] = None
 
 class DailyRateRequest(BaseModel):
     """Solicitação de diária completa"""
@@ -1992,6 +1996,10 @@ class DailyRateRequest(BaseModel):
 class DailyRateRequestCreate(BaseModel):
     items: List[DailyRateRequestItem]
     observations: Optional[str] = None
+
+class DailyRatePaidItemsUpdate(BaseModel):
+    indexes: List[int]  # posições dos itens na solicitação
+    paid: bool
 
 class DailyRateRequestResponse(BaseModel):
     id: str

@@ -490,6 +490,8 @@ export const api = {
   updateDailyRateRequest: (id, data) => axios.put(`${API}/daily-rate-requests/${id}`, data),
   deleteDailyRateRequest: (id) => axios.delete(`${API}/daily-rate-requests/${id}`),
   updateDailyRateRequestStatus: (id, status) => axios.put(`${API}/daily-rate-requests/${id}/update-status?new_status=${status}`),
+  // Marca como pagos (ou não) os itens/motoristas da solicitação, pela posição
+  setDailyRatePaidItems: (id, indexes, paid) => axios.put(`${API}/daily-rate-requests/${id}/paid-items`, { indexes, paid }),
   getDailyRateRequestPDF: (id) => axios.get(`${API}/daily-rate-requests/${id}/pdf`, { responseType: 'blob' }),
 
   // Financeiro - Controle de Cheque

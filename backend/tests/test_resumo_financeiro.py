@@ -30,8 +30,9 @@ def _seed(api):
             {"id": "f1", "status": "PAGO", "freight_value": 900, "paid_at": "2026-10-20T15:00:00+00:00"},
             {"id": "f2", "status": "PENDENTE", "freight_value": 250})
     _insert(api, "daily_rate_requests",
-            {"id": "d1", "status": "PAGO", "total_value": 200, "updated_at": "2026-10-03T15:00:00+00:00"},  # sem paid_at: usa updated_at
-            {"id": "d2", "status": "PENDENTE", "total_value": 80})
+            {"id": "d1", "status": "PAGO", "total_value": 200, "updated_at": "2026-10-03T15:00:00+00:00",  # sem paid_at: usa updated_at
+             "items": [{"driver_name": "A", "total": 150}, {"driver_name": "B", "total": 50}]},  # sem pagamento por item: vale o status
+            {"id": "d2", "status": "PENDENTE", "total_value": 80, "items": [{"driver_name": "C", "total": 80}]})
     _insert(api, "expense_reports", {"id": "e1", "deposits": [{"amount": 500, "date": "2026-10-01", "sent_by": "Fin"}], "purchases": []})
     _insert(api, "container_purchases", {"id": "p1", "container_number": "X", "purchase_value": 5000, "entry_date": "2026-10-02T12:00:00+00:00"})
 

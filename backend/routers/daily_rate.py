@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
-from models import DailyRateRequestItem, DailyRateRequestCreate, DailyRateRequestResponse
+from models import DailyRateRequestItem, DailyRateRequestCreate, DailyRateRequestResponse, DailyRatePaidItemsUpdate
 from reports import merge_company
 
 from shared import db, get_current_admin_user, get_company_settings, parse_datetime_value, load_logo_buffer
@@ -46,9 +46,45 @@ def _build_daily_rate_items(data: DailyRateRequestCreate):
             if (getattr(item, field) or 0) < 0:
                 raise HTTPException(status_code=400, detail=f"Item {idx}: {label} não pode ser negativo")
         item.total = calculate_daily_rate_item_total(item)
+        item.paid, item.paid_at = False, None
         total_value += item.total
         items_data.append(item.model_dump())
     return items_data, round(total_value, 2)
+
+
+def item_is_paid(request: dict, item: dict) -> bool:
+    """Item (motorista) pago. Solicitação de antes do pagamento por item: vale
+    o status dela."""
+    if item.get("paid") is not None:
+        return bool(item["paid"])
+    return request.get("status") == "PAGO"
+
+
+def item_paid_at(request: dict, item: dict) -> Optional[str]:
+    if item.get("paid") is not None:
+        return item.get("paid_at") if item["paid"] else None
+    if request.get("status") == "PAGO":
+        return request.get("paid_at") or request.get("updated_at")
+    return None
+
+
+def _set_items_paid(request: dict, paid_by_index: dict, now: str) -> dict:
+    """Grava o pagamento dos itens (índice -> pago) e devolve o $set com o
+    status da solicitação: Pago quando todos os itens estão pagos. Item que já
+    estava pago mantém a data."""
+    items = request.get("items") or []
+    for index, item in enumerate(items):
+        was_paid, was_at = item_is_paid(request, item), item_paid_at(request, item)
+        paid = paid_by_index.get(index, was_paid)
+        item["paid"] = paid
+        item["paid_at"] = ((was_at if was_paid else None) or now) if paid else None
+    all_paid = bool(items) and all(item["paid"] for item in items)
+    update = {"items": items, "status": "PAGO" if all_paid else "PENDENTE", "updated_at": now}
+    if not all_paid:
+        update["paid_at"] = None
+    elif request.get("status") != "PAGO" or not request.get("paid_at"):
+        update["paid_at"] = max(item["paid_at"] for item in items)
+    return update
 
 
 @api_router.get("/daily-rate-requests")
@@ -142,6 +178,8 @@ async def update_daily_rate_request(request_id: str, data: DailyRateRequestCreat
     # Paga ou cancelada não muda mais de valor (volte para Pendente antes)
     if daily_request.get('status', 'PENDENTE') != 'PENDENTE':
         raise HTTPException(status_code=400, detail="Só é possível editar solicitação pendente. Volte o status para Pendente antes de editar.")
+    if any(item_is_paid(daily_request, item) for item in daily_request.get("items") or []):
+        raise HTTPException(status_code=400, detail="Esta solicitação tem motorista já pago. Desmarque o pagamento antes de editar.")
 
     items_data, total_value = _build_daily_rate_items(data)
 
@@ -174,20 +212,41 @@ async def update_daily_rate_request_status(request_id: str, new_status: str, cur
     if new_status not in ["PENDENTE", "PAGO", "CANCELADO"]:
         raise HTTPException(status_code=400, detail="Status inválido")
 
-    daily_request = await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0, "status": 1, "paid_at": 1})
+    daily_request = await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0})
     if not daily_request:
         raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
 
     now = datetime.now(timezone.utc).isoformat()
-    update = {"status": new_status, "updated_at": now}
-    # Quando foi paga (Resumo Financeiro); repetir "Pago" não muda a data
-    if new_status != "PAGO":
-        update["paid_at"] = None
-    elif daily_request.get("status") != "PAGO" or not daily_request.get("paid_at"):
-        update["paid_at"] = now
+    items = daily_request.get("items") or []
+    if new_status == "CANCELADO":
+        update = {"status": new_status, "paid_at": None, "updated_at": now}
+    elif items:
+        # Pago/Pendente vale para todos os motoristas da solicitação
+        update = _set_items_paid(daily_request, {i: new_status == "PAGO" for i in range(len(items))}, now)
+    else:
+        update = {"status": new_status, "updated_at": now,
+                  "paid_at": (daily_request.get("paid_at") or now) if new_status == "PAGO" else None}
     await db.daily_rate_requests.update_one({"id": request_id}, {"$set": update})
 
     return {"message": "Status atualizado"}
+
+
+@api_router.put("/daily-rate-requests/{request_id}/paid-items", response_model=DailyRateRequestResponse)
+async def update_daily_rate_paid_items(request_id: str, data: DailyRatePaidItemsUpdate, current_user: dict = Depends(get_current_admin_user)):
+    """Marca como pagos (ou não) os itens - um por motorista/viagem - da
+    solicitação. Com todos pagos ela fica Paga; senão, Pendente."""
+    daily_request = await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0})
+    if not daily_request:
+        raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
+    if daily_request.get("status") == "CANCELADO":
+        raise HTTPException(status_code=400, detail="Solicitação cancelada não tem pagamento")
+    items = daily_request.get("items") or []
+    if not data.indexes or any(i < 0 or i >= len(items) for i in data.indexes):
+        raise HTTPException(status_code=400, detail="Item inválido")
+
+    update = _set_items_paid(daily_request, {i: data.paid for i in data.indexes}, datetime.now(timezone.utc).isoformat())
+    await db.daily_rate_requests.update_one({"id": request_id}, {"$set": update})
+    return await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0})
 
 
 @api_router.get("/daily-rate-requests/{request_id}/pdf")

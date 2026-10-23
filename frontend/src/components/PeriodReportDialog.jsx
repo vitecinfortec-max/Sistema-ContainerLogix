@@ -37,16 +37,18 @@ async function saveBlob(request, params, filename) {
  * - `statuses`: [{ value, label }] - o primeiro é o padrão ('' = sem filtro);
  *   vai no parâmetro `statusParam`, com o rótulo `statusLabel`
  * - `textFilters`: [{ key, label }]; `checkboxes`: [{ key, label }]
+ * - `selects`: [{ key, label, options: [{ value, label }] }] - o primeiro valor é o padrão
  * - `load(params)`: busca a prévia; `summarize(data)`: [[rótulo, valor], ...]
  */
 export default function PeriodReportDialog({
-  open, onOpenChange, title, description, periodLabel = 'Período', statuses = [], textFilters = [], checkboxes = [],
+  open, onOpenChange, title, description, periodLabel = 'Período', statuses = [], textFilters = [], checkboxes = [], selects = [],
   load, summarize, downloadPdf, downloadExcel, filename, statusParam = 'status', statusLabel = 'Situação',
 }) {
   const [[dateFrom, dateTo], setPeriod] = useState(currentMonth);
   const [status, setStatus] = useState(statuses[0]?.value ?? '');
   const [texts, setTexts] = useState({});
   const [flags, setFlags] = useState({});
+  const [choices, setChoices] = useState(() => Object.fromEntries(selects.map((s) => [s.key, s.options[0].value])));
   const [summary, setSummary] = useState(null);
   const [busy, setBusy] = useState('');
   const debouncedTexts = useDebouncedValue(texts);
@@ -58,6 +60,7 @@ export default function PeriodReportDialog({
     if (status) p[statusParam] = status;
     Object.entries(debouncedTexts).forEach(([k, v]) => { if (v && v.trim()) p[k] = v.trim(); });
     Object.entries(flags).forEach(([k, v]) => { if (v) p[k] = true; });
+    Object.entries(choices).forEach(([k, v]) => { if (v) p[k] = v; });
     return p;
   };
 
@@ -70,7 +73,7 @@ export default function PeriodReportDialog({
       .catch((error) => { if (!cancelled) toast.error(error.response?.data?.detail || 'Erro ao carregar o relatório'); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, dateFrom, dateTo, status, debouncedTexts, flags]);
+  }, [open, dateFrom, dateTo, status, debouncedTexts, flags, choices]);
 
   const download = async (kind) => {
     setBusy(kind);
@@ -109,6 +112,16 @@ export default function PeriodReportDialog({
               </Select>
             </Field>
           )}
+          {selects.map((sel) => (
+            <Field key={sel.key} label={sel.label}>
+              <Select value={choices[sel.key]} onValueChange={(v) => setChoices((prev) => ({ ...prev, [sel.key]: v }))}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {sel.options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          ))}
           {textFilters.map((f) => (
             <Field key={f.key} label={f.label}>
               <Input className="h-9" value={texts[f.key] || ''} onChange={(e) => setTexts((prev) => ({ ...prev, [f.key]: e.target.value }))} />

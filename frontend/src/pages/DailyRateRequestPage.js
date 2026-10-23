@@ -26,6 +26,25 @@ import { FileBarChart } from 'lucide-react';
 
 const brl = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// Motorista (item) pago. Solicitação de antes do pagamento por item: vale o
+// status dela (mesma regra do backend).
+function isItemPaid(request, item) {
+  if (item.paid !== null && item.paid !== undefined) return !!item.paid;
+  return request.status === 'PAGO';
+}
+
+function itemPaidAt(request, item) {
+  if (item.paid !== null && item.paid !== undefined) return item.paid ? item.paid_at : null;
+  return request.status === 'PAGO' ? (request.paid_at || request.updated_at) : null;
+}
+
+function paidSummary(request) {
+  const items = request.items || [];
+  const paidItems = items.filter((item) => isItemPaid(request, item));
+  const paidValue = paidItems.reduce((sum, item) => sum + (item.total || 0), 0);
+  return { paidCount: paidItems.length, count: items.length, paidValue, openValue: (request.total_value || 0) - paidValue };
+}
+
 function calculateItemTotal(item) {
   const others = parseFloat(item.others_value) || 0;
   const commission = parseFloat(item.commission_value) || 0;
@@ -60,6 +79,7 @@ export default function DailyRateRequestPage() {
 
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [payingItem, setPayingItem] = useState(false);
 
   // Estado de Seleção (toolbar)
   const [selectedIds, setSelectedIds] = useState(() => new Set());
@@ -307,7 +327,10 @@ export default function DailyRateRequestPage() {
     : null;
   const selectedRequests = requests.filter((r) => selectedIds.has(r.id));
   const canMarkPaid = selectedRequests.length > 0 && selectedRequests.every((r) => r.status === 'PENDENTE');
-  const canMarkPending = selectedRequests.length > 0 && selectedRequests.every((r) => r.status === 'PAGO');
+  const canMarkPending = selectedRequests.length > 0 && selectedRequests.every((r) => r.status === 'PAGO' || paidSummary(r).paidCount > 0);
+  // Com motorista já pago não edita (o valor pago não pode mudar)
+  const canEdit = !!singleSelectedRequest && (singleSelectedRequest.status || 'PENDENTE') === 'PENDENTE'
+    && paidSummary(singleSelectedRequest).paidCount === 0;
 
   const handlePrintPDF = async (id) => {
     try {
@@ -330,7 +353,30 @@ export default function DailyRateRequestPage() {
     setDetailModalOpen(true);
   };
 
-  const getStatusBadge = (status) => {
+  // Marca/desmarca o pagamento de um motorista; com todos pagos a
+  // solicitação fica Paga
+  const toggleItemPaid = async (index, paid) => {
+    if (!selectedRequest || payingItem) return;
+    setPayingItem(true);
+    try {
+      const { data } = await api.setDailyRatePaidItems(selectedRequest.id, [index], paid);
+      setSelectedRequest(data);
+      const name = data.items[index]?.driver_name;
+      toast.success(paid ? `${name}: marcado como pago` : `${name}: voltou para pendente`);
+      loadRequests();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar o pagamento');
+    } finally {
+      setPayingItem(false);
+    }
+  };
+
+  const getStatusBadge = (request) => {
+    const { status } = request;
+    const { paidCount, count } = paidSummary(request);
+    if (status === 'PENDENTE' && paidCount > 0) {
+      return <StatusPill tone="blue" title="Motoristas pagos / total">Pago {paidCount} de {count}</StatusPill>;
+    }
     const tones = { PENDENTE: 'amber', PAGO: 'emerald', CANCELADO: 'red' };
     const labels = { PENDENTE: 'Pendente', PAGO: 'Pago', CANCELADO: 'Cancelado' };
     return <StatusPill tone={tones[status] || 'amber'}>{labels[status] || status}</StatusPill>;
@@ -386,7 +432,7 @@ export default function DailyRateRequestPage() {
               primary={<ToolbarPrimary icon={Plus} label="Nova solicitação" onClick={openNewModal} testId="new-daily-rate-btn" />}
             >
               <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedRequest && openDetails(singleSelectedRequest)} disabled={!singleSelectedRequest} />
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedRequest && openEditModal(singleSelectedRequest)} disabled={!singleSelectedRequest || (singleSelectedRequest.status || 'PENDENTE') !== 'PENDENTE'} />
+              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedRequest && openEditModal(singleSelectedRequest)} disabled={!canEdit} />
               <ToolbarDivider />
               <ToolbarButton icon={CheckCircle2} label="Marcar como pago" tone="emerald" onClick={() => markSelectedAs('PAGO')} disabled={!canMarkPaid || updatingStatus} testId="daily-rate-mark-paid" />
               <ToolbarButton icon={RotateCcw} label="Marcar como pendente" tone="amber" onClick={() => markSelectedAs('PENDENTE')} disabled={!canMarkPending || updatingStatus} testId="daily-rate-mark-pending" />
@@ -427,6 +473,7 @@ export default function DailyRateRequestPage() {
                     <th>Nº</th>
                     <th className="!text-right">Itens</th>
                     <th className="!text-right">Total</th>
+                    <th className="!text-right">A pagar</th>
                     <th>Status</th>
                     <th>Criado em</th>
                   </tr>
@@ -448,7 +495,10 @@ export default function DailyRateRequestPage() {
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{request.request_number}</td>
                       <td className="text-right tabular-nums">{request.items?.length || 0}</td>
                       <td className="text-right whitespace-nowrap tabular-nums cell-strong">{formatMoney(request.total_value)}</td>
-                      <td>{getStatusBadge(request.status)}</td>
+                      <td className="text-right whitespace-nowrap tabular-nums">
+                        {request.status === 'CANCELADO' ? '-' : formatMoney(paidSummary(request).openValue)}
+                      </td>
+                      <td>{getStatusBadge(request)}</td>
                       <td className="whitespace-nowrap tabular-nums">
                         {request.created_at && format(new Date(request.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                       </td>
@@ -586,7 +636,7 @@ export default function DailyRateRequestPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Solicitação #{selectedRequest?.request_number}
-              {selectedRequest && getStatusBadge(selectedRequest.status)}
+              {selectedRequest && getStatusBadge(selectedRequest)}
             </DialogTitle>
           </DialogHeader>
 
@@ -609,6 +659,7 @@ export default function DailyRateRequestPage() {
                         <th className="!text-right">Qtd.</th>
                         <th className="!text-right">Diária</th>
                         <th className="!text-right">Total</th>
+                        <th className="!text-center">Pago</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -625,14 +676,39 @@ export default function DailyRateRequestPage() {
                           <td className="text-right">{item.daily_rate_quantity}</td>
                           <td className="text-right">{formatMoney(item.daily_rate_value)}</td>
                           <td className="text-right font-semibold">{formatMoney(item.total)}</td>
+                          <td className="text-center whitespace-nowrap">
+                            <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                              <Checkbox
+                                checked={isItemPaid(selectedRequest, item)}
+                                disabled={payingItem || selectedRequest.status === 'CANCELADO'}
+                                onCheckedChange={(v) => toggleItemPaid(idx, !!v)}
+                                aria-label={`Pago - ${item.driver_name}`}
+                                data-testid={`daily-rate-item-paid-${idx}`}
+                              />
+                              {itemPaidAt(selectedRequest, item) && (
+                                <span className="text-xs text-muted-foreground tabular-nums">
+                                  {format(new Date(itemPaidAt(selectedRequest, item)), 'dd/MM/yyyy')}
+                                </span>
+                              )}
+                            </label>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-                <div className="text-right font-bold mt-2">
-                  Total Geral: {formatMoney(selectedRequest.total_value)}
+                <div className="flex flex-wrap justify-end gap-x-6 gap-y-1 mt-2 text-sm">
+                  {selectedRequest.status !== 'CANCELADO' && (
+                    <>
+                      <span>Pago: <strong className="tabular-nums text-emerald-700 dark:text-emerald-400">{formatMoney(paidSummary(selectedRequest).paidValue)}</strong></span>
+                      <span>A pagar: <strong className="tabular-nums text-amber-700 dark:text-amber-400">{formatMoney(paidSummary(selectedRequest).openValue)}</strong></span>
+                    </>
+                  )}
+                  <span className="font-bold">Total Geral: {formatMoney(selectedRequest.total_value)}</span>
                 </div>
+                {selectedRequest.status !== 'CANCELADO' && (
+                  <p className="text-xs text-muted-foreground mt-1">Marque "Pago" em cada motorista conforme for pagando. Com todos pagos, a solicitação fica Paga.</p>
+                )}
               </div>
 
               {selectedRequest.observations && (
@@ -656,14 +732,18 @@ export default function DailyRateRequestPage() {
         open={reportOpen}
         onOpenChange={setReportOpen}
         title="Relatório de Diárias"
-        description="Diárias, comissões e almoços pela data de saída, por motorista e item a item."
-        periodLabel="Saída"
+        description="Diárias, comissões e almoços por motorista e item a item: o que já foi pago e o que está pendente."
+        selects={[{
+          key: 'period_by',
+          label: 'Período pela data de',
+          options: [{ value: 'departure', label: 'Saída' }, { value: 'payment', label: 'Pagamento (só as pagas)' }],
+        }]}
         statuses={[{ value: '', label: 'Pendentes e pagas' }, { value: 'PENDENTE', label: 'Pendentes' }, { value: 'PAGO', label: 'Pagas' }, { value: 'CANCELADO', label: 'Canceladas' }]}
         textFilters={[{ key: 'driver', label: 'Motorista' }, { key: 'client', label: 'Cliente' }]}
         load={api.getDailyRatesReport}
         summarize={(d) => [
           ['Viagens', d.summary.count], ['Motoristas', d.drivers.length],
-          ['Total', brl(d.summary.total)], ['A pagar', brl(d.summary.pending)],
+          ['Total', brl(d.summary.total)], ['Pago', brl(d.summary.paid)], ['A pagar', brl(d.summary.pending)],
         ]}
         downloadPdf={api.downloadDailyRatesReportPdf}
         downloadExcel={api.downloadDailyRatesReportExcel}

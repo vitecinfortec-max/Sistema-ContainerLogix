@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 
 from period_reports import Column, Section, MONEY, DAY, INT, pdf_response, excel_response, period_text
 from routers.movements import _parse_filter_day
+from routers.daily_rate import item_is_paid, item_paid_at
 from shared import db, get_current_admin_user
 
 api_router = APIRouter(prefix="/api")
@@ -34,10 +35,13 @@ def _r(value) -> float:
 # ---------------------------------------------------------------- Diárias
 
 DAILY_STATUS_LABELS = {"PENDENTE": "Pendente", "PAGO": "Pago", "CANCELADO": "Cancelado"}
+DAILY_PERIOD_LABELS = {"departure": "Saída", "payment": "Pagamento"}
 
 
-async def build_daily_rates(date_from=None, date_to=None, status=None, driver=None, client=None) -> dict:
-    query = {"status": status} if status else {"status": {"$ne": "CANCELADO"}}
+async def build_daily_rates(date_from=None, date_to=None, status=None, driver=None, client=None, period_by="departure") -> dict:
+    """Situação item a item (cada motorista é pago à parte). Período pela data
+    de saída ou pela do pagamento (aí só entra o que foi pago)."""
+    query = {"status": "CANCELADO"} if status == "CANCELADO" else {"status": {"$ne": "CANCELADO"}}
     requests = await db.daily_rate_requests.find(query, {"_id": 0}).sort("request_number", 1).to_list(None)
     driver_re = re.compile(re.escape(driver.strip()), re.I) if driver else None
     client_re = re.compile(re.escape(client.strip()), re.I) if client else None
@@ -46,7 +50,15 @@ async def build_daily_rates(date_from=None, date_to=None, status=None, driver=No
     totals = {"others": 0.0, "commission": 0.0, "lunch": 0.0, "daily": 0.0, "total": 0.0, "days": 0.0}
     for req in requests:
         for item in req.get("items") or []:
-            if not _in_period(item.get("departure_date"), date_from, date_to):
+            paid = item_is_paid(req, item)
+            row_status = "CANCELADO" if req.get("status") == "CANCELADO" else ("PAGO" if paid else "PENDENTE")
+            if status and row_status != status:
+                continue
+            paid_day = (item_paid_at(req, item) or "")[:10] or None
+            period_day = paid_day if period_by == "payment" else item.get("departure_date")
+            if period_by == "payment" and not paid_day:
+                continue
+            if not _in_period(period_day, date_from, date_to):
                 continue
             if driver_re and not driver_re.search(item.get("driver_name") or ""):
                 continue
@@ -55,7 +67,8 @@ async def build_daily_rates(date_from=None, date_to=None, status=None, driver=No
             daily = (item.get("daily_rate_quantity") or 0) * (item.get("daily_rate_value") or 0)
             row = {
                 "request_number": req["request_number"],
-                "status": req.get("status") or "PENDENTE",
+                "status": row_status,
+                "paid_at": paid_day,
                 "driver_name": item.get("driver_name"),
                 "vehicle_plate": item.get("vehicle_plate"),
                 "client_name": item.get("client_name"),
@@ -70,16 +83,18 @@ async def build_daily_rates(date_from=None, date_to=None, status=None, driver=No
             items.append(row)
             d = drivers.setdefault(row["driver_name"], {"driver_name": row["driver_name"], "trips": 0, "days": 0.0,
                                                         "daily": 0.0, "commission": 0.0, "lunch": 0.0, "others": 0.0,
-                                                        "total": 0.0, "pending": 0.0})
+                                                        "total": 0.0, "paid": 0.0, "pending": 0.0})
             d["trips"] += 1
             for key in ("days", "daily", "commission", "lunch", "others", "total"):
                 d[key] += row[key]
                 totals[key] += row[key]
             if row["status"] == "PENDENTE":
                 d["pending"] += row["total"]
+            elif row["status"] == "PAGO":
+                d["paid"] += row["total"]
     items.sort(key=lambda r: (r["departure_date"] or "", r["request_number"]))
     for d in drivers.values():
-        for key in ("daily", "commission", "lunch", "others", "total", "pending"):
+        for key in ("daily", "commission", "lunch", "others", "total", "paid", "pending"):
             d[key] = _r(d[key])
     pending = _r(sum(r["total"] for r in items if r["status"] == "PENDENTE"))
     return {
@@ -96,32 +111,33 @@ def _daily_sections(data):
         "Por motorista",
         [Column("Motorista", width=30), Column("Viagens", INT, 8), Column("Qtd. diárias", INT, 9),
          Column("Diárias", MONEY, 12), Column("Comissão", MONEY, 12), Column("Almoço", MONEY, 11),
-         Column("Outros", MONEY, 11), Column("Total", MONEY, 13), Column("A pagar", MONEY, 13)],
-        [[d["driver_name"], d["trips"], d["days"], d["daily"], d["commission"], d["lunch"], d["others"], d["total"], d["pending"]]
+         Column("Outros", MONEY, 11), Column("Total", MONEY, 13), Column("Pago", MONEY, 13), Column("A pagar", MONEY, 13)],
+        [[d["driver_name"], d["trips"], d["days"], d["daily"], d["commission"], d["lunch"], d["others"], d["total"], d["paid"], d["pending"]]
          for d in data["drivers"]],
-        total=["TOTAL", s["count"], s["days"], s["daily"], s["commission"], s["lunch"], s["others"], s["total"], s["pending"]],
+        total=["TOTAL", s["count"], s["days"], s["daily"], s["commission"], s["lunch"], s["others"], s["total"], s["paid"], s["pending"]],
         empty_text="Nenhuma diária no período.", sheet_name="Por motorista",
     )
     detail = Section(
         "Itens",
         [Column("Nº", INT, 6), Column("Saída", DAY, 9), Column("Motorista", width=22), Column("Placa", width=9, align="center"),
-         Column("Cliente", width=22), Column("Status", width=9, align="center"), Column("Qtd.", INT, 6),
+         Column("Cliente", width=20), Column("Status", width=9, align="center"), Column("Pago em", DAY, 9), Column("Qtd.", INT, 6),
          Column("Diárias", MONEY, 11), Column("Comissão", MONEY, 11), Column("Almoço", MONEY, 10),
          Column("Outros", MONEY, 10), Column("Total", MONEY, 12)],
         [[r["request_number"], r["departure_date"], r["driver_name"], r["vehicle_plate"], r["client_name"],
-          DAILY_STATUS_LABELS.get(r["status"], r["status"]), r["days"], r["daily"], r["commission"], r["lunch"], r["others"], r["total"]]
+          DAILY_STATUS_LABELS.get(r["status"], r["status"]), r["paid_at"], r["days"], r["daily"], r["commission"], r["lunch"], r["others"], r["total"]]
          for r in data["items"]],
-        total=["TOTAL", None, None, None, None, None, s["days"], s["daily"], s["commission"], s["lunch"], s["others"], s["total"]],
+        total=["TOTAL", None, None, None, None, None, None, s["days"], s["daily"], s["commission"], s["lunch"], s["others"], s["total"]],
         empty_text="Nenhuma diária no período.", sheet_name="Itens",
     )
     return [by_driver, detail]
 
 
 DAILY_STATUS_PATTERN = "^(PENDENTE|PAGO|CANCELADO)$"
+DAILY_PERIOD_PATTERN = "^(departure|payment)$"
 
 
-def _daily_subtitle(date_from, date_to, status):
-    parts = [period_text("Saída", date_from, date_to), DAILY_STATUS_LABELS.get(status, "Pendentes e pagas") if status else "Pendentes e pagas"]
+def _daily_subtitle(date_from, date_to, status, period_by="departure"):
+    parts = [period_text(DAILY_PERIOD_LABELS[period_by], date_from, date_to), DAILY_STATUS_LABELS.get(status, "Pendentes e pagas") if status else "Pendentes e pagas"]
     return " · ".join(p for p in parts if p)
 
 
@@ -130,10 +146,11 @@ async def get_daily_rates_report(
     date_from: Optional[str] = None, date_to: Optional[str] = None,
     status: Optional[str] = Query(None, pattern=DAILY_STATUS_PATTERN),
     driver: Optional[str] = None, client: Optional[str] = None,
+    period_by: str = Query("departure", pattern=DAILY_PERIOD_PATTERN),
     current_user: dict = Depends(get_current_admin_user),
 ):
-    """Diárias do período (pela data de saída), por motorista e item a item"""
-    return await build_daily_rates(date_from, date_to, status, driver, client)
+    """Diárias do período (pela data de saída ou do pagamento), por motorista e item a item"""
+    return await build_daily_rates(date_from, date_to, status, driver, client, period_by)
 
 
 @api_router.get("/reports/daily-rates/pdf")
@@ -141,15 +158,16 @@ async def get_daily_rates_report_pdf(
     date_from: Optional[str] = None, date_to: Optional[str] = None,
     status: Optional[str] = Query(None, pattern=DAILY_STATUS_PATTERN),
     driver: Optional[str] = None, client: Optional[str] = None,
+    period_by: str = Query("departure", pattern=DAILY_PERIOD_PATTERN),
     current_user: dict = Depends(get_current_admin_user),
 ):
-    data = await build_daily_rates(date_from, date_to, status, driver, client)
+    data = await build_daily_rates(date_from, date_to, status, driver, client, period_by)
     s = data["summary"]
     from reports import format_currency
     info = [("Viagens", str(s["count"])), ("Total", format_currency(s["total"], "BRL")),
             ("Pago", format_currency(s["paid"], "BRL")), ("A pagar", format_currency(s["pending"], "BRL")),
             ("Motoristas", str(len(data["drivers"]))), ("Qtd. diárias", f"{s['days']:g}")]
-    return await pdf_response("Relatório de Diárias", _daily_subtitle(date_from, date_to, status), info,
+    return await pdf_response("Relatório de Diárias", _daily_subtitle(date_from, date_to, status, period_by), info,
                               _daily_sections(data), "relatorio_diarias", current_user.get("name", "Sistema"))
 
 
@@ -158,10 +176,11 @@ async def get_daily_rates_report_excel(
     date_from: Optional[str] = None, date_to: Optional[str] = None,
     status: Optional[str] = Query(None, pattern=DAILY_STATUS_PATTERN),
     driver: Optional[str] = None, client: Optional[str] = None,
+    period_by: str = Query("departure", pattern=DAILY_PERIOD_PATTERN),
     current_user: dict = Depends(get_current_admin_user),
 ):
-    data = await build_daily_rates(date_from, date_to, status, driver, client)
-    return await excel_response("Relatório de Diárias", _daily_subtitle(date_from, date_to, status), _daily_sections(data), "relatorio_diarias")
+    data = await build_daily_rates(date_from, date_to, status, driver, client, period_by)
+    return await excel_response("Relatório de Diárias", _daily_subtitle(date_from, date_to, status, period_by), _daily_sections(data), "relatorio_diarias")
 
 
 # ---------------------------------------------------------- Prestação de Contas

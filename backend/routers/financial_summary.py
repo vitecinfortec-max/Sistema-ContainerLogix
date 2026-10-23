@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from period_reports import Column, Section, MONEY, INT, TEXT, pdf_response, excel_response, period_text
 from reports import BRT_TZ, format_currency
 from routers.financial_reports import _in_period, _r
+from routers.daily_rate import item_is_paid, item_paid_at
 from shared import db, get_current_admin_user, get_disabled_modules, is_module_disabled, parse_datetime_value
 
 api_router = APIRouter(prefix="/api")
@@ -50,8 +51,7 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
     checks_open = await find("checks", {"status": "EMITIDO"}, "financeiro.controle_cheque")
     freight_paid = await find("freight_payments", {"status": "PAGO"}, "financeiro.pagamento_frete")
     freight_open = await find("freight_payments", {"status": "PENDENTE"}, "financeiro.pagamento_frete")
-    daily_paid = await find("daily_rate_requests", {"status": "PAGO"}, "financeiro.diaria")
-    daily_open = await find("daily_rate_requests", {"status": "PENDENTE"}, "financeiro.diaria")
+    daily_requests = await find("daily_rate_requests", {"status": {"$in": ["PAGO", "PENDENTE"]}}, "financeiro.diaria")
     expense_reports = await find("expense_reports", {}, "financeiro.prestacao_contas")
     purchases = await find("container_purchases", {}, "gestao_container.compra")
     credit_entries = await find("client_credit_entries", {}, "financeiro.credito_cliente")
@@ -64,6 +64,15 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
         net = lambda e: (e.get("amount") or 0) - (e.get("reversed_amount") or 0)
         credit_in = [e for e in credit_entries if e["entry_type"] == "CREDITO"]
         credit_out = [e for e in credit_entries if e["entry_type"] == "DEVOLUCAO"]
+
+    # Diárias: cada motorista (item) é pago à parte
+    daily_paid = daily_open = None
+    if daily_requests is not None:
+        daily_paid, daily_open = [], []
+        for req in daily_requests:
+            for item in req.get("items") or []:
+                paid = item_is_paid(req, item)
+                (daily_paid if paid else daily_open).append({"total": item.get("total"), "paid_at": item_paid_at(req, item)})
 
     deposits = None
     if expense_reports is not None:
@@ -86,8 +95,7 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
         _line("checks", "Cheques compensados", "financeiro.controle_cheque", checks_comp, lambda d: d.get("amount"), lambda d: d.get("compensation_date"),
               note="o cheque pode ter sido o meio de pagamento de outra saída desta lista"),
         _line("freight", "Pagamento de frete", "financeiro.pagamento_frete", freight_paid, lambda d: d.get("freight_value"), lambda d: _day(d.get("paid_at"))),
-        _line("daily", "Diárias pagas", "financeiro.diaria", daily_paid, lambda d: d.get("total_value"),
-              lambda d: _day(d.get("paid_at") or d.get("updated_at"))),
+        _line("daily", "Diárias pagas", "financeiro.diaria", daily_paid, lambda d: d.get("total"), lambda d: _day(d.get("paid_at"))),
         _line("expense_deposits", "Depósitos para Prestação de Contas", "financeiro.prestacao_contas", deposits, lambda d: d.get("amount"), lambda d: d.get("date")),
         _line("container_purchases", "Compras de container", "gestao_container.compra", purchases, lambda d: d.get("purchase_value"),
               lambda d: _day(d.get("entry_date") or d.get("created_at"))),
@@ -104,7 +112,7 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
     payable = [
         _line("checks_open", "Cheques emitidos a compensar", "financeiro.controle_cheque", checks_open, lambda d: d.get("amount")),
         _line("freight_open", "Fretes a pagar", "financeiro.pagamento_frete", freight_open, lambda d: d.get("freight_value")),
-        _line("daily_open", "Diárias a pagar", "financeiro.diaria", daily_open, lambda d: d.get("total_value")),
+        _line("daily_open", "Diárias a pagar", "financeiro.diaria", daily_open, lambda d: d.get("total")),
         _line("client_credit_balance", "Saldo de crédito de clientes", "financeiro.credito_cliente", credit_accounts,
               lambda d: (d.get("balance_cents") or 0) / 100, note="já recebido; será abatido em faturas ou devolvido"),
     ]
