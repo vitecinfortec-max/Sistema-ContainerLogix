@@ -99,7 +99,7 @@ const TYPES = [
     plural: 'Motoristas',
     icon: Truck,
     moduleKey: 'cadastro.pessoas',
-    documentKinds: ['cnh', 'rg'],
+    documentKinds: ['rg'],
     api: { list: api.getDrivers, create: api.createDriver, update: api.updateDriver, remove: api.deleteDriver },
     listColumns: [['name', 'Nome'], ['cpf', 'CPF'], ['phone', 'Telefone'], ['cnh_expiry', 'Validade CNH'], ['status', 'Status']],
     fields: [
