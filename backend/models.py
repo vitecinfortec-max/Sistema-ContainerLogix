@@ -4039,10 +4039,17 @@ class ExpenseReport(BaseModel):
     total_purchases: float = 0
     balance: float = 0  # total_purchases - total_deposits
     status: str = "EM_ANDAMENTO"  # EM_ANDAMENTO, CONCLUIDA
+    # Acerto do saldo (ressarcimento pago ao funcionário ou devolução recebida)
+    settled_at: Optional[str] = None  # YYYY-MM-DD
+    settled_by_name: Optional[str] = None
     created_by: str
     created_by_name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
+
+class ExpenseReportSettlement(BaseModel):
+    settled: bool
+    date: Optional[str] = None  # YYYY-MM-DD; vazio = hoje
 
 class ExpenseReportCreate(BaseModel):
     period_start: str

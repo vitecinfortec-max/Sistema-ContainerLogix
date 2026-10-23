@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
-from models import ExpenseReportPurchase, ExpenseReportCreate, ExpenseReportResponse
+from models import ExpenseReportPurchase, ExpenseReportCreate, ExpenseReportResponse, ExpenseReportSettlement
 from reports import now_brt
 
 from shared import (
@@ -197,6 +197,8 @@ async def update_expense_report_status(report_id: str, status: str, current_user
     """Conclui ou reabre uma prestação de contas"""
     if status not in ["EM_ANDAMENTO", "CONCLUIDA"]:
         raise HTTPException(status_code=400, detail="Status inválido")
+    if status == "EM_ANDAMENTO" and await db.expense_reports.find_one({"id": report_id, "settled_at": {"$nin": [None, ""]}}):
+        raise HTTPException(status_code=400, detail="O saldo desta prestação já foi acertado. Desfaça o acerto antes de reabrir.")
 
     result = await db.expense_reports.update_one(
         {"id": report_id},
@@ -207,6 +209,31 @@ async def update_expense_report_status(report_id: str, status: str, current_user
         raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
 
     return {"message": "Status atualizado"}
+
+
+@api_router.put("/expense-reports/{report_id}/settlement", response_model=ExpenseReportResponse)
+async def update_expense_report_settlement(report_id: str, data: ExpenseReportSettlement, current_user: dict = Depends(get_current_admin_user)):
+    """Marca (ou desfaz) o acerto do saldo: ressarcimento pago ao funcionário
+    ou devolução recebida dele. Só com a prestação concluída."""
+    report = await db.expense_reports.find_one({"id": report_id}, {"_id": 0})
+    if not report:
+        raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
+    if data.settled:
+        if report.get("status") != "CONCLUIDA":
+            raise HTTPException(status_code=400, detail="Conclua a prestação de contas antes de acertar o saldo")
+        if abs(report.get("balance") or 0) < 0.005:
+            raise HTTPException(status_code=400, detail="Esta prestação não tem saldo a acertar")
+        day = (data.date or now_brt().date().isoformat())[:10]
+        try:
+            datetime.strptime(day, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Data do acerto inválida")
+        update = {"settled_at": day, "settled_by_name": current_user.get("name", "Sistema")}
+    else:
+        update = {"settled_at": None, "settled_by_name": None}
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.expense_reports.update_one({"id": report_id}, {"$set": update})
+    return await db.expense_reports.find_one({"id": report_id}, {"_id": 0})
 
 
 @api_router.post("/expense-reports/{report_id}/purchases/{item_id}/upload-receipt")

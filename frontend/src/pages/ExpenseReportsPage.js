@@ -20,7 +20,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import {
   Calculator, Plus, Eye, Trash2, Printer, Pencil, X,
-  CheckCircle2, RotateCcw, Camera, Receipt
+  CheckCircle2, RotateCcw, Camera, Receipt, Banknote
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -56,9 +56,13 @@ function balanceInfo(balance) {
 
 const brl = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// Saldo que precisa de acerto (ressarcir ou devolver)
+const hasBalance = (report) => Math.abs(report?.balance || 0) > 0.004;
+
 export default function ExpenseReportsPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [reportOpen, setReportOpen] = useState(false);
+  const [settlementReportOpen, setSettlementReportOpen] = useState(false);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -375,13 +379,42 @@ export default function ExpenseReportsPage() {
     }
   };
 
+  // Acerto do saldo: data em que o ressarcimento foi pago (ou a devolução
+  // recebida). Só com a prestação concluída; enquanto acertada não reabre.
+  const [settlementReport, setSettlementReport] = useState(null);
+  const [settlementDate, setSettlementDate] = useState('');
+  const [settling, setSettling] = useState(false);
+
+  const openSettlement = (report) => {
+    setSettlementDate(todayISO());
+    setSettlementReport(report);
+  };
+
+  const saveSettlement = async (settled) => {
+    const report = settlementReport || (settled ? null : singleSelectedReport);
+    if (!report) return;
+    if (!settled && !(await confirm('Desfazer o acerto do saldo desta prestação? Ela volta a aparecer como pendente.'))) return;
+    setSettling(true);
+    try {
+      const { data } = await api.setExpenseReportSettlement(report.id, settled, settled ? settlementDate : undefined);
+      toast.success(settled ? 'Saldo marcado como acertado' : 'Acerto desfeito: saldo pendente');
+      setSettlementReport(null);
+      if (selectedReport?.id === data.id) setSelectedReport(data);
+      loadReports();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao atualizar o acerto');
+    } finally {
+      setSettling(false);
+    }
+  };
+
   const handleReopen = async (id) => {
     try {
       await api.updateExpenseReportStatus(id, 'EM_ANDAMENTO');
       toast.success('Prestação de contas reaberta para edição');
       loadReports();
     } catch (error) {
-      toast.error('Erro ao reabrir prestação de contas');
+      toast.error(error.response?.data?.detail || 'Erro ao reabrir prestação de contas');
     }
   };
 
@@ -430,9 +463,14 @@ export default function ExpenseReportsPage() {
           title="Prestação de Contas"
           subtitle="Controle de depósitos recebidos e compras realizadas por período"
           actions={(
-            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="expense-period-report">
-              <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setSettlementReportOpen(true)} data-testid="expense-settlement-report">
+                <Banknote className="w-4 h-4 mr-1.5" /> Ressarcimentos
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="expense-period-report">
+                <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
+              </Button>
+            </div>
           )}
         />
 
@@ -462,9 +500,21 @@ export default function ExpenseReportsPage() {
               <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedReport && openDetails(singleSelectedReport)} disabled={!singleSelectedReport} />
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedReport && openEditModal(singleSelectedReport)} disabled={!singleSelectedReport || singleSelectedReport.status !== 'EM_ANDAMENTO'} />
               {singleSelectedReport?.status === 'CONCLUIDA' ? (
-                <ToolbarButton icon={RotateCcw} label="Reabrir" tone="amber" onClick={() => handleReopen(singleSelectedReport.id)} />
+                <ToolbarButton icon={RotateCcw} label="Reabrir" tone="amber" onClick={() => handleReopen(singleSelectedReport.id)} disabled={!!singleSelectedReport.settled_at} />
               ) : (
                 <ToolbarButton icon={CheckCircle2} label="Concluir" tone="emerald" onClick={() => singleSelectedReport && handleComplete(singleSelectedReport.id)} disabled={!singleSelectedReport} />
+              )}
+              {singleSelectedReport?.settled_at ? (
+                <ToolbarButton icon={RotateCcw} label="Desfazer acerto" tone="amber" onClick={() => saveSettlement(false)} disabled={settling} testId="expense-undo-settlement" />
+              ) : (
+                <ToolbarButton
+                  icon={Banknote}
+                  label="Acertar saldo"
+                  tone="emerald"
+                  onClick={() => singleSelectedReport && openSettlement(singleSelectedReport)}
+                  disabled={!singleSelectedReport || singleSelectedReport.status !== 'CONCLUIDA' || !hasBalance(singleSelectedReport)}
+                  testId="expense-settle"
+                />
               )}
               <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedReport && handlePrintPDF(singleSelectedReport.id)} disabled={!singleSelectedReport || singleSelectedReport.status !== 'CONCLUIDA'} />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedReport && handleDelete(singleSelectedReport.id)} disabled={!singleSelectedReport} />
@@ -503,6 +553,7 @@ export default function ExpenseReportsPage() {
                     <th>Período</th>
                     <th className="!text-right">Total compras</th>
                     <th className="!text-right">Saldo</th>
+                    <th>Acerto</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -527,6 +578,13 @@ export default function ExpenseReportsPage() {
                         <td className="whitespace-nowrap tabular-nums">{formatPeriodDate(report.period_start)} a {formatPeriodDate(report.period_end)}</td>
                         <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(report.total_purchases)}</td>
                         <td className={`text-right whitespace-nowrap tabular-nums font-semibold ${bi.className}`}>{formatMoney(bi.value)}</td>
+                        <td className="whitespace-nowrap">
+                          {!hasBalance(report) ? '-' : report.settled_at ? (
+                            <StatusPill tone="emerald">Acertado {formatPeriodDate(report.settled_at)}</StatusPill>
+                          ) : (
+                            <StatusPill tone="amber">Pendente</StatusPill>
+                          )}
+                        </td>
                         <td>{getStatusBadge(report.status)}</td>
                       </tr>
                     );
@@ -800,6 +858,13 @@ export default function ExpenseReportsPage() {
                     </div>
                   );
                 })()}
+                {hasBalance(selectedReport) && (
+                  <div className="text-sm text-muted-foreground">
+                    {selectedReport.settled_at
+                      ? `Saldo acertado em ${formatPeriodDate(selectedReport.settled_at)}${selectedReport.settled_by_name ? ` por ${selectedReport.settled_by_name}` : ''}`
+                      : 'Saldo ainda não acertado'}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -811,7 +876,7 @@ export default function ExpenseReportsPage() {
                 Concluir
               </Button>
             ) : (
-              <Button variant="outline" onClick={() => handleReopen(selectedReport?.id)}>
+              <Button variant="outline" onClick={() => handleReopen(selectedReport?.id)} disabled={!!selectedReport?.settled_at}>
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Reabrir
               </Button>
@@ -846,6 +911,56 @@ export default function ExpenseReportsPage() {
         downloadPdf={api.downloadExpensesReportPdf}
         downloadExcel={api.downloadExpensesReportExcel}
         filename="relatorio_prestacao_contas"
+      />
+      <Dialog open={!!settlementReport} onOpenChange={(v) => { if (!v) setSettlementReport(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Acertar saldo #{settlementReport?.report_number_formatted}</DialogTitle>
+          </DialogHeader>
+          {settlementReport && (() => {
+            const bi = balanceInfo(settlementReport.balance || 0);
+            return (
+              <div className="space-y-3">
+                <p className={`font-semibold ${bi.className}`}>{bi.label}: {formatMoney(bi.value)}</p>
+                <div>
+                  <Label className="mb-1.5 block">
+                    {settlementReport.balance > 0 ? 'Data do ressarcimento ao funcionário' : 'Data da devolução recebida'}
+                  </Label>
+                  <Input type="date" className="h-9" value={settlementDate} onChange={(e) => setSettlementDate(e.target.value)} data-testid="expense-settlement-date" />
+                </div>
+                <p className="text-xs text-muted-foreground">Com o saldo acertado a prestação não pode ser reaberta; desfaça o acerto antes, se precisar.</p>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSettlementReport(null)}>Cancelar</Button>
+            <Button onClick={() => saveSettlement(true)} disabled={settling || !settlementDate} data-testid="expense-settlement-save">
+              {settling ? 'Salvando...' : 'Marcar como acertado'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <PeriodReportDialog
+        open={settlementReportOpen}
+        onOpenChange={setSettlementReportOpen}
+        title="Ressarcimentos da Prestação de Contas"
+        description="Saldo de cada prestação: o que falta ressarcir ao funcionário ou receber de volta, e o que já foi acertado."
+        statuses={[{ value: '', label: 'Pendentes e acertadas' }, { value: 'PENDENTE', label: 'Pendentes' }, { value: 'ACERTADO', label: 'Acertadas' }]}
+        statusParam="situation"
+        selects={[{
+          key: 'period_by',
+          label: 'Período pela data',
+          options: [{ value: 'report', label: 'Da prestação' }, { value: 'settlement', label: 'Do acerto (só as acertadas)' }],
+        }]}
+        load={api.getExpenseSettlementsReport}
+        summarize={(d) => [
+          ['A ressarcir (pendente)', brl(d.summary.pending_reimburse)], ['A devolver (pendente)', brl(d.summary.pending_return)],
+          ['Ressarcido', brl(d.summary.settled_reimburse)], ['Devolvido', brl(d.summary.settled_return)],
+          ['Pendentes', d.summary.pending_count], ['Acertadas', d.summary.settled_count],
+        ]}
+        downloadPdf={api.downloadExpenseSettlementsReportPdf}
+        downloadExcel={api.downloadExpenseSettlementsReportExcel}
+        filename="relatorio_ressarcimentos"
       />
       <ConfirmDialog />
     </Layout>

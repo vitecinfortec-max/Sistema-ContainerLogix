@@ -285,6 +285,140 @@ def _expense_sections(data):
 EXPENSE_STATUS_PATTERN = "^(EM_ANDAMENTO|CONCLUIDA)$"
 
 
+# ------------------------------------------- Prestação de Contas: ressarcimentos
+# Saldo de cada prestação (compras - depósitos): positivo = ressarcir ao
+# funcionário, negativo = ele devolve. Pendente até alguém marcar o acerto.
+
+SETTLEMENT_LABELS = {"PENDENTE": "Pendente", "ACERTADO": "Acertado"}
+SETTLEMENT_PERIOD_LABELS = {"report": "Período da prestação", "settlement": "Acerto"}
+
+
+def _overlaps(start: Optional[str], end: Optional[str], date_from: Optional[str], date_to: Optional[str]) -> bool:
+    """Período da prestação cruza o filtro"""
+    start, end = (start or "")[:10], (end or start or "")[:10]
+    if date_from and end and end < _parse_filter_day(date_from, "date_from").isoformat():
+        return False
+    if date_to and start and start > _parse_filter_day(date_to, "date_to").isoformat():
+        return False
+    return True
+
+
+async def build_expense_settlements(date_from=None, date_to=None, situation=None, period_by="report") -> dict:
+    reports = await db.expense_reports.find({}, {"_id": 0, "purchases": 0, "deposits": 0}).sort("report_number_formatted", 1).to_list(None)
+    rows = []
+    for rep in reports:
+        balance = _r(rep.get("balance"))
+        if abs(balance) < 0.005:
+            continue  # quitada: nada a acertar
+        settled_at = (rep.get("settled_at") or "")[:10] or None
+        row_situation = "ACERTADO" if settled_at else "PENDENTE"
+        if situation and row_situation != situation:
+            continue
+        if period_by == "settlement":
+            if not settled_at or not _in_period(settled_at, date_from, date_to):
+                continue
+        elif not _overlaps(rep.get("period_start"), rep.get("period_end"), date_from, date_to):
+            continue
+        rows.append({
+            "report": rep.get("report_number_formatted") or str(rep.get("report_number")), "report_id": rep["id"],
+            "status": rep.get("status") or "EM_ANDAMENTO", "situation": row_situation,
+            "period_start": (rep.get("period_start") or "")[:10] or None, "period_end": (rep.get("period_end") or "")[:10] or None,
+            "responsible": rep.get("created_by_name"),
+            "total_purchases": _r(rep.get("total_purchases")), "total_deposits": _r(rep.get("total_deposits")),
+            "to_reimburse": balance if balance > 0 else 0.0, "to_return": -balance if balance < 0 else 0.0,
+            "settled_at": settled_at, "settled_by_name": rep.get("settled_by_name") if settled_at else None,
+        })
+    sums = lambda sit, key: _r(sum(r[key] for r in rows if r["situation"] == sit))
+    pending = [r for r in rows if r["situation"] == "PENDENTE"]
+    return {
+        "items": rows,
+        "summary": {
+            "count": len(rows), "pending_count": len(pending), "settled_count": len(rows) - len(pending),
+            "pending_reimburse": sums("PENDENTE", "to_reimburse"), "pending_return": sums("PENDENTE", "to_return"),
+            "settled_reimburse": sums("ACERTADO", "to_reimburse"), "settled_return": sums("ACERTADO", "to_return"),
+        },
+    }
+
+
+def _settlement_sections(data, situation):
+    s = data["summary"]
+    base = [Column("Prestação", width=10, align="center"), Column("Início", DAY, 9), Column("Fim", DAY, 9),
+            Column("Responsável", width=22), Column("Situação", width=11, align="center"),
+            Column("Compras", MONEY, 12), Column("Depósitos", MONEY, 12),
+            Column("A ressarcir", MONEY, 12), Column("A devolver", MONEY, 12)]
+    row = lambda r: [r["report"], r["period_start"], r["period_end"], r["responsible"],
+                     EXPENSE_STATUS_LABELS.get(r["status"], r["status"]), r["total_purchases"], r["total_deposits"],
+                     r["to_reimburse"], r["to_return"]]
+    sections = []
+    if situation != "ACERTADO":
+        sections.append(Section(
+            "Pendentes de acerto", base,
+            [row(r) for r in data["items"] if r["situation"] == "PENDENTE"],
+            total=["TOTAL", None, None, None, None, None, None, s["pending_reimburse"], s["pending_return"]] if s["pending_count"] else None,
+            empty_text="Nenhum saldo pendente no período.", sheet_name="Pendentes",
+        ))
+    if situation != "PENDENTE":
+        sections.append(Section(
+            "Acertadas", base + [Column("Acertado em", DAY, 10), Column("Por", width=18)],
+            [row(r) + [r["settled_at"], r["settled_by_name"]] for r in data["items"] if r["situation"] == "ACERTADO"],
+            total=["TOTAL", None, None, None, None, None, None, s["settled_reimburse"], s["settled_return"], None, None] if s["settled_count"] else None,
+            empty_text="Nenhum saldo acertado no período.", sheet_name="Acertadas",
+        ))
+    return sections
+
+
+SETTLEMENT_PATTERN = "^(PENDENTE|ACERTADO)$"
+SETTLEMENT_PERIOD_PATTERN = "^(report|settlement)$"
+
+
+def _settlement_subtitle(date_from, date_to, situation, period_by):
+    parts = [period_text(SETTLEMENT_PERIOD_LABELS[period_by], date_from, date_to),
+             {"PENDENTE": "Só pendentes", "ACERTADO": "Só acertadas"}.get(situation, "Pendentes e acertadas")]
+    return " · ".join(p for p in parts if p)
+
+
+@api_router.get("/reports/expenses/settlements")
+async def get_expense_settlements_report(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    situation: Optional[str] = Query(None, pattern=SETTLEMENT_PATTERN),
+    period_by: str = Query("report", pattern=SETTLEMENT_PERIOD_PATTERN),
+    current_user: dict = Depends(get_current_admin_user),
+):
+    """Saldos das prestações de contas: o que falta ressarcir/devolver e o que já foi acertado"""
+    return await build_expense_settlements(date_from, date_to, situation, period_by)
+
+
+@api_router.get("/reports/expenses/settlements/pdf")
+async def get_expense_settlements_report_pdf(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    situation: Optional[str] = Query(None, pattern=SETTLEMENT_PATTERN),
+    period_by: str = Query("report", pattern=SETTLEMENT_PERIOD_PATTERN),
+    current_user: dict = Depends(get_current_admin_user),
+):
+    from reports import format_currency
+    data = await build_expense_settlements(date_from, date_to, situation, period_by)
+    s = data["summary"]
+    info = [("A ressarcir (pendente)", format_currency(s["pending_reimburse"], "BRL")),
+            ("A devolver (pendente)", format_currency(s["pending_return"], "BRL")),
+            ("Ressarcido", format_currency(s["settled_reimburse"], "BRL")),
+            ("Devolvido", format_currency(s["settled_return"], "BRL")),
+            ("Prestações pendentes", str(s["pending_count"])), ("Prestações acertadas", str(s["settled_count"]))]
+    return await pdf_response("Ressarcimentos da Prestação de Contas", _settlement_subtitle(date_from, date_to, situation, period_by),
+                              info, _settlement_sections(data, situation), "relatorio_ressarcimentos", current_user.get("name", "Sistema"))
+
+
+@api_router.get("/reports/expenses/settlements/excel")
+async def get_expense_settlements_report_excel(
+    date_from: Optional[str] = None, date_to: Optional[str] = None,
+    situation: Optional[str] = Query(None, pattern=SETTLEMENT_PATTERN),
+    period_by: str = Query("report", pattern=SETTLEMENT_PERIOD_PATTERN),
+    current_user: dict = Depends(get_current_admin_user),
+):
+    data = await build_expense_settlements(date_from, date_to, situation, period_by)
+    return await excel_response("Ressarcimentos da Prestação de Contas", _settlement_subtitle(date_from, date_to, situation, period_by),
+                                _settlement_sections(data, situation), "relatorio_ressarcimentos")
+
+
 def _expense_subtitle(date_from, date_to, status, only_without_receipt):
     parts = [period_text("Compras/depósitos", date_from, date_to), EXPENSE_STATUS_LABELS.get(status),
              "Só compras sem recibo" if only_without_receipt else None]

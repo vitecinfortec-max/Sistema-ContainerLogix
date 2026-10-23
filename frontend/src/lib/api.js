@@ -519,6 +519,9 @@ export const api = {
   getExpensesReport: (params) => axios.get(`${API}/reports/expenses`, { params }),
   downloadExpensesReportPdf: (params) => axios.get(`${API}/reports/expenses/pdf`, { params, responseType: 'blob' }),
   downloadExpensesReportExcel: (params) => axios.get(`${API}/reports/expenses/excel`, { params, responseType: 'blob' }),
+  getExpenseSettlementsReport: (params) => axios.get(`${API}/reports/expenses/settlements`, { params }),
+  downloadExpenseSettlementsReportPdf: (params) => axios.get(`${API}/reports/expenses/settlements/pdf`, { params, responseType: 'blob' }),
+  downloadExpenseSettlementsReportExcel: (params) => axios.get(`${API}/reports/expenses/settlements/excel`, { params, responseType: 'blob' }),
 
   // Gestão de Container - relatório de compra e venda
   getFreightReconciliation: (params) => axios.get(`${API}/reports/freight-reconciliation`, { params }),
@@ -535,6 +538,8 @@ export const api = {
   updateExpenseReport: (id, data) => axios.put(`${API}/expense-reports/${id}`, data),
   deleteExpenseReport: (id) => axios.delete(`${API}/expense-reports/${id}`),
   updateExpenseReportStatus: (id, status) => axios.put(`${API}/expense-reports/${id}/status?status=${status}`),
+  // Acerto do saldo (ressarcimento pago / devolução recebida); date 'YYYY-MM-DD'
+  setExpenseReportSettlement: (id, settled, date) => axios.put(`${API}/expense-reports/${id}/settlement`, { settled, date }),
   uploadExpenseReportReceipt: (reportId, itemId, file) => {
     const formData = new FormData();
     formData.append('file', file);
