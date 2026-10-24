@@ -149,6 +149,7 @@ async def delete_driver(driver_id: str, current_user: dict = Depends(get_current
         (db.loading_schedules, {"items.driver_id": driver_id}, "programação(ões) de carregamento"),
         (db.freight_payments, {"driver_id": driver_id}, "pagamento(s) de frete"),
         (db.daily_rate_requests, {"items.driver_id": driver_id}, "solicitação(ões) de diária"),
+        (db.gratifications, {"person_type": "MOTORISTA", "person_id": driver_id}, "gratificação(ões)"),
         (db.delivery_statuses, {"items.driver_id": driver_id}, "status de entrega"),
         (db.port_services, {"driver_id": driver_id}, "serviço(s) portuário(s)"),
         (db.fuel_supplies, {"driver_id": driver_id}, "abastecimento(s)"),
@@ -542,6 +543,7 @@ async def delete_employee(employee_id: str, current_user: dict = Depends(get_cur
     await _ensure_not_in_use([
         (db.ordem_servico, {"person_id": employee_id}, "ordem(ns) de serviço"),
         (db.epi_deliveries, {"recipient_id": employee_id}, "entrega(s) de EPI"),
+        (db.gratifications, {"person_type": "FUNCIONARIO", "person_id": employee_id}, "gratificação(ões)"),
     ], "Funcionário")
     result = await db.employees.delete_one({"id": employee_id})
     if result.deleted_count == 0:

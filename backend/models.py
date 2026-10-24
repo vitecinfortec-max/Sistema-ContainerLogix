@@ -2124,6 +2124,63 @@ class CheckResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+# ==================== CONTROLE DE GRATIFICAÇÃO ====================
+
+GRATIFICATION_STATUS_OPTIONS = ["PENDENTE", "PAGO", "CANCELADO"]
+GRATIFICATION_PERSON_TYPES = ["MOTORISTA", "FUNCIONARIO"]
+# Funções que todo sistema já traz cadastradas; as demais o usuário inclui
+DEFAULT_GRATIFICATION_ROLES = ["Motorista", "Frentista", "Mecânico", "Borracheiro", "Operacional", "Auxiliar de Mecânico"]
+
+
+class GratificationRoleCreate(BaseModel):
+    name: str
+
+
+class GratificationRoleResponse(BaseModel):
+    id: str
+    name: str
+    is_default: bool = False
+    created_at: datetime
+
+
+class GratificationCreate(BaseModel):
+    person_type: Literal["MOTORISTA", "FUNCIONARIO"]
+    person_id: str
+    role: str  # função (nome de uma GratificationRole)
+    reference_date: str  # data de referência (YYYY-MM-DD)
+    amount: float
+    description: Optional[str] = None  # motivo / referência (ex: meta de outubro)
+    observations: Optional[str] = None
+
+
+class GratificationPay(BaseModel):
+    ids: List[str]
+    payment_date: str  # YYYY-MM-DD
+    payment_method: Optional[str] = None  # PIX, dinheiro, transferência...
+
+
+class GratificationResponse(BaseModel):
+    id: str
+    gratification_number: int
+    person_type: str
+    person_id: str
+    person_name: str
+    person_cpf: Optional[str] = None
+    role: str
+    reference_date: str
+    amount: float
+    description: Optional[str] = None
+    observations: Optional[str] = None
+    status: str
+    payment_date: Optional[str] = None
+    payment_method: Optional[str] = None
+    paid_by_name: Optional[str] = None
+    created_by: str
+    created_by_name: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+
 # ==================== INTERNATIONAL INVOICE ====================
 
 class IntlInvoiceItem(BaseModel):

@@ -512,6 +512,21 @@ export const api = {
   deleteCheckPhoto: (id, side) => axios.delete(`${API}/checks/${id}/photo/${side}`),
   getChecksReportPDF: (params) => axios.get(`${API}/checks/report/pdf`, { params, responseType: 'blob' }),
 
+  // Financeiro - Controle de Gratificação
+  getGratificationRoles: () => axios.get(`${API}/gratification-roles`),
+  createGratificationRole: (data) => axios.post(`${API}/gratification-roles`, data),
+  deleteGratificationRole: (id) => axios.delete(`${API}/gratification-roles/${id}`),
+  getGratifications: (params) => axios.get(`${API}/gratifications`, { params }),
+  createGratification: (data) => axios.post(`${API}/gratifications`, data),
+  updateGratification: (id, data) => axios.put(`${API}/gratifications/${id}`, data),
+  deleteGratification: (id) => axios.delete(`${API}/gratifications/${id}`),
+  payGratifications: (data) => axios.post(`${API}/gratifications/pay`, data),
+  updateGratificationStatus: (id, status) => axios.put(`${API}/gratifications/${id}/status`, null, { params: { status } }),
+  getGratificationReceiptPDF: (ids) => axios.get(`${API}/gratifications/receipt/pdf`, { params: { ids: ids.join(',') }, responseType: 'blob' }),
+  getGratificationsReport: (params) => axios.get(`${API}/reports/gratifications`, { params }),
+  downloadGratificationsReportPdf: (params) => axios.get(`${API}/reports/gratifications/pdf`, { params, responseType: 'blob' }),
+  downloadGratificationsReportExcel: (params) => axios.get(`${API}/reports/gratifications/excel`, { params, responseType: 'blob' }),
+
   // Financeiro - Relatórios do período (conferência)
   getDailyRatesReport: (params) => axios.get(`${API}/reports/daily-rates`, { params }),
   downloadDailyRatesReportPdf: (params) => axios.get(`${API}/reports/daily-rates/pdf`, { params, responseType: 'blob' }),

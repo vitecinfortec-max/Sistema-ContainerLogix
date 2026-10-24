@@ -51,6 +51,8 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
     checks_open = await find("checks", {"status": "EMITIDO"}, "financeiro.controle_cheque")
     freight_paid = await find("freight_payments", {"status": "PAGO"}, "financeiro.pagamento_frete")
     freight_open = await find("freight_payments", {"status": "PENDENTE"}, "financeiro.pagamento_frete")
+    gratifications_paid = await find("gratifications", {"status": "PAGO"}, "financeiro.gratificacao")
+    gratifications_open = await find("gratifications", {"status": "PENDENTE"}, "financeiro.gratificacao")
     daily_requests = await find("daily_rate_requests", {"status": {"$in": ["PAGO", "PENDENTE"]}}, "financeiro.diaria")
     expense_reports = await find("expense_reports", {}, "financeiro.prestacao_contas")
     purchases = await find("container_purchases", {}, "gestao_container.compra")
@@ -96,6 +98,7 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
               note="o cheque pode ter sido o meio de pagamento de outra saída desta lista"),
         _line("freight", "Pagamento de frete", "financeiro.pagamento_frete", freight_paid, lambda d: d.get("freight_value"), lambda d: _day(d.get("paid_at"))),
         _line("daily", "Diárias pagas", "financeiro.diaria", daily_paid, lambda d: d.get("total"), lambda d: _day(d.get("paid_at"))),
+        _line("gratifications", "Gratificações pagas", "financeiro.gratificacao", gratifications_paid, lambda d: d.get("amount"), lambda d: d.get("payment_date")),
         _line("expense_deposits", "Depósitos para Prestação de Contas", "financeiro.prestacao_contas", deposits, lambda d: d.get("amount"), lambda d: d.get("date")),
         _line("container_purchases", "Compras de container", "gestao_container.compra", purchases, lambda d: d.get("purchase_value"),
               lambda d: _day(d.get("entry_date") or d.get("created_at"))),
@@ -113,6 +116,7 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
         _line("checks_open", "Cheques emitidos a compensar", "financeiro.controle_cheque", checks_open, lambda d: d.get("amount")),
         _line("freight_open", "Fretes a pagar", "financeiro.pagamento_frete", freight_open, lambda d: d.get("freight_value")),
         _line("daily_open", "Diárias a pagar", "financeiro.diaria", daily_open, lambda d: d.get("total")),
+        _line("gratifications_open", "Gratificações a pagar", "financeiro.gratificacao", gratifications_open, lambda d: d.get("amount")),
         _line("client_credit_balance", "Saldo de crédito de clientes", "financeiro.credito_cliente", credit_accounts,
               lambda d: (d.get("balance_cents") or 0) / 100, note="já recebido; será abatido em faturas ou devolvido"),
     ]

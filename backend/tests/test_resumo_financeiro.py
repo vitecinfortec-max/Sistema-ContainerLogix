@@ -1,6 +1,6 @@
 """Resumo Financeiro: entradas e saídas do período vindas de cada módulo,
 posição do que falta receber/pagar, módulo não contratado fora do resumo, e
-a data de pagamento das Diárias."""
+a data de pagamento das Diárias e das Gratificações."""
 import io
 
 from openpyxl import load_workbook
@@ -34,6 +34,11 @@ def _seed(api):
              "items": [{"driver_name": "A", "total": 150}, {"driver_name": "B", "total": 50}]},  # sem pagamento por item: vale o status
             {"id": "d2", "status": "PENDENTE", "total_value": 80, "items": [{"driver_name": "C", "total": 80}]})
     _insert(api, "expense_reports", {"id": "e1", "deposits": [{"amount": 500, "date": "2026-10-01", "sent_by": "Fin"}], "purchases": []})
+    _insert(api, "gratifications",
+            {"id": "g1", "status": "PAGO", "amount": 100, "payment_date": "2026-10-18"},
+            {"id": "g2", "status": "PAGO", "amount": 999, "payment_date": "2026-11-01"},  # fora do período
+            {"id": "g3", "status": "PENDENTE", "amount": 60},
+            {"id": "g4", "status": "CANCELADO", "amount": 777})
     _insert(api, "container_purchases", {"id": "p1", "container_number": "X", "purchase_value": 5000, "entry_date": "2026-10-02T12:00:00+00:00"})
 
 
@@ -43,11 +48,11 @@ def test_inflows_outflows_and_positions(api):
     ins = {r["key"]: r["total"] for r in data["inflows"]}
     outs = {r["key"]: r["total"] for r in data["outflows"]}
     assert ins == {"invoices": 1000, "port_billing": 400, "container_sales": 7500, "client_credits": 0}
-    assert outs == {"checks": 300, "freight": 900, "daily": 200, "expense_deposits": 500, "container_purchases": 5000, "client_credit_refunds": 0}
+    assert outs == {"checks": 300, "freight": 900, "daily": 200, "gratifications": 100, "expense_deposits": 500, "container_purchases": 5000, "client_credit_refunds": 0}
     s = data["summary"]
-    assert s["inflow_total"] == 8900 and s["outflow_total"] == 6900 and s["balance"] == 2000
+    assert s["inflow_total"] == 8900 and s["outflow_total"] == 7000 and s["balance"] == 1900
     assert {r["key"]: r["total"] for r in data["receivable"]} == {"invoices_open": 700, "port_open": 0, "sales_open": 2000}
-    assert {r["key"]: r["total"] for r in data["payable"]} == {"checks_open": 120, "freight_open": 250, "daily_open": 80, "client_credit_balance": 0}
+    assert {r["key"]: r["total"] for r in data["payable"]} == {"checks_open": 120, "freight_open": 250, "daily_open": 80, "gratifications_open": 60, "client_credit_balance": 0}
     invoices_line = next(r for r in data["inflows"] if r["key"] == "invoices")
     assert "1 fatura" in invoices_line["note"]
 

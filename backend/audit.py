@@ -39,7 +39,7 @@ _MAX_SNAPSHOTS = 200
 # Campo que identifica o registro para quem lê o log, em ordem de preferência
 _LABEL_FIELDS = (
     "invoice_number", "request_number", "payment_number", "batch_number", "order_number",
-    "os_number", "proposal_number", "check_number", "container_number", "plate", "name",
+    "os_number", "proposal_number", "check_number", "gratification_number", "container_number", "plate", "name",
     "email", "code", "description",
 )
 

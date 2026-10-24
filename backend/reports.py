@@ -3626,6 +3626,80 @@ def generate_freight_payment_receipt_pdf(batch: dict, payments: list, company: d
     return pdf_bytes
 
 
+def generate_gratification_receipt_pdf(person: dict, gratifications: list, amount_in_words: str = '', company: dict = None) -> bytes:
+    """Recibo de Gratificação: as gratificações pagas selecionadas de uma
+    mesma pessoa (Motorista/Funcionário), com o total, a declaração de
+    recebimento e as linhas de assinatura."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=15 * mm, leftMargin=15 * mm, topMargin=12 * mm, bottomMargin=15 * mm
+    )
+    c = merge_company(company)
+    elements = []
+    styles = getSampleStyleSheet()
+
+    elements.extend(_build_pdf_header(styles, download_logo(company), "Recibo de Gratificação", company=company, content_width=doc.width))
+
+    total = round(sum((g.get('amount') or 0) for g in gratifications), 2)
+    total_str = format_currency(total, 'BRL')
+    payment_days = sorted({g.get('payment_date') for g in gratifications if g.get('payment_date')})
+    roles = sorted({g.get('role') for g in gratifications if g.get('role')})
+    elements.append(_pdf_info_grid([
+        ("Nome", person.get('name') or '-', 2),
+        ("CPF", person.get('cpf') or '-'),
+        ("Função", ', '.join(roles) or '-'),
+        ("Data do pagamento", ' / '.join(fmt_date(d) for d in payment_days) or '-'),
+        ("Gratificações", _fmt_int(len(gratifications))),
+    ], doc.width, cols=3))
+    elements.append(Spacer(1, 10))
+
+    cell = _pdf_cell_factory(styles, font_size=8.5)
+    table_data = [_pdf_header_cells(['Nº', 'Referência', 'Função', 'Descrição', 'Pagamento', 'Valor'], font_size=8.5)]
+    for g in gratifications:
+        table_data.append([
+            cell(g.get('gratification_number'), 'center', bold=True),
+            cell(fmt_date(g.get('reference_date')), 'center'),
+            cell(g.get('role')),
+            cell(g.get('description') or '-'),
+            cell(fmt_date(g.get('payment_date')), 'center'),
+            cell(format_currency(g.get('amount') or 0, 'BRL'), 'right'),
+        ])
+    base_widths = [40, 65, 90, 200, 65, 80]
+    scale = doc.width / sum(base_widths)
+    table = Table(table_data, colWidths=[w * scale for w in base_widths], repeatRows=1)
+    table.setStyle(TableStyle(_pdf_table_style() + [('FONTSIZE', (0, 0), (-1, -1), 8.5)]))
+    elements.append(table)
+    elements.append(Spacer(1, 8))
+    elements.append(_pdf_totals_box([("Valor total", total_str)], doc.width))
+    elements.append(Spacer(1, 16))
+
+    declaration_style = ParagraphStyle(
+        'GratificationDeclaration', parent=styles['Normal'], fontSize=10, alignment=TA_LEFT, leading=15,
+        textColor=_hex(BRAND_TEXT),
+    )
+    word = 'à gratificação discriminada' if len(gratifications) == 1 else f'às {len(gratifications)} gratificações discriminadas'
+    in_words = f" ({xml_escape(amount_in_words)})" if amount_in_words else ''
+    declaration = (
+        f"Eu, <b>{xml_escape(person.get('name') or '-')}</b>, portador do CPF <b>{xml_escape(person.get('cpf') or '-')}</b>, "
+        f"declaro ter recebido de <b>{xml_escape(c['name'])}</b> a quantia de <b>{total_str.replace(' ', '&nbsp;')}</b>{in_words}, referente "
+        f"{word} acima, dando plena quitação do valor recebido."
+    )
+    elements.append(Paragraph(declaration, declaration_style))
+    elements.append(Spacer(1, 16))
+
+    elements.append(_pdf_signatures([
+        ("Assinatura do Recebedor", f"{person.get('name') or '-'}  ·  CPF {person.get('cpf') or '-'}"),
+        ("Assinatura do Responsável", f"{gratifications[0].get('paid_by_name') or '-'}  ·  {now_brt().strftime('%d/%m/%Y')}"),
+    ], doc.width, space_above=40))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
+
+
 def _pdf_barcode_block(code, issued_by, content_width, barcode_width=130, print_datetime=False):
     """Código de barras (Code128) do número do documento + "Emitido por" e
     data de impressão ao lado - bloco de controle usado nos documentos que
