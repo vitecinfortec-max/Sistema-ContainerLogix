@@ -4116,3 +4116,149 @@ class ExpenseReportCreate(BaseModel):
 
 class ExpenseReportResponse(ExpenseReport):
     pass
+
+
+# ==================== RH ====================
+# Cálculos em hr_payroll.py; rotas em routers/hr.py (cadastros, férias,
+# ocorrências, documentos, relatórios) e routers/payroll.py (folha).
+
+class HRPositionCreate(BaseModel):
+    name: str
+    department: Optional[str] = None
+    cbo: Optional[str] = None  # Classificação Brasileira de Ocupações
+    salary_min: Optional[float] = None
+    salary_max: Optional[float] = None
+    description: Optional[str] = None
+    status: str = "ATIVO"
+
+
+class HRDependent(BaseModel):
+    name: str
+    cpf: Optional[str] = None
+    birth_date: Optional[str] = None
+    relationship: Optional[str] = None  # filho(a), cônjuge...
+    irrf: bool = False  # deduz no IRRF
+    family_allowance: bool = False  # conta pro salário-família (filho até 14 anos)
+
+
+class HRRecurringEvent(BaseModel):
+    code: str  # um dos EVENTS lançáveis (hr_payroll.MANUAL_EVENT_CODES)
+    quantity: Optional[float] = None
+    value: Optional[float] = None
+    description: Optional[str] = None
+
+
+class HRContractCreate(BaseModel):
+    person_type: Literal["MOTORISTA", "FUNCIONARIO"]
+    person_id: str
+    position_id: Optional[str] = None
+    department: Optional[str] = None
+    contract_type: str = "CLT"
+    admission_date: str
+    experience_days: int = 0  # contrato de experiência (0 = sem)
+    base_salary: float
+    weekly_hours: Optional[float] = 44
+    work_schedule: Optional[str] = None
+    insalubridade_grade: float = 0  # 0, 10, 20 ou 40 (% do salário mínimo)
+    periculosidade: bool = False
+    vt_opt_in: bool = False
+    vt_monthly_cost: Optional[float] = None
+    pis: Optional[str] = None
+    ctps_number: Optional[str] = None
+    ctps_series: Optional[str] = None
+    bank_name: Optional[str] = None
+    bank_agency: Optional[str] = None
+    bank_account: Optional[str] = None
+    pix_key: Optional[str] = None
+    dependents: List[HRDependent] = Field(default_factory=list)
+    recurring_events: List[HRRecurringEvent] = Field(default_factory=list)
+    # Implantação: períodos aquisitivos que terminam até esta data já tiveram
+    # as férias tiradas fora do sistema (contam como quitados)
+    vacation_settled_until: Optional[str] = None
+    observations: Optional[str] = None
+
+
+class HRTermination(BaseModel):
+    termination_date: str
+    termination_type: str
+    notice_type: str = "TRABALHADO"
+    reason: Optional[str] = None
+    fgts_balance: Optional[float] = None  # saldo do FGTS (multa); vazio = estimado pela folha
+    confirm: bool = False  # False = só simula
+
+
+class HRPayrollSettings(BaseModel):
+    valid_from: Optional[str] = None
+    min_wage: float
+    inss_brackets: List[dict]
+    irrf_brackets: List[dict]
+    irrf_dependent_deduction: float
+    irrf_simplified_discount: float
+    irrf_reduction_full_up_to: float
+    irrf_reduction_full_max: float
+    irrf_reduction_partial_up_to: float
+    irrf_reduction_partial_a: float
+    irrf_reduction_partial_b: float
+    fgts_rate: float
+    fgts_apprentice_rate: float
+    family_allowance_limit: float
+    family_allowance_value: float
+    vt_rate: float
+    night_bonus_rate: float
+    monthly_hours: float
+
+
+class HRPayrollRunCreate(BaseModel):
+    competence: str  # YYYY-MM
+    run_type: str = "MENSAL"  # MENSAL, DECIMO_1, DECIMO_2
+    payment_date: Optional[str] = None
+    observations: Optional[str] = None
+
+
+class HRPayslipInputs(BaseModel):
+    inputs: List[HRRecurringEvent] = Field(default_factory=list)
+    days_worked: Optional[int] = None  # None = calculado (admissão/férias no mês)
+    observations: Optional[str] = None
+
+
+class HRPayrollPay(BaseModel):
+    payment_date: str
+
+
+class HRVacationCreate(BaseModel):
+    contract_id: str
+    acquisition_start: str  # início do período aquisitivo
+    start_date: str
+    days: int
+    sell_days: int = 0  # abono pecuniário (até 1/3)
+    advance_13th: bool = False
+    payment_date: Optional[str] = None  # padrão: 2 dias antes do início
+    observations: Optional[str] = None
+
+
+class HROccurrenceCreate(BaseModel):
+    contract_id: str
+    occurrence_type: str
+    start_date: str
+    end_date: Optional[str] = None
+    days: Optional[float] = None
+    cid: Optional[str] = None
+    description: Optional[str] = None
+    attachments: List[str] = Field(default_factory=list)
+
+
+class HRTimeBankCreate(BaseModel):
+    contract_id: str
+    date: str
+    minutes: int  # positivo = crédito, negativo = débito
+    description: Optional[str] = None
+
+
+class HRDocumentCreate(BaseModel):
+    contract_id: str
+    doc_type: str
+    description: Optional[str] = None
+    issue_date: Optional[str] = None
+    expiry_date: Optional[str] = None
+    file_url: Optional[str] = None
+    observations: Optional[str] = None

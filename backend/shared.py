@@ -521,6 +521,16 @@ MODULE_CATALOG = [
         {"key": "comercial.vinculo_clientes", "label": "Vínculo de Clientes"},
         {"key": "comercial.proposta", "label": "Proposta Comercial"},
     ]},
+    {"key": "rh", "label": "RH", "items": [
+        {"key": "rh.contratos", "label": "Admissão e Contratos"},
+        {"key": "rh.cargos", "label": "Cargos e Salários"},
+        {"key": "rh.folha", "label": "Folha de Pagamento"},
+        {"key": "rh.ferias", "label": "Férias"},
+        {"key": "rh.ocorrencias", "label": "Ocorrências"},
+        {"key": "rh.banco_horas", "label": "Banco de Horas"},
+        {"key": "rh.documentos", "label": "Documentos e ASO"},
+        {"key": "rh.relatorios", "label": "Relatórios de RH"},
+    ]},
     {"key": "gestao_container", "label": "Gestão de Container", "items": [
         {"key": "gestao_container.compra", "label": "Compra de Container"},
         {"key": "gestao_container.representante", "label": "Cadastro de Representantes"},
@@ -616,6 +626,16 @@ PATH_MODULE_MAP = [
     ("/api/port-services/billing-batches", "financeiro.faturamento_portuario"),
     ("/api/port-services/billing-candidates", "financeiro.faturamento_portuario"),
     ("/api/port-services", "operacional.servico_portuario"),
+    ("/api/hr/positions", "rh.cargos"),
+    ("/api/hr/contracts", "rh.contratos"),
+    ("/api/hr/payroll", "rh.folha"),
+    ("/api/hr/payslips", "rh.folha"),
+    ("/api/hr/vacation", "rh.ferias"),
+    ("/api/hr/occurrences", "rh.ocorrencias"),
+    ("/api/hr/time-bank", "rh.banco_horas"),
+    ("/api/hr/documents", "rh.documentos"),
+    ("/api/reports/hr", "rh.relatorios"),
+    ("/api/hr/", "rh"),
 ]
 
 _module_config_cache = {"value": None, "expires_at": 0}

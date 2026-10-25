@@ -38,6 +38,7 @@
     --chart-8: 320 65% 52%;  /* Estoque */
     --chart-9: 10 75% 55%;   /* Comercial */
     --chart-10: 45 90% 48%;  /* Gestão de Container */
+    --chart-11: 330 65% 50%; /* RH */
 
     --sidebar-bg: 210 20% 98%;          /* #F9FAFB */
     --canvas: 210 22% 96%;              /* fundo da área de conteúdo (cinza bem claro, destaca os cards brancos) */
@@ -75,6 +76,7 @@
     --chart-8: 320 60% 65%;
     --chart-9: 10 80% 65%;
     --chart-10: 45 85% 60%;
+    --chart-11: 330 65% 64%;
     --canvas: 222 30% 6%;
   }
 }

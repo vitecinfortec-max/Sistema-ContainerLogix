@@ -39,6 +39,13 @@ def _seed(api):
             {"id": "g2", "status": "PAGO", "amount": 999, "payment_date": "2026-11-01"},  # fora do período
             {"id": "g3", "status": "PENDENTE", "amount": 60},
             {"id": "g4", "status": "CANCELADO", "amount": 777})
+    _insert(api, "hr_payroll_runs",
+            {"id": "r1", "status": "PAGA", "paid_at": "2026-10-05", "totals": {"net": 2000}},
+            {"id": "r2", "status": "FECHADA", "totals": {"net": 1500}},
+            {"id": "r3", "status": "ABERTA", "totals": {"net": 9999}})  # aberta: ainda não é conta a pagar
+    _insert(api, "hr_vacations",
+            {"id": "v1", "status": "PAGA", "paid_at": "2026-10-07", "calc": {"net": 800}},
+            {"id": "v2", "status": "PROGRAMADA", "calc": {"net": 400}})
     _insert(api, "container_purchases", {"id": "p1", "container_number": "X", "purchase_value": 5000, "entry_date": "2026-10-02T12:00:00+00:00"})
 
 
@@ -48,11 +55,12 @@ def test_inflows_outflows_and_positions(api):
     ins = {r["key"]: r["total"] for r in data["inflows"]}
     outs = {r["key"]: r["total"] for r in data["outflows"]}
     assert ins == {"invoices": 1000, "port_billing": 400, "container_sales": 7500, "client_credits": 0}
-    assert outs == {"checks": 300, "freight": 900, "daily": 200, "gratifications": 100, "expense_deposits": 500, "container_purchases": 5000, "client_credit_refunds": 0}
+    assert outs == {"checks": 300, "freight": 900, "daily": 200, "gratifications": 100, "payroll": 2000, "vacations": 800, "expense_deposits": 500, "container_purchases": 5000, "client_credit_refunds": 0}
     s = data["summary"]
-    assert s["inflow_total"] == 8900 and s["outflow_total"] == 7000 and s["balance"] == 1900
+    assert s["inflow_total"] == 8900 and s["outflow_total"] == 9800 and s["balance"] == -900
     assert {r["key"]: r["total"] for r in data["receivable"]} == {"invoices_open": 700, "port_open": 0, "sales_open": 2000}
-    assert {r["key"]: r["total"] for r in data["payable"]} == {"checks_open": 120, "freight_open": 250, "daily_open": 80, "gratifications_open": 60, "client_credit_balance": 0}
+    assert {r["key"]: r["total"] for r in data["payable"]} == {"checks_open": 120, "freight_open": 250, "daily_open": 80, "gratifications_open": 60,
+                                                                 "payroll_open": 1500, "vacations_open": 400, "client_credit_balance": 0}
     invoices_line = next(r for r in data["inflows"] if r["key"] == "invoices")
     assert "1 fatura" in invoices_line["note"]
 

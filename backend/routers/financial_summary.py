@@ -53,6 +53,10 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
     freight_open = await find("freight_payments", {"status": "PENDENTE"}, "financeiro.pagamento_frete")
     gratifications_paid = await find("gratifications", {"status": "PAGO"}, "financeiro.gratificacao")
     gratifications_open = await find("gratifications", {"status": "PENDENTE"}, "financeiro.gratificacao")
+    payroll_paid = await find("hr_payroll_runs", {"status": "PAGA"}, "rh.folha")
+    payroll_open = await find("hr_payroll_runs", {"status": "FECHADA"}, "rh.folha")
+    vacations_paid = await find("hr_vacations", {"status": "PAGA"}, "rh.ferias")
+    vacations_open = await find("hr_vacations", {"status": "PROGRAMADA"}, "rh.ferias")
     daily_requests = await find("daily_rate_requests", {"status": {"$in": ["PAGO", "PENDENTE"]}}, "financeiro.diaria")
     expense_reports = await find("expense_reports", {}, "financeiro.prestacao_contas")
     purchases = await find("container_purchases", {}, "gestao_container.compra")
@@ -99,6 +103,8 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
         _line("freight", "Pagamento de frete", "financeiro.pagamento_frete", freight_paid, lambda d: d.get("freight_value"), lambda d: _day(d.get("paid_at"))),
         _line("daily", "Diárias pagas", "financeiro.diaria", daily_paid, lambda d: d.get("total"), lambda d: _day(d.get("paid_at"))),
         _line("gratifications", "Gratificações pagas", "financeiro.gratificacao", gratifications_paid, lambda d: d.get("amount"), lambda d: d.get("payment_date")),
+        _line("payroll", "Folha de pagamento (líquido)", "rh.folha", payroll_paid, lambda d: (d.get("totals") or {}).get("net"), lambda d: d.get("paid_at")),
+        _line("vacations", "Férias pagas (líquido)", "rh.ferias", vacations_paid, lambda d: (d.get("calc") or {}).get("net"), lambda d: d.get("paid_at")),
         _line("expense_deposits", "Depósitos para Prestação de Contas", "financeiro.prestacao_contas", deposits, lambda d: d.get("amount"), lambda d: d.get("date")),
         _line("container_purchases", "Compras de container", "gestao_container.compra", purchases, lambda d: d.get("purchase_value"),
               lambda d: _day(d.get("entry_date") or d.get("created_at"))),
@@ -117,6 +123,8 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
         _line("freight_open", "Fretes a pagar", "financeiro.pagamento_frete", freight_open, lambda d: d.get("freight_value")),
         _line("daily_open", "Diárias a pagar", "financeiro.diaria", daily_open, lambda d: d.get("total")),
         _line("gratifications_open", "Gratificações a pagar", "financeiro.gratificacao", gratifications_open, lambda d: d.get("amount")),
+        _line("payroll_open", "Folhas fechadas a pagar (líquido)", "rh.folha", payroll_open, lambda d: (d.get("totals") or {}).get("net")),
+        _line("vacations_open", "Férias programadas a pagar", "rh.ferias", vacations_open, lambda d: (d.get("calc") or {}).get("net")),
         _line("client_credit_balance", "Saldo de crédito de clientes", "financeiro.credito_cliente", credit_accounts,
               lambda d: (d.get("balance_cents") or 0) / 100, note="já recebido; será abatido em faturas ou devolvido"),
     ]

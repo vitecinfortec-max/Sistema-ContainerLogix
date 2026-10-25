@@ -72,7 +72,16 @@ import {
   TrendingUp,
   Droplet,
   Timer,
-  Award
+  Award,
+  Contact,
+  UserPlus,
+  BriefcaseBusiness,
+  WalletCards,
+  TreePalm,
+  MessageSquareWarning,
+  Hourglass,
+  FileBadge,
+  Percent
 } from 'lucide-react';
 import { Suspense, createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageSkeleton } from './DataPage';
@@ -155,6 +164,16 @@ const PAGE_TITLES = {
   '/expense-reports': 'Prestação de Contas',
   '/checks': 'Controle de Cheque',
   '/gratifications': 'Controle de Gratificação',
+  '/rh': 'Painel do RH',
+  '/rh/contratos': 'Admissão e Contratos',
+  '/rh/cargos': 'Cargos e Salários',
+  '/rh/folha': 'Folha de Pagamento',
+  '/rh/tabelas': 'Tabelas de Cálculo',
+  '/rh/ferias': 'Férias',
+  '/rh/ocorrencias': 'Ocorrências',
+  '/rh/banco-horas': 'Banco de Horas',
+  '/rh/documentos': 'Documentos e ASO',
+  '/rh/relatorios': 'Relatórios de RH',
   '/repair-estimates': 'Orçamento de Reparo',
   '/reports/receivables': 'Contas a Receber',
   '/financial-summary': 'Resumo Financeiro',
@@ -197,6 +216,7 @@ const GROUP_COLORS = {
   Estoque: 'chart-8',
   Comercial: 'chart-9',
   'Gestão de Container': 'chart-10',
+  RH: 'chart-11',
 };
 
 // Moldura do sistema (menu lateral, cabeçalho, sino, busca). Fica montada uma
@@ -247,6 +267,7 @@ function LayoutFrame({ children }) {
   const [estoqueCadastroOpen, setEstoqueCadastroOpen] = useState(false);
   const [comercialOpen, setComercialOpen] = useState(false);
   const [gestaoContainerOpen, setGestaoContainerOpen] = useState(false);
+  const [rhOpen, setRhOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [transporteOpen, setTransporteOpen] = useState(false);
   const [opcoesSistemaOpen, setOpcoesSistemaOpen] = useState(false);
@@ -364,6 +385,8 @@ function LayoutFrame({ children }) {
     if (savedComercial !== null) setComercialOpen(JSON.parse(savedComercial));
     const savedGestaoContainer = localStorage.getItem('gestaoContainerOpen');
     if (savedGestaoContainer !== null) setGestaoContainerOpen(JSON.parse(savedGestaoContainer));
+    const savedRh = localStorage.getItem('rhOpen');
+    if (savedRh !== null) setRhOpen(JSON.parse(savedRh));
     const savedTerminal = localStorage.getItem('terminalOpen');
     if (savedTerminal !== null) setTerminalOpen(JSON.parse(savedTerminal));
     const savedTransporte = localStorage.getItem('transporteOpen');
@@ -385,6 +408,7 @@ function LayoutFrame({ children }) {
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio', '/estoque/entrega-epi'].includes(location.pathname);
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
   const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
+  const isRhActive = location.pathname === '/rh' || location.pathname.startsWith('/rh/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
@@ -412,6 +436,7 @@ function LayoutFrame({ children }) {
     if (isEstoqueCadastroActive && !estoqueCadastroOpen) setEstoqueCadastroOpen(true);
     if (isComercialActive && !comercialOpen) setComercialOpen(true);
     if (isGestaoContainerActive && !gestaoContainerOpen) setGestaoContainerOpen(true);
+    if (isRhActive && !rhOpen) setRhOpen(true);
     if (isTerminalActive && !terminalOpen) setTerminalOpen(true);
   }, [location.pathname]);
 
@@ -526,6 +551,12 @@ function LayoutFrame({ children }) {
     localStorage.setItem('gestaoContainerOpen', JSON.stringify(newState));
   };
 
+  const toggleRh = () => {
+    const newState = !rhOpen;
+    setRhOpen(newState);
+    localStorage.setItem('rhOpen', JSON.stringify(newState));
+  };
+
   const toggleTerminal = () => {
     const newState = !terminalOpen;
     setTerminalOpen(newState);
@@ -635,6 +666,20 @@ function LayoutFrame({ children }) {
     { path: '/container-sales', label: 'Registro de Venda', icon: BadgeDollarSign, moduleKey: 'gestao_container.venda' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
+  // RH: salários em todas as telas - só administrador (as rotas também são adminOnly)
+  const rhItems = (isAdmin ? [
+    { path: '/rh', label: 'Painel do RH', icon: Contact, moduleKey: 'rh' },
+    { path: '/rh/contratos', label: 'Admissão e Contratos', icon: UserPlus, moduleKey: 'rh.contratos' },
+    { path: '/rh/cargos', label: 'Cargos e Salários', icon: BriefcaseBusiness, moduleKey: 'rh.cargos' },
+    { path: '/rh/folha', label: 'Folha de Pagamento', icon: WalletCards, moduleKey: 'rh.folha' },
+    { path: '/rh/ferias', label: 'Férias', icon: TreePalm, moduleKey: 'rh.ferias' },
+    { path: '/rh/ocorrencias', label: 'Ocorrências', icon: MessageSquareWarning, moduleKey: 'rh.ocorrencias' },
+    { path: '/rh/banco-horas', label: 'Banco de Horas', icon: Hourglass, moduleKey: 'rh.banco_horas' },
+    { path: '/rh/documentos', label: 'Documentos e ASO', icon: FileBadge, moduleKey: 'rh.documentos' },
+    { path: '/rh/relatorios', label: 'Relatórios de RH', icon: BarChart3, moduleKey: 'rh.relatorios' },
+    { path: '/rh/tabelas', label: 'Tabelas de Cálculo', icon: Percent, moduleKey: 'rh.folha' },
+  ] : []).filter((item) => isModuleEnabled(item.moduleKey));
+
   const transporteItems = [
     { path: '/fleet', label: 'Cadastro de Veículo', icon: Car, moduleKey: 'frota.veiculos' },
     { path: '/fleet/rpa-terceiro', label: 'Contrato de Frete', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
@@ -695,12 +740,13 @@ function LayoutFrame({ children }) {
   const isEstoqueGroupVisible = estoqueItems.length > 0 || estoqueCadastroItems.length > 0;
   const isComercialGroupVisible = comercialItems.length > 0;
   const isGestaoContainerGroupVisible = gestaoContainerItems.length > 0;
+  const isRhGroupVisible = rhItems.length > 0;
   const isOpcoesSistemaGroupVisible = opcoesSistemaItems.length > 0;
 
   const allSearchableItems = useMemo(() => [
     ...mainNavItems, ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...manutencaoItems, ...abastecimentoItems, ...manutencaoCadastroItems, ...manutencaoRelatorioItems, ...transporteItems, ...cadastroItems,
     ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems, ...estoqueItems, ...estoqueCadastroItems, ...comercialItems,
-    ...gestaoContainerItems,
+    ...gestaoContainerItems, ...rhItems,
   ], [isAdmin]);
 
   const filteredItems = searchQuery
@@ -741,9 +787,10 @@ function LayoutFrame({ children }) {
     if (isEstoqueActive) return 'Almoxarifado';
     if (isComercialActive) return 'Comercial';
     if (isGestaoContainerActive) return 'Gestão de Container';
+    if (isRhActive) return 'RH';
     if (isOpcoesSistemaActive) return 'Opções do Sistema';
     return null;
-  }, [isTerminalActive, isManutencaoActive, isAbastecimentoActive, isTransporteActive, isCadastroActive, isFinanceiroActive, isOperacionalActive, isEstoqueActive, isComercialActive, isGestaoContainerActive, isOpcoesSistemaActive]);
+  }, [isTerminalActive, isManutencaoActive, isAbastecimentoActive, isTransporteActive, isCadastroActive, isFinanceiroActive, isOperacionalActive, isEstoqueActive, isComercialActive, isGestaoContainerActive, isRhActive, isOpcoesSistemaActive]);
 
   // Expand sidebar when clicking a group while collapsed
   const handleGroupClickCollapsed = (toggleFn) => {
@@ -1184,6 +1231,12 @@ function LayoutFrame({ children }) {
                   <div>{gestaoContainerItems.map((item) => renderNavItem(item, true))}</div>
                 )}
 
+                {/* RH */}
+                {isRhGroupVisible && renderGroupHeader('RH', Contact, rhOpen, toggleRh, isRhActive, 'nav-rh-toggle')}
+                {isRhGroupVisible && rhOpen && sidebarOpen && (
+                  <div>{rhItems.map((item) => renderNavItem(item, true))}</div>
+                )}
+
                 {/* Opções do Sistema */}
                 {isOpcoesSistemaGroupVisible && renderGroupHeader('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive, 'nav-opcoes-sistema-toggle')}
                 {isOpcoesSistemaGroupVisible && opcoesSistemaOpen && sidebarOpen && (
@@ -1312,6 +1365,10 @@ function LayoutFrame({ children }) {
                 {/* Gestão de Container Mobile */}
                 {isGestaoContainerGroupVisible && renderMobileGroupToggle('Gestão de Container', ShoppingBag, gestaoContainerOpen, toggleGestaoContainer, isGestaoContainerActive)}
                 {isGestaoContainerGroupVisible && gestaoContainerOpen && gestaoContainerItems.map((item) => renderMobileNavItem(item))}
+
+                {/* RH Mobile */}
+                {isRhGroupVisible && renderMobileGroupToggle('RH', Contact, rhOpen, toggleRh, isRhActive)}
+                {isRhGroupVisible && rhOpen && rhItems.map((item) => renderMobileNavItem(item))}
 
                 {/* Opções do Sistema Mobile */}
                 {isOpcoesSistemaGroupVisible && renderMobileGroupToggle('Opções do Sistema', Cog, opcoesSistemaOpen, toggleOpcoesSistema, isOpcoesSistemaActive)}

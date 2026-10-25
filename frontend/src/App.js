@@ -90,6 +90,16 @@ const LoadingSchedulePage = lazyPage(() => import('./pages/LoadingSchedulePage')
 const DailyRateRequestPage = lazyPage(() => import('./pages/DailyRateRequestPage'));
 const CheckControlPage = lazyPage(() => import('./pages/CheckControlPage'));
 const GratificationsPage = lazyPage(() => import('./pages/GratificationsPage'));
+const HRDashboardPage = lazyPage(() => import('./pages/HRDashboardPage'));
+const HRContractsPage = lazyPage(() => import('./pages/HRContractsPage'));
+const HRPositionsPage = lazyPage(() => import('./pages/HRPositionsPage'));
+const PayrollPage = lazyPage(() => import('./pages/PayrollPage'));
+const PayrollSettingsPage = lazyPage(() => import('./pages/PayrollSettingsPage'));
+const HRVacationsPage = lazyPage(() => import('./pages/HRVacationsPage'));
+const HROccurrencesPage = lazyPage(() => import('./pages/HROccurrencesPage'));
+const HRTimeBankPage = lazyPage(() => import('./pages/HRTimeBankPage'));
+const HRDocumentsPage = lazyPage(() => import('./pages/HRDocumentsPage'));
+const HRReportsPage = lazyPage(() => import('./pages/HRReportsPage'));
 const RepairEstimatesPage = lazyPage(() => import('./pages/RepairEstimatesPage'));
 const ReceivablesPage = lazyPage(() => import('./pages/ReceivablesPage'));
 const FinancialSummaryPage = lazyPage(() => import('./pages/FinancialSummaryPage'));
@@ -744,6 +754,86 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.controle_cheque">
                 <CheckControlPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh">
+                <HRDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/contratos"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.contratos">
+                <HRContractsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/cargos"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.cargos">
+                <HRPositionsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/folha"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.folha">
+                <PayrollPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/tabelas"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.folha">
+                <PayrollSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/ferias"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.ferias">
+                <HRVacationsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/ocorrencias"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.ocorrencias">
+                <HROccurrencesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/banco-horas"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.banco_horas">
+                <HRTimeBankPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/documentos"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.documentos">
+                <HRDocumentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/relatorios"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.relatorios">
+                <HRReportsPage />
               </ProtectedRoute>
             }
           />
