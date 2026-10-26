@@ -1,4 +1,5 @@
 import axios from 'axios';
+import './tenant'; // empresa em toda chamada (multi-cliente)
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const BASE_URL = process.env.REACT_APP_BACKEND_URL;
@@ -10,6 +11,8 @@ if (token) {
 
 export const api = {
   getDashboardStats: () => axios.get(`${API}/dashboard`),
+  // Tela de login: de qual empresa é este endereço (nome e logo)
+  getTenantInfo: () => axios.get(`${API}/tenant-info`),
   
   // Drivers
   getDrivers: () => axios.get(`${API}/drivers`),

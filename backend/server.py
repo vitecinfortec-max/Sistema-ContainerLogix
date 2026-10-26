@@ -16,7 +16,7 @@ from typing import Optional
 from shared import (
     db, client, manager, UPLOADS_DIR,
     get_disabled_modules, match_module_for_path, is_module_disabled, session_is_current,
-    rate_limit_rule, rate_limit_exceeded, client_ip, RATE_LIMIT_MESSAGE,
+    rate_limit_rule, rate_limit_exceeded, client_ip, RATE_LIMIT_MESSAGE, get_company_settings,
 )
 from auth import decode_token, FILE_TOKEN_SCOPE
 
@@ -74,7 +74,8 @@ from routers.audit_log import api_router as audit_log_router
 from routers.module_config import api_router as module_config_router
 from scheduled_reports import api_router as scheduled_reports_router, start_scheduler, stop_scheduler
 from tenancy import (
-    NoTenantError, TENANT_HEADER, TENANT_HOST_HEADER, active_tenants, directory, is_multi_tenant, reset_current_tenant,
+    NoTenantError, TENANT_HEADER, TENANT_HOST_HEADER, active_tenants, current_tenant, directory, is_multi_tenant,
+    reset_current_tenant,
     set_current_tenant, tenant_context,
 )
 
@@ -150,7 +151,9 @@ async def resolve_request_tenant(request: Request):
             token_tid = None  # token inválido: a própria rota recusa depois
 
     directory_ = directory()
-    header_slug = request.headers.get(TENANT_HEADER)
+    # ?tenant= vale como o cabeçalho: um <img> não manda cabeçalhos (logo
+    # da empresa na tela de login, antes de existir token)
+    header_slug = request.headers.get(TENANT_HEADER) or request.query_params.get("tenant")
     header_host = request.headers.get(TENANT_HOST_HEADER)
     header_tenant = None
     if header_slug:
@@ -180,7 +183,9 @@ async def tenant_middleware(request: Request, call_next):
     """Multi-cliente (MULTI_TENANT): define a empresa antes de qualquer outra
     coisa - o bloqueio de módulos e o limite de requisições já rodam no banco
     dela. Desligado, não faz nada."""
-    if not is_multi_tenant() or request.method == "OPTIONS" or request.url.path in _TENANTLESS_PATHS:
+    path = request.url.path
+    if (not is_multi_tenant() or request.method == "OPTIONS" or path in _TENANTLESS_PATHS
+            or not path.startswith("/api/")):
         return await call_next(request)
     tenant, error = await resolve_request_tenant(request)
     if error is not None:
@@ -247,6 +252,21 @@ async def serve_upload(file_path: str, request: Request, token: Optional[str] = 
 @api_router.get("/")
 async def root():
     return {"message": "ContainerLogix API"}
+
+
+@api_router.get("/tenant-info")
+async def tenant_info():
+    """Tela de login (sem login): de qual empresa é este endereço, com o nome
+    e o logo dela. Com MULTI_TENANT e endereço desconhecido, o tenant_middleware
+    já responde 400/404 - a tela então pede o "Código da empresa"."""
+    company = await get_company_settings()
+    tenant = current_tenant()
+    return {
+        "multi_tenant": is_multi_tenant(),
+        "slug": tenant["slug"] if tenant else None,
+        "name": company.get("name") or (tenant["name"] if tenant else None),
+        "logo_filename": company.get("logo_filename"),
+    }
 
 
 app.include_router(api_router)

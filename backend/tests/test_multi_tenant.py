@@ -175,3 +175,24 @@ def test_cors_regex_accepts_company_subdomains(monkeypatch):
     assert pattern.match("https://containerlogix.com.br")
     assert not pattern.match("https://ja.containerlogix.com.br.evil.com")
     assert not pattern.match("https://evilcontainerlogix.com.br")
+
+
+def test_tenant_info_for_login_screen(mt):
+    mt.run(mt.db["db_t2"].company_settings.insert_one({"name": "Transportes Dois LTDA", "logo_filename": "logo2.png"}))
+    info = mt.request("GET", "/api/tenant-info", headers={"X-Tenant-Host": "t2.containerlogix.com.br"}).json()
+    assert info == {"multi_tenant": True, "slug": "t2", "name": "Transportes Dois LTDA", "logo_filename": "logo2.png"}
+    assert mt.request("GET", "/api/tenant-info", tenant="t1").json()["name"] == "Empresa Um"
+    # endereço que não é de empresa nenhuma (ex.: app no celular): a tela pede o código
+    assert mt.request("GET", "/api/tenant-info", headers={"X-Tenant-Host": "localhost"}).status_code == 404
+    assert mt.request("GET", "/api/tenant-info").status_code == 400
+    # logo antes do login, pela URL
+    (mt.uploads_root / "t2").mkdir(exist_ok=True)
+    (mt.uploads_root / "t2" / "logo2.png").write_bytes(b"png")
+    assert mt.request("GET", "/api/uploads/logo2.png?tenant=t2").content == b"png"
+    assert mt.request("GET", "/api/uploads/logo2.png?tenant=t1").status_code == 404
+
+
+def test_only_api_paths_need_a_company(mt):
+    # o site (quando servido pelo mesmo processo) e a documentação não passam pelo filtro
+    assert mt.request("GET", "/login").status_code != 400
+    assert mt.request("GET", "/openapi.json").status_code == 200

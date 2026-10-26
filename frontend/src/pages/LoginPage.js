@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { LogIn, Mail, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, KeyRound, Building2 } from 'lucide-react';
+import { api } from '../lib/api';
+import { getTenantCode, setTenantCode } from '../lib/tenant';
 import LoginScene3D from '../components/LoginScene3D';
 import { motion, riseIn, staggerParent } from '../components/Motion';
 
@@ -16,12 +18,58 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  // Multi-cliente: { status: 'single' | 'ok' | 'need-code', name, slug, logo_filename }
+  const [tenant, setTenant] = useState({ status: 'loading' });
+  const [companyCode, setCompanyCode] = useState(getTenantCode());
+
+  const loadTenant = () => api.getTenantInfo()
+    .then((res) => {
+      const info = res.data || {};
+      const next = info.multi_tenant ? { status: 'ok', ...info } : { status: 'single' };
+      setTenant(next);
+      return next;
+    })
+    .catch((error) => {
+      const status = error.response?.status;
+      const detail = error.response?.data?.detail;
+      // 400/404 do servidor multi-cliente: este endereço não diz a empresa
+      // (app do celular) - pede o código. Outros erros: tela como sempre.
+      const next = (status === 400 || status === 404) && detail !== 'Not Found' ? { status: 'need-code' } : { status: 'single' };
+      setTenant(next);
+      return next;
+    });
+
+  useEffect(() => { loadTenant(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const changeCompany = () => {
+    setTenantCode('');
+    setCompanyCode('');
+    loadTenant();
+  };
+
+  // Antes do login o <img> não tem token: a empresa vai na URL (?tenant=)
+  const companyLogo = tenant.status === 'ok' && tenant.logo_filename ? api.getFileUrl(`/api/uploads/${tenant.logo_filename}`) : null;
+  const logoUrl = companyLogo ? `${companyLogo}${companyLogo.includes('?') ? '&' : '?'}tenant=${tenant.slug}` : '/logo-containerlogix.png';
+  const brandName = tenant.status === 'ok' && tenant.name ? tenant.name : 'ContainerLogix';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
+      if (tenant.status === 'need-code') {
+        if (!companyCode.trim()) {
+          toast.error('Informe o código da empresa');
+          return;
+        }
+        setTenantCode(companyCode);
+        const info = await loadTenant();
+        if (info.status !== 'ok') {
+          setTenantCode('');
+          toast.error('Código da empresa não encontrado');
+          return;
+        }
+      }
       const userData = await login(email, password);
       toast.success('Login realizado com sucesso!');
 
@@ -76,11 +124,22 @@ export default function LoginPage() {
           {/* Marca: logo + nome do sistema, acima das informações de login */}
           <motion.div variants={riseIn} className="flex items-center gap-3 mb-10" data-testid="login-brand">
             <div className="rounded-xl bg-white dark:bg-slate-800 p-1.5 shadow-md ring-1 ring-slate-200 dark:ring-slate-700">
-              <img src="/logo-containerlogix.png" alt="ContainerLogix" className="h-12 w-12 object-contain" />
+              <img src={logoUrl} alt={brandName} className="h-12 w-12 object-contain"
+                onError={(e) => { e.currentTarget.src = '/logo-containerlogix.png'; }} />
             </div>
-            <span className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              ContainerLogix
-            </span>
+            <div className="min-w-0">
+              <span className="block text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 truncate" data-testid="login-brand-name">
+                {brandName}
+              </span>
+              {tenant.status === 'ok' && (
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  ContainerLogix
+                  {getTenantCode() && (
+                    <> · <button type="button" onClick={changeCompany} className="text-primary hover:underline" data-testid="change-company">trocar empresa</button></>
+                  )}
+                </span>
+              )}
+            </div>
           </motion.div>
 
           {/* Cabeçalho do Formulário */}
@@ -94,6 +153,24 @@ export default function LoginPage() {
           </motion.div>
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
+            {tenant.status === 'need-code' && (
+              <motion.div variants={riseIn} className="space-y-2">
+                <Label htmlFor="company-code" className="text-sm text-slate-700 dark:text-slate-300 font-medium">Código da empresa</Label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
+                  <Input
+                    id="company-code"
+                    data-testid="company-code-input"
+                    value={companyCode}
+                    onChange={(e) => setCompanyCode(e.target.value)}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    required
+                    className="h-12 pl-11 border-slate-300 dark:border-slate-600 focus:border-primary focus:ring-primary"
+                  />
+                </div>
+              </motion.div>
+            )}
             <motion.div variants={riseIn} className="space-y-2">
               <Label htmlFor="email" className="text-sm text-slate-700 dark:text-slate-300 font-medium">Email</Label>
               <div className="relative">

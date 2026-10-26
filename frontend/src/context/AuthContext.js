@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
+import '../lib/tenant'; // empresa em toda chamada (multi-cliente)
 
 const AuthContext = createContext();
 

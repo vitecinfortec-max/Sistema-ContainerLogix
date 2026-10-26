@@ -177,3 +177,8 @@ def test_token_without_password_version_keeps_working_until_a_password_change(ap
     assert api.get("/api/movements", as_user=None, headers=headers).status_code == 200
     api.run(api.db.users.update_one({"id": "admin-1"}, {"$set": {"password_version": 1}}))
     assert api.get("/api/movements", as_user=None, headers=headers).status_code == 401
+
+
+def test_tenant_info_single_instance(api):
+    info = api.get("/api/tenant-info", as_user=None).json()
+    assert info["multi_tenant"] is (os.environ.get("TEST_MULTI_TENANT") == "1")
