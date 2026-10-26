@@ -756,6 +756,7 @@ export const api = {
   updateFuelSupplyOrder: (id, data) => axios.put(`${API}/fuel-supply-orders/${id}`, data),
   deleteFuelSupplyOrder: (id) => axios.delete(`${API}/fuel-supply-orders/${id}`),
   getFuelSupplyOrderPDF: (id) => axios.get(`${API}/fuel-supply-orders/${id}/pdf`, { responseType: 'blob' }),
+  getFuelSupplyOrdersPDF: (ids) => axios.get(`${API}/fuel-supply-orders/pdf`, { params: { ids: ids.join(',') }, responseType: 'blob' }),
 
   // Relatório de Abastecimento (Frota)
   getFuelSupplyReportSummary: (params) => axios.get(`${API}/reports/fuel-supply/summary`, { params }),

@@ -253,6 +253,50 @@ export default function FuelSupplyOrderPage() {
 
   const singleSelectedOrder = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;
 
+  // Várias ordens selecionadas: um PDF só, uma ordem por folha (2 vias cada)
+  const selectedPdf = async () => {
+    const ids = [...selectedIds];
+    const r = ids.length === 1 ? await api.getFuelSupplyOrderPDF(ids[0]) : await api.getFuelSupplyOrdersPDF(ids);
+    return new Blob([r.data], { type: 'application/pdf' });
+  };
+  const selectedName = () => {
+    const nums = list.filter((o) => selectedIds.has(o.id)).map((o) => o.order_number).sort((a, b) => a - b);
+    return nums.length === 1 ? `OrdemAbastecimento_${nums[0]}.pdf` : `OrdensAbastecimento_${nums[0]}_a_${nums[nums.length - 1]}.pdf`;
+  };
+  const downloadSelected = async () => {
+    try {
+      const url = window.URL.createObjectURL(await selectedPdf());
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', selectedName());
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => window.URL.revokeObjectURL(url), 10000);
+      toast.success(selectedIds.size === 1 ? 'PDF gerado!' : `PDF com ${selectedIds.size} ordens gerado!`);
+    } catch (e) { toast.error('Erro ao gerar PDF'); }
+  };
+  // Imprime direto: o PDF abre num quadro escondido e chama a impressão do
+  // navegador; se o navegador não deixar, abre o PDF numa aba para imprimir
+  const printSelected = async () => {
+    try {
+      const url = window.URL.createObjectURL(await selectedPdf());
+      const frame = document.createElement('iframe');
+      frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+      frame.src = url;
+      frame.onload = () => {
+        try {
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+        } catch (err) {
+          window.open(url, '_blank');
+        }
+        setTimeout(() => { frame.remove(); window.URL.revokeObjectURL(url); }, 60000);
+      };
+      document.body.appendChild(frame);
+    } catch (e) { toast.error('Erro ao gerar PDF'); }
+  };
+
   return (
     <Layout>
       <div className="space-y-4" data-testid="fuel-order-page">
@@ -292,7 +336,10 @@ export default function FuelSupplyOrderPage() {
               primary={<ToolbarPrimary icon={Plus} label="Nova ordem" onClick={openCreate} testId="fuel-order-new-btn" />}
             >
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedOrder && openEdit(singleSelectedOrder.id)} disabled={!singleSelectedOrder} />
-              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedOrder && downloadPDF(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
+              <ToolbarButton icon={Download} label={selectedIds.size > 1 ? `Baixar PDF (${selectedIds.size} ordens)` : 'Baixar PDF'} tone="emerald"
+                onClick={downloadSelected} disabled={!selectedIds.size} testId="fuel-orders-download" />
+              <ToolbarButton icon={Printer} label={selectedIds.size > 1 ? `Imprimir (${selectedIds.size} ordens)` : 'Imprimir'} tone="primary"
+                onClick={printSelected} disabled={!selectedIds.size} testId="fuel-orders-print" />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
             </Toolbar>
           )}

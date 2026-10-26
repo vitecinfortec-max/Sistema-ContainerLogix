@@ -607,6 +607,26 @@ async def get_next_fuel_supply_order_number(current_user: dict = Depends(get_cur
     return {"next_number": (counter["seq"] + 1) if counter else 1}
 
 
+@api_router.get("/fuel-supply-orders/pdf")
+async def download_fuel_supply_orders_pdf(ids: str = Query(..., description="IDs separados por vírgula"),
+                                          current_user: dict = Depends(get_current_active_user)):
+    """Várias ordens selecionadas num PDF só, em ordem de número."""
+    wanted = [i for i in (x.strip() for x in ids.split(",")) if i]
+    if not wanted:
+        raise HTTPException(status_code=400, detail="Selecione ao menos uma ordem")
+    if len(wanted) > 200:
+        raise HTTPException(status_code=400, detail="Selecione no máximo 200 ordens por vez")
+    orders = await db.fuel_supply_orders.find({"id": {"$in": wanted}}, {"_id": 0}).to_list(None)
+    if not orders:
+        raise HTTPException(status_code=404, detail="Ordens de Abastecimento não encontradas")
+    orders.sort(key=lambda o: o.get("order_number") or 0)
+    pdf_bytes = _fuel_orders_pdf(orders, merge_company(await get_company_settings()), current_user)
+    first, last = orders[0]["order_number"], orders[-1]["order_number"]
+    filename = f"OrdemAbastecimento_{first}.pdf" if len(orders) == 1 else f"OrdensAbastecimento_{first}_a_{last}.pdf"
+    return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
+                             headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+
 @api_router.get("/fuel-supply-orders/{order_id}", response_model=FuelSupplyOrderResponse)
 async def get_fuel_supply_order(order_id: str, current_user: dict = Depends(get_current_active_user)):
     doc = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0})
@@ -688,26 +708,20 @@ def _valor_por_extenso(value):
     return ' '.join(w if w in conectores else w.capitalize() for w in words)
 
 
-@api_router.get("/fuel-supply-orders/{order_id}/pdf")
-async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Depends(get_current_active_user)):
-    """Gera PDF da Ordem de Abastecimento (2 vias na mesma página, com linha
-    de corte) no padrão visual dos documentos do sistema - cabeçalho padrão
-    na versão compacta pra as duas vias caberem numa folha."""
+def _fuel_orders_pdf(orders: list, company: dict, current_user: dict) -> bytes:
+    """PDF das Ordens de Abastecimento: cada ordem em uma folha, com 2 vias
+    (linha de corte) no padrão visual dos documentos do sistema - cabeçalho
+    padrão na versão compacta pra as duas vias caberem numa folha."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable, PageBreak
     from reports import (
         download_logo, _build_pdf_header, _pdf_info_grid, _pdf_header_cells, _pdf_table_style,
         _pdf_signatures, _hex, BRAND_LINE, BRAND_MUTED, BRAND_TEXT,
     )
-
-    order = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0})
-    if not order:
-        raise HTTPException(status_code=404, detail="Ordem de Abastecimento não encontrada")
-    company = merge_company(await get_company_settings())
 
     def fmt_dt(s):
         # Horário de Brasília: o que o servidor carimbou (UTC) é convertido
@@ -727,11 +741,6 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
         except Exception:
             return "-"
 
-    liters = order.get('liters')
-    estimated_value = order.get('estimated_value')
-    has_total = liters is not None and estimated_value is not None
-    total_value = (float(liters) * float(estimated_value)) if has_total else None
-
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
@@ -741,8 +750,12 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
     styles = getSampleStyleSheet()
     WIDTH = doc.width
 
-    def build_via():
+    def build_via(order):
         elems = []
+        liters = order.get('liters')
+        estimated_value = order.get('estimated_value')
+        has_total = liters is not None and estimated_value is not None
+        total_value = (float(liters) * float(estimated_value)) if has_total else None
 
         # ========== CABEÇALHO (padrão, versão compacta) ==========
         elems.extend(_build_pdf_header(
@@ -827,23 +840,36 @@ async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Dep
         ))
         return elems
 
-    elements = build_via()
-    elements.append(Spacer(1, 6))
-    elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#94A3B8'),
-                               dash=(4, 3), spaceBefore=0, spaceAfter=0))
-    elements.append(Paragraph(
-        "&#9986;  corte aqui  &#9986;",
-        ParagraphStyle('CutLine', parent=styles['Normal'], fontSize=6.5, textColor=colors.HexColor('#94A3B8'),
-                       alignment=TA_CENTER, spaceBefore=1, spaceAfter=1)
-    ))
-    elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#94A3B8'),
-                               dash=(4, 3), spaceBefore=0, spaceAfter=0))
-    elements.append(Spacer(1, 8))
-    elements += build_via()
+    elements = []
+    for i, order in enumerate(orders):
+        if i:
+            elements.append(PageBreak())  # uma ordem por folha, com as 2 vias
+        elements += build_via(order)
+        elements.append(Spacer(1, 6))
+        elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#94A3B8'),
+                                   dash=(4, 3), spaceBefore=0, spaceAfter=0))
+        elements.append(Paragraph(
+            "&#9986;  corte aqui  &#9986;",
+            ParagraphStyle('CutLine', parent=styles['Normal'], fontSize=6.5, textColor=colors.HexColor('#94A3B8'),
+                           alignment=TA_CENTER, spaceBefore=1, spaceAfter=1)
+        ))
+        elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#94A3B8'),
+                                   dash=(4, 3), spaceBefore=0, spaceAfter=0))
+        elements.append(Spacer(1, 8))
+        elements += build_via(order)
 
     doc.build(elements)
     pdf_bytes = buffer.getvalue()
     buffer.close()
+    return pdf_bytes
+
+
+@api_router.get("/fuel-supply-orders/{order_id}/pdf")
+async def download_fuel_supply_order_pdf(order_id: str, current_user: dict = Depends(get_current_active_user)):
+    order = await db.fuel_supply_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordem de Abastecimento não encontrada")
+    pdf_bytes = _fuel_orders_pdf([order], merge_company(await get_company_settings()), current_user)
     filename = f"OrdemAbastecimento_{order['order_number']}.pdf"
     return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf",
                              headers={"Content-Disposition": f"attachment; filename={filename}"})
