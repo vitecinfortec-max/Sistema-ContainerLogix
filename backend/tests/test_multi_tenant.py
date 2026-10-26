@@ -257,3 +257,65 @@ def test_platform_edits_suspends_and_sets_modules(mt):
     assert mt.request("PUT", "/api/platform/tenants/t2/modules", token=owner, json={"disabled_modules": ["rh"]}).status_code == 200
     assert mt.request("GET", "/api/hr/positions", token=t2).status_code == 403
     assert mt.request("PUT", "/api/platform/tenants/nao-existe/modules", token=owner, json={"disabled_modules": []}).status_code == 404
+
+
+# ---------------------------------------------------------------- Etapa 5: isolamento do resto
+
+def test_audit_log_and_reports_stay_in_their_company(mt):
+    t1, t2 = mt.token("t1"), mt.token("t2")
+    emp = mt.request("POST", "/api/employees", token=t1, json={"name": "Funcionário Exclusivo Um", "cpf": "123.456.789-00"}).json()
+    mt.request("POST", "/api/hr/contracts", token=t1, json={"person_type": "FUNCIONARIO", "person_id": emp["id"],
+                                                            "admission_date": "2025-01-10", "base_salary": 3000})
+    log1 = mt.request("GET", "/api/audit-log", token=t1)
+    log2 = mt.request("GET", "/api/audit-log", token=t2)
+    assert log1.status_code == 200 and "Funcionário Exclusivo Um" in log1.text
+    assert log2.status_code == 200 and "Funcionário Exclusivo Um" not in log2.text
+    assert mt.request("GET", "/api/reports/hr/headcount", token=t1).json()["summary"]["count"] == 1
+    assert mt.request("GET", "/api/reports/hr/headcount", token=t2).json()["summary"]["count"] == 0
+    pdf = mt.request("GET", "/api/reports/hr/headcount/pdf", token=t2)
+    assert pdf.content.startswith(b"%PDF")
+    # a pessoa de outra empresa não existe aqui (não dá pra admitir pelo id)
+    assert mt.request("POST", "/api/hr/contracts", token=t2, json={"person_type": "FUNCIONARIO", "person_id": emp["id"],
+                                                                   "admission_date": "2025-01-10", "base_salary": 3000}).status_code == 404
+
+
+def test_realtime_notices_only_reach_the_same_company(mt):
+    import shared
+    import tenancy
+
+    class FakeSocket:
+        def __init__(self):
+            self.received = []
+
+        async def accept(self):
+            pass
+
+        async def send_json(self, message):
+            self.received.append(message)
+
+    manager = shared.ConnectionManager()
+    one, two = FakeSocket(), FakeSocket()
+    with tenancy.tenant_context({"slug": "t1", "db_name": "db_t1"}):
+        mt.run(manager.connect(one))
+    with tenancy.tenant_context({"slug": "t2", "db_name": "db_t2"}):
+        mt.run(manager.connect(two))
+        mt.run(manager.broadcast({"type": "movement_created", "id": "x"}))
+    assert two.received == [{"type": "movement_created", "id": "x"}] and one.received == []
+
+
+def test_daily_email_runs_once_per_active_company(mt, monkeypatch):
+    import scheduled_reports
+    import tenancy
+    seen = []
+
+    async def fake_send(day=None):
+        seen.append((tenancy.current_tenant_slug(), await scheduled_reports.db.users.count_documents({})))
+        return {}
+
+    monkeypatch.setattr(scheduled_reports, "send_daily_client_movement_reports", fake_send)
+    mt.run(mt.db["central_teste"].tenants.update_one({"slug": "t2"}, {"$set": {"status": "SUSPENSO"}}))
+    mt.run(scheduled_reports._run_scheduled_daily_reports())
+    assert seen == [("t1", 1)]  # empresa suspensa não recebe
+    # e cada empresa reserva o próprio dia (não bloqueia a outra)
+    assert mt.run(mt.db["db_t1"].scheduled_job_runs.count_documents({})) == 1
+    assert mt.run(mt.db["db_t2"].scheduled_job_runs.count_documents({})) == 0
