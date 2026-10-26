@@ -18,6 +18,10 @@ from fastapi import Depends, HTTPException, Request, UploadFile, WebSocket, stat
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from audit import AuditedDatabase, set_actor
+from tenancy import (
+    CENTRAL_DB_NAME, TenantRoutedDatabase, TenantUploadsRoot, configure as configure_tenants, current_tenant_slug,
+    is_multi_tenant,
+)
 
 from auth import get_current_user
 
@@ -43,7 +47,11 @@ def _sweep_rate_limits(now: float):
 
 def rate_limit_exceeded(key: str, limit: int, window_seconds: int) -> bool:
     """Registra a tentativa e diz se 'key' passou de 'limit' dentro de
-    'window_seconds' (a tentativa recusada não conta)."""
+    'window_seconds' (a tentativa recusada não conta). Com várias empresas no
+    mesmo servidor, cada uma tem os seus limites."""
+    tenant_slug = current_tenant_slug()
+    if tenant_slug:
+        key = f"{tenant_slug}|{key}"
     now = time.time()
     _sweep_rate_limits(now)
     attempts = _rate_limit_attempts[key]
@@ -169,8 +177,10 @@ def migrate_inspection_photos(inspection: dict) -> dict:
 
 
 ROOT_DIR = Path(__file__).parent
-# A pasta é criada na inicialização do app (lifespan em server.py).
-UPLOADS_DIR = ROOT_DIR.parent / 'uploads'
+# A pasta é criada na inicialização do app (lifespan em server.py). Com
+# MULTI_TENANT, cada empresa tem a sua: uploads/<empresa>/ (tenancy.py).
+UPLOADS_BASE_DIR = ROOT_DIR.parent / 'uploads'
+UPLOADS_DIR = TenantUploadsRoot(UPLOADS_BASE_DIR) if is_multi_tenant() else UPLOADS_BASE_DIR
 LOGO_PATH = ROOT_DIR / 'assets' / 'logo.png'
 
 
@@ -197,8 +207,14 @@ mongo_url = os.environ['MONGO_URL']
 # voltavam "sem fuso", a API as mandava sem o "+00:00" e o navegador as lia
 # como hora local - tudo aparecia 3 horas adiantado.
 client = AsyncIOMotorClient(mongo_url, tz_aware=True, tzinfo=timezone.utc)
-# Toda gravação feita por um usuário logado entra no log de auditoria (audit.py)
-db = AuditedDatabase(client[os.environ['DB_NAME']])
+# Toda gravação feita por um usuário logado entra no log de auditoria (audit.py).
+# Com MULTI_TENANT, `db` entrega o banco da empresa da requisição (tenancy.py)
+# e a lista de empresas vem do banco central; sem ele, o banco de DB_NAME.
+if is_multi_tenant():
+    db = TenantRoutedDatabase(client, wrap=AuditedDatabase)
+    configure_tenants(client[CENTRAL_DB_NAME])
+else:
+    db = AuditedDatabase(client[os.environ['DB_NAME']])
 
 
 # Quem ainda precisa trocar a senha provisória só alcança o necessário pra
@@ -280,19 +296,26 @@ async def get_current_superadmin_user(request: Request, current_user: dict = Dep
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        # Com MULTI_TENANT: conexão -> empresa (o aviso só vai pra mesma empresa)
+        self._tenant_of = {}
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        self._tenant_of[id(websocket)] = current_tenant_slug()
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
+        self._tenant_of.pop(id(websocket), None)
 
     async def broadcast(self, message: dict):
-        """Envia mensagem para todos os clientes conectados"""
+        """Envia mensagem para os clientes conectados (da mesma empresa)"""
         disconnected = []
-        for connection in self.active_connections:
+        tenant_slug = current_tenant_slug()
+        for connection in list(self.active_connections):
+            if self._tenant_of.get(id(connection)) != tenant_slug:
+                continue
             try:
                 await connection.send_json(message)
             except Exception:
@@ -386,7 +409,11 @@ async def validate_and_read_upload(file: UploadFile, allowed_extensions: set) ->
 # tela) e vira um PNG em uploads/signatures/. Cada assinatura nova ganha um
 # arquivo novo (nunca sobrescreve), então uma Entrega de EPI que guardou o
 # caminho da assinatura do dia continua imprimindo a assinatura daquele dia.
-SIGNATURES_DIR = UPLOADS_DIR / 'signatures'
+def signatures_dir() -> Path:
+    """uploads/signatures/ (da empresa atual, com MULTI_TENANT)."""
+    return UPLOADS_DIR / 'signatures'
+
+
 SIGNATURE_URL_PREFIX = '/api/uploads/signatures/'
 MAX_SIGNATURE_BYTES = 3 * 1024 * 1024
 
@@ -419,9 +446,9 @@ def save_signature_value(kind: str, person_id: str, incoming, existing):
             img = img.convert('RGBA')
             # Reduz fotos grandes de assinatura - nos PDFs ela sai com ~3cm
             img.thumbnail((1200, 600))
-            SIGNATURES_DIR.mkdir(parents=True, exist_ok=True)
+            signatures_dir().mkdir(parents=True, exist_ok=True)
             filename = f"{kind}_{person_id}_{uuid.uuid4().hex[:10]}.png"
-            img.save(SIGNATURES_DIR / filename, 'PNG', optimize=True)
+            img.save(signatures_dir() / filename, 'PNG', optimize=True)
     except HTTPException:
         raise
     except Exception:
@@ -434,7 +461,7 @@ def signature_file_path(url):
     if not url or not str(url).startswith(SIGNATURE_URL_PREFIX):
         return None
     name = Path(str(url)[len(SIGNATURE_URL_PREFIX):]).name  # sem "../"
-    path = SIGNATURES_DIR / name
+    path = signatures_dir() / name
     return path if path.is_file() else None
 
 
@@ -639,25 +666,36 @@ PATH_MODULE_MAP = [
 ]
 
 _module_config_cache = {"value": None, "expires_at": 0}
+# Com MULTI_TENANT, um cache por empresa (cada uma contrata os seus módulos)
+_module_config_cache_by_tenant: dict = {}
 _MODULE_CONFIG_CACHE_TTL = 10  # segundos - baixo o bastante pra uma mudança feita pelo superadmin valer quase na hora
+
+
+def _module_cache() -> dict:
+    slug = current_tenant_slug()
+    if not slug:
+        return _module_config_cache
+    return _module_config_cache_by_tenant.setdefault(slug, {"value": None, "expires_at": 0})
 
 
 async def get_disabled_modules() -> list:
     """Lê a lista de módulos desativados, com um cache curto pra não bater no
     banco em toda requisição."""
     now = time.time()
-    if _module_config_cache["value"] is not None and now < _module_config_cache["expires_at"]:
-        return _module_config_cache["value"]
+    cache = _module_cache()
+    if cache["value"] is not None and now < cache["expires_at"]:
+        return cache["value"]
     doc = await db.module_config.find_one({}, {"_id": 0, "disabled_modules": 1})
     disabled = (doc or {}).get("disabled_modules", [])
-    _module_config_cache["value"] = disabled
-    _module_config_cache["expires_at"] = now + _MODULE_CONFIG_CACHE_TTL
+    cache["value"] = disabled
+    cache["expires_at"] = now + _MODULE_CONFIG_CACHE_TTL
     return disabled
 
 
 def invalidate_module_config_cache():
-    _module_config_cache["value"] = None
-    _module_config_cache["expires_at"] = 0
+    cache = _module_cache()
+    cache["value"] = None
+    cache["expires_at"] = 0
 
 
 def match_module_for_path(path: str):

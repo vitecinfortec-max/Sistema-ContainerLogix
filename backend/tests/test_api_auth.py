@@ -3,6 +3,7 @@ Testes de API de login, recuperação e troca de senha, contra o app inteiro
 com banco em memória (fixture `api` em conftest.py). O envio de e-mail é
 substituído por um dublê que guarda a mensagem.
 """
+import os
 import re
 
 import pytest
@@ -156,6 +157,8 @@ class TestChangePassword:
         assert response.status_code == 400
 
 
+@pytest.mark.skipif(os.environ.get("TEST_MULTI_TENANT") == "1",
+                    reason="no multi-cliente, token sem empresa (formato antigo) é recusado de propósito")
 def test_token_without_password_version_keeps_working_until_a_password_change(api):
     # Sessões abertas antes desta versão não têm "pv" no token: continuam
     # válidas, e só deixam de valer se a conta trocar de senha.

@@ -21,6 +21,13 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      # Multi-cliente (ver backend/tenancy.py): MULTI_TENANT=1 liga um servidor
+      # para todas as empresas; CORS_ORIGIN_REGEX libera os subdomínios delas.
+      # Desligado (padrão), cada instância continua com o seu DB_NAME.
+      - key: MULTI_TENANT
+        sync: false
+      - key: CORS_ORIGIN_REGEX
+        sync: false
       - key: JWT_SECRET_KEY
         sync: false
       # Opcionais: usados para envio de e-mail (ex: recuperação de senha) via Resend.

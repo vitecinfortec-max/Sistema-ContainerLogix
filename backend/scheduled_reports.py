@@ -18,6 +18,7 @@ from pymongo.errors import DuplicateKeyError
 
 from reports import generate_pdf_report, now_brt, merge_company, BRT_TZ
 from shared import db, get_company_settings, get_current_admin_user
+from tenancy import active_tenants, is_multi_tenant, tenant_context
 
 api_router = APIRouter(prefix="/api")
 
@@ -146,7 +147,21 @@ async def trigger_daily_movement_reports(
 
 
 async def _run_scheduled_daily_reports():
-    """Execução agendada: reserva o dia no banco antes de enviar. Se o backend
+    """Execução agendada. Com MULTI_TENANT, roda uma vez para cada empresa
+    ativa, no banco dela; uma empresa com erro não impede as outras."""
+    if not is_multi_tenant():
+        await _run_daily_reports_for_current_db()
+        return
+    for tenant in await active_tenants():
+        with tenant_context(tenant):
+            try:
+                await _run_daily_reports_for_current_db()
+            except Exception:
+                logger.exception(f"Falha no envio diário da empresa {tenant['slug']}")
+
+
+async def _run_daily_reports_for_current_db():
+    """Reserva o dia no banco antes de enviar. Se o backend
     estiver rodando em mais de um processo, cada um tem o seu agendador - só
     quem conseguir gravar a reserva envia, os outros pulam (sem e-mail em
     dobro). O disparo manual não passa por aqui, então continua podendo

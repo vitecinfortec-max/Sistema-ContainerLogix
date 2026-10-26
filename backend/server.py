@@ -73,6 +73,10 @@ from routers.users import api_router as users_router
 from routers.audit_log import api_router as audit_log_router
 from routers.module_config import api_router as module_config_router
 from scheduled_reports import api_router as scheduled_reports_router, start_scheduler, stop_scheduler
+from tenancy import (
+    NoTenantError, TENANT_HEADER, TENANT_HOST_HEADER, active_tenants, directory, is_multi_tenant, reset_current_tenant,
+    set_current_tenant, tenant_context,
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -120,6 +124,75 @@ async def rate_limit_middleware(request: Request, call_next):
         if rate_limit_exceeded(f"{bucket}:{who}", limit, window):
             return JSONResponse(status_code=429, content={"detail": RATE_LIMIT_MESSAGE})
     return await call_next(request)
+
+
+# Rotas que respondem sem empresa: verificação de saúde do Render e a
+# documentação da API (não tocam em banco de empresa nenhuma).
+_TENANTLESS_PATHS = {"/api/", "/api", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect"}
+
+
+async def resolve_request_tenant(request: Request):
+    """Multi-cliente: descobre a empresa da requisição.
+    - Com login: a empresa vem do token ("tid"). Se o navegador disser outra
+      (cabeçalho X-Tenant / X-Tenant-Host), recusa.
+    - Sem login (tela de entrar, esqueci a senha): a do cabeçalho.
+    Devolve (empresa, None) ou (None, resposta de erro)."""
+    token = None
+    authorization = request.headers.get("authorization", "")
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+    token = token or request.query_params.get("token")
+    token_tid = None
+    if token:
+        try:
+            token_tid = decode_token(token).get("tid")
+        except HTTPException:
+            token_tid = None  # token inválido: a própria rota recusa depois
+
+    directory_ = directory()
+    header_slug = request.headers.get(TENANT_HEADER)
+    header_host = request.headers.get(TENANT_HOST_HEADER)
+    header_tenant = None
+    if header_slug:
+        header_tenant = await directory_.by_slug(header_slug)
+    elif header_host:
+        header_tenant = await directory_.by_host(header_host)
+    if (header_slug or header_host) and header_tenant is None:
+        return None, JSONResponse(status_code=404, content={"detail": "Empresa não encontrada"})
+
+    if token_tid:
+        tenant = await directory_.by_slug(token_tid)
+        if tenant is None:
+            return None, JSONResponse(status_code=401, content={"detail": "Sessão inválida: empresa não encontrada. Entre novamente."})
+        if header_tenant is not None and header_tenant["slug"] != tenant["slug"]:
+            return None, JSONResponse(status_code=403, content={"detail": "Este acesso pertence a outra empresa. Entre novamente."})
+    else:
+        tenant = header_tenant
+    if tenant is None:
+        return None, JSONResponse(status_code=400, content={"detail": "Empresa não identificada"})
+    if tenant.get("status") != "ATIVO":
+        return None, JSONResponse(status_code=403, content={"detail": "O acesso desta empresa está suspenso. Fale com o suporte."})
+    return tenant, None
+
+
+@app.middleware("http")
+async def tenant_middleware(request: Request, call_next):
+    """Multi-cliente (MULTI_TENANT): define a empresa antes de qualquer outra
+    coisa - o bloqueio de módulos e o limite de requisições já rodam no banco
+    dela. Desligado, não faz nada."""
+    if not is_multi_tenant() or request.method == "OPTIONS" or request.url.path in _TENANTLESS_PATHS:
+        return await call_next(request)
+    tenant, error = await resolve_request_tenant(request)
+    if error is not None:
+        return error
+    context_token = set_current_tenant(tenant)
+    try:
+        return await call_next(request)
+    except NoTenantError:
+        logger.exception("Acesso ao banco sem empresa definida")
+        return JSONResponse(status_code=500, content={"detail": "Erro interno"})
+    finally:
+        reset_current_tenant(context_token)
 
 
 api_router = APIRouter(prefix="/api")
@@ -271,6 +344,14 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
         await websocket.close(code=1008)
         return
 
+    # Multi-cliente: a conexão inteira roda no banco da empresa do token
+    if is_multi_tenant():
+        tenant = await directory().by_slug(payload.get("tid") or "")
+        if tenant is None or tenant.get("status") != "ATIVO":
+            await websocket.close(code=1008)
+            return
+        set_current_tenant(tenant)
+
     if not await _ws_session_valid(payload):
         await websocket.close(code=1008)
         return
@@ -308,10 +389,16 @@ else:
     logging.warning("CORS_ORIGINS não configurada - nenhuma origem cross-origin será permitida")
     _cors_origins = []
 
+# Multi-cliente: cada empresa abre o sistema pelo próprio subdomínio
+# (ja.containerlogix.com.br, tll...). Em vez de listar um por um, uma
+# expressão, ex.: ^https://([a-z0-9-]+\.)?containerlogix\.com\.br$
+_cors_origin_regex = os.environ.get('CORS_ORIGIN_REGEX', '').strip() or None
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origins=_cors_origins,
+    allow_origin_regex=_cors_origin_regex,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -324,6 +411,22 @@ logger = logging.getLogger(__name__)
 
 
 async def startup_event():
+    """Prepara o banco (contadores, índices) e liga o agendador. Com
+    MULTI_TENANT, prepara o banco de cada empresa ativa; uma empresa com
+    problema não impede as outras de subir."""
+    if is_multi_tenant():
+        for tenant in await active_tenants():
+            with tenant_context(tenant):
+                try:
+                    await prepare_database()
+                except Exception:
+                    logger.exception(f"Falha ao preparar o banco da empresa {tenant['slug']}")
+    else:
+        await prepare_database()
+    start_scheduler()
+
+
+async def prepare_database():
     # Inicializar contador de transaction_id se não existir
     counter = await db.counters.find_one({"_id": "transaction_id"})
     if not counter:
@@ -468,5 +571,4 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Não foi possível criar índice único em container_sales.(loading_order_id, container_number): {e}")
 
-    start_scheduler()
 

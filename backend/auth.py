@@ -37,6 +37,11 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
+    # Multi-cliente: o token leva a empresa em que foi emitido ("tid"); o
+    # servidor recusa usá-lo em outra (tenant_middleware em server.py)
+    from tenancy import current_tenant_slug
+    if "tid" not in to_encode and current_tenant_slug():
+        to_encode["tid"] = current_tenant_slug()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
@@ -61,7 +66,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     payload = decode_token(token)
     user_id: str = payload.get("sub")
     # Token de arquivos (ver /auth/file-token) só serve pra baixar anexos.
-    if user_id is None or payload.get("scope") == FILE_TOKEN_SCOPE:
+    # Multi-cliente: o token tem que ser da empresa desta requisição.
+    from tenancy import current_tenant_slug, is_multi_tenant
+    wrong_tenant = is_multi_tenant() and payload.get("tid") != current_tenant_slug()
+    if user_id is None or payload.get("scope") == FILE_TOKEN_SCOPE or wrong_tenant:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido",

@@ -120,7 +120,9 @@ PRIMARY_COLOR = "008B7B"
 HEADER_BG_COLOR = "E8F4F5"
 
 ROOT_DIR = Path(__file__).parent
-UPLOADS_DIR = ROOT_DIR.parent / 'uploads'
+from tenancy import TenantUploadsRoot, is_multi_tenant  # noqa: E402
+# Mesma pasta de shared.UPLOADS_DIR (com MULTI_TENANT, a da empresa atual)
+UPLOADS_DIR = TenantUploadsRoot(ROOT_DIR.parent / 'uploads') if is_multi_tenant() else ROOT_DIR.parent / 'uploads'
 
 # Valores usados quando a empresa ainda não configurou seus próprios dados em
 # "Dados da Empresa" - propositalmente genéricos (nunca dados reais de um cliente

@@ -81,18 +81,19 @@ def _teach_mongomock_date_operators():
 class ApiClient:
     """Chamadas HTTP síncronas contra o app, já autenticadas como admin."""
 
-    def __init__(self, app, db, loop, headers):
+    def __init__(self, app, db, loop, headers, base_headers=None):
         import httpx
         self.db = db
         self._loop = loop
         self._headers = headers
+        self._base_headers = base_headers or {}
         self._client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
 
     def run(self, coroutine):
         return self._loop.run_until_complete(coroutine)
 
     def request(self, method, path, as_user="admin", **kwargs):
-        headers = {**self._headers[as_user], **kwargs.pop("headers", {})} if as_user else kwargs.pop("headers", {})
+        headers = {**self._base_headers, **(self._headers[as_user] if as_user else {}), **kwargs.pop("headers", {})}
         return self.run(self._client.request(method, path, headers=headers, **kwargs))
 
     def get(self, path, **kwargs):
@@ -111,8 +112,15 @@ class ApiClient:
         self.run(self._client.aclose())
 
 
+# TEST_MULTI_TENANT=1 roda a suíte inteira com o multi-cliente ligado (uma
+# empresa de teste no cadastro central, banco e pasta de arquivos dela, token
+# com a empresa e cabeçalho X-Tenant em toda chamada) - prova que nenhuma rota
+# depende do banco fixo de antes.
+_MULTI_TENANT_SUITE = os.environ.get("TEST_MULTI_TENANT", "").strip() == "1"
+
+
 @pytest.fixture
-def api(monkeypatch):
+def api(monkeypatch, tmp_path):
     from mongomock_motor import AsyncMongoMockClient
 
     _teach_mongomock_date_operators()
@@ -122,13 +130,33 @@ def api(monkeypatch):
 
     from audit import AuditedDatabase
     # igual ao cliente real (shared.py), inclusive o log de auditoria
-    fake_db = AuditedDatabase(AsyncMongoMockClient(tz_aware=True)["containerlogix_teste"])
+    mongo = AsyncMongoMockClient(tz_aware=True)
+    fake_db = AuditedDatabase(mongo["containerlogix_teste"])
+    app_db = fake_db
+    tenant = None
+    if _MULTI_TENANT_SUITE:
+        import reports
+        import tenancy
+        tenant = {"slug": "teste", "name": "Teste", "db_name": "containerlogix_teste", "status": "ATIVO"}
+        app_db = tenancy.TenantRoutedDatabase(mongo, wrap=AuditedDatabase)
+        fake_db = app_db.for_tenant(tenant)  # os testes leem/gravam direto no banco da empresa
+        central = mongo["central_teste"]
+        asyncio.new_event_loop().run_until_complete(central.tenants.insert_one(dict(tenant)))
+        tenancy.configure(central)
+        monkeypatch.setattr(tenancy, "MULTI_TENANT", True)
+        monkeypatch.setattr(shared, "_module_config_cache_by_tenant", {})
+        uploads = tenancy.TenantUploadsRoot(tmp_path)
+        originals = (shared.UPLOADS_DIR, reports.UPLOADS_DIR)  # antes de trocar qualquer um
+        for module in list(sys.modules.values()):
+            current = getattr(module, "UPLOADS_DIR", None)
+            if any(current is original for original in originals):
+                monkeypatch.setattr(module, "UPLOADS_DIR", uploads)
     real_db = shared.db
     # Cada router fez "from shared import db" - a troca precisa alcançar a
     # referência guardada em cada módulo, não só a de shared.
     for module in list(sys.modules.values()):
         if getattr(module, "db", None) is real_db:
-            monkeypatch.setattr(module, "db", fake_db)
+            monkeypatch.setattr(module, "db", app_db)
     monkeypatch.setitem(shared._module_config_cache, "value", None)
     monkeypatch.setitem(shared._module_config_cache, "expires_at", 0)
     # A suíte inteira roda como o mesmo admin, em segundos: sem zerar,
@@ -141,12 +169,18 @@ def api(monkeypatch):
         {"id": "oper-1", "name": "Operador Teste", "email": "oper@teste.local", "role": "user", "active": True},
     ]
     loop.run_until_complete(fake_db.users.insert_many([dict(u) for u in users]))
+    claims = {"tid": tenant["slug"]} if tenant else {}
     headers = {
-        key: {"Authorization": "Bearer " + create_access_token({"sub": u["id"], "email": u["email"], "name": u["name"]})}
+        key: {"Authorization": "Bearer " + create_access_token({"sub": u["id"], "email": u["email"], "name": u["name"], **claims})}
         for key, u in zip(("admin", "operator"), users)
     }
-    client = ApiClient(server.app, fake_db, loop, headers)
+    client = ApiClient(server.app, fake_db, loop, headers, {"X-Tenant": tenant["slug"]} if tenant else None)
+    # O teste inteiro roda "dentro" da empresa: funções chamadas direto (fora
+    # de uma requisição) também usam o banco e a pasta dela
+    context_token = tenancy.set_current_tenant(tenant) if tenant else None
     yield client
+    if context_token is not None:
+        tenancy.reset_current_tenant(context_token)
     client.close()
     loop.close()
 
