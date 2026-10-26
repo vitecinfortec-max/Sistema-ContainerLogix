@@ -645,6 +645,41 @@ def test_biweekly_salary_advance(api):
     assert items["Adiantamento salarial (quinzena) já pago"] == 1200
 
 
+def test_payroll_check_report(api):
+    ok = _contract(api, _employee(api), dependents=[], vt_opt_in=False, pis="123.45678.90-1", pix_key="ana@pix.com")
+    low = _contract(api, _employee(api, "Bia Baixo", "222.333.444-55"), dependents=[], vt_opt_in=False, base_salary=1000)
+    pj = _contract(api, _employee(api, "Caio PJ", "333.444.555-66"), dependents=[], contract_type="PJ")
+    api.post("/api/hr/occurrences", json={"contract_id": ok["id"], "occurrence_type": "FALTA_INJUSTIFICADA", "start_date": "2026-10-07", "days": 2})
+    prev = api.post("/api/hr/payroll-runs", json={"competence": "2026-09", "run_type": "MENSAL"}).json()
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    slip = next(p for p in api.get(f"/api/hr/payroll-runs/{run['id']}").json()["payslips"] if p["contract_id"] == low["id"])
+    api.put(f"/api/hr/payslips/{slip['id']}", json={"inputs": [{"code": "EMPRESTIMO", "value": 900}]})
+    late = _contract(api, _employee(api, "Davi Novo", "444.555.666-77"), dependents=[], admission_date="2026-10-05")  # depois de gerar
+    r = api.get(f"/api/hr/payroll-runs/{run['id']}/check")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    alerts = {}
+    for level, name, _, text in data["sections"][0]["rows"]:
+        alerts.setdefault((name, level), []).append(text)
+    assert any("salário mínimo" in t for t in alerts[("Bia Baixo", "Erro")])
+    assert any("dos proventos" in t for t in alerts[("Bia Baixo", "Atenção")])
+    assert any("PIX" in t for t in alerts[("Bia Baixo", "Atenção")]) and ("Ana Souza", "Atenção") not in alerts
+    assert any("2 falta(s)" in t for t in alerts[("Ana Souza", "Conferir")])
+    assert data["sections"][0]["rows"][0][0] == "Erro"  # erros primeiro
+    texts = " | ".join(row[3] for row in data["sections"][0]["rows"])
+    assert "Empréstimo consignado" in texts and "Sem PIS" in texts
+    # variação sobre setembro (a falta e o empréstimo mudam o líquido)
+    people = {row[1]: row for row in data["sections"][1]["rows"]}
+    assert people["Bia Baixo"][-1].startswith("-") and len(people) == 2 and prev["id"]
+    rubrics = {row[1]: row for row in data["sections"][2]["rows"]}
+    assert rubrics["Salário"][3] == 2 and rubrics["Empréstimo consignado"][4] == 900
+    left = {row[1]: row[3] for row in data["sections"][3]["rows"]}
+    assert "PJ" in left["Caio PJ"] and "Recalcular" in left["Davi Novo"] and pj["id"] and late["id"]
+    assert data["summary"]["errors"] >= 1 and data["summary"]["left_out"] == 2
+    assert api.get(f"/api/hr/payroll-runs/{run['id']}/check/pdf").content.startswith(b"%PDF")
+    assert api.get(f"/api/hr/payroll-runs/{run['id']}/check/excel").status_code == 200
+
+
 def test_vacations_settled_before_the_system(api):
     emp = _employee(api)
     c = _contract(api, emp, admission_date="2020-01-10", dependents=[])

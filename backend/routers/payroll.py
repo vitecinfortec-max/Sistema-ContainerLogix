@@ -17,7 +17,8 @@ from hr_payroll import (
     months_by_fifteen, overlap_days, parse_day, r2,
 )
 from models import HRPayrollPay, HRPayrollRunCreate, HRPayrollSettings, HRPayslipInputs
-from reports import merge_company
+from period_reports import Column, Section, MONEY, INT, excel_response, pdf_response
+from reports import format_currency, merge_company
 from routers.hr import (
     DOCUMENT_TYPES, LEAVE_TYPES, OCCURRENCE_TYPES, PAYROLL_ABSENCE_TYPES, contract_ctx, contract_snapshot, leave_ranges,
     load_payroll_settings, occurrence_days_in, pdf_stream, salary_advance_paid, variable_average, _clean, _now_iso,
@@ -464,3 +465,164 @@ async def payslips_pdf(ids: Optional[str] = Query(None, description="IDs separad
     first = slips[0]
     name = first.get("person_name") if len(slips) == 1 else f"{len(slips)}_funcionarios"
     return pdf_stream(pdf, f"Contracheque_{first['competence']}_{name}.pdf")
+
+
+# ---------------------------------------------------------------- Conferência da folha
+
+CHECK_TITLE = "Conferência da Folha"
+
+
+def _previous_competence(competence: str) -> str:
+    year, month = (int(x) for x in competence.split("-"))
+    return f"{year - 1}-12" if month == 1 else f"{year}-{month - 1:02d}"
+
+
+async def build_payroll_check(run: dict) -> dict:
+    """Relatório para o RH conferir a folha antes de fechar e imprimir os
+    contracheques: pendências de cada contracheque, a lista com a variação do
+    líquido sobre a folha anterior do mesmo tipo, o resumo por rubrica e os
+    contratos vigentes que ficaram de fora."""
+    settings = await load_payroll_settings()
+    slips = sorted(await db.hr_payslips.find({"run_id": run["id"]}, {"_id": 0}).to_list(None),
+                   key=lambda p: (p.get("person_name") or "").lower())
+    previous_competence = _previous_competence(run["competence"])
+    previous = await db.hr_payroll_runs.find_one({"run_type": run["run_type"], "competence": previous_competence}, {"_id": 0, "id": 1})
+    previous_net = {}
+    if previous:
+        for p in await db.hr_payslips.find({"run_id": previous["id"]}, {"_id": 0, "contract_id": 1, "totals": 1}).to_list(None):
+            previous_net[p["contract_id"]] = (p.get("totals") or {}).get("net") or 0
+    contracts = {c["id"]: c for c in await db.hr_contracts.find({}, {"_id": 0}).to_list(None)}
+    monthly = run["run_type"] in ("MENSAL", "ADIANTAMENTO")
+
+    alerts, people, rubrics = [], [], {}
+
+    def alert(slip, level, text):
+        alerts.append([level, slip.get("person_name"), slip.get("position_name"), text])
+
+    for p in slips:
+        t = p.get("totals") or {}
+        gross, net = t.get("gross") or 0, t.get("net") or 0
+        contract = contracts.get(p["contract_id"]) or {}
+        # pendências que impedem ou atrasam o pagamento
+        if net <= 0:
+            alert(p, "Erro", f"Líquido zerado ou negativo ({format_currency(net, 'BRL')}): os descontos passam dos proventos")
+        elif run["run_type"] == "MENSAL" and gross and net < gross * 0.3:
+            alert(p, "Atenção", f"Líquido de só {round(net / gross * 100)}% dos proventos: confira os descontos")
+        if not (p.get("pix_key") or p.get("bank_account")):
+            alert(p, "Atenção", "Sem conta bancária nem PIX no contrato")
+        if not p.get("pis") and run["run_type"] != "ADIANTAMENTO":
+            alert(p, "Atenção", "Sem PIS no contrato (obrigatório no eSocial)")
+        weekly = contract.get("weekly_hours") or 44
+        if (p.get("base_salary") or 0) < settings["min_wage"] * min(weekly, 44) / 44 - 0.01 \
+                and contract.get("contract_type") not in ("ESTAGIO", "APRENDIZ"):
+            alert(p, "Erro", f"Salário-base abaixo do salário mínimo ({format_currency(settings['min_wage'], 'BRL')} para 44h semanais)")
+        # o que mudou o cálculo no mês - para conferir com o ponto e as ocorrências
+        if monthly:
+            notes = []
+            if p.get("days_override") is not None:
+                notes.append(f"dias pagos informados à mão ({p.get('days_worked')})")
+            elif (p.get("days_worked") or 0) < 30:
+                notes.append(f"{p.get('days_worked')} dias pagos")
+            if p.get("vacation_days"):
+                notes.append(f"{p['vacation_days']} dia(s) de férias")
+            if p.get("leave_days"):
+                notes.append(f"{p['leave_days']} dia(s) de afastamento pelo INSS")
+            if p.get("absence_days"):
+                notes.append(f"{p['absence_days']} falta(s)/suspensão descontada(s)")
+            if notes:
+                alert(p, "Conferir", "; ".join(notes))
+        manual = [e for e in p.get("events") or [] if not e.get("auto")]
+        if manual:
+            alert(p, "Conferir", f"{len(manual)} lançamento(s) manual(is): " + ", ".join(
+                f"{e['label']} {format_currency(e['value'], 'BRL')}" for e in manual[:4]) + ("..." if len(manual) > 4 else ""))
+        variation = None
+        if previous_net.get(p["contract_id"]):
+            before = previous_net[p["contract_id"]]
+            variation = round((net - before) / before * 100, 1)
+            if abs(variation) >= 20:
+                alert(p, "Conferir", f"Líquido {'subiu' if variation > 0 else 'caiu'} {abs(variation):.1f}% sobre a folha anterior "
+                                     f"({format_currency(before, 'BRL')})")
+        people.append([p.get("contract_number"), p.get("person_name"), p.get("position_name"),
+                       p.get("days_worked") if monthly else p.get("months_13th"), p.get("base_salary"), gross, t.get("deductions"), net,
+                       t.get("inss"), t.get("irrf"), t.get("fgts"), f"{variation:+.1f}%".replace(".", ",") if variation is not None else "-"])
+        for e in p.get("events") or []:
+            r = rubrics.setdefault(e["code"], {"number": e.get("number"), "label": EVENTS[e["code"]][1] if e["code"] in EVENTS else e["label"],
+                                               "kind": e["kind"], "people": 0, "total": 0.0})
+            r["people"] += 1
+            r["total"] += e["value"]
+
+    # contratos vigentes que ficaram fora (para não esquecer ninguém)
+    in_run = {p["contract_id"] for p in slips}
+    first, last = competence_bounds(run["competence"])
+    left_out = []
+    for c in sorted(contracts.values(), key=lambda c: (c.get("person_name") or "").lower()):
+        if c["id"] in in_run or c.get("status") == "DESLIGADO":
+            continue
+        if c.get("contract_type") not in PAYROLL_CONTRACT_TYPES:
+            reason = "PJ / prestador: não entra na folha"
+        elif parse_day(c.get("admission_date")) > last:
+            reason = "admitido depois da competência"
+        elif run["run_type"] == "ADIANTAMENTO" and not c.get("salary_advance"):
+            reason = "não recebe adiantamento quinzenal"
+        elif run["run_type"] == "ADIANTAMENTO":
+            reason = "admitido depois do dia 15"
+        else:
+            reason = "contrato novo ou alterado depois de gerar a folha: clique em Recalcular"
+        left_out.append([c.get("contract_number"), c.get("person_name"), c.get("position_name"), reason])
+
+    order = {"Erro": 0, "Atenção": 1, "Conferir": 2}
+    alerts.sort(key=lambda a: (order[a[0]], (a[1] or "").lower()))
+    totals = run.get("totals") or {}
+    rubric_rows = [[r["number"], r["label"], "Provento" if r["kind"] == "P" else "Desconto", r["people"], r2(r["total"])]
+                   for r in sorted(rubrics.values(), key=lambda r: (r["kind"] != "P", r["number"] or ""))]
+    sections = [
+        Section("Pendências e pontos a conferir", [Column("Nível", width=9), Column("Funcionário", width=26), Column("Cargo", width=18),
+                                                   Column("Detalhe", width=60)],
+                alerts, empty_text="Nenhuma pendência encontrada.", sheet_name="Pendências"),
+        Section("Funcionários", [Column("Mat.", INT, 5), Column("Nome", width=24), Column("Cargo", width=16),
+                                 Column("Dias" if monthly else "Avos", INT, 6), Column("Salário base", MONEY, 12), Column("Proventos", MONEY, 12),
+                                 Column("Descontos", MONEY, 12), Column("Líquido", MONEY, 12), Column("INSS", MONEY, 10),
+                                 Column("IRRF", MONEY, 10), Column("FGTS", MONEY, 10), Column("Var. líquido", width=9, align="center")],
+                people, total=["TOTAL", None, None, None, r2(sum(r[4] or 0 for r in people)), totals.get("gross"), totals.get("deductions"),
+                               totals.get("net"), totals.get("inss"), totals.get("irrf"), totals.get("fgts"), None] if people else None,
+                empty_text="Nenhum contracheque nesta folha.", sheet_name="Funcionários"),
+        Section("Resumo por rubrica", [Column("Cód.", width=6), Column("Rubrica", width=40), Column("Tipo", width=10),
+                                       Column("Funcionários", INT, 10), Column("Total", MONEY, 14)],
+                rubric_rows, empty_text="Nenhuma rubrica.", sheet_name="Rubricas"),
+        Section("Contratos vigentes fora desta folha", [Column("Mat.", INT, 5), Column("Nome", width=28), Column("Cargo", width=20),
+                                                        Column("Motivo", width=40)],
+                left_out, empty_text="Todos os contratos vigentes estão na folha.", sheet_name="Fora da folha"),
+    ]
+    errors = sum(1 for a in alerts if a[0] == "Erro")
+    info = [("Contracheques", str(len(slips))), ("Líquido", format_currency(totals.get("net") or 0, "BRL")),
+            ("Erros", str(errors)), ("Pontos a conferir", str(len(alerts) - errors))]
+    subtitle = f"{RUN_TYPES.get(run['run_type'], run['run_type'])} · competência {run['competence'][5:]}/{run['competence'][:4]}"
+    if previous:
+        subtitle += f" · variação sobre {previous_competence[5:]}/{previous_competence[:4]}"
+    return {"summary": {"count": len(slips), "errors": errors, "alerts": len(alerts), "left_out": len(left_out),
+                        "net": totals.get("net") or 0},
+            "sections": sections, "info": info, "subtitle": subtitle}
+
+
+@api_router.get("/hr/payroll-runs/{run_id}/check")
+async def payroll_check(run_id: str, current_user: dict = Depends(get_current_admin_user)):
+    data = await build_payroll_check(await _get_run(run_id))
+    return {"title": CHECK_TITLE, "subtitle": data["subtitle"], "summary": data["summary"], "info": data["info"],
+            "sections": [{"title": s.title, "columns": [{"label": c.label, "kind": c.kind} for c in s.columns],
+                          "rows": s.rows, "total": s.total, "count": len(s.rows)} for s in data["sections"]]}
+
+
+@api_router.get("/hr/payroll-runs/{run_id}/check/pdf")
+async def payroll_check_pdf(run_id: str, current_user: dict = Depends(get_current_admin_user)):
+    run = await _get_run(run_id)
+    data = await build_payroll_check(run)
+    return await pdf_response(CHECK_TITLE, data["subtitle"], data["info"], data["sections"],
+                              f"conferencia_folha_{run['competence']}_{run['run_type'].lower()}", current_user.get("name", "Sistema"))
+
+
+@api_router.get("/hr/payroll-runs/{run_id}/check/excel")
+async def payroll_check_excel(run_id: str, current_user: dict = Depends(get_current_admin_user)):
+    run = await _get_run(run_id)
+    data = await build_payroll_check(run)
+    return await excel_response(CHECK_TITLE, data["subtitle"], data["sections"],
+                                f"conferencia_folha_{run['competence']}_{run['run_type'].lower()}")

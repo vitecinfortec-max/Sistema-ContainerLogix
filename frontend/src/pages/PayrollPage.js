@@ -20,7 +20,7 @@ import { competenceLabel, errorDetail, fmtDate, fmtNumber, formatMoney, saveBlob
 import { toast } from 'sonner';
 import {
   WalletCards, Plus, Trash2, FolderOpen, Printer, RefreshCw, Lock, LockOpen, CheckCircle2, RotateCcw, Pencil, Save, Percent,
-  Users, Banknote, Landmark, Receipt,
+  Users, Banknote, Landmark, Receipt, ClipboardCheck, FileSpreadsheet, AlertTriangle,
 } from 'lucide-react';
 
 const STATUS_LABELS = { ABERTA: 'Aberta', FECHADA: 'Fechada', PAGA: 'Paga' };
@@ -257,6 +257,14 @@ function PayrollRunDetail({ runId, onBack }) {
   const single = selectedIds.size === 1 ? run?.payslips.find((p) => selectedIds.has(p.id)) : null;
   const open = run?.status === 'ABERTA';
 
+  // Conferência da folha: resumo das pendências, atualizado a cada recálculo
+  const [check, setCheck] = useState(null);
+  useEffect(() => {
+    if (!run?.id) return;
+    api.getPayrollCheck(run.id).then((r) => setCheck(r.data.summary)).catch(() => setCheck(null));
+  }, [run?.id, run?.updated_at, run?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  const checkFile = `Conferencia_Folha_${run?.competence}_${run?.run_type}`;
+
   const action = async (fn, success, message) => {
     if (message && !(await confirm(message))) return;
     setBusy(true);
@@ -291,6 +299,20 @@ function PayrollRunDetail({ runId, onBack }) {
           meta={<StatusPill tone={STATUS_TONES[run.status]}>{STATUS_LABELS[run.status]}</StatusPill>}
           subtitle={run.paid_at ? `Paga em ${fmtDate(run.paid_at)}` : run.payment_date ? `Pagamento previsto: ${fmtDate(run.payment_date)}` : undefined} />
 
+        {check && open && (check.errors > 0 || check.alerts > 0 || check.left_out > 0) && (
+          <div className={`flex flex-wrap items-center gap-3 rounded-md border p-3 text-sm ${check.errors ? 'border-red-300 bg-red-50 text-red-900 dark:bg-red-950/40 dark:text-red-200' : 'border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200'}`}
+            data-testid="payroll-check-banner">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span className="flex-1">
+              Antes de fechar: {check.errors ? <b>{check.errors} erro(s)</b> : 'nenhum erro'}, {check.alerts - check.errors} ponto(s) a conferir
+              {check.left_out ? `, ${check.left_out} contrato(s) vigente(s) fora desta folha` : ''}.
+            </span>
+            <Button variant="outline" size="sm" className="h-8" onClick={() => saveBlob(() => api.getPayrollCheckPDF(run.id), `${checkFile}.pdf`)}>
+              <ClipboardCheck className="w-4 h-4 mr-1" />Ver conferência
+            </Button>
+          </div>
+        )}
+
         <StatGrid>
           <StatCard label="Contracheques" value={t.count || 0} icon={Users} tone="blue" />
           <StatCard label="Proventos" value={formatMoney(t.gross)} icon={Receipt} tone="slate" hint={`Descontos: ${formatMoney(t.deductions)}`} />
@@ -319,6 +341,10 @@ function PayrollRunDetail({ runId, onBack }) {
                 onClick={() => saveBlob(() => api.getPayslipsPDF({ ids: [...selectedIds].join(',') }), `Contracheques_${run.competence}.pdf`)} testId="payslip-print-selected-btn" />
               <ToolbarButton icon={Receipt} label="Todos os contracheques (PDF)" tone="primary"
                 onClick={() => saveBlob(() => api.getPayslipsPDF({ run_id: run.id }), `Contracheques_${run.competence}.pdf`)} testId="payslip-print-all-btn" />
+              <ToolbarButton icon={ClipboardCheck} label="Conferência da folha (PDF)" tone="amber"
+                onClick={() => saveBlob(() => api.getPayrollCheckPDF(run.id), `${checkFile}.pdf`)} testId="payroll-check-pdf-btn" />
+              <ToolbarButton icon={FileSpreadsheet} label="Conferência da folha (Excel)" tone="emerald"
+                onClick={() => saveBlob(() => api.getPayrollCheckExcel(run.id), `${checkFile}.xlsx`)} testId="payroll-check-excel-btn" />
               <ToolbarDivider />
               <ToolbarButton icon={RefreshCw} label="Recalcular (contratos, ocorrências e tabelas atuais)" tone="blue" disabled={!open || busy}
                 onClick={() => action(() => api.recalculatePayrollRun(run.id), 'Folha recalculada')} testId="payroll-recalc-btn" />
