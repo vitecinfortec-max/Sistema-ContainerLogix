@@ -41,6 +41,7 @@ def mt(monkeypatch, tmp_path):
 
     loop = asyncio.new_event_loop()
     central = client["central_teste"]
+    monkeypatch.setattr(tenancy, "_directory", None)  # restaurado ao fim do teste
     tenancy.configure(central)
     loop.run_until_complete(ensure_central_indexes(central))
     for slug, name in (("t1", "Empresa Um"), ("t2", "Empresa Dois")):
@@ -76,7 +77,6 @@ def mt(monkeypatch, tmp_path):
     yield Client()
     loop.run_until_complete(http.aclose())
     loop.close()
-    tenancy.configure(None)
 
 
 def test_request_without_company_is_refused(mt):
@@ -196,3 +196,64 @@ def test_only_api_paths_need_a_company(mt):
     # o site (quando servido pelo mesmo processo) e a documentação não passam pelo filtro
     assert mt.request("GET", "/login").status_code != 400
     assert mt.request("GET", "/openapi.json").status_code == 200
+
+
+def _make_owner(mt):
+    mt.run(mt.db["db_t1"].users.update_one({"id": "admin-t1"}, {"$set": {"is_superadmin": True}}))
+
+
+def test_platform_is_superadmin_only(mt):
+    assert mt.request("GET", "/api/platform/tenants", token=mt.token("t1")).status_code == 403
+    _make_owner(mt)
+    rows = mt.request("GET", "/api/platform/tenants", token=mt.token("t1")).json()
+    assert [(r["slug"], r["users"], r["current"]) for r in sorted(rows, key=lambda r: r["slug"])] == [("t1", 1, True), ("t2", 1, False)]
+
+
+def test_platform_creates_a_working_company(mt):
+    _make_owner(mt)
+    owner = mt.token("t1")
+    body = {"slug": "t3", "name": "Empresa Três", "hosts": ["t3.containerlogix.com.br"],
+            "admin_name": "Ana Admin", "admin_email": "Ana@Tres.com", "disabled_modules": ["rh", "nao-existe"]}
+    r = mt.request("POST", "/api/platform/tenants", token=owner, json=body)
+    assert r.status_code == 200, r.text
+    created = r.json()
+    assert created["tenant"]["db_name"] == "containerlogix_t3" and len(created["temp_password"]) == 10
+    users = mt.run(mt.db["containerlogix_t3"].users.find({}, {"_id": 0}).to_list(None))
+    assert {(u["email"], u["is_superadmin"], u["must_change_password"]) for u in users} == {
+        ("ana@tres.com", False, True), ("admin@empresa.com", True, False)}
+    assert mt.run(mt.db["containerlogix_t3"].module_config.find_one({}))["disabled_modules"] == ["rh"]
+
+    # o admin novo entra com a senha provisória (e é obrigado a trocar)
+    login = mt.request("POST", "/api/auth/login", headers={"X-Tenant-Host": "t3.containerlogix.com.br"},
+                       json={"email": "ana@tres.com", "password": created["temp_password"]})
+    assert login.status_code == 200 and login.json()["user"]["must_change_password"] is True
+    # o dono entra com a mesma senha que já usa
+    assert mt.request("POST", "/api/auth/login", tenant="t3", json={"email": "admin@empresa.com", "password": "senha-t1"}).status_code == 200
+
+    assert mt.request("POST", "/api/platform/tenants", token=owner, json=body).status_code == 400  # identificador repetido
+    assert mt.request("POST", "/api/platform/tenants", token=owner, json={**body, "slug": "t4", "admin_email": "x"}).status_code == 400
+    assert mt.request("POST", "/api/platform/tenants", token=owner,
+                      json={**body, "slug": "t5", "hosts": ["t1.containerlogix.com.br"]}).status_code == 400
+
+
+def test_platform_edits_suspends_and_sets_modules(mt):
+    _make_owner(mt)
+    owner, t2 = mt.token("t1"), mt.token("t2")
+    r = mt.request("PUT", "/api/platform/tenants/t2", token=owner,
+                   json={"name": "Empresa Dois Nova", "hosts": ["dois.containerlogix.com.br"]})
+    assert r.status_code == 200 and r.json()["hosts"] == ["dois.containerlogix.com.br"]
+    assert mt.request("GET", "/api/tenant-info", headers={"X-Tenant-Host": "dois.containerlogix.com.br"}).json()["slug"] == "t2"
+    assert mt.request("GET", "/api/tenant-info", headers={"X-Tenant-Host": "t2.containerlogix.com.br"}).status_code == 404
+    assert mt.request("PUT", "/api/platform/tenants/t2", token=owner,
+                      json={"name": "x", "hosts": ["t1.containerlogix.com.br"]}).status_code == 400
+
+    assert mt.request("PUT", "/api/platform/tenants/t1/status", token=owner, json={"status": "SUSPENSO"}).status_code == 400
+    assert mt.request("PUT", "/api/platform/tenants/t2/status", token=owner, json={"status": "SUSPENSO"}).status_code == 200
+    assert mt.request("GET", "/api/clients", token=t2).status_code == 403
+    assert mt.request("PUT", "/api/platform/tenants/t2/status", token=owner, json={"status": "ATIVO"}).status_code == 200
+    assert mt.request("GET", "/api/clients", token=t2).status_code == 200
+
+    assert mt.request("GET", "/api/hr/positions", token=t2).status_code == 200
+    assert mt.request("PUT", "/api/platform/tenants/t2/modules", token=owner, json={"disabled_modules": ["rh"]}).status_code == 200
+    assert mt.request("GET", "/api/hr/positions", token=t2).status_code == 403
+    assert mt.request("PUT", "/api/platform/tenants/nao-existe/modules", token=owner, json={"disabled_modules": []}).status_code == 404

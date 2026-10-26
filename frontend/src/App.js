@@ -91,6 +91,7 @@ const DailyRateRequestPage = lazyPage(() => import('./pages/DailyRateRequestPage
 const CheckControlPage = lazyPage(() => import('./pages/CheckControlPage'));
 const GratificationsPage = lazyPage(() => import('./pages/GratificationsPage'));
 const HRDashboardPage = lazyPage(() => import('./pages/HRDashboardPage'));
+const PlatformTenantsPage = lazyPage(() => import('./pages/PlatformTenantsPage'));
 const HRContractsPage = lazyPage(() => import('./pages/HRContractsPage'));
 const HRPositionsPage = lazyPage(() => import('./pages/HRPositionsPage'));
 const PayrollPage = lazyPage(() => import('./pages/PayrollPage'));
@@ -398,6 +399,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly>
                 <UsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/plataforma"
+            element={
+              <ProtectedRoute superadminOnly>
+                <PlatformTenantsPage />
               </ProtectedRoute>
             }
           />

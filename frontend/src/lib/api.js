@@ -258,6 +258,12 @@ export const api = {
   // Módulos Contratados (superadmin)
   getModuleConfig: () => axios.get(`${API}/module-config`),
   getModuleCatalog: () => axios.get(`${API}/module-config/catalog`),
+  // Painel do dono do sistema (superadmin): empresas atendidas
+  getPlatformTenants: () => axios.get(`${API}/platform/tenants`),
+  createPlatformTenant: (data) => axios.post(`${API}/platform/tenants`, data),
+  updatePlatformTenant: (slug, data) => axios.put(`${API}/platform/tenants/${slug}`, data),
+  setPlatformTenantStatus: (slug, status) => axios.put(`${API}/platform/tenants/${slug}/status`, { status }),
+  setPlatformTenantModules: (slug, disabledModules) => axios.put(`${API}/platform/tenants/${slug}/modules`, { disabled_modules: disabledModules }),
   updateModuleConfig: (disabledModules) => axios.put(`${API}/module-config`, { disabled_modules: disabledModules }),
 
   // File Upload

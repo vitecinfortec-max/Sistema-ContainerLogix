@@ -81,7 +81,8 @@ import {
   MessageSquareWarning,
   Hourglass,
   FileBadge,
-  Percent
+  Percent,
+  Building2
 } from 'lucide-react';
 import { Suspense, createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageSkeleton } from './DataPage';
@@ -131,6 +132,7 @@ const PAGE_TITLES = {
   '/company-settings': 'Dados da Empresa',
   '/users': 'Gestão de Usuários',
   '/modules': 'Módulos Contratados',
+  '/plataforma': 'Clientes do Sistema',
   '/audit-log': 'Log de Auditoria',
   '/shipping-lines': 'Armadores',
   '/service-types': 'Tipos de Serviço',
@@ -412,7 +414,7 @@ function LayoutFrame({ children }) {
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
-  const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/audit-log' || location.pathname === '/modules' || location.pathname === '/tank-settings';
+  const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/audit-log' || location.pathname === '/modules' || location.pathname === '/plataforma' || location.pathname === '/tank-settings';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status' || location.pathname === '/port-services' || location.pathname === '/reports/port-services' || location.pathname === '/reports/port-service-shifts' || location.pathname === '/reports/vehicle-results';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
@@ -700,6 +702,7 @@ function LayoutFrame({ children }) {
     isAdmin ? [{ path: '/users', label: 'Usuários', icon: ShieldCheck }] : [],
     isAdmin ? [{ path: '/audit-log', label: 'Log de Auditoria', icon: History }] : [],
     isSuperadmin ? [{ path: '/modules', label: 'Módulos Contratados', icon: LayoutGrid }] : [],
+    isSuperadmin ? [{ path: '/plataforma', label: 'Clientes do Sistema', icon: Building2 }] : [],
     isAdmin && isModuleEnabled('abastecimento.configuracao_tanque') ? [{ path: '/tank-settings', label: 'Configuração de Tanque', icon: Settings }] : [],
   ].flat();
 

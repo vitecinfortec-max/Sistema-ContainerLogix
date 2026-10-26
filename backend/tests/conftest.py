@@ -142,6 +142,7 @@ def api(monkeypatch, tmp_path):
         fake_db = app_db.for_tenant(tenant)  # os testes leem/gravam direto no banco da empresa
         central = mongo["central_teste"]
         asyncio.new_event_loop().run_until_complete(central.tenants.insert_one(dict(tenant)))
+        monkeypatch.setattr(tenancy, "_directory", None)  # restaurado ao fim do teste
         tenancy.configure(central)
         monkeypatch.setattr(tenancy, "MULTI_TENANT", True)
         monkeypatch.setattr(shared, "_module_config_cache_by_tenant", {})

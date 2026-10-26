@@ -2,6 +2,7 @@
 banco/endereço por empresa, cadastro idempotente que nunca altera uma
 empresa existente e busca pelo endereço de acesso."""
 import asyncio
+import os
 
 import pytest
 from mongomock_motor import AsyncMongoMockClient
@@ -71,3 +72,14 @@ def test_find_by_host(central):
     assert run(find_tenant_by_host(central, "containerlogix-jalogistica.vercel.app"))["slug"] == "ja"
     assert run(find_tenant_by_host(central, "outro.containerlogix.com.br")) is None
     assert run(find_tenant_by_host(central, "")) is None
+
+
+@pytest.mark.skipif(os.environ.get("TEST_MULTI_TENANT") == "1", reason="cenário de instância única")
+def test_platform_on_a_single_instance(api):
+    """Com MULTI_TENANT desligado (hoje), o dono já administra o cadastro central."""
+    api.run(api.db.users.update_one({"id": "admin-1"}, {"$set": {"is_superadmin": True}}))
+    assert api.get("/api/platform/tenants").json() == []
+    r = api.post("/api/platform/tenants", json={"slug": "novo", "name": "Cliente Novo", "admin_name": "Ana", "admin_email": "ana@novo.com"})
+    assert r.status_code == 200, r.text
+    assert [t["slug"] for t in api.get("/api/platform/tenants").json()] == ["novo"]
+    assert api.get("/api/platform/tenants", as_user="operator").status_code == 403

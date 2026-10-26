@@ -134,3 +134,32 @@ async def find_tenant_by_host(central, host: str) -> Optional[dict]:
 async def list_tenants(central) -> list:
     rows = await central.tenants.find({}, {"_id": 0}).to_list(None)
     return sorted(rows, key=lambda t: t["name"].lower())
+
+
+async def update_tenant(central, slug: str, name: str, hosts: list, notes: Optional[str] = None) -> dict:
+    """Altera nome, endereços e observações (o banco e o identificador nunca mudam)."""
+    tenant = await get_tenant(central, slug)
+    if not tenant:
+        raise ValueError("Empresa não encontrada")
+    data = TenantCreate(slug=tenant["slug"], name=name, db_name=tenant["db_name"], hosts=hosts,
+                        status=tenant.get("status", "ATIVO"), notes=notes)
+    for host in data.hosts:
+        other = await central.tenant_hosts.find_one({"host": host, "slug": {"$ne": tenant["slug"]}}, {"_id": 0, "slug": 1})
+        if other:
+            raise ValueError(f"O endereço {host} já pertence à empresa {other['slug']}")
+    await central.tenant_hosts.delete_many({"slug": tenant["slug"]})
+    for host in data.hosts:
+        await central.tenant_hosts.insert_one({"host": host, "slug": tenant["slug"]})
+    await central.tenants.update_one({"slug": tenant["slug"]}, {"$set": {
+        "name": data.name, "hosts": data.hosts, "notes": data.notes, "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return await get_tenant(central, tenant["slug"])
+
+
+async def set_tenant_status(central, slug: str, status: str) -> dict:
+    if status not in TENANT_STATUS:
+        raise ValueError("Situação inválida")
+    result = await central.tenants.update_one({"slug": (slug or "").strip().lower()}, {"$set": {
+        "status": status, "updated_at": datetime.now(timezone.utc).isoformat()}})
+    if result.matched_count == 0:
+        raise ValueError("Empresa não encontrada")
+    return await get_tenant(central, slug)
