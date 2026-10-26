@@ -42,6 +42,7 @@ class PlatformTenantCreate(BaseModel):
     name: str
     hosts: List[str] = []
     notes: Optional[str] = None
+    sender_email: Optional[str] = None
     admin_name: str
     admin_email: str
     disabled_modules: List[str] = []
@@ -51,6 +52,7 @@ class PlatformTenantUpdate(BaseModel):
     name: str
     hosts: List[str] = []
     notes: Optional[str] = None
+    sender_email: Optional[str] = None
 
 
 class PlatformTenantStatus(BaseModel):
@@ -121,7 +123,7 @@ async def platform_create_tenant(data: PlatformTenantCreate, current_user: dict 
     módulos contratados. A senha provisória só aparece nesta resposta."""
     try:
         tenant_data = TenantCreate(slug=data.slug, name=data.name, db_name=f"containerlogix_{(data.slug or '').strip().lower()}",
-                                   hosts=data.hosts, notes=data.notes)
+                                   hosts=data.hosts, notes=data.notes, sender_email=data.sender_email)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e).split("\n")[-1].replace("Value error, ", "").strip())
     admin_name = (data.admin_name or "").strip()
@@ -171,7 +173,7 @@ async def platform_create_tenant(data: PlatformTenantCreate, current_user: dict 
 async def platform_update_tenant(slug: str, data: PlatformTenantUpdate, current_user: dict = Depends(get_current_superadmin_user)):
     await _tenant_or_404(slug)
     try:
-        tenant = await update_tenant(_central(), slug, data.name, data.hosts, data.notes)
+        tenant = await update_tenant(_central(), slug, data.name, data.hosts, data.notes, data.sender_email)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e).split("\n")[-1].replace("Value error, ", "").strip())
     _changed()

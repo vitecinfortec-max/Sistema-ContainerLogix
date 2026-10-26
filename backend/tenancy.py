@@ -56,6 +56,13 @@ def current_tenant_slug() -> Optional[str]:
     return tenant["slug"] if tenant else None
 
 
+def sender_email(default: str) -> str:
+    """Remetente dos e-mails da empresa atual (cadastro central); sem
+    empresa ou sem remetente próprio, o SENDER_EMAIL do servidor."""
+    tenant = _current.get()
+    return (tenant or {}).get("sender_email") or default
+
+
 def set_current_tenant(tenant: Optional[dict]):
     """Define a empresa da requisição/tarefa atual. Devolve o token do
     ContextVar para reset_current_tenant."""

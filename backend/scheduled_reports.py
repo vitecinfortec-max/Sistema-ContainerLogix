@@ -18,7 +18,7 @@ from pymongo.errors import DuplicateKeyError
 
 from reports import generate_pdf_report, now_brt, merge_company, BRT_TZ
 from shared import db, get_company_settings, get_current_admin_user
-from tenancy import active_tenants, is_multi_tenant, tenant_context
+from tenancy import active_tenants, is_multi_tenant, sender_email, tenant_context
 
 api_router = APIRouter(prefix="/api")
 
@@ -113,7 +113,7 @@ async def send_daily_client_movement_reports(day: date = None) -> dict:
             )
 
             params = {
-                "from": SENDER_EMAIL,
+                "from": sender_email(SENDER_EMAIL),
                 "to": recipient_emails,
                 "subject": f"ContainerLogix - Relatório de Movimentações - {day.strftime('%d/%m/%Y')}",
                 "html": _build_email_html(c["name"], day, len(movements)),

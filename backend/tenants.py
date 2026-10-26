@@ -21,6 +21,7 @@ _SLUG_RX = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
 # Nome de banco aceito pelo Atlas: sem / \ . " $ espaço e no máximo 38 bytes
 _DB_RX = re.compile(r"^[A-Za-z0-9_-]{1,38}$")
 _HOST_RX = re.compile(r"^(?=.{1,253}$)([a-z0-9-]+\.)+[a-z0-9-]+$|^localhost$")
+_EMAIL_RX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def normalize_host(host: Optional[str]) -> str:
@@ -38,6 +39,9 @@ class TenantCreate(BaseModel):
     hosts: List[str] = []  # endereços pelos quais a empresa acessa o sistema
     status: str = "ATIVO"
     notes: Optional[str] = None
+    # Remetente dos e-mails da empresa (relatório diário, recuperação de senha);
+    # vazio = SENDER_EMAIL do servidor. O domínio precisa estar verificado no Resend.
+    sender_email: Optional[str] = None
     # Onde a instância antiga roda até a virada (Etapa 6) - só referência
     legacy_backend_url: Optional[str] = None
     legacy_frontend_url: Optional[str] = None
@@ -79,6 +83,16 @@ class TenantCreate(BaseModel):
             if h not in out:
                 out.append(h)
         return out
+
+    @field_validator("sender_email")
+    @classmethod
+    def _sender(cls, v):
+        v = (v or "").strip().lower()
+        if not v:
+            return None
+        if not _EMAIL_RX.match(v):
+            raise ValueError(f"E-mail do remetente inválido: {v}")
+        return v
 
     @field_validator("status")
     @classmethod
@@ -136,13 +150,14 @@ async def list_tenants(central) -> list:
     return sorted(rows, key=lambda t: t["name"].lower())
 
 
-async def update_tenant(central, slug: str, name: str, hosts: list, notes: Optional[str] = None) -> dict:
-    """Altera nome, endereços e observações (o banco e o identificador nunca mudam)."""
+async def update_tenant(central, slug: str, name: str, hosts: list, notes: Optional[str] = None,
+                        sender_email: Optional[str] = None) -> dict:
+    """Altera nome, endereços, observações e remetente (o banco e o identificador nunca mudam)."""
     tenant = await get_tenant(central, slug)
     if not tenant:
         raise ValueError("Empresa não encontrada")
     data = TenantCreate(slug=tenant["slug"], name=name, db_name=tenant["db_name"], hosts=hosts,
-                        status=tenant.get("status", "ATIVO"), notes=notes)
+                        status=tenant.get("status", "ATIVO"), notes=notes, sender_email=sender_email)
     for host in data.hosts:
         other = await central.tenant_hosts.find_one({"host": host, "slug": {"$ne": tenant["slug"]}}, {"_id": 0, "slug": 1})
         if other:
@@ -151,7 +166,8 @@ async def update_tenant(central, slug: str, name: str, hosts: list, notes: Optio
     for host in data.hosts:
         await central.tenant_hosts.insert_one({"host": host, "slug": tenant["slug"]})
     await central.tenants.update_one({"slug": tenant["slug"]}, {"$set": {
-        "name": data.name, "hosts": data.hosts, "notes": data.notes, "updated_at": datetime.now(timezone.utc).isoformat()}})
+        "name": data.name, "hosts": data.hosts, "notes": data.notes, "sender_email": data.sender_email,
+        "updated_at": datetime.now(timezone.utc).isoformat()}})
     return await get_tenant(central, tenant["slug"])
 
 

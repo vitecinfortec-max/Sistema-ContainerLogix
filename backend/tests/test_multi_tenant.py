@@ -323,6 +323,31 @@ def test_daily_email_runs_once_per_active_company(mt, monkeypatch):
     assert mt.run(mt.db["db_t2"].scheduled_job_runs.count_documents({})) == 0
 
 
+def test_each_company_sends_email_from_its_own_sender(mt, monkeypatch):
+    from routers import auth as auth_router
+    _make_owner(mt)
+    owner = mt.token("t1")
+    sent = []
+    monkeypatch.setattr(auth_router.resend.Emails, "send", lambda params: sent.append(params["from"]))
+    monkeypatch.setattr(auth_router, "SENDER_EMAIL", "padrao@containerlogix.com.br")
+
+    assert mt.request("PUT", "/api/platform/tenants/t2", token=owner, json={
+        "name": "Empresa Dois", "hosts": ["t2.containerlogix.com.br"], "sender_email": "nao-e-email"}).status_code == 400
+    r = mt.request("PUT", "/api/platform/tenants/t2", token=owner, json={
+        "name": "Empresa Dois", "hosts": ["t2.containerlogix.com.br"], "sender_email": " Relatorios-T2@containerlogix.com.br "})
+    assert r.status_code == 200 and r.json()["sender_email"] == "relatorios-t2@containerlogix.com.br"
+
+    for slug in ("t1", "t2"):
+        mt.request("POST", "/api/auth/forgot-password", tenant=slug, json={"email": "admin@empresa.com"})
+    assert sent == ["padrao@containerlogix.com.br", "relatorios-t2@containerlogix.com.br"]
+
+    # vazio volta para o remetente do servidor
+    mt.request("PUT", "/api/platform/tenants/t2", token=owner, json={
+        "name": "Empresa Dois", "hosts": ["t2.containerlogix.com.br"], "sender_email": ""})
+    mt.request("POST", "/api/auth/forgot-password", tenant="t2", json={"email": "admin@empresa.com"})
+    assert sent[-1] == "padrao@containerlogix.com.br"
+
+
 # ---------------------------------------------------------------- Etapa 6: cópia dos arquivos
 
 MIGRATION = "senha-de-migracao-com-mais-de-24-caracteres"

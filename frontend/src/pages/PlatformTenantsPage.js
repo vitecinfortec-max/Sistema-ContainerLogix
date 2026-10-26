@@ -18,7 +18,7 @@ const errorDetail = (e, fallback) => e?.response?.data?.detail || fallback;
 const slugify = (text) => (text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
 const fmtDateTime = (v) => { try { return v ? format(new Date(v), 'dd/MM/yyyy HH:mm') : '-'; } catch (e) { return '-'; } };
-const EMPTY = { name: '', slug: '', slugTouched: false, hosts: '', notes: '', admin_name: '', admin_email: '' };
+const EMPTY = { name: '', slug: '', slugTouched: false, hosts: '', notes: '', sender_email: '', admin_name: '', admin_email: '' };
 
 /** Painel do dono do sistema: empresas (clientes) atendidas pelo servidor. */
 export default function PlatformTenantsPage() {
@@ -33,7 +33,7 @@ export default function PlatformTenantsPage() {
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState(null);
   const [editOpen, setEditOpen] = useState(false);
-  const [editForm, setEditForm] = useState({ name: '', hosts: '', notes: '' });
+  const [editForm, setEditForm] = useState({ name: '', hosts: '', notes: '', sender_email: '' });
   const [modulesOpen, setModulesOpen] = useState(false);
   const [disabled, setDisabled] = useState(() => new Set());
   const [importOpen, setImportOpen] = useState(false);
@@ -84,7 +84,7 @@ export default function PlatformTenantsPage() {
     try {
       const hosts = hostsOf(form.hosts);
       const r = await api.createPlatformTenant({
-        name: form.name.trim(), slug: form.slug.trim(), notes: form.notes || null,
+        name: form.name.trim(), slug: form.slug.trim(), notes: form.notes || null, sender_email: form.sender_email.trim() || null,
         hosts: hosts.length ? hosts : [`${form.slug.trim()}.containerlogix.com.br`],
         admin_name: form.admin_name.trim(), admin_email: form.admin_email.trim(),
       });
@@ -99,13 +99,16 @@ export default function PlatformTenantsPage() {
   };
 
   const openEdit = () => {
-    setEditForm({ name: selected.name, hosts: (selected.hosts || []).join('\n'), notes: selected.notes || '' });
+    setEditForm({ name: selected.name, hosts: (selected.hosts || []).join('\n'), notes: selected.notes || '', sender_email: selected.sender_email || '' });
     setEditOpen(true);
   };
   const saveEdit = async () => {
     setSaving(true);
     try {
-      await api.updatePlatformTenant(selected.slug, { name: editForm.name, hosts: hostsOf(editForm.hosts), notes: editForm.notes || null });
+      await api.updatePlatformTenant(selected.slug, {
+        name: editForm.name, hosts: hostsOf(editForm.hosts), notes: editForm.notes || null,
+        sender_email: editForm.sender_email.trim() || null,
+      });
       toast.success('Empresa atualizada');
       setEditOpen(false);
       load();
@@ -276,6 +279,11 @@ export default function PlatformTenantsPage() {
               <Input type="email" value={form.admin_email} onChange={(e) => setField('admin_email', e.target.value)} className="h-9 text-sm" data-testid="platform-admin-email" />
             </div>
             <div className="sm:col-span-2">
+              <Label className="mb-1.5 block">Remetente dos e-mails</Label>
+              <Input type="email" value={form.sender_email} onChange={(e) => setField('sender_email', e.target.value)} placeholder="relatorios@containerlogix.com.br" className="h-9 text-sm" />
+              <p className="text-[11px] text-slate-500 mt-1">Relatório diário e recuperação de senha. Vazio: o remetente padrão do servidor.</p>
+            </div>
+            <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Observações</Label>
               <Textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)} className="text-sm min-h-[50px]" />
             </div>
@@ -325,6 +333,11 @@ export default function PlatformTenantsPage() {
             <div>
               <Label className="mb-1.5 block">Endereços (um por linha)</Label>
               <Textarea value={editForm.hosts} onChange={(e) => setEditForm((f) => ({ ...f, hosts: e.target.value }))} className="text-sm min-h-[80px]" />
+            </div>
+            <div>
+              <Label className="mb-1.5 block">Remetente dos e-mails</Label>
+              <Input type="email" value={editForm.sender_email} onChange={(e) => setEditForm((f) => ({ ...f, sender_email: e.target.value }))} placeholder="relatorios@containerlogix.com.br" className="h-9 text-sm" />
+              <p className="text-[11px] text-slate-500 mt-1">Vazio: o remetente padrão do servidor.</p>
             </div>
             <div>
               <Label className="mb-1.5 block">Observações</Label>

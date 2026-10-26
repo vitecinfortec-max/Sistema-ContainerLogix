@@ -10,6 +10,7 @@ from models import UserLogin, UserResponse, Token, CompanySettingsUpdate
 from auth import get_password_hash, verify_password, create_access_token, FILE_TOKEN_SCOPE
 
 from shared import db, get_current_active_user, get_company_settings, check_rate_limit, client_ip
+from tenancy import sender_email
 from routers.users import email_query
 
 api_router = APIRouter(prefix="/api")
@@ -119,7 +120,7 @@ async def forgot_password(request: ForgotPasswordRequest, http_request: Request)
         """
         
         params = {
-            "from": SENDER_EMAIL,
+            "from": sender_email(SENDER_EMAIL),
             "to": [user_doc['email']],
             "subject": "ContainerLogix - Recuperação de Senha",
             "html": html_content
