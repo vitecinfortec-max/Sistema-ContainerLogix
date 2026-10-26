@@ -8,7 +8,7 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import KeepInFrame, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepInFrame, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus.flowables import HRFlowable
 
 from hr_payroll import CONTRACT_TYPES, RUN_TYPES
@@ -296,14 +296,161 @@ def generate_occurrence_term_pdf(occ: dict, company: dict) -> bytes:
     return buffer.getvalue()
 
 
+# ---------------------------------------------------------------- Contrato de trabalho
+
+# Tipos com modelo de contrato (aprendiz, temporário, estágio e PJ têm
+# requisitos próprios - programa de aprendizagem, agência, instituição de ensino)
+WORK_CONTRACT_TYPES = {"CLT", "EXPERIENCIA"}
+
+
+def _person_address(person: dict) -> str:
+    addr = person.get("address_details") or {}
+    return ", ".join(x for x in (addr.get("street"), addr.get("number"), addr.get("neighborhood"), addr.get("city"), addr.get("state"), addr.get("zip")) if x)
+
+
+def _long_date(value) -> str:
+    from datetime import date
+    day = value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
+    return f"{day.day} de {MONTHS[day.month - 1]} de {day.year}"
+
+
+def generate_work_contract_pdf(contract: dict, person: dict, company: dict) -> bytes:
+    """Contrato individual de trabalho (CLT), por prazo indeterminado ou de
+    experiência - com o termo de prorrogação quando a experiência é menor que 90 dias."""
+    from datetime import date, timedelta
+
+    buffer = io.BytesIO()
+    doc = _doc(buffer)
+    styles = getSampleStyleSheet()
+    text_style = _paragraph_style(styles, 9.5, 14)
+    text_style.alignment = 4  # justificado
+    clause_title = ParagraphStyle("HRClause", parent=text_style, fontName="Helvetica-Bold", spaceBefore=6, spaceAfter=2)
+
+    def esc(value) -> str:
+        return xml_escape(str(value)) if value not in (None, "") else "-"
+
+    experience_days = int(contract.get("experience_days") or 0)
+    is_experience = contract.get("contract_type") == "EXPERIENCIA" or experience_days > 0
+    title = "Contrato de Trabalho a Título de Experiência" if is_experience else "Contrato Individual de Trabalho"
+    driver = contract.get("person_type") == "MOTORISTA"
+    admission = date.fromisoformat(contract["admission_date"][:10])
+
+    elements = list(_build_pdf_header(styles, download_logo(company), title,
+                                      generation_info=f"Matrícula {contract.get('contract_number')}", company=company, content_width=doc.width))
+    elements.extend(_pdf_section_title("Empregadora", doc.width))
+    elements.append(_pdf_info_grid([
+        ("Razão social", company.get("name"), 2), ("CNPJ", company.get("cnpj"), 2), ("Endereço", company.get("address"), 4),
+    ], doc.width, cols=4))
+    elements.extend(_pdf_section_title("Empregado(a)", doc.width))
+    elements.append(_pdf_info_grid([
+        ("Nome", contract.get("person_name"), 2), ("CPF", contract.get("person_cpf")), ("RG", person.get("rg")),
+        ("Nascimento", fmt_date(person.get("birth_date"))), ("PIS", contract.get("pis")),
+        ("CTPS", contract.get("ctps_number")), ("Série", contract.get("ctps_series")),
+        ("Endereço", _person_address(person) or "-", 4),
+    ], doc.width, cols=4))
+    elements.append(Spacer(1, 8))
+    elements.append(Paragraph(
+        "As partes acima identificadas celebram o presente contrato individual de trabalho, regido pela Consolidação das "
+        "Leis do Trabalho (CLT) e pelas cláusulas a seguir:", text_style))
+
+    position = esc(contract.get("position_name"))
+    if contract.get("cbo"):
+        position += f" (CBO {esc(contract['cbo'])})"
+    if contract.get("department"):
+        position += f", no setor {esc(contract['department'])}"
+    schedule = f"{_num(contract.get('weekly_hours') or 44).replace(',00', '')} horas semanais"
+    if contract.get("work_schedule"):
+        schedule += f", no horário {esc(contract['work_schedule'])}"
+    extras = []
+    if contract.get("insalubridade_grade"):
+        extras.append(f"adicional de insalubridade de {_num(contract['insalubridade_grade']).replace(',00', '')}% sobre o salário mínimo (art. 192 da CLT)")
+    if contract.get("periculosidade"):
+        extras.append("adicional de periculosidade de 30% sobre o salário-base (art. 193 da CLT)")
+
+    clauses = [
+        ("Função", f"O(A) EMPREGADO(A) é admitido(a) para exercer a função de <b>{position}</b>, obrigando-se a executar "
+                   "também as tarefas compatíveis com a sua condição pessoal que lhe forem atribuídas (art. 456, parágrafo único, da CLT)."),
+        ("Remuneração", f"O(A) EMPREGADO(A) receberá o salário mensal de <b>{_money(contract.get('base_salary'))}</b>, pago até o "
+                        "5º (quinto) dia útil do mês seguinte ao vencido (art. 459, § 1º, da CLT)"
+                        + (", além de " + " e ".join(extras) if extras else "") + "."),
+        ("Jornada de trabalho", f"A jornada será de <b>{schedule}</b>, com intervalo para repouso e alimentação na forma do art. 71 da CLT. "
+                                "A jornada poderá ser prorrogada ou compensada nos termos da lei e de acordo individual ou coletivo, "
+                                "inclusive por banco de horas, sendo as horas extras não compensadas pagas com o adicional legal."
+                                + (" Por se tratar de motorista profissional, aplicam-se os arts. 235-A a 235-G da CLT (Lei 13.103/2015), "
+                                   "com o controle da jornada e dos tempos de direção e de descanso." if driver else "")),
+        ("Local de trabalho", f"O trabalho será prestado no estabelecimento da EMPREGADORA ({esc(company.get('address'))})"
+                              + (" e nas rotas e locais em que for necessária a prestação do serviço" if driver else "")
+                              + ", podendo o(a) EMPREGADO(A) ser transferido(a) nas hipóteses do art. 469 da CLT."),
+    ]
+    if is_experience:
+        end = admission + timedelta(days=experience_days - 1)
+        text = (f"Este contrato é celebrado a título de experiência, pelo prazo de <b>{experience_days} dias</b>, de "
+                f"<b>{fmt_date(admission.isoformat())}</b> a <b>{fmt_date(end.isoformat())}</b> (art. 443, § 2º, \"c\", da CLT)")
+        if experience_days < 90:
+            text += (f", podendo ser prorrogado uma única vez por até {90 - experience_days} dias, sem ultrapassar o total de 90 dias "
+                     "(arts. 445, parágrafo único, e 451 da CLT)")
+        text += (". Continuando a prestação de serviços após o término do prazo, o contrato passará a vigorar por prazo indeterminado. "
+                 "A rescisão antecipada sem justa causa obriga a parte que lhe der causa à indenização dos arts. 479 e 480 da CLT.")
+        clauses.append(("Prazo", text))
+    else:
+        clauses.append(("Prazo", f"Este contrato vigora por prazo indeterminado a partir de <b>{fmt_date(admission.isoformat())}</b>, "
+                                 "e sua rescisão observará o aviso prévio e as demais regras da legislação."))
+    discount = ("Além dos descontos previstos em lei, o(a) EMPREGADO(A) autoriza o desconto dos danos que causar à EMPREGADORA, "
+                "em caso de dolo ou culpa, valendo esta cláusula como o acordo previsto no art. 462, § 1º, da CLT")
+    if contract.get("vt_opt_in"):
+        discount += ", e o desconto de até 6% do salário-base referente ao vale-transporte (Lei 7.418/1985)"
+    clauses += [
+        ("Descontos", discount + "."),
+        ("Normas da empresa e segurança", "O(A) EMPREGADO(A) obriga-se a cumprir o regulamento interno, as ordens de serviço e as normas de "
+                                          "segurança e medicina do trabalho, inclusive o uso dos equipamentos de proteção individual fornecidos "
+                                          "(art. 158 da CLT), e a manter sigilo sobre as informações da EMPREGADORA e de seus clientes."),
+        ("Dados pessoais", "A EMPREGADORA tratará os dados pessoais do(a) EMPREGADO(A) e de seus dependentes para a execução deste contrato e "
+                           "o cumprimento das obrigações legais (Lei 13.709/2018, art. 7º, II e V)."),
+    ]
+    if contract.get("observations"):
+        clauses.append(("Disposições adicionais", esc(contract["observations"])))
+    for i, (name, text) in enumerate(clauses, 1):
+        elements.append(KeepTogether([Paragraph(f"Cláusula {i}ª - {name}", clause_title), Paragraph(text, text_style)]))
+
+    elements.append(Spacer(1, 8))
+    elements.append(Paragraph("E, por estarem de acordo, as partes assinam este contrato em 2 (duas) vias de igual teor, "
+                              "na presença das testemunhas abaixo.", text_style))
+    elements.append(Spacer(1, 6))
+    elements.append(Paragraph(f"{esc(company.get('address'))}, {_long_date(admission)}.", _paragraph_style(styles, 9.5)))
+    elements.append(_pdf_signatures([("Empregadora", company["name"]), ("Empregado(a)", contract.get("person_name") or "")],
+                                    doc.width, space_above=44))
+    elements.append(_pdf_signatures([("Testemunha 1", "Nome / CPF"), ("Testemunha 2", "Nome / CPF")], doc.width, space_above=36))
+
+    if is_experience and experience_days < 90:
+        first_end = admission + timedelta(days=experience_days - 1)
+        final_end = admission + timedelta(days=89)
+        elements.append(PageBreak())
+        elements.extend(_build_pdf_header(styles, download_logo(company), "Termo de Prorrogação do Contrato de Experiência",
+                                          generation_info=f"Matrícula {contract.get('contract_number')}", company=company, content_width=doc.width))
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph(
+            f"Por mútuo acordo, o contrato de experiência celebrado em <b>{fmt_date(admission.isoformat())}</b> entre "
+            f"<b>{esc(company.get('name'))}</b> e <b>{esc(contract.get('person_name'))}</b>, CPF {esc(contract.get('person_cpf'))}, "
+            f"com término previsto para <b>{fmt_date(first_end.isoformat())}</b>, fica prorrogado por mais "
+            f"<b>{90 - experience_days} dias</b>, de <b>{fmt_date((first_end + timedelta(days=1)).isoformat())}</b> a "
+            f"<b>{fmt_date(final_end.isoformat())}</b>, mantidas as demais cláusulas (arts. 445, parágrafo único, e 451 da CLT).",
+            text_style))
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph(f"{esc(company.get('address'))}, ____ de ______________ de ______.", _paragraph_style(styles, 9.5)))
+        elements.append(_pdf_signatures([("Empregadora", company["name"]), ("Empregado(a)", contract.get("person_name") or "")],
+                                        doc.width, space_above=44))
+        elements.append(_pdf_signatures([("Testemunha 1", "Nome / CPF"), ("Testemunha 2", "Nome / CPF")], doc.width, space_above=36))
+    _build(doc, elements, company)
+    return buffer.getvalue()
+
+
 # ---------------------------------------------------------------- Ficha do funcionário
 
 def generate_employee_sheet_pdf(contract: dict, person: dict, company: dict) -> bytes:
     buffer = io.BytesIO()
     doc = _doc(buffer)
     styles = getSampleStyleSheet()
-    addr = person.get("address_details") or {}
-    address = ", ".join(x for x in (addr.get("street"), addr.get("number"), addr.get("neighborhood"), addr.get("city"), addr.get("state"), addr.get("zip")) if x)
+    address = _person_address(person)
     elements = list(_build_pdf_header(styles, download_logo(company), "Ficha de Registro do Empregado",
                                       generation_info=f"Matrícula {contract.get('contract_number')}", company=company, content_width=doc.width))
     elements.extend(_pdf_section_title("Dados pessoais", doc.width))

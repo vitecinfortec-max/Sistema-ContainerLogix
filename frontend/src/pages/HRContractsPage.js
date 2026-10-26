@@ -349,6 +349,9 @@ export default function HRContractsPage() {
               <ToolbarButton icon={UserX} label="Desligar (simular rescisão)" tone="red" onClick={openTermination} disabled={!isVigente} testId="hr-contract-terminate-btn" />
               <ToolbarButton icon={Undo2} label="Desfazer desligamento" tone="amber" onClick={reinstate} disabled={!single || single.status !== 'DESLIGADO'} testId="hr-contract-reinstate-btn" />
               <ToolbarDivider />
+              <ToolbarButton icon={FileSignature} label="Contrato de trabalho (PDF)" tone="primary"
+                disabled={!single || !['CLT', 'EXPERIENCIA'].includes(single.contract_type)}
+                onClick={() => saveBlob(() => api.getHRWorkContractPDF(single.id), `Contrato_${single.person_name}.pdf`)} testId="hr-work-contract-btn" />
               <ToolbarButton icon={FileText} label="Ficha do funcionário (PDF)" tone="primary" disabled={!single}
                 onClick={() => saveBlob(() => api.getHRContractSheetPDF(single.id), `Ficha_${single.person_name}.pdf`)} testId="hr-contract-sheet-btn" />
               <ToolbarButton icon={FileSignature} label="Demonstrativo de rescisão (PDF)" tone="emerald" disabled={!single || single.status !== 'DESLIGADO'}

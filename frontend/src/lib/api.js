@@ -560,6 +560,7 @@ export const api = {
   reinstateHRContract: (id) => axios.post(`${API}/hr/contracts/${id}/reinstate`),
   getHRTerminationPDF: (id) => axios.get(`${API}/hr/contracts/${id}/termination/pdf`, { responseType: 'blob' }),
   getHRContractSheetPDF: (id) => axios.get(`${API}/hr/contracts/${id}/sheet/pdf`, { responseType: 'blob' }),
+  getHRWorkContractPDF: (id) => axios.get(`${API}/hr/contracts/${id}/contract/pdf`, { responseType: 'blob' }),
   getPayrollSettings: () => axios.get(`${API}/hr/payroll-settings`),
   updatePayrollSettings: (data) => axios.put(`${API}/hr/payroll-settings`, data),
   resetPayrollSettings: () => axios.post(`${API}/hr/payroll-settings/reset`),

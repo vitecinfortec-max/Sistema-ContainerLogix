@@ -142,6 +142,37 @@ def test_positions_and_contract_lifecycle(api):
     assert api.get("/api/hr/contracts/" + c["id"] + "/sheet/pdf").content.startswith(b"%PDF")
 
 
+def _pdf_text(content: bytes) -> str:
+    from io import StringIO
+    from pdfminer.high_level import extract_text_to_fp
+    out = StringIO()
+    extract_text_to_fp(__import__("io").BytesIO(content), out)
+    return "".join(out.getvalue().split())  # sem espaços: as quebras de linha do PDF não atrapalham
+
+
+def test_work_contract_pdf(api):
+    pos = api.post("/api/hr/positions", json={"name": "Auxiliar de Pátio", "cbo": "7832-25"}).json()
+    c = _contract(api, _employee(api), position_id=pos["id"], contract_type="EXPERIENCIA", experience_days=45,
+                  insalubridade_grade=20, work_schedule="07:00 às 17:00")
+    r = api.get(f"/api/hr/contracts/{c['id']}/contract/pdf")
+    assert r.status_code == 200 and r.content.startswith(b"%PDF")
+    text = _pdf_text(r.content)
+    assert "ContratodeTrabalhoaTítulodeExperiência" in text and "AnaSouza" in text and "AuxiliardePátio" in text
+    assert "45dias" in text and "15/01/2024" in text and "28/02/2024" in text
+    assert "insalubridadede20%" in text and "vale-transporte" in text and "07:00às17:00" in text
+    # 45 + 45: termo de prorrogação de 29/02 a 13/04
+    assert "TermodeProrrogação" in text and "29/02/2024" in text and "13/04/2024" in text
+
+    other = _contract(api, _employee(api, name="Bruno Lima", cpf="222.333.444-55"), vt_opt_in=False)
+    text = _pdf_text(api.get(f"/api/hr/contracts/{other['id']}/contract/pdf").content)
+    assert "ContratoIndividualdeTrabalho" in text and "prazoindeterminado" in text
+    assert "Prorrogação" not in text and "vale-transporte" not in text
+
+    pj = _contract(api, _employee(api, name="Carla PJ", cpf="333.444.555-66"), contract_type="PJ")
+    r = api.get(f"/api/hr/contracts/{pj['id']}/contract/pdf")
+    assert r.status_code == 400 and "PJ" in r.json()["detail"]
+
+
 def test_validation_of_contract(api):
     emp = _employee(api)
     base = {"person_type": "FUNCIONARIO", "person_id": emp["id"], "admission_date": "2024-01-15", "base_salary": 3000}

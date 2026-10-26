@@ -538,6 +538,22 @@ async def contract_sheet_pdf(contract_id: str, current_user: dict = Depends(get_
     return pdf_stream(pdf, f"Ficha_{contract.get('person_name') or 'funcionario'}.pdf")
 
 
+@api_router.get("/hr/contracts/{contract_id}/contract/pdf")
+async def work_contract_pdf(contract_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Contrato de trabalho para assinatura (CLT por prazo indeterminado ou de experiência)."""
+    from hr_reports import WORK_CONTRACT_TYPES, generate_work_contract_pdf
+    contract = await get_contract(contract_id)
+    if contract.get("contract_type") not in WORK_CONTRACT_TYPES:
+        label = CONTRACT_TYPES.get(contract.get("contract_type"), contract.get("contract_type"))
+        raise HTTPException(status_code=400, detail=f"Ainda não há modelo de contrato para o tipo {label} - só para CLT e CLT - Experiência")
+    if contract.get("contract_type") == "EXPERIENCIA" and not contract.get("experience_days"):
+        raise HTTPException(status_code=400, detail="Informe no contrato os dias de experiência (até 90)")
+    person = await get_person(contract["person_type"], contract["person_id"]) or {}
+    company = merge_company(await get_company_settings())
+    pdf = generate_work_contract_pdf(contract, person, company)
+    return pdf_stream(pdf, f"Contrato_{contract.get('person_name') or 'funcionario'}.pdf")
+
+
 # ---------------------------------------------------------------- Férias
 
 @api_router.get("/hr/vacation-balances")
