@@ -263,6 +263,8 @@ export const api = {
   createPlatformTenant: (data) => axios.post(`${API}/platform/tenants`, data),
   updatePlatformTenant: (slug, data) => axios.put(`${API}/platform/tenants/${slug}`, data),
   setPlatformTenantStatus: (slug, status) => axios.put(`${API}/platform/tenants/${slug}/status`, { status }),
+  importPlatformTenantUploads: (slug, sourceUrl) => axios.post(`${API}/platform/tenants/${slug}/import-uploads`, { source_url: sourceUrl }),
+  getPlatformTenantImport: (slug) => axios.get(`${API}/platform/tenants/${slug}/import-uploads`),
   setPlatformTenantModules: (slug, disabledModules) => axios.put(`${API}/platform/tenants/${slug}/modules`, { disabled_modules: disabledModules }),
   updateModuleConfig: (disabledModules) => axios.put(`${API}/module-config`, { disabled_modules: disabledModules }),
 

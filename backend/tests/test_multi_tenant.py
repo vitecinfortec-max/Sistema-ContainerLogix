@@ -3,6 +3,7 @@ duas empresas, cada uma no próprio banco e na própria pasta de arquivos, e
 uma nunca enxerga os dados da outra - nem trocando o cabeçalho, nem usando o
 token de outra empresa."""
 import asyncio
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -29,6 +30,7 @@ def mt(monkeypatch, tmp_path):
         if getattr(module, "db", None) is real_db:
             monkeypatch.setattr(module, "db", routed)
     uploads = tenancy.TenantUploadsRoot(tmp_path)
+    monkeypatch.setattr(shared, "UPLOADS_BASE_DIR", tmp_path)
     real_uploads = [shared.UPLOADS_DIR]
     import reports
     real_uploads.append(reports.UPLOADS_DIR)
@@ -319,3 +321,71 @@ def test_daily_email_runs_once_per_active_company(mt, monkeypatch):
     # e cada empresa reserva o próprio dia (não bloqueia a outra)
     assert mt.run(mt.db["db_t1"].scheduled_job_runs.count_documents({})) == 1
     assert mt.run(mt.db["db_t2"].scheduled_job_runs.count_documents({})) == 0
+
+
+# ---------------------------------------------------------------- Etapa 6: cópia dos arquivos
+
+MIGRATION = "senha-de-migracao-com-mais-de-24-caracteres"
+
+
+def test_old_server_lists_and_serves_files_only_with_the_migration_token(api, monkeypatch, tmp_path):
+    import shared
+    if os.environ.get("TEST_MULTI_TENANT") == "1":
+        pytest.skip("o servidor antigo é de uma empresa só")
+    monkeypatch.setenv("MIGRATION_TOKEN", MIGRATION)
+    monkeypatch.setattr(shared, "UPLOADS_BASE_DIR", tmp_path)
+    (tmp_path / "checks" / "c1").mkdir(parents=True)
+    (tmp_path / "checks" / "c1" / "frente.jpg").write_bytes(b"jpg-1")
+    (tmp_path / "logo.png").write_bytes(b"png")
+    headers = {"X-Migration-Token": MIGRATION}
+    assert api.get("/api/platform/migration/uploads-manifest", as_user=None).status_code == 404
+    assert api.get("/api/platform/migration/uploads-manifest", as_user=None, headers={"X-Migration-Token": "errada"}).status_code == 404
+    manifest = api.get("/api/platform/migration/uploads-manifest", as_user=None, headers=headers).json()
+    assert manifest == [{"path": "checks/c1/frente.jpg", "size": 5}, {"path": "logo.png", "size": 3}]
+    assert api.get("/api/platform/migration/uploads/checks/c1/frente.jpg", as_user=None, headers=headers).content == b"jpg-1"
+    assert api.get("/api/platform/migration/uploads/../segredo.txt", as_user=None, headers=headers).status_code == 404
+    monkeypatch.setenv("MIGRATION_TOKEN", "curta")  # senha fraca: rota desligada
+    assert api.get("/api/platform/migration/uploads-manifest", as_user=None, headers={"X-Migration-Token": "curta"}).status_code == 404
+
+
+def test_new_server_copies_a_company_files_from_the_old_one(mt, monkeypatch):
+    import httpx
+    from routers import platform
+    _make_owner(mt)
+    owner = mt.token("t1")
+    files = {"checks/c1/frente.jpg": b"jpg-1", "logo.png": b"png", "signatures/a.png": b"sig"}
+
+    def old_server(request):
+        if request.headers.get("x-migration-token") != MIGRATION:
+            return httpx.Response(404)
+        if request.url.path == "/api/platform/migration/uploads-manifest":
+            return httpx.Response(200, json=[{"path": p, "size": len(c)} for p, c in files.items()])
+        name = request.url.path.split("/api/platform/migration/uploads/", 1)[1]
+        return httpx.Response(200, content=files[name]) if name in files else httpx.Response(404)
+
+    monkeypatch.setattr(platform, "_http_transport", httpx.MockTransport(old_server))
+    body = {"source_url": "https://antigo.onrender.com"}
+    assert mt.request("POST", "/api/platform/tenants/t2/import-uploads", token=owner, json=body).status_code == 400  # sem senha
+    monkeypatch.setenv("MIGRATION_TOKEN", MIGRATION)
+    assert mt.request("POST", "/api/platform/tenants/t2/import-uploads", token=owner, json={"source_url": "lixo"}).status_code == 400
+
+    def copy():
+        assert mt.request("POST", "/api/platform/tenants/t2/import-uploads", token=owner, json=body).status_code == 200
+        for _ in range(50):
+            status = mt.request("GET", "/api/platform/tenants/t2/import-uploads", token=owner).json()
+            if status["state"] != "COPIANDO":
+                return status
+            mt.run(asyncio.sleep(0.02))
+        raise AssertionError("cópia não terminou")
+
+    status = copy()
+    assert (status["state"], status["total"], status["copied"], status["failed"]) == ("CONCLUIDO", 3, 3, 0)
+    assert (mt.uploads_root / "t2" / "checks" / "c1" / "frente.jpg").read_bytes() == b"jpg-1"
+    assert not (mt.uploads_root / "t1" / "logo.png").exists()  # só na pasta da empresa escolhida
+    # o arquivo copiado já sai pelo endereço de sempre, na empresa certa
+    assert mt.request("GET", "/api/uploads/logo.png", tenant="t2").content == b"png"
+    # de novo (sincronização final da virada): só o que mudou
+    files["logo.png"] = b"png-novo"
+    status = copy()
+    assert (status["copied"], status["skipped"]) == (1, 2)
+    assert mt.request("GET", "/api/platform/tenants/t2/import-uploads", token=mt.token("t2")).status_code == 403

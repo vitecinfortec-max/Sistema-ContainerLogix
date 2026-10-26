@@ -12,7 +12,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Building2, Plus, Pencil, LayoutGrid, PauseCircle, PlayCircle, Save, Copy, Users, KeyRound } from 'lucide-react';
+import { Building2, Plus, Pencil, LayoutGrid, PauseCircle, PlayCircle, Save, Copy, Users, KeyRound, FolderInput } from 'lucide-react';
 
 const errorDetail = (e, fallback) => e?.response?.data?.detail || fallback;
 const slugify = (text) => (text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -36,6 +36,18 @@ export default function PlatformTenantsPage() {
   const [editForm, setEditForm] = useState({ name: '', hosts: '', notes: '' });
   const [modulesOpen, setModulesOpen] = useState(false);
   const [disabled, setDisabled] = useState(() => new Set());
+  const [importOpen, setImportOpen] = useState(false);
+  const [importSource, setImportSource] = useState('');
+  const [importStatus, setImportStatus] = useState(null);
+
+  // Cópia dos arquivos: acompanha a cada 2s enquanto estiver copiando
+  useEffect(() => {
+    if (!importOpen || importStatus?.state !== 'COPIANDO') return undefined;
+    const timer = setInterval(() => {
+      api.getPlatformTenantImport(selected.slug).then((r) => setImportStatus(r.data)).catch(() => {});
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [importOpen, importStatus?.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     load();
@@ -139,6 +151,21 @@ export default function PlatformTenantsPage() {
     }
   };
 
+  const openImport = async () => {
+    setImportSource(selected.legacy_backend_url || '');
+    setImportStatus(null);
+    setImportOpen(true);
+    try { setImportStatus((await api.getPlatformTenantImport(selected.slug)).data); } catch (e) { /* sem histórico */ }
+  };
+  const startImport = async () => {
+    try {
+      setImportStatus((await api.importPlatformTenantUploads(selected.slug, importSource)).data);
+    } catch (e) {
+      toast.error(errorDetail(e, 'Erro ao iniciar a cópia'));
+    }
+  };
+  const fmtBytes = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.round((n || 0) / 1024)} KB`);
+
   const copyAccess = () => {
     const tenant = created.tenant;
     const text = `Acesso ao ContainerLogix - ${tenant.name}\nEndereço: https://${tenant.hosts[0] || ''}\nCódigo da empresa (app): ${tenant.slug}\n`
@@ -167,6 +194,7 @@ export default function PlatformTenantsPage() {
             <Toolbar selectedCount={selected ? 1 : 0} primary={<ToolbarPrimary icon={Plus} label="Novo cliente" onClick={openCreate} testId="platform-new-btn" />}>
               <ToolbarButton icon={Pencil} label="Editar nome e endereços" tone="blue" onClick={openEdit} disabled={!selected} testId="platform-edit-btn" />
               <ToolbarButton icon={LayoutGrid} label="Módulos contratados" tone="primary" onClick={openModules} disabled={!selected} testId="platform-modules-btn" />
+              <ToolbarButton icon={FolderInput} label="Copiar arquivos do servidor antigo" tone="emerald" onClick={openImport} disabled={!selected} testId="platform-import-btn" />
               <ToolbarDivider />
               <ToolbarButton icon={selected?.status === 'SUSPENSO' ? PlayCircle : PauseCircle} label={selected?.status === 'SUSPENSO' ? 'Reativar' : 'Suspender'}
                 tone="amber" onClick={toggleStatus} disabled={!selected || selected.current} testId="platform-status-btn" />
@@ -336,6 +364,36 @@ export default function PlatformTenantsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setModulesOpen(false)} disabled={saving}>Cancelar</Button>
             <Button onClick={saveModules} disabled={saving} data-testid="platform-modules-save"><Save className="w-4 h-4 mr-2" />Salvar módulos</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Cópia dos arquivos (virada) */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-w-lg" data-testid="platform-import-dialog">
+          <DialogHeader>
+            <DialogTitle className="text-base">Copiar Arquivos · {selected?.name}</DialogTitle>
+            <DialogDescription>
+              Traz as fotos e PDFs do servidor antigo da empresa para este servidor. Pode repetir: só copia o que falta ou mudou, e não apaga nada no antigo.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label className="mb-1.5 block">Endereço do servidor antigo</Label>
+            <Input value={importSource} onChange={(e) => setImportSource(e.target.value)} className="h-9 text-sm" data-testid="platform-import-source" />
+          </div>
+          {importStatus && importStatus.state !== 'NUNCA' && (
+            <div className="rounded-md bg-muted p-3 text-sm space-y-1" data-testid="platform-import-status">
+              <div><b>{{ COPIANDO: 'Copiando...', CONCLUIDO: 'Cópia concluída', ERRO: 'Erro na cópia' }[importStatus.state]}</b></div>
+              <div>Arquivos: {importStatus.total ?? '...'} · copiados {importStatus.copied} · já existiam {importStatus.skipped} · com erro {importStatus.failed}</div>
+              <div>Transferido: {fmtBytes(importStatus.bytes)}</div>
+              {importStatus.error && <div className="text-destructive">{importStatus.error}</div>}
+              {(importStatus.errors || []).slice(0, 5).map((err) => <div key={err} className="text-[11px] text-destructive">{err}</div>)}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>Fechar</Button>
+            <Button onClick={startImport} disabled={!importSource || importStatus?.state === 'COPIANDO'} data-testid="platform-import-start">
+              <FolderInput className="w-4 h-4 mr-2" />{importStatus?.state === 'CONCLUIDO' ? 'Copiar de novo' : 'Copiar arquivos'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

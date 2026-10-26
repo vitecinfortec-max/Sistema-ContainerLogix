@@ -10,14 +10,19 @@ Funciona com MULTI_TENANT ligado ou desligado: o cadastro central fica no
 mesmo cluster do Atlas. Desligado, a empresa criada só passa a ser atendida
 quando o servidor multi-cliente entrar no ar (Etapa 6).
 """
+import asyncio
+import os
 import re
 import secrets
 import string
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from auth import get_password_hash
@@ -195,3 +200,138 @@ async def platform_tenant_modules(slug: str, data: PlatformTenantModules, curren
     shared._module_config_cache_by_tenant.pop(tenant["slug"], None)
     shared.invalidate_module_config_cache()  # instância única: o cache é um só
     return {"disabled_modules": disabled}
+
+
+# ---------------------------------------------------------------- Cópia dos arquivos (Etapa 6)
+# Na virada, as fotos/PDFs de cada empresa saem do disco do servidor antigo
+# (uma instância por cliente) para uploads/<empresa>/ do servidor novo. O
+# servidor novo busca direto do antigo; os dois conhecem a mesma senha de
+# migração (variável MIGRATION_TOKEN). Pode rodar de novo quantas vezes
+# precisar: só copia o que falta ou mudou de tamanho, e nunca apaga nada.
+
+_MIGRATION_HEADER = "x-migration-token"
+_imports: dict = {}  # empresa -> andamento da cópia (este processo)
+_http_transport = None  # nos testes, um servidor antigo de mentira
+
+
+def _migration_token() -> str:
+    token = os.environ.get("MIGRATION_TOKEN", "").strip()
+    return token if len(token) >= 24 else ""
+
+
+def _require_migration_token(request: Request):
+    expected = _migration_token()
+    given = request.headers.get(_MIGRATION_HEADER, "")
+    if not expected or not secrets.compare_digest(given.encode(), expected.encode()):
+        raise HTTPException(status_code=404, detail="Not Found")  # sem senha, a rota "não existe"
+
+
+def _safe_relative(path: str) -> Optional[str]:
+    parts = [p for p in str(path).replace("\\", "/").split("/") if p not in ("", ".")]
+    if not parts or any(p == ".." for p in parts) or ":" in parts[0]:
+        return None
+    return "/".join(parts)
+
+
+def _list_files(root: Path) -> list:
+    out = []
+    if not root.is_dir():
+        return out
+    for current, _dirs, files in os.walk(root):
+        for name in files:
+            full = Path(current) / name
+            out.append({"path": full.relative_to(root).as_posix(), "size": full.stat().st_size})
+    return sorted(out, key=lambda f: f["path"])
+
+
+@api_router.get("/platform/migration/uploads-manifest", include_in_schema=False)
+async def migration_manifest(request: Request):
+    """Servidor antigo: lista dos arquivos guardados (caminho e tamanho)."""
+    _require_migration_token(request)
+    return await asyncio.to_thread(_list_files, Path(shared.UPLOADS_BASE_DIR))
+
+
+@api_router.get("/platform/migration/uploads/{file_path:path}", include_in_schema=False)
+async def migration_file(file_path: str, request: Request):
+    """Servidor antigo: entrega um arquivo para a cópia."""
+    _require_migration_token(request)
+    relative = _safe_relative(file_path)
+    root = Path(shared.UPLOADS_BASE_DIR).resolve()
+    target = (root / relative).resolve() if relative else None
+    if target is None or root not in target.parents or not target.is_file():
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado")
+    return FileResponse(target)
+
+
+class PlatformImportUploads(BaseModel):
+    source_url: str
+
+
+async def _run_import(slug: str, source_url: str):
+    status = _imports[slug]
+    dest_root = Path(shared.UPLOADS_BASE_DIR) / slug
+    headers = {_MIGRATION_HEADER: _migration_token()}
+    try:
+        async with httpx.AsyncClient(base_url=source_url, headers=headers, timeout=120, transport=_http_transport) as http:
+            response = await http.get("/api/platform/migration/uploads-manifest")
+            if response.status_code != 200:
+                raise RuntimeError(f"o servidor antigo recusou a lista de arquivos (HTTP {response.status_code}) - confira o endereço e a MIGRATION_TOKEN dele")
+            manifest = response.json()
+            status["total"] = len(manifest)
+            for item in manifest:
+                relative = _safe_relative(item.get("path"))
+                if not relative:
+                    status["failed"] += 1
+                    continue
+                dest = dest_root / relative
+                if dest.is_file() and dest.stat().st_size == item.get("size"):
+                    status["skipped"] += 1
+                    continue
+                try:
+                    file_response = await http.get(f"/api/platform/migration/uploads/{relative}")
+                    if file_response.status_code != 200:
+                        raise RuntimeError(f"HTTP {file_response.status_code}")
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    partial = dest.with_name(dest.name + ".parcial")
+                    partial.write_bytes(file_response.content)
+                    partial.replace(dest)
+                    status["copied"] += 1
+                    status["bytes"] += len(file_response.content)
+                except Exception as e:  # um arquivo com problema não para a cópia
+                    status["failed"] += 1
+                    if len(status["errors"]) < 50:
+                        status["errors"].append(f"{relative}: {e}")
+        status["state"] = "CONCLUIDO"
+    except Exception as e:
+        status["state"] = "ERRO"
+        status["error"] = str(e)
+    status["finished_at"] = datetime.now(timezone.utc).isoformat()
+
+
+@api_router.post("/platform/tenants/{slug}/import-uploads")
+async def platform_import_uploads(slug: str, data: PlatformImportUploads, current_user: dict = Depends(get_current_superadmin_user)):
+    """Servidor novo (multi-cliente): começa a copiar os arquivos da empresa a
+    partir do servidor antigo dela. Acompanhe pelo GET da mesma rota."""
+    tenant = await _tenant_or_404(slug)
+    if not tenancy.is_multi_tenant():
+        raise HTTPException(status_code=400, detail="A cópia de arquivos é feita no servidor multi-cliente")
+    if not _migration_token():
+        raise HTTPException(status_code=400, detail="Configure a variável MIGRATION_TOKEN (mínimo de 24 caracteres) neste servidor e no antigo")
+    source = (data.source_url or "").strip().rstrip("/")
+    if not re.match(r"^https?://[^\s/]+$", source):
+        raise HTTPException(status_code=400, detail="Informe o endereço do servidor antigo (ex.: https://...onrender.com)")
+    current = _imports.get(tenant["slug"])
+    if current and current["state"] == "COPIANDO":
+        raise HTTPException(status_code=409, detail="A cópia desta empresa já está em andamento")
+    _imports[tenant["slug"]] = {
+        "state": "COPIANDO", "source_url": source, "total": None, "copied": 0, "skipped": 0, "failed": 0, "bytes": 0,
+        "errors": [], "error": None, "started_at": datetime.now(timezone.utc).isoformat(), "finished_at": None,
+    }
+    asyncio.create_task(_run_import(tenant["slug"], source))
+    return _imports[tenant["slug"]]
+
+
+@api_router.get("/platform/tenants/{slug}/import-uploads")
+async def platform_import_status(slug: str, current_user: dict = Depends(get_current_superadmin_user)):
+    await _tenant_or_404(slug)
+    return _imports.get(slug.strip().lower()) or {"state": "NUNCA"}
