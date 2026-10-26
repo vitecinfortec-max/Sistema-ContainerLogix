@@ -138,6 +138,16 @@ async def variable_average(contract_id: str, first_competence: str, last_compete
     return r2(total / len(slips))
 
 
+async def salary_advance_paid(contract_id: str, competence: str) -> float:
+    """Adiantamento quinzenal da competência já pago (folha de adiantamento fechada ou paga)."""
+    runs = [r["id"] for r in await db.hr_payroll_runs.find(
+        {"run_type": "ADIANTAMENTO", "competence": competence, "status": {"$ne": "ABERTA"}}, {"_id": 0, "id": 1}).to_list(None)]
+    if not runs:
+        return 0.0
+    slips = await db.hr_payslips.find({"contract_id": contract_id, "run_id": {"$in": runs}}, {"_id": 0, "totals": 1}).to_list(None)
+    return r2(sum((p.get("totals") or {}).get("gross") or 0 for p in slips))
+
+
 def competence_window(day: date, months: int) -> tuple:
     """As `months` competências fechadas antes do mês de `day` (AAAA-MM)."""
     last = add_months(date(day.year, day.month, 1), -1)
@@ -341,6 +351,7 @@ async def _validate_contract(data: HRContractCreate, current_id: Optional[str]) 
         "base_salary": r2(data.base_salary), "weekly_hours": data.weekly_hours, "work_schedule": _clean(data.work_schedule),
         "insalubridade_grade": data.insalubridade_grade, "periculosidade": data.periculosidade,
         "vt_opt_in": data.vt_opt_in, "vt_monthly_cost": r2(data.vt_monthly_cost) if data.vt_monthly_cost else None,
+        "salary_advance": data.salary_advance,
         "pis": _clean(data.pis), "ctps_number": _clean(data.ctps_number), "ctps_series": _clean(data.ctps_series),
         "bank_name": _clean(data.bank_name), "bank_agency": _clean(data.bank_agency), "bank_account": _clean(data.bank_account),
         "pix_key": _clean(data.pix_key), "dependents": dependents, "recurring_events": recurring,
@@ -558,6 +569,7 @@ async def termination_preview(contract: dict, data: HRTermination, settings: dic
         "first_13th_paid": r2(first_13th), "fgts_balance": fgts_balance,
         "experience_end": contract.get("experience_end"),
         "variable_average": await variable_average(contract["id"], *competence_window(end, 12)),
+        "salary_advance_paid": await salary_advance_paid(contract["id"], end.strftime("%Y-%m")),
         "leave_ranges": await leave_ranges(contract["id"]),
     }
     calc = compute_termination(ctx, settings)
@@ -1185,6 +1197,7 @@ async def build_hr_report(kind: str, date_from=None, date_to=None, department=No
             query.setdefault("competence", {})["$gte"] = date_from[:7]
         if date_to:
             query.setdefault("competence", {})["$lte"] = date_to[:7]
+        query["run_type"] = {"$ne": "ADIANTAMENTO"}  # o adiantamento já está dentro da folha mensal
         runs = {r["id"]: r for r in await db.hr_payroll_runs.find(query, {"_id": 0}).to_list(None)}
         slips = await db.hr_payslips.find({"run_id": {"$in": list(runs)}}, {"_id": 0}).to_list(None) if runs else []
         if dep_rx:

@@ -13,14 +13,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from hr_payroll import (
     CONTRACT_TYPES, EVENTS, MANUAL_EVENT_CODES, NOTICE_TYPES, PAYROLL_CONTRACT_TYPES, RUN_TYPES,
-    TERMINATION_TYPES, commercial_days, commercial_overlap, competence_bounds, compute_13th_payslip, compute_monthly_payslip,
+    TERMINATION_TYPES, commercial_days, commercial_overlap, competence_bounds, compute_13th_payslip, compute_advance_payslip, compute_monthly_payslip,
     months_by_fifteen, overlap_days, parse_day, r2,
 )
 from models import HRPayrollPay, HRPayrollRunCreate, HRPayrollSettings, HRPayslipInputs
 from reports import merge_company
 from routers.hr import (
     DOCUMENT_TYPES, LEAVE_TYPES, OCCURRENCE_TYPES, PAYROLL_ABSENCE_TYPES, contract_ctx, contract_snapshot, leave_ranges,
-    load_payroll_settings, occurrence_days_in, pdf_stream, variable_average, _clean, _now_iso,
+    load_payroll_settings, occurrence_days_in, pdf_stream, salary_advance_paid, variable_average, _clean, _now_iso,
 )
 from routers.stock import _valid_iso_date
 from shared import db, get_current_admin_user, get_company_settings
@@ -121,6 +121,9 @@ def _eligible(contract: dict, run: dict) -> bool:
     admission = parse_day(contract.get("admission_date"))
     if run["run_type"] == "MENSAL":
         return admission <= last
+    if run["run_type"] == "ADIANTAMENTO":
+        # só quem optou e foi admitido até o dia 15
+        return bool(contract.get("salary_advance")) and admission <= first.replace(day=15)
     return admission <= date(first.year, 12, 31)
 
 
@@ -183,7 +186,13 @@ async def _calc_payslip(run: dict, contract: dict, settings: dict, inputs: list,
         ctx["absence_days"] = info["absence_days"]
         ctx["other_inss_base"] = info["vacation_inss_base"]
         ctx["other_inss_withheld"] = info["vacation_inss"]
+        ctx["salary_advance_paid"] = await salary_advance_paid(contract["id"], run["competence"])
         result = compute_monthly_payslip(ctx, inputs, settings)
+        months = None
+    elif run["run_type"] == "ADIANTAMENTO":
+        info = await _month_days(contract, first, last)
+        ctx["days_worked"] = info["days"] if days_override is None else days_override
+        result = compute_advance_payslip(ctx, settings)
         months = None
     else:
         admission = parse_day(contract["admission_date"])
@@ -197,7 +206,7 @@ async def _calc_payslip(run: dict, contract: dict, settings: dict, inputs: list,
         result = compute_13th_payslip(ctx, part, months, first_paid, inputs, settings)
     events = result.pop("events")
     return {
-        "days_worked": ctx.get("days_worked", 30) if run["run_type"] == "MENSAL" else None,
+        "days_worked": ctx.get("days_worked", 30) if run["run_type"] in ("MENSAL", "ADIANTAMENTO") else None,
         "days_override": days_override, "vacation_days": info["vacation_days"], "leave_days": info["leave_days"],
         "absence_days": info["absence_days"], "months_13th": months,
         "irrf_dependents": ctx["irrf_dependents"], "family_children": ctx["family_children"],
@@ -288,6 +297,13 @@ async def create_run(data: HRPayrollRunCreate, current_user: dict = Depends(get_
         raise HTTPException(status_code=400, detail="Tipo de folha inválido")
     if await db.hr_payroll_runs.find_one({"competence": data.competence, "run_type": data.run_type}, {"_id": 1}):
         raise HTTPException(status_code=400, detail=f"Já existe {RUN_TYPES[data.run_type].lower()} para essa competência")
+    # o adiantamento vem antes da folha do mês, que o desconta
+    if data.run_type == "ADIANTAMENTO" and await db.hr_payroll_runs.find_one(
+            {"competence": data.competence, "run_type": "MENSAL"}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="A folha mensal dessa competência já foi gerada: o adiantamento vem antes dela")
+    if data.run_type == "MENSAL" and await db.hr_payroll_runs.find_one(
+            {"competence": data.competence, "run_type": "ADIANTAMENTO", "status": "ABERTA"}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="Feche o adiantamento quinzenal dessa competência antes de gerar a folha mensal")
     if data.run_type == "DECIMO_2":
         year = data.competence[:4]
         first = await db.hr_payroll_runs.find_one({"run_type": "DECIMO_1", "competence": {"$regex": f"^{year}-"}}, {"_id": 0, "status": 1})
@@ -348,6 +364,9 @@ async def reopen_run(run_id: str, current_user: dict = Depends(get_current_admin
         year = run["competence"][:4]
         if await db.hr_payroll_runs.find_one({"run_type": "DECIMO_2", "competence": {"$regex": f"^{year}-"}}, {"_id": 1}):
             raise HTTPException(status_code=400, detail="A 2ª parcela do 13º já desconta esta folha: exclua-a antes de reabrir")
+    if run["run_type"] == "ADIANTAMENTO" and await db.hr_payroll_runs.find_one(
+            {"run_type": "MENSAL", "competence": run["competence"]}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="A folha mensal já desconta este adiantamento: exclua-a antes de reabrir")
     await db.hr_payroll_runs.update_one({"id": run_id}, {"$set": {"status": "ABERTA", "updated_at": _now_iso()}})
     return await _get_run(run_id)
 

@@ -334,7 +334,7 @@ function PayrollRunDetail({ runId, onBack }) {
                     </th>
                     <th>Funcionário</th>
                     <th>Cargo</th>
-                    <th className="!text-center">{run.run_type === 'MENSAL' ? 'Dias' : 'Avos'}</th>
+                    <th className="!text-center">{['MENSAL', 'ADIANTAMENTO'].includes(run.run_type) ? 'Dias' : 'Avos'}</th>
                     <th className="!text-right">Salário base</th>
                     <th className="!text-right">Proventos</th>
                     <th className="!text-right">Descontos</th>
@@ -355,7 +355,7 @@ function PayrollRunDetail({ runId, onBack }) {
                       </td>
                       <td>{p.position_name || '-'}</td>
                       <td className="text-center tabular-nums">
-                        {run.run_type === 'MENSAL' ? p.days_worked : `${p.months_13th}/12`}
+                        {['MENSAL', 'ADIANTAMENTO'].includes(run.run_type) ? p.days_worked : `${p.months_13th}/12`}
                         {p.vacation_days > 0 && <span className="block text-[10px] text-blue-600">{p.vacation_days}d férias</span>}
                       </td>
                       <td className="text-right tabular-nums">{formatMoney(p.base_salary)}</td>
@@ -503,7 +503,7 @@ function PayslipDialog({ slip, run, events, onClose, onSaved }) {
               </div>
             );
           })}
-          {editable && (
+          {editable && run.run_type !== 'ADIANTAMENTO' && (
             <Button variant="outline" size="sm" onClick={() => setInputs((list) => [...list, { code: '', quantity: '', value: '', description: '' }])} data-testid="payslip-add-input">
               <Plus className="w-4 h-4 mr-1" />Adicionar lançamento
             </Button>
@@ -511,7 +511,7 @@ function PayslipDialog({ slip, run, events, onClose, onSaved }) {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {run.run_type === 'MENSAL' && (
+          {['MENSAL', 'ADIANTAMENTO'].includes(run.run_type) && (
             <div>
               <Label className="mb-1.5 block">Dias pagos (0 a 30)</Label>
               <Input type="number" min="0" max="30" disabled={!editable} value={daysOverride} onChange={(e) => setDaysOverride(e.target.value)} className="h-9 text-sm" />

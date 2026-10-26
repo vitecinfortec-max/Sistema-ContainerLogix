@@ -592,6 +592,38 @@ def test_payroll_cost_has_employer_charges_and_other_costs(api):
     assert api.put("/api/hr/payroll-settings", json={**settings, "time_bank_months": 18}).status_code == 400
 
 
+def test_biweekly_salary_advance(api):
+    c = _contract(api, _employee(api), dependents=[], vt_opt_in=False, salary_advance=True)
+    _contract(api, _employee(api, "Sem Vale", "666.777.888-99"), dependents=[], vt_opt_in=False)
+    late = _contract(api, _employee(api, "Admitido Dia 20", "555.666.777-88"), dependents=[], vt_opt_in=False,
+                     salary_advance=True, admission_date="2026-10-20")
+    adv = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "ADIANTAMENTO"}).json()
+    slips = api.get(f"/api/hr/payroll-runs/{adv['id']}").json()["payslips"]
+    # só quem optou e foi admitido até o dia 15; 40% do salário, sem INSS/IRRF/FGTS
+    assert [s["contract_id"] for s in slips] == [c["id"]] and late["id"]
+    t = slips[0]["totals"]
+    assert (t["gross"], t["net"], t["inss"], t["irrf"], t["fgts"]) == (1200, 1200, 0, 0, 0)
+    assert api.get("/api/hr/payslips/pdf", params={"run_id": adv["id"]}).content.startswith(b"%PDF")
+    # a folha mensal só depois do adiantamento fechado, e desconta o que foi pago
+    assert api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).status_code == 400
+    api.post(f"/api/hr/payroll-runs/{adv['id']}/close")
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    mine = next(p for p in api.get(f"/api/hr/payroll-runs/{run['id']}").json()["payslips"] if p["contract_id"] == c["id"])
+    codes = {e["code"]: e["value"] for e in mine["events"]}
+    assert codes["ADIANT_QUINZENA_DESC"] == 1200 and mine["totals"]["inss_base"] == 3000  # não reduz as bases
+    assert api.post(f"/api/hr/payroll-runs/{adv['id']}/reopen").status_code == 400
+    assert api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "ADIANTAMENTO"}).status_code == 400
+    # o custo da folha não conta o adiantamento duas vezes
+    cost = api.get("/api/reports/hr/payroll-cost", params={"date_from": "2026-10-01", "date_to": "2026-10-31"}).json()["summary"]
+    assert cost["gross"] == 7100  # 3.000 + 3.000 + 1.100 (admitido dia 20); sem o adiantamento seria 8.300
+    # a rescisão do mês desconta o adiantamento pago
+    api.delete(f"/api/hr/payroll-runs/{run['id']}")
+    sim = api.post(f"/api/hr/contracts/{c['id']}/terminate", json={"termination_date": "2026-10-25", "termination_type": "PEDIDO",
+                                                                    "notice_type": "TRABALHADO"}).json()
+    items = {i["label"]: i["value"] for i in sim["calc"]["items"]}
+    assert items["Adiantamento salarial (quinzena) já pago"] == 1200
+
+
 def test_vacations_settled_before_the_system(api):
     emp = _employee(api)
     c = _contract(api, emp, admission_date="2020-01-10", dependents=[])

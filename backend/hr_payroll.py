@@ -54,6 +54,10 @@ DEFAULT_PAYROLL_SETTINGS = {
     # Banco de horas: prazo para compensar (6 meses no acordo individual,
     # até 12 no coletivo - art. 59, §§ 2º e 5º, da CLT)
     "time_bank_months": 6,
+    # Adiantamento quinzenal (vale): % do salário pago por volta do dia 20 e
+    # descontado na folha do mês. A CLT não obriga nem fixa o percentual - vem
+    # da convenção coletiva ou do acordo da empresa (40% é o mais comum)
+    "salary_advance_rate": 40.0,
 }
 
 # Variáveis que entram na média das férias, do 13º e da rescisão
@@ -87,6 +91,7 @@ EVENTS = {
     "AJUDA_CUSTO": ("030", "Ajuda de custo", "P", "VALUE", False, False, False, False),
     "REEMBOLSO": ("031", "Reembolso de despesas", "P", "VALUE", False, False, False, False),
     "SALARIO_FAMILIA": ("040", "Salário-família", "P", "AUTO", False, False, False, False),
+    "ADIANT_QUINZENA": ("060", "Adiantamento salarial (quinzena)", "P", "AUTO", False, False, False, False),
     "DECIMO_1": ("050", "13º salário - 1ª parcela", "P", "AUTO", False, False, True, False),
     "DECIMO": ("051", "13º salário", "P", "AUTO", True, True, True, False),
     "DECIMO_MEDIAS": ("052", "13º salário - médias de variáveis", "P", "AUTO", True, True, True, False),
@@ -100,13 +105,15 @@ EVENTS = {
     "PENSAO": ("114", "Pensão alimentícia", "D", "VALUE", False, False, False, False),
     "EMPRESTIMO": ("115", "Empréstimo consignado", "D", "VALUE", False, False, False, False),
     "OUTROS_DESCONTOS": ("119", "Outros descontos", "D", "VALUE", False, False, False, False),
+    "ADIANT_QUINZENA_DESC": ("116", "Adiantamento quinzenal", "D", "AUTO", False, False, False, False),
     "DECIMO_ADIANT": ("150", "13º salário - adiantamento", "D", "AUTO", False, False, False, False),
     "INSS": ("201", "INSS", "D", "AUTO", False, False, False, False),
     "IRRF": ("202", "IRRF", "D", "AUTO", False, False, False, False),
 }
 MANUAL_EVENT_CODES = [code for code, ev in EVENTS.items() if ev[3] != "AUTO"]
 
-RUN_TYPES = {"MENSAL": "Folha mensal", "DECIMO_1": "13º salário - 1ª parcela", "DECIMO_2": "13º salário - 2ª parcela"}
+RUN_TYPES = {"MENSAL": "Folha mensal", "ADIANTAMENTO": "Adiantamento quinzenal", "DECIMO_1": "13º salário - 1ª parcela",
+             "DECIMO_2": "13º salário - 2ª parcela"}
 
 TERMINATION_TYPES = {
     "SEM_JUSTA_CAUSA": "Dispensa sem justa causa",
@@ -392,6 +399,9 @@ def compute_monthly_payslip(ctx: dict, inputs: list, s: dict) -> dict:
             _days(item.get("quantity")) if EVENTS[code][3] == "DAYS" else f"{_fmt_qty(item.get('quantity'))} h")
         events.append(_event(code, value, reference, (item.get("description") or "").strip() or None, auto=False))
 
+    if ctx.get("salary_advance_paid"):
+        events.append(_event("ADIANT_QUINZENA_DESC", ctx["salary_advance_paid"]))
+
     contract_type = ctx.get("contract_type") or "CLT"
     if ctx.get("vt_opt_in") and contract_type != "ESTAGIO" and days:
         vt = base_salary / 30 * days * s["vt_rate"] / 100
@@ -409,6 +419,20 @@ def compute_monthly_payslip(ctx: dict, inputs: list, s: dict) -> dict:
             events.append(_event("SALARIO_FAMILIA", children * s["family_allowance_value"] * (days / 30 if days < 30 else 1), f"{children} filho(s)"))
 
     return _totals(events, ctx, s)
+
+
+def compute_advance_payslip(ctx: dict, s: dict) -> dict:
+    """Adiantamento quinzenal: % do salário-base proporcional aos dias do mês
+    (admissão, férias e afastamento contam como na folha). Não tem INSS, IRRF
+    nem FGTS - eles saem na folha mensal, que desconta o adiantamento."""
+    days = max(0, min(30, int(ctx.get("days_worked", 30))))
+    rate = s.get("salary_advance_rate") or 0
+    value = (ctx.get("base_salary") or 0) * rate / 100 * days / 30
+    events = [_event("ADIANT_QUINZENA", value, f"{_fmt_qty(rate)}%")] if value > 0 else []
+    gross = r2(sum(e["value"] for e in events))
+    return {"events": events, "gross": gross, "deductions": 0.0, "net": gross, "inss_base": 0.0, "inss": 0.0,
+            "irrf_base": 0.0, "irrf_income": 0.0, "irrf": 0.0, "irrf_rate": 0.0, "irrf_simplified": False,
+            "irrf_reduction": 0.0, "fgts_base": 0.0, "fgts_rate": 0.0, "fgts": 0.0}
 
 
 def compute_13th_payslip(ctx: dict, part: int, months: int, first_paid: float, inputs: list, s: dict) -> dict:
@@ -641,6 +665,9 @@ def compute_termination(ctx: dict, s: dict) -> dict:
         first_paid = ctx.get("first_13th_paid") or 0
         if first_paid and thirteenth:
             add("13º salário - adiantamento já pago", "D", min(first_paid, thirteenth))
+
+    if ctx.get("salary_advance_paid"):
+        add("Adiantamento salarial (quinzena) já pago", "D", ctx["salary_advance_paid"])
 
     # INSS/IRRF: saldo de salário e 13º, cada um com o seu cálculo; férias
     # indenizadas e aviso indenizado não têm INSS nem IRRF

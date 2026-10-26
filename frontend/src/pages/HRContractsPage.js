@@ -35,7 +35,7 @@ function emptyForm() {
     new_person: false, new_name: '', new_cpf: '', new_birth: '', new_phone: '',
     position_id: '', department: '', contract_type: 'CLT', admission_date: todayISO(), experience_days: 0,
     base_salary: '', weekly_hours: 44, work_schedule: '',
-    insalubridade_grade: 0, periculosidade: false, vt_opt_in: false, vt_monthly_cost: '',
+    insalubridade_grade: 0, periculosidade: false, vt_opt_in: false, vt_monthly_cost: '', salary_advance: false,
     pis: '', ctps_number: '', ctps_series: '', bank_name: '', bank_agency: '', bank_account: '', pix_key: '',
     dependents: [], recurring_events: [], vacation_settled_until: '', observations: '',
   };
@@ -134,7 +134,7 @@ export default function HRContractsPage() {
       admission_date: c.admission_date, experience_days: c.experience_days || 0,
       base_salary: c.base_salary, weekly_hours: c.weekly_hours ?? '', work_schedule: c.work_schedule || '',
       insalubridade_grade: c.insalubridade_grade || 0, periculosidade: !!c.periculosidade,
-      vt_opt_in: !!c.vt_opt_in, vt_monthly_cost: c.vt_monthly_cost ?? '',
+      vt_opt_in: !!c.vt_opt_in, vt_monthly_cost: c.vt_monthly_cost ?? '', salary_advance: !!c.salary_advance,
       pis: c.pis || '', ctps_number: c.ctps_number || '', ctps_series: c.ctps_series || '',
       bank_name: c.bank_name || '', bank_agency: c.bank_agency || '', bank_account: c.bank_account || '', pix_key: c.pix_key || '',
       dependents: (c.dependents || []).map((d) => ({ ...d, cpf: d.cpf || '', birth_date: d.birth_date || '', relationship: d.relationship || '' })),
@@ -186,6 +186,7 @@ export default function HRContractsPage() {
         work_schedule: form.work_schedule || null,
         insalubridade_grade: Number(form.insalubridade_grade) || 0, periculosidade: form.periculosidade,
         vt_opt_in: form.vt_opt_in, vt_monthly_cost: form.vt_monthly_cost === '' ? null : Number(form.vt_monthly_cost),
+        salary_advance: form.salary_advance,
         pis: form.pis || null, ctps_number: form.ctps_number || null, ctps_series: form.ctps_series || null,
         bank_name: form.bank_name || null, bank_agency: form.bank_agency || null, bank_account: form.bank_account || null, pix_key: form.pix_key || null,
         dependents: form.dependents.map((d) => ({ ...d, cpf: d.cpf || null, birth_date: d.birth_date || null, relationship: d.relationship || null })),
@@ -570,6 +571,10 @@ export default function HRContractsPage() {
                 <div className="flex items-center gap-2 pt-1">
                   <Switch checked={form.periculosidade} onCheckedChange={(v) => setField('periculosidade', v)} />
                   <span className="text-sm">Periculosidade (30% do salário)</span>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <Switch checked={form.salary_advance} onCheckedChange={(v) => setField('salary_advance', v)} data-testid="hr-contract-advance" />
+                  <span className="text-sm">Recebe adiantamento quinzenal (vale, % nas Tabelas de Cálculo)</span>
                 </div>
                 <div className="flex items-center gap-2 pt-1">
                   <Switch checked={form.vt_opt_in} onCheckedChange={(v) => setField('vt_opt_in', v)} data-testid="hr-contract-vt" />

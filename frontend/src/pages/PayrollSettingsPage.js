@@ -19,6 +19,7 @@ const SIMPLE_FIELDS = [
     ['monthly_hours', 'Jornada mensal (horas, divisor da hora)'],
     ['night_bonus_rate', 'Adicional noturno (%)'],
     ['vt_rate', 'Desconto do vale-transporte (%)'],
+    ['salary_advance_rate', 'Adiantamento quinzenal (% do salário)'],
   ]],
   ['IRRF - deduções e redução (Lei 15.270/2025)', [
     ['irrf_dependent_deduction', 'Dedução por dependente (R$)'],

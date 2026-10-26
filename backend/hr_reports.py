@@ -52,7 +52,8 @@ def _paragraph_style(styles, size=9.5, leading=14, align=TA_LEFT):
 
 def _payslip_via(slip: dict, run: dict, company: dict, logo, width: float, via_label: str):
     styles = getSampleStyleSheet()
-    title = "Recibo de Pagamento de Salário" if slip.get("run_type") == "MENSAL" else "Recibo de 13º Salário"
+    title = {"MENSAL": "Recibo de Pagamento de Salário", "ADIANTAMENTO": "Recibo de Adiantamento Salarial"}.get(
+        slip.get("run_type"), "Recibo de 13º Salário")
     info = f"{RUN_TYPES.get(slip.get('run_type'), '')} · Competência {competence_label(slip['competence'])} · {via_label}"
     parts = list(_build_pdf_header(styles, logo, title, generation_info=info, company=company, content_width=width, compact=True))
     parts.append(_pdf_info_grid([

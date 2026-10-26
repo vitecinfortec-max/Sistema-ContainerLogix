@@ -4170,6 +4170,7 @@ class HRContractCreate(BaseModel):
     insalubridade_grade: float = 0  # 0, 10, 20 ou 40 (% do salário mínimo)
     periculosidade: bool = False
     vt_opt_in: bool = False
+    salary_advance: bool = False  # recebe o adiantamento quinzenal
     vt_monthly_cost: Optional[float] = None
     pis: Optional[str] = None
     ctps_number: Optional[str] = None
@@ -4218,6 +4219,7 @@ class HRPayrollSettings(BaseModel):
     rat_rate: Optional[float] = None
     third_party_rate: Optional[float] = None
     time_bank_months: Optional[float] = None
+    salary_advance_rate: Optional[float] = None
 
 
 class HRPayrollRunCreate(BaseModel):
