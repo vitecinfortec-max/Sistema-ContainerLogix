@@ -3830,6 +3830,84 @@ def generate_intl_invoice_pdf(invoice: dict, company: dict = None) -> bytes:
     return buffer.getvalue()
 
 
+# ==================== GRÁFICOS DE CUSTO (Prestação de Contas) ====================
+# Desenhados com o reportlab (sem imagem): barras horizontais por grupo de
+# custo e colunas por mês, na paleta dos documentos.
+CHART_PALETTE = [PRIMARY_COLOR, 'F59E0B', '10B981', '6366F1', 'EF4444', '06B6D4', 'A855F7', '84CC16', '94A3B8']
+
+
+def _short(text, limit):
+    text = str(text or '')
+    return text if len(text) <= limit else text[:limit - 1] + '…'
+
+
+def pdf_group_cost_bars(groups, width, max_rows=12):
+    """Barras horizontais: grupo, barra proporcional ao maior, total e % do total.
+    `groups`: [{group_name, total, share, count}] do maior para o menor."""
+    from reportlab.graphics.shapes import Drawing, Rect, String
+    rows = list(groups)[:max_rows]
+    if len(groups) > max_rows:
+        rest = groups[max_rows:]
+        rows.append({"group_name": f"Demais ({len(rest)})", "total": round(sum(g["total"] for g in rest), 2),
+                     "share": round(sum(g["share"] for g in rest), 1), "count": sum(g["count"] for g in rest)})
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    def value_text(g):
+        return f"{format_currency(g['total'])}  ·  {str(g['share']).replace('.', ',')}%  ·  {g['count']} compra(s)"
+
+    # rótulo e valor com a largura que o texto precisa; a barra fica com o resto
+    row_h = 18
+    label_w = min(width * 0.3, max(stringWidth(_short(g["group_name"], 34), 'Helvetica', 8) for g in rows) + 10)
+    value_w = max(stringWidth(value_text(g), 'Helvetica-Bold', 8) for g in rows) + 12
+    bar_w = max(40, width - label_w - value_w)
+    drawing = Drawing(width, row_h * len(rows) + 4)
+    top = max((g["total"] for g in rows), default=0) or 1
+    for i, g in enumerate(rows):
+        y = drawing.height - (i + 1) * row_h
+        color = _hex(CHART_PALETTE[i % len(CHART_PALETTE)])
+        drawing.add(String(0, y + 5, _short(g["group_name"], 34), fontName='Helvetica', fontSize=8, fillColor=_hex(BRAND_TEXT)))
+        drawing.add(Rect(label_w, y + 3, bar_w, row_h - 7, fillColor=_hex(BRAND_ZEBRA), strokeColor=None))
+        drawing.add(Rect(label_w, y + 3, max(1.5, bar_w * g["total"] / top), row_h - 7, fillColor=color, strokeColor=None))
+        drawing.add(String(width, y + 5, value_text(g), fontName='Helvetica-Bold', fontSize=8, fillColor=_hex(BRAND_DARK), textAnchor='end'))
+    return drawing
+
+
+def pdf_month_cost_columns(months, width, height=120):
+    """Colunas do total gasto por mês. `months`: [{month: 'AAAA-MM', total}]."""
+    from reportlab.graphics.shapes import Drawing, Line, Rect, String
+    drawing = Drawing(width, height + 28)
+    if not months:
+        return drawing
+    top = max(m["total"] for m in months) or 1
+    slot = width / len(months)
+    bar = min(46, slot * 0.6)
+    drawing.add(Line(0, 16, width, 16, strokeColor=_hex(BRAND_LINE), strokeWidth=0.8))
+    for i, m in enumerate(months):
+        x = i * slot + (slot - bar) / 2
+        h = max(1.5, height * m["total"] / top)
+        drawing.add(Rect(x, 16, bar, h, fillColor=_hex(PRIMARY_COLOR), strokeColor=None))
+        drawing.add(String(x + bar / 2, 18 + h, format_currency(m["total"]), fontName='Helvetica-Bold', fontSize=7,
+                           fillColor=_hex(BRAND_DARK), textAnchor='middle'))
+        drawing.add(String(x + bar / 2, 4, f"{m['month'][5:7]}/{m['month'][:4]}", fontName='Helvetica', fontSize=7.5,
+                           fillColor=_hex(BRAND_MUTED), textAnchor='middle'))
+    return drawing
+
+
+def expense_groups_of(purchases):
+    """Custo por grupo de uma lista de compras (do maior para o menor)."""
+    total = sum(p.get('amount') or 0 for p in purchases)
+    groups = {}
+    for p in purchases:
+        name = p.get('group_name') or '(sem grupo)'
+        g = groups.setdefault(name, {"group_name": name, "total": 0.0, "count": 0})
+        g["total"] += p.get('amount') or 0
+        g["count"] += 1
+    for g in groups.values():
+        g["total"] = round(g["total"], 2)
+        g["share"] = round(g["total"] / total * 100, 1) if total else 0
+    return sorted(groups.values(), key=lambda g: (-g["total"], g["group_name"]))
+
+
 def generate_expense_report_pdf(report: dict, company: dict = None) -> bytes:
     """
     Gera o PDF final da Prestação de Contas: período, depósitos recebidos,
@@ -3889,19 +3967,26 @@ def generate_expense_report_pdf(report: dict, company: dict = None) -> bytes:
     elements.extend(_pdf_section_title("Lançamentos de compras", doc.width))
     purchases = report.get('purchases', []) or []
     purchases = sorted(purchases, key=lambda p: p.get('purchase_date') or '')
-    purchases_data = [_pdf_header_cells(['Local de Compra', 'Data', 'Valor', 'Observação'], font_size=8.5)]
+    purchases_data = [_pdf_header_cells(['Local de Compra', 'Grupo de custo', 'Data', 'Valor', 'Observação'], font_size=8.5)]
     for p in purchases:
         purchases_data.append([
             cell(p.get('supplier_name') or '-'),
+            cell(p.get('group_name') or '(sem grupo)'),
             cell(fmt_date(p.get('purchase_date')), 'center'),
             cell(money(p.get('amount')), 'right'),
             cell(p.get('observation') or '-'),
         ])
-    purchases_data.append(['', cell('TOTAL COMPRAS', 'right', bold=True), cell(money(report.get('total_purchases')), 'right', bold=True), ''])
+    purchases_data.append(['', '', cell('TOTAL COMPRAS', 'right', bold=True), cell(money(report.get('total_purchases')), 'right', bold=True), ''])
 
-    purchases_table = Table(purchases_data, colWidths=[doc.width * 0.32, doc.width * 0.16, doc.width * 0.17, doc.width * 0.35], repeatRows=1)
+    purchases_table = Table(purchases_data, colWidths=[doc.width * 0.25, doc.width * 0.19, doc.width * 0.13, doc.width * 0.15, doc.width * 0.28],
+                            repeatRows=1)
     purchases_table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
     elements.append(purchases_table)
+
+    # ========== DASHBOARD: CUSTO POR GRUPO ==========
+    if purchases:
+        elements.extend(_pdf_section_title("Custo por grupo", doc.width))
+        elements.append(pdf_group_cost_bars(expense_groups_of(purchases), doc.width))
     elements.append(Spacer(1, 12))
 
     # ========== TOTAIS / SALDO ==========

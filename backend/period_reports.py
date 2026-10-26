@@ -77,7 +77,9 @@ def _pdf_text(value, kind):
     return str(value)
 
 
-async def pdf_response(title: str, subtitle: Optional[str], info: list, sections: List[Section], filename: str, user_name: str):
+async def pdf_response(title: str, subtitle: Optional[str], info: list, sections: List[Section], filename: str, user_name: str,
+                       dashboard=None):
+    """`dashboard(width)`: flowables extras (gráficos) entre os indicadores e as tabelas."""
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.units import mm
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
@@ -95,6 +97,8 @@ async def pdf_response(title: str, subtitle: Optional[str], info: list, sections
     elements = list(_build_pdf_header(styles, load_logo_buffer(company), title, generation_info=subtitle, company=company, content_width=width))
     info = list(info) + [("Gerado em", datetime.now(BRT_TZ).strftime("%d/%m/%Y %H:%M")), ("Gerado por", user_name)]
     elements.append(_pdf_info_grid(info, width, cols=4))
+    if dashboard:
+        elements.extend(dashboard(width))
 
     cell = _pdf_cell_factory(styles, font_size=7.5)
     for section in sections:

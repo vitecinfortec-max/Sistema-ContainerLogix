@@ -85,3 +85,21 @@ def test_report_filters_by_group_and_lists_largest_costs(api):
     sheet = wb["Por grupo"]
     names = {v for row in sheet.iter_rows(values_only=True) for v in row if isinstance(v, str)}  # a tabela começa na coluna B
     assert "Combustível" in names and "Alimentação" in names
+
+
+def _pdf_text(content: bytes) -> str:
+    from io import BytesIO, StringIO
+    from pdfminer.high_level import extract_text_to_fp
+    out = StringIO()
+    extract_text_to_fp(BytesIO(content), out)
+    return "".join(out.getvalue().split())
+
+
+def test_pdfs_bring_the_cost_dashboard(api):
+    g = _groups(api)
+    rep = _create(api, [_purchase(g["Combustível"]["id"], "2026-09-03", 600), _purchase(g["Alimentação"]["id"], "2026-10-05", 80)])
+    api.put(f"/api/expense-reports/{rep['id']}/status", params={"status": "CONCLUIDA"})
+    one = _pdf_text(api.get(f"/api/expense-reports/{rep['id']}/pdf").content)
+    assert "Custoporgrupo" in one and "Combustível" in one and "88,2%" in one
+    period = _pdf_text(api.get("/api/reports/expenses/pdf").content)
+    assert "Dashboard-custoporgrupo" in period and "Dashboard-totalgastopormês" in period

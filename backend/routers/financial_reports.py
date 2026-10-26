@@ -319,6 +319,23 @@ def _expense_sections(data):
     return sections
 
 
+def _expense_dashboard(data, width):
+    """Dashboard do PDF: barras de custo por grupo e, com mais de um mês, a evolução mensal."""
+    from reports import _pdf_section_title, pdf_group_cost_bars, pdf_month_cost_columns
+    if not data["groups"]:
+        return []
+    out = list(_pdf_section_title("Dashboard - custo por grupo", width))
+    out.append(pdf_group_cost_bars(data["groups"], width))
+    months = {}
+    for p in data["purchases"]:
+        if p["purchase_date"]:
+            months[p["purchase_date"][:7]] = months.get(p["purchase_date"][:7], 0) + p["amount"]
+    if len(months) > 1:
+        out.extend(_pdf_section_title("Dashboard - total gasto por mês", width))
+        out.append(pdf_month_cost_columns([{"month": k, "total": round(v, 2)} for k, v in sorted(months.items())], width))
+    return out
+
+
 EXPENSE_STATUS_PATTERN = "^(EM_ANDAMENTO|CONCLUIDA)$"
 
 
@@ -492,7 +509,8 @@ async def get_expenses_report_pdf(
         label = data["groups"][0]["group_name"] if data["groups"] else ("sem grupo" if group == "SEM_GRUPO" else "grupo")
         subtitle = f"{subtitle} · Grupo: {label}" if subtitle else f"Grupo: {label}"
     return await pdf_response("Relatório de Prestação de Contas", subtitle,
-                              info, _expense_sections(data), "relatorio_prestacao_contas", current_user.get("name", "Sistema"))
+                              info, _expense_sections(data), "relatorio_prestacao_contas", current_user.get("name", "Sistema"),
+                              dashboard=lambda width: _expense_dashboard(data, width))
 
 
 @api_router.get("/reports/expenses/excel")
