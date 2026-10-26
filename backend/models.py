@@ -4261,6 +4261,11 @@ class HROccurrenceCreate(BaseModel):
     attachments: List[str] = Field(default_factory=list)
 
 
+class HRSalaryAdvanceBulk(BaseModel):
+    contract_ids: List[str]
+    enabled: bool
+
+
 class HRExperienceExtension(BaseModel):
     total_days: int  # prazo total da experiência depois da prorrogação (até 90)
 

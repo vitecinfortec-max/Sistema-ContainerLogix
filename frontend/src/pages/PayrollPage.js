@@ -184,6 +184,13 @@ function PayrollRunList({ onOpen, onSettings }) {
                   {meta.run_types.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              <p className="text-[11px] text-slate-500 mt-1" data-testid="payroll-new-type-hint">
+                {newForm.run_type === 'ADIANTAMENTO'
+                  ? `Paga ${meta.salary_advance_rate ?? 40}% do salário a quem tem "Recebe adiantamento quinzenal" no contrato, sem nenhum desconto (INSS, IRRF, vale-transporte e lançamentos ficam na folha mensal).`
+                  : newForm.run_type === 'MENSAL'
+                    ? `Salário do mês com todos os descontos. Para quem recebeu o adiantamento, os ${meta.salary_advance_rate ?? 40}% já pagos são descontados e o líquido é o saldo (cerca de ${100 - (meta.salary_advance_rate ?? 40)}%). Gere e feche o adiantamento antes.`
+                    : '13º salário calculado pelos avos do ano.'}
+              </p>
             </div>
             <div>
               <Label className="mb-1.5 block">Competência *</Label>
@@ -287,7 +294,9 @@ function PayrollRunDetail({ runId, onBack }) {
         <StatGrid>
           <StatCard label="Contracheques" value={t.count || 0} icon={Users} tone="blue" />
           <StatCard label="Proventos" value={formatMoney(t.gross)} icon={Receipt} tone="slate" hint={`Descontos: ${formatMoney(t.deductions)}`} />
-          <StatCard label="Líquido a pagar" value={formatMoney(t.net)} icon={Banknote} tone="emerald" />
+          <StatCard label={t.advance_paid ? 'Saldo a pagar (com descontos)' : run.run_type === 'ADIANTAMENTO' ? 'Adiantamento a pagar (sem descontos)' : 'Líquido a pagar'}
+            value={formatMoney(t.net)} icon={Banknote} tone="emerald"
+            hint={t.advance_paid ? `Adiantamento já pago: ${formatMoney(t.advance_paid)}` : undefined} />
           <StatCard label="FGTS (8%)" value={formatMoney(t.fgts)} icon={Landmark} tone="amber" hint={`INSS ${formatMoney(t.inss)} · IRRF ${formatMoney(t.irrf)}`} />
         </StatGrid>
 
@@ -369,7 +378,8 @@ function PayrollRunDetail({ runId, onBack }) {
               </table>
             </div>
           ) : (
-            <EmptyState icon={Users} title="Nenhum contracheque" hint="Cadastre contratos em Admissão e Contratos e clique em Recalcular" />
+            <EmptyState icon={Users} title="Nenhum contracheque" hint={run.empty_reason || 'Cadastre contratos em Admissão e Contratos e clique em Recalcular'}
+              testId="payroll-detail-empty" />
           )}
         </DataCard>
       </div>

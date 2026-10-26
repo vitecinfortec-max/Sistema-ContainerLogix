@@ -20,7 +20,7 @@ from hr_payroll import (
     vacation_periods,
 )
 from models import (
-    HRContractCreate, HRDocumentCreate, HRExperienceExtension, HROccurrenceCreate, HRPositionCreate, HRTermination,
+    HRContractCreate, HRDocumentCreate, HRExperienceExtension, HROccurrenceCreate, HRPositionCreate, HRSalaryAdvanceBulk, HRTermination,
     HRTimeBankCreate, HRVacationCreate, HRPayrollPay,
 )
 from period_reports import Column, Section, MONEY, DAY, INT, pdf_response, excel_response, period_text
@@ -455,6 +455,16 @@ async def delete_contract(contract_id: str, current_user: dict = Depends(get_cur
         raise HTTPException(status_code=400, detail=f"Contrato com histórico ({', '.join(used)}): em vez de excluir, registre o desligamento")
     await db.hr_contracts.delete_one({"id": contract_id})
     return {"message": "Contrato excluído"}
+
+
+@api_router.put("/hr/contracts-salary-advance")
+async def set_salary_advance(data: HRSalaryAdvanceBulk, current_user: dict = Depends(get_current_admin_user)):
+    """Liga/desliga o adiantamento quinzenal de vários contratos de uma vez."""
+    if not data.contract_ids:
+        raise HTTPException(status_code=400, detail="Selecione os contratos")
+    result = await db.hr_contracts.update_many({"id": {"$in": data.contract_ids}, "status": {"$ne": "DESLIGADO"}},
+                                               {"$set": {"salary_advance": data.enabled, "updated_at": _now_iso()}})
+    return {"updated": result.modified_count, "matched": result.matched_count}
 
 
 @api_router.post("/hr/contracts/{contract_id}/extend-experience")

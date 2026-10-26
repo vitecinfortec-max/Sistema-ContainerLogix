@@ -281,6 +281,25 @@ export default function HRContractsPage() {
     }
   };
 
+  // Adiantamento quinzenal (vale) para os contratos selecionados
+  const selectedList = list.filter((c) => selectedIds.has(c.id));
+  const allAdvance = selectedList.length > 0 && selectedList.every((c) => c.salary_advance);
+  const toggleAdvance = async () => {
+    const enabled = !allAdvance;
+    const n = selectedList.length;
+    const msg = enabled
+      ? `Ligar o adiantamento quinzenal (vale) para ${n} contrato(s)? Eles passam a entrar na folha "Adiantamento quinzenal".`
+      : `Tirar o adiantamento quinzenal de ${n} contrato(s)?`;
+    if (!(await confirm(msg))) return;
+    try {
+      const r = await api.setHRSalaryAdvance({ contract_ids: selectedList.map((c) => c.id), enabled });
+      toast.success(`${r.data.updated} contrato(s) atualizado(s)`);
+      reload();
+    } catch (e) {
+      toast.error(errorDetail(e, 'Erro ao atualizar'));
+    }
+  };
+
   // Prorroga a experiência uma vez, antes do fim, até 90 dias no total
   const canExtend = !!(single && single.status !== 'DESLIGADO' && single.experience_days && !single.experience_initial_days
     && single.experience_end >= today && single.experience_days < 90);
@@ -365,6 +384,8 @@ export default function HRContractsPage() {
               <ToolbarButton icon={UserX} label="Desligar (simular rescisão)" tone="red" onClick={openTermination} disabled={!isVigente} testId="hr-contract-terminate-btn" />
               <ToolbarButton icon={Undo2} label="Desfazer desligamento" tone="amber" onClick={reinstate} disabled={!single || single.status !== 'DESLIGADO'} testId="hr-contract-reinstate-btn" />
               <ToolbarButton icon={Hourglass} label="Prorrogar experiência" tone="amber" onClick={() => setExtendDays(90)} disabled={!canExtend} testId="hr-contract-extend-btn" />
+              <ToolbarButton icon={Wallet} label={allAdvance ? 'Tirar adiantamento quinzenal' : 'Adiantamento quinzenal'} tone="blue"
+                onClick={toggleAdvance} disabled={!selectedIds.size} testId="hr-contract-advance-btn" />
               <ToolbarDivider />
               <ToolbarButton icon={FileSignature} label="Contrato de trabalho (PDF)" tone="primary"
                 disabled={!single || !['CLT', 'EXPERIENCIA'].includes(single.contract_type)}
@@ -403,6 +424,7 @@ export default function HRContractsPage() {
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="cell-strong max-w-[220px] truncate" title={c.person_name}>{c.person_name}</span>
                           {c.person_type === 'MOTORISTA' && <StatusPill tone="slate" dot={false} className="text-[10px] px-1.5">Motorista</StatusPill>}
+                          {c.salary_advance && <StatusPill tone="blue" dot={false} className="text-[10px] px-1.5" title="Recebe adiantamento quinzenal">Vale</StatusPill>}
                         </div>
                       </td>
                       <td>{c.position_name || '-'}</td>

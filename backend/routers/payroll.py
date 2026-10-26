@@ -41,6 +41,7 @@ async def hr_meta(current_user: dict = Depends(get_current_admin_user)):
         "occurrence_types": [{"value": k, "label": v} for k, v in OCCURRENCE_TYPES.items()],
         "document_types": [{"value": k, "label": v} for k, v in DOCUMENT_TYPES.items()],
         "run_types": [{"value": k, "label": v} for k, v in RUN_TYPES.items()],
+        "salary_advance_rate": (await load_payroll_settings()).get("salary_advance_rate"),
         "events": [{"code": code, "number": EVENTS[code][0], "label": EVENTS[code][1], "kind": EVENTS[code][2], "input": EVENTS[code][3]}
                    for code in MANUAL_EVENT_CODES],
     }
@@ -232,8 +233,9 @@ def _initial_inputs(contract: dict, run: dict) -> list:
 
 
 async def _refresh_run_totals(run_id: str):
-    slips = await db.hr_payslips.find({"run_id": run_id}, {"_id": 0, "totals": 1}).to_list(None)
+    slips = await db.hr_payslips.find({"run_id": run_id}, {"_id": 0, "totals": 1, "events": 1}).to_list(None)
     totals = {f: r2(sum((s.get("totals") or {}).get(f) or 0 for s in slips)) for f in ("gross", "deductions", "net", "inss", "irrf", "fgts")}
+    totals["advance_paid"] = r2(sum(e["value"] for s in slips for e in s.get("events") or [] if e.get("code") == "ADIANT_QUINZENA_DESC"))
     totals["count"] = len(slips)
     await db.hr_payroll_runs.update_one({"id": run_id}, {"$set": {"totals": totals, "updated_at": _now_iso()}})
 
@@ -324,7 +326,23 @@ async def read_run(run_id: str, current_user: dict = Depends(get_current_admin_u
     run = await _get_run(run_id)
     slips = await db.hr_payslips.find({"run_id": run_id}, {"_id": 0}).to_list(None)
     run["payslips"] = sorted(slips, key=lambda p: (p.get("person_name") or "").lower())
+    run["empty_reason"] = await _empty_reason(run) if not slips else None
     return run
+
+
+async def _empty_reason(run: dict) -> str:
+    """Por que a folha saiu sem contracheques (a folha só usa os contratos do RH)."""
+    vigentes = [c for c in await db.hr_contracts.find({"status": {"$ne": "DESLIGADO"}}, {"_id": 0}).to_list(None)
+                if c.get("contract_type") in PAYROLL_CONTRACT_TYPES]
+    if not vigentes:
+        return ("Esta empresa não tem contratos no RH. A folha é gerada a partir dos contratos de RH → Admissão e Contratos "
+                "(o cadastro de funcionários e motoristas sozinho não basta).")
+    if run["run_type"] == "ADIANTAMENTO" and not any(c.get("salary_advance") for c in vigentes):
+        return (f"Nenhum dos {len(vigentes)} contratos vigentes recebe adiantamento quinzenal. Em Admissão e Contratos, selecione "
+                "os contratos e use o botão \"Adiantamento quinzenal\" (ou ligue a opção em cada contrato) e clique em Recalcular.")
+    if run["run_type"] == "ADIANTAMENTO":
+        return "Os contratos com adiantamento quinzenal foram admitidos depois do dia 15 da competência."
+    return "Nenhum contrato vigente foi admitido até o fim da competência."
 
 
 @api_router.delete("/hr/payroll-runs/{run_id}")

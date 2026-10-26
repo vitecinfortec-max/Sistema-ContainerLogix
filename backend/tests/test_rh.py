@@ -592,6 +592,27 @@ def test_payroll_cost_has_employer_charges_and_other_costs(api):
     assert api.put("/api/hr/payroll-settings", json={**settings, "time_bank_months": 18}).status_code == 400
 
 
+def test_empty_payroll_explains_why_and_bulk_advance(api):
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    detail = api.get(f"/api/hr/payroll-runs/{run['id']}").json()
+    assert detail["payslips"] == [] and "não tem contratos no RH" in detail["empty_reason"]
+    api.delete(f"/api/hr/payroll-runs/{run['id']}")
+    a = _contract(api, _employee(api), dependents=[], vt_opt_in=False)
+    b = _contract(api, _employee(api, "Bia", "222.333.444-55"), dependents=[], vt_opt_in=False)
+    adv = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "ADIANTAMENTO"}).json()
+    assert "recebe adiantamento quinzenal" in api.get(f"/api/hr/payroll-runs/{adv['id']}").json()["empty_reason"]
+    # liga o vale dos dois de uma vez e recalcula
+    r = api.put("/api/hr/contracts-salary-advance", json={"contract_ids": [a["id"], b["id"]], "enabled": True})
+    assert r.json()["updated"] == 2
+    detail = api.post(f"/api/hr/payroll-runs/{adv['id']}/recalculate").json()
+    assert len(detail["payslips"]) == 2 and detail["empty_reason"] is None
+    assert api.get("/api/hr/meta").json()["salary_advance_rate"] == 40
+    api.post(f"/api/hr/payroll-runs/{adv['id']}/close")
+    month = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    assert month["totals"]["advance_paid"] == 2400
+    assert api.put("/api/hr/contracts-salary-advance", json={"contract_ids": [], "enabled": True}).status_code == 400
+
+
 def test_biweekly_salary_advance(api):
     c = _contract(api, _employee(api), dependents=[], vt_opt_in=False, salary_advance=True)
     _contract(api, _employee(api, "Sem Vale", "666.777.888-99"), dependents=[], vt_opt_in=False)

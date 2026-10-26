@@ -105,14 +105,14 @@ EVENTS = {
     "PENSAO": ("114", "Pensão alimentícia", "D", "VALUE", False, False, False, False),
     "EMPRESTIMO": ("115", "Empréstimo consignado", "D", "VALUE", False, False, False, False),
     "OUTROS_DESCONTOS": ("119", "Outros descontos", "D", "VALUE", False, False, False, False),
-    "ADIANT_QUINZENA_DESC": ("116", "Adiantamento quinzenal", "D", "AUTO", False, False, False, False),
+    "ADIANT_QUINZENA_DESC": ("116", "Adiantamento quinzenal (já pago)", "D", "AUTO", False, False, False, False),
     "DECIMO_ADIANT": ("150", "13º salário - adiantamento", "D", "AUTO", False, False, False, False),
     "INSS": ("201", "INSS", "D", "AUTO", False, False, False, False),
     "IRRF": ("202", "IRRF", "D", "AUTO", False, False, False, False),
 }
 MANUAL_EVENT_CODES = [code for code, ev in EVENTS.items() if ev[3] != "AUTO"]
 
-RUN_TYPES = {"MENSAL": "Folha mensal", "ADIANTAMENTO": "Adiantamento quinzenal", "DECIMO_1": "13º salário - 1ª parcela",
+RUN_TYPES = {"MENSAL": "Folha mensal", "ADIANTAMENTO": "Adiantamento quinzenal (sem descontos)", "DECIMO_1": "13º salário - 1ª parcela",
              "DECIMO_2": "13º salário - 2ª parcela"}
 
 TERMINATION_TYPES = {
