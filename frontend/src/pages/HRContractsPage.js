@@ -699,7 +699,7 @@ export default function HRContractsPage() {
                       </Select>
                     </div>
                     <div className="sm:col-span-2">
-                      <Label className="mb-1 block text-xs">{input === 'VALUE' ? 'Valor (R$)' : input === 'DAYS' ? 'Dias' : 'Horas'}</Label>
+                      <Label className="mb-1 block text-xs">{input === 'VALUE' ? 'Valor (R$)' : input === 'DAYS' ? 'Dias' : input === 'PERCENT' ? '% do salário' : 'Horas'}</Label>
                       <Input type="number" min="0" step="0.01" value={input === 'VALUE' ? ev.value : ev.quantity}
                         onChange={(e) => updateEvent(i, input === 'VALUE' ? 'value' : 'quantity', e.target.value)} className="h-9 text-sm text-right" />
                     </div>

@@ -686,6 +686,37 @@ def test_payroll_check_report(api):
     assert api.get(f"/api/hr/payroll-runs/{run['id']}/check/excel").status_code == 200
 
 
+def test_new_recurring_events_service_bonus_basket_and_union_fees(api):
+    fixed = [{"code": "PREMIO_TEMPO_SERVICO", "quantity": 5}, {"code": "CESTA_BASICA", "value": 150},
+             {"code": "AUXILIO_ALIMENTACAO", "value": 30}, {"code": "TAXA_ADESAO_CONVENCAO", "value": 20},
+             {"code": "CONTRIB_ASSISTENCIAL", "value": 25}]
+    meta = {e["code"]: e for e in api.get("/api/hr/meta").json()["events"]}
+    assert meta["PREMIO_TEMPO_SERVICO"]["input"] == "PERCENT" and meta["PREMIO_TEMPO_SERVICO"]["kind"] == "P"
+    assert meta["CESTA_BASICA"]["kind"] == "P" and all(meta[c]["kind"] == "D" for c in ("AUXILIO_ALIMENTACAO", "TAXA_ADESAO_CONVENCAO", "CONTRIB_ASSISTENCIAL"))
+    emp = _employee(api)
+    bad = {"person_type": "FUNCIONARIO", "person_id": emp["id"], "admission_date": "2024-01-15", "base_salary": 3000,
+           "recurring_events": [{"code": "PREMIO_TEMPO_SERVICO", "quantity": 150}]}
+    assert api.post("/api/hr/contracts", json=bad).status_code == 400
+    c = _contract(api, emp, dependents=[], vt_opt_in=False, recurring_events=fixed)
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    slip = api.get(f"/api/hr/payroll-runs/{run['id']}").json()["payslips"][0]
+    ev = {e["code"]: e for e in slip["events"]}
+    assert ev["PREMIO_TEMPO_SERVICO"]["value"] == 150 and ev["PREMIO_TEMPO_SERVICO"]["reference"] == "5%"
+    assert ev["CESTA_BASICA"]["value"] == 150
+    assert (ev["AUXILIO_ALIMENTACAO"]["value"], ev["TAXA_ADESAO_CONVENCAO"]["value"], ev["CONTRIB_ASSISTENCIAL"]["value"]) == (30, 20, 25)
+    t = slip["totals"]
+    # o prêmio tem INSS/IRRF/FGTS; a cesta básica e os descontos não mexem nas bases
+    assert t["inss_base"] == 3150 and t["fgts"] == 252 and t["gross"] == 3300
+    assert t["net"] == round(3300 - 30 - 20 - 25 - t["inss"] - t["irrf"], 2)
+    # o prêmio entra nas férias e no 13º
+    v = api.post("/api/hr/vacations/preview", json={"contract_id": c["id"], "acquisition_start": "2024-01-15",
+                                                     "start_date": "2026-11-03", "days": 30, "sell_days": 0}).json()
+    assert v["calc"]["vacation_pay"] == 3150
+    api.post(f"/api/hr/payroll-runs/{run['id']}/close")
+    first = api.post("/api/hr/payroll-runs", json={"competence": "2026-11", "run_type": "DECIMO_1"}).json()
+    assert api.get(f"/api/hr/payroll-runs/{first['id']}").json()["payslips"][0]["totals"]["gross"] == 1575
+
+
 def test_vacations_settled_before_the_system(api):
     emp = _employee(api)
     c = _contract(api, emp, admission_date="2020-01-10", dependents=[])

@@ -291,6 +291,8 @@ def contract_ctx(contract: dict, settings: dict, on_day: date) -> dict:
         "vt_opt_in": bool(contract.get("vt_opt_in")),
         "vt_monthly_cost": contract.get("vt_monthly_cost"),
         "irrf_dependents": sum(1 for d in deps if d.get("irrf")),
+        "service_bonus_rate": sum(float(e.get("quantity") or 0) for e in contract.get("recurring_events") or []
+                                  if e.get("code") == "PREMIO_TEMPO_SERVICO"),
         "family_children": children,
         "admission_date": contract.get("admission_date"),
     }
@@ -327,6 +329,8 @@ async def _validate_contract(data: HRContractCreate, current_id: Optional[str]) 
     for ev in data.recurring_events:
         if ev.code not in MANUAL_EVENT_CODES:
             raise HTTPException(status_code=400, detail=f"Lançamento fixo inválido: {ev.code}")
+        if ev.code == "PREMIO_TEMPO_SERVICO" and not 0 < (ev.quantity or 0) <= 100:
+            raise HTTPException(status_code=400, detail="Prêmio por tempo de serviço: informe o percentual (até 100%)")
         recurring.append({"code": ev.code, "quantity": ev.quantity, "value": ev.value, "description": _clean(ev.description)})
     dependents = []
     for d in data.dependents:

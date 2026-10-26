@@ -431,6 +431,8 @@ async def update_payslip(payslip_id: str, data: HRPayslipInputs, current_user: d
         amount = item.value if entry == "VALUE" else item.quantity
         if amount is None or amount <= 0:
             raise HTTPException(status_code=400, detail=f"{EVENTS[item.code][1]}: informe {'o valor' if entry == 'VALUE' else 'a quantidade'}")
+        if entry == "PERCENT" and amount > 100:
+            raise HTTPException(status_code=400, detail=f"{EVENTS[item.code][1]}: percentual de 0 a 100")
         inputs.append({"code": item.code, "quantity": item.quantity if entry != "VALUE" else None,
                        "value": r2(item.value) if entry == "VALUE" else None, "description": _clean(item.description)})
     if data.days_worked is not None and not 0 <= data.days_worked <= 30:

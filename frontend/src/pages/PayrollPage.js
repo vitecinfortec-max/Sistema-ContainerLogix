@@ -520,7 +520,7 @@ function PayslipDialog({ slip, run, events, onClose, onSaved }) {
                   </Select>
                 </div>
                 <div className="sm:col-span-2">
-                  <Label className="mb-1 block text-xs">{kind === 'VALUE' ? 'Valor (R$)' : kind === 'DAYS' ? 'Dias' : 'Horas'}</Label>
+                  <Label className="mb-1 block text-xs">{kind === 'VALUE' ? 'Valor (R$)' : kind === 'DAYS' ? 'Dias' : kind === 'PERCENT' ? '% do salário' : 'Horas'}</Label>
                   <Input type="number" min="0" step="0.01" disabled={!editable} value={kind === 'VALUE' ? inp.value : inp.quantity}
                     onChange={(e) => update(i, kind === 'VALUE' ? 'value' : 'quantity', e.target.value)} className="h-9 text-sm text-right" />
                 </div>

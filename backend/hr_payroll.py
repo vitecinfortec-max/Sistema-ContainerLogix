@@ -75,7 +75,7 @@ CONTRACT_TYPES = {
 PAYROLL_CONTRACT_TYPES = {"CLT", "EXPERIENCIA", "APRENDIZ", "TEMPORARIO", "ESTAGIO"}
 
 # code: (código do holerite, descrição, P/D, entrada, INSS, IRRF, FGTS, reduz as bases)
-# entrada: AUTO (calculado), HOURS, DAYS ou VALUE (lançado na folha)
+# entrada: AUTO (calculado), HOURS, DAYS, VALUE ou PERCENT (% do salário-base) lançado na folha
 EVENTS = {
     "SALARIO": ("001", "Salário", "P", "AUTO", True, True, True, False),
     "INSALUBRIDADE": ("002", "Adicional de insalubridade", "P", "AUTO", True, True, True, False),
@@ -87,9 +87,14 @@ EVENTS = {
     "COMISSAO": ("020", "Comissões", "P", "VALUE", True, True, True, False),
     "GRATIFICACAO": ("021", "Gratificação", "P", "VALUE", True, True, True, False),
     "PREMIO": ("022", "Prêmio", "P", "VALUE", False, True, False, False),
+    # adicional pago todo mês pelo tempo de casa: tem natureza salarial
+    # (INSS, IRRF e FGTS) e entra nas férias, no 13º e na rescisão
+    "PREMIO_TEMPO_SERVICO": ("023", "Prêmio por tempo de serviço", "P", "PERCENT", True, True, True, False),
     "OUTROS_PROVENTOS": ("029", "Outros proventos", "P", "VALUE", True, True, True, False),
     "AJUDA_CUSTO": ("030", "Ajuda de custo", "P", "VALUE", False, False, False, False),
     "REEMBOLSO": ("031", "Reembolso de despesas", "P", "VALUE", False, False, False, False),
+    # alimentação não integra o salário (art. 457, § 2º, da CLT; PAT)
+    "CESTA_BASICA": ("032", "Cesta básica", "P", "VALUE", False, False, False, False),
     "SALARIO_FAMILIA": ("040", "Salário-família", "P", "AUTO", False, False, False, False),
     "ADIANT_QUINZENA": ("060", "Adiantamento salarial (quinzena)", "P", "AUTO", False, False, False, False),
     "DECIMO_1": ("050", "13º salário - 1ª parcela", "P", "AUTO", False, False, True, False),
@@ -104,6 +109,9 @@ EVENTS = {
     "PLANO_SAUDE": ("113", "Plano de saúde", "D", "VALUE", False, False, False, False),
     "PENSAO": ("114", "Pensão alimentícia", "D", "VALUE", False, False, False, False),
     "EMPRESTIMO": ("115", "Empréstimo consignado", "D", "VALUE", False, False, False, False),
+    "AUXILIO_ALIMENTACAO": ("117", "Auxílio-alimentação (desconto)", "D", "VALUE", False, False, False, False),
+    "TAXA_ADESAO_CONVENCAO": ("118", "Taxa de adesão à convenção coletiva", "D", "VALUE", False, False, False, False),
+    "CONTRIB_ASSISTENCIAL": ("120", "Contribuição assistencial", "D", "VALUE", False, False, False, False),
     "OUTROS_DESCONTOS": ("119", "Outros descontos", "D", "VALUE", False, False, False, False),
     "ADIANT_QUINZENA_DESC": ("116", "Adiantamento quinzenal (já pago)", "D", "AUTO", False, False, False, False),
     "DECIMO_ADIANT": ("150", "13º salário - adiantamento", "D", "AUTO", False, False, False, False),
@@ -314,11 +322,20 @@ def fixed_additions(ctx: dict, s: dict) -> tuple:
     return insal, peric
 
 
+def service_bonus(ctx: dict) -> float:
+    """Prêmio por tempo de serviço do mês cheio (% do salário, dos lançamentos
+    fixos): no contracheque sai pelo lançamento; aqui entra na hora extra, nas
+    férias, no 13º e na rescisão."""
+    return (ctx.get("base_salary") or 0) * (ctx.get("service_bonus_rate") or 0) / 100
+
+
 def _manual_value(code: str, item: dict, ctx: dict, s: dict, hourly: float) -> float:
     entry = EVENTS[code][3]
     qty = float(item.get("quantity") or 0)
     if entry == "VALUE":
         return float(item.get("value") or 0)
+    if entry == "PERCENT":
+        return (ctx.get("base_salary") or 0) * qty / 100
     if entry == "DAYS":
         return (ctx.get("base_salary") or 0) / 30 * qty
     if code == "HE50":
@@ -378,7 +395,7 @@ def compute_monthly_payslip(ctx: dict, inputs: list, s: dict) -> dict:
     base_salary = ctx.get("base_salary") or 0
     days = max(0, min(30, int(ctx.get("days_worked", 30))))
     insal, peric = fixed_additions(ctx, s)
-    hourly = (base_salary + insal + peric) / (s["monthly_hours"] or 220)
+    hourly = (base_salary + insal + peric + service_bonus(ctx)) / (s["monthly_hours"] or 220)
     events = []
     if days:
         events.append(_event("SALARIO", base_salary / 30 * days, _days(days)))
@@ -398,8 +415,9 @@ def compute_monthly_payslip(ctx: dict, inputs: list, s: dict) -> dict:
         value = _manual_value(code, item, ctx, s, hourly)
         if value <= 0:
             continue
-        reference = "" if EVENTS[code][3] == "VALUE" else (
-            _days(item.get("quantity")) if EVENTS[code][3] == "DAYS" else f"{_fmt_qty(item.get('quantity'))} h")
+        entry = EVENTS[code][3]
+        reference = "" if entry == "VALUE" else _days(item.get("quantity")) if entry == "DAYS" else (
+            f"{_fmt_qty(item.get('quantity'))}%" if entry == "PERCENT" else f"{_fmt_qty(item.get('quantity'))} h")
         events.append(_event(code, value, reference, (item.get("description") or "").strip() or None, auto=False))
 
     if ctx.get("salary_advance_paid"):
@@ -443,7 +461,7 @@ def compute_13th_payslip(ctx: dict, part: int, months: int, first_paid: float, i
     2ª parcela = valor integral com INSS e IRRF próprios, menos o adiantamento.
     Médias de horas extras/comissões entram como lançamento manual."""
     insal, peric = fixed_additions(ctx, s)
-    monthly = (ctx.get("base_salary") or 0) + insal + peric
+    monthly = (ctx.get("base_salary") or 0) + insal + peric + service_bonus(ctx)
     full = monthly / 12 * months
     events = []
     if part == 1:
@@ -490,7 +508,7 @@ def compute_vacation(ctx: dict, days: int, sell_days: int, advance_13th: bool, s
     """Recibo de férias: férias + 1/3 (com INSS e IRRF), abono pecuniário + 1/3
     (isento) e, se pedido, o adiantamento da 1ª parcela do 13º."""
     insal, peric = fixed_additions(ctx, s)
-    monthly = (ctx.get("base_salary") or 0) + insal + peric
+    monthly = (ctx.get("base_salary") or 0) + insal + peric + service_bonus(ctx)
     average = ctx.get("variable_average") or 0
     base_pay = r2(monthly / 30 * days)
     average_pay = r2(average / 30 * days)
@@ -599,7 +617,7 @@ def compute_termination(ctx: dict, s: dict) -> dict:
     admission = parse_day(ctx["admission_date"])
     end = parse_day(ctx["termination_date"])
     insal, peric = fixed_additions(ctx, s)
-    salary = (ctx.get("base_salary") or 0) + insal + peric
+    salary = (ctx.get("base_salary") or 0) + insal + peric + service_bonus(ctx)
     # aviso, férias e 13º levam a média das variáveis; o saldo, só o salário
     monthly = salary + (ctx.get("variable_average") or 0)
     leaves = [(parse_day(lo), parse_day(hi)) for lo, hi in ctx.get("leave_ranges") or []]
