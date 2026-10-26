@@ -166,7 +166,10 @@ def irrf_reduction(income: float, tax: float, s: dict) -> float:
     if tax <= 0:
         return 0.0
     if income <= s["irrf_reduction_full_up_to"]:
-        reduction = s["irrf_reduction_full_max"]
+        # até R$ 5.000 a lei quer o imposto zerado; os R$ 312,89 bastam no mês
+        # (com o desconto simplificado), mas não no 13º, que não tem o
+        # desconto simplificado - lá a redução vai até zerar
+        reduction = tax
     elif income <= s["irrf_reduction_partial_up_to"]:
         reduction = s["irrf_reduction_partial_a"] - s["irrf_reduction_partial_b"] * income
     else:

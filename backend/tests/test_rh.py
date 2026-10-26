@@ -25,6 +25,12 @@ def test_irrf_2026_reduction_law_15270():
     # R$ 6.000: imposto da tabela (564,85) menos 978,62 - 0,133145 x 6.000 (179,75)
     r = calc_irrf(6000, calc_inss(6000, S), 0, 0, S)
     assert (r["gross_tax"], r["reduction"], r["tax"]) == (564.85, 179.75, 385.10)
+    # 13º (sem desconto simplificado) de até R$ 5.000 também sai zerado
+    assert calc_irrf(5000, calc_inss(5000, S), 0, 0, S, allow_simplified=False)["tax"] == 0
+    second = compute_13th_payslip({"base_salary": 5000, "contract_type": "CLT"}, 2, 12, 2500, [], S)
+    assert second["irrf"] == 0 and not any(e["code"] == "IRRF" for e in second["events"])
+    # logo acima de R$ 5.000 volta a fórmula da redução parcial
+    assert calc_irrf(5000.01, calc_inss(5000.01, S), 0, 0, S, allow_simplified=False)["tax"] > 0
     # acima de R$ 7.350: sem redução; dependente deduz 189,59
     r = calc_irrf(10000, calc_inss(10000, S), 1, 0, S)
     assert r["reduction"] == 0 and r["base"] == round(10000 - 988.09 - 189.59, 2)
