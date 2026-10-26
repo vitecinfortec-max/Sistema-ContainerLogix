@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from hr_payroll import (
     CONTRACT_TYPES, EVENTS, MANUAL_EVENT_CODES, NOTICE_TYPES, PAYROLL_CONTRACT_TYPES, RUN_TYPES,
-    TERMINATION_TYPES, commercial_days, competence_bounds, compute_13th_payslip, compute_monthly_payslip, months_by_fifteen,
-    overlap_days, parse_day, r2,
+    TERMINATION_TYPES, commercial_days, commercial_overlap, competence_bounds, compute_13th_payslip, compute_monthly_payslip,
+    months_by_fifteen, overlap_days, parse_day, r2,
 )
 from models import HRPayrollPay, HRPayrollRunCreate, HRPayrollSettings, HRPayslipInputs
 from reports import merge_company
@@ -129,10 +129,17 @@ async def _month_days(contract: dict, first: date, last: date) -> dict:
     admission = parse_day(contract["admission_date"])
     days = commercial_days(max(admission, first), last, last)
     vacation_days = 0
+    vacation_inss_base, vacation_inss = 0.0, 0.0
     for v in await db.hr_vacations.find({"contract_id": contract["id"], "status": {"$ne": "CANCELADA"},
                                          "start_date": {"$lte": last.isoformat()}, "end_date": {"$gte": first.isoformat()}},
-                                        {"_id": 0, "start_date": 1, "end_date": 1}).to_list(None):
-        vacation_days += overlap_days(parse_day(v["start_date"]), parse_day(v["end_date"]), first, last)
+                                        {"_id": 0, "start_date": 1, "end_date": 1, "days": 1, "calc": 1}).to_list(None):
+        start, end = parse_day(v["start_date"]), parse_day(v["end_date"])
+        vacation_days += commercial_overlap(start, end, first, last)
+        # a parte das férias gozada neste mês soma na base do INSS da competência
+        share = overlap_days(start, end, first, last) / (v.get("days") or 1)
+        calc = v.get("calc") or {}
+        vacation_inss_base += ((calc.get("vacation_pay") or 0) + (calc.get("one_third") or 0)) * share
+        vacation_inss += (calc.get("inss") or 0) * share
     leave_days = 0
     absence_days = 0
     for o in await db.hr_occurrences.find({"contract_id": contract["id"],
@@ -142,16 +149,18 @@ async def _month_days(contract: dict, first: date, last: date) -> dict:
             start = parse_day(o.get("start_date"))
             end = parse_day(o.get("end_date")) or last
             if start:
-                leave_days += overlap_days(start + timedelta(days=15), end, first, last)
+                leave_days += commercial_overlap(start + timedelta(days=15), end, first, last)
         else:
             absence_days += int(occurrence_days_in(o, first, last))
     paid = max(0, min(30, days - min(vacation_days, 30) - leave_days))
-    return {"days": paid, "vacation_days": vacation_days, "leave_days": leave_days, "absence_days": absence_days}
+    return {"days": paid, "vacation_days": vacation_days, "leave_days": leave_days, "absence_days": absence_days,
+            "vacation_inss_base": r2(vacation_inss_base), "vacation_inss": r2(vacation_inss)}
 
 
 async def _first_13th_paid(contract_id: str, year: int) -> float:
     total = 0.0
-    runs = [r["id"] for r in await db.hr_payroll_runs.find({"run_type": "DECIMO_1", "competence": {"$regex": f"^{year}-"}},
+    runs = [r["id"] for r in await db.hr_payroll_runs.find({"run_type": "DECIMO_1", "competence": {"$regex": f"^{year}-"},
+                                                            "status": {"$ne": "ABERTA"}},
                                                            {"_id": 0, "id": 1}).to_list(None)]
     if runs:
         for p in await db.hr_payslips.find({"contract_id": contract_id, "run_id": {"$in": runs}}, {"_id": 0, "totals": 1}).to_list(None):
@@ -170,6 +179,8 @@ async def _calc_payslip(run: dict, contract: dict, settings: dict, inputs: list,
         info = await _month_days(contract, first, last)
         ctx["days_worked"] = info["days"] if days_override is None else days_override
         ctx["absence_days"] = info["absence_days"]
+        ctx["other_inss_base"] = info["vacation_inss_base"]
+        ctx["other_inss_withheld"] = info["vacation_inss"]
         result = compute_monthly_payslip(ctx, inputs, settings)
         months = None
     else:

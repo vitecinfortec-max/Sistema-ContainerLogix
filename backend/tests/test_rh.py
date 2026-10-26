@@ -367,6 +367,109 @@ def test_hr_upload_accepts_pdf(api):
     assert api.post("/api/hr/uploads", files={"file": ("x.exe", b"MZ", "application/octet-stream")}).status_code == 400
 
 
+# ---------------------------------------------------------------- correções da auditoria (26/10/2026)
+
+def test_inss_of_a_month_with_vacation_is_on_the_whole_competence():
+    # 15 dias de férias (INSS já descontado no recibo) + 15 trabalhados
+    vac = compute_vacation({"base_salary": 6000}, 15, 0, False, S)
+    slip = compute_monthly_payslip({"base_salary": 6000, "contract_type": "CLT", "days_worked": 15,
+                                    "other_inss_base": vac["vacation_pay"] + vac["one_third"],
+                                    "other_inss_withheld": vac["inss"]}, [], S)
+    total = calc_inss(vac["vacation_pay"] + vac["one_third"] + 3000, S)
+    assert round(vac["inss"] + slip["inss"], 2) == total == 781.51
+    assert next(e for e in slip["events"] if e["code"] == "INSS")["reference"] == "complemento (férias no mês)"
+
+
+def test_early_end_of_experience_follows_art_479_and_480():
+    base = {"base_salary": 3000, "contract_type": "EXPERIENCIA", "admission_date": "2026-01-05",
+            "experience_end": "2026-04-04", "termination_date": "2026-02-03", "fgts_balance": 240}
+    fired = compute_termination({**base, "termination_type": "SEM_JUSTA_CAUSA", "notice_type": "INDENIZADO"}, S)
+    items = {i["label"]: i for i in fired["items"]}
+    assert fired["early_experience"] and fired["experience_remaining_days"] == 60 and fired["notice_days"] == 0
+    assert items["Indenização art. 479 CLT (metade dos dias restantes)"]["value"] == 3000
+    assert "Aviso prévio indenizado" not in items
+    assert items["13º salário proporcional"]["reference"] == "1/12"  # sem projeção do aviso
+    assert fired["fgts_fine_rate"] == 40
+    quit_ = compute_termination({**base, "termination_type": "PEDIDO", "notice_type": "NAO_CUMPRIDO"}, S)
+    assert {i["label"]: i["value"] for i in quit_["items"]}["Indenização art. 480 CLT (metade dos dias restantes)"] == 3000
+    assert not any(i["label"] == "Aviso prévio não cumprido" for i in quit_["items"])
+    # no fim do prazo (ou depois dele) volta a ser rescisão comum
+    after = compute_termination({**base, "termination_date": "2026-04-04", "termination_type": "SEM_JUSTA_CAUSA",
+                                 "notice_type": "INDENIZADO"}, S)
+    assert not after["early_experience"]
+
+
+def test_february_on_vacation_pays_no_salary_days(api):
+    c = _contract(api, _employee(api), admission_date="2024-01-15", dependents=[], vt_opt_in=False)
+    v = api.post("/api/hr/vacations", json={"contract_id": c["id"], "acquisition_start": "2025-01-15",
+                                            "start_date": "2027-02-01", "days": 28, "sell_days": 0})
+    assert v.status_code == 200, v.text
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2027-02", "run_type": "MENSAL"}).json()
+    slip = api.get(f"/api/hr/payroll-runs/{run['id']}").json()["payslips"][0]
+    assert slip["vacation_days"] == 30 and slip["days_worked"] == 0
+
+
+def test_payroll_inss_counts_the_vacation_of_the_month(api):
+    c = _contract(api, _employee(api), base_salary=6000, dependents=[], vt_opt_in=False)
+    v = api.post("/api/hr/vacations", json={"contract_id": c["id"], "acquisition_start": "2024-01-15",
+                                            "start_date": "2026-11-16", "days": 15, "sell_days": 0}).json()
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2026-11", "run_type": "MENSAL"}).json()
+    slip = api.get(f"/api/hr/payroll-runs/{run['id']}").json()["payslips"][0]
+    assert slip["days_worked"] == 15
+    assert round(slip["totals"]["inss"] + v["calc"]["inss"], 2) == calc_inss(3000 + v["calc"]["vacation_pay"] + v["calc"]["one_third"], S)
+
+
+def test_open_first_13th_run_is_not_discounted_on_termination(api):
+    c = _contract(api, _employee(api), admission_date="2023-03-10", base_salary=3600, dependents=[])
+    api.post("/api/hr/payroll-runs", json={"competence": "2026-11", "run_type": "DECIMO_1"})  # aberta: ninguém recebeu
+    body = {"termination_date": "2026-11-20", "termination_type": "SEM_JUSTA_CAUSA", "notice_type": "TRABALHADO"}
+    sim = api.post(f"/api/hr/contracts/{c['id']}/terminate", json=body).json()
+    assert not any("adiantamento" in i["label"] for i in sim["calc"]["items"])
+
+
+def test_driver_registry_follows_the_contract(api):
+    drv = api.post("/api/drivers", json={"name": "Zé Motorista", "cpf": "444.555.666-77"}).json()
+    c = _contract(api, drv, person_type="MOTORISTA", dependents=[])
+    status = lambda: next(d for d in api.get("/api/drivers").json() if d["id"] == drv["id"])["status"]  # noqa: E731
+    api.put(f"/api/hr/contracts/{c['id']}/status", params={"status": "AFASTADO"})
+    assert status() == "INATIVO"
+    api.put(f"/api/hr/contracts/{c['id']}/status", params={"status": "ATIVO"})
+    assert status() == "ATIVO"
+    api.post(f"/api/hr/contracts/{c['id']}/terminate", json={"termination_date": "2026-10-20", "termination_type": "PEDIDO",
+                                                              "notice_type": "TRABALHADO", "confirm": True})
+    assert status() == "INATIVO"
+    api.post(f"/api/hr/contracts/{c['id']}/reinstate")
+    assert status() == "ATIVO"
+
+
+def test_experience_contract_rules_and_dashboard_alert(api):
+    from datetime import timedelta
+    from reports import today_brt
+    base = {"person_type": "FUNCIONARIO", "contract_type": "EXPERIENCIA", "admission_date": "2024-01-15", "base_salary": 3000}
+    emp = _employee(api)
+    assert api.post("/api/hr/contracts", json={**base, "person_id": emp["id"]}).status_code == 400  # sem os dias
+    # experiência que já terminou não fica para sempre no painel
+    _contract(api, emp, contract_type="EXPERIENCIA", experience_days=45, dependents=[])
+    soon = (today_brt().date() - timedelta(days=40)).isoformat()
+    other = _contract(api, _employee(api, "Bia", "222.333.444-55"), contract_type="EXPERIENCIA", experience_days=45,
+                      admission_date=soon, dependents=[])
+    alerts = api.get("/api/hr/dashboard").json()["experiences"]
+    assert [a["contract_id"] for a in alerts] == [other["id"]] and alerts[0]["days_left"] == 4
+
+
+def test_programmed_vacation_follows_salary_changes(api):
+    emp = _employee(api)
+    c = _contract(api, emp, dependents=[])
+    v = api.post("/api/hr/vacations", json={"contract_id": c["id"], "acquisition_start": "2024-01-15",
+                                            "start_date": "2026-12-01", "days": 30, "sell_days": 0}).json()
+    assert v["calc"]["vacation_pay"] == 3000
+    body = {"person_type": "FUNCIONARIO", "person_id": emp["id"], "admission_date": "2024-01-15", "base_salary": 3600}
+    assert api.put(f"/api/hr/contracts/{c['id']}", json=body).status_code == 200
+    assert api.get("/api/hr/vacations").json()[0]["calc"]["vacation_pay"] == 3600
+    paid = api.post(f"/api/hr/vacations/{v['id']}/pay", json={"payment_date": "2026-11-28"}).json()
+    assert paid["calc"]["vacation_pay"] == 3600
+
+
 def test_vacations_settled_before_the_system(api):
     emp = _employee(api)
     c = _contract(api, emp, admission_date="2020-01-10", dependents=[])

@@ -731,6 +731,14 @@ export default function HRContractsPage() {
 
           {termPreview && (
             <div className="space-y-2" data-testid="hr-termination-preview">
+              {termPreview.calc.early_experience && (
+                <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[12px] text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  Experiência encerrada antes do prazo ({termPreview.calc.experience_remaining_days} dias restantes): não há aviso prévio.
+                  {termForm.termination_type === 'PEDIDO'
+                    ? ' O empregado indeniza metade dos dias restantes (art. 480) só se o aviso estiver como "Não cumprido".'
+                    : ' A empresa indeniza metade dos dias restantes (art. 479).'}
+                </p>
+              )}
               <table className="data-table">
                 <thead><tr><th>Verba</th><th>Ref.</th><th className="!text-right">Vencimentos</th><th className="!text-right">Descontos</th></tr></thead>
                 <tbody>

@@ -262,6 +262,8 @@ async def _validate_contract(data: HRContractCreate, current_id: Optional[str]) 
         raise HTTPException(status_code=400, detail="Informe o salário")
     if data.experience_days < 0 or data.experience_days > 90:
         raise HTTPException(status_code=400, detail="O contrato de experiência vai de 0 a 90 dias")
+    if data.contract_type == "EXPERIENCIA" and not data.experience_days:
+        raise HTTPException(status_code=400, detail="Informe os dias do contrato de experiência (até 90)")
     if data.insalubridade_grade not in (0, 10, 20, 40):
         raise HTTPException(status_code=400, detail="Insalubridade: grau 10, 20 ou 40%")
     if data.vt_monthly_cost is not None and data.vt_monthly_cost < 0:
@@ -308,7 +310,15 @@ async def _validate_contract(data: HRContractCreate, current_id: Optional[str]) 
 
 
 async def _sync_employee(contract: dict, status: str):
-    """O cadastro de Funcionário acompanha o contrato (cargo, setor, admissão, status)."""
+    """O cadastro acompanha o contrato: Funcionário (cargo, setor, admissão,
+    status); Motorista afastado ou desligado fica Inativo (não é escalado) e
+    volta a Ativo no retorno - um motorista Bloqueado continua bloqueado."""
+    if contract["person_type"] == "MOTORISTA":
+        if status == "ATIVO":
+            await db.drivers.update_one({"id": contract["person_id"], "status": "INATIVO"}, {"$set": {"status": "ATIVO"}})
+        else:
+            await db.drivers.update_one({"id": contract["person_id"], "status": {"$ne": "BLOQUEADO"}}, {"$set": {"status": "INATIVO"}})
+        return
     if contract["person_type"] != "FUNCIONARIO":
         return
     await db.employees.update_one({"id": contract["person_id"]}, {"$set": {
@@ -376,6 +386,7 @@ async def update_contract(contract_id: str, data: HRContractCreate, current_user
     for collection in ("hr_occurrences", "hr_documents", "hr_time_bank"):
         await db[collection].update_many({"contract_id": contract_id}, {"$set": snapshot})
     await db.hr_vacations.update_many({"contract_id": contract_id, "status": "PROGRAMADA"}, {"$set": snapshot})
+    await _recalc_programmed_vacations(updated)
     return updated
 
 
@@ -458,7 +469,8 @@ async def termination_preview(contract: dict, data: HRTermination, settings: dic
     current = next((p for p in periods if not p["complete"]), None)
     first_13th = 0.0
     year_runs = {r["id"] for r in await db.hr_payroll_runs.find(
-        {"run_type": "DECIMO_1", "competence": {"$regex": f"^{end.year}-"}}, {"_id": 0, "id": 1}).to_list(None)}
+        {"run_type": "DECIMO_1", "competence": {"$regex": f"^{end.year}-"}, "status": {"$ne": "ABERTA"}},
+        {"_id": 0, "id": 1}).to_list(None)}
     if year_runs:
         for p in await db.hr_payslips.find({"contract_id": contract["id"], "run_id": {"$in": list(year_runs)}}, {"_id": 0, "totals": 1}).to_list(None):
             first_13th += (p.get("totals") or {}).get("gross") or 0
@@ -473,6 +485,7 @@ async def termination_preview(contract: dict, data: HRTermination, settings: dic
         "current_period_start": current["start"] if current else None,
         "current_period_absences": current["absences"] if current else 0,
         "first_13th_paid": r2(first_13th), "fgts_balance": fgts_balance,
+        "experience_end": contract.get("experience_end"),
     }
     calc = compute_termination(ctx, settings)
     return {
@@ -658,6 +671,19 @@ async def create_vacation(data: HRVacationCreate, current_user: dict = Depends(g
     return doc
 
 
+def _vacation_calc(vacation: dict, contract: dict, settings: dict) -> dict:
+    start = date.fromisoformat(vacation["start_date"])
+    return compute_vacation(contract_ctx(contract, settings, start), vacation["days"], vacation.get("sell_days") or 0,
+                            bool(vacation.get("advance_13th")), settings)
+
+
+async def _recalc_programmed_vacations(contract: dict):
+    """Férias ainda não pagas recalculam com o salário e as tabelas atuais."""
+    settings = await load_payroll_settings()
+    for v in await db.hr_vacations.find({"contract_id": contract["id"], "status": "PROGRAMADA"}, {"_id": 0}).to_list(None):
+        await db.hr_vacations.update_one({"id": v["id"]}, {"$set": {"calc": _vacation_calc(v, contract, settings)}})
+
+
 async def _get_vacation(vacation_id: str) -> dict:
     doc = await db.hr_vacations.find_one({"id": vacation_id}, {"_id": 0})
     if not doc:
@@ -693,7 +719,9 @@ async def pay_vacation(vacation_id: str, data: HRPayrollPay, current_user: dict 
     if current["status"] != "PROGRAMADA":
         raise HTTPException(status_code=400, detail="Só férias Programadas podem ser pagas")
     paid_at = _valid_iso_date(data.payment_date, "Data do pagamento")
-    await db.hr_vacations.update_one({"id": vacation_id}, {"$set": {"status": "PAGA", "paid_at": paid_at, "payment_date": paid_at,
+    # paga pelo valor de hoje (o salário ou as tabelas podem ter mudado desde o lançamento)
+    calc = _vacation_calc(current, await get_contract(current["contract_id"]), await load_payroll_settings())
+    await db.hr_vacations.update_one({"id": vacation_id}, {"$set": {"status": "PAGA", "paid_at": paid_at, "payment_date": paid_at, "calc": calc,
                                                                   "paid_by_name": current_user["name"], "updated_at": _now_iso()}})
     return await _get_vacation(vacation_id)
 
@@ -966,7 +994,7 @@ async def hr_dashboard(current_user: dict = Depends(get_current_admin_user)):
     experiences = []
     for c in contracts:
         end = parse_day(c.get("experience_end"))
-        if end and c["status"] == "ATIVO" and (end - today).days <= 15:
+        if end and c["status"] == "ATIVO" and 0 <= (end - today).days <= 15:
             experiences.append({**contract_snapshot(c), "experience_end": end.isoformat(), "days_left": (end - today).days})
 
     vacations = []

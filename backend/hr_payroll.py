@@ -200,6 +200,16 @@ def commercial_days(first_day: date, last_day: date, month_last: date) -> int:
     return max(0, min(30, (last_day - first_day).days + 1))
 
 
+def commercial_overlap(start: date, end: date, first: date, last: date) -> int:
+    """Dias de [start, end] dentro do mês [first, last] no mês comercial de 30
+    dias: um intervalo que vai até o fim do mês conta como 30 - (dia inicial - 1)
+    (fevereiro inteiro de férias = 30 dias, não 28)."""
+    lo, hi = max(start, first), min(end, last)
+    if hi < lo:
+        return 0
+    return commercial_days(lo, hi, last)
+
+
 def add_months(day: date, months: int) -> date:
     month_index = day.month - 1 + months
     year, month = day.year + month_index // 12, month_index % 12 + 1
@@ -303,12 +313,19 @@ def _totals(events: list, ctx: dict, s: dict, allow_simplified=True, irrf_events
     inss_base, irrf_income, fgts_base = base(4), base(5), base(6)
     if contract_type == "ESTAGIO":
         inss_base, fgts_base = 0.0, 0.0
-    inss = calc_inss(inss_base, s)
+    # INSS é da competência: as férias gozadas no mês já tiveram INSS no
+    # recibo, então o daqui é o da soma (até o teto) menos o já descontado
+    other_base = ctx.get("other_inss_base") or 0
+    other_withheld = ctx.get("other_inss_withheld") or 0
+    if other_base and inss_base:
+        inss = r2(max(0.0, calc_inss(inss_base + other_base, s) - other_withheld))
+    else:
+        inss = calc_inss(inss_base, s)
     pension = sum(e["value"] for e in events if e["code"] == "PENSAO")
     irrf = calc_irrf(irrf_income, inss, ctx.get("irrf_dependents") or 0, pension, s, allow_simplified=allow_simplified)
     if inss > 0:
         effective = inss / inss_base * 100 if inss_base else 0
-        events.append(_event("INSS", inss, f"{_fmt_qty(round(effective, 2))}%"))
+        events.append(_event("INSS", inss, "complemento (férias no mês)" if other_base and inss_base else f"{_fmt_qty(round(effective, 2))}%"))
     if irrf_events and irrf["tax"] > 0:
         events.append(_event("IRRF", irrf["tax"], f"{_fmt_qty(irrf['rate'])}%"))
     fgts_rate = s["fgts_apprentice_rate"] if contract_type == "APRENDIZ" else s["fgts_rate"]
@@ -522,6 +539,8 @@ def compute_termination(ctx: dict, s: dict) -> dict:
     prazo de concessão), vacation_double_days (vencidas fora do prazo: em
     dobro, art. 137),
     current_period_start (início do período aquisitivo em curso),
+    experience_end (fim do contrato de experiência: antes dele, a dispensa ou o
+    pedido de demissão seguem os arts. 479/480 em vez do aviso prévio),
     current_period_absences, first_13th_paid (1ª parcela já paga no ano),
     fgts_balance (saldo para a multa)."""
     kind = ctx["termination_type"]
@@ -544,11 +563,22 @@ def compute_termination(ctx: dict, s: dict) -> dict:
     worked_days = commercial_days(max(admission, month_start), end, month_last)
     saldo = add("Saldo de salário", "P", monthly / 30 * worked_days, _days(worked_days))
 
-    # Aviso prévio
+    # Aviso prévio - ou, na experiência encerrada antes do prazo, a indenização
+    # de metade dos dias que faltavam (art. 479 se a empresa dispensa; art.
+    # 480 se o empregado sai, descontada só quando o aviso é "Não cumprido")
     n_days = notice_days(admission, end)
     projected_end = end
     aviso = 0.0
-    if kind == "SEM_JUSTA_CAUSA" and notice == "INDENIZADO":
+    experience_end = parse_day(ctx.get("experience_end"))
+    early_experience = bool(experience_end and end < experience_end and kind in ("SEM_JUSTA_CAUSA", "PEDIDO"))
+    remaining = (experience_end - end).days if early_experience else 0
+    if early_experience:
+        n_days = 0
+        if kind == "SEM_JUSTA_CAUSA":
+            add("Indenização art. 479 CLT (metade dos dias restantes)", "P", monthly / 30 * remaining / 2, _days(remaining / 2))
+        elif notice == "NAO_CUMPRIDO":
+            add("Indenização art. 480 CLT (metade dos dias restantes)", "D", monthly / 30 * remaining / 2, _days(remaining / 2))
+    elif kind == "SEM_JUSTA_CAUSA" and notice == "INDENIZADO":
         aviso = add("Aviso prévio indenizado", "P", monthly / 30 * n_days, f"{n_days} dias")
         projected_end = end + timedelta(days=n_days)
     elif kind == "ACORDO" and notice == "INDENIZADO":
@@ -608,6 +638,7 @@ def compute_termination(ctx: dict, s: dict) -> dict:
     return {
         "items": items, "gross": gross, "deductions": deductions, "net": r2(gross - deductions),
         "monthly_base": r2(monthly), "notice_days": n_days, "projected_end": projected_end.isoformat(),
+        "early_experience": early_experience, "experience_remaining_days": remaining,
         "fgts_month": fgts_month, "fgts_balance": fgts_balance, "fgts_fine_rate": fine_rate,
         "fgts_fine": r2(fgts_balance * fine_rate / 100), "fgts_withdraw": withdraw,
         "unemployment_insurance": kind in ("SEM_JUSTA_CAUSA",),
