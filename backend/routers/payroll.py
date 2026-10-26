@@ -19,8 +19,8 @@ from hr_payroll import (
 from models import HRPayrollPay, HRPayrollRunCreate, HRPayrollSettings, HRPayslipInputs
 from reports import merge_company
 from routers.hr import (
-    DOCUMENT_TYPES, LEAVE_TYPES, OCCURRENCE_TYPES, PAYROLL_ABSENCE_TYPES, contract_ctx, contract_snapshot, load_payroll_settings,
-    occurrence_days_in, pdf_stream, _clean, _now_iso,
+    DOCUMENT_TYPES, LEAVE_TYPES, OCCURRENCE_TYPES, PAYROLL_ABSENCE_TYPES, contract_ctx, contract_snapshot, leave_ranges,
+    load_payroll_settings, occurrence_days_in, pdf_stream, variable_average, _clean, _now_iso,
 )
 from routers.stock import _valid_iso_date
 from shared import db, get_current_admin_user, get_company_settings
@@ -97,6 +97,8 @@ async def update_payroll_settings(data: HRPayrollSettings, current_user: dict = 
             raise HTTPException(status_code=400, detail=f"Valor inválido em {key}")
     if not values.get("monthly_hours"):
         raise HTTPException(status_code=400, detail="Informe a jornada mensal (horas)")
+    if values.get("time_bank_months") is not None and not 1 <= values["time_bank_months"] <= 12:
+        raise HTTPException(status_code=400, detail="Prazo do banco de horas: de 1 a 12 meses")
     if values.get("valid_from"):
         values["valid_from"] = _valid_iso_date(values["valid_from"], "Vigência")
     doc = {"id": "default", **values, "updated_at": _now_iso(), "updated_by_name": current_user["name"]}
@@ -185,8 +187,12 @@ async def _calc_payslip(run: dict, contract: dict, settings: dict, inputs: list,
         months = None
     else:
         admission = parse_day(contract["admission_date"])
-        months = months_by_fifteen(max(admission, date(first.year, 1, 1)), date(first.year, 12, 31))
+        # o afastamento pelo INSS depois do 15º dia não gera avos (o INSS paga o abono)
+        leaves = [(parse_day(lo), parse_day(hi)) for lo, hi in await leave_ranges(contract["id"])]
+        months = months_by_fifteen(max(admission, date(first.year, 1, 1)), date(first.year, 12, 31), leaves)
         part = 1 if run["run_type"] == "DECIMO_1" else 2
+        if part == 2:  # médias das variáveis de janeiro a novembro
+            ctx["variable_average"] = await variable_average(contract["id"], f"{first.year}-01", f"{first.year}-11")
         first_paid = await _first_13th_paid(contract["id"], first.year) if part == 2 else 0.0
         result = compute_13th_payslip(ctx, part, months, first_paid, inputs, settings)
     events = result.pop("events")

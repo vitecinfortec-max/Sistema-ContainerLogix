@@ -6,7 +6,7 @@ import { StatCard, StatGrid, DataCard, EmptyState, StatusPill } from '../compone
 import { BarsChart, CHART_COLORS, DonutChart } from '../components/Charts';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
-import { competenceLabel, fmtDate, formatMoney } from '../components/HRKit';
+import { competenceLabel, fmtDate, fmtMinutes, formatMoney } from '../components/HRKit';
 import { toast } from 'sonner';
 import {
   Contact, Users, PauseCircle, Plane, Wallet, UserPlus, UserMinus, Hourglass, TreePalm, FileBadge, Cake, WalletCards,
@@ -93,6 +93,14 @@ export default function HRDashboardPage() {
               <>
                 <span className="truncate"><span className="font-medium">{d.person_name}</span> <span className="text-slate-500 dark:text-slate-400">{d.description || d.doc_type.replace(/_/g, ' ').toLowerCase()}</span></span>
                 <StatusPill tone={d.status === 'VENCIDO' ? 'red' : 'amber'}>{d.status === 'VENCIDO' ? 'vencido' : 'vence'} {fmtDate(d.expiry_date)}</StatusPill>
+              </>
+            )} />
+          <AlertList title="Banco de horas vencido ou vencendo" icon={Hourglass} items={data.time_bank || []} empty="Nenhuma hora perto do prazo"
+            onMore={() => navigate('/rh/banco-horas')} testId="hr-dash-time-bank"
+            render={(b) => (
+              <>
+                <span className="truncate"><span className="font-medium">{b.person_name}</span> <span className="text-slate-500 dark:text-slate-400">saldo {fmtMinutes(b.balance)}</span></span>
+                <StatusPill tone={b.expired ? 'red' : 'amber'}>{b.expired ? `${fmtMinutes(b.expired)} vencidas` : `${fmtMinutes(b.expiring)} vencem ${fmtDate(b.next_expiry)}`}</StatusPill>
               </>
             )} />
           <AlertList title="Aniversariantes do mês" icon={Cake} items={data.birthdays} empty="Nenhum aniversariante este mês" testId="hr-dash-birthdays"

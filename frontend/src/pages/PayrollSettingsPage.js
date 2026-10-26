@@ -35,6 +35,12 @@ const SIMPLE_FIELDS = [
     ['family_allowance_limit', 'Salário-família: remuneração até (R$)'],
     ['family_allowance_value', 'Salário-família: valor por filho (R$)'],
   ]],
+  ['Encargos da empresa (custo da folha) e banco de horas', [
+    ['employer_inss_rate', 'INSS patronal (%)'],
+    ['rat_rate', 'RAT/GILRAT ajustado pelo FAP (%)'],
+    ['third_party_rate', 'Terceiros - Sistema S, salário-educação (%)'],
+    ['time_bank_months', 'Banco de horas: prazo para compensar (meses)'],
+  ], 'Optante do Simples Nacional (anexos I a III e V): coloque 0 nos três encargos. O banco de horas vence em 6 meses no acordo individual e em até 12 no coletivo.'],
 ];
 
 export default function PayrollSettingsPage() {
@@ -112,8 +118,9 @@ export default function PayrollSettingsPage() {
             hint="A última faixa não tem limite (deixe em branco)." />
         </FormSection>
 
-        {SIMPLE_FIELDS.map(([title, fields]) => (
+        {SIMPLE_FIELDS.map(([title, fields, hint]) => (
           <FormSection key={title} title={title}>
+            {hint && <p className="text-[12px] text-slate-500 mb-3">{hint}</p>}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {fields.map(([k, lbl, type]) => (
                 <div key={k}>

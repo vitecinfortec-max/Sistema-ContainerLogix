@@ -329,7 +329,10 @@ def generate_work_contract_pdf(contract: dict, person: dict, company: dict) -> b
     def esc(value) -> str:
         return xml_escape(str(value)) if value not in (None, "") else "-"
 
-    experience_days = int(contract.get("experience_days") or 0)
+    # prazo inicial da experiência; com prorrogação registrada, o total vai no termo
+    total_days = int(contract.get("experience_days") or 0)
+    experience_days = int(contract.get("experience_initial_days") or total_days)
+    extended = total_days > experience_days
     is_experience = contract.get("contract_type") == "EXPERIENCIA" or experience_days > 0
     title = "Contrato de Trabalho a Título de Experiência" if is_experience else "Contrato Individual de Trabalho"
     driver = contract.get("person_type") == "MOTORISTA"
@@ -344,9 +347,10 @@ def generate_work_contract_pdf(contract: dict, person: dict, company: dict) -> b
     elements.extend(_pdf_section_title("Empregado(a)", doc.width))
     elements.append(_pdf_info_grid([
         ("Nome", contract.get("person_name"), 2), ("CPF", contract.get("person_cpf")), ("RG", person.get("rg")),
-        ("Nascimento", fmt_date(person.get("birth_date"))), ("PIS", contract.get("pis")),
+        ("Nascimento", fmt_date(person.get("birth_date"))), ("Nacionalidade", person.get("nationality")),
+        ("Estado civil", person.get("marital_status")), ("PIS", contract.get("pis")),
         ("CTPS", contract.get("ctps_number")), ("Série", contract.get("ctps_series")),
-        ("Endereço", _person_address(person) or "-", 4),
+        ("Endereço", _person_address(person) or "-", 2),
     ], doc.width, cols=4))
     elements.append(Spacer(1, 8))
     elements.append(Paragraph(
@@ -423,7 +427,7 @@ def generate_work_contract_pdf(contract: dict, person: dict, company: dict) -> b
 
     if is_experience and experience_days < 90:
         first_end = admission + timedelta(days=experience_days - 1)
-        final_end = admission + timedelta(days=89)
+        final_end = admission + timedelta(days=(total_days if extended else 90) - 1)
         elements.append(PageBreak())
         elements.extend(_build_pdf_header(styles, download_logo(company), "Termo de Prorrogação do Contrato de Experiência",
                                           generation_info=f"Matrícula {contract.get('contract_number')}", company=company, content_width=doc.width))
@@ -432,11 +436,13 @@ def generate_work_contract_pdf(contract: dict, person: dict, company: dict) -> b
             f"Por mútuo acordo, o contrato de experiência celebrado em <b>{fmt_date(admission.isoformat())}</b> entre "
             f"<b>{esc(company.get('name'))}</b> e <b>{esc(contract.get('person_name'))}</b>, CPF {esc(contract.get('person_cpf'))}, "
             f"com término previsto para <b>{fmt_date(first_end.isoformat())}</b>, fica prorrogado por mais "
-            f"<b>{90 - experience_days} dias</b>, de <b>{fmt_date((first_end + timedelta(days=1)).isoformat())}</b> a "
+            f"<b>{(final_end - first_end).days} dias</b>, de <b>{fmt_date((first_end + timedelta(days=1)).isoformat())}</b> a "
             f"<b>{fmt_date(final_end.isoformat())}</b>, mantidas as demais cláusulas (arts. 445, parágrafo único, e 451 da CLT).",
             text_style))
         elements.append(Spacer(1, 10))
-        elements.append(Paragraph(f"{esc(company.get('address'))}, ____ de ______________ de ______.", _paragraph_style(styles, 9.5)))
+        signed = (f"{esc(company.get('address'))}, {_long_date(contract['experience_extended_at'][:10])}." if extended
+                  and contract.get("experience_extended_at") else f"{esc(company.get('address'))}, ____ de ______________ de ______.")
+        elements.append(Paragraph(signed, _paragraph_style(styles, 9.5)))
         elements.append(_pdf_signatures([("Empregadora", company["name"]), ("Empregado(a)", contract.get("person_name") or "")],
                                         doc.width, space_above=44))
         elements.append(_pdf_signatures([("Testemunha 1", "Nome / CPF"), ("Testemunha 2", "Nome / CPF")], doc.width, space_above=36))

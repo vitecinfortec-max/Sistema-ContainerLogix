@@ -15,12 +15,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
 from hr_payroll import (
-    CONTRACT_TYPES, MANUAL_EVENT_CODES, NOTICE_TYPES, TERMINATION_TYPES, age_on,
-    compute_termination, compute_vacation, merge_settings, overlap_days, parse_day, r2, vacation_periods,
+    CONTRACT_TYPES, MANUAL_EVENT_CODES, NOTICE_TYPES, TERMINATION_TYPES, VARIABLE_EVENT_CODES, add_months, age_on,
+    compute_termination, compute_vacation, employer_charges, merge_settings, overlap_days, parse_day, r2, time_bank_status,
+    vacation_periods,
 )
 from models import (
-    HRContractCreate, HRDocumentCreate, HROccurrenceCreate, HRPositionCreate, HRTermination, HRTimeBankCreate,
-    HRVacationCreate, HRPayrollPay,
+    HRContractCreate, HRDocumentCreate, HRExperienceExtension, HROccurrenceCreate, HRPositionCreate, HRTermination,
+    HRTimeBankCreate, HRVacationCreate, HRPayrollPay,
 )
 from period_reports import Column, Section, MONEY, DAY, INT, pdf_response, excel_response, period_text
 from reports import format_currency, merge_company, today_brt
@@ -119,6 +120,44 @@ async def upload_hr_file(file: UploadFile = File(...), current_user: dict = Depe
 async def load_payroll_settings() -> dict:
     stored = await db.hr_payroll_settings.find_one({"id": "default"}, {"_id": 0})
     return merge_settings(stored)
+
+
+async def variable_average(contract_id: str, first_competence: str, last_competence: str) -> float:
+    """Média mensal das variáveis (horas extras, adicional noturno, DSR,
+    comissões) nos contracheques mensais de folhas fechadas/pagas entre as
+    competências: o total dividido pelos meses que tiveram contracheque."""
+    runs = {r["id"] for r in await db.hr_payroll_runs.find(
+        {"run_type": "MENSAL", "status": {"$ne": "ABERTA"}, "competence": {"$gte": first_competence, "$lte": last_competence}},
+        {"_id": 0, "id": 1}).to_list(None)}
+    if not runs:
+        return 0.0
+    slips = await db.hr_payslips.find({"contract_id": contract_id, "run_id": {"$in": list(runs)}}, {"_id": 0, "events": 1}).to_list(None)
+    if not slips:
+        return 0.0
+    total = sum(e["value"] for s in slips for e in s.get("events") or [] if e.get("code") in VARIABLE_EVENT_CODES)
+    return r2(total / len(slips))
+
+
+def competence_window(day: date, months: int) -> tuple:
+    """As `months` competências fechadas antes do mês de `day` (AAAA-MM)."""
+    last = add_months(date(day.year, day.month, 1), -1)
+    first = add_months(last, -(months - 1))
+    return first.strftime("%Y-%m"), last.strftime("%Y-%m")
+
+
+async def leave_ranges(contract_id: str) -> list:
+    """Afastamentos pelo INSS (doença/acidente): os dias depois do 15º, que o
+    INSS paga - não contam para os avos do 13º. Sem data final, até hoje+5 anos."""
+    out = []
+    for o in await db.hr_occurrences.find({"contract_id": contract_id, "occurrence_type": {"$in": list(LEAVE_TYPES)}},
+                                          {"_id": 0, "start_date": 1, "end_date": 1}).to_list(None):
+        start = parse_day(o.get("start_date"))
+        if not start:
+            continue
+        end = parse_day(o.get("end_date")) or date(_today().year + 5, 12, 31)
+        if end >= start + timedelta(days=15):
+            out.append(((start + timedelta(days=15)).isoformat(), end.isoformat()))
+    return out
 
 
 # ---------------------------------------------------------------- Cargos e Salários
@@ -377,6 +416,8 @@ async def update_contract(contract_id: str, data: HRContractCreate, current_user
     if (data.person_type, data.person_id) != (current["person_type"], current["person_id"]):
         raise HTTPException(status_code=400, detail="A pessoa do contrato não pode ser trocada: faça uma nova admissão")
     fields = await _validate_contract(data, contract_id)
+    if current.get("experience_initial_days") and fields["experience_days"] != current.get("experience_days"):
+        raise HTTPException(status_code=400, detail="A experiência já foi prorrogada: o prazo não muda mais")
     fields["updated_at"] = _now_iso()
     await db.hr_contracts.update_one({"id": contract_id}, {"$set": fields})
     updated = await get_contract(contract_id)
@@ -403,6 +444,28 @@ async def delete_contract(contract_id: str, current_user: dict = Depends(get_cur
         raise HTTPException(status_code=400, detail=f"Contrato com histórico ({', '.join(used)}): em vez de excluir, registre o desligamento")
     await db.hr_contracts.delete_one({"id": contract_id})
     return {"message": "Contrato excluído"}
+
+
+@api_router.post("/hr/contracts/{contract_id}/extend-experience")
+async def extend_experience(contract_id: str, data: HRExperienceExtension, current_user: dict = Depends(get_current_admin_user)):
+    """Prorroga a experiência uma única vez, antes do fim, até 90 dias no total
+    (arts. 445 e 451 da CLT). O prazo inicial fica guardado para o contrato e o
+    termo de prorrogação em PDF."""
+    contract = await get_contract(contract_id)
+    days = int(contract.get("experience_days") or 0)
+    if contract["status"] == "DESLIGADO" or not days:
+        raise HTTPException(status_code=400, detail="O contrato não está em experiência")
+    if contract.get("experience_initial_days"):
+        raise HTTPException(status_code=400, detail="A experiência só pode ser prorrogada uma vez")
+    if _today() > date.fromisoformat(contract["experience_end"]):
+        raise HTTPException(status_code=400, detail="A experiência já terminou: o contrato passou a prazo indeterminado")
+    if data.total_days <= days or data.total_days > 90:
+        raise HTTPException(status_code=400, detail=f"O novo prazo total vai de {days + 1} a 90 dias")
+    end = (date.fromisoformat(contract["admission_date"]) + timedelta(days=data.total_days - 1)).isoformat()
+    await db.hr_contracts.update_one({"id": contract_id}, {"$set": {
+        "experience_initial_days": days, "experience_days": data.total_days, "experience_end": end,
+        "experience_extended_at": _now_iso(), "experience_extended_by_name": current_user["name"], "updated_at": _now_iso()}})
+    return await get_contract(contract_id)
 
 
 @api_router.put("/hr/contracts/{contract_id}/status")
@@ -439,7 +502,15 @@ async def _vacation_state(contract: dict, until: date) -> list:
     for p in periods:
         first, last = date.fromisoformat(p["start"]), date.fromisoformat(p["end"])
         absences[p["start"]] = int(sum(occurrence_days_in(o, first, last) for o in occurrences))
-    return vacation_periods(contract.get("admission_date"), until, used, absences, settled)
+    periods = vacation_periods(contract.get("admission_date"), until, used, absences, settled)
+    # Art. 133, IV: mais de 6 meses de benefício do INSS no período aquisitivo
+    # tira o direito às férias (o novo período começa na volta) - fica o aviso
+    leaves = await leave_ranges(contract["id"])
+    for p in periods:
+        first, last = date.fromisoformat(p["start"]), min(date.fromisoformat(p["end"]), until)
+        p["inss_leave_days"] = sum(overlap_days(parse_day(lo), parse_day(hi), first, last) for lo, hi in leaves)
+        p["inss_leave_warning"] = p["inss_leave_days"] > 180
+    return periods
 
 
 def occurrence_days_in(occ: dict, first: date, last: date) -> float:
@@ -486,6 +557,8 @@ async def termination_preview(contract: dict, data: HRTermination, settings: dic
         "current_period_absences": current["absences"] if current else 0,
         "first_13th_paid": r2(first_13th), "fgts_balance": fgts_balance,
         "experience_end": contract.get("experience_end"),
+        "variable_average": await variable_average(contract["id"], *competence_window(end, 12)),
+        "leave_ranges": await leave_ranges(contract["id"]),
     }
     calc = compute_termination(ctx, settings)
     return {
@@ -510,7 +583,8 @@ async def terminate_contract(contract_id: str, data: HRTermination, current_user
     await db.hr_contracts.update_one({"id": contract_id}, {"$set": {"status": "DESLIGADO", "termination": termination, "updated_at": _now_iso()}})
     await _sync_employee(contract, "DESLIGADO")
     # férias ainda não pagas deixam de valer: entram na rescisão
-    await db.hr_vacations.update_many({"contract_id": contract_id, "status": "PROGRAMADA"}, {"$set": {"status": "CANCELADA", "updated_at": _now_iso()}})
+    await db.hr_vacations.update_many({"contract_id": contract_id, "status": "PROGRAMADA"},
+                                      {"$set": {"status": "CANCELADA", "cancelled_by_termination": True, "updated_at": _now_iso()}})
     return await get_contract(contract_id)
 
 
@@ -526,6 +600,9 @@ async def reinstate_contract(contract_id: str, current_user: dict = Depends(get_
         raise HTTPException(status_code=400, detail="A pessoa já tem outro contrato ativo")
     await db.hr_contracts.update_one({"id": contract_id}, {"$set": {"status": "ATIVO", "termination": None, "updated_at": _now_iso()}})
     await _sync_employee(contract, "ATIVO")
+    # as férias que o desligamento cancelou voltam a valer
+    await db.hr_vacations.update_many({"contract_id": contract_id, "status": "CANCELADA", "cancelled_by_termination": True},
+                                      {"$set": {"status": "PROGRAMADA", "cancelled_by_termination": False, "updated_at": _now_iso()}})
     return await get_contract(contract_id)
 
 
@@ -620,6 +697,17 @@ async def _validate_vacation(data: HRVacationCreate, current_id: Optional[str]) 
     if already + data.days + data.sell_days > period["entitled"]:
         left = period["entitled"] - already
         raise HTTPException(status_code=400, detail=f"Saldo do período: {left} dia(s) (direito de {period['entitled']} dias)")
+    # Art. 143: abono de até 1/3 do direito; art. 134, § 1º: até 3 períodos,
+    # um deles com 14 dias ou mais
+    if data.sell_days > period["entitled"] // 3:
+        raise HTTPException(status_code=400, detail=f"O abono pecuniário é de até 1/3 do direito ({int(period['entitled'] // 3)} dias)")
+    others = await db.hr_vacations.find({"contract_id": contract["id"], "acquisition_start": acquisition, "status": {"$ne": "CANCELADA"},
+                                         **({"id": {"$ne": current_id}} if current_id else {})}, {"_id": 0, "days": 1}).to_list(None)
+    if len(others) >= 3:
+        raise HTTPException(status_code=400, detail="As férias de um período podem ser divididas em no máximo 3 partes")
+    left_after = period["entitled"] - already - data.days - data.sell_days
+    if data.days < 14 and not any((o.get("days") or 0) >= 14 for o in others) and left_after < 14:
+        raise HTTPException(status_code=400, detail="Uma das partes das férias precisa ter 14 dias ou mais (art. 134, § 1º, da CLT)")
     end = start + timedelta(days=data.days - 1)
     clash = {"contract_id": contract["id"], "status": {"$ne": "CANCELADA"}, "start_date": {"$lte": end.isoformat()}, "end_date": {"$gte": start.isoformat()}}
     if current_id:
@@ -628,7 +716,8 @@ async def _validate_vacation(data: HRVacationCreate, current_id: Optional[str]) 
         raise HTTPException(status_code=400, detail="Já existem férias nesse intervalo")
     payment_date = _valid_iso_date(data.payment_date, "Data do pagamento") if _clean(data.payment_date) else (start - timedelta(days=2)).isoformat()
     settings = await load_payroll_settings()
-    calc = compute_vacation(contract_ctx(contract, settings, start), data.days, data.sell_days, data.advance_13th, settings)
+    calc = await _vacation_calc({"start_date": start.isoformat(), "days": data.days, "sell_days": data.sell_days,
+                                 "advance_13th": data.advance_13th}, contract, settings)
     fields = {
         **contract_snapshot(contract),
         "acquisition_start": acquisition, "acquisition_end": period["end"], "concession_deadline": period["deadline"],
@@ -671,17 +760,19 @@ async def create_vacation(data: HRVacationCreate, current_user: dict = Depends(g
     return doc
 
 
-def _vacation_calc(vacation: dict, contract: dict, settings: dict) -> dict:
+async def _vacation_calc(vacation: dict, contract: dict, settings: dict) -> dict:
+    """Recibo de férias com a média das variáveis dos 12 meses anteriores."""
     start = date.fromisoformat(vacation["start_date"])
-    return compute_vacation(contract_ctx(contract, settings, start), vacation["days"], vacation.get("sell_days") or 0,
-                            bool(vacation.get("advance_13th")), settings)
+    ctx = {**contract_ctx(contract, settings, start),
+           "variable_average": await variable_average(contract["id"], *competence_window(start, 12))}
+    return compute_vacation(ctx, vacation["days"], vacation.get("sell_days") or 0, bool(vacation.get("advance_13th")), settings)
 
 
 async def _recalc_programmed_vacations(contract: dict):
     """Férias ainda não pagas recalculam com o salário e as tabelas atuais."""
     settings = await load_payroll_settings()
     for v in await db.hr_vacations.find({"contract_id": contract["id"], "status": "PROGRAMADA"}, {"_id": 0}).to_list(None):
-        await db.hr_vacations.update_one({"id": v["id"]}, {"$set": {"calc": _vacation_calc(v, contract, settings)}})
+        await db.hr_vacations.update_one({"id": v["id"]}, {"$set": {"calc": await _vacation_calc(v, contract, settings)}})
 
 
 async def _get_vacation(vacation_id: str) -> dict:
@@ -720,7 +811,7 @@ async def pay_vacation(vacation_id: str, data: HRPayrollPay, current_user: dict 
         raise HTTPException(status_code=400, detail="Só férias Programadas podem ser pagas")
     paid_at = _valid_iso_date(data.payment_date, "Data do pagamento")
     # paga pelo valor de hoje (o salário ou as tabelas podem ter mudado desde o lançamento)
-    calc = _vacation_calc(current, await get_contract(current["contract_id"]), await load_payroll_settings())
+    calc = await _vacation_calc(current, await get_contract(current["contract_id"]), await load_payroll_settings())
     await db.hr_vacations.update_one({"id": vacation_id}, {"$set": {"status": "PAGA", "paid_at": paid_at, "payment_date": paid_at, "calc": calc,
                                                                   "paid_by_name": current_user["name"], "updated_at": _now_iso()}})
     return await _get_vacation(vacation_id)
@@ -854,18 +945,20 @@ async def list_time_bank(search: Optional[str] = None, contract_id: Optional[str
 
 @api_router.get("/hr/time-bank/balances")
 async def time_bank_balances(current_user: dict = Depends(get_current_admin_user)):
-    balances = {}
+    """Saldo por pessoa, com as horas vencidas (passaram do prazo de
+    compensação sem ser compensadas: pagar como hora extra) e as que vencem em 30 dias."""
+    settings = await load_payroll_settings()
+    months = int(settings.get("time_bank_months") or 6)
+    today = _today()
+    by_contract = {}
     for e in await db.hr_time_bank.find({}, {"_id": 0}).to_list(None):
-        b = balances.setdefault(e["contract_id"], {"contract_id": e["contract_id"], "person_name": e.get("person_name"),
-                                                   "credit": 0, "debit": 0, "last_date": None})
-        if e["minutes"] >= 0:
-            b["credit"] += e["minutes"]
-        else:
-            b["debit"] += -e["minutes"]
-        b["last_date"] = max(b["last_date"] or "", e["date"])
-    for b in balances.values():
-        b["balance"] = b["credit"] - b["debit"]
-    return sorted(balances.values(), key=lambda b: (b["person_name"] or "").lower())
+        by_contract.setdefault(e["contract_id"], []).append(e)
+    out = []
+    for contract_id, entries in by_contract.items():
+        status = time_bank_status(entries, today, months)
+        out.append({"contract_id": contract_id, "person_name": entries[0].get("person_name"),
+                    "last_date": max(e["date"] for e in entries), "months": months, **status})
+    return sorted(out, key=lambda b: (b["person_name"] or "").lower())
 
 
 @api_router.post("/hr/time-bank")
@@ -1003,6 +1096,7 @@ async def hr_dashboard(current_user: dict = Depends(get_current_admin_user)):
             vacations.append({k: row[k] for k in ("contract_id", "person_name", "position_name", "overdue", "due_soon", "available_days", "next_deadline")})
 
     documents = [d for d in await list_documents(None, None, None, None, current_user) if d["status"] in ("VENCIDO", "A_VENCER")]
+    time_bank = [b for b in await time_bank_balances(current_user) if b["expired"] or b["expiring"]]
     on_vacation = await db.hr_vacations.count_documents({"status": {"$ne": "CANCELADA"}, "start_date": {"$lte": today.isoformat()},
                                                          "end_date": {"$gte": today.isoformat()}})
     last_run = await db.hr_payroll_runs.find({"run_type": "MENSAL"}, {"_id": 0}).sort([("competence", -1)]).to_list(1)
@@ -1022,6 +1116,7 @@ async def hr_dashboard(current_user: dict = Depends(get_current_admin_user)):
         "vacations": vacations,
         "documents": documents[:20],
         "documents_count": len(documents),
+        "time_bank": time_bank,
         "birthdays": await _birthdays(contracts, today.month),
         "last_payroll": last_run[0] if last_run else None,
     }
@@ -1095,27 +1190,52 @@ async def build_hr_report(kind: str, date_from=None, date_to=None, department=No
         if dep_rx:
             rx = re.compile(dep_rx["$regex"], re.I)
             slips = [s for s in slips if rx.match(s.get("department") or "")]
+        settings = await load_payroll_settings()
+        # encargos da empresa (INSS patronal + RAT + terceiros) sobre a base do INSS
+        for s in slips:
+            s.setdefault("totals", {})["charges"] = employer_charges((s.get("totals") or {}).get("inss_base"), settings)
         by_month, by_dep = {}, {}
         for s in slips:
             run = runs[s["run_id"]]
             t = s.get("totals") or {}
             for key, bucket in ((f"{run['competence']} {run['run_type']}", by_month), (s.get("department") or "Sem setor", by_dep)):
                 b = bucket.setdefault(key, {"label": key, "competence": run["competence"], "run_type": run["run_type"], "count": 0,
-                                            "gross": 0.0, "deductions": 0.0, "net": 0.0, "inss": 0.0, "irrf": 0.0, "fgts": 0.0})
+                                            "gross": 0.0, "deductions": 0.0, "net": 0.0, "inss": 0.0, "irrf": 0.0, "fgts": 0.0, "charges": 0.0})
                 b["count"] += 1
-                for f in ("gross", "deductions", "net", "inss", "irrf", "fgts"):
+                for f in ("gross", "deductions", "net", "inss", "irrf", "fgts", "charges"):
                     b[f] += t.get(f) or 0
         from hr_payroll import RUN_TYPES
 
         def row(b, label):
             return [label, b["count"], r2(b["gross"]), r2(b["deductions"]), r2(b["net"]), r2(b["inss"]), r2(b["irrf"]), r2(b["fgts"]),
-                    r2(b["gross"] + b["fgts"])]
-        totals = {f: r2(sum((s.get("totals") or {}).get(f) or 0 for s in slips)) for f in ("gross", "deductions", "net", "inss", "irrf", "fgts")}
-        cols = lambda first: [Column(first, width=26), Column("Contracheques", INT, 11), Column("Proventos", MONEY, 13), Column("Descontos", MONEY, 13),
+                    r2(b["charges"]), r2(b["gross"] + b["fgts"] + b["charges"])]
+        totals = {f: r2(sum((s.get("totals") or {}).get(f) or 0 for s in slips))
+                  for f in ("gross", "deductions", "net", "inss", "irrf", "fgts", "charges")}
+        cols = lambda first: [Column(first, width=24), Column("Contracheques", INT, 11), Column("Proventos", MONEY, 13), Column("Descontos", MONEY, 13),
                               Column("Líquido", MONEY, 13), Column("INSS", MONEY, 12), Column("IRRF", MONEY, 12), Column("FGTS", MONEY, 12),
-                              Column("Custo (prov.+FGTS)", MONEY, 14)]
+                              Column("Encargos", MONEY, 12), Column("Custo", MONEY, 14)]
         total_row = ["TOTAL", len(slips), totals["gross"], totals["deductions"], totals["net"], totals["inss"], totals["irrf"], totals["fgts"],
-                     r2(totals["gross"] + totals["fgts"])]
+                     totals["charges"], r2(totals["gross"] + totals["fgts"] + totals["charges"])]
+
+        # férias pagas e rescisões no período também custam (fora da folha)
+        vq = {"status": "PAGA", **_period_query("paid_at", date_from, date_to)}
+        others = []
+        for v in await db.hr_vacations.find(vq, {"_id": 0}).to_list(None):
+            c = v.get("calc") or {}
+            base = (c.get("vacation_pay") or 0) + (c.get("one_third") or 0)
+            others.append(["Férias", v.get("person_name"), v.get("paid_at"), r2(c.get("gross")), r2(c.get("fgts")),
+                           employer_charges(base, settings), v.get("department")])
+        tq = {"status": "DESLIGADO", **_period_query("termination.termination_date", date_from, date_to)}
+        for ct in await db.hr_contracts.find(tq, {"_id": 0}).to_list(None):
+            c = (ct.get("termination") or {}).get("calc") or {}
+            base = sum(i["value"] for i in c.get("items") or [] if i["label"] in ("Saldo de salário", "13º salário proporcional"))
+            others.append(["Rescisão", ct.get("person_name"), ct["termination"].get("termination_date"), r2(c.get("gross")),
+                           r2((c.get("fgts_month") or 0) + (c.get("fgts_fine") or 0)), employer_charges(base, settings), ct.get("department")])
+        if dep_rx:
+            rx = re.compile(dep_rx["$regex"], re.I)
+            others = [o for o in others if rx.match(o[6] or "")]
+        others = [o[:6] + [r2(o[3] + o[4] + o[5])] for o in sorted(others, key=lambda o: o[2] or "")]
+        others_cost = r2(sum(o[6] for o in others))
         sections = [
             Section("Por competência", cols("Competência"),
                     [row(b, f"{b['competence'][5:]}/{b['competence'][:4]} - {RUN_TYPES.get(b['run_type'], b['run_type'])}")
@@ -1123,12 +1243,21 @@ async def build_hr_report(kind: str, date_from=None, date_to=None, department=No
                     total=total_row if slips else None, empty_text="Nenhuma folha no período.", sheet_name="Por competência"),
             Section("Por setor", cols("Setor"), [row(b, b["label"]) for b in sorted(by_dep.values(), key=lambda b: b["label"].lower())],
                     total=total_row if slips else None, empty_text="Nenhuma folha no período.", sheet_name="Por setor"),
+            Section("Férias pagas e rescisões", [Column("Tipo", width=12), Column("Nome", width=28), Column("Data", DAY, 11),
+                                                 Column("Bruto", MONEY, 13), Column("FGTS (+ multa)", MONEY, 14), Column("Encargos", MONEY, 12),
+                                                 Column("Custo", MONEY, 14)],
+                    others, total=["TOTAL", None, None, r2(sum(o[3] for o in others)), r2(sum(o[4] for o in others)),
+                                   r2(sum(o[5] for o in others)), others_cost] if others else None,
+                    empty_text="Nenhuma férias paga ou rescisão no período.", sheet_name="Férias e rescisões"),
         ]
+        payroll_cost = r2(totals["gross"] + totals["fgts"] + totals["charges"])
         info = [("Proventos", format_currency(totals["gross"], "BRL")), ("Líquido", format_currency(totals["net"], "BRL")),
-                ("FGTS", format_currency(totals["fgts"], "BRL")), ("Custo", format_currency(totals["gross"] + totals["fgts"], "BRL"))]
+                ("FGTS", format_currency(totals["fgts"], "BRL")), ("Encargos", format_currency(totals["charges"], "BRL")),
+                ("Custo total", format_currency(payroll_cost + others_cost, "BRL"))]
         months = lambda d: f"{d[5:7]}/{d[:4]}" if d else None
         subtitle = f"Competência: {months(date_from) or 'início'} a {months(date_to) or 'hoje'}" if (date_from or date_to) else None
-        return {"summary": {**totals, "count": len(slips), "cost": r2(totals["gross"] + totals["fgts"])}, "sections": sections, "info": info,
+        return {"summary": {**totals, "count": len(slips), "cost": payroll_cost, "others_cost": others_cost,
+                            "total_cost": r2(payroll_cost + others_cost)}, "sections": sections, "info": info,
                 "subtitle": subtitle}
 
     if kind == "vacations":

@@ -120,7 +120,7 @@ export default function HRTimeBankPage() {
           <DataCard title="Saldos" count={filteredBalances.length} className="xl:col-span-1">
             {filteredBalances.length > 0 ? (
               <table className="data-table">
-                <thead><tr><th>Funcionário</th><th className="!text-right">Créditos</th><th className="!text-right">Débitos</th><th className="!text-right">Saldo</th></tr></thead>
+                <thead><tr><th>Funcionário</th><th className="!text-right">Créditos</th><th className="!text-right">Débitos</th><th className="!text-right">Saldo</th><th className="!text-right">Vencidas</th></tr></thead>
                 <tbody>
                   {filteredBalances.map((b) => (
                     <tr key={b.contract_id}>
@@ -128,6 +128,10 @@ export default function HRTimeBankPage() {
                       <td className="text-right tabular-nums">{fmtMinutes(b.credit)}</td>
                       <td className="text-right tabular-nums">{fmtMinutes(-b.debit)}</td>
                       <td className={`text-right tabular-nums cell-strong ${b.balance < 0 ? 'text-blue-600' : b.balance > 0 ? 'text-amber-600' : ''}`}>{fmtMinutes(b.balance)}</td>
+                      <td className="text-right tabular-nums" title={b.next_expiry ? `Próximo vencimento: ${fmtDate(b.next_expiry)} (prazo de ${b.months} meses)` : ''}>
+                        {b.expired ? <span className="text-destructive font-semibold">{fmtMinutes(b.expired)}</span> : '-'}
+                        {b.expiring ? <span className="block text-[11px] text-amber-600">{fmtMinutes(b.expiring)} vencem {fmtDate(b.next_expiry)}</span> : null}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

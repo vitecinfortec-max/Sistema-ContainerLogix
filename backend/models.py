@@ -108,6 +108,8 @@ class Driver(BaseModel):
     rg_issuer: Optional[str] = None
     rg_uf: Optional[str] = None
     birth_date: Optional[str] = None
+    nationality: Optional[str] = None  # sai no contrato de trabalho
+    marital_status: Optional[str] = None
     cnh_number: Optional[str] = None
     cnh_category: Optional[str] = None
     cnh_expiry: Optional[str] = None
@@ -134,6 +136,8 @@ class DriverCreate(BaseModel):
     rg_issuer: Optional[str] = None
     rg_uf: Optional[str] = None
     birth_date: Optional[str] = None
+    nationality: Optional[str] = None  # sai no contrato de trabalho
+    marital_status: Optional[str] = None
     cnh_number: Optional[str] = None
     cnh_category: Optional[str] = None
     cnh_expiry: Optional[str] = None
@@ -350,6 +354,8 @@ class Employee(BaseModel):
     cpf: str
     rg: Optional[str] = None
     birth_date: Optional[str] = None
+    nationality: Optional[str] = None  # sai no contrato de trabalho
+    marital_status: Optional[str] = None
     position: Optional[str] = None  # cargo/função
     department: Optional[str] = None  # setor
     admission_date: Optional[str] = None
@@ -370,6 +376,8 @@ class EmployeeCreate(BaseModel):
     cpf: str
     rg: Optional[str] = None
     birth_date: Optional[str] = None
+    nationality: Optional[str] = None  # sai no contrato de trabalho
+    marital_status: Optional[str] = None
     position: Optional[str] = None
     department: Optional[str] = None
     admission_date: Optional[str] = None
@@ -4206,6 +4214,10 @@ class HRPayrollSettings(BaseModel):
     vt_rate: float
     night_bonus_rate: float
     monthly_hours: float
+    employer_inss_rate: Optional[float] = None
+    rat_rate: Optional[float] = None
+    third_party_rate: Optional[float] = None
+    time_bank_months: Optional[float] = None
 
 
 class HRPayrollRunCreate(BaseModel):
@@ -4245,6 +4257,10 @@ class HROccurrenceCreate(BaseModel):
     cid: Optional[str] = None
     description: Optional[str] = None
     attachments: List[str] = Field(default_factory=list)
+
+
+class HRExperienceExtension(BaseModel):
+    total_days: int  # prazo total da experiência depois da prorrogação (até 90)
 
 
 class HRTimeBankCreate(BaseModel):

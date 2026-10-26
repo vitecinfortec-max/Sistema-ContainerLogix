@@ -244,6 +244,12 @@ export default function HRVacationsPage() {
                                   {fmtDate(p.start).slice(3)}: {PERIOD_LABELS[p.status]}{p.status !== 'QUITADO' ? ` (${fmtNumber(p.balance, 1)}d)` : ''}
                                 </StatusPill>
                               ))}
+                              {b.periods.some((p) => p.inss_leave_warning) && (
+                                <StatusPill tone="red" dot={false} className="text-[10px]"
+                                  title="Mais de 6 meses de afastamento pelo INSS no período aquisitivo: pelo art. 133, IV, da CLT o empregado perde as férias desse período e o novo período começa na volta. Confira com a contabilidade.">
+                                  afastamento &gt; 6 meses (art. 133)
+                                </StatusPill>
+                              )}
                             </div>
                           </td>
                           <td className="text-center tabular-nums cell-strong">{b.available_days}</td>

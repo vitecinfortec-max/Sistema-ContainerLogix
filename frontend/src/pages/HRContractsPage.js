@@ -66,6 +66,7 @@ export default function HRContractsPage() {
   const [saving, setSaving] = useState(false);
 
   const [termOpen, setTermOpen] = useState(false);
+  const [extendDays, setExtendDays] = useState(null);  // prorrogação da experiência: prazo total
   const [termForm, setTermForm] = useState(EMPTY_TERMINATION);
   const [termPreview, setTermPreview] = useState(null);
   const [termBusy, setTermBusy] = useState(false);
@@ -279,6 +280,20 @@ export default function HRContractsPage() {
     }
   };
 
+  // Prorroga a experiência uma vez, antes do fim, até 90 dias no total
+  const canExtend = !!(single && single.status !== 'DESLIGADO' && single.experience_days && !single.experience_initial_days
+    && single.experience_end >= today && single.experience_days < 90);
+  const extendExperience = async () => {
+    try {
+      await api.extendHRExperience(single.id, { total_days: Number(extendDays) });
+      toast.success('Experiência prorrogada. O termo de prorrogação sai no Contrato de trabalho (PDF).');
+      setExtendDays(null);
+      reload();
+    } catch (e) {
+      toast.error(errorDetail(e, 'Erro ao prorrogar'));
+    }
+  };
+
   const hasFilters = !!(search || statusFilter !== 'VIGENTE' || typeFilter);
   const pickerPeople = activeRecords(people);
   const isVigente = single && single.status !== 'DESLIGADO';
@@ -348,6 +363,7 @@ export default function HRContractsPage() {
                 tone="amber" onClick={toggleLeave} disabled={!isVigente} testId="hr-contract-leave-btn" />
               <ToolbarButton icon={UserX} label="Desligar (simular rescisão)" tone="red" onClick={openTermination} disabled={!isVigente} testId="hr-contract-terminate-btn" />
               <ToolbarButton icon={Undo2} label="Desfazer desligamento" tone="amber" onClick={reinstate} disabled={!single || single.status !== 'DESLIGADO'} testId="hr-contract-reinstate-btn" />
+              <ToolbarButton icon={Hourglass} label="Prorrogar experiência" tone="amber" onClick={() => setExtendDays(90)} disabled={!canExtend} testId="hr-contract-extend-btn" />
               <ToolbarDivider />
               <ToolbarButton icon={FileSignature} label="Contrato de trabalho (PDF)" tone="primary"
                 disabled={!single || !['CLT', 'EXPERIENCIA'].includes(single.contract_type)}
@@ -689,6 +705,27 @@ export default function HRContractsPage() {
       </Dialog>
 
       {/* Desligamento */}
+      <Dialog open={extendDays !== null} onOpenChange={(v) => !v && setExtendDays(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-base">Prorrogar experiência</DialogTitle>
+            <DialogDescription>
+              {single?.person_name}: {single?.experience_days} dias, até {fmtDate(single?.experience_end)}. A prorrogação é feita uma única vez,
+              antes do fim, e o total não passa de 90 dias.
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label className="mb-1.5 block">Prazo total da experiência (dias)</Label>
+            <Input type="number" min={(single?.experience_days || 0) + 1} max={90} value={extendDays ?? ''}
+              onChange={(e) => setExtendDays(e.target.value)} className="h-9 text-sm" data-testid="hr-extend-days" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExtendDays(null)}>Cancelar</Button>
+            <Button onClick={extendExperience} data-testid="hr-extend-confirm"><Hourglass className="w-4 h-4 mr-2" />Prorrogar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={termOpen} onOpenChange={(v) => !termBusy && setTermOpen(v)}>
         <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto" data-testid="hr-termination-dialog">
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">

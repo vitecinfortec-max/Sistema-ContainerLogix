@@ -46,7 +46,18 @@ DEFAULT_PAYROLL_SETTINGS = {
     "vt_rate": 6.0,
     "night_bonus_rate": 20.0,
     "monthly_hours": 220,
+    # Encargos da empresa sobre a folha (custo); optante do Simples Nacional
+    # (anexos I a III e V) não paga a contribuição patronal: zere as três
+    "employer_inss_rate": 20.0,
+    "rat_rate": 2.0,  # RAT/GILRAT já ajustado pelo FAP
+    "third_party_rate": 5.8,  # Sistema S, salário-educação, Incra
+    # Banco de horas: prazo para compensar (6 meses no acordo individual,
+    # até 12 no coletivo - art. 59, §§ 2º e 5º, da CLT)
+    "time_bank_months": 6,
 }
+
+# Variáveis que entram na média das férias, do 13º e da rescisão
+VARIABLE_EVENT_CODES = ("HE50", "HE100", "ADIC_NOTURNO", "DSR", "COMISSAO")
 
 CONTRACT_TYPES = {
     "CLT": "CLT",
@@ -78,6 +89,7 @@ EVENTS = {
     "SALARIO_FAMILIA": ("040", "Salário-família", "P", "AUTO", False, False, False, False),
     "DECIMO_1": ("050", "13º salário - 1ª parcela", "P", "AUTO", False, False, True, False),
     "DECIMO": ("051", "13º salário", "P", "AUTO", True, True, True, False),
+    "DECIMO_MEDIAS": ("052", "13º salário - médias de variáveis", "P", "AUTO", True, True, True, False),
     "FALTAS": ("101", "Faltas", "D", "DAYS", True, True, True, True),
     "DSR_FALTAS": ("102", "DSR sobre faltas", "D", "DAYS", True, True, True, True),
     "ATRASOS": ("103", "Atrasos", "D", "HOURS", True, True, True, True),
@@ -216,14 +228,19 @@ def add_months(day: date, months: int) -> date:
     return date(year, month, min(day.day, monthrange(year, month)[1]))
 
 
-def months_by_fifteen(start: date, end: date) -> int:
-    """Avos (1/12): cada mês do calendário com 15 dias ou mais trabalhados entre start e end."""
+def months_by_fifteen(start: date, end: date, excluded=()) -> int:
+    """Avos (1/12): cada mês do calendário com 15 dias ou mais trabalhados entre
+    start e end. `excluded`: intervalos (início, fim) que não contam - o
+    afastamento pelo INSS depois do 15º dia (quem paga é o INSS)."""
     if end < start:
         return 0
     count, cursor = 0, date(start.year, start.month, 1)
     while cursor <= end:
         last = date(cursor.year, cursor.month, monthrange(cursor.year, cursor.month)[1])
-        if overlap_days(start, end, cursor, last) >= 15:
+        worked = overlap_days(start, end, cursor, last)
+        for lo, hi in excluded:
+            worked -= overlap_days(max(lo, start), min(hi, end), cursor, last) if lo <= end and hi >= start else 0
+        if worked >= 15:
             count += 1
         cursor = last + timedelta(days=1)
     return count
@@ -421,6 +438,9 @@ def compute_13th_payslip(ctx: dict, part: int, months: int, first_paid: float, i
 
     if full:
         events.append(_event("DECIMO", full, f"{months}/12"))
+    average = (ctx.get("variable_average") or 0) / 12 * months
+    if average > 0:
+        events.append(_event("DECIMO_MEDIAS", average, f"{months}/12"))
     for item in inputs or []:
         code = item.get("code")
         if code in EVENTS and EVENTS[code][3] == "VALUE" and float(item.get("value") or 0) > 0:
@@ -444,18 +464,21 @@ def compute_vacation(ctx: dict, days: int, sell_days: int, advance_13th: bool, s
     (isento) e, se pedido, o adiantamento da 1ª parcela do 13º."""
     insal, peric = fixed_additions(ctx, s)
     monthly = (ctx.get("base_salary") or 0) + insal + peric
-    pay = r2(monthly / 30 * days)
+    average = ctx.get("variable_average") or 0
+    base_pay = r2(monthly / 30 * days)
+    average_pay = r2(average / 30 * days)
+    pay = r2(base_pay + average_pay)
     third = r2(pay / 3)
-    abono = r2(monthly / 30 * (sell_days or 0))
+    abono = r2((monthly + average) / 30 * (sell_days or 0))
     abono_third = r2(abono / 3)
     advance = r2(monthly / 2) if advance_13th else 0.0
     taxable = pay + third
     inss = 0.0 if ctx.get("contract_type") == "ESTAGIO" else calc_inss(taxable, s)
     irrf = calc_irrf(taxable, inss, ctx.get("irrf_dependents") or 0, 0, s)
-    items = [
-        {"label": f"Férias ({days} dias)", "kind": "P", "value": pay},
-        {"label": "1/3 constitucional sobre férias", "kind": "P", "value": third},
-    ]
+    items = [{"label": f"Férias ({days} dias)", "kind": "P", "value": base_pay}]
+    if average_pay:
+        items.append({"label": "Médias de variáveis sobre férias", "kind": "P", "value": average_pay})
+    items.append({"label": "1/3 constitucional sobre férias", "kind": "P", "value": third})
     if abono:
         items += [{"label": f"Abono pecuniário ({sell_days} dias)", "kind": "P", "value": abono},
                   {"label": "1/3 sobre abono pecuniário", "kind": "P", "value": abono_third}]
@@ -470,7 +493,8 @@ def compute_vacation(ctx: dict, days: int, sell_days: int, advance_13th: bool, s
     fgts_rate = s["fgts_apprentice_rate"] if ctx.get("contract_type") == "APRENDIZ" else s["fgts_rate"]
     fgts_base = 0.0 if ctx.get("contract_type") == "ESTAGIO" else taxable + advance
     return {
-        "monthly_base": r2(monthly), "vacation_pay": pay, "one_third": third, "abono": abono, "abono_third": abono_third,
+        "monthly_base": r2(monthly), "variable_average": r2(average), "average_pay": average_pay,
+        "vacation_pay": pay, "one_third": third, "abono": abono, "abono_third": abono_third,
         "advance_13th": advance, "inss": inss, "irrf": irrf["tax"], "irrf_base": irrf["base"],
         "items": items, "gross": gross, "deductions": deductions, "net": r2(gross - deductions),
         "fgts": r2(fgts_base * fgts_rate / 100),
@@ -548,7 +572,10 @@ def compute_termination(ctx: dict, s: dict) -> dict:
     admission = parse_day(ctx["admission_date"])
     end = parse_day(ctx["termination_date"])
     insal, peric = fixed_additions(ctx, s)
-    monthly = (ctx.get("base_salary") or 0) + insal + peric
+    salary = (ctx.get("base_salary") or 0) + insal + peric
+    # aviso, férias e 13º levam a média das variáveis; o saldo, só o salário
+    monthly = salary + (ctx.get("variable_average") or 0)
+    leaves = [(parse_day(lo), parse_day(hi)) for lo, hi in ctx.get("leave_ranges") or []]
     items = []
 
     def add(label, kind_, value, reference=""):
@@ -561,7 +588,7 @@ def compute_termination(ctx: dict, s: dict) -> dict:
     month_start = date(end.year, end.month, 1)
     month_last = date(end.year, end.month, monthrange(end.year, end.month)[1])
     worked_days = commercial_days(max(admission, month_start), end, month_last)
-    saldo = add("Saldo de salário", "P", monthly / 30 * worked_days, _days(worked_days))
+    saldo = add("Saldo de salário", "P", salary / 30 * worked_days, _days(worked_days))
 
     # Aviso prévio - ou, na experiência encerrada antes do prazo, a indenização
     # de metade dos dias que faltavam (art. 479 se a empresa dispensa; art.
@@ -586,7 +613,7 @@ def compute_termination(ctx: dict, s: dict) -> dict:
         aviso = add("Aviso prévio indenizado (metade)", "P", monthly / 30 * half, f"{_fmt_qty(half)} dias")
         projected_end = end + timedelta(days=int(half))
     elif kind == "PEDIDO" and notice == "NAO_CUMPRIDO":
-        add("Aviso prévio não cumprido", "D", monthly, "30 dias")
+        add("Aviso prévio não cumprido", "D", salary, "30 dias")
 
     # Férias vencidas (todos os tipos) e proporcionais (menos justa causa)
     overdue_days = ctx.get("vacation_balance_days") or 0
@@ -609,7 +636,7 @@ def compute_termination(ctx: dict, s: dict) -> dict:
     thirteenth = 0.0
     if kind != "JUSTA_CAUSA":
         year_start = max(admission, date(projected_end.year, 1, 1))
-        avos = months_by_fifteen(year_start, projected_end)
+        avos = months_by_fifteen(year_start, projected_end, leaves)
         thirteenth = add("13º salário proporcional", "P", monthly / 12 * avos, f"{avos}/12")
         first_paid = ctx.get("first_13th_paid") or 0
         if first_paid and thirteenth:
@@ -637,9 +664,51 @@ def compute_termination(ctx: dict, s: dict) -> dict:
     withdraw = {"SEM_JUSTA_CAUSA": "100% do saldo", "ACORDO": "até 80% do saldo", "FIM_CONTRATO": "100% do saldo"}.get(kind, "não pode sacar")
     return {
         "items": items, "gross": gross, "deductions": deductions, "net": r2(gross - deductions),
-        "monthly_base": r2(monthly), "notice_days": n_days, "projected_end": projected_end.isoformat(),
+        "monthly_base": r2(salary), "variable_average": r2(ctx.get("variable_average") or 0),
+        "notice_days": n_days, "projected_end": projected_end.isoformat(),
         "early_experience": early_experience, "experience_remaining_days": remaining,
         "fgts_month": fgts_month, "fgts_balance": fgts_balance, "fgts_fine_rate": fine_rate,
         "fgts_fine": r2(fgts_balance * fine_rate / 100), "fgts_withdraw": withdraw,
         "unemployment_insurance": kind in ("SEM_JUSTA_CAUSA",),
     }
+
+
+# ---------------------------------------------------------------- Encargos e banco de horas
+
+def employer_charges(inss_base: float, s: dict) -> float:
+    """INSS patronal + RAT + terceiros sobre a base do INSS (custo da empresa)."""
+    rate = (s.get("employer_inss_rate") or 0) + (s.get("rat_rate") or 0) + (s.get("third_party_rate") or 0)
+    return r2((inss_base or 0) * rate / 100)
+
+
+def time_bank_status(entries: list, today: date, months: int, warn_days: int = 30) -> dict:
+    """Saldo do banco de horas com vencimento: cada débito compensa os créditos
+    mais antigos primeiro; o crédito que passou do prazo sem compensar venceu
+    (tem de ser pago como hora extra)."""
+    credits = []  # [data do crédito, minutos ainda não compensados]
+    debit = 0
+    for e in sorted(entries, key=lambda e: e["date"]):
+        if e["minutes"] >= 0:
+            credits.append([parse_day(e["date"]), e["minutes"]])
+        else:
+            debit += -e["minutes"]
+    to_use = debit
+    for c in credits:
+        used = min(c[1], to_use)
+        c[1] -= used
+        to_use -= used
+    expired = expiring = 0
+    next_expiry = None
+    for day, left in credits:
+        if not left:
+            continue
+        expiry = add_months(day, months)
+        if expiry < today:
+            expired += left
+        else:
+            if (expiry - today).days <= warn_days:
+                expiring += left
+            next_expiry = min(next_expiry or expiry, expiry)
+    total_credit = sum(e["minutes"] for e in entries if e["minutes"] >= 0)
+    return {"credit": total_credit, "debit": debit, "balance": total_credit - debit, "expired": expired,
+            "expiring": expiring, "next_expiry": next_expiry.isoformat() if next_expiry else None}

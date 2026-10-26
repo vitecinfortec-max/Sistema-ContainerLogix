@@ -470,6 +470,128 @@ def test_programmed_vacation_follows_salary_changes(api):
     assert paid["calc"]["vacation_pay"] == 3600
 
 
+# ---------------------------------------------------------------- melhorias (26/10/2026)
+
+def test_engine_averages_leaves_charges_and_time_bank():
+    from hr_payroll import employer_charges, time_bank_status
+    # médias de variáveis entram nas férias (com o 1/3), no 13º e na rescisão
+    v = compute_vacation({"base_salary": 3000, "variable_average": 300}, 30, 0, False, S)
+    assert (v["average_pay"], v["vacation_pay"], v["one_third"]) == (300, 3300, 1100)
+    second = compute_13th_payslip({"base_salary": 3600, "contract_type": "CLT", "variable_average": 600}, 2, 12, 1800, [], S)
+    assert {e["code"]: e["value"] for e in second["events"]}["DECIMO_MEDIAS"] == 600
+    # afastamento pelo INSS de março a junho: 8 avos no ano
+    assert months_by_fifteen(date(2026, 1, 1), date(2026, 12, 31), [(date(2026, 3, 1), date(2026, 6, 30))]) == 8
+    t = compute_termination({"base_salary": 3000, "admission_date": "2023-03-10", "termination_date": "2026-10-20",
+                             "termination_type": "PEDIDO", "notice_type": "TRABALHADO", "variable_average": 300,
+                             "leave_ranges": [("2026-03-01", "2026-06-30")]}, S)
+    items = {i["label"]: i for i in t["items"]}
+    assert items["Saldo de salário"]["value"] == 2000  # saldo sem média
+    assert items["13º salário proporcional"]["reference"] == "6/12" and items["13º salário proporcional"]["value"] == 1650
+    # encargos: 20% + 2% + 5,8% sobre a base do INSS
+    assert employer_charges(3000, S) == 834
+    # banco de horas: débito compensa o crédito mais antigo; o resto vence em 6 meses
+    entries = [{"date": "2026-01-10", "minutes": 120}, {"date": "2026-09-30", "minutes": 90}, {"date": "2026-10-01", "minutes": -60}]
+    st = time_bank_status(entries, date(2026, 10, 26), 6)
+    assert (st["balance"], st["expired"], st["expiring"]) == (150, 60, 0)
+    st = time_bank_status(entries, date(2026, 3, 20), 6)
+    assert st["expired"] == 0
+
+
+def test_vacation_split_and_bonus_rules(api):
+    c = _contract(api, _employee(api), dependents=[])
+    base = {"contract_id": c["id"], "acquisition_start": "2024-01-15", "sell_days": 0}
+    # parte menor que 14 dias só se ainda sobrar uma de 14 ou mais
+    assert api.post("/api/hr/vacations", json={**base, "start_date": "2026-11-03", "days": 10, "sell_days": 10}).status_code == 400
+    assert api.post("/api/hr/vacations", json={**base, "start_date": "2026-11-03", "days": 10}).status_code == 200
+    assert api.post("/api/hr/vacations", json={**base, "start_date": "2026-12-01", "days": 5}).status_code == 200
+    assert api.post("/api/hr/vacations", json={**base, "start_date": "2027-01-04", "days": 15}).status_code == 200
+    # no máximo 3 partes
+    other = _contract(api, _employee(api, "Davi", "777.888.999-00"), dependents=[], admission_date="2023-01-10")
+    b2 = {"contract_id": other["id"], "acquisition_start": "2023-01-10", "sell_days": 0}
+    for start, days in (("2026-11-03", 14), ("2026-12-01", 5), ("2027-01-04", 5)):
+        assert api.post("/api/hr/vacations", json={**b2, "start_date": start, "days": days}).status_code == 200
+    r = api.post("/api/hr/vacations", json={**b2, "start_date": "2027-02-01", "days": 5})
+    assert r.status_code == 400 and "3 partes" in r.json()["detail"]
+    # abono: até 1/3 do direito (24 dias com 10 faltas -> 8)
+    for i in range(10):
+        api.post("/api/hr/occurrences", json={"contract_id": other["id"], "occurrence_type": "FALTA_INJUSTIFICADA",
+                                              "start_date": f"2024-02-{i + 1:02d}", "days": 1})
+    r = api.post("/api/hr/vacations", json={"contract_id": other["id"], "acquisition_start": "2024-01-10", "start_date": "2027-03-01",
+                                            "days": 15, "sell_days": 9})
+    assert r.status_code == 400 and "8 dias" in r.json()["detail"]
+
+
+def test_reinstate_restores_vacations_cancelled_by_termination(api):
+    c = _contract(api, _employee(api), dependents=[])
+    v = api.post("/api/hr/vacations", json={"contract_id": c["id"], "acquisition_start": "2024-01-15", "start_date": "2026-12-01",
+                                            "days": 30, "sell_days": 0}).json()
+    api.post(f"/api/hr/contracts/{c['id']}/terminate", json={"termination_date": "2026-10-20", "termination_type": "PEDIDO",
+                                                             "notice_type": "TRABALHADO", "confirm": True})
+    assert api.get("/api/hr/vacations").json()[0]["status"] == "CANCELADA"
+    api.post(f"/api/hr/contracts/{c['id']}/reinstate")
+    assert api.get("/api/hr/vacations").json()[0]["status"] == "PROGRAMADA" and v["id"]
+
+
+def test_long_inss_leave_warns_about_art_133(api):
+    c = _contract(api, _employee(api), dependents=[])
+    api.post("/api/hr/occurrences", json={"contract_id": c["id"], "occurrence_type": "AFASTAMENTO_INSS",
+                                          "start_date": "2024-03-01", "end_date": "2024-12-31"})
+    period = api.get("/api/hr/vacation-balances").json()[0]["periods"][0]
+    assert period["inss_leave_warning"] and period["inss_leave_days"] > 180
+
+
+def test_vacation_uses_the_average_of_variables(api):
+    c = _contract(api, _employee(api), dependents=[], vt_opt_in=False)
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    slip = api.get(f"/api/hr/payroll-runs/{run['id']}").json()["payslips"][0]
+    api.put(f"/api/hr/payslips/{slip['id']}", json={"inputs": [{"code": "HE50", "quantity": 10}]})
+    # folha aberta ainda não conta
+    body = {"contract_id": c["id"], "acquisition_start": "2024-01-15", "start_date": "2026-11-03", "days": 30, "sell_days": 0}
+    assert api.post("/api/hr/vacations/preview", json=body).json()["calc"]["average_pay"] == 0
+    api.post(f"/api/hr/payroll-runs/{run['id']}/close")
+    calc = api.post("/api/hr/vacations/preview", json=body).json()["calc"]
+    assert calc["variable_average"] == 204.55 and calc["average_pay"] == 204.55
+
+
+def test_extend_experience_once_and_contract_pdf(api):
+    from datetime import timedelta
+    from reports import today_brt
+    admission = (today_brt().date() - timedelta(days=10)).isoformat()
+    emp = _employee(api)
+    api.put(f"/api/employees/{emp['id']}", json={**{k: v for k, v in emp.items() if k not in ("id", "created_at")},
+                                                 "nationality": "brasileira", "marital_status": "solteira"})
+    c = _contract(api, emp, contract_type="EXPERIENCIA", experience_days=45, admission_date=admission, dependents=[])
+    assert api.post(f"/api/hr/contracts/{c['id']}/extend-experience", json={"total_days": 120}).status_code == 400
+    r = api.post(f"/api/hr/contracts/{c['id']}/extend-experience", json={"total_days": 90})
+    assert r.status_code == 200, r.text
+    ext = r.json()
+    assert ext["experience_initial_days"] == 45 and ext["experience_days"] == 90
+    assert ext["experience_end"] == (today_brt().date() - timedelta(days=10) + timedelta(days=89)).isoformat()
+    assert api.post(f"/api/hr/contracts/{c['id']}/extend-experience", json={"total_days": 90}).status_code == 400  # só uma vez
+    text = _pdf_text(api.get(f"/api/hr/contracts/{c['id']}/contract/pdf").content)
+    assert "45dias" in text and "TermodeProrrogação" in text and "brasileira" in text and "solteira" in text
+    plain = _contract(api, _employee(api, "Edu", "888.999.000-11"), dependents=[])
+    assert api.post(f"/api/hr/contracts/{plain['id']}/extend-experience", json={"total_days": 90}).status_code == 400
+
+
+def test_payroll_cost_has_employer_charges_and_other_costs(api):
+    c = _contract(api, _employee(api), dependents=[], vt_opt_in=False)
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    v = api.post("/api/hr/vacations", json={"contract_id": c["id"], "acquisition_start": "2024-01-15", "start_date": "2026-11-03",
+                                            "days": 30, "sell_days": 0}).json()
+    api.post(f"/api/hr/vacations/{v['id']}/pay", json={"payment_date": "2026-10-30"})
+    report = api.get("/api/reports/hr/payroll-cost", params={"date_from": "2026-10-01", "date_to": "2026-10-31"}).json()
+    s = report["summary"]
+    assert s["charges"] == 834 and s["cost"] == round(3000 + 240 + 834, 2)
+    assert s["others_cost"] > 4000 and s["total_cost"] == round(s["cost"] + s["others_cost"], 2)
+    assert run["id"]
+    # Simples Nacional: zera os encargos
+    settings = api.get("/api/hr/payroll-settings").json()["settings"]
+    api.put("/api/hr/payroll-settings", json={**settings, "employer_inss_rate": 0, "rat_rate": 0, "third_party_rate": 0})
+    assert api.get("/api/reports/hr/payroll-cost", params={"date_from": "2026-10-01", "date_to": "2026-10-31"}).json()["summary"]["charges"] == 0
+    assert api.put("/api/hr/payroll-settings", json={**settings, "time_bank_months": 18}).status_code == 400
+
+
 def test_vacations_settled_before_the_system(api):
     emp = _employee(api)
     c = _contract(api, emp, admission_date="2020-01-10", dependents=[])
