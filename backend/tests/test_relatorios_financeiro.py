@@ -83,7 +83,7 @@ def test_expenses_files_and_admin_only(api):
     _expense(api, 1, purchases=[("Posto A", "2026-10-02", 100, "Diesel", False)], deposits=[(200, "2026-10-01", "Financeiro")])
     assert api.get("/api/reports/expenses/pdf").content[:4] == b"%PDF"
     sheets = _sheet_values(api.get("/api/reports/expenses/excel").content)
-    assert list(sheets) == ["Sem recibo", "Por fornecedor", "Compras", "Depósitos"]
+    assert list(sheets) == ["Por grupo", "Maiores compras", "Sem recibo", "Por fornecedor", "Compras", "Depósitos"]
     assert "Posto A" in sheets["Sem recibo"]
     for path in ("/api/reports/expenses", "/api/reports/daily-rates"):
         assert api.get(path, as_user="operator").status_code == 403

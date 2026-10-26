@@ -188,8 +188,13 @@ async def get_daily_rates_report_excel(
 EXPENSE_STATUS_LABELS = {"EM_ANDAMENTO": "Em andamento", "CONCLUIDA": "Concluída"}
 
 
-async def build_expenses(date_from=None, date_to=None, status=None, supplier=None, only_without_receipt=False) -> dict:
+NO_GROUP = "(sem grupo)"
+
+
+async def build_expenses(date_from=None, date_to=None, status=None, supplier=None, only_without_receipt=False, group=None) -> dict:
+    """`group`: id do grupo de custo, "SEM_GRUPO" (compras sem grupo) ou vazio/"TODOS"."""
     query = {"status": status} if status else {}
+    group = None if group in (None, "", "TODOS") else group
     reports = await db.expense_reports.find(query, {"_id": 0}).sort("report_number_formatted", 1).to_list(None)
     supplier_re = re.compile(re.escape(supplier.strip()), re.I) if supplier else None
 
@@ -206,9 +211,11 @@ async def build_expenses(date_from=None, date_to=None, status=None, supplier=Non
             has_receipt = bool(p.get("receipts"))
             if only_without_receipt and has_receipt:
                 continue
+            if group and (p.get("group_id") or "SEM_GRUPO") != group:
+                continue
             row = {"report": number, "report_id": rep["id"], "status": rep_status, "purchase_date": (p.get("purchase_date") or "")[:10] or None,
                    "supplier_name": name, "observation": p.get("observation"), "amount": _r(p.get("amount")),
-                   "receipts": len(p.get("receipts") or [])}
+                   "receipts": len(p.get("receipts") or []), "group_name": p.get("group_name") or NO_GROUP}
             purchases.append(row)
             sup = suppliers.setdefault(name, {"supplier_name": name, "count": 0, "total": 0.0, "without_receipt": 0, "without_receipt_total": 0.0})
             sup["count"] += 1
@@ -216,8 +223,8 @@ async def build_expenses(date_from=None, date_to=None, status=None, supplier=Non
             if not has_receipt:
                 sup["without_receipt"] += 1
                 sup["without_receipt_total"] += row["amount"]
-        if supplier_re or only_without_receipt:
-            continue  # depósito não tem fornecedor nem recibo: não entra nesses filtros
+        if supplier_re or only_without_receipt or group:
+            continue  # depósito não tem fornecedor, recibo nem grupo: não entra nesses filtros
         for d in rep.get("deposits") or []:
             if _in_period(d.get("date"), date_from, date_to):
                 deposits.append({"report": number, "date": (d.get("date") or "")[:10] or None, "sent_by": d.get("sent_by"), "amount": _r(d.get("amount"))})
@@ -229,15 +236,29 @@ async def build_expenses(date_from=None, date_to=None, status=None, supplier=Non
     total_purchases = _r(sum(p["amount"] for p in purchases))
     total_deposits = _r(sum(d["amount"] for d in deposits))
     missing = [p for p in purchases if not p["receipts"]]
+    groups = {}
+    for p in purchases:
+        g = groups.setdefault(p["group_name"], {"group_name": p["group_name"], "count": 0, "total": 0.0, "largest": 0.0})
+        g["count"] += 1
+        g["total"] += p["amount"]
+        g["largest"] = max(g["largest"], p["amount"])
+    for g in groups.values():
+        g["total"] = _r(g["total"])
+        g["average"] = _r(g["total"] / g["count"])
+        g["share"] = round(g["total"] / total_purchases * 100, 1) if total_purchases else 0
     return {
         "purchases": purchases,
         "deposits": deposits,
+        "groups": sorted(groups.values(), key=lambda g: (-g["total"], g["group_name"])),
+        "top_purchases": sorted(purchases, key=lambda p: -p["amount"])[:20],
         "suppliers": sorted(suppliers.values(), key=lambda s: (-s["total"], s["supplier_name"])),
         "summary": {
             "purchases_count": len(purchases), "total_purchases": total_purchases,
             "deposits_count": len(deposits), "total_deposits": total_deposits,
             "balance": _r(total_purchases - total_deposits),
             "without_receipt_count": len(missing), "without_receipt_total": _r(sum(p["amount"] for p in missing)),
+            "without_group_total": groups.get(NO_GROUP, {}).get("total", 0.0),
+            "groups_count": len([g for g in groups if g != NO_GROUP]),
         },
     }
 
@@ -245,6 +266,21 @@ async def build_expenses(date_from=None, date_to=None, status=None, supplier=Non
 def _expense_sections(data):
     s = data["summary"]
     sections = [
+        Section(
+            "Custo por grupo",
+            [Column("Grupo", width=34), Column("Compras", INT, 10), Column("Total", MONEY, 14), Column("% do total", width=10, align="center"),
+             Column("Média por compra", MONEY, 14), Column("Maior compra", MONEY, 14)],
+            [[g["group_name"], g["count"], g["total"], f"{g['share']:.1f}%".replace(".", ","), g["average"], g["largest"]] for g in data["groups"]],
+            total=["TOTAL", s["purchases_count"], s["total_purchases"], "100%" if s["purchases_count"] else None, None, None],
+            empty_text="Nenhuma compra no período.", sheet_name="Por grupo",
+        ),
+        Section(
+            "Maiores compras",
+            [Column("Prestação", width=10, align="center"), Column("Data", DAY, 9), Column("Grupo", width=20), Column("Fornecedor", width=26),
+             Column("Observação", width=28), Column("Valor", MONEY, 12)],
+            [[p["report"], p["purchase_date"], p["group_name"], p["supplier_name"], p["observation"], p["amount"]] for p in data["top_purchases"]],
+            empty_text="Nenhuma compra no período.", sheet_name="Maiores compras",
+        ),
         Section(
             "Compras sem recibo anexado",
             [Column("Prestação", width=10, align="center"), Column("Data", DAY, 9), Column("Fornecedor", width=30),
@@ -264,10 +300,11 @@ def _expense_sections(data):
         Section(
             "Compras",
             [Column("Prestação", width=10, align="center"), Column("Situação", width=11, align="center"), Column("Data", DAY, 9),
-             Column("Fornecedor", width=28), Column("Observação", width=30), Column("Recibos", INT, 8), Column("Valor", MONEY, 12)],
-            [[p["report"], EXPENSE_STATUS_LABELS.get(p["status"], p["status"]), p["purchase_date"], p["supplier_name"],
+             Column("Grupo", width=18), Column("Fornecedor", width=24), Column("Observação", width=26), Column("Recibos", INT, 8),
+             Column("Valor", MONEY, 12)],
+            [[p["report"], EXPENSE_STATUS_LABELS.get(p["status"], p["status"]), p["purchase_date"], p["group_name"], p["supplier_name"],
               p["observation"], p["receipts"], p["amount"]] for p in data["purchases"]],
-            total=["TOTAL", None, None, None, None, None, s["total_purchases"]],
+            total=["TOTAL", None, None, None, None, None, None, s["total_purchases"]],
             empty_text="Nenhuma compra no período.", sheet_name="Compras",
         ),
     ]
@@ -429,28 +466,32 @@ def _expense_subtitle(date_from, date_to, status, only_without_receipt):
 async def get_expenses_report(
     date_from: Optional[str] = None, date_to: Optional[str] = None,
     status: Optional[str] = Query(None, pattern=EXPENSE_STATUS_PATTERN),
-    supplier: Optional[str] = None, only_without_receipt: bool = False,
+    supplier: Optional[str] = None, only_without_receipt: bool = False, group: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user),
 ):
     """Compras e depósitos das Prestações de Contas no período, por fornecedor e sem recibo"""
-    return await build_expenses(date_from, date_to, status, supplier, only_without_receipt)
+    return await build_expenses(date_from, date_to, status, supplier, only_without_receipt, group)
 
 
 @api_router.get("/reports/expenses/pdf")
 async def get_expenses_report_pdf(
     date_from: Optional[str] = None, date_to: Optional[str] = None,
     status: Optional[str] = Query(None, pattern=EXPENSE_STATUS_PATTERN),
-    supplier: Optional[str] = None, only_without_receipt: bool = False,
+    supplier: Optional[str] = None, only_without_receipt: bool = False, group: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user),
 ):
     from reports import format_currency
-    data = await build_expenses(date_from, date_to, status, supplier, only_without_receipt)
+    data = await build_expenses(date_from, date_to, status, supplier, only_without_receipt, group)
     s = data["summary"]
     info = [("Compras", format_currency(s["total_purchases"], "BRL")), ("Depósitos", format_currency(s["total_deposits"], "BRL")),
             ("Saldo (compras - depósitos)", format_currency(s["balance"], "BRL")),
             ("Sem recibo", f"{s['without_receipt_count']} · {format_currency(s['without_receipt_total'], 'BRL')}"),
             ("Lançamentos de compra", str(s["purchases_count"])), ("Depósitos recebidos", str(s["deposits_count"]))]
-    return await pdf_response("Relatório de Prestação de Contas", _expense_subtitle(date_from, date_to, status, only_without_receipt),
+    subtitle = _expense_subtitle(date_from, date_to, status, only_without_receipt)
+    if group and group != "TODOS":
+        label = data["groups"][0]["group_name"] if data["groups"] else ("sem grupo" if group == "SEM_GRUPO" else "grupo")
+        subtitle = f"{subtitle} · Grupo: {label}" if subtitle else f"Grupo: {label}"
+    return await pdf_response("Relatório de Prestação de Contas", subtitle,
                               info, _expense_sections(data), "relatorio_prestacao_contas", current_user.get("name", "Sistema"))
 
 
@@ -458,9 +499,9 @@ async def get_expenses_report_pdf(
 async def get_expenses_report_excel(
     date_from: Optional[str] = None, date_to: Optional[str] = None,
     status: Optional[str] = Query(None, pattern=EXPENSE_STATUS_PATTERN),
-    supplier: Optional[str] = None, only_without_receipt: bool = False,
+    supplier: Optional[str] = None, only_without_receipt: bool = False, group: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user),
 ):
-    data = await build_expenses(date_from, date_to, status, supplier, only_without_receipt)
+    data = await build_expenses(date_from, date_to, status, supplier, only_without_receipt, group)
     return await excel_response("Relatório de Prestação de Contas", _expense_subtitle(date_from, date_to, status, only_without_receipt) or "Todas as prestações",
                                 _expense_sections(data), "relatorio_prestacao_contas")

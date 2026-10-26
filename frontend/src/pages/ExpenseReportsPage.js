@@ -1,7 +1,10 @@
 import { FormSectionTitle } from '../components/FormKit';
 import PeriodReportDialog from '../components/PeriodReportDialog';
-import { FileBarChart } from 'lucide-react';
+import { FileBarChart, PieChart, Tags } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import ExpenseGroupsDialog from '../components/ExpenseGroupsDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
@@ -40,6 +43,7 @@ function createEmptyPurchase() {
     item_id: newItemId(),
     supplier_id: '',
     supplier_name: '',
+    group_id: '',
     purchase_date: todayISO(),
     amount: '',
     observation: '',
@@ -69,6 +73,10 @@ export default function ExpenseReportsPage() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
 
   const [suppliers, setSuppliers] = useState([]);
+  // Grupos de custo (Combustível, Alimentação...) de cada compra
+  const [groups, setGroups] = useState([]);
+  const [groupsOpen, setGroupsOpen] = useState(false);
+  const navigate = useNavigate();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingReport, setEditingReport] = useState(null);
@@ -93,6 +101,7 @@ export default function ExpenseReportsPage() {
 
   useEffect(() => {
     loadSuppliers();
+    api.getExpenseGroups().then((r) => setGroups(r.data)).catch(() => toast.error('Erro ao carregar os grupos de custo'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -277,6 +286,10 @@ export default function ExpenseReportsPage() {
         toast.error(`Preencha os campos obrigatórios da compra ${i + 1}`);
         return;
       }
+      if (!p.group_id) {
+        toast.error(`Escolha o grupo de custo da compra ${i + 1}`);
+        return;
+      }
     }
 
     setSaving(true);
@@ -293,6 +306,7 @@ export default function ExpenseReportsPage() {
           item_id: p.item_id,
           supplier_id: p.supplier_id || null,
           supplier_name: p.supplier_name || null,
+          group_id: p.group_id || null,
           purchase_date: p.purchase_date,
           amount: parseFloat(p.amount) || 0,
           observation: p.observation || null
@@ -464,6 +478,12 @@ export default function ExpenseReportsPage() {
           subtitle="Controle de depósitos recebidos e compras realizadas por período"
           actions={(
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate('/expense-reports/dashboard')} data-testid="expense-dashboard-link">
+                <PieChart className="w-4 h-4 mr-1.5" /> Custos por grupo
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setGroupsOpen(true)} data-testid="expense-groups-link">
+                <Tags className="w-4 h-4 mr-1.5" /> Grupos de custo
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setSettlementReportOpen(true)} data-testid="expense-settlement-report">
                 <Banknote className="w-4 h-4 mr-1.5" /> Ressarcimentos
               </Button>
@@ -675,7 +695,20 @@ export default function ExpenseReportsPage() {
                     </div>
                     <div className="text-sm font-medium text-muted-foreground mb-3">Compra #{index + 1}</div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                      <div>
+                        <Label className="mb-1.5 block">Grupo de custo *</Label>
+                        <Select value={purchase.group_id || undefined} onValueChange={(v) => handlePurchaseChange(index, 'group_id', v)}>
+                          <SelectTrigger className={`h-9 text-sm ${purchase.group_id ? '' : 'text-muted-foreground'}`} data-testid={`expense-purchase-group-${index}`}>
+                            <SelectValue placeholder="Escolha o grupo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {groups.filter((g) => g.status === 'ATIVO' || g.id === purchase.group_id).map((g) => (
+                              <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div>
                         <Label className="mb-1.5 block">Local de Compra (Fornecedor) *</Label>
                         <Autocomplete
@@ -831,6 +864,9 @@ export default function ExpenseReportsPage() {
                         <span>{p.supplier_name || '-'}</span>
                         <span>{formatMoney(p.amount)}</span>
                       </div>
+                      <div className="mt-1">
+                        <StatusPill tone={p.group_name ? 'blue' : 'amber'} dot={false} className="text-[10px]">{p.group_name || 'Sem grupo'}</StatusPill>
+                      </div>
                       <div className="text-muted-foreground text-xs mt-1">{formatPeriodDate(p.purchase_date)}</div>
                       {p.observation && <div className="text-xs mt-1">{p.observation}</div>}
                       {p.receipts?.length > 0 && (
@@ -897,14 +933,21 @@ export default function ExpenseReportsPage() {
         open={reportOpen}
         onOpenChange={setReportOpen}
         title="Relatório de Prestação de Contas"
-        description="Compras e depósitos do período, por fornecedor, com a lista das compras sem recibo anexado."
+        description="Custo por grupo e as maiores compras do período, por fornecedor, com a lista das compras sem recibo anexado."
         periodLabel="Data da compra/depósito"
         statuses={[{ value: '', label: 'Todas' }, { value: 'EM_ANDAMENTO', label: 'Em andamento' }, { value: 'CONCLUIDA', label: 'Concluídas' }]}
         textFilters={[{ key: 'supplier', label: 'Fornecedor' }]}
         checkboxes={[{ key: 'only_without_receipt', label: 'Só compras sem recibo anexado' }]}
+        selects={[{
+          key: 'group',
+          label: 'Grupo de custo',
+          options: [{ value: 'TODOS', label: 'Todos os grupos' }, ...groups.map((g) => ({ value: g.id, label: g.name })),
+            { value: 'SEM_GRUPO', label: '(sem grupo)' }],
+        }]}
         load={api.getExpensesReport}
         summarize={(d) => [
           ['Compras', brl(d.summary.total_purchases)], ['Depósitos', brl(d.summary.total_deposits)],
+          ['Maior grupo', d.groups?.[0] ? `${d.groups[0].group_name} · ${brl(d.groups[0].total)} (${d.groups[0].share}%)` : '-'],
           ['Saldo (compras - depósitos)', brl(d.summary.balance)],
           ['Sem recibo', `${d.summary.without_receipt_count} · ${brl(d.summary.without_receipt_total)}`],
         ]}
@@ -962,6 +1005,7 @@ export default function ExpenseReportsPage() {
         downloadExcel={api.downloadExpenseSettlementsReportExcel}
         filename="relatorio_ressarcimentos"
       />
+      <ExpenseGroupsDialog open={groupsOpen} onOpenChange={setGroupsOpen} onChanged={setGroups} />
       <ConfirmDialog />
     </Layout>
   );

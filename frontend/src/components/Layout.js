@@ -164,6 +164,7 @@ const PAGE_TITLES = {
   '/reports/vehicle-results': 'Custo e Faturamento por Veículo',
   '/daily-rate-requests': 'Solicitação de Diária',
   '/expense-reports': 'Prestação de Contas',
+  '/expense-reports/dashboard': 'Custos por Grupo',
   '/checks': 'Controle de Cheque',
   '/gratifications': 'Controle de Gratificação',
   '/rh': 'Painel do RH',

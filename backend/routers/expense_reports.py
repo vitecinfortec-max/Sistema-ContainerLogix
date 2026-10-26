@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
-from models import ExpenseReportPurchase, ExpenseReportCreate, ExpenseReportResponse, ExpenseReportSettlement
+from models import ExpenseGroupCreate, ExpenseReportPurchase, ExpenseReportCreate, ExpenseReportResponse, ExpenseReportSettlement
 from reports import now_brt
 
 from shared import (
@@ -45,7 +45,7 @@ def calculate_expense_report_totals(deposits: list, purchases: list):
 
 
 async def resolve_expense_report_purchases(purchases: list) -> list:
-    """Garante item_id em cada compra e resolve supplier_name a partir do supplier_id."""
+    """Garante item_id em cada compra e resolve supplier_name/group_name a partir dos ids."""
     resolved = []
     for p in purchases:
         d = p.model_dump()
@@ -54,8 +54,142 @@ async def resolve_expense_report_purchases(purchases: list) -> list:
         if d.get("supplier_id"):
             supplier = await db.suppliers.find_one({"id": d["supplier_id"]}, {"_id": 0, "name": 1})
             d["supplier_name"] = supplier.get("name") if supplier else d.get("supplier_name")
+        if d.get("group_id"):
+            group = await db.expense_groups.find_one({"id": d["group_id"]}, {"_id": 0, "name": 1})
+            if not group:
+                raise HTTPException(status_code=400, detail="Grupo de custo não encontrado")
+            d["group_name"] = group["name"]
+        else:
+            d["group_id"], d["group_name"] = None, None
         resolved.append(d)
     return resolved
+
+
+# ---------------------------------------------------------- Grupos de custo
+# Cada compra da prestação aponta para um grupo (Combustível, Alimentação...)
+# para somar o custo por grupo no dashboard e nos relatórios.
+
+DEFAULT_EXPENSE_GROUPS = [
+    "Combustível", "Alimentação", "Manutenção e peças", "Pedágio e estacionamento", "Hospedagem",
+    "Material de escritório", "Limpeza e higiene", "Ferramentas e equipamentos", "Taxas e documentos", "Outros",
+]
+
+
+async def ensure_expense_groups():
+    """Na primeira vez, a empresa recebe os grupos padrão (editáveis)."""
+    if await db.expense_groups.count_documents({}) == 0:
+        now = datetime.now(timezone.utc).isoformat()
+        await db.expense_groups.insert_many([{"id": str(uuid.uuid4()), "name": name, "description": None, "status": "ATIVO",
+                                              "created_at": now} for name in DEFAULT_EXPENSE_GROUPS])
+
+
+def _clean_group(data: ExpenseGroupCreate) -> dict:
+    name = (data.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Informe o nome do grupo")
+    if data.status not in ("ATIVO", "INATIVO"):
+        raise HTTPException(status_code=400, detail="Situação inválida")
+    return {"name": name, "description": (data.description or "").strip() or None, "status": data.status}
+
+
+async def _refuse_duplicate_group(name: str, current_id: Optional[str]):
+    query = {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+    if current_id:
+        query["id"] = {"$ne": current_id}
+    if await db.expense_groups.find_one(query, {"_id": 1}):
+        raise HTTPException(status_code=400, detail=f"O grupo {name} já existe")
+
+
+async def _group_usage() -> dict:
+    usage = {}
+    for rep in await db.expense_reports.find({}, {"_id": 0, "purchases.group_id": 1}).to_list(None):
+        for p in rep.get("purchases") or []:
+            if p.get("group_id"):
+                usage[p["group_id"]] = usage.get(p["group_id"], 0) + 1
+    return usage
+
+
+@api_router.get("/expense-groups")
+async def list_expense_groups(current_user: dict = Depends(get_current_admin_user)):
+    await ensure_expense_groups()
+    usage = await _group_usage()
+    rows = await db.expense_groups.find({}, {"_id": 0}).to_list(None)
+    for row in rows:
+        row["purchases"] = usage.get(row["id"], 0)
+    return sorted(rows, key=lambda g: (g["status"] != "ATIVO", g["name"] == "Outros", g["name"].lower()))
+
+
+@api_router.post("/expense-groups")
+async def create_expense_group(data: ExpenseGroupCreate, current_user: dict = Depends(get_current_admin_user)):
+    fields = _clean_group(data)
+    await _refuse_duplicate_group(fields["name"], None)
+    doc = {"id": str(uuid.uuid4()), **fields, "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.expense_groups.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.put("/expense-groups/{group_id}")
+async def update_expense_group(group_id: str, data: ExpenseGroupCreate, current_user: dict = Depends(get_current_admin_user)):
+    current = await db.expense_groups.find_one({"id": group_id}, {"_id": 0})
+    if not current:
+        raise HTTPException(status_code=404, detail="Grupo não encontrado")
+    fields = _clean_group(data)
+    await _refuse_duplicate_group(fields["name"], group_id)
+    await db.expense_groups.update_one({"id": group_id}, {"$set": fields})
+    if fields["name"] != current["name"]:
+        # o nome novo vale também nas compras já lançadas
+        for rep in await db.expense_reports.find({"purchases.group_id": group_id}, {"_id": 0, "id": 1, "purchases": 1}).to_list(None):
+            purchases = [{**p, "group_name": fields["name"]} if p.get("group_id") == group_id else p for p in rep["purchases"]]
+            await db.expense_reports.update_one({"id": rep["id"]}, {"$set": {"purchases": purchases}})
+    return await db.expense_groups.find_one({"id": group_id}, {"_id": 0})
+
+
+@api_router.delete("/expense-groups/{group_id}")
+async def delete_expense_group(group_id: str, current_user: dict = Depends(get_current_admin_user)):
+    used = (await _group_usage()).get(group_id, 0)
+    if used:
+        raise HTTPException(status_code=400, detail=f"Grupo usado em {used} compra(s): em vez de excluir, marque como Inativo")
+    result = await db.expense_groups.delete_one({"id": group_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Grupo não encontrado")
+    return {"message": "Grupo excluído"}
+
+
+@api_router.get("/expense-reports/dashboard")
+async def expense_dashboard(date_from: Optional[str] = None, date_to: Optional[str] = None, status: Optional[str] = None,
+                            current_user: dict = Depends(get_current_admin_user)):
+    """Custo por grupo no período: totais, participação, comparação com o
+    período anterior de mesmo tamanho, evolução mensal, maiores compras e fornecedores."""
+    from datetime import date, timedelta
+    from routers.financial_reports import build_expenses
+    data = await build_expenses(date_from, date_to, status)
+    previous = {}
+    if date_from and date_to:
+        start, end = date.fromisoformat(date_from[:10]), date.fromisoformat(date_to[:10])
+        prev_end = start - timedelta(days=1)
+        prev_start = prev_end - (end - start)
+        prev = await build_expenses(prev_start.isoformat(), prev_end.isoformat(), status)
+        previous = {g["group_name"]: g["total"] for g in prev["groups"]}
+        data["previous_period"] = {"date_from": prev_start.isoformat(), "date_to": prev_end.isoformat(),
+                                   "total": prev["summary"]["total_purchases"]}
+    for g in data["groups"]:
+        before = previous.get(g["group_name"])
+        g["previous_total"] = before
+        g["variation"] = round((g["total"] - before) / before * 100, 1) if before else None
+    by_month = {}
+    for p in data["purchases"]:
+        month = (p["purchase_date"] or "")[:7]
+        if month:
+            bucket = by_month.setdefault(month, {"month": month, "total": 0.0})
+            bucket[p["group_name"]] = round(bucket.get(p["group_name"], 0) + p["amount"], 2)
+            bucket["total"] = round(bucket["total"] + p["amount"], 2)
+    return {
+        "summary": data["summary"], "groups": data["groups"], "previous_period": data.get("previous_period"),
+        "by_month": [by_month[k] for k in sorted(by_month)],
+        "top_purchases": data["top_purchases"][:10],
+        "top_suppliers": data["suppliers"][:10],
+    }
 
 
 @api_router.get("/expense-reports")

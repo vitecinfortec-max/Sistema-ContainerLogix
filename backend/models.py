@@ -4087,6 +4087,8 @@ class ExpenseReportPurchase(BaseModel):
     purchase_date: str  # YYYY-MM-DD
     amount: float
     observation: Optional[str] = None
+    group_id: Optional[str] = None  # grupo de custo (Combustível, Alimentação...)
+    group_name: Optional[str] = None  # snapshot resolvido no backend a partir do group_id
     receipts: List[ExpenseReportReceipt] = Field(default_factory=list)
 
 class ExpenseReport(BaseModel):
@@ -4111,6 +4113,13 @@ class ExpenseReport(BaseModel):
     created_by_name: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
+
+class ExpenseGroupCreate(BaseModel):
+    """Grupo de custo da Prestação de Contas"""
+    name: str
+    description: Optional[str] = None
+    status: str = "ATIVO"  # ATIVO, INATIVO
+
 
 class ExpenseReportSettlement(BaseModel):
     settled: bool
