@@ -447,7 +447,7 @@ async def update_payslip(payslip_id: str, data: HRPayslipInputs, current_user: d
 @api_router.get("/hr/payslips/pdf")
 async def payslips_pdf(ids: Optional[str] = Query(None, description="IDs separados por vírgula"), run_id: Optional[str] = None,
                        current_user: dict = Depends(get_current_admin_user)):
-    """Contracheques em PDF (2 vias por página): os selecionados ou a folha inteira."""
+    """Contracheques em PDF (1 via, 2 funcionários por página): os selecionados ou a folha inteira."""
     from hr_reports import generate_payslips_pdf
     if ids:
         id_list = [i for i in ids.split(",") if i]

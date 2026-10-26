@@ -728,3 +728,13 @@ def test_vacations_settled_before_the_system(api):
     after = api.get("/api/hr/vacation-balances").json()[0]
     statuses = [p["status"] for p in after["periods"]]
     assert statuses[:5] == ["QUITADO"] * 5 and after["overdue"] == 0 and after["available_days"] == 30
+
+
+def test_payslips_pdf_two_employees_per_page(api):
+    from io import BytesIO
+    from pdfminer.pdfpage import PDFPage
+    for i in range(3):
+        _contract(api, _employee(api, f"Pessoa {i}", f"{i}{i}{i}.222.333-44"), dependents=[], vt_opt_in=False)
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    pdf = api.get("/api/hr/payslips/pdf", params={"run_id": run["id"]}).content
+    assert len(list(PDFPage.get_pages(BytesIO(pdf)))) == 2  # 3 funcionários, 1 via cada, 2 por folha

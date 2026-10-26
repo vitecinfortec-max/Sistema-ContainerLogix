@@ -1,4 +1,4 @@
-"""RH - documentos em PDF: contracheque (2 vias por página), aviso e recibo
+"""RH - documentos em PDF: contracheque (2 funcionários por página), aviso e recibo
 de férias, simulação da rescisão, termo de advertência/suspensão e ficha
 do funcionário. Mesma identidade visual dos outros documentos (reports.py)."""
 import io
@@ -50,11 +50,11 @@ def _paragraph_style(styles, size=9.5, leading=14, align=TA_LEFT):
 
 # ---------------------------------------------------------------- Contracheque
 
-def _payslip_via(slip: dict, run: dict, company: dict, logo, width: float, via_label: str):
+def _payslip_via(slip: dict, run: dict, company: dict, logo, width: float, via_label: str = ""):
     styles = getSampleStyleSheet()
     title = {"MENSAL": "Recibo de Pagamento de Salário", "ADIANTAMENTO": "Recibo de Adiantamento Salarial"}.get(
         slip.get("run_type"), "Recibo de 13º Salário")
-    info = f"{RUN_TYPES.get(slip.get('run_type'), '')} · Competência {competence_label(slip['competence'])} · {via_label}"
+    info = f"{RUN_TYPES.get(slip.get('run_type'), '')} · Competência {competence_label(slip['competence'])}" + (f" · {via_label}" if via_label else "")
     parts = list(_build_pdf_header(styles, logo, title, generation_info=info, company=company, content_width=width, compact=True))
     parts.append(_pdf_info_grid([
         ("Funcionário", slip.get("person_name"), 2),
@@ -114,25 +114,24 @@ def _payslip_via(slip: dict, run: dict, company: dict, logo, width: float, via_l
 
 
 def generate_payslips_pdf(slips: list, runs: dict, company: dict) -> bytes:
-    """Um contracheque por página, em 2 vias (empresa e funcionário) separadas por linha de corte."""
+    """Uma via por funcionário e dois funcionários por folha (economia de
+    papel), separados por linha de corte. O funcionário assina e a empresa guarda."""
     buffer = io.BytesIO()
     doc = _doc(buffer, top=8)
     logo = download_logo(company)
     half = (doc.height - 14) / 2
     elements = []
     for i, slip in enumerate(slips):
-        if i:
+        if i and i % 2 == 0:
             elements.append(PageBreak())
-        run = runs.get(slip["run_id"], {})
-        for j, via in enumerate(("1ª via - empresa", "2ª via - funcionário")):
-            if logo:
-                logo.seek(0)
-            block = _payslip_via(slip, run, company, logo, doc.width, via)
-            elements.append(KeepInFrame(doc.width, half, block, mode="shrink"))
-            if j == 0:
-                elements.append(Spacer(1, 4))
-                elements.append(HRFlowable(width="100%", thickness=0.6, color=_hex(BRAND_MUTED), dash=(3, 3)))
-                elements.append(Spacer(1, 4))
+        elif i:
+            elements.append(Spacer(1, 4))
+            elements.append(HRFlowable(width="100%", thickness=0.6, color=_hex(BRAND_MUTED), dash=(3, 3)))
+            elements.append(Spacer(1, 4))
+        if logo:
+            logo.seek(0)
+        block = _payslip_via(slip, runs.get(slip["run_id"], {}), company, logo, doc.width)
+        elements.append(KeepInFrame(doc.width, half, block, mode="shrink"))
     _build(doc, elements, company)
     return buffer.getvalue()
 
