@@ -801,6 +801,7 @@ export const api = {
   cancelCte: (id, justificativa) => axios.post(`${API}/ctes/${id}/cancelar`, { justificativa }),
   getCtePDF: (id) => axios.get(`${API}/ctes/${id}/pdf`, { responseType: 'blob' }),
   getCteXML: (id) => axios.get(`${API}/ctes/${id}/xml`, { responseType: 'blob' }),
+  getCtePreviewPDF: (id) => axios.get(`${API}/ctes/${id}/preview-pdf`, { responseType: 'blob' }),
   getMdfes: (params) => axios.get(`${API}/mdfes`, { params }),
   getMdfeDraftFromCtes: (ids) => axios.get(`${API}/mdfes/from-ctes`, { params: { ids: ids.join(',') } }),
   createMdfe: (data) => axios.post(`${API}/mdfes`, data),

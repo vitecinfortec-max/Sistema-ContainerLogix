@@ -16,11 +16,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
 import fiscal_cte
+import fiscal_cte_preview
 import fiscal_focus
 import fiscal_mdfe
 from fiscal_focus import FiscalProviderError
 from models import CteCancelRequest, CteCreate, FiscalSettingsUpdate
-from shared import ROOT_DIR, db, get_current_admin_user
+from shared import ROOT_DIR, db, get_company_settings, get_current_admin_user
 
 api_router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -594,6 +595,16 @@ async def _download(cte_id: str, kind: str) -> Response:
 @api_router.get("/ctes/{cte_id}/pdf")
 async def cte_pdf(cte_id: str, current_user: dict = Depends(get_current_admin_user)):
     return await _download(cte_id, "pdf")
+
+
+@api_router.get("/ctes/{cte_id}/preview-pdf")
+async def cte_preview_pdf(cte_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Espelho do CT-e para conferência (qualquer situação, inclusive rascunho), marcado "SEM VALOR FISCAL"."""
+    cte = await _get_cte_or_404(cte_id)
+    settings = await get_fiscal_settings()
+    content = await asyncio.to_thread(fiscal_cte_preview.generate_cte_preview_pdf, cte, settings, await get_company_settings())
+    name = f"Espelho_CTe_{cte.get('numero') or 'rascunho'}_SEM_VALOR_FISCAL.pdf"
+    return Response(content=content, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={name}"})
 
 
 @api_router.get("/ctes/{cte_id}/xml")

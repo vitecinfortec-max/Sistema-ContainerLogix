@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -6,7 +6,7 @@ import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   ToolbarDivider, StatusPill, EmptyState, TablePagination, usePagination, PlateTag,
 } from '../components/DataPage';
-import { FormSectionTitle, Field } from '../components/FormKit';
+import { Field, IssueSection } from '../components/FormKit';
 import { CityStateFields } from '../components/AddressFields';
 import { Autocomplete } from '../components/Autocomplete';
 import { Button } from '../components/ui/button';
@@ -25,7 +25,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { differenceInCalendarDays, format } from 'date-fns';
 import {
-  Ban, CheckCircle2, Clock, FileCheck, FileCode, FileCog, Flag, Loader2, Pencil, Plus, Printer, RefreshCw, Save,
+  AlertTriangle, Ban, CheckCircle2, Clock, FileCheck, FileCode, FileCog, Flag, Loader2, Pencil, Plus, Printer, RefreshCw, Save,
   Send, Trash2, Truck, UserPlus, X, XCircle,
 } from 'lucide-react';
 
@@ -163,6 +163,102 @@ function toPayload(form) {
   };
 }
 
+// Blocos da página de emissão (as pendências da conferência levam até eles)
+const SECTION_LABELS = {
+  basicos: 'Configuração', percurso: 'Percurso', descarga: 'Descarregamento', condutores: 'Motorista e veículo',
+  antt: 'CIOT e contratantes', seguro: 'Seguro da carga', carga: 'Carga',
+};
+const Section = (props) => <IssueSection idPrefix="mdfe" {...props} />;
+
+const docOk = (v) => [11, 14].includes(onlyDigits(v).length);
+const cteKeyOk = (k) => onlyDigits(k).length === 44 && onlyDigits(k).slice(20, 22) === '57';
+
+function ownerIssues(owner, label, add) {
+  const o = owner || {};
+  if (!docOk(o.cnpj_cpf)) add(`${label}: CNPJ/CPF do proprietário inválido`);
+  if ((o.nome || '').trim().length < 2) add(`${label}: informe o nome do proprietário`);
+  if (onlyDigits(o.rntrc).length !== 8) add(`${label}: RNTRC do proprietário deve ter 8 dígitos`);
+  if (!(o.ie || '').trim()) add(`${label}: informe a IE do proprietário (ou "ISENTO")`);
+  if (!o.uf) add(`${label}: informe a UF do proprietário`);
+}
+
+/** Conferência local antes de transmitir (as mesmas regras do backend, menos o código IBGE, conferido lá). */
+function validateMdfe(f, settings) {
+  const issues = [];
+  const add = (section) => (msg) => issues.push({ section, msg });
+  if (settings && (!settings.provider_configured || !settings.provider_synced_at || !settings.certificate)) {
+    add('basicos')('Configuração Fiscal incompleta (emissor, cadastro da empresa ou certificado A1)');
+  }
+  if (settings && onlyDigits(settings.rntrc).length !== 8) add('basicos')('Configuração Fiscal: RNTRC do emitente deve ter 8 dígitos');
+
+  const percurso = add('percurso');
+  if (!f.uf_inicio) percurso('Informe a UF de início (carregamento)');
+  if (!f.uf_fim) percurso('Informe a UF de fim (descarregamento)');
+  const carregamento = f.municipios_carregamento.filter((m) => (m.cidade || '').trim());
+  if (!carregamento.length) percurso('Informe ao menos um município de carregamento');
+  carregamento.forEach((m) => {
+    if (m.uf !== f.uf_inicio) percurso(`Município de carregamento ${m.cidade} não é da UF de início (${f.uf_inicio || '-'})`);
+  });
+  f.percursos.filter(Boolean).forEach((uf) => {
+    if ([f.uf_inicio, f.uf_fim].includes(uf)) percurso(`UF de percurso ${uf} não pode ser a de início nem a de fim`);
+  });
+
+  const descarga = add('descarga');
+  const unloading = f.descarregamentos.filter((d) => (d.cidade || '').trim() || d.ctes.some((k) => onlyDigits(k)));
+  if (!unloading.length) descarga('Informe ao menos um município de descarregamento com os CT-es');
+  unloading.forEach((d) => {
+    const cidade = (d.cidade || '').trim() || '-';
+    if (cidade === '-') descarga('Descarregamento: informe o município');
+    else if (d.uf !== f.uf_fim) descarga(`Município de descarregamento ${cidade} não é da UF de fim (${f.uf_fim || '-'})`);
+    const keys = d.ctes.map(onlyDigits).filter(Boolean);
+    if (!keys.length) descarga(`Descarregamento em ${cidade}: informe ao menos uma chave de CT-e`);
+    else if (!keys.every(cteKeyOk)) descarga(`Descarregamento em ${cidade}: chave de CT-e inválida (44 dígitos, modelo 57)`);
+  });
+  const keys = f.descarregamentos.flatMap((d) => d.ctes.map(onlyDigits).filter(Boolean));
+  if (new Set(keys).size !== keys.length) descarga('A mesma chave de CT-e aparece mais de uma vez');
+
+  const condutor = add('condutores');
+  const drivers = f.condutores.filter((c) => (c.nome || '').trim() || onlyDigits(c.cpf));
+  if (!drivers.length) condutor('Informe ao menos um condutor');
+  drivers.forEach((c) => {
+    if ((c.nome || '').trim().length < 2 || onlyDigits(c.cpf).length !== 11) condutor(`Condutor ${(c.nome || '').trim() || '-'}: informe nome e CPF (11 dígitos)`);
+  });
+  const v = f.veiculo;
+  if (normPlate(v.placa).length !== 7) condutor('Veículo: placa inválida (7 caracteres)');
+  if (!(intOrNull(v.tara) > 0)) condutor('Veículo: informe a tara (kg)');
+  if (!v.tipo_rodado) condutor('Veículo: informe o tipo de rodado');
+  if (!v.tipo_carroceria) condutor('Veículo: informe o tipo de carroceria');
+  if (!v.uf_licenciamento) condutor('Veículo: informe a UF de licenciamento');
+  if (v.terceiro) ownerIssues(v.proprietario, 'Veículo', condutor);
+  f.reboques.forEach((r, i) => {
+    const label = `Reboque ${i + 1}`;
+    if (normPlate(r.placa).length !== 7) condutor(`${label}: placa inválida (7 caracteres)`);
+    if (!(intOrNull(r.tara) > 0)) condutor(`${label}: informe a tara (kg)`);
+    if (!(intOrNull(r.capacidade_kg) > 0)) condutor(`${label}: informe a capacidade (kg)`);
+    if (!r.uf_licenciamento) condutor(`${label}: informe a UF de licenciamento`);
+    if (r.terceiro) ownerIssues(r.proprietario, label, condutor);
+  });
+
+  const antt = add('antt');
+  f.ciots.filter((c) => c.numero || c.responsavel_cnpj_cpf).forEach((c) => {
+    if (onlyDigits(c.numero).length !== 12) antt('CIOT deve ter 12 dígitos');
+    if (!docOk(c.responsavel_cnpj_cpf)) antt('CIOT: informe o CNPJ/CPF do responsável pela geração');
+  });
+  f.contratantes.filter((c) => c.nome || c.cnpj_cpf).forEach((c) => {
+    if (!docOk(c.cnpj_cpf)) antt(`Contratante ${(c.nome || '').trim() || '-'}: CNPJ/CPF inválido`);
+  });
+
+  const seguro = add('seguro');
+  if (f.seguro_responsavel === '2' && !docOk(f.seguro_responsavel_cnpj_cpf)) seguro('Seguro da carga: informe o CNPJ/CPF do contratante responsável');
+  if (onlyDigits(f.seguradora_cnpj) && onlyDigits(f.seguradora_cnpj).length !== 14) seguro('Seguro da carga: CNPJ da seguradora inválido');
+
+  const carga = add('carga');
+  if ((f.descricao_produto || '').trim().length < 2) carga('Informe a descrição do produto predominante');
+  if (!(toNumber(f.valor_total_carga) > 0)) carga('Informe o valor total da carga');
+  if (!(toNumber(f.peso_bruto) > 0)) carga('Informe o peso bruto da carga');
+  return issues;
+}
+
 function UfSelect({ value, onChange, testId, allowEmpty = false }) {
   return (
     <Select value={value || '_empty'} onValueChange={(v) => onChange(v === '_empty' ? '' : v)}>
@@ -295,6 +391,12 @@ export default function MdfePage() {
   const [justificativa, setJustificativa] = useState('');
   const debounceRef = useRef(null);
   const activeRef = useRef(true);
+  const issues = useMemo(() => validateMdfe(form, settings), [form, settings]);
+  const issuesIn = (section) => issues.filter((i) => i.section === section).length;
+  // Rola a página do formulário até o bloco (depois do diálogo renderizar)
+  const scrollToSection = (id) => setTimeout(() => {
+    document.getElementById(`mdfe-sec-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 120);
 
   const filtered = statusFilter ? list.filter((m) => m.status === statusFilter) : list;
   const { pageItems, paginationProps } = usePagination(filtered, { resetKey: `${search}|${statusFilter}` });
@@ -444,6 +546,12 @@ export default function MdfePage() {
           peso_bruto: draft.peso_bruto,
           descricao_produto: draft.descricao_produto,
           observacoes: draft.observacoes,
+          // Seguro do CT-e (ou o padrão da Configuração Fiscal); averbações somam
+          seguro_responsavel: draft.seguro_responsavel,
+          seguradora_nome: draft.seguradora_nome,
+          seguradora_cnpj: draft.seguradora_cnpj,
+          seguro_apolice: draft.seguro_apolice,
+          averbacoes: [...new Set([...prev.averbacoes.filter((a) => (a || '').trim()), ...draft.averbacoes])],
           veiculo: prev.veiculo.placa ? prev.veiculo : draft.veiculo,
           reboques: prev.reboques.some((r) => r.placa) ? prev.reboques : draft.reboques,
           condutores: prev.condutores.some((c) => (c.nome || '').trim()) ? prev.condutores : draft.condutores,
@@ -516,10 +624,17 @@ export default function MdfePage() {
   };
 
   const saveAndEmit = async () => {
+    if (issues.length) {
+      scrollToSection('conferencia');
+      toast.error(`Há ${issues.length} pendência(s) antes de transmitir`);
+      return;
+    }
     const doc = await save({ silent: true });
     if (!doc) return;
     const result = await emit(doc);
-    if (result && !CTE_EDITABLE.includes(result.status)) setEmitted(result);
+    if (!result) return;
+    if (CTE_EDITABLE.includes(result.status)) scrollToSection('conferencia');
+    else setEmitted(result);
   };
 
   const runAction = async (key, fn, success) => {
@@ -789,86 +904,99 @@ export default function MdfePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Formulário */}
+      {/* Formulário: uma página só, com conferência antes de transmitir */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!emitting) setDialogOpen(open); }}>
-        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto" data-testid="mdfe-dialog">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
+        <DialogContent className="max-w-6xl max-h-[94vh] flex flex-col gap-0 p-0" data-testid="mdfe-dialog">
+          <DialogHeader className="px-4 sm:px-6 pt-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex flex-wrap items-center gap-2 text-base">
               <Truck className="w-5 h-5 text-primary" />
               {emitted ? `MDF-e nº ${emitted.numero || '-'}` : editingId ? 'Editar MDF-e' : 'Novo MDF-e'}
               {!emitted && form.cte_ids?.length > 0 && <span className="text-sm font-normal text-slate-500">· {form.cte_ids.length} CT-e(s) do sistema</span>}
+              {!emitted && settings && settings.ambiente !== 'producao' && (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Homologação</span>
+              )}
             </DialogTitle>
           </DialogHeader>
 
-          {emitted ? (
-            <div className="py-6 space-y-5 text-center" data-testid="mdfe-emitted">
-              {emitted.status === 'AUTORIZADO'
-                ? <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-600" />
-                : <Clock className="w-12 h-12 mx-auto text-amber-500" />}
-              <div className="space-y-1">
-                <p className="text-lg font-semibold">
-                  {emitted.status === 'AUTORIZADO' ? `MDF-e nº ${emitted.numero} autorizado` : `MDF-e ${(MDFE_STATUS_LABELS[emitted.status] || emitted.status).toLowerCase()}`}
-                </p>
-                {emitted.status === 'PENDENTE' && <p className="text-sm text-slate-500">A Sefaz ainda não respondeu. Consulte de novo em instantes.</p>}
-                {emitted.chave && <p className="text-xs font-mono text-slate-500 break-all">Chave: {emitted.chave}</p>}
-                {emitted.status === 'AUTORIZADO' && <p className="text-xs text-amber-700 dark:text-amber-300">Lembre de encerrar o MDF-e ao fim da viagem.</p>}
-                {emitted.motivo && emitted.status !== 'AUTORIZADO' && <p className="text-sm text-red-700 dark:text-red-300">{emitted.motivo}</p>}
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {emitted.status === 'AUTORIZADO' ? (
-                  <>
-                    <Button onClick={() => download(emitted, 'pdf')} disabled={!!busy} data-testid="mdfe-emitted-pdf">
-                      {busy === 'pdf' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Printer className="w-4 h-4 mr-1.5" />} DAMDFE
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+            {emitted ? (
+              <div className="py-6 space-y-5 text-center" data-testid="mdfe-emitted">
+                {emitted.status === 'AUTORIZADO'
+                  ? <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-600" />
+                  : <Clock className="w-12 h-12 mx-auto text-amber-500" />}
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold">
+                    {emitted.status === 'AUTORIZADO' ? `MDF-e nº ${emitted.numero} autorizado` : `MDF-e ${(MDFE_STATUS_LABELS[emitted.status] || emitted.status).toLowerCase()}`}
+                  </p>
+                  {emitted.status === 'PENDENTE' && <p className="text-sm text-slate-500">A Sefaz ainda não respondeu. Consulte de novo em instantes.</p>}
+                  {emitted.chave && <p className="text-xs font-mono text-slate-500 break-all">Chave: {emitted.chave}</p>}
+                  {emitted.status === 'AUTORIZADO' && <p className="text-xs text-amber-700 dark:text-amber-300">Lembre de encerrar o MDF-e ao fim da viagem.</p>}
+                  {emitted.motivo && emitted.status !== 'AUTORIZADO' && <p className="text-sm text-red-700 dark:text-red-300">{emitted.motivo}</p>}
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {emitted.status === 'AUTORIZADO' ? (
+                    <>
+                      <Button onClick={() => download(emitted, 'pdf')} disabled={!!busy} data-testid="mdfe-emitted-pdf">
+                        {busy === 'pdf' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Printer className="w-4 h-4 mr-1.5" />} DAMDFE
+                      </Button>
+                      <Button variant="outline" onClick={() => download(emitted, 'xml')} disabled={!!busy}><FileCode className="w-4 h-4 mr-1.5" /> XML</Button>
+                    </>
+                  ) : (
+                    <Button variant="outline" disabled={!!busy}
+                      onClick={() => runAction('refresh', () => api.refreshMdfe(emitted.id), (d) => `Situação: ${MDFE_STATUS_LABELS[d.status] || d.status}`)}>
+                      {busy === 'refresh' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />} Atualizar situação
                     </Button>
-                    <Button variant="outline" onClick={() => download(emitted, 'xml')} disabled={!!busy}><FileCode className="w-4 h-4 mr-1.5" /> XML</Button>
-                  </>
-                ) : (
-                  <Button variant="outline" disabled={!!busy}
-                    onClick={() => runAction('refresh', () => api.refreshMdfe(emitted.id), (d) => `Situação: ${MDFE_STATUS_LABELS[d.status] || d.status}`)}>
-                    {busy === 'refresh' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />} Atualizar situação
-                  </Button>
-                )}
-                <Button variant="outline" onClick={openCreate}><Plus className="w-4 h-4 mr-1.5" /> Novo MDF-e</Button>
+                  )}
+                  <Button variant="outline" onClick={openCreate}><Plus className="w-4 h-4 mr-1.5" /> Novo MDF-e</Button>
+                </div>
               </div>
-            </div>
-          ) : (
-            <>
-              {editingDoc?.motivo && ['REJEITADO', 'ERRO'].includes(editingDoc.status) && (
-                <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-3 py-2 text-sm text-red-800 dark:text-red-200"><b>Último retorno:</b> {editingDoc.motivo}</div>
-              )}
+            ) : (
+              <div className="space-y-7">
+                {editingDoc?.motivo && ['REJEITADO', 'ERRO'].includes(editingDoc.status) && (
+                  <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-3 py-2 text-sm text-red-800 dark:text-red-200"><b>Último retorno:</b> {editingDoc.motivo}</div>
+                )}
+                {issuesIn('basicos') > 0 && (
+                  <section id="mdfe-sec-basicos" className="scroll-mt-3 space-y-1.5">
+                    {issues.filter((it) => it.section === 'basicos').map((it, i) => (
+                      <div key={i} className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                        <AlertTriangle className="w-4 h-4 shrink-0" /> {it.msg}
+                        <button type="button" className="ml-auto text-xs underline" onClick={() => navigate('/fiscal/configuracao')}>Configuração Fiscal</button>
+                      </div>
+                    ))}
+                  </section>
+                )}
 
-              <div className="space-y-6 py-2">
-                <div className="space-y-2" data-testid="mdfe-cte-picker">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <FormSectionTitle bare>CT-es da viagem</FormSectionTitle>
+                <Section id="ctes" title="CT-es da viagem"
+                  actions={(
                     <span className="text-xs text-slate-500">
                       {busy === 'ctes' && <Loader2 className="inline w-3.5 h-3.5 mr-1 animate-spin" />}
-                      Marque os CT-es: percurso, descarga, peso, valor e contratantes são preenchidos sozinhos
+                      Marque os CT-es: percurso, descarga, peso, valor, motorista, veículo e seguro vêm deles
                     </span>
+                  )}>
+                  <div className="space-y-2" data-testid="mdfe-cte-picker">
+                    <Input value={cteFilter} onChange={(e) => setCteFilter(e.target.value)} placeholder="Filtrar por nº, cliente, cidade, container ou ordem" className="h-9" />
+                    <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
+                      {availableCtes.length === 0 ? (
+                        <p className="px-3 py-3 text-sm text-slate-500">Nenhum CT-e autorizado disponível{cteQuery ? ' com esse filtro' : ' (os já manifestados não aparecem)'}.</p>
+                      ) : availableCtes.map((c) => {
+                        const checked = form.cte_ids.includes(c.id);
+                        const otherAmbiente = !checked && ambientePicked && c.ambiente !== ambientePicked;
+                        return (
+                          <label key={c.id} className={`flex items-center gap-3 px-3 py-2 text-sm ${otherAmbiente ? 'opacity-50' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60'}`} data-testid={`mdfe-cte-${c.id}`}>
+                            <Checkbox checked={checked} disabled={busy === 'ctes' || otherAmbiente} onCheckedChange={() => toggleCte(c.id)} />
+                            <span className="w-16 font-semibold tabular-nums">Nº {c.numero}</span>
+                            <span className="flex-1 min-w-0 truncate">{c.remetente?.nome || '-'} → {c.destinatario?.nome || '-'}</span>
+                            <span className="hidden md:block w-44 truncate text-slate-500">{c.destino?.cidade ? `${c.destino.cidade}/${c.destino.uf}` : '-'}</span>
+                            <span className="w-28 text-right tabular-nums">{fmtMoney(c.valor_carga || c.valor_total)}</span>
+                            {c.ambiente === 'homologacao' && <span className="text-[10px] uppercase text-slate-400">homolog.</span>}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <Input value={cteFilter} onChange={(e) => setCteFilter(e.target.value)} placeholder="Filtrar por nº, cliente, cidade, container ou ordem" className="h-9" />
-                  <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
-                    {availableCtes.length === 0 ? (
-                      <p className="px-3 py-3 text-sm text-slate-500">Nenhum CT-e autorizado disponível{cteQuery ? ' com esse filtro' : ' (os já manifestados não aparecem)'}.</p>
-                    ) : availableCtes.map((c) => {
-                      const checked = form.cte_ids.includes(c.id);
-                      const otherAmbiente = !checked && ambientePicked && c.ambiente !== ambientePicked;
-                      return (
-                        <label key={c.id} className={`flex items-center gap-3 px-3 py-2 text-sm ${otherAmbiente ? 'opacity-50' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60'}`} data-testid={`mdfe-cte-${c.id}`}>
-                          <Checkbox checked={checked} disabled={busy === 'ctes' || otherAmbiente} onCheckedChange={() => toggleCte(c.id)} />
-                          <span className="w-16 font-semibold tabular-nums">Nº {c.numero}</span>
-                          <span className="flex-1 min-w-0 truncate">{c.remetente?.nome || '-'} → {c.destinatario?.nome || '-'}</span>
-                          <span className="hidden md:block w-44 truncate text-slate-500">{c.destino?.cidade ? `${c.destino.cidade}/${c.destino.uf}` : '-'}</span>
-                          <span className="w-28 text-right tabular-nums">{fmtMoney(c.valor_carga || c.valor_total)}</span>
-                          {c.ambiente === 'homologacao' && <span className="text-[10px] uppercase text-slate-400">homolog.</span>}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
+                </Section>
 
-                <div className="space-y-3">
-                  <FormSectionTitle>Percurso</FormSectionTitle>
+                <Section id="percurso" title="Percurso" count={issuesIn('percurso')}>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <Field label="UF de início" required><UfSelect value={form.uf_inicio} onChange={(v) => set('uf_inicio', v)} testId="mdfe-uf-inicio" /></Field>
                     <Field label="UF de fim" required><UfSelect value={form.uf_fim} onChange={(v) => set('uf_fim', v)} testId="mdfe-uf-fim" /></Field>
@@ -876,39 +1004,39 @@ export default function MdfePage() {
                       <Input type="datetime-local" value={form.data_inicio_viagem || ''} onChange={(e) => set('data_inicio_viagem', e.target.value)} />
                     </Field>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-slate-500">UFs atravessadas no caminho (sem a de início e a de fim)</p>
-                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('percursos', '')}><Plus className="w-3.5 h-3.5 mr-1" /> UF</Button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {form.percursos.map((p, i) => (
-                        <div key={i} className="flex gap-1 w-32">
-                          <UfSelect value={p} onChange={(v) => setForm((prev) => ({ ...prev, percursos: prev.percursos.map((x, j) => (j === i ? v : x)) }))} allowEmpty />
-                          <RowRemove onClick={() => removeRow('percursos', i)} />
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-x-6 gap-y-4">
+                    <div className="lg:col-span-8 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Municípios de carregamento <span className="text-red-500">*</span></p>
+                        <Button type="button" variant="outline" size="sm" onClick={() => addRow('municipios_carregamento', { cidade: '', uf: form.uf_inicio })}><Plus className="w-3.5 h-3.5 mr-1" /> Município</Button>
+                      </div>
+                      {form.municipios_carregamento.map((m, i) => (
+                        <div key={i} className="flex gap-2 items-end">
+                          <div className="flex-1"><CityStateFields value={{ city: m.cidade, state: m.uf }} onChange={(v) => setRow('municipios_carregamento', i, { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} /></div>
+                          <RowRemove onClick={() => removeRow('municipios_carregamento', i)} />
                         </div>
                       ))}
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-slate-500">Municípios de carregamento *</p>
-                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('municipios_carregamento', { cidade: '', uf: form.uf_inicio })}><Plus className="w-3.5 h-3.5 mr-1" /> Município</Button>
-                    </div>
-                    {form.municipios_carregamento.map((m, i) => (
-                      <div key={i} className="flex gap-2 items-end">
-                        <div className="flex-1"><CityStateFields value={{ city: m.cidade, state: m.uf }} onChange={(v) => setRow('municipios_carregamento', i, { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} /></div>
-                        <RowRemove onClick={() => removeRow('municipios_carregamento', i)} />
+                    <div className="lg:col-span-4 space-y-2 lg:border-l lg:border-slate-200 lg:pl-6 dark:lg:border-slate-700">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">UFs atravessadas</p>
+                        <Button type="button" variant="outline" size="sm" onClick={() => addRow('percursos', '')}><Plus className="w-3.5 h-3.5 mr-1" /> UF</Button>
                       </div>
-                    ))}
+                      {form.percursos.length === 0 && <p className="text-xs text-slate-500">Sem a de início e a de fim. Vazio = viagem direta.</p>}
+                      <div className="flex flex-wrap gap-2">
+                        {form.percursos.map((p, i) => (
+                          <div key={i} className="flex gap-1 w-32">
+                            <UfSelect value={p} onChange={(v) => setForm((prev) => ({ ...prev, percursos: prev.percursos.map((x, j) => (j === i ? v : x)) }))} allowEmpty />
+                            <RowRemove onClick={() => removeRow('percursos', i)} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </Section>
 
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <FormSectionTitle bare>Descarregamento e CT-es *</FormSectionTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={() => addRow('descarregamentos', { cidade: '', uf: form.uf_fim, ctes: [''] })}><Plus className="w-3.5 h-3.5 mr-1" /> Município</Button>
-                  </div>
+                <Section id="descarga" title="Descarregamento e CT-es" count={issuesIn('descarga')}
+                  actions={<Button type="button" variant="outline" size="sm" onClick={() => addRow('descarregamentos', { cidade: '', uf: form.uf_fim, ctes: [''] })}><Plus className="w-3.5 h-3.5 mr-1" /> Município</Button>}>
                   {form.descarregamentos.map((d, di) => (
                     <div key={di} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2" data-testid={`mdfe-descarga-${di}`}>
                       <div className="flex gap-2 items-end">
@@ -917,9 +1045,11 @@ export default function MdfePage() {
                       </div>
                       {d.ctes.map((k, ki) => {
                         const known = authorizedCtes.find((c) => c.chave && c.chave === onlyDigits(k));
+                        const bad = onlyDigits(k).length === 44 && !cteKeyOk(k);
                         return (
                           <div key={ki} className="flex gap-2 items-center">
-                            <Input value={k} onChange={(e) => setUnloadingKey(di, ki, onlyDigits(e.target.value).slice(0, 44))} className="font-mono" aria-label="Chave do CT-e" data-testid={`mdfe-chave-${di}-${ki}`} />
+                            <Input value={k} onChange={(e) => setUnloadingKey(di, ki, onlyDigits(e.target.value).slice(0, 44))} placeholder="Chave do CT-e (44 dígitos)"
+                              className={`font-mono ${bad ? 'border-red-400' : ''}`} aria-label="Chave do CT-e" data-testid={`mdfe-chave-${di}-${ki}`} />
                             {known && <span className="shrink-0 text-xs text-slate-500">CT-e nº {known.numero}</span>}
                             <RowRemove onClick={() => setRow('descarregamentos', di, { ctes: d.ctes.filter((_, j) => j !== ki) })} />
                           </div>
@@ -928,138 +1058,162 @@ export default function MdfePage() {
                       <Button type="button" variant="ghost" size="sm" onClick={() => setRow('descarregamentos', di, { ctes: [...d.ctes, ''] })}><Plus className="w-3.5 h-3.5 mr-1" /> Chave de CT-e (de fora do sistema)</Button>
                     </div>
                   ))}
-                </div>
+                </Section>
 
-                <div className="space-y-3">
-                  <FormSectionTitle>Veículo de tração</FormSectionTitle>
-                  <VehicleFields value={form.veiculo} onChange={(v) => set('veiculo', v)} vehicles={vehicles} registry={registry} onPicked={suggestFromTraction} testId="mdfe-veiculo" />
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <FormSectionTitle bare>Reboques (até 3)</FormSectionTitle>
-                    <Button type="button" variant="outline" size="sm" disabled={form.reboques.length >= 3} onClick={() => addRow('reboques', emptyVehicle(uf, true))}><Plus className="w-3.5 h-3.5 mr-1" /> Reboque</Button>
-                  </div>
-                  {form.reboques.map((r, i) => (
-                    <div key={i} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2">
-                      <div className="flex justify-between items-center"><span className="text-xs font-semibold text-slate-500">Reboque {i + 1}</span><RowRemove onClick={() => removeRow('reboques', i)} /></div>
-                      <VehicleFields value={r} onChange={(v) => setRow('reboques', i, v)} vehicles={vehicles} registry={registry} trailer testId={`mdfe-reboque-${i}`} />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <FormSectionTitle bare>Condutores *</FormSectionTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={() => addRow('condutores', { driver_id: null, nome: '', cpf: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Condutor</Button>
-                  </div>
+                <Section id="condutores" title="Motorista e veículo" count={issuesIn('condutores')}
+                  actions={(
+                    <>
+                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('condutores', { driver_id: null, nome: '', cpf: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Condutor</Button>
+                      <Button type="button" variant="outline" size="sm" disabled={form.reboques.length >= 3} onClick={() => addRow('reboques', emptyVehicle(uf, true))}><Plus className="w-3.5 h-3.5 mr-1" /> Reboque</Button>
+                    </>
+                  )}>
                   {form.condutores.map((c, i) => (
                     <div key={i} className="flex gap-2 items-end">
-                      <Field label="Nome" className="flex-1">
+                      <Field label={i === 0 ? 'Motorista (condutor)' : undefined} required={i === 0} className="flex-1">
                         <Autocomplete value={c.nome || ''} onChange={(t) => setRow('condutores', i, { nome: t, driver_id: null })} options={drivers}
                           displayField={(d) => d.name}
                           onSelect={(d) => { setRow('condutores', i, { driver_id: d.id, nome: d.name, cpf: formatCnpjCpf(d.cpf || '') }); suggestFromDriver(d); }}
                           testId={`mdfe-condutor-${i}`} />
                       </Field>
-                      <Field label="CPF" className="w-44">
+                      <Field label={i === 0 ? 'CPF' : undefined} required={i === 0} className="w-44">
                         <Input value={c.cpf || ''} onChange={(e) => setRow('condutores', i, { cpf: formatCnpjCpf(e.target.value).slice(0, 14) })} className="font-mono" />
                       </Field>
                       <RowRemove onClick={() => removeRow('condutores', i)} />
                     </div>
                   ))}
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <FormSectionTitle bare>CIOT (motorista autônomo / TAC)</FormSectionTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={() => addRow('ciots', { numero: '', responsavel_cnpj_cpf: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> CIOT</Button>
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-slate-500">Veículo principal (tração)</p>
+                    <VehicleFields value={form.veiculo} onChange={(v) => set('veiculo', v)} vehicles={vehicles} registry={registry} onPicked={suggestFromTraction} testId="mdfe-veiculo" />
                   </div>
+                  {form.reboques.map((r, i) => (
+                    <div key={i} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2">
+                      <div className="flex justify-between items-center"><span className="text-xs font-semibold text-slate-500">Vinculado 0{i + 1} (reboque)</span><RowRemove onClick={() => removeRow('reboques', i)} /></div>
+                      <VehicleFields value={r} onChange={(v) => setRow('reboques', i, v)} vehicles={vehicles} registry={registry} trailer testId={`mdfe-reboque-${i}`} />
+                    </div>
+                  ))}
+                </Section>
+
+                <Section id="antt" title="CIOT e contratantes" count={issuesIn('antt')}
+                  actions={(
+                    <>
+                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('ciots', { numero: '', responsavel_cnpj_cpf: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> CIOT</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('contratantes', { nome: '', cnpj_cpf: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Contratante</Button>
+                    </>
+                  )}>
+                  {form.ciots.length === 0 && form.contratantes.length === 0 && (
+                    <p className="text-xs text-slate-500">CIOT só para motorista autônomo / TAC. Os contratantes vêm dos CT-es marcados.</p>
+                  )}
                   {form.ciots.map((c, i) => (
-                    <div key={i} className="flex gap-2 items-end">
-                      <Field label="Código CIOT (12 dígitos)" className="flex-1">
+                    <div key={`ciot-${i}`} className="flex gap-2 items-end">
+                      <Field label={i === 0 ? 'Código CIOT (12 dígitos)' : undefined} className="flex-1">
                         <Input value={c.numero} onChange={(e) => setRow('ciots', i, { numero: onlyDigits(e.target.value).slice(0, 12) })} className="font-mono" />
                       </Field>
-                      <Field label="CNPJ/CPF de quem gerou" className="w-56">
+                      <Field label={i === 0 ? 'CNPJ/CPF de quem gerou' : undefined} className="w-56">
                         <Input value={c.responsavel_cnpj_cpf} onChange={(e) => setRow('ciots', i, { responsavel_cnpj_cpf: formatCnpjCpf(e.target.value) })} className="font-mono" />
                       </Field>
                       <RowRemove onClick={() => removeRow('ciots', i)} />
                     </div>
                   ))}
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <FormSectionTitle bare>Contratantes do transporte</FormSectionTitle>
-                    <Button type="button" variant="outline" size="sm" onClick={() => addRow('contratantes', { nome: '', cnpj_cpf: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Contratante</Button>
-                  </div>
                   {form.contratantes.map((c, i) => (
-                    <div key={i} className="flex gap-2 items-end">
-                      <Field label="Nome" className="flex-1"><Input value={c.nome || ''} onChange={(e) => setRow('contratantes', i, { nome: e.target.value })} /></Field>
-                      <Field label="CNPJ / CPF" className="w-56"><Input value={c.cnpj_cpf} onChange={(e) => setRow('contratantes', i, { cnpj_cpf: formatCnpjCpf(e.target.value) })} className="font-mono" /></Field>
+                    <div key={`contr-${i}`} className="flex gap-2 items-end">
+                      <Field label={i === 0 ? 'Contratante' : undefined} className="flex-1"><Input value={c.nome || ''} onChange={(e) => setRow('contratantes', i, { nome: e.target.value })} /></Field>
+                      <Field label={i === 0 ? 'CNPJ / CPF' : undefined} className="w-56"><Input value={c.cnpj_cpf} onChange={(e) => setRow('contratantes', i, { cnpj_cpf: formatCnpjCpf(e.target.value) })} className="font-mono" /></Field>
                       <RowRemove onClick={() => removeRow('contratantes', i)} />
                     </div>
                   ))}
-                </div>
+                </Section>
 
-                <div className="space-y-3">
-                  <FormSectionTitle>Seguro da carga</FormSectionTitle>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <Field label="Responsável" required>
+                <Section id="seguro" title="Seguro da carga" count={issuesIn('seguro')}
+                  actions={<Button type="button" variant="outline" size="sm" onClick={() => addRow('averbacoes', '')}><Plus className="w-3.5 h-3.5 mr-1" /> Averbação</Button>}>
+                  <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
+                    <Field label="Responsável" required className="md:col-span-2">
                       <OptionSelect value={form.seguro_responsavel} onChange={(v) => set('seguro_responsavel', v)} options={SEGURO_RESPONSAVEL_OPTIONS} />
                     </Field>
                     {form.seguro_responsavel === '2' && (
-                      <Field label="CNPJ/CPF do contratante responsável" required>
+                      <Field label="CNPJ/CPF do contratante" required className="md:col-span-2">
                         <Input value={form.seguro_responsavel_cnpj_cpf} onChange={(e) => set('seguro_responsavel_cnpj_cpf', formatCnpjCpf(e.target.value))} className="font-mono" />
                       </Field>
                     )}
-                    <Field label="Seguradora"><Input value={form.seguradora_nome} maxLength={30} onChange={(e) => set('seguradora_nome', e.target.value)} /></Field>
-                    <Field label="CNPJ da seguradora"><Input value={form.seguradora_cnpj} onChange={(e) => set('seguradora_cnpj', formatCnpjCpf(e.target.value))} className="font-mono" /></Field>
-                    <Field label="Apólice"><Input value={form.seguro_apolice} maxLength={20} onChange={(e) => set('seguro_apolice', e.target.value)} /></Field>
+                    <Field label="Seguradora" className={`col-span-2 ${form.seguro_responsavel === '2' ? 'md:col-span-3' : 'md:col-span-4'}`}>
+                      <Input value={form.seguradora_nome} maxLength={30} onChange={(e) => set('seguradora_nome', e.target.value)} />
+                    </Field>
+                    <Field label="CNPJ da seguradora" className={form.seguro_responsavel === '2' ? 'md:col-span-2' : 'md:col-span-3'}>
+                      <Input value={form.seguradora_cnpj} onChange={(e) => set('seguradora_cnpj', formatCnpjCpf(e.target.value))} className="font-mono" />
+                    </Field>
+                    <Field label="Nº apólice" className={form.seguro_responsavel === '2' ? 'md:col-span-3' : 'md:col-span-3'}>
+                      <Input value={form.seguro_apolice} maxLength={20} onChange={(e) => set('seguro_apolice', e.target.value)} />
+                    </Field>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-slate-500">Averbações</p>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => addRow('averbacoes', '')}><Plus className="w-3.5 h-3.5 mr-1" /> Averbação</Button>
+                  {form.averbacoes.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      {form.averbacoes.map((a, i) => (
+                        <div key={i} className="flex gap-1">
+                          <Input value={a} maxLength={40} placeholder="Nº da averbação" onChange={(e) => setForm((p) => ({ ...p, averbacoes: p.averbacoes.map((x, j) => (j === i ? e.target.value : x)) }))} aria-label="Número da averbação" />
+                          <RowRemove onClick={() => removeRow('averbacoes', i)} />
+                        </div>
+                      ))}
                     </div>
-                    {form.averbacoes.map((a, i) => (
-                      <div key={i} className="flex gap-2 w-full md:w-1/2">
-                        <Input value={a} maxLength={40} onChange={(e) => setForm((p) => ({ ...p, averbacoes: p.averbacoes.map((x, j) => (j === i ? e.target.value : x)) }))} aria-label="Número da averbação" />
-                        <RowRemove onClick={() => removeRow('averbacoes', i)} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                  )}
+                </Section>
 
-                <div className="space-y-3">
-                  <FormSectionTitle>Carga</FormSectionTitle>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <Field label="Tipo da carga" required className="col-span-2">
+                <Section id="carga" title="Totais da carga" count={issuesIn('carga')}>
+                  <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
+                    <Field label="Tipo da carga" required className="col-span-2 md:col-span-3">
                       <OptionSelect value={form.tipo_carga} onChange={(v) => set('tipo_carga', v)} options={TIPO_CARGA_OPTIONS} />
                     </Field>
                     <Field label="Produto predominante" required className="col-span-2 md:col-span-3">
                       <Input value={form.descricao_produto} maxLength={120} onChange={(e) => set('descricao_produto', e.target.value.toUpperCase())} />
                     </Field>
-                    <Field label="Valor total da carga (R$)" required>
-                      <Input inputMode="decimal" value={form.valor_total_carga} onChange={(e) => set('valor_total_carga', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="mdfe-valor-carga" />
+                    <Field label="Valor total (R$)" required className="md:col-span-2">
+                      <Input inputMode="decimal" value={form.valor_total_carga} onChange={(e) => set('valor_total_carga', e.target.value.replace(/[^\d,.]/g, ''))} className="text-right" data-testid="mdfe-valor-carga" />
                     </Field>
-                    <Field label="Peso bruto" required>
-                      <Input inputMode="decimal" value={form.peso_bruto} onChange={(e) => set('peso_bruto', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="mdfe-peso" />
+                    <Field label="Peso bruto" required className="md:col-span-2">
+                      <Input inputMode="decimal" value={form.peso_bruto} onChange={(e) => set('peso_bruto', e.target.value.replace(/[^\d,.]/g, ''))} className="text-right" data-testid="mdfe-peso" />
                     </Field>
-                    <Field label="Unidade">
+                    <Field label="Unidade" className="md:col-span-2">
                       <OptionSelect value={form.unidade_peso} onChange={(v) => set('unidade_peso', v)} options={[['01', 'KG'], ['02', 'TON']]} />
                     </Field>
                   </div>
-                </div>
+                </Section>
 
-                <div className="space-y-3">
-                  <FormSectionTitle>Informações complementares</FormSectionTitle>
-                  <Textarea value={form.observacoes} onChange={(e) => set('observacoes', e.target.value.slice(0, 5000))} rows={2} />
-                </div>
+                <Section id="observacoes" title="Informações complementares">
+                  <Textarea value={form.observacoes} onChange={(e) => set('observacoes', e.target.value.slice(0, 5000))} rows={3} />
+                </Section>
+
+                <Section id="conferencia" title="Conferência antes de transmitir">
+                  {issues.length === 0 ? (
+                    <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200" data-testid="mdfe-conferencia-ok">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" /> Tudo certo para transmitir.
+                    </div>
+                  ) : (
+                    <ul className="space-y-1.5" data-testid="mdfe-issues">
+                      {issues.map((it, i) => (
+                        <li key={i}>
+                          <button type="button" onClick={() => scrollToSection(it.section)}
+                            className="flex w-full items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-900 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                            <span className="flex-1">{it.msg}</span>
+                            <span className="shrink-0 text-xs opacity-80">{SECTION_LABELS[it.section]} ↑</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </Section>
               </div>
-            </>
-          )}
+            )}
+          </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="flex-row flex-wrap items-center justify-end gap-2 space-x-0 sm:space-x-0 border-t border-slate-100 px-4 sm:px-6 py-3 dark:border-slate-800">
+            {!emitted && (
+              issues.length ? (
+                <button type="button" onClick={() => scrollToSection('conferencia')} className="mr-auto flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:underline dark:text-amber-300" data-testid="mdfe-issues-count">
+                  <AlertTriangle className="w-4 h-4" /> {issues.length} pendência(s)
+                </button>
+              ) : (
+                <span className="mr-auto flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="w-4 h-4" /> Pronto para transmitir</span>
+              )
+            )}
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={emitting}>Fechar</Button>
             {!emitted && (
               <>

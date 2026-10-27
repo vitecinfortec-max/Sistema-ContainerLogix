@@ -22,6 +22,28 @@ export function FormSection({ title, icon: Icon, actions, children, className, c
   );
 }
 
+function IssueCount({ n }) {
+  if (!n) return null;
+  return <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{n}</span>;
+}
+
+/**
+ * Bloco de uma página de emissão (CT-e, MDF-e): título com as pendências do
+ * bloco e ações à direita. O id (`<idPrefix>-sec-<id>`) é o alvo das
+ * pendências da conferência.
+ */
+export function IssueSection({ idPrefix, id, title, count, actions, children }) {
+  return (
+    <section id={`${idPrefix}-sec-${id}`} className="scroll-mt-3 space-y-3" data-testid={`${idPrefix}-sec-${id}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-1.5 dark:border-slate-700">
+        <h3 className="flex items-center text-sm font-semibold text-slate-800 dark:text-slate-100">{title}<IssueCount n={count} /></h3>
+        {actions && <div className="flex flex-wrap gap-1.5">{actions}</div>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 /**
  * Título de um grupo de campos dentro de um diálogo ou de uma seção.
  * `bare`: sem o filete embaixo (título ao lado de um botão, ex.: "Itens" +

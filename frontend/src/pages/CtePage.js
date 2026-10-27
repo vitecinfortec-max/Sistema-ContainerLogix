@@ -6,7 +6,7 @@ import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   ToolbarDivider, StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
-import { Field } from '../components/FormKit';
+import { Field, IssueSection } from '../components/FormKit';
 import { AddressFields, CityStateFields } from '../components/AddressFields';
 import { ClientNamePicker } from '../components/ClientNamePicker';
 import { Autocomplete } from '../components/Autocomplete';
@@ -28,7 +28,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import {
-  AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, FileCheck, FileCode, FileCog, FileUp, Loader2, MapPin,
+  AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, FileCheck, FileCode, FileCog, FileSearch, FileUp, Loader2, MapPin,
   PackageCheck, Pencil, Plus, Printer, RefreshCw, Save, Send, Trash2, Truck, X, XCircle,
 } from 'lucide-react';
 
@@ -465,23 +465,7 @@ function RowRemove({ onClick }) {
   );
 }
 
-function IssueCount({ n }) {
-  if (!n) return null;
-  return <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{n}</span>;
-}
-
-/** Bloco da página de emissão: título com as pendências do bloco e ações à direita. */
-function Section({ id, title, count, actions, children }) {
-  return (
-    <section id={`cte-sec-${id}`} className="scroll-mt-3 space-y-3" data-testid={`cte-sec-${id}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-1.5 dark:border-slate-700">
-        <h3 className="flex items-center text-sm font-semibold text-slate-800 dark:text-slate-100">{title}<IssueCount n={count} /></h3>
-        {actions && <div className="flex flex-wrap gap-1.5">{actions}</div>}
-      </div>
-      {children}
-    </section>
-  );
-}
+const Section = (props) => <IssueSection idPrefix="cte" {...props} />;
 
 export default function CtePage() {
   const navigate = useNavigate();
@@ -682,6 +666,21 @@ export default function CtePage() {
     }
   };
 
+  // Espelho em PDF para conferência (sem valor fiscal); do formulário, salva o rascunho antes
+  const preview = async (doc) => {
+    const target = doc || await save({ silent: true });
+    if (!target) return;
+    setBusy('preview');
+    try {
+      const r = await api.getCtePreviewPDF(target.id);
+      downloadBlob(r.data, `Espelho_CTe_${target.numero || 'rascunho'}_SEM_VALOR_FISCAL.pdf`);
+    } catch (e) {
+      toast.error('Erro ao gerar o espelho do CT-e');
+    } finally {
+      setBusy('');
+    }
+  };
+
   const notifyResult = (doc) => {
     if (doc.status === 'AUTORIZADO') {
       toast.success(`CT-e nº ${doc.numero} autorizado`, { action: { label: 'DACTE', onClick: () => download(doc, 'pdf') } });
@@ -877,6 +876,7 @@ export default function CtePage() {
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => openEdit(selected)} disabled={!isEditable} testId="cte-edit-btn" />
               <ToolbarButton icon={Send} label="Transmitir" tone="emerald" onClick={() => emit(selected)} disabled={!isEditable || !!busy} testId="cte-emit-btn" />
               <ToolbarButton icon={RefreshCw} label="Atualizar situação" tone="slate" onClick={() => refresh(selected)} disabled={!selected?.provider_id || !!busy} testId="cte-refresh-btn" />
+              <ToolbarButton icon={FileSearch} label="Espelho (conferência)" tone="slate" onClick={() => preview(selected)} disabled={!selected || !!busy} testId="cte-preview-btn" />
               <ToolbarButton icon={Printer} label="DACTE" tone="emerald" onClick={() => download(selected, 'pdf')} disabled={!isDone || !!busy} testId="cte-pdf-btn" />
               <ToolbarButton icon={FileCode} label="XML" tone="slate" onClick={() => download(selected, 'xml')} disabled={!isDone || !!busy} testId="cte-xml-btn" />
               <ToolbarButton icon={Truck} label="Gerar MDF-e" tone="violet" onClick={() => navigate(`/fiscal/mdfe?ctes=${selectedDocs.map((c) => c.id).join(',')}`)} disabled={!canManifest} testId="cte-mdfe-btn" />
@@ -1411,6 +1411,9 @@ export default function CtePage() {
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={emitting}>Fechar</Button>
             {!emittedDoc && (
               <>
+                <Button variant="outline" onClick={() => preview()} disabled={saving || !!busy} title="PDF para conferência, sem valor fiscal (salva o rascunho)" data-testid="cte-form-preview-btn">
+                  {busy === 'preview' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <FileSearch className="w-4 h-4 mr-1.5" />} Espelho PDF
+                </Button>
                 <Button variant="outline" onClick={() => save()} disabled={saving || !!busy} data-testid="cte-save-btn">
                   {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />} Salvar rascunho
                 </Button>
