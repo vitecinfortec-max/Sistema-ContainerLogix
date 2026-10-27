@@ -155,7 +155,62 @@ def validate(cte: dict, settings: dict) -> list:
             errors.append("Chave de NF-e deve ter 44 dígitos")
         if doc.get("tipo") == "OUTROS" and not _text(doc.get("descricao")) and doc.get("tipo_outros", "99") == "99":
             errors.append("Outro documento: informe a descrição")
+
+    motorista = cte.get("motorista") or {}
+    if only_digits(motorista.get("cpf")) and len(only_digits(motorista.get("cpf"))) != 11:
+        errors.append("Motorista: CPF deve ter 11 dígitos")
+    if only_digits(cte.get("seguradora_cnpj")) and len(only_digits(cte.get("seguradora_cnpj"))) != 14:
+        errors.append("Seguro: CNPJ da seguradora deve ter 14 dígitos")
+    for vale in cte.get("vales_pedagio") or []:
+        if len(only_digits(vale.get("fornecedor_cnpj"))) != 14:
+            errors.append("Vale-pedágio: informe o CNPJ da fornecedora (14 dígitos)")
+        if not _text(vale.get("numero_comprovante")):
+            errors.append("Vale-pedágio: informe o número do comprovante")
+        if _money(vale.get("valor")) <= 0:
+            errors.append("Vale-pedágio: informe o valor")
     return errors
+
+
+TOLL_PAYERS = {"EMITENTE": "Emitente", "REMETENTE": "Remetente", "DESTINATARIO": "Destinatário", "TOMADOR": "Tomador"}
+TOLL_TYPES = {"01": "TAG", "02": "Cupom", "03": "Cartão"}
+
+
+def _brl(value) -> str:
+    return f"R$ {_money(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def trip_notes(cte: dict) -> list:
+    """Motorista, placas, seguro e vale-pedágio da viagem em texto: o CT-e 4.00
+    não tem esses grupos (estão no MDF-e), então vão nas observações do DACTE."""
+    notes = []
+    motorista = cte.get("motorista") or {}
+    if _text(motorista.get("nome")):
+        cpf = only_digits(motorista.get("cpf"))
+        notes.append(f"Motorista: {_text(motorista['nome'])}" + (f" - CPF {cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}" if len(cpf) == 11 else ""))
+    placas = [p for p in [cte.get("veiculo_placa"), *(cte.get("reboque_placas") or [])] if _text(p)]
+    if placas:
+        notes.append("Placas: " + " / ".join(_text(p).upper() for p in placas))
+    if _text(cte.get("seguradora_nome")) or _text(cte.get("seguro_apolice")):
+        seguro = "Seguro: " + (_text(cte.get("seguradora_nome")) or "-")
+        if _text(cte.get("seguro_apolice")):
+            seguro += f" - Apólice {_text(cte['seguro_apolice'])}"
+        if _text(cte.get("seguro_averbacao")):
+            seguro += f" - Averbação {_text(cte['seguro_averbacao'])}"
+        if cte.get("seguro_responsavel"):
+            seguro += " - Resp.: " + ("Emitente" if int(cte["seguro_responsavel"]) == 1 else "Contratante")
+        notes.append(seguro)
+    for vale in cte.get("vales_pedagio") or []:
+        if not _text(vale.get("numero_comprovante")) and not _money(vale.get("valor")):
+            continue
+        parts = [f"Vale-pedágio nº {_text(vale.get('numero_comprovante')) or '-'}", _brl(vale.get("valor"))]
+        if _text(vale.get("fornecedor_nome")) or only_digits(vale.get("fornecedor_cnpj")):
+            parts.append("Fornecedora " + (_text(vale.get("fornecedor_nome")) or only_digits(vale.get("fornecedor_cnpj"))))
+        if vale.get("tipo") in TOLL_TYPES:
+            parts.append(TOLL_TYPES[vale["tipo"]])
+        if vale.get("pago_por") in TOLL_PAYERS:
+            parts.append("Pago por " + TOLL_PAYERS[vale["pago_por"]])
+        notes.append(" - ".join(parts))
+    return notes
 
 
 def _party(party: dict, suffix: str) -> dict:
@@ -349,7 +404,7 @@ def build_payload(cte: dict, settings: dict, now: datetime = None) -> dict:
     if outros:
         payload["outros_documentos"] = outros
 
-    obs = _text(cte.get("observacoes"), 2000)
+    obs = _text(" | ".join(n for n in [_text(cte.get("observacoes")), *trip_notes(cte)] if n), 2000)
     if obs:
         payload["observacao"] = obs
     payload["modal_rodoviario"] = {"rntrc": only_digits(settings.get("rntrc"))}

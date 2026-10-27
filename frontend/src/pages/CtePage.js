@@ -6,7 +6,7 @@ import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   ToolbarDivider, StatusPill, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
-import { FormSectionTitle, Field } from '../components/FormKit';
+import { Field } from '../components/FormKit';
 import { AddressFields, CityStateFields } from '../components/AddressFields';
 import { ClientNamePicker } from '../components/ClientNamePicker';
 import { Autocomplete } from '../components/Autocomplete';
@@ -15,7 +15,6 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
@@ -43,11 +42,28 @@ const toNumber = (v) => {
 const toInput = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','));
 const toMoneyInput = (v) => (v === null || v === undefined || v === '' ? '' : Number(v).toFixed(2).replace('.', ','));
 
-const TAB_LABELS = { basicos: 'Dados básicos', carga: 'Carga e documentos', frete: 'Frete e impostos', conferencia: 'Conferência' };
+// Seções da página de emissão (as pendências da conferência levam até elas)
+const SECTION_LABELS = {
+  basicos: 'Dados básicos', envolvidos: 'Envolvidos', viagem: 'Motorista e veículo', seguro: 'Seguro', documentos: 'Documentos',
+  carga: 'Totais da carga', frete: 'Composição do frete', pedagio: 'Vale-pedágio',
+};
 // Componentes mais usados na composição do frete (o nome vai no CT-e, até 15 caracteres)
 const COMPONENT_PRESETS = [['FRETE VALOR', 'Frete'], ['PEDAGIO', 'Pedágio'], ['SEGURO', 'Seguro'], ['OUTROS', 'Outros']];
 
 const emptyParty = () => ({ client_id: null, nome: '', cnpj_cpf: '', ie: '', fone: '', email: '', endereco: {} });
+const emptyDriver = () => ({ driver_id: null, nome: '', cpf: '' });
+const emptyToll = () => ({ pago_por: 'EMITENTE', tipo: '01', fornecedor_nome: '', fornecedor_cnpj: '', numero_comprovante: '', valor: '' });
+const normPlate = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const TOLL_PAYER_OPTIONS = [['EMITENTE', 'Emitente'], ['REMETENTE', 'Remetente'], ['DESTINATARIO', 'Destinatário'], ['TOMADOR', 'Tomador']];
+const TOLL_TYPE_OPTIONS = [['01', 'TAG'], ['02', 'Cupom'], ['03', 'Cartão']];
+// Seguro da carga: padrão da Configuração Fiscal (o mesmo do MDF-e)
+const insuranceDefaults = (settings) => ({
+  seguro_responsavel: String(settings?.seguro_responsavel || 1),
+  seguradora_nome: settings?.seguradora_nome || '',
+  seguradora_cnpj: settings?.seguradora_cnpj ? formatCnpjCpf(settings.seguradora_cnpj) : '',
+  seguro_apolice: settings?.seguro_apolice || '',
+  seguro_averbacao: '',
+});
 
 function buildEmpty(settings) {
   return {
@@ -76,6 +92,11 @@ function buildEmpty(settings) {
     documentos: [{ tipo: 'NFE', chave: '', tipo_outros: '99', descricao: '', numero: '', data_emissao: '', valor: '' }],
     containers: [],
     observacoes: '',
+    motorista: emptyDriver(),
+    veiculo_placa: '',
+    reboque_placas: ['', ''],
+    ...insuranceDefaults(settings),
+    vales_pedagio: [],
   };
 }
 
@@ -110,6 +131,17 @@ function toForm(doc, settings) {
     documentos: (doc.documentos?.length ? doc.documentos : base.documentos).map((d) => ({ ...base.documentos[0], ...d, valor: toMoneyInput(d.valor) })),
     containers: doc.containers || [],
     observacoes: doc.observacoes || '',
+    motorista: { ...emptyDriver(), ...(doc.motorista || {}), cpf: doc.motorista?.cpf ? formatCnpjCpf(doc.motorista.cpf) : '' },
+    veiculo_placa: doc.veiculo_placa || '',
+    reboque_placas: [...(doc.reboque_placas || []), '', ''].slice(0, 2),
+    seguro_responsavel: String(doc.seguro_responsavel || base.seguro_responsavel),
+    seguradora_nome: doc.seguradora_nome ?? base.seguradora_nome,
+    seguradora_cnpj: doc.seguradora_cnpj ? formatCnpjCpf(doc.seguradora_cnpj) : (doc.seguradora_nome ? '' : base.seguradora_cnpj),
+    seguro_apolice: doc.seguro_apolice ?? base.seguro_apolice,
+    seguro_averbacao: doc.seguro_averbacao || '',
+    vales_pedagio: (doc.vales_pedagio || []).map((v) => ({
+      ...emptyToll(), ...v, fornecedor_cnpj: v.fornecedor_cnpj ? formatCnpjCpf(v.fornecedor_cnpj) : '', valor: toMoneyInput(v.valor),
+    })),
   };
 }
 
@@ -233,7 +265,7 @@ function cnpjCpfOk(value) {
 /** Conferência local antes de transmitir (as mesmas regras do backend, sem ir à Sefaz). */
 function validateCte(f, settings) {
   const issues = [];
-  const add = (tab, msg) => issues.push({ tab, msg });
+  const add = (section, msg) => issues.push({ section, msg });
   if (settings && (!settings.provider_configured || !settings.provider_synced_at || !settings.certificate)) {
     add('basicos', 'Configuração Fiscal incompleta (emissor, cadastro da empresa ou certificado A1)');
   }
@@ -244,15 +276,15 @@ function validateCte(f, settings) {
   if (f.tomador_papel === '4') parties.push(['Tomador', f.tomador]);
   parties.forEach(([label, p]) => {
     const e = p?.endereco || {};
-    if ((p?.nome || '').trim().length < 2) add('basicos', `${label}: informe o nome / razão social`);
-    if (!cnpjCpfOk(p?.cnpj_cpf)) add('basicos', `${label}: CNPJ/CPF inválido`);
+    if ((p?.nome || '').trim().length < 2) add('envolvidos', `${label}: informe o nome / razão social`);
+    if (!cnpjCpfOk(p?.cnpj_cpf)) add('envolvidos', `${label}: CNPJ/CPF inválido`);
     if ((e.logradouro || '').trim().length < 2 || !(e.numero || '').trim() || (e.bairro || '').trim().length < 2) {
-      add('basicos', `${label}: endereço incompleto (logradouro, número e bairro)`);
+      add('envolvidos', `${label}: endereço incompleto (logradouro, número e bairro)`);
     }
-    if ((e.cidade || '').trim().length < 2 || !e.uf) add('basicos', `${label}: informe a cidade e a UF do endereço`);
+    if ((e.cidade || '').trim().length < 2 || !e.uf) add('envolvidos', `${label}: informe a cidade e a UF do endereço`);
   });
   [['Início da prestação', f.origem], ['Término da prestação', f.destino]].forEach(([label, p]) => {
-    if ((p?.cidade || '').trim().length < 2 || !p?.uf) add('basicos', `${label}: informe a cidade e a UF`);
+    if ((p?.cidade || '').trim().length < 2 || !p?.uf) add('envolvidos', `${label}: informe a cidade e a UF`);
   });
 
   if (!(f.produto_predominante || '').trim()) add('carga', 'Informe o produto predominante');
@@ -263,15 +295,15 @@ function validateCte(f, settings) {
     if (d.tipo === 'NFE' && onlyDigits(d.chave)) {
       docs += 1;
       keys.push(onlyDigits(d.chave));
-      if (!accessKeyOk(d.chave, '55')) add('carga', `NF-e ${i + 1}: chave inválida (44 dígitos, confira o dígito verificador)`);
+      if (!accessKeyOk(d.chave, '55')) add('documentos', `NF-e ${i + 1}: chave inválida (44 dígitos, confira o dígito verificador)`);
     }
     if (d.tipo === 'OUTROS' && (d.descricao || d.numero)) {
       docs += 1;
-      if (d.tipo_outros === '99' && !(d.descricao || '').trim()) add('carga', `Documento ${i + 1}: informe a descrição`);
+      if (d.tipo_outros === '99' && !(d.descricao || '').trim()) add('documentos', `Documento ${i + 1}: informe a descrição`);
     }
   });
-  if (!docs) add('carga', 'Informe ao menos um documento transportado (chave da NF-e ou outro documento)');
-  if (new Set(keys).size !== keys.length) add('carga', 'A mesma chave de NF-e aparece mais de uma vez');
+  if (!docs) add('documentos', 'Informe ao menos um documento transportado (chave da NF-e ou outro documento)');
+  if (new Set(keys).size !== keys.length) add('documentos', 'A mesma chave de NF-e aparece mais de uma vez');
 
   const total = toNumber(f.valor_total) || 0;
   if (total <= 0) add('frete', 'Informe o valor total da prestação (ou a composição do frete)');
@@ -282,6 +314,17 @@ function validateCte(f, settings) {
     const rate = toNumber(f.icms_aliquota);
     if (!rate || rate <= 0 || rate > 100) add('frete', 'Informe a alíquota do ICMS');
   }
+
+  const cpf = onlyDigits(f.motorista?.cpf);
+  if (cpf && !cnpjCpfOk(cpf)) add('viagem', 'Motorista: CPF inválido');
+  if ((f.motorista?.nome || '').trim() && !cpf) add('viagem', 'Motorista: informe o CPF');
+  if (onlyDigits(f.seguradora_cnpj) && !cnpjCpfOk(f.seguradora_cnpj)) add('seguro', 'Seguro: CNPJ da seguradora inválido');
+  f.vales_pedagio.forEach((v, i) => {
+    const n = f.vales_pedagio.length > 1 ? ` ${i + 1}` : '';
+    if (!cnpjCpfOk(v.fornecedor_cnpj) || onlyDigits(v.fornecedor_cnpj).length !== 14) add('pedagio', `Vale-pedágio${n}: CNPJ da fornecedora inválido`);
+    if (!(v.numero_comprovante || '').trim()) add('pedagio', `Vale-pedágio${n}: informe o número do comprovante`);
+    if (!(toNumber(v.valor) > 0)) add('pedagio', `Vale-pedágio${n}: informe o valor`);
+  });
   return issues;
 }
 
@@ -322,6 +365,23 @@ function toPayload(form) {
       })),
     containers: form.containers.filter((c) => (c.numero || '').trim()).map((c) => ({ numero: c.numero.trim().toUpperCase(), lacre: (c.lacre || '').trim() || null })),
     observacoes: (form.observacoes || '').trim() || null,
+    motorista: (form.motorista?.nome || '').trim()
+      ? { driver_id: form.motorista.driver_id || null, nome: form.motorista.nome.trim(), cpf: onlyDigits(form.motorista.cpf) || null }
+      : null,
+    veiculo_placa: normPlate(form.veiculo_placa) || null,
+    reboque_placas: form.reboque_placas.map(normPlate).filter(Boolean),
+    seguro_responsavel: Number(form.seguro_responsavel) || null,
+    seguradora_nome: (form.seguradora_nome || '').trim() || null,
+    seguradora_cnpj: onlyDigits(form.seguradora_cnpj) || null,
+    seguro_apolice: (form.seguro_apolice || '').trim() || null,
+    seguro_averbacao: (form.seguro_averbacao || '').trim() || null,
+    vales_pedagio: form.vales_pedagio
+      .filter((v) => (v.numero_comprovante || '').trim() || toNumber(v.valor) || onlyDigits(v.fornecedor_cnpj))
+      .map((v) => ({
+        pago_por: v.pago_por, tipo: v.tipo, fornecedor_nome: (v.fornecedor_nome || '').trim() || null,
+        fornecedor_cnpj: onlyDigits(v.fornecedor_cnpj) || null, numero_comprovante: (v.numero_comprovante || '').trim() || null,
+        valor: toNumber(v.valor),
+      })),
   };
 }
 
@@ -405,9 +465,22 @@ function RowRemove({ onClick }) {
   );
 }
 
-function TabCount({ n }) {
+function IssueCount({ n }) {
   if (!n) return null;
   return <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{n}</span>;
+}
+
+/** Bloco da página de emissão: título com as pendências do bloco e ações à direita. */
+function Section({ id, title, count, actions, children }) {
+  return (
+    <section id={`cte-sec-${id}`} className="scroll-mt-3 space-y-3" data-testid={`cte-sec-${id}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-1.5 dark:border-slate-700">
+        <h3 className="flex items-center text-sm font-semibold text-slate-800 dark:text-slate-100">{title}<IssueCount n={count} /></h3>
+        {actions && <div className="flex flex-wrap gap-1.5">{actions}</div>}
+      </div>
+      {children}
+    </section>
+  );
 }
 
 export default function CtePage() {
@@ -420,12 +493,13 @@ export default function CtePage() {
   const [settings, setSettings] = useState(null);
   const [clients, setClients] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(buildEmpty());
   const [formKey, setFormKey] = useState(0);
-  const [tab, setTab] = useState('basicos');
   const [emitted, setEmitted] = useState(null);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState('');
@@ -440,12 +514,18 @@ export default function CtePage() {
   const filtered = statusFilter ? list.filter((c) => c.status === statusFilter) : list;
   const { pageItems, paginationProps } = usePagination(filtered, { resetKey: `${search}|${statusFilter}` });
   const issues = useMemo(() => validateCte(form, settings), [form, settings]);
-  const issuesIn = (t) => issues.filter((i) => i.tab === t).length;
+  const issuesIn = (section) => issues.filter((i) => i.section === section).length;
+  // Rola a página do formulário até a seção (depois do diálogo abrir/renderizar)
+  const scrollToSection = (id) => setTimeout(() => {
+    document.getElementById(`cte-sec-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 120);
 
   useEffect(() => {
     api.getFiscalSettings().then((r) => setSettings(r.data)).catch(() => setSettings({}));
     api.getClients().then((r) => setClients((r.data || []).filter((c) => c.status !== 'INATIVO'))).catch(() => {});
     api.getLoadingOrders().then((r) => setOrders(r.data || [])).catch(() => {});
+    api.getDrivers().then((r) => setDrivers((r.data || []).filter((d) => d.status !== 'INATIVO'))).catch(() => {});
+    api.getVehicles({ per_page: 1000 }).then((r) => setVehicles(r.data?.items || r.data || [])).catch(() => {});
     return () => { activeRef.current = false; };
   }, []);
 
@@ -476,12 +556,34 @@ export default function CtePage() {
   }));
   const addRow = (field, row) => update((prev) => ({ ...prev, [field]: [...prev[field], row] }));
   const removeRow = (field, index) => update((prev) => ({ ...prev, [field]: prev[field].filter((_, i) => i !== index) }));
+  const setTrailer = (index, plate) => update((prev) => ({ ...prev, reboque_placas: prev.reboque_placas.map((p, i) => (i === index ? plate : p)) }));
 
-  const openForm = (f, { id = null, startTab = 'basicos' } = {}) => {
+  // Motorista escolhido: cavalo e carreta padrão dele, se ainda não há placa
+  const pickDriver = (driver) => update((prev) => ({
+    ...prev,
+    motorista: { driver_id: driver.id, nome: driver.name || '', cpf: driver.cpf ? formatCnpjCpf(driver.cpf) : '' },
+    veiculo_placa: prev.veiculo_placa || normPlate(driver.default_truck_plate),
+    reboque_placas: prev.reboque_placas.some(Boolean) ? prev.reboque_placas : [normPlate(driver.default_trailer_plate), ''],
+  }));
+  // Cavalo escolhido: motorista vinculado e a carreta dele, se ainda estão vazios
+  const pickTraction = (vehicle) => update((prev) => {
+    const plate = normPlate(vehicle.plate);
+    const driver = drivers.find((d) => d.id === vehicle.driver_id) || drivers.find((d) => normPlate(d.default_truck_plate) === plate);
+    const next = { ...prev, veiculo_placa: plate };
+    if (!driver) return next;
+    return {
+      ...next,
+      motorista: (prev.motorista?.nome || '').trim() ? prev.motorista
+        : { driver_id: driver.id, nome: driver.name || '', cpf: driver.cpf ? formatCnpjCpf(driver.cpf) : '' },
+      reboque_placas: prev.reboque_placas.some(Boolean) ? prev.reboque_placas : [normPlate(driver.default_trailer_plate), ''],
+    };
+  });
+
+  const openForm = (f, { id = null, focus = null } = {}) => {
     setEditingId(id);
     setEmitted(null);
     setForm(derive(f, f));
-    setTab(startTab);
+    if (focus) scrollToSection(focus);
     setFormKey((k) => k + 1);
     setDialogOpen(true);
   };
@@ -516,7 +618,12 @@ export default function CtePage() {
       quantidades: f.quantidades.map((q) => ({ ...q, quantidade: '' })),
       valor_carga: '',
       observacoes: doc.loading_order_id ? '' : f.observacoes,
-    }, { startTab: 'carga' });
+      motorista: emptyDriver(),
+      veiculo_placa: '',
+      reboque_placas: ['', ''],
+      seguro_averbacao: '',
+      vales_pedagio: [],
+    }, { focus: 'documentos' });
     toast.info(`Cópia do CT-e nº ${doc.numero || '-'}: informe os documentos e a carga desta viagem`);
   };
 
@@ -539,7 +646,7 @@ export default function CtePage() {
     const editing = dialogOpen && !emitted;
     const result = mergeXml(editing ? form : buildEmpty(settings), items, ctx);
     if (editing) setForm(derive(form, result.form));
-    else openForm({ ...result.form, indicador_ie_tomador: indicadorIe(payerOf(result.form)) }, { startTab: 'conferencia' });
+    else openForm({ ...result.form, indicador_ie_tomador: indicadorIe(payerOf(result.form)) });
     const parts = [result.ctes && 'dados do CT-e', result.nfes && `${result.nfes} NF-e`].filter(Boolean);
     if (parts.length) toast.success(`Importado: ${parts.join(' e ')}. Confira antes de transmitir.`);
     result.warnings.forEach((w) => toast.warning(w));
@@ -610,7 +717,7 @@ export default function CtePage() {
 
   const saveAndEmit = async () => {
     if (issues.length) {
-      setTab('conferencia');
+      scrollToSection('conferencia');
       toast.error(`Há ${issues.length} pendência(s) antes de transmitir`);
       return;
     }
@@ -618,7 +725,7 @@ export default function CtePage() {
     if (!doc) return;
     const result = await emit(doc);
     if (!result) return;
-    if (CTE_EDITABLE.includes(result.status)) setTab('conferencia');
+    if (CTE_EDITABLE.includes(result.status)) scrollToSection('conferencia');
     else setEmitted(result);
   };
 
@@ -697,7 +804,8 @@ export default function CtePage() {
   const icmsValue = Math.round(total * icmsRate) / 100;
   const nfeCount = form.documentos.filter((d) => d.tipo === 'NFE' && onlyDigits(d.chave)).length;
   const otherDocCount = form.documentos.filter((d) => d.tipo === 'OUTROS' && (d.descricao || d.numero)).length;
-  const payerLabel = (TOMADOR_OPTIONS.find(([v]) => v === form.tomador_papel) || [])[1] || '-';
+  // Peso bruto total pelas quantidades em KG e TON
+  const pesoKg = form.quantidades.reduce((sum, q) => sum + (toNumber(q.quantidade) || 0) * ({ '01': 1, '02': 1000 }[q.unidade] || 0), 0);
   const placeLabel = (p) => (p?.cidade ? `${p.cidade}/${p.uf}` : '-');
   const emitting = busy === 'emit' || busy === 'wait';
 
@@ -882,350 +990,424 @@ export default function CtePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Formulário */}
+      {/* Formulário: uma página só, na ordem do conhecimento */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!emitting) setDialogOpen(open); }}>
-        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto" data-testid="cte-dialog">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
+        <DialogContent className="max-w-6xl max-h-[94vh] flex flex-col gap-0 p-0" data-testid="cte-dialog">
+          <DialogHeader className="px-4 sm:px-6 pt-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <DialogTitle className="flex flex-wrap items-center gap-2 text-base">
               <FileCheck className="w-5 h-5 text-primary" />
               {emittedDoc ? `CT-e nº ${emittedDoc.numero || '-'}` : editingId ? 'Editar CT-e' : 'Novo CT-e'}
               {!emittedDoc && form.loading_order_number && <span className="text-sm font-normal text-slate-500">· Ordem de Carregamento #{form.loading_order_number}</span>}
+              {!emittedDoc && settings && settings.ambiente !== 'producao' && (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Homologação</span>
+              )}
             </DialogTitle>
           </DialogHeader>
 
-          {emittedDoc ? (
-            <div className="py-6 space-y-5 text-center" data-testid="cte-emitted">
-              {emittedDoc.status === 'AUTORIZADO'
-                ? <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-600" />
-                : <Clock className="w-12 h-12 mx-auto text-amber-500" />}
-              <div className="space-y-1">
-                <p className="text-lg font-semibold">
-                  {emittedDoc.status === 'AUTORIZADO' ? `CT-e nº ${emittedDoc.numero} autorizado` : `CT-e ${(CTE_STATUS_LABELS[emittedDoc.status] || emittedDoc.status).toLowerCase()}`}
-                </p>
-                {emittedDoc.status === 'PENDENTE' && <p className="text-sm text-slate-500">A Sefaz ainda não respondeu. Consulte de novo em instantes.</p>}
-                {emittedDoc.chave && <p className="text-xs font-mono text-slate-500 break-all">Chave: {emittedDoc.chave}{emittedDoc.protocolo ? ` · Protocolo: ${emittedDoc.protocolo}` : ''}</p>}
-                {emittedDoc.motivo && emittedDoc.status !== 'AUTORIZADO' && <p className="text-sm text-red-700 dark:text-red-300">{emittedDoc.motivo}</p>}
-              </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {emittedDoc.status === 'AUTORIZADO' ? (
-                  <>
-                    <Button onClick={() => download(emittedDoc, 'pdf')} disabled={!!busy} data-testid="cte-emitted-pdf">
-                      {busy === 'pdf' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Printer className="w-4 h-4 mr-1.5" />} DACTE
-                    </Button>
-                    <Button variant="outline" onClick={() => download(emittedDoc, 'xml')} disabled={!!busy}><FileCode className="w-4 h-4 mr-1.5" /> XML</Button>
-                    <Button variant="outline" onClick={() => navigate(`/fiscal/mdfe?ctes=${emittedDoc.id}`)} data-testid="cte-emitted-mdfe"><Truck className="w-4 h-4 mr-1.5" /> Gerar MDF-e</Button>
-                  </>
-                ) : (
-                  <Button variant="outline" onClick={() => refresh(emittedDoc)} disabled={!!busy}>
-                    {busy === 'refresh' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />} Atualizar situação
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => openDuplicate(emittedDoc)} data-testid="cte-emitted-duplicate"><Copy className="w-4 h-4 mr-1.5" /> Duplicar</Button>
-                <Button variant="outline" onClick={openCreate}><Plus className="w-4 h-4 mr-1.5" /> Novo CT-e</Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              {editingDoc?.motivo && ['REJEITADO', 'ERRO'].includes(editingDoc.status) && (
-                <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-3 py-2 text-sm text-red-800 dark:text-red-200">
-                  <b>Último retorno:</b> {editingDoc.motivo}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4" key={formKey}>
+            {emittedDoc ? (
+              <div className="py-6 space-y-5 text-center" data-testid="cte-emitted">
+                {emittedDoc.status === 'AUTORIZADO'
+                  ? <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-600" />
+                  : <Clock className="w-12 h-12 mx-auto text-amber-500" />}
+                <div className="space-y-1">
+                  <p className="text-lg font-semibold">
+                    {emittedDoc.status === 'AUTORIZADO' ? `CT-e nº ${emittedDoc.numero} autorizado` : `CT-e ${(CTE_STATUS_LABELS[emittedDoc.status] || emittedDoc.status).toLowerCase()}`}
+                  </p>
+                  {emittedDoc.status === 'PENDENTE' && <p className="text-sm text-slate-500">A Sefaz ainda não respondeu. Consulte de novo em instantes.</p>}
+                  {emittedDoc.chave && <p className="text-xs font-mono text-slate-500 break-all">Chave: {emittedDoc.chave}{emittedDoc.protocolo ? ` · Protocolo: ${emittedDoc.protocolo}` : ''}</p>}
+                  {emittedDoc.motivo && emittedDoc.status !== 'AUTORIZADO' && <p className="text-sm text-red-700 dark:text-red-300">{emittedDoc.motivo}</p>}
                 </div>
-              )}
-
-              <Tabs value={tab} onValueChange={setTab} key={formKey}>
-                <TabsList className="flex flex-wrap h-auto">
-                  <TabsTrigger value="basicos" data-testid="cte-tab-basicos">Dados básicos<TabCount n={issuesIn('basicos')} /></TabsTrigger>
-                  <TabsTrigger value="carga" data-testid="cte-tab-carga">Carga e documentos<TabCount n={issuesIn('carga')} /></TabsTrigger>
-                  <TabsTrigger value="frete" data-testid="cte-tab-frete">Frete e impostos<TabCount n={issuesIn('frete')} /></TabsTrigger>
-                  <TabsTrigger value="conferencia" data-testid="cte-tab-conferencia">
-                    Conferência
-                    {issues.length ? <TabCount n={issues.length} /> : <CheckCircle2 className="ml-1.5 w-3.5 h-3.5 text-emerald-600" />}
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="basicos" className="space-y-6 pt-3">
-                  <div className="space-y-3">
-                    <FormSectionTitle>Operação</FormSectionTitle>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                      <Field label="CFOP" required className="md:col-span-2" hint="5xxx/6xxx ajustado pelo percurso (dentro da UF / interestadual)">
-                        <Select value={form.cfop} onValueChange={(v) => set('cfop', v)}>
-                          <SelectTrigger data-testid="cte-cfop"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {CFOP_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                      <Field label="Natureza da Operação" required className="md:col-span-2">
-                        <Input value={form.natureza_operacao} onChange={(e) => set('natureza_operacao', e.target.value.toUpperCase())} maxLength={60} />
-                      </Field>
-                    </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {emittedDoc.status === 'AUTORIZADO' ? (
+                    <>
+                      <Button onClick={() => download(emittedDoc, 'pdf')} disabled={!!busy} data-testid="cte-emitted-pdf">
+                        {busy === 'pdf' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Printer className="w-4 h-4 mr-1.5" />} DACTE
+                      </Button>
+                      <Button variant="outline" onClick={() => download(emittedDoc, 'xml')} disabled={!!busy}><FileCode className="w-4 h-4 mr-1.5" /> XML</Button>
+                      <Button variant="outline" onClick={() => navigate(`/fiscal/mdfe?ctes=${emittedDoc.id}`)} data-testid="cte-emitted-mdfe"><Truck className="w-4 h-4 mr-1.5" /> Gerar MDF-e</Button>
+                    </>
+                  ) : (
+                    <Button variant="outline" onClick={() => refresh(emittedDoc)} disabled={!!busy}>
+                      {busy === 'refresh' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />} Atualizar situação
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => openDuplicate(emittedDoc)} data-testid="cte-emitted-duplicate"><Copy className="w-4 h-4 mr-1.5" /> Duplicar</Button>
+                  <Button variant="outline" onClick={openCreate}><Plus className="w-4 h-4 mr-1.5" /> Novo CT-e</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-7">
+                {editingDoc?.motivo && ['REJEITADO', 'ERRO'].includes(editingDoc.status) && (
+                  <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-3 py-2 text-sm text-red-800 dark:text-red-200">
+                    <b>Último retorno:</b> {editingDoc.motivo}
                   </div>
+                )}
 
-                  <div className="space-y-3">
-                    <FormSectionTitle>Envolvidos</FormSectionTitle>
-                    <PartyFields title="Remetente" value={form.remetente} onChange={(v) => set('remetente', v)} clients={clients} testId="cte-remetente" />
-                    <PartyFields title="Destinatário" value={form.destinatario} onChange={(v) => set('destinatario', v)} clients={clients} testId="cte-destinatario" />
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                      <Field label="Pagador do frete (tomador)" required className="md:col-span-7">
-                        <RadioGroup value={form.tomador_papel} onValueChange={(v) => set('tomador_papel', v)} className="flex flex-wrap gap-x-5 gap-y-2 min-h-9 items-center" data-testid="cte-tomador">
+                <Section id="basicos" title="Dados básicos" count={issuesIn('basicos')}
+                  actions={(
+                    <Button type="button" variant="outline" size="sm" onClick={() => xmlInputRef.current?.click()} data-testid="cte-form-import-xml">
+                      <FileUp className="w-3.5 h-3.5 mr-1" /> Enviar XML (NF-e / CT-e)
+                    </Button>
+                  )}>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <Field label="CFOP" required className="md:col-span-5" hint="5xxx/6xxx ajustado pelo percurso (dentro da UF / interestadual)">
+                      <Select value={form.cfop} onValueChange={(v) => set('cfop', v)}>
+                        <SelectTrigger data-testid="cte-cfop"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CFOP_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Natureza da Operação" required className="md:col-span-5">
+                      <Input value={form.natureza_operacao} onChange={(e) => set('natureza_operacao', e.target.value.toUpperCase())} maxLength={60} />
+                    </Field>
+                    <Field label="Ordem de Carregamento" className="md:col-span-2">
+                      <Input value={form.loading_order_number ? `#${form.loading_order_number}` : ''} placeholder="Sem vínculo" readOnly className="bg-slate-50 dark:bg-slate-800" />
+                    </Field>
+                  </div>
+                </Section>
+
+                <Section id="envolvidos" title="Envolvidos" count={issuesIn('envolvidos')}>
+                  <PartyFields title="Remetente" value={form.remetente} onChange={(v) => set('remetente', v)} clients={clients} testId="cte-remetente" />
+                  <PartyFields title="Destinatário" value={form.destinatario} onChange={(v) => set('destinatario', v)} clients={clients} testId="cte-destinatario" />
+                  {form.tomador_papel === '4' && (
+                    <PartyFields title="Tomador (outro)" value={form.tomador} onChange={(v) => set('tomador', v)} clients={clients} testId="cte-tomador-outros" />
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    <Field label="Pagador do frete" required className="md:col-span-8">
+                      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 min-h-9">
+                        <RadioGroup value={form.tomador_papel} onValueChange={(v) => set('tomador_papel', v)} className="flex flex-wrap gap-x-5 gap-y-2" data-testid="cte-tomador">
                           {TOMADOR_OPTIONS.map(([v, l]) => (
                             <label key={v} className="flex items-center gap-2 text-sm cursor-pointer">
                               <RadioGroupItem value={v} data-testid={`cte-tomador-${v}`} /> {v === '4' ? 'Outro' : l}
                             </label>
                           ))}
                         </RadioGroup>
-                      </Field>
-                      <Field label="Tomador perante o ICMS" required className="md:col-span-5" hint="Sugerido pela IE do pagador">
-                        <Select value={form.indicador_ie_tomador} onValueChange={(v) => set('indicador_ie_tomador', v)}>
-                          <SelectTrigger data-testid="cte-ie-tomador"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {IE_TOMADOR_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    </div>
-                    {form.tomador_papel === '4' && (
-                      <PartyFields title="Tomador (outro)" value={form.tomador} onChange={(v) => set('tomador', v)} clients={clients} testId="cte-tomador-outros" />
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <FormSectionTitle>Percurso</FormSectionTitle>
-                    <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                      <Checkbox checked={form.percurso_auto} onCheckedChange={(c) => set('percurso_auto', !!c)} data-testid="cte-percurso-auto" />
-                      Início/fim da prestação nas cidades do remetente e do destinatário
-                    </label>
-                    {form.percurso_auto ? (
-                      <p className="text-sm text-slate-700 dark:text-slate-200" data-testid="cte-percurso">
-                        <MapPin className="inline w-4 h-4 mr-1 text-primary" />{placeLabel(form.origem)} → {placeLabel(form.destino)}
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs font-semibold text-slate-500 mb-1.5">Início da prestação</p>
-                          <CityStateFields value={{ city: form.origem.cidade, state: form.origem.uf }}
-                            onChange={(v) => set('origem', { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-slate-500 mb-1.5">Término da prestação</p>
-                          <CityStateFields value={{ city: form.destino.cidade, state: form.destino.uf }}
-                            onChange={(v) => set('destino', { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} />
-                        </div>
+                        <label className="flex items-center gap-2 text-sm cursor-pointer sm:border-l sm:border-slate-200 sm:pl-5 dark:sm:border-slate-700">
+                          <Checkbox checked={!form.percurso_auto} onCheckedChange={(c) => set('percurso_auto', !c)} data-testid="cte-percurso-manual" />
+                          Início/Fim da Prestação
+                        </label>
                       </div>
-                    )}
+                    </Field>
+                    <Field label="Tomador perante o ICMS" required className="md:col-span-4" hint="Sugerido pela IE do pagador">
+                      <Select value={form.indicador_ie_tomador} onValueChange={(v) => set('indicador_ie_tomador', v)}>
+                        <SelectTrigger data-testid="cte-ie-tomador"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {IE_TOMADOR_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
                   </div>
-                </TabsContent>
-
-                <TabsContent value="carga" className="space-y-6 pt-3">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <FormSectionTitle bare>Documentos transportados *</FormSectionTitle>
-                      <div className="flex flex-wrap gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => xmlInputRef.current?.click()} data-testid="cte-form-import-xml"><FileUp className="w-3.5 h-3.5 mr-1" /> Importar XML</Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'NFE', chave: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> NF-e</Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'OUTROS', tipo_outros: '99', descricao: '', numero: '', data_emissao: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Outro documento</Button>
+                  {form.percurso_auto ? (
+                    <p className="text-sm text-slate-700 dark:text-slate-200" data-testid="cte-percurso">
+                      <MapPin className="inline w-4 h-4 mr-1 text-primary" />
+                      Prestação: {placeLabel(form.origem)} → {placeLabel(form.destino)}
+                      <span className="text-xs text-slate-500"> (cidades do remetente e do destinatário)</span>
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 mb-1.5">Início da prestação</p>
+                        <CityStateFields value={{ city: form.origem.cidade, state: form.origem.uf }}
+                          onChange={(v) => set('origem', { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 mb-1.5">Fim da prestação</p>
+                        <CityStateFields value={{ city: form.destino.cidade, state: form.destino.uf }}
+                          onChange={(v) => set('destino', { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} />
                       </div>
                     </div>
-                    {form.documentos.map((d, i) => {
-                      const key = onlyDigits(d.chave);
-                      const keyState = d.tipo !== 'NFE' || !key ? null : accessKeyOk(key, '55') ? 'ok' : key.length < 44 ? 'short' : 'bad';
-                      return (
-                        <div key={i} className="flex gap-2 items-end">
-                          {d.tipo === 'NFE' ? (
-                            <Field label="Chave da NF-e (44 dígitos)" className="flex-1"
-                              hint={keyState === 'ok' ? `NF-e nº ${Number(key.slice(25, 34))} · série ${Number(key.slice(22, 25))}` : keyState === 'short' ? `${key.length}/44 dígitos` : keyState === 'bad' ? 'Chave inválida: confira os dígitos' : undefined}>
-                              <div className="relative">
-                                <Input value={d.chave || ''} onChange={(e) => setRow('documentos', i, { chave: onlyDigits(e.target.value).slice(0, 44) })}
-                                  className={`font-mono pr-8 ${keyState === 'bad' ? 'border-red-400' : ''}`} data-testid={`cte-nfe-${i}`} />
-                                {keyState === 'ok' && <CheckCircle2 className="absolute right-2.5 top-2.5 w-4 h-4 text-emerald-600" />}
-                                {keyState === 'bad' && <AlertTriangle className="absolute right-2.5 top-2.5 w-4 h-4 text-red-500" />}
-                              </div>
+                  )}
+                </Section>
+
+                <Section id="viagem" title="Motorista e veículo" count={issuesIn('viagem')}>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <Field label="Motorista" className="md:col-span-6">
+                      <Autocomplete value={form.motorista.nome || ''} options={drivers} displayField={(d) => d.name}
+                        onChange={(t) => set('motorista', { ...form.motorista, nome: t.toUpperCase(), driver_id: null })}
+                        onSelect={pickDriver} testId="cte-motorista" />
+                    </Field>
+                    <Field label="CPF do motorista" className="md:col-span-3">
+                      <Input value={form.motorista.cpf || ''} onChange={(e) => set('motorista', { ...form.motorista, cpf: formatCnpjCpf(e.target.value).slice(0, 14) })} className="font-mono" data-testid="cte-motorista-cpf" />
+                    </Field>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Field label="Veículo principal (placa)">
+                      <Autocomplete value={form.veiculo_placa || ''} options={vehicles} displayField={(v) => v.plate}
+                        onChange={(t) => set('veiculo_placa', normPlate(t).slice(0, 7))} onSelect={pickTraction} testId="cte-veiculo" />
+                    </Field>
+                    {[0, 1].map((i) => (
+                      <Field key={i} label={`Vinculado 0${i + 1} (placa)`}>
+                        <Autocomplete value={form.reboque_placas[i] || ''} options={vehicles} displayField={(v) => v.plate}
+                          onChange={(t) => setTrailer(i, normPlate(t).slice(0, 7))} onSelect={(v) => setTrailer(i, normPlate(v.plate))} testId={`cte-reboque-${i}`} />
+                      </Field>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-500">O leiaute do CT-e não tem campo próprio para motorista, veículo, seguro e vale-pedágio: eles saem nas observações do DACTE e preenchem o MDF-e gerado deste CT-e.</p>
+                </Section>
+
+                <Section id="seguro" title="Seguro" count={issuesIn('seguro')}>
+                  <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
+                    <Field label="Responsável" className="md:col-span-2">
+                      <Select value={form.seguro_responsavel} onValueChange={(v) => set('seguro_responsavel', v)}>
+                        <SelectTrigger data-testid="cte-seguro-responsavel"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Emitente</SelectItem>
+                          <SelectItem value="2">Contratante</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Seguradora" className="col-span-2 md:col-span-4">
+                      <Input value={form.seguradora_nome || ''} onChange={(e) => set('seguradora_nome', e.target.value.toUpperCase())} maxLength={60} data-testid="cte-seguradora" />
+                    </Field>
+                    <Field label="CNPJ da seguradora" className="md:col-span-2">
+                      <Input value={form.seguradora_cnpj || ''} onChange={(e) => set('seguradora_cnpj', formatCnpjCpf(e.target.value))} className="font-mono" />
+                    </Field>
+                    <Field label="Nº apólice" className="md:col-span-2">
+                      <Input value={form.seguro_apolice || ''} onChange={(e) => set('seguro_apolice', e.target.value)} maxLength={20} />
+                    </Field>
+                    <Field label="Nº averbação" className="md:col-span-2">
+                      <Input value={form.seguro_averbacao || ''} onChange={(e) => set('seguro_averbacao', e.target.value)} maxLength={40} data-testid="cte-averbacao" />
+                    </Field>
+                  </div>
+                </Section>
+
+                <Section id="documentos" title={`Documentos${nfeCount + otherDocCount ? ` (${nfeCount} NF-e${otherDocCount ? ` + ${otherDocCount} outro(s)` : ''})` : ''}`} count={issuesIn('documentos')}
+                  actions={(
+                    <>
+                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'NFE', chave: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> NF-e</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'OUTROS', tipo_outros: '99', descricao: '', numero: '', data_emissao: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Outro documento</Button>
+                    </>
+                  )}>
+                  {form.documentos.map((d, i) => {
+                    const key = onlyDigits(d.chave);
+                    const keyState = d.tipo !== 'NFE' || !key ? null : accessKeyOk(key, '55') ? 'ok' : key.length < 44 ? 'short' : 'bad';
+                    return (
+                      <div key={i} className="flex gap-2 items-end">
+                        {d.tipo === 'NFE' ? (
+                          <Field label="NF-e - Chave de acesso (44 dígitos)" className="flex-1"
+                            hint={keyState === 'ok' ? `NF-e nº ${Number(key.slice(25, 34))} · série ${Number(key.slice(22, 25))}` : keyState === 'short' ? `${key.length}/44 dígitos` : keyState === 'bad' ? 'Chave inválida: confira os dígitos' : undefined}>
+                            <div className="relative">
+                              <Input value={d.chave || ''} onChange={(e) => setRow('documentos', i, { chave: onlyDigits(e.target.value).slice(0, 44) })}
+                                className={`font-mono pr-8 ${keyState === 'bad' ? 'border-red-400' : ''}`} data-testid={`cte-nfe-${i}`} />
+                              {keyState === 'ok' && <CheckCircle2 className="absolute right-2.5 top-2.5 w-4 h-4 text-emerald-600" />}
+                              {keyState === 'bad' && <AlertTriangle className="absolute right-2.5 top-2.5 w-4 h-4 text-red-500" />}
+                            </div>
+                          </Field>
+                        ) : (
+                          <>
+                            <Field label="Tipo" className="w-36">
+                              <Select value={d.tipo_outros || '99'} onValueChange={(v) => setRow('documentos', i, { tipo_outros: v })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="99">Outros</SelectItem>
+                                  <SelectItem value="00">Declaração</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </Field>
-                          ) : (
-                            <>
-                              <Field label="Tipo" className="w-36">
-                                <Select value={d.tipo_outros || '99'} onValueChange={(v) => setRow('documentos', i, { tipo_outros: v })}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="99">Outros</SelectItem>
-                                    <SelectItem value="00">Declaração</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </Field>
-                              <Field label="Descrição" className="flex-1">
-                                <Input value={d.descricao || ''} maxLength={100} onChange={(e) => setRow('documentos', i, { descricao: e.target.value })} />
-                              </Field>
-                              <Field label="Número" className="w-32">
-                                <Input value={d.numero || ''} maxLength={20} onChange={(e) => setRow('documentos', i, { numero: e.target.value })} />
-                              </Field>
-                              <Field label="Emissão" className="w-40">
-                                <Input type="date" value={d.data_emissao || ''} onChange={(e) => setRow('documentos', i, { data_emissao: e.target.value })} />
-                              </Field>
-                              <Field label="Valor (R$)" className="w-32">
-                                <Input inputMode="decimal" value={d.valor || ''} onChange={(e) => setRow('documentos', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} />
-                              </Field>
-                            </>
-                          )}
-                          <RowRemove onClick={() => removeRow('documentos', i)} />
-                        </div>
-                      );
-                    })}
-                  </div>
+                            <Field label="Descrição" className="flex-1">
+                              <Input value={d.descricao || ''} maxLength={100} onChange={(e) => setRow('documentos', i, { descricao: e.target.value })} />
+                            </Field>
+                            <Field label="Número" className="w-32">
+                              <Input value={d.numero || ''} maxLength={20} onChange={(e) => setRow('documentos', i, { numero: e.target.value })} />
+                            </Field>
+                            <Field label="Emissão" className="w-40">
+                              <Input type="date" value={d.data_emissao || ''} onChange={(e) => setRow('documentos', i, { data_emissao: e.target.value })} />
+                            </Field>
+                            <Field label="Valor (R$)" className="w-32">
+                              <Input inputMode="decimal" value={d.valor || ''} onChange={(e) => setRow('documentos', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} />
+                            </Field>
+                          </>
+                        )}
+                        <RowRemove onClick={() => removeRow('documentos', i)} />
+                      </div>
+                    );
+                  })}
+                </Section>
 
-                  <div className="space-y-3">
-                    <FormSectionTitle>Carga</FormSectionTitle>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                      <Field label="Produto predominante" required>
+                <Section id="carga" title="Totais da carga transportada" count={issuesIn('carga')}>
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-x-6 gap-y-4">
+                    <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-4 gap-3 content-start">
+                      <Field label="Peso (kg)">
+                        <Input value={pesoKg ? pesoKg.toLocaleString('pt-BR') : '0'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-peso-kg" />
+                      </Field>
+                      <Field label="Peso (ton)">
+                        <Input value={(pesoKg / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 3 })} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" />
+                      </Field>
+                      <Field label="Valor total (R$)" className="col-span-2">
+                        <Input inputMode="decimal" value={form.valor_carga} onChange={(e) => set('valor_carga', e.target.value.replace(/[^\d,.]/g, ''))} className="text-right" data-testid="cte-valor-carga" />
+                      </Field>
+                      <Field label="Produto predominante" required className="col-span-2">
                         <Input value={form.produto_predominante} onChange={(e) => set('produto_predominante', e.target.value.toUpperCase())} maxLength={60} />
                       </Field>
-                      <Field label="Outras características">
+                      <Field label="Outras características" className="col-span-2">
                         <Input value={form.outras_caracteristicas || ''} onChange={(e) => set('outras_caracteristicas', e.target.value.toUpperCase())} maxLength={30} />
                       </Field>
-                      <Field label="Valor da carga (R$)">
-                        <Input inputMode="decimal" value={form.valor_carga} onChange={(e) => set('valor_carga', e.target.value.replace(/[^\d,.]/g, ''))} />
-                      </Field>
                     </div>
-                    <div className="space-y-2">
+                    <div className="lg:col-span-5 space-y-2 lg:border-l lg:border-slate-200 lg:pl-6 dark:lg:border-slate-700">
                       <div className="flex items-center justify-between">
-                        <p className="text-xs font-semibold text-slate-500">Quantidades *</p>
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Quantidades <span className="text-red-500">*</span></p>
                         <Button type="button" variant="outline" size="sm" onClick={() => addRow('quantidades', { unidade: '01', tipo_medida: 'PESO BRUTO', quantidade: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Quantidade</Button>
                       </div>
                       {form.quantidades.map((q, i) => (
                         <div key={i} className="flex gap-2">
                           <Select value={q.unidade} onValueChange={(v) => setRow('quantidades', i, { unidade: v })}>
-                            <SelectTrigger className="w-32" aria-label="Unidade"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="w-28" aria-label="Unidade"><SelectValue /></SelectTrigger>
                             <SelectContent>{UNIDADE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
                           </Select>
-                          <Input value={q.tipo_medida} maxLength={20} onChange={(e) => setRow('quantidades', i, { tipo_medida: e.target.value.toUpperCase() })} className="flex-1" aria-label="Tipo da medida" />
-                          <Input inputMode="decimal" value={q.quantidade} onChange={(e) => setRow('quantidades', i, { quantidade: e.target.value.replace(/[^\d,.]/g, '') })} className="w-40" aria-label="Quantidade" data-testid={`cte-qtd-${i}`} />
+                          <Input value={q.tipo_medida} maxLength={20} onChange={(e) => setRow('quantidades', i, { tipo_medida: e.target.value.toUpperCase() })} className="flex-1 min-w-0" aria-label="Tipo da medida" />
+                          <Input inputMode="decimal" value={q.quantidade} onChange={(e) => setRow('quantidades', i, { quantidade: e.target.value.replace(/[^\d,.]/g, '') })} className="w-32 text-right" aria-label="Quantidade" data-testid={`cte-qtd-${i}`} />
                           <RowRemove onClick={() => removeRow('quantidades', i)} />
                         </div>
                       ))}
                     </div>
                   </div>
+                </Section>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <FormSectionTitle bare>Contêineres (vão como unidades de carga)</FormSectionTitle>
-                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('containers', { numero: '', lacre: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Contêiner</Button>
+                <Section id="containers" title="Contêineres"
+                  actions={<Button type="button" variant="outline" size="sm" onClick={() => addRow('containers', { numero: '', lacre: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Contêiner</Button>}>
+                  {form.containers.length === 0 ? (
+                    <p className="text-xs text-slate-500">Nenhum contêiner. Os informados vão no CT-e como unidades de carga.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+                      {form.containers.map((c, i) => (
+                        <div key={i} className="flex gap-2 items-end">
+                          <Field label={i === 0 ? 'Número' : undefined} className="flex-1">
+                            <Input value={c.numero} onChange={(e) => setRow('containers', i, { numero: e.target.value.toUpperCase() })} className="font-mono" maxLength={20} aria-label="Container" />
+                          </Field>
+                          <Field label={i === 0 ? 'Lacre' : undefined} className="w-44">
+                            <Input value={c.lacre || ''} onChange={(e) => setRow('containers', i, { lacre: e.target.value.toUpperCase() })} className="font-mono" maxLength={20} aria-label="Lacre" />
+                          </Field>
+                          <RowRemove onClick={() => removeRow('containers', i)} />
+                        </div>
+                      ))}
                     </div>
-                    {form.containers.map((c, i) => (
-                      <div key={i} className="flex gap-2">
-                        <Input value={c.numero} placeholder="Número" onChange={(e) => setRow('containers', i, { numero: e.target.value.toUpperCase() })} className="flex-1 font-mono" maxLength={20} aria-label="Container" />
-                        <Input value={c.lacre || ''} placeholder="Lacre" onChange={(e) => setRow('containers', i, { lacre: e.target.value.toUpperCase() })} className="w-48 font-mono" maxLength={20} aria-label="Lacre" />
-                        <RowRemove onClick={() => removeRow('containers', i)} />
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
+                  )}
+                </Section>
 
-                <TabsContent value="frete" className="space-y-6 pt-3">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <FormSectionTitle bare>Composição do frete</FormSectionTitle>
-                      <div className="flex flex-wrap gap-1.5">
-                        {COMPONENT_PRESETS.filter(([nome]) => !form.componentes.some((c) => c.nome === nome)).map(([nome, label]) => (
-                          <Button key={nome} type="button" variant="outline" size="sm" onClick={() => addRow('componentes', { nome, valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> {label}</Button>
-                        ))}
-                        <Button type="button" variant="ghost" size="sm" onClick={() => addRow('componentes', { nome: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Nome livre</Button>
-                      </div>
-                    </div>
-                    {form.componentes.length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {form.componentes.map((c, i) => (
-                          <div key={i} className="flex gap-1 items-end">
-                            <div className="flex-1 space-y-1.5 min-w-0">
-                              <Input value={c.nome} maxLength={15} onChange={(e) => setRow('componentes', i, { nome: e.target.value.toUpperCase() })} className="h-7 text-xs font-semibold" aria-label="Nome do componente" />
-                              <Input inputMode="decimal" value={c.valor} placeholder="0,00" onChange={(e) => setRow('componentes', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} aria-label="Valor do componente" data-testid={`cte-comp-${i}`} />
-                            </div>
-                            <RowRemove onClick={() => removeRow('componentes', i)} />
+                <Section id="frete" title="Composição do frete" count={issuesIn('frete')}
+                  actions={(
+                    <>
+                      {COMPONENT_PRESETS.filter(([nome]) => !form.componentes.some((c) => c.nome === nome)).map(([nome, label]) => (
+                        <Button key={nome} type="button" variant="outline" size="sm" onClick={() => addRow('componentes', { nome, valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> {label}</Button>
+                      ))}
+                      <Button type="button" variant="ghost" size="sm" onClick={() => addRow('componentes', { nome: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Nome livre</Button>
+                    </>
+                  )}>
+                  {form.componentes.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {form.componentes.map((c, i) => (
+                        <div key={i} className="flex gap-1 items-end">
+                          <div className="flex-1 space-y-1.5 min-w-0">
+                            <Input value={c.nome} maxLength={15} onChange={(e) => setRow('componentes', i, { nome: e.target.value.toUpperCase() })} className="h-7 text-xs font-semibold" aria-label="Nome do componente" />
+                            <Input inputMode="decimal" value={c.valor} placeholder="0,00" onChange={(e) => setRow('componentes', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} className="text-right" aria-label="Valor do componente" data-testid={`cte-comp-${i}`} />
                           </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Field label="Total da prestação (R$)" required hint={hasComponents ? 'Soma da composição' : 'Ou use a composição acima'}>
-                        <Input inputMode="decimal" value={form.valor_total} readOnly={hasComponents}
-                          className={hasComponents ? 'bg-slate-50 dark:bg-slate-800 font-semibold' : 'font-semibold'}
-                          onChange={(e) => set('valor_total', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-valor-total" />
-                      </Field>
-                      <Field label="Valor a receber (R$)" hint="Vazio = igual ao total">
-                        <Input inputMode="decimal" value={form.valor_receber} onChange={(e) => set('valor_receber', e.target.value.replace(/[^\d,.]/g, ''))} />
-                      </Field>
+                          <RowRemove onClick={() => removeRow('componentes', i)} />
+                        </div>
+                      ))}
                     </div>
+                  )}
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                    <Field label="Total da prestação (R$)" required hint={hasComponents ? 'Soma da composição' : 'Ou use a composição'}>
+                      <Input inputMode="decimal" value={form.valor_total} readOnly={hasComponents}
+                        className={`text-right font-semibold ${hasComponents ? 'bg-slate-50 dark:bg-slate-800' : ''}`}
+                        onChange={(e) => set('valor_total', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-valor-total" />
+                    </Field>
+                    <Field label="Valor a receber (R$)" hint="Vazio = igual ao total">
+                      <Input inputMode="decimal" value={form.valor_receber} className="text-right" onChange={(e) => set('valor_receber', e.target.value.replace(/[^\d,.]/g, ''))} />
+                    </Field>
+                    <Field label="CST do ICMS" required className="col-span-2">
+                      <Select value={form.icms_cst} onValueChange={(v) => set('icms_cst', v)}>
+                        <SelectTrigger data-testid="cte-icms-cst"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {ICMS_CST_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Alíquota (%)" required={ICMS_WITH_RATE.includes(form.icms_cst)}>
+                      <Input inputMode="decimal" value={form.icms_aliquota} disabled={!ICMS_WITH_RATE.includes(form.icms_cst)} className="text-right"
+                        onChange={(e) => set('icms_aliquota', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-icms-aliquota" />
+                    </Field>
+                    <Field label="Valor do ICMS" hint={icmsRate ? `Base ${fmtMoney(total)}` : undefined}>
+                      <Input value={icmsRate ? fmtMoney(icmsValue) : '-'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-icms-valor" />
+                    </Field>
                   </div>
+                </Section>
 
-                  <div className="space-y-3">
-                    <FormSectionTitle>ICMS</FormSectionTitle>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      <Field label="Situação tributária (CST)" required className="col-span-2">
-                        <Select value={form.icms_cst} onValueChange={(v) => set('icms_cst', v)}>
-                          <SelectTrigger data-testid="cte-icms-cst"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {ICMS_CST_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                          </SelectContent>
+                <Section id="pedagio" title="Vale-pedágio" count={issuesIn('pedagio')}
+                  actions={<Button type="button" variant="outline" size="sm" onClick={() => addRow('vales_pedagio', emptyToll())} data-testid="cte-add-pedagio"><Plus className="w-3.5 h-3.5 mr-1" /> Vale-pedágio</Button>}>
+                  {form.vales_pedagio.length === 0 ? (
+                    <p className="text-xs text-slate-500">Nenhum vale-pedágio nesta viagem.</p>
+                  ) : form.vales_pedagio.map((v, i) => (
+                    <div key={i} className="flex flex-wrap md:flex-nowrap gap-2 items-end">
+                      <Field label={i === 0 ? 'Pago por' : undefined} className="w-36">
+                        <Select value={v.pago_por} onValueChange={(val) => setRow('vales_pedagio', i, { pago_por: val })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>{TOLL_PAYER_OPTIONS.map(([val, l]) => <SelectItem key={val} value={val}>{l}</SelectItem>)}</SelectContent>
                         </Select>
                       </Field>
-                      <Field label="Alíquota (%)" required={ICMS_WITH_RATE.includes(form.icms_cst)}>
-                        <Input inputMode="decimal" value={form.icms_aliquota} disabled={!ICMS_WITH_RATE.includes(form.icms_cst)}
-                          onChange={(e) => set('icms_aliquota', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-icms-aliquota" />
+                      <Field label={i === 0 ? 'Dispositivo' : undefined} className="w-28">
+                        <Select value={v.tipo} onValueChange={(val) => setRow('vales_pedagio', i, { tipo: val })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>{TOLL_TYPE_OPTIONS.map(([val, l]) => <SelectItem key={val} value={val}>{l}</SelectItem>)}</SelectContent>
+                        </Select>
                       </Field>
-                      <Field label="Valor do ICMS" hint={icmsRate ? `Base de cálculo ${fmtMoney(total)}` : undefined}>
-                        <Input value={icmsRate ? fmtMoney(icmsValue) : '-'} readOnly className="bg-slate-50 dark:bg-slate-800 tabular-nums" data-testid="cte-icms-valor" />
+                      <Field label={i === 0 ? 'Fornecedora' : undefined} className="flex-1 min-w-[10rem]">
+                        <Input value={v.fornecedor_nome || ''} onChange={(e) => setRow('vales_pedagio', i, { fornecedor_nome: e.target.value.toUpperCase() })} maxLength={60} />
                       </Field>
+                      <Field label={i === 0 ? 'CNPJ fornecedora' : undefined} className="w-44">
+                        <Input value={v.fornecedor_cnpj || ''} onChange={(e) => setRow('vales_pedagio', i, { fornecedor_cnpj: formatCnpjCpf(e.target.value) })} className="font-mono" data-testid={`cte-pedagio-cnpj-${i}`} />
+                      </Field>
+                      <Field label={i === 0 ? 'Nº comprovante' : undefined} className="w-40">
+                        <Input value={v.numero_comprovante || ''} onChange={(e) => setRow('vales_pedagio', i, { numero_comprovante: e.target.value })} maxLength={20} data-testid={`cte-pedagio-numero-${i}`} />
+                      </Field>
+                      <Field label={i === 0 ? 'Valor (R$)' : undefined} className="w-32">
+                        <Input inputMode="decimal" value={v.valor || ''} onChange={(e) => setRow('vales_pedagio', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} className="text-right" data-testid={`cte-pedagio-valor-${i}`} />
+                      </Field>
+                      <RowRemove onClick={() => removeRow('vales_pedagio', i)} />
                     </div>
-                  </div>
+                  ))}
+                </Section>
 
-                  <div className="space-y-3">
-                    <FormSectionTitle>Observações</FormSectionTitle>
-                    <Textarea value={form.observacoes} onChange={(e) => set('observacoes', e.target.value.slice(0, 2000))} rows={3} />
-                  </div>
-                </TabsContent>
+                <Section id="observacoes" title="Observações do conhecimento">
+                  <Textarea value={form.observacoes} onChange={(e) => set('observacoes', e.target.value.slice(0, 2000))} rows={3} />
+                </Section>
 
-                <TabsContent value="conferencia" className="space-y-5 pt-3" data-testid="cte-conferencia">
+                <Section id="conferencia" title="Conferência antes de transmitir">
                   {issues.length === 0 ? (
-                    <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                    <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200" data-testid="cte-conferencia-ok">
                       <CheckCircle2 className="w-4 h-4 shrink-0" /> Tudo certo para transmitir.
                     </div>
                   ) : (
                     <ul className="space-y-1.5" data-testid="cte-issues">
                       {issues.map((it, i) => (
                         <li key={i}>
-                          <button type="button" onClick={() => setTab(it.tab)}
+                          <button type="button" onClick={() => scrollToSection(it.section)}
                             className="flex w-full items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-900 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
                             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                             <span className="flex-1">{it.msg}</span>
-                            <span className="shrink-0 text-xs opacity-80">{TAB_LABELS[it.tab]} →</span>
+                            <span className="shrink-0 text-xs opacity-80">{SECTION_LABELS[it.section]} ↑</span>
                           </button>
                         </li>
                       ))}
                     </ul>
                   )}
-                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm">
-                    {[
-                      ['Remetente', form.remetente?.nome || '-'],
-                      ['Destinatário', form.destinatario?.nome || '-'],
-                      ['Pagador do frete', form.tomador_papel === '4' ? (form.tomador?.nome || 'Outro') : payerLabel],
-                      ['Percurso', `${placeLabel(form.origem)} → ${placeLabel(form.destino)}`],
-                      ['CFOP', form.cfop],
-                      ['Total da prestação', fmtMoney(total)],
-                      ['ICMS', icmsRate ? `${fmtMoney(icmsValue)} (${toInput(icmsRate)}%)` : (ICMS_CST_OPTIONS.find(([v]) => v === form.icms_cst) || [])[1]],
-                      ['Documentos', `${nfeCount} NF-e${otherDocCount ? ` + ${otherDocCount} outro(s)` : ''}`],
-                      ['Contêineres', form.containers.filter((c) => (c.numero || '').trim()).map((c) => c.numero).join(', ') || '-'],
-                      ['Ambiente', settings?.ambiente === 'producao' ? 'Produção' : 'Homologação (sem valor fiscal)'],
-                    ].map(([label, value]) => (
-                      <div key={label} className="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-800 py-1">
-                        <dt className="text-slate-500">{label}</dt>
-                        <dd className="text-right font-medium truncate">{value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </TabsContent>
-              </Tabs>
-            </>
-          )}
+                </Section>
+              </div>
+            )}
+          </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="flex-row flex-wrap items-center justify-end gap-2 space-x-0 sm:space-x-0 border-t border-slate-100 px-4 sm:px-6 py-3 dark:border-slate-800">
+            {!emittedDoc && (
+              issues.length ? (
+                <button type="button" onClick={() => scrollToSection('conferencia')} className="mr-auto flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:underline dark:text-amber-300" data-testid="cte-issues-count">
+                  <AlertTriangle className="w-4 h-4" /> {issues.length} pendência(s)
+                </button>
+              ) : (
+                <span className="mr-auto flex items-center gap-1.5 text-sm font-medium text-emerald-700 dark:text-emerald-300"><CheckCircle2 className="w-4 h-4" /> Pronto para transmitir</span>
+              )
+            )}
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={emitting}>Fechar</Button>
             {!emittedDoc && (
               <>

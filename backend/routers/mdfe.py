@@ -11,6 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
+import fiscal_cte
 import fiscal_focus
 import fiscal_mdfe
 from fiscal_cte import only_digits
@@ -151,8 +152,19 @@ async def mdfe_draft_from_ctes(ids: str = Query(...), current_user: dict = Depen
     uf_emit = ((settings.get("endereco") or {}).get("uf") or "").upper() or None
 
     veiculo, reboques, condutores = None, [], []
+    # Motorista e veículos informados no CT-e; sem eles, os da Ordem de Carregamento
+    trip = next((c for c in ctes if c.get("veiculo_placa") or (c.get("motorista") or {}).get("nome")), None)
+    if trip:
+        veiculo = await _vehicle_from_plate(trip.get("veiculo_placa"), uf_emit, trailer=False)
+        for placa in trip.get("reboque_placas") or []:
+            trailer = await _vehicle_from_plate(placa, uf_emit, trailer=True)
+            if trailer:
+                reboques.append(trailer)
+        motorista = trip.get("motorista") or {}
+        if motorista.get("nome") or motorista.get("cpf"):
+            condutores.append({"driver_id": motorista.get("driver_id"), "nome": motorista.get("nome"), "cpf": only_digits(motorista.get("cpf"))})
     order_id = next((c.get("loading_order_id") for c in ctes if c.get("loading_order_id")), None)
-    order = await db.loading_orders.find_one({"id": order_id}, {"_id": 0}) if order_id else None
+    order = await db.loading_orders.find_one({"id": order_id}, {"_id": 0}) if order_id and not trip else None
     if order:
         veiculo = await _vehicle_from_plate(order.get("truck_plate"), uf_emit, trailer=False)
         trailer = await _vehicle_from_plate(order.get("trailer_plate"), uf_emit, trailer=True)
@@ -163,6 +175,13 @@ async def mdfe_draft_from_ctes(ids: str = Query(...), current_user: dict = Depen
         cpf = (driver or {}).get("cpf") or order.get("driver_cpf")
         if nome or cpf:
             condutores.append({"driver_id": (driver or {}).get("id"), "nome": nome, "cpf": only_digits(cpf)})
+
+    # Seguro do CT-e (ou o padrão da Configuração Fiscal) e vale-pedágio nas observações
+    insured = next((c for c in ctes if c.get("seguradora_nome") or c.get("seguro_apolice")), None) or {}
+    seguro = insured if insured else settings
+    averbacoes = list(dict.fromkeys(c["seguro_averbacao"] for c in ctes if c.get("seguro_averbacao")))
+    obs = ["CT-e nº " + ", ".join(str(c.get("numero")) for c in ctes)]
+    obs += [n for c in ctes for n in fiscal_cte.trip_notes({"vales_pedagio": c.get("vales_pedagio")})]
 
     first, last = ctes[0], ctes[-1]
     return MdfeCreate(
@@ -175,17 +194,18 @@ async def mdfe_draft_from_ctes(ids: str = Query(...), current_user: dict = Depen
         reboques=reboques,
         condutores=condutores,
         contratantes=list(contratantes.values()),
-        seguro_responsavel=settings.get("seguro_responsavel"),
-        seguradora_nome=settings.get("seguradora_nome"),
-        seguradora_cnpj=settings.get("seguradora_cnpj"),
-        seguro_apolice=settings.get("seguro_apolice"),
+        seguro_responsavel=seguro.get("seguro_responsavel") or settings.get("seguro_responsavel"),
+        seguradora_nome=seguro.get("seguradora_nome"),
+        seguradora_cnpj=seguro.get("seguradora_cnpj"),
+        seguro_apolice=seguro.get("seguro_apolice"),
+        averbacoes=averbacoes,
         tipo_carga=settings.get("mdfe_tipo_carga") or "04",
         descricao_produto=next((c.get("produto_predominante") for c in ctes if c.get("produto_predominante")),
                                settings.get("produto_predominante")),
         valor_total_carga=round(valor, 2) or None,
         unidade_peso="01",
         peso_bruto=round(peso, 4) or None,
-        observacoes="CT-e nº " + ", ".join(str(c.get("numero")) for c in ctes),
+        observacoes=" | ".join(obs),
     ).model_dump()
 
 

@@ -379,10 +379,12 @@ async def cte_draft_from_loading_order(order_id: str, current_user: dict = Depen
     obs = [f"Ordem de Carregamento nº {order.get('order_number')}"]
     if order.get("booking"):
         obs.append(f"Booking/Ref.: {order['booking']}")
-    if order.get("truck_plate"):
-        obs.append(f"Placa: {order['truck_plate']}" + (f" / {order['trailer_plate']}" if order.get("trailer_plate") else ""))
-    if order.get("driver_name"):
-        obs.append(f"Motorista: {order['driver_name']}")
+    # Motorista e placas vão nos campos da viagem (saem nas observações na emissão)
+    driver = await db.drivers.find_one({"id": order.get("driver_id")}, {"_id": 0}) if order.get("driver_id") else None
+    motorista = None
+    if (driver or {}).get("name") or order.get("driver_name"):
+        motorista = {"driver_id": (driver or {}).get("id"), "nome": (driver or {}).get("name") or order.get("driver_name"),
+                     "cpf": (driver or {}).get("cpf") or order.get("driver_cpf")}
     return CteCreate(
         loading_order_id=order["id"],
         loading_order_number=order.get("order_number"),
@@ -398,6 +400,13 @@ async def cte_draft_from_loading_order(order_id: str, current_user: dict = Depen
         quantidades=[{"unidade": "01", "tipo_medida": "PESO BRUTO", "quantidade": peso}] if peso > 0 else [],
         containers=containers,
         observacoes=" · ".join(obs),
+        motorista=motorista,
+        veiculo_placa=order.get("truck_plate"),
+        reboque_placas=[order["trailer_plate"]] if order.get("trailer_plate") else [],
+        seguro_responsavel=settings.get("seguro_responsavel"),
+        seguradora_nome=settings.get("seguradora_nome"),
+        seguradora_cnpj=settings.get("seguradora_cnpj"),
+        seguro_apolice=settings.get("seguro_apolice"),
     ).model_dump()
 
 

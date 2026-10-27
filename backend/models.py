@@ -4388,6 +4388,23 @@ class CteContainer(BaseModel):
     lacre: Optional[str] = None
 
 
+class CteDriver(BaseModel):
+    driver_id: Optional[str] = None
+    nome: Optional[str] = None
+    cpf: Optional[str] = None
+
+
+class CteTollVoucher(BaseModel):
+    """Vale-pedágio da viagem: o leiaute 4.00 do CT-e não tem o grupo, então
+    sai nas observações do DACTE e vai para o MDF-e gerado do CT-e."""
+    pago_por: Optional[str] = None  # EMITENTE, REMETENTE, DESTINATARIO, TOMADOR
+    tipo: Optional[str] = None  # 01 TAG, 02 Cupom, 03 Cartão
+    fornecedor_nome: Optional[str] = None
+    fornecedor_cnpj: Optional[str] = None
+    numero_comprovante: Optional[str] = None
+    valor: Optional[float] = None
+
+
 class CteCreate(BaseModel):
     loading_order_id: Optional[str] = None
     loading_order_number: Optional[int] = None
@@ -4412,6 +4429,17 @@ class CteCreate(BaseModel):
     documentos: List[CteDocument] = []
     containers: List[CteContainer] = []
     observacoes: Optional[str] = None
+    # Viagem: motorista, veículos, seguro e vale-pedágio não têm grupo no CT-e
+    # 4.00 (ficaram no MDF-e). Saem nas observações e preenchem o MDF-e.
+    motorista: Optional[CteDriver] = None
+    veiculo_placa: Optional[str] = None
+    reboque_placas: List[str] = []  # vinculados 01 e 02
+    seguro_responsavel: Optional[int] = None  # 1 Emitente, 2 Contratante
+    seguradora_nome: Optional[str] = None
+    seguradora_cnpj: Optional[str] = None
+    seguro_apolice: Optional[str] = None
+    seguro_averbacao: Optional[str] = None
+    vales_pedagio: List[CteTollVoucher] = []
 
 
 class CteCancelRequest(BaseModel):
