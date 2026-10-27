@@ -404,7 +404,7 @@ export default function CtePage() {
         <PageHeader
           icon={FileCheck}
           title="CT-e"
-          subtitle="Conhecimento de Transporte Eletrônico emitido pela Nuvem Fiscal"
+          subtitle="Conhecimento de Transporte Eletrônico emitido pela Focus NFe"
           actions={(
             <Button variant="outline" size="sm" onClick={() => navigate('/fiscal/configuracao')} data-testid="cte-settings-btn">
               <FileCog className="w-4 h-4 mr-1.5" /> Configuração Fiscal

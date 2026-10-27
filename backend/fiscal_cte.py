@@ -1,5 +1,6 @@
-"""Monta o pedido de emissão do CT-e (layout 4.00 da Sefaz, no formato JSON da
-Nuvem Fiscal) a partir do CT-e salvo no sistema e da Configuração Fiscal.
+"""Monta o pedido de emissão do CT-e (layout 4.00 da Sefaz, no formato JSON
+"plano" da Focus NFe - ver https://campos.focusnfe.com.br/cte_cteos/) a partir
+do CT-e salvo no sistema e da Configuração Fiscal.
 
 Funções puras (sem banco e sem rede) - os códigos IBGE dos municípios já
 chegam resolvidos (ver resolve_municipalities em routers/fiscal.py).
@@ -7,8 +8,6 @@ chegam resolvidos (ver resolve_municipalities em routers/fiscal.py).
 import re
 from datetime import datetime, timedelta, timezone
 
-VERSAO_LEIAUTE = "4.00"
-VERSAO_PROCESSO = "ContainerLogix 1.0"
 BRT = timezone(timedelta(hours=-3))
 
 UF_CODES = {
@@ -21,15 +20,17 @@ UF_CODES = {
 
 TOMADOR_LABELS = {0: "Remetente", 1: "Expedidor", 2: "Recebedor", 3: "Destinatário", 4: "Outros"}
 
-# Status da Nuvem Fiscal -> status do CT-e no sistema
+# Status da Focus NFe -> status do CT-e no sistema
 PROVIDER_STATUS = {
-    "pendente": "PENDENTE",
+    "processando_autorizacao": "PENDENTE",
     "autorizado": "AUTORIZADO",
-    "rejeitado": "REJEITADO",
+    "erro_autorizacao": "REJEITADO",
     "denegado": "DENEGADO",
     "cancelado": "CANCELADO",
-    "erro": "ERRO",
 }
+
+# CST do sistema -> icms_situacao_tributaria da Focus
+ICMS_CST_FOCUS = {"00": "00", "40": "40", "41": "41", "51": "51", "60": "60", "90": "90", "SN": "90_simples_nacional"}
 
 
 def only_digits(value) -> str:
@@ -43,6 +44,10 @@ def _text(value, limit=None) -> str:
 
 def _money(value) -> float:
     return round(float(value or 0), 2)
+
+
+def _dec(value, places=2) -> str:
+    return f"{float(value or 0):.{places}f}"
 
 
 def _first_email(value):
@@ -128,6 +133,11 @@ def validate(cte: dict, settings: dict) -> list:
         if aliquota is None or not (0 < float(aliquota) <= 100):
             errors.append("Informe a alíquota do ICMS")
 
+    # Reforma Tributária (IBS/CBS): opcional, mas CST e classificação andam juntos
+    ibs_cst, ibs_class = _text(settings.get("ibs_cbs_cst")), _text(settings.get("ibs_cbs_classificacao"))
+    if (ibs_cst or ibs_class) and not (re.fullmatch(r"\d{3}", ibs_cst) and re.fullmatch(r"\d{6}", ibs_class)):
+        errors.append("Configuração Fiscal: IBS/CBS exige CST (3 dígitos) e Classificação Tributária (6 dígitos)")
+
     if not _text(cte.get("produto_predominante") or settings.get("produto_predominante")):
         errors.append("Informe o Produto Predominante da carga")
     if not cte.get("quantidades"):
@@ -148,53 +158,74 @@ def validate(cte: dict, settings: dict) -> list:
     return errors
 
 
-def _address(address: dict) -> dict:
-    out = {
-        "xLgr": _text(address.get("logradouro"), 255),
-        "nro": _text(address.get("numero"), 60) or "S/N",
-        "xBairro": _text(address.get("bairro"), 60),
-        "cMun": only_digits(address.get("codigo_municipio")),
-        "xMun": _text(address.get("cidade"), 60),
-        "UF": (address.get("uf") or "").upper(),
-    }
-    if _text(address.get("complemento")):
-        out["xCpl"] = _text(address.get("complemento"), 60)
-    cep = only_digits(address.get("cep"))
-    if len(cep) == 8:
-        out["CEP"] = cep
-    return out
-
-
-def _party(party: dict, address_key: str) -> dict:
+def _party(party: dict, suffix: str) -> dict:
+    """Remetente/destinatário/tomador no formato da Focus (campo_<sufixo>)."""
+    address = party.get("endereco") or {}
     doc = only_digits(party.get("cnpj_cpf"))
-    out = {"CNPJ" if len(doc) == 14 else "CPF": doc}
+    out = {f"{'cnpj' if len(doc) == 14 else 'cpf'}_{suffix}": doc}
     ie = _text(party.get("ie")).upper()
     if ie:
-        out["IE"] = "ISENTO" if ie == "ISENTO" else only_digits(ie)
-    out["xNome"] = _text(party.get("nome"), 60)
+        out[f"inscricao_estadual_{suffix}"] = "ISENTO" if ie == "ISENTO" else only_digits(ie)
+    out[f"nome_{suffix}"] = _text(party.get("nome"), 60)
     fone = only_digits(party.get("fone"))
     if 6 <= len(fone) <= 14:
-        out["fone"] = fone
-    out[address_key] = _address(party.get("endereco") or {})
+        out[f"telefone_{suffix}"] = fone
+    out.update({
+        f"logradouro_{suffix}": _text(address.get("logradouro"), 255),
+        f"numero_{suffix}": _text(address.get("numero"), 60) or "S/N",
+        f"bairro_{suffix}": _text(address.get("bairro"), 60),
+        f"codigo_municipio_{suffix}": only_digits(address.get("codigo_municipio")),
+        f"municipio_{suffix}": _text(address.get("cidade"), 60),
+        f"uf_{suffix}": (address.get("uf") or "").upper(),
+        f"codigo_pais_{suffix}": "1058",
+        f"pais_{suffix}": "BRASIL",
+    })
+    if _text(address.get("complemento")):
+        out[f"complemento_{suffix}"] = _text(address.get("complemento"), 60)
+    cep = only_digits(address.get("cep"))
+    if len(cep) == 8:
+        out[f"cep_{suffix}"] = cep
     email = _first_email(party.get("email"))
     if email:
-        out["email"] = email[:60]
+        out[f"email_{suffix}"] = email[:60]
     return out
 
 
 def _icms(cst: str, total: float, aliquota) -> dict:
-    if cst == "00":
-        return {"ICMS00": {"CST": "00", "vBC": total, "pICMS": float(aliquota),
-                           "vICMS": _money(total * float(aliquota) / 100)}}
-    if cst in ("40", "41", "51"):
-        return {"ICMS45": {"CST": cst}}
-    if cst == "60":
-        return {"ICMS60": {"CST": "60", "vBCSTRet": total, "pICMSSTRet": float(aliquota),
-                           "vICMSSTRet": _money(total * float(aliquota) / 100)}}
-    if cst == "90":
-        return {"ICMS90": {"CST": "90", "vBC": total, "pICMS": float(aliquota),
-                           "vICMS": _money(total * float(aliquota) / 100)}}
-    return {"ICMSSN": {"CST": "90", "indSN": 1}}
+    out = {"icms_situacao_tributaria": ICMS_CST_FOCUS[cst]}
+    if cst in ("00", "90"):
+        out.update({"icms_base_calculo": _dec(total), "icms_aliquota": _dec(aliquota),
+                    "icms_valor": _dec(_money(total * float(aliquota) / 100))})
+    elif cst == "60":
+        out.update({"icms_base_calculo_retido_st": _dec(total), "icms_aliquota_retido_st": _dec(aliquota),
+                    "icms_valor_retido_st": _dec(_money(total * float(aliquota) / 100))})
+    elif cst == "SN":
+        out["icms_indicador_simples_nacional"] = "1"
+    return out
+
+
+def _ibs_cbs(settings: dict, total: float) -> dict:
+    """Grupo IBS/CBS da Reforma Tributária, só quando configurado (CST +
+    classificação definidos pelo contador). Alíquota vazia = não informada."""
+    cst, classificacao = _text(settings.get("ibs_cbs_cst")), _text(settings.get("ibs_cbs_classificacao"))
+    if not (cst and classificacao):
+        return {}
+    out = {"ibs_cbs_situacao_tributaria": cst, "ibs_cbs_classificacao_tributaria": classificacao,
+           "ibs_cbs_base_calculo": _dec(total)}
+    ibs_total, has_ibs = 0.0, False
+    for key, field in (("ibs_uf_aliquota", "ibs_uf"), ("ibs_mun_aliquota", "ibs_mun")):
+        if settings.get(key) is not None:
+            valor = _money(total * float(settings[key]) / 100)
+            ibs_total += valor
+            has_ibs = True
+            out[f"{field}_aliquota"] = _dec(settings[key])
+            out[f"{field}_valor"] = _dec(valor)
+    if has_ibs:
+        out["ibs_valor_total"] = _dec(ibs_total)
+    if settings.get("cbs_aliquota") is not None:
+        out["cbs_aliquota"] = _dec(settings["cbs_aliquota"])
+        out["cbs_valor"] = _dec(_money(total * float(settings["cbs_aliquota"]) / 100))
+    return out
 
 
 def _cargo_units(containers: list) -> list:
@@ -203,9 +234,9 @@ def _cargo_units(containers: list) -> list:
         number = _text(c.get("numero")).upper()
         if not number:
             continue
-        unit = {"tpUnidCarga": 1, "idUnidCarga": number[:20]}
+        unit = {"tipo": "1", "identificacao": number[:20]}
         if _text(c.get("lacre")):
-            unit["lacUnidCarga"] = [{"nLacre": _text(c.get("lacre"), 20)}]
+            unit["lacres"] = [{"numero_lacre": _text(c.get("lacre"), 20)}]
         units.append(unit)
     return units
 
@@ -215,10 +246,10 @@ def emission_datetime(now: datetime = None) -> str:
     return now.strftime("%Y-%m-%dT%H:%M:%S-03:00")
 
 
-def build_payload(cte: dict, settings: dict, numero: int, referencia: str, now: datetime = None) -> dict:
-    """Pedido de emissão (POST /cte da Nuvem Fiscal). Chamar validate() antes."""
+def build_payload(cte: dict, settings: dict, now: datetime = None) -> dict:
+    """Corpo do POST /v2/cte da Focus NFe. Chamar validate() antes. Série e
+    número ficam com a Focus (numeração automática da empresa cadastrada lá)."""
     endereco = settings.get("endereco") or {}
-    uf_emit = (endereco.get("uf") or "").upper()
     origem = cte.get("origem") or {}
     destino = cte.get("destino") or {}
     papel = cte.get("tomador_papel", 0)
@@ -229,131 +260,119 @@ def build_payload(cte: dict, settings: dict, numero: int, referencia: str, now: 
     if aliquota is None:
         aliquota = settings.get("icms_aliquota")
 
-    ide = {
-        "cUF": UF_CODES[uf_emit],
-        "CFOP": only_digits(cte.get("cfop")),
-        "natOp": _text(cte.get("natureza_operacao"), 60),
-        "mod": 57,
-        "serie": int(settings.get("cte_serie") or 1),
-        "nCT": int(numero),
-        "dhEmi": emission_datetime(now),
-        "tpImp": 1,
-        "tpEmis": 1,
-        "tpAmb": 1 if settings.get("ambiente") == "producao" else 2,
-        "tpCTe": 0,
-        "procEmi": 0,
-        "verProc": VERSAO_PROCESSO,
-        "cMunEnv": only_digits(endereco.get("codigo_municipio")),
-        "xMunEnv": _text(endereco.get("cidade"), 60),
-        "UFEnv": uf_emit,
+    payload = {
+        "cfop": only_digits(cte.get("cfop")),
+        "natureza_operacao": _text(cte.get("natureza_operacao"), 60),
+        "data_emissao": emission_datetime(now),
+        "tipo_documento": "0",
         "modal": "01",
-        "tpServ": 0,
-        "cMunIni": only_digits(origem.get("codigo_municipio")),
-        "xMunIni": _text(origem.get("cidade"), 60),
-        "UFIni": (origem.get("uf") or "").upper(),
-        "cMunFim": only_digits(destino.get("codigo_municipio")),
-        "xMunFim": _text(destino.get("cidade"), 60),
-        "UFFim": (destino.get("uf") or "").upper(),
-        "retira": 1,
-        "indIEToma": int(cte.get("indicador_ie_tomador") or 1),
+        "tipo_servico": "0",
+        "codigo_municipio_envio": only_digits(endereco.get("codigo_municipio")),
+        "municipio_envio": _text(endereco.get("cidade"), 60),
+        "uf_envio": (endereco.get("uf") or "").upper(),
+        "codigo_municipio_inicio": only_digits(origem.get("codigo_municipio")),
+        "municipio_inicio": _text(origem.get("cidade"), 60),
+        "uf_inicio": (origem.get("uf") or "").upper(),
+        "codigo_municipio_fim": only_digits(destino.get("codigo_municipio")),
+        "municipio_fim": _text(destino.get("cidade"), 60),
+        "uf_fim": (destino.get("uf") or "").upper(),
+        "retirar_mercadoria": "1",
+        "indicador_inscricao_estadual_tomador": str(int(cte.get("indicador_ie_tomador") or 1)),
+        "tomador": str(papel),
+        # Emitente
+        "cnpj_emitente": only_digits(settings.get("cnpj")),
+        "inscricao_estadual_emitente": only_digits(settings.get("ie")),
+        "nome_emitente": _text(settings.get("razao_social"), 60),
+        "logradouro_emitente": _text(endereco.get("logradouro"), 60),
+        "numero_emitente": _text(endereco.get("numero"), 60) or "S/N",
+        "bairro_emitente": _text(endereco.get("bairro"), 60),
+        "codigo_municipio_emitente": only_digits(endereco.get("codigo_municipio")),
+        "municipio_emitente": _text(endereco.get("cidade"), 60),
+        "uf_emitente": (endereco.get("uf") or "").upper(),
+        "regime_tributario_emitente": str(int(settings.get("crt") or 3)),
     }
-    if papel == 4:
-        tomador = _party(cte.get("tomador") or {}, "enderToma")
-        ide["toma4"] = {"toma": 4, **tomador}
-    else:
-        ide["toma3"] = {"toma": papel}
+    if _text(settings.get("nome_fantasia")):
+        payload["nome_fantasia_emitente"] = _text(settings.get("nome_fantasia"), 60)
+    if _text(endereco.get("complemento")):
+        payload["complemento_emitente"] = _text(endereco.get("complemento"), 60)
+    if len(only_digits(endereco.get("cep"))) == 8:
+        payload["cep_emitente"] = only_digits(endereco.get("cep"))
+    if 6 <= len(only_digits(settings.get("fone"))) <= 14:
+        payload["telefone_emitente"] = only_digits(settings.get("fone"))
 
-    inf_cte = {
-        "versao": VERSAO_LEIAUTE,
-        "ide": ide,
-        # O resto do emitente (nome, endereço) vem do cadastro da empresa na Nuvem Fiscal
-        "emit": {
-            "CNPJ": only_digits(settings.get("cnpj")),
-            "IE": only_digits(settings.get("ie")),
-            "CRT": int(settings.get("crt")),
-        },
-        "rem": _party(cte.get("remetente") or {}, "enderReme"),
-        "dest": _party(cte.get("destinatario") or {}, "enderDest"),
-        "vPrest": {"vTPrest": total, "vRec": receber},
-        "imp": {"ICMS": _icms(cst, total, aliquota)},
-    }
-    componentes = [{"xNome": _text(c.get("nome"), 15).upper(), "vComp": _money(c.get("valor"))}
+    payload.update(_party(cte.get("remetente") or {}, "remetente"))
+    payload.update(_party(cte.get("destinatario") or {}, "destinatario"))
+    if papel == 4:
+        payload.update(_party(cte.get("tomador") or {}, "tomador"))
+
+    payload["valor_total"] = _dec(total)
+    payload["valor_receber"] = _dec(receber)
+    componentes = [{"nome": _text(c.get("nome"), 15).upper(), "valor": _dec(c.get("valor"))}
                    for c in cte.get("componentes") or [] if _text(c.get("nome"))]
     if componentes:
-        inf_cte["vPrest"]["Comp"] = componentes
+        payload["componentes_valor"] = componentes
+    payload.update(_icms(cst, total, aliquota))
+    payload.update(_ibs_cbs(settings, total))
 
-    compl = {}
-    obs = _text(cte.get("observacoes"), 2000)
-    if obs:
-        compl["xObs"] = obs
-    if compl:
-        inf_cte["compl"] = compl
-
-    carga = {
-        "proPred": _text(cte.get("produto_predominante") or settings.get("produto_predominante"), 60),
-        "infQ": [{
-            "cUnid": str(q.get("unidade") or "01").zfill(2),
-            "tpMed": _text(q.get("tipo_medida"), 20) or "PESO BRUTO",
-            "qCarga": round(float(q.get("quantidade") or 0), 4),
-        } for q in cte.get("quantidades") or []],
-    }
+    payload["produto_predominante"] = _text(cte.get("produto_predominante") or settings.get("produto_predominante"), 60)
     if cte.get("valor_carga") is not None:
-        carga["vCarga"] = _money(cte.get("valor_carga"))
+        payload["valor_total_carga"] = _dec(cte.get("valor_carga"))
     if _text(cte.get("outras_caracteristicas")):
-        carga["xOutCat"] = _text(cte.get("outras_caracteristicas"), 30)
+        payload["outras_caracteristicas_carga"] = _text(cte.get("outras_caracteristicas"), 40)
+    payload["quantidades"] = [{
+        "codigo_unidade_medida": str(q.get("unidade") or "01").zfill(2),
+        "tipo_medida": _text(q.get("tipo_medida"), 20) or "PESO BRUTO",
+        "quantidade": _dec(q.get("quantidade"), 4),
+    } for q in cte.get("quantidades") or []]
 
     # Containers vão como unidades de carga do primeiro documento transportado
     units = _cargo_units(cte.get("containers"))
-    inf_nfe, inf_outros = [], []
+    nfes, outros = [], []
     for doc in cte.get("documentos") or []:
         if doc.get("tipo") == "NFE":
-            item = {"chave": only_digits(doc.get("chave"))}
-            target = inf_nfe
+            item, target = {"chave_nfe": only_digits(doc.get("chave"))}, nfes
         else:
-            item = {"tpDoc": str(doc.get("tipo_outros") or "99").zfill(2)}
+            item, target = {"tipo_documento": str(doc.get("tipo_outros") or "99").zfill(2)}, outros
             if _text(doc.get("descricao")):
-                item["descOutros"] = _text(doc.get("descricao"), 100)
+                item["descricao_documento"] = _text(doc.get("descricao"), 100)
             if _text(doc.get("numero")):
-                item["nDoc"] = _text(doc.get("numero"), 20)
+                item["numero"] = _text(doc.get("numero"), 100)
             if doc.get("data_emissao"):
-                item["dEmi"] = str(doc["data_emissao"])[:10]
+                item["data_emissao"] = str(doc["data_emissao"])[:10]
             if doc.get("valor") is not None:
-                item["vDocFisc"] = _money(doc.get("valor"))
-            target = inf_outros
-        if units and not inf_nfe and not inf_outros:
-            item["infUnidCarga"] = units
+                item["valor"] = _dec(doc.get("valor"))
+        if units and not nfes and not outros:
+            item["unidades_carga"] = units
         target.append(item)
-    inf_doc = {}
-    if inf_nfe:
-        inf_doc["infNFe"] = inf_nfe
-    if inf_outros:
-        inf_doc["infOutros"] = inf_outros
+    if nfes:
+        payload["nfes"] = nfes
+    if outros:
+        payload["outros_documentos"] = outros
 
-    inf_cte["infCTeNorm"] = {
-        "infCarga": carga,
-        "infDoc": inf_doc,
-        "infModal": {"versaoModal": VERSAO_LEIAUTE, "rodo": {"RNTRC": only_digits(settings.get("rntrc"))}},
-    }
-
-    return {
-        "infCte": inf_cte,
-        "ambiente": "producao" if settings.get("ambiente") == "producao" else "homologacao",
-        "referencia": referencia,
-    }
+    obs = _text(cte.get("observacoes"), 2000)
+    if obs:
+        payload["observacao"] = obs
+    payload["modal_rodoviario"] = {"rntrc": only_digits(settings.get("rntrc"))}
+    return payload
 
 
 def provider_result(response: dict) -> dict:
-    """Campos do retorno da Nuvem Fiscal (Dfe) que o sistema guarda."""
-    autorizacao = response.get("autorizacao") or {}
-    motivo = autorizacao.get("motivo_status") or autorizacao.get("mensagem")
-    codigo = autorizacao.get("codigo_status")
+    """Campos da consulta do CT-e na Focus NFe que o sistema guarda."""
+    status_focus = (response.get("status") or "").lower()
+    motivo = response.get("mensagem_sefaz") or response.get("mensagem")
+    codigo = response.get("status_sefaz")
     if motivo and codigo:
         motivo = f"{codigo} - {motivo}"
-    return {
-        "status": PROVIDER_STATUS.get((response.get("status") or "").lower(), "ERRO"),
-        "provider_id": response.get("id"),
-        "chave": response.get("chave"),
-        "protocolo": autorizacao.get("numero_protocolo"),
+    result = {
+        "status": PROVIDER_STATUS.get(status_focus, "ERRO"),
+        "chave": only_digits(response.get("chave")) or None,  # às vezes vem com o prefixo "CTe"
+        "protocolo": response.get("protocolo"),
         "motivo": motivo,
-        "data_emissao": response.get("data_emissao"),
+        "caminho_dacte": response.get("caminho_dacte"),
+        "caminho_xml": response.get("caminho_xml"),
     }
+    if response.get("numero") not in (None, ""):
+        result["numero"] = int(response["numero"])
+    if response.get("serie") not in (None, ""):
+        result["serie"] = int(response["serie"])
+    return result

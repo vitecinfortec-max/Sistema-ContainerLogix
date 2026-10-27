@@ -14,22 +14,24 @@ import {
 } from '../lib/fiscal';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Building2, FileCog, KeyRound, Loader2, RefreshCw, Save, Send, ShieldCheck, Truck } from 'lucide-react';
+import { Building2, FileCog, KeyRound, Landmark, Loader2, Save, Send, ShieldCheck, Truck } from 'lucide-react';
 
 const EMPTY_FORM = {
   ambiente: 'homologacao', cnpj: '', ie: '', razao_social: '', nome_fantasia: '', email: '', fone: '',
   endereco: {}, crt: '3', rntrc: '', cte_serie: '1', cte_proximo_numero: '', cfop_padrao: '5353',
   natureza_operacao: '', icms_cst: '00', icms_aliquota: '', produto_predominante: '',
+  ibs_cbs_cst: '', ibs_cbs_classificacao: '', ibs_uf_aliquota: '', ibs_mun_aliquota: '', cbs_aliquota: '',
 };
 
 const fmtDate = (value) => (value ? format(new Date(value), 'dd/MM/yyyy') : '-');
+const toRate = (value) => (value === '' || value === null || value === undefined ? null : Number(String(value).replace(',', '.')));
+const fromRate = (value) => (value === null || value === undefined ? '' : String(value).replace('.', ','));
 
 export default function FiscalSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [checkingSefaz, setCheckingSefaz] = useState(false);
   const [info, setInfo] = useState({});
   const [form, setForm] = useState(EMPTY_FORM);
   const [nextNumber, setNextNumber] = useState(1);
@@ -40,7 +42,7 @@ export default function FiscalSettingsPage() {
 
   const applySettings = (data) => {
     setInfo(data);
-    setNextNumber(data.cte_proximo_numero || 1);
+    setNextNumber(data.cte_proximo_numero || '');
     setForm({
       ambiente: data.ambiente || 'homologacao',
       cnpj: data.cnpj ? formatCnpjCpf(data.cnpj) : '',
@@ -53,12 +55,17 @@ export default function FiscalSettingsPage() {
       crt: String(data.crt || 3),
       rntrc: data.rntrc || '',
       cte_serie: String(data.cte_serie ?? 1),
-      cte_proximo_numero: String(data.cte_proximo_numero || 1),
+      cte_proximo_numero: data.cte_proximo_numero ? String(data.cte_proximo_numero) : '',
       cfop_padrao: data.cfop_padrao || '5353',
       natureza_operacao: data.natureza_operacao || '',
       icms_cst: data.icms_cst || '00',
       icms_aliquota: data.icms_aliquota ?? '',
       produto_predominante: data.produto_predominante || '',
+      ibs_cbs_cst: data.ibs_cbs_cst || '',
+      ibs_cbs_classificacao: data.ibs_cbs_classificacao || '',
+      ibs_uf_aliquota: fromRate(data.ibs_uf_aliquota),
+      ibs_mun_aliquota: fromRate(data.ibs_mun_aliquota),
+      cbs_aliquota: fromRate(data.cbs_aliquota),
     });
   };
 
@@ -104,9 +111,14 @@ export default function FiscalSettingsPage() {
       icms_cst: form.icms_cst,
       icms_aliquota: form.icms_aliquota === '' ? null : Number(String(form.icms_aliquota).replace(',', '.')),
       produto_predominante: form.produto_predominante.trim() || null,
+      ibs_cbs_cst: form.ibs_cbs_cst || null,
+      ibs_cbs_classificacao: form.ibs_cbs_classificacao || null,
+      ibs_uf_aliquota: toRate(form.ibs_uf_aliquota),
+      ibs_mun_aliquota: toRate(form.ibs_mun_aliquota),
+      cbs_aliquota: toRate(form.cbs_aliquota),
     };
     // Só manda o próximo número quando ele foi alterado na tela
-    if (Number(form.cte_proximo_numero) !== Number(nextNumber)) {
+    if (form.cte_proximo_numero && Number(form.cte_proximo_numero) !== Number(nextNumber)) {
       payload.cte_proximo_numero = Number(form.cte_proximo_numero);
     }
     return payload;
@@ -162,21 +174,6 @@ export default function FiscalSettingsPage() {
     }
   };
 
-  const handleSefazStatus = async () => {
-    setCheckingSefaz(true);
-    try {
-      const r = await api.getFiscalSefazStatus();
-      const d = r.data || {};
-      const message = `${d.autorizador ? `${d.autorizador}: ` : ''}${d.codigo_status || ''} ${d.motivo_status || ''}`.trim();
-      if (Number(d.codigo_status) === 107) toast.success(message || 'Serviço em operação');
-      else toast.warning(message || 'Situação desconhecida');
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao consultar a Sefaz');
-    } finally {
-      setCheckingSefaz(false);
-    }
-  };
-
   if (loading) {
     return (
       <Layout>
@@ -194,7 +191,7 @@ export default function FiscalSettingsPage() {
         <PageHeader
           icon={FileCog}
           title="Configuração Fiscal"
-          subtitle="Emitente, certificado A1 e padrões do CT-e emitido pela Nuvem Fiscal"
+          subtitle="Emitente, certificado A1 e padrões do CT-e emitido pela Focus NFe"
           backTo="/fiscal/cte"
         />
 
@@ -204,7 +201,7 @@ export default function FiscalSettingsPage() {
               <p className="text-xs text-slate-500 mb-1">Emissor no servidor</p>
               {info.provider_configured
                 ? <StatusPill tone="emerald">Configurado</StatusPill>
-                : <StatusPill tone="red" title="Faltam NUVEMFISCAL_CLIENT_ID / NUVEMFISCAL_CLIENT_SECRET no servidor">Não configurado</StatusPill>}
+                : <StatusPill tone="red" title="Falta a variável FOCUSNFE_TOKEN no servidor">Não configurado</StatusPill>}
             </div>
             <div>
               <p className="text-xs text-slate-500 mb-1">Cadastro da empresa no emissor</p>
@@ -229,10 +226,6 @@ export default function FiscalSettingsPage() {
             <Button type="button" variant="outline" size="sm" onClick={handleSync} disabled={syncing || saving} data-testid="fiscal-sync-btn">
               {syncing ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Send className="w-4 h-4 mr-1.5" />}
               Salvar e enviar cadastro ao emissor
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={handleSefazStatus} disabled={checkingSefaz || !info.provider_synced_at} data-testid="fiscal-sefaz-btn">
-              {checkingSefaz ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
-              Consultar Sefaz
             </Button>
           </div>
         </FormSection>
@@ -288,7 +281,7 @@ export default function FiscalSettingsPage() {
             <Field label="Série">
               <Input inputMode="numeric" value={form.cte_serie} onChange={(e) => set('cte_serie', e.target.value.replace(/\D/g, '').slice(0, 3))} />
             </Field>
-            <Field label="Próximo número" hint="Para continuar a numeração de outro emissor">
+            <Field label="Próximo número" hint="Para continuar a numeração de outro emissor (vale ao enviar o cadastro ao emissor)">
               <Input inputMode="numeric" value={form.cte_proximo_numero} onChange={(e) => set('cte_proximo_numero', e.target.value.replace(/\D/g, '').slice(0, 9))} data-testid="fiscal-next-number" />
             </Field>
             <Field label="CFOP padrão" className="md:col-span-2">
@@ -323,10 +316,33 @@ export default function FiscalSettingsPage() {
           </p>
         </FormSection>
 
+        <FormSection title="Reforma Tributária (IBS/CBS)" icon={Landmark}>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Preencha conforme orientação do contador. Com o CST e a Classificação vazios, o CT-e sai sem o grupo IBS/CBS.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <Field label="CST IBS/CBS" hint="3 dígitos">
+              <Input inputMode="numeric" value={form.ibs_cbs_cst} onChange={(e) => set('ibs_cbs_cst', e.target.value.replace(/\D/g, '').slice(0, 3))} className="font-mono" data-testid="fiscal-ibs-cst" />
+            </Field>
+            <Field label="Classificação Tributária" hint="6 dígitos (cClassTrib)">
+              <Input inputMode="numeric" value={form.ibs_cbs_classificacao} onChange={(e) => set('ibs_cbs_classificacao', e.target.value.replace(/\D/g, '').slice(0, 6))} className="font-mono" data-testid="fiscal-ibs-class" />
+            </Field>
+            <Field label="Alíquota IBS UF (%)">
+              <Input inputMode="decimal" value={form.ibs_uf_aliquota} onChange={(e) => set('ibs_uf_aliquota', e.target.value.replace(/[^\d,.]/g, ''))} />
+            </Field>
+            <Field label="Alíquota IBS Município (%)">
+              <Input inputMode="decimal" value={form.ibs_mun_aliquota} onChange={(e) => set('ibs_mun_aliquota', e.target.value.replace(/[^\d,.]/g, ''))} />
+            </Field>
+            <Field label="Alíquota CBS (%)">
+              <Input inputMode="decimal" value={form.cbs_aliquota} onChange={(e) => set('cbs_aliquota', e.target.value.replace(/[^\d,.]/g, ''))} />
+            </Field>
+          </div>
+        </FormSection>
+
         <FormSection title="Certificado digital A1" icon={KeyRound}>
           {certificate && (
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              {certificate.subject_name} · emitido por {certificate.issuer_name || '-'} · válido de {fmtDate(certificate.not_valid_before)} até {fmtDate(certificate.not_valid_after)}
+              Certificado do CNPJ {certificate.cpf_cnpj || '-'} · válido de {fmtDate(certificate.not_valid_before)} até {fmtDate(certificate.not_valid_after)}
             </p>
           )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
@@ -342,7 +358,7 @@ export default function FiscalSettingsPage() {
             </Button>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            O certificado e a senha vão direto para a Nuvem Fiscal e não ficam guardados no sistema. Envie o cadastro da empresa antes.
+            O certificado e a senha vão direto para a Focus NFe e não ficam guardados no sistema. Envie o cadastro da empresa antes.
           </p>
         </FormSection>
 

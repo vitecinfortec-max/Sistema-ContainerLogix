@@ -4296,7 +4296,7 @@ class HRDocumentCreate(BaseModel):
     observations: Optional[str] = None
 
 
-# ==================== FISCAL - CT-e (emissão via Nuvem Fiscal) ====================
+# ==================== FISCAL - CT-e (emissão via Focus NFe) ====================
 
 CTE_STATUS_OPTIONS = ["RASCUNHO", "ENVIANDO", "PENDENTE", "AUTORIZADO", "REJEITADO", "DENEGADO", "CANCELADO", "ERRO"]
 FISCAL_ICMS_CST_OPTIONS = ["00", "40", "41", "51", "60", "90", "SN"]
@@ -4326,12 +4326,18 @@ class FiscalSettingsUpdate(BaseModel):
     crt: Optional[int] = None  # 1 Simples Nacional, 2 Simples excesso sublimite, 3 Regime Normal, 4 MEI
     rntrc: Optional[str] = None
     cte_serie: Optional[int] = None
-    cte_proximo_numero: Optional[int] = None  # só grava se informado (continua a numeração de outro emissor)
+    cte_proximo_numero: Optional[int] = None  # vai para a Focus no próximo envio do cadastro (continua a numeração de outro emissor)
     cfop_padrao: Optional[str] = None
     natureza_operacao: Optional[str] = None
     icms_cst: Optional[str] = None
     icms_aliquota: Optional[float] = None
     produto_predominante: Optional[str] = None
+    # Reforma Tributária (IBS/CBS) - definidos pelo contador; vazios = não enviados
+    ibs_cbs_cst: Optional[str] = None
+    ibs_cbs_classificacao: Optional[str] = None
+    ibs_uf_aliquota: Optional[float] = None
+    ibs_mun_aliquota: Optional[float] = None
+    cbs_aliquota: Optional[float] = None
 
 
 class CteParty(BaseModel):

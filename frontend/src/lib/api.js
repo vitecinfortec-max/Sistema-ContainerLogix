@@ -780,7 +780,7 @@ export const api = {
   deleteLoadingOrder: (id) => axios.delete(`${API}/loading-orders/${id}`),
   getLoadingOrderPDF: (id) => axios.get(`${API}/loading-orders/${id}/pdf`, { responseType: 'blob' }),
 
-  // Fiscal (CT-e pela Nuvem Fiscal)
+  // Fiscal (CT-e pela Focus NFe)
   getFiscalSettings: () => axios.get(`${API}/fiscal/settings`),
   updateFiscalSettings: (data) => axios.put(`${API}/fiscal/settings`, data),
   syncFiscalCompany: () => axios.post(`${API}/fiscal/settings/sync`),
@@ -790,7 +790,6 @@ export const api = {
     formData.append('password', password);
     return axios.post(`${API}/fiscal/settings/certificate`, formData);
   },
-  getFiscalSefazStatus: () => axios.get(`${API}/fiscal/sefaz-status`),
   getCtes: (params) => axios.get(`${API}/ctes`, { params }),
   getCte: (id) => axios.get(`${API}/ctes/${id}`),
   getCteDraftFromLoadingOrder: (orderId) => axios.get(`${API}/ctes/from-loading-order/${orderId}`),
