@@ -471,12 +471,29 @@ async def _filter_fuel_supplies(
             date_query['$lte'] = date_to
         query['supply_date'] = date_query
     rows = await db.fuel_supplies.find(query, {"_id": 0}).sort("supply_date", -1).to_list(None)
+    order_ids = list({r['fuel_supply_order_id'] for r in rows if r.get('fuel_supply_order_id')})
+    order_numbers = {
+        o['id']: o.get('order_number')
+        for o in await db.fuel_supply_orders.find({"id": {"$in": order_ids}}, {"_id": 0, "id": 1, "order_number": 1}).to_list(None)
+    } if order_ids else {}
     out = []
     for r in rows:
         calc = _fuel_calc(r)
         calc['fuel_type_label'] = _FUEL_SUPPLY_FUEL_TYPE_LABELS.get(calc.get('fuel_type'), calc.get('fuel_type'))
+        calc['order_number_label'] = _order_number_label(r, order_numbers)
         out.append(calc)
     return out
+
+
+def _order_number_label(supply: dict, order_numbers: dict) -> Optional[str]:
+    """Nº da Ordem de Abastecimento do lançamento, pra conferência no
+    relatório: pelo vínculo com a ordem ou, nos lançamentos antigos (sem o
+    vínculo) e nos digitados à mão, pelo texto livre ("Nº 123")."""
+    number = order_numbers.get(supply.get('fuel_supply_order_id'))
+    if number is not None:
+        return str(number)
+    text = re.sub(r'^\s*N[º°o]?\.?\s*', '', supply.get('supply_order') or '', flags=re.IGNORECASE).strip()
+    return text or None
 
 
 @api_router.get("/reports/fuel-supply/summary")
@@ -497,6 +514,7 @@ async def get_fuel_supply_report_summary(
         # Os abastecimentos do filtro, pra tabela da tela (o mesmo recorte do PDF/Excel)
         "rows": [{
             "id": r.get('id'), "supply_number": r.get('supply_number'), "supply_date": r.get('supply_date'),
+            "order_number_label": r.get('order_number_label'),
             "equipment_plate": r.get('equipment_plate'), "driver_name": r.get('driver_name'),
             "supplier_name": r.get('supplier_name'), "source": r.get('source'),
             "fuel_type_label": r.get('fuel_type_label'), "liters": r.get('liters') or 0,

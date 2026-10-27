@@ -270,6 +270,7 @@ export default function ReportsFuelSupplyPage() {
                 <thead>
                   <tr>
                     <th>Nº</th>
+                    <th>Ordem</th>
                     <th>Data</th>
                     <th>Placa</th>
                     <th>Motorista</th>
@@ -285,6 +286,7 @@ export default function ReportsFuelSupplyPage() {
                   {pageItems.map((f) => (
                     <tr key={f.id}>
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{f.supply_number}</td>
+                      <td className="whitespace-nowrap tabular-nums" data-testid={`fuel-supply-order-${f.id}`}>{f.order_number_label || '-'}</td>
                       <td className="whitespace-nowrap tabular-nums">{f.supply_date ? format(new Date(`${f.supply_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
                       <td>{f.equipment_plate ? <PlateTag>{f.equipment_plate}</PlateTag> : '-'}</td>
                       <td><div className="max-w-[180px] truncate" title={f.driver_name || ''}>{f.driver_name || '-'}</div></td>

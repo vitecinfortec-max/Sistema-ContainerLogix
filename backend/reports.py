@@ -2200,19 +2200,24 @@ def generate_fuel_supply_report_excel(supplies: list, company: dict = None, repo
             f"Preço médio/litro: {format_currency(avg_price, 'BRL')}   •   Valor total: {format_currency(total_value, 'BRL')}"
         )
 
-        headers = ['Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total']
+        def order_cell(s):
+            # Número puro vira número no Excel (ordena e filtra certo); texto digitado à mão fica como está
+            label = s.get('order_number_label')
+            return int(label) if label and label.isdigit() else (label or '-')
+
+        headers = ['Ordem', 'Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total']
         data_rows = [[
-            _xl_date(s.get('supply_date')), s.get('equipment_plate') or '-', s.get('driver_name') or '-',
+            order_cell(s), _xl_date(s.get('supply_date')), s.get('equipment_plate') or '-', s.get('driver_name') or '-',
             s.get('supplier_name') or '-', s.get('fuel_type_label') or '-',
             s.get('liters') or 0, s.get('unit_price') or 0, s.get('total_value') or 0,
         ] for s in supplies]
 
         _bsoft_style_excel(
             ws, report_title, stats_text, headers, data_rows,
-            {'B': 12, 'C': 14, 'D': 26, 'E': 26, 'F': 16, 'G': 12, 'H': 13, 'I': 15},
-            center_cols={0, 1},
-            number_fmt_cols={0: XL_DATE, 5: XL_DECIMAL, 6: 'R$ #,##0.00', 7: 'R$ #,##0.00'},
-            total_col=[5, 7],
+            {'B': 10, 'C': 12, 'D': 14, 'E': 26, 'F': 26, 'G': 16, 'H': 12, 'I': 13, 'J': 15},
+            center_cols={0, 1, 2},
+            number_fmt_cols={1: XL_DATE, 6: XL_DECIMAL, 7: 'R$ #,##0.00', 8: 'R$ #,##0.00'},
+            total_col=[6, 8],
             stats_text=stats_text,
             company_name=c['name'],
             logo_buffer=download_logo(company),
@@ -2771,9 +2776,10 @@ def generate_fuel_supply_report_pdf(supplies: list, company: dict = None, report
 
     if supplies:
         cell = _pdf_cell_factory(styles, font_size=8)
-        rows = [_pdf_header_cells(['Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total'], font_size=8)]
+        rows = [_pdf_header_cells(['Ordem', 'Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total'], font_size=8)]
         for s in supplies:
             rows.append([
+                cell(s.get('order_number_label') or '-', 'center', bold=True),
                 cell(fmt_date(s.get('supply_date')), 'center'),
                 cell(s.get('equipment_plate') or '-', bold=True),
                 cell(s.get('driver_name') or '-'),
@@ -2783,9 +2789,9 @@ def generate_fuel_supply_report_pdf(supplies: list, company: dict = None, report
                 cell(format_currency(s.get('unit_price') or 0), 'right'),
                 cell(format_currency(s.get('total_value') or 0), 'right'),
             ])
-        rows.append([''] * 4 + [cell('TOTAL', 'right', bold=True), cell(fmt_liters(total_liters), 'right', bold=True), '', cell(format_currency(total_value), 'right', bold=True)])
+        rows.append([''] * 5 + [cell('TOTAL', 'right', bold=True), cell(fmt_liters(total_liters), 'right', bold=True), '', cell(format_currency(total_value), 'right', bold=True)])
 
-        col_widths = [doc.width*0.09, doc.width*0.12, doc.width*0.16, doc.width*0.18, doc.width*0.13, doc.width*0.1, doc.width*0.11, doc.width*0.11]
+        col_widths = [doc.width*0.07, doc.width*0.09, doc.width*0.12, doc.width*0.14, doc.width*0.16, doc.width*0.11, doc.width*0.1, doc.width*0.1, doc.width*0.11]
         table = Table(rows, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(table)
