@@ -24,11 +24,12 @@ import {
   IE_TOMADOR_OPTIONS, TOMADOR_OPTIONS, UNIDADE_OPTIONS, accessKeyOk, cfopForRoute, downloadBlob, formatCnpjCpf,
   fromAddressFields, indicadorIe, onlyDigits, toAddressFields, waitWhilePending,
 } from '../lib/fiscal';
+import { parseFiscalXml } from '../lib/fiscalXml';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import {
-  AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, FileCheck, FileCode, FileCog, Loader2, MapPin,
+  AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, FileCheck, FileCode, FileCog, FileUp, Loader2, MapPin,
   PackageCheck, Pencil, Plus, Printer, RefreshCw, Save, Send, Trash2, Truck, X, XCircle,
 } from 'lucide-react';
 
@@ -40,6 +41,7 @@ const toNumber = (v) => {
 };
 // Número digitado (pt-BR) a partir do valor salvo
 const toInput = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','));
+const toMoneyInput = (v) => (v === null || v === undefined || v === '' ? '' : Number(v).toFixed(2).replace('.', ','));
 
 const TAB_LABELS = { basicos: 'Dados básicos', carga: 'Carga e documentos', frete: 'Frete e impostos', conferencia: 'Conferência' };
 // Componentes mais usados na composição do frete (o nome vai no CT-e, até 15 caracteres)
@@ -98,14 +100,14 @@ function toForm(doc, settings) {
       || (sameCity(origem, doc.remetente?.endereco) && sameCity(destino, doc.destinatario?.endereco)),
     origem,
     destino,
-    valor_total: toInput(doc.valor_total),
-    valor_receber: toInput(doc.valor_receber),
+    valor_total: toMoneyInput(doc.valor_total),
+    valor_receber: toMoneyInput(doc.valor_receber),
     icms_cst: doc.icms_cst || base.icms_cst,
     icms_aliquota: toInput(doc.icms_aliquota ?? settings?.icms_aliquota),
-    valor_carga: toInput(doc.valor_carga),
-    componentes: (doc.componentes || []).map((c) => ({ ...c, valor: toInput(c.valor) })),
+    valor_carga: toMoneyInput(doc.valor_carga),
+    componentes: (doc.componentes || []).map((c) => ({ ...c, valor: toMoneyInput(c.valor) })),
     quantidades: (doc.quantidades?.length ? doc.quantidades : base.quantidades).map((q) => ({ ...q, quantidade: toInput(q.quantidade) })),
-    documentos: (doc.documentos?.length ? doc.documentos : base.documentos).map((d) => ({ ...base.documentos[0], ...d, valor: toInput(d.valor) })),
+    documentos: (doc.documentos?.length ? doc.documentos : base.documentos).map((d) => ({ ...base.documentos[0], ...d, valor: toMoneyInput(d.valor) })),
     containers: doc.containers || [],
     observacoes: doc.observacoes || '',
   };
@@ -133,6 +135,83 @@ function derive(prev, next) {
     if (values.length) f = { ...f, valor_total: values.reduce((a, b) => a + b, 0).toFixed(2).replace('.', ',') };
   }
   return f;
+}
+
+/**
+ * XML importado -> formulário. Um CT-e (de outro sistema) vira a base do
+ * formulário; as NF-e entram como documentos, somam valor e peso da carga e
+ * preenchem remetente/destinatário que ainda estão em branco.
+ */
+function mergeXml(current, items, { settings, clients }) {
+  const byCnpj = (p) => {
+    const d = onlyDigits(p?.cnpj_cpf);
+    const client = d && clients.find((c) => onlyDigits(c.cnpj) === d);
+    return client ? { ...p, client_id: client.id } : p;
+  };
+  const warnings = [];
+  const ctes = items.filter((x) => x.tipo === 'CTE');
+  const nfes = items.filter((x) => x.tipo === 'NFE');
+  let f = current;
+  if (ctes.length) {
+    // tipo/chave/numero são do CT-e de origem, não do novo
+    const { tipo, chave, numero, nfes: keys, ...c } = ctes[0];
+    if (ctes.length > 1) warnings.push(`Mais de um CT-e no arquivo: usado o nº ${numero || '-'}`);
+    if (!['0', '3', '4'].includes(c.tomador_papel)) warnings.push('Tomador do CT-e original era expedidor/recebedor: confira o pagador do frete');
+    const doc = toForm({
+      ...c,
+      tomador_papel: ['0', '3', '4'].includes(c.tomador_papel) ? c.tomador_papel : '0',
+      remetente: byCnpj(c.remetente),
+      destinatario: byCnpj(c.destinatario),
+      tomador: c.tomador ? byCnpj(c.tomador) : null,
+      cfop: c.cfop || current.cfop,
+      icms_cst: c.icms_cst || current.icms_cst,
+      componentes: c.componentes.filter((x) => x.nome),
+      quantidades: c.quantidades.filter((q) => q.quantidade),
+      documentos: keys.map((k) => ({ tipo: 'NFE', chave: k })),
+      containers: current.containers,
+    }, settings);
+    f = { ...doc, loading_order_id: current.loading_order_id, loading_order_number: current.loading_order_number };
+    f = { ...f, indicador_ie_tomador: indicadorIe(payerOf(f)) };
+  }
+
+  const known = new Set(f.documentos.map((d) => onlyDigits(d.chave)).filter(Boolean));
+  const fresh = nfes.filter((n) => n.chave && !known.has(n.chave) && known.add(n.chave));
+  const repeated = nfes.length - fresh.length;
+  if (repeated) warnings.push(repeated === 1 ? 'Uma NF-e já estava no CT-e e foi ignorada' : `${repeated} NF-e já estavam no CT-e e foram ignoradas`);
+  if (fresh.length) {
+    const ref = fresh[0];
+    const blank = (p) => !(p?.nome || '').trim();
+    const newParties = blank(f.remetente) && blank(f.destinatario);
+    const others = fresh.filter((n) => onlyDigits(n.remetente?.cnpj_cpf) !== onlyDigits(ref.remetente?.cnpj_cpf)
+      || onlyDigits(n.destinatario?.cnpj_cpf) !== onlyDigits(ref.destinatario?.cnpj_cpf));
+    if (others.length) warnings.push(`${others.length} NF-e com remetente ou destinatário diferente da primeira`);
+    const peso = fresh.reduce((sum, n) => sum + n.peso_bruto, 0);
+    const valor = fresh.reduce((sum, n) => sum + n.valor, 0);
+    let quantidades = f.quantidades;
+    if (peso > 0) {
+      const i = quantidades.findIndex((q) => q.unidade === '01');
+      const add = (q) => ({ ...q, quantidade: toInput(Math.round(((toNumber(q.quantidade) || 0) + peso) * 1000) / 1000) });
+      quantidades = i >= 0
+        ? quantidades.map((q, j) => (j === i ? add(q) : q))
+        : [...quantidades, add({ unidade: '01', tipo_medida: 'PESO BRUTO', quantidade: '' })];
+    }
+    f = {
+      ...f,
+      remetente: blank(f.remetente) && ref.remetente ? byCnpj(ref.remetente) : f.remetente,
+      destinatario: blank(f.destinatario) && ref.destinatario ? byCnpj(ref.destinatario) : f.destinatario,
+      // Modalidade do frete na nota: 0 = por conta do remetente, 1 = do destinatário
+      tomador_papel: newParties && ({ 0: '0', 1: '3' })[ref.mod_frete] ? ({ 0: '0', 1: '3' })[ref.mod_frete] : f.tomador_papel,
+      documentos: [
+        ...f.documentos.filter((d) => (d.tipo === 'NFE' ? onlyDigits(d.chave) : (d.descricao || d.numero))),
+        ...fresh.map((n) => ({ ...buildEmpty().documentos[0], chave: n.chave })),
+      ],
+      valor_carga: toMoneyInput((toNumber(f.valor_carga) || 0) + valor),
+      quantidades,
+      produto_predominante: (f.produto_predominante || '').trim() || (ref.produto || '').slice(0, 60).toUpperCase(),
+    };
+  }
+  if (!f.documentos.length) f = { ...f, documentos: buildEmpty().documentos };
+  return { form: f, ctes: ctes.length ? 1 : 0, nfes: fresh.length, warnings };
 }
 
 function cnpjCpfOk(value) {
@@ -356,6 +435,7 @@ export default function CtePage() {
   const [justificativa, setJustificativa] = useState('');
   const debounceRef = useRef(null);
   const activeRef = useRef(true);
+  const xmlInputRef = useRef(null);
 
   const filtered = statusFilter ? list.filter((c) => c.status === statusFilter) : list;
   const { pageItems, paginationProps } = usePagination(filtered, { resetKey: `${search}|${statusFilter}` });
@@ -438,6 +518,31 @@ export default function CtePage() {
       observacoes: doc.loading_order_id ? '' : f.observacoes,
     }, { startTab: 'carga' });
     toast.info(`Cópia do CT-e nº ${doc.numero || '-'}: informe os documentos e a carga desta viagem`);
+  };
+
+  // XML de NF-e / CT-e: com o formulário aberto completa o CT-e em edição; na lista, abre um novo
+  const importXml = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    const items = [];
+    const failed = [];
+    await Promise.all(files.map(async (file) => {
+      try {
+        items.push(parseFiscalXml(await file.text()));
+      } catch (e) {
+        failed.push(`${file.name}: ${e.message}`);
+      }
+    }));
+    failed.forEach((msg) => toast.error(`XML não importado - ${msg}`));
+    if (!items.length) return;
+    const ctx = { settings, clients };
+    const editing = dialogOpen && !emitted;
+    const result = mergeXml(editing ? form : buildEmpty(settings), items, ctx);
+    if (editing) setForm(derive(form, result.form));
+    else openForm({ ...result.form, indicador_ie_tomador: indicadorIe(payerOf(result.form)) }, { startTab: 'conferencia' });
+    const parts = [result.ctes && 'dados do CT-e', result.nfes && `${result.nfes} NF-e`].filter(Boolean);
+    if (parts.length) toast.success(`Importado: ${parts.join(' e ')}. Confira antes de transmitir.`);
+    result.warnings.forEach((w) => toast.warning(w));
   };
 
   const save = async ({ silent = false } = {}) => {
@@ -599,6 +704,8 @@ export default function CtePage() {
   return (
     <Layout>
       <div className="space-y-4" data-testid="cte-page">
+        <input ref={xmlInputRef} type="file" accept=".xml,text/xml,application/xml" multiple className="hidden" data-testid="cte-xml-input"
+          onChange={(e) => { importXml(e.target.files); e.target.value = ''; }} />
         <PageHeader
           icon={FileCheck}
           title="CT-e"
@@ -656,6 +763,7 @@ export default function CtePage() {
               primary={<ToolbarPrimary icon={Plus} label="Novo CT-e" onClick={openCreate} testId="cte-new-btn" />}
             >
               <ToolbarButton icon={PackageCheck} label="Da Ordem de Carregamento" tone="violet" onClick={() => setOrderDialogOpen(true)} testId="cte-from-order-btn" />
+              <ToolbarButton icon={FileUp} label="Importar XML" tone="blue" onClick={() => xmlInputRef.current?.click()} testId="cte-import-xml-btn" />
               <ToolbarButton icon={Copy} label="Duplicar" tone="blue" onClick={() => openDuplicate(selected)} disabled={!selected} testId="cte-duplicate-btn" />
               <ToolbarDivider />
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => openEdit(selected)} disabled={!isEditable} testId="cte-edit-btn" />
@@ -912,7 +1020,8 @@ export default function CtePage() {
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <FormSectionTitle bare>Documentos transportados *</FormSectionTitle>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => xmlInputRef.current?.click()} data-testid="cte-form-import-xml"><FileUp className="w-3.5 h-3.5 mr-1" /> Importar XML</Button>
                         <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'NFE', chave: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> NF-e</Button>
                         <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'OUTROS', tipo_outros: '99', descricao: '', numero: '', data_emissao: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Outro documento</Button>
                       </div>
