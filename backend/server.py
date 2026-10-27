@@ -73,6 +73,7 @@ from routers.users import api_router as users_router
 from routers.audit_log import api_router as audit_log_router
 from routers.module_config import api_router as module_config_router
 from routers.platform import api_router as platform_router
+from routers.fiscal import api_router as fiscal_router
 from scheduled_reports import api_router as scheduled_reports_router, start_scheduler, stop_scheduler
 from tenancy import (
     NoTenantError, TENANT_HEADER, TENANT_HOST_HEADER, active_tenants, current_tenant, directory, is_multi_tenant,
@@ -324,6 +325,7 @@ app.include_router(users_router)
 app.include_router(audit_log_router)
 app.include_router(module_config_router)
 app.include_router(platform_router)
+app.include_router(fiscal_router)
 app.include_router(scheduled_reports_router)
 
 _WS_RECHECK_SECONDS = 60

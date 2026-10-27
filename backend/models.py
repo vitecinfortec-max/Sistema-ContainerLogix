@@ -4294,3 +4294,113 @@ class HRDocumentCreate(BaseModel):
     expiry_date: Optional[str] = None
     file_url: Optional[str] = None
     observations: Optional[str] = None
+
+
+# ==================== FISCAL - CT-e (emissão via Nuvem Fiscal) ====================
+
+CTE_STATUS_OPTIONS = ["RASCUNHO", "ENVIANDO", "PENDENTE", "AUTORIZADO", "REJEITADO", "DENEGADO", "CANCELADO", "ERRO"]
+FISCAL_ICMS_CST_OPTIONS = ["00", "40", "41", "51", "60", "90", "SN"]
+
+
+class FiscalAddress(BaseModel):
+    logradouro: Optional[str] = None
+    numero: Optional[str] = None
+    complemento: Optional[str] = None
+    bairro: Optional[str] = None
+    cep: Optional[str] = None
+    cidade: Optional[str] = None
+    uf: Optional[str] = None
+    codigo_municipio: Optional[str] = None  # código IBGE (7 dígitos)
+
+
+class FiscalSettingsUpdate(BaseModel):
+    """Configuração Fiscal da empresa emitente (um documento por banco)."""
+    ambiente: Optional[Literal["homologacao", "producao"]] = None
+    cnpj: Optional[str] = None
+    ie: Optional[str] = None
+    razao_social: Optional[str] = None
+    nome_fantasia: Optional[str] = None
+    email: Optional[str] = None
+    fone: Optional[str] = None
+    endereco: Optional[FiscalAddress] = None
+    crt: Optional[int] = None  # 1 Simples Nacional, 2 Simples excesso sublimite, 3 Regime Normal, 4 MEI
+    rntrc: Optional[str] = None
+    cte_serie: Optional[int] = None
+    cte_proximo_numero: Optional[int] = None  # só grava se informado (continua a numeração de outro emissor)
+    cfop_padrao: Optional[str] = None
+    natureza_operacao: Optional[str] = None
+    icms_cst: Optional[str] = None
+    icms_aliquota: Optional[float] = None
+    produto_predominante: Optional[str] = None
+
+
+class CteParty(BaseModel):
+    client_id: Optional[str] = None
+    nome: Optional[str] = None
+    cnpj_cpf: Optional[str] = None
+    ie: Optional[str] = None
+    fone: Optional[str] = None
+    email: Optional[str] = None
+    endereco: Optional[FiscalAddress] = None
+
+
+class CtePlace(BaseModel):
+    cidade: Optional[str] = None
+    uf: Optional[str] = None
+    codigo_municipio: Optional[str] = None
+
+
+class CteComponent(BaseModel):
+    nome: str
+    valor: float
+
+
+class CteQuantity(BaseModel):
+    unidade: str = "01"  # 00 M3, 01 KG, 02 TON, 03 UNIDADE, 04 LITROS, 05 MMBTU
+    tipo_medida: str = "PESO BRUTO"
+    quantidade: float
+
+
+class CteDocument(BaseModel):
+    tipo: Literal["NFE", "OUTROS"] = "NFE"
+    chave: Optional[str] = None  # NF-e: chave de acesso (44 dígitos)
+    tipo_outros: Optional[str] = "99"  # 00 Declaração, 99 Outros
+    descricao: Optional[str] = None
+    numero: Optional[str] = None
+    data_emissao: Optional[str] = None
+    valor: Optional[float] = None
+
+
+class CteContainer(BaseModel):
+    numero: str
+    lacre: Optional[str] = None
+
+
+class CteCreate(BaseModel):
+    loading_order_id: Optional[str] = None
+    loading_order_number: Optional[int] = None
+    cfop: Optional[str] = None
+    natureza_operacao: Optional[str] = None
+    tomador_papel: int = 0  # 0 Remetente, 1 Expedidor, 2 Recebedor, 3 Destinatário, 4 Outros
+    indicador_ie_tomador: int = 1  # 1 Contribuinte ICMS, 2 Contribuinte isento, 9 Não contribuinte
+    remetente: Optional[CteParty] = None
+    destinatario: Optional[CteParty] = None
+    tomador: Optional[CteParty] = None  # só quando tomador_papel = 4
+    origem: Optional[CtePlace] = None
+    destino: Optional[CtePlace] = None
+    valor_total: Optional[float] = None
+    valor_receber: Optional[float] = None
+    componentes: List[CteComponent] = []
+    icms_cst: Optional[str] = None
+    icms_aliquota: Optional[float] = None
+    valor_carga: Optional[float] = None
+    produto_predominante: Optional[str] = None
+    outras_caracteristicas: Optional[str] = None
+    quantidades: List[CteQuantity] = []
+    documentos: List[CteDocument] = []
+    containers: List[CteContainer] = []
+    observacoes: Optional[str] = None
+
+
+class CteCancelRequest(BaseModel):
+    justificativa: str

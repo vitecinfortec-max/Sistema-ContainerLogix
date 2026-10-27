@@ -41,6 +41,7 @@ async def lookup_cep(cep: str, current_user: dict = Depends(get_current_active_u
         "neighborhood": data.get("bairro") or "",
         "city": data.get("localidade") or "",
         "state": data.get("uf") or "",
+        "ibge": data.get("ibge") or "",  # código do município (CT-e/MDF-e)
     }
 
 

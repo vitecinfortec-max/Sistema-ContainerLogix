@@ -563,6 +563,10 @@ MODULE_CATALOG = [
         {"key": "gestao_container.representante", "label": "Cadastro de Representantes"},
         {"key": "gestao_container.venda", "label": "Registro de Venda"},
     ]},
+    {"key": "fiscal", "label": "Fiscal", "items": [
+        {"key": "fiscal.cte", "label": "CT-e"},
+        {"key": "fiscal.configuracao", "label": "Configuração Fiscal"},
+    ]},
 ]
 
 # Prefixo de rota da API -> chave do módulo dono dela. Usado pelo middleware
@@ -663,6 +667,8 @@ PATH_MODULE_MAP = [
     ("/api/hr/documents", "rh.documentos"),
     ("/api/reports/hr", "rh.relatorios"),
     ("/api/hr/", "rh"),
+    ("/api/ctes", "fiscal.cte"),
+    ("/api/fiscal", "fiscal"),
 ]
 
 _module_config_cache = {"value": None, "expires_at": 0}

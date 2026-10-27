@@ -780,6 +780,29 @@ export const api = {
   deleteLoadingOrder: (id) => axios.delete(`${API}/loading-orders/${id}`),
   getLoadingOrderPDF: (id) => axios.get(`${API}/loading-orders/${id}/pdf`, { responseType: 'blob' }),
 
+  // Fiscal (CT-e pela Nuvem Fiscal)
+  getFiscalSettings: () => axios.get(`${API}/fiscal/settings`),
+  updateFiscalSettings: (data) => axios.put(`${API}/fiscal/settings`, data),
+  syncFiscalCompany: () => axios.post(`${API}/fiscal/settings/sync`),
+  uploadFiscalCertificate: (file, password) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('password', password);
+    return axios.post(`${API}/fiscal/settings/certificate`, formData);
+  },
+  getFiscalSefazStatus: () => axios.get(`${API}/fiscal/sefaz-status`),
+  getCtes: (params) => axios.get(`${API}/ctes`, { params }),
+  getCte: (id) => axios.get(`${API}/ctes/${id}`),
+  getCteDraftFromLoadingOrder: (orderId) => axios.get(`${API}/ctes/from-loading-order/${orderId}`),
+  createCte: (data) => axios.post(`${API}/ctes`, data),
+  updateCte: (id, data) => axios.put(`${API}/ctes/${id}`, data),
+  deleteCte: (id) => axios.delete(`${API}/ctes/${id}`),
+  emitCte: (id) => axios.post(`${API}/ctes/${id}/emitir`),
+  refreshCte: (id) => axios.post(`${API}/ctes/${id}/atualizar`),
+  cancelCte: (id, justificativa) => axios.post(`${API}/ctes/${id}/cancelar`, { justificativa }),
+  getCtePDF: (id) => axios.get(`${API}/ctes/${id}/pdf`, { responseType: 'blob' }),
+  getCteXML: (id) => axios.get(`${API}/ctes/${id}/xml`, { responseType: 'blob' }),
+
   // Rota (Transporte)
   getFreightRoutes: () => axios.get(`${API}/freight-routes`),
   createFreightRoute: (data) => axios.post(`${API}/freight-routes`, data),

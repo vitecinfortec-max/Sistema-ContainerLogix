@@ -61,6 +61,8 @@ import {
   Briefcase,
   Route,
   HandCoins,
+  FileCheck,
+  FileCog,
   Coins,
   ShoppingBag,
   ShoppingCart,
@@ -125,6 +127,8 @@ const PAGE_TITLES = {
   '/estoque/entrega-epi': "Entrega de EPI's",
   '/estoque/relatorio': 'Relatórios do Estoque',
   '/loading-orders': 'Ordem de Carregamento',
+  '/fiscal/cte': 'CT-e',
+  '/fiscal/configuracao': 'Configuração Fiscal',
   '/freight-routes': 'Rota',
   '/freight-payments': 'Pagamento Frete',
   '/fleet/checklist': 'Checklist de Veículo',
@@ -414,7 +418,7 @@ function LayoutFrame({ children }) {
   const isRhActive = location.pathname === '/rh' || location.pathname.startsWith('/rh/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
-  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments';
+  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments' || location.pathname.startsWith('/fiscal/');
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/audit-log' || location.pathname === '/modules' || location.pathname === '/plataforma' || location.pathname === '/tank-settings';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status' || location.pathname === '/port-services' || location.pathname === '/reports/port-services' || location.pathname === '/reports/port-service-shifts' || location.pathname === '/reports/vehicle-results';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
@@ -689,6 +693,11 @@ function LayoutFrame({ children }) {
     { path: '/loading-orders', label: 'Ordem de Carregamento', icon: PackageCheck, moduleKey: 'operacional.ordem_carregamento' },
     { path: '/freight-routes', label: 'Rota', icon: Route, moduleKey: 'cadastro.rota' },
     { path: '/freight-payments', label: 'Pagamento Frete', icon: HandCoins, moduleKey: 'financeiro.pagamento_frete' },
+    // CT-e em piloto: só o dono do sistema vê até a liberação para os clientes
+    ...(isSuperadmin ? [
+      { path: '/fiscal/cte', label: 'CT-e', icon: FileCheck, moduleKey: 'fiscal.cte' },
+      { path: '/fiscal/configuracao', label: 'Configuração Fiscal', icon: FileCog, moduleKey: 'fiscal.configuracao' },
+    ] : []),
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const cadastroItems = [

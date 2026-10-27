@@ -41,3 +41,12 @@ services:
       # DOCUMENT_OCR_MODEL trocam o modelo, padrão claude-opus-5-5).
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Opcional: emissão de CT-e/MDF-e pela Nuvem Fiscal (conta do dono do
+      # sistema; cada empresa cadastra o próprio certificado A1 na tela
+      # Configuração Fiscal). NUVEMFISCAL_API_URL troca para o sandbox.
+      - key: NUVEMFISCAL_CLIENT_ID
+        sync: false
+      - key: NUVEMFISCAL_CLIENT_SECRET
+        sync: false
+      - key: NUVEMFISCAL_API_URL
+        sync: false

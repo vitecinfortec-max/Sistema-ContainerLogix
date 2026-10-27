@@ -126,6 +126,8 @@ const ReportsFuelSupplyPage = lazyPage(() => import('./pages/ReportsFuelSupplyPa
 const ReportsServiceOrdersPage = lazyPage(() => import('./pages/ReportsServiceOrdersPage'));
 const FuelSupplyOrderPage = lazyPage(() => import('./pages/FuelSupplyOrderPage'));
 const LoadingOrderPage = lazyPage(() => import('./pages/LoadingOrderPage'));
+const CtePage = lazyPage(() => import('./pages/CtePage'));
+const FiscalSettingsPage = lazyPage(() => import('./pages/FiscalSettingsPage'));
 const FreightRoutesPage = lazyPage(() => import('./pages/FreightRoutesPage'));
 const FreightPaymentsPage = lazyPage(() => import('./pages/FreightPaymentsPage'));
 const ContainerRepresentativesPage = lazyPage(() => import('./pages/ContainerRepresentativesPage'));
@@ -400,6 +402,23 @@ function App() {
             element={
               <ProtectedRoute adminOnly>
                 <UsersPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Fiscal (CT-e): em piloto, só o dono do sistema vê (o backend já exige admin) */}
+          <Route
+            path="/fiscal/cte"
+            element={
+              <ProtectedRoute superadminOnly moduleKey="fiscal.cte">
+                <CtePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fiscal/configuracao"
+            element={
+              <ProtectedRoute superadminOnly moduleKey="fiscal.configuracao">
+                <FiscalSettingsPage />
               </ProtectedRoute>
             }
           />
