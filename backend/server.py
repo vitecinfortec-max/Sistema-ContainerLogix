@@ -32,6 +32,7 @@ from routers.container_repair_services import api_router as container_repair_ser
 from routers.container_vistorias import api_router as container_vistorias_router
 from routers.container_audits import api_router as container_audits_router
 from routers.commercial import api_router as commercial_router
+from routers.commissions import api_router as commissions_router
 from routers.flex_tank import api_router as flex_tank_router
 from routers.frota import api_router as frota_router
 from routers.loading_schedule import api_router as loading_schedule_router
@@ -285,6 +286,7 @@ app.include_router(container_repair_services_router)
 app.include_router(container_vistorias_router)
 app.include_router(container_audits_router)
 app.include_router(commercial_router)
+app.include_router(commissions_router)
 app.include_router(flex_tank_router)
 app.include_router(frota_router)
 app.include_router(loading_schedule_router)

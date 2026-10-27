@@ -411,6 +411,15 @@ export const api = {
   deleteClientRepresentativeLink: (id) => axios.delete(`${API}/client-representative-links/${id}`),
   getCommissionReport: (params) => axios.get(`${API}/reports/commission`, { params }),
   downloadCommissionReportPdf: (params) => axios.get(`${API}/reports/commission/pdf`, { params, responseType: 'blob' }),
+  getCommissionEntries: (params) => axios.get(`${API}/commission-entries`, { params }),
+  createCommissionEntry: (data) => axios.post(`${API}/commission-entries`, data),
+  updateCommissionEntry: (id, data) => axios.put(`${API}/commission-entries/${id}`, data),
+  deleteCommissionEntry: (id) => axios.delete(`${API}/commission-entries/${id}`),
+  payCommissionEntries: (data) => axios.post(`${API}/commission-entries/pay`, data),
+  unpayCommissionEntries: (ids) => axios.post(`${API}/commission-entries/unpay`, { ids }),
+  getCommissionCteCandidates: (params) => axios.get(`${API}/commission-entries/cte-candidates`, { params }),
+  createCommissionFromCtes: (ids) => axios.post(`${API}/commission-entries/from-ctes`, { ids }),
+  downloadCommissionStatementPdf: (params) => axios.get(`${API}/commission-entries/pdf`, { params, responseType: 'blob' }),
 
   // Comercial: Proposta Comercial
   getCommercialProposals: () => axios.get(`${API}/commercial-proposals`),

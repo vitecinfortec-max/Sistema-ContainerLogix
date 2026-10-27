@@ -949,6 +949,36 @@ class ClientRepresentativeLinkResponse(BaseModel):
     created_at: datetime
 
 
+class CommissionDiscount(BaseModel):
+    description: str
+    value: float
+
+
+class CommissionEntryCreate(BaseModel):
+    """Lançamento de Comissão: frete faturado de um cliente; o representante
+    e o percentual vêm do Vínculo de Clientes (o % pode ser ajustado no
+    lançamento) e a comissão incide sobre o frete menos os descontos."""
+    client_id: str
+    document_type: str = "CTE"  # CTE, NF, FATURA, OUTRO
+    document_number: Optional[str] = None
+    billing_date: str  # AAAA-MM-DD (data do faturamento)
+    freight_value: float
+    discounts: List[CommissionDiscount] = []
+    commission_percentage: Optional[float] = None  # vazio = o do Vínculo de Clientes
+    observations: Optional[str] = None
+    cte_id: Optional[str] = None  # CT-e do sistema que originou o lançamento
+
+
+class CommissionPayRequest(BaseModel):
+    ids: List[str]
+    payment_date: str  # AAAA-MM-DD
+    payment_notes: Optional[str] = None
+
+
+class CommissionFromCtesRequest(BaseModel):
+    ids: List[str]
+
+
 class CommercialProposalItem(BaseModel):
     description: str
     value: float

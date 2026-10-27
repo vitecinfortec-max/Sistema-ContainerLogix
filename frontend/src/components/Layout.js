@@ -155,6 +155,7 @@ const PAGE_TITLES = {
   '/comercial/tabela-servicos': 'Tabela de Serviços',
   '/comercial/vinculo-clientes': 'Vínculo de Clientes',
   '/comercial/proposta': 'Proposta Comercial',
+  '/comercial/comissao': 'Comissão',
   '/comercial/proposta/new': 'Nova Proposta Comercial',
   '/container-representatives': 'Cadastro de Representantes',
   '/container-purchases': 'Compra de Container',
@@ -414,7 +415,7 @@ function LayoutFrame({ children }) {
   const isManutencaoRelatorioActive = location.pathname === '/reports/service-orders';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
   const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio', '/estoque/entrega-epi'].includes(location.pathname);
-  const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/');
+  const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/') || location.pathname === '/comercial/comissao';
   const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
   const isRhActive = location.pathname === '/rh' || location.pathname.startsWith('/rh/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
@@ -666,6 +667,7 @@ function LayoutFrame({ children }) {
     { path: '/comercial/tabela-servicos', label: 'Tabela de Serviços', icon: Tags, moduleKey: 'comercial.tabela_servicos' },
     { path: '/comercial/vinculo-clientes', label: 'Vínculo de Clientes', icon: Link2, moduleKey: 'comercial.vinculo_clientes' },
     { path: '/comercial/proposta', label: 'Proposta Comercial', icon: FileText, moduleKey: 'comercial.proposta' },
+    { path: '/comercial/comissao', label: 'Comissão', icon: Percent, moduleKey: 'comercial.comissao' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 
   const gestaoContainerItems = [

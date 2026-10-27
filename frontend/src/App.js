@@ -77,6 +77,7 @@ const ServicePriceTablePage = lazyPage(() => import('./pages/ServicePriceTablePa
 const ServicePriceTableClientPage = lazyPage(() => import('./pages/ServicePriceTableClientPage'));
 const ClientRepresentativeLinksPage = lazyPage(() => import('./pages/ClientRepresentativeLinksPage'));
 const ComercialProposalsPage = lazyPage(() => import('./pages/ComercialProposalsPage'));
+const CommissionsPage = lazyPage(() => import('./pages/CommissionsPage'));
 const NewCommercialProposalPage = lazyPage(() => import('./pages/NewCommercialProposalPage'));
 const EditCommercialProposalPage = lazyPage(() => import('./pages/EditCommercialProposalPage'));
 const FlexTankPage = lazyPage(() => import('./pages/FlexTankPage'));
@@ -688,6 +689,14 @@ function App() {
             element={
               <ProtectedRoute moduleKey="comercial.vinculo_clientes">
                 <ClientRepresentativeLinksPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/comercial/comissao"
+            element={
+              <ProtectedRoute moduleKey="comercial.comissao">
+                <CommissionsPage />
               </ProtectedRoute>
             }
           />

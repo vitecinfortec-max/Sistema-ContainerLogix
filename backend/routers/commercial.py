@@ -158,10 +158,12 @@ async def update_representative(item_id: str, data: RepresentativeCreate, curren
 @api_router.delete("/representatives/{item_id}")
 async def delete_representative(item_id: str, current_user: dict = Depends(get_current_active_user)):
     links = await db.client_representative_links.count_documents({"representative_id": item_id})
-    if links:
+    entries = await db.commission_entries.count_documents({"representative_id": item_id})
+    if links or entries:
+        uses = ", ".join(x for x in [links and f"{links} vínculo(s) com clientes", entries and f"{entries} lançamento(s) de comissão"] if x)
         raise HTTPException(
             status_code=400,
-            detail=f"Representante em uso ({links} vínculo(s) com clientes). Em vez de excluir, mude o status para Inativo.",
+            detail=f"Representante em uso ({uses}). Em vez de excluir, mude o status para Inativo.",
         )
     result = await db.representatives.delete_one({"id": item_id})
     if result.deleted_count == 0:

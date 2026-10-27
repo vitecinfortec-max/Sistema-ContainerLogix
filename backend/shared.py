@@ -547,6 +547,7 @@ MODULE_CATALOG = [
         {"key": "comercial.tabela_servicos", "label": "Tabela de Serviços"},
         {"key": "comercial.vinculo_clientes", "label": "Vínculo de Clientes"},
         {"key": "comercial.proposta", "label": "Proposta Comercial"},
+        {"key": "comercial.comissao", "label": "Comissão"},
     ]},
     {"key": "rh", "label": "RH", "items": [
         {"key": "rh.contratos", "label": "Admissão e Contratos"},
@@ -591,6 +592,7 @@ PATH_MODULE_MAP = [
     ("/api/client-representative-links", "comercial.vinculo_clientes"),
     ("/api/reports/commission", "comercial.vinculo_clientes"),
     ("/api/commercial-proposals", "comercial.proposta"),
+    ("/api/commission-entries", "comercial.comissao"),
     ("/api/container-purchases", "gestao_container.compra"),
     ("/api/container-representatives", "gestao_container.representante"),
     ("/api/container-sales", "gestao_container.venda"),

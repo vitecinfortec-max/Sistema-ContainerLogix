@@ -4306,6 +4306,90 @@ def generate_commission_report_pdf(data: dict, company: dict = None) -> bytes:
     return buffer.getvalue()
 
 
+COMMISSION_DOC_LABELS = {"CTE": "CT-e", "NF": "NF", "FATURA": "Fatura", "OUTRO": "Doc."}
+
+
+def generate_commission_statement_pdf(entries: list, filters: dict, company: dict = None) -> bytes:
+    """Prestação de contas da Comissão (Comercial > Comissão): para cada
+    representante, os fretes faturados lançados, descontos, base de cálculo,
+    percentual, comissão e situação (pendente/paga), com totais e assinaturas."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=10*mm, leftMargin=10*mm, topMargin=12*mm, bottomMargin=15*mm)
+    elements = []
+    styles = getSampleStyleSheet()
+    money = format_currency
+    period = (f"{fmt_date(filters.get('start_date')) if filters.get('start_date') else 'Início'} a "
+              f"{fmt_date(filters.get('end_date')) if filters.get('end_date') else 'Hoje'}")
+    situation = {"PENDENTE": "Pendentes", "PAGO": "Pagos"}.get(filters.get("status"), "Todos")
+    elements.extend(_build_pdf_header(styles, download_logo(company), "Prestação de Contas - Comissão",
+                                      generation_info=f"Período: {period} · {situation}", company=company, content_width=doc.width))
+
+    total = lambda key, items=entries: round(sum(e.get(key) or 0 for e in items), 2)  # noqa: E731
+    pending = round(sum(e["commission_value"] for e in entries if e["status"] == "PENDENTE"), 2)
+    elements.extend(_build_pdf_summary([
+        ("Frete faturado", money(total("freight_value"))),
+        ("Descontos", money(total("discount_total"))),
+        ("Base de cálculo", money(total("calculation_base"))),
+        ("Comissão", money(total("commission_value"))),
+        ("A pagar", money(pending)),
+    ], doc.width, max_box_width=200))
+
+    if not entries:
+        elements.append(_pdf_empty_state("Nenhum lançamento de comissão para os filtros informados.", doc.width))
+
+    cell = _pdf_cell_factory(styles, font_size=7.5)
+    groups = {}
+    for e in entries:
+        groups.setdefault(e["representative_name"], []).append(e)
+    widths = [0.07, 0.09, 0.22, 0.10, 0.09, 0.10, 0.06, 0.10, 0.08, 0.09]
+    for rep_name, items in groups.items():
+        elements.extend(_pdf_section_title(rep_name, doc.width))
+        rows = [_pdf_header_cells(["Data", "Documento", "Cliente", "Frete", "Descontos", "Base", "%", "Comissão", "Situação", "Pago em"], font_size=7.5)]
+        for e in items:
+            doc_label = f"{COMMISSION_DOC_LABELS.get(e.get('document_type'), '')} {e.get('document_number') or ''}".strip()
+            pct = f"{e['commission_percentage']:.2f}".rstrip("0").rstrip(".").replace(".", ",") + "%"
+            if e.get("percentage_overridden"):
+                pct += "*"
+            rows.append([
+                cell(fmt_date(e["billing_date"]), "center"), cell(doc_label or "-"), cell(e["client_name"]),
+                cell(money(e["freight_value"]), "right"), cell(money(e.get("discount_total") or 0), "right"),
+                cell(money(e["calculation_base"]), "right"), cell(pct, "center"), cell(money(e["commission_value"]), "right", bold=True),
+                cell("Paga" if e["status"] == "PAGO" else "Pendente", "center"),
+                cell(fmt_date(e["payment_date"]) if e.get("payment_date") else "-", "center"),
+            ])
+            notes = "; ".join(f"{d['description']}: {money(d['value'])}" for d in e.get("discounts") or [])
+            notes = " · ".join(x for x in [notes and f"Descontos: {notes}", e.get("observations")] if x)
+            if notes:
+                rows.append(["", cell(None, markup=f"<font color='#{BRAND_MUTED}'>{xml_escape(notes)}</font>"), "", "", "", "", "", "", "", ""])
+        rows.append(["", "", cell("TOTAL DO REPRESENTANTE", "right", bold=True), cell(money(total("freight_value", items)), "right", bold=True),
+                     cell(money(total("discount_total", items)), "right", bold=True), cell(money(total("calculation_base", items)), "right", bold=True),
+                     "", cell(money(total("commission_value", items)), "right", bold=True), "", ""])
+        table = Table(rows, colWidths=[doc.width * w for w in widths], repeatRows=1)
+        style = _pdf_table_style(total_row=True)
+        for i, row in enumerate(rows):
+            if i and row[0] == "" and i < len(rows) - 1:
+                style.append(("SPAN", (1, i), (-1, i)))
+        table.setStyle(TableStyle(style))
+        elements.append(table)
+        rep_pending = round(sum(e["commission_value"] for e in items if e["status"] == "PENDENTE"), 2)
+        if len(groups) > 1 or rep_pending:
+            elements.append(Spacer(1, 6))
+            elements.append(_pdf_totals_box([("Comissão paga", money(round(total("commission_value", items) - rep_pending, 2))),
+                                             ("Comissão a pagar", money(rep_pending))], doc.width, width=260))
+
+    if any(e.get("percentage_overridden") for e in entries):
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph("* percentual ajustado no lançamento (diferente do Vínculo de Clientes).",
+                                  ParagraphStyle("CommissionNote", fontName="Helvetica", fontSize=7, textColor=_hex(BRAND_MUTED))))
+    if len(groups) == 1:
+        elements.append(_pdf_signatures([("Representante", next(iter(groups))), ("Responsável", c["name"])], doc.width))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
 def generate_service_price_table_pdf(client_name: str, entries: list, company: dict = None) -> bytes:
     """Gera o PDF da Tabela de Serviços de um cliente (Comercial > Tabela de
     Serviços): lista simples de serviço + valor cadastrados para ele."""

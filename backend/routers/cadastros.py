@@ -351,6 +351,7 @@ async def delete_client(client_id: str, current_user: dict = Depends(get_current
         (db.invoices, by_name, "fatura(s)"),
         (db.service_price_entries, {"client_id": client_id}, "item(ns) da Tabela de Serviços"),
         (db.client_representative_links, {"client_id": client_id}, "vínculo(s) com representante"),
+        (db.commission_entries, {"client_id": client_id}, "lançamento(s) de comissão"),
         (db.port_services, {"client_id": client_id}, "serviço(s) portuário(s)"),
         (db.container_inspections, {"client_id": client_id}, "registro(s) fotográfico(s)"),
         (db.container_audits, {"client_id": client_id}, "auditoria(s)"),
