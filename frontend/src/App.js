@@ -405,11 +405,11 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Fiscal (CT-e): em piloto, só o dono do sistema vê (o backend já exige admin) */}
+          {/* Fiscal (CT-e): módulo sob contratação, só administradores (igual ao backend) */}
           <Route
             path="/fiscal/cte"
             element={
-              <ProtectedRoute superadminOnly moduleKey="fiscal.cte">
+              <ProtectedRoute adminOnly moduleKey="fiscal.cte">
                 <CtePage />
               </ProtectedRoute>
             }
@@ -417,7 +417,7 @@ function App() {
           <Route
             path="/fiscal/configuracao"
             element={
-              <ProtectedRoute superadminOnly moduleKey="fiscal.configuracao">
+              <ProtectedRoute adminOnly moduleKey="fiscal.configuracao">
                 <FiscalSettingsPage />
               </ProtectedRoute>
             }

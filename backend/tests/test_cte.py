@@ -74,7 +74,9 @@ class FakeFocus:
 
 
 @pytest.fixture
-def provider(monkeypatch):
+def provider(monkeypatch, api):
+    # Fiscal é "sob contratação": nasce desligado, o teste liga na empresa
+    api.run(api.db.module_config.replace_one({}, {"disabled_modules": [], "enabled_opt_in": ["fiscal"]}, upsert=True))
     fake = FakeFocus()
     for name in ("save_company", "emit_cte", "get_cte", "cancel_cte", "download"):
         monkeypatch.setattr(fiscal_focus, name, getattr(fake, name))
@@ -359,9 +361,32 @@ def test_list_search(api, provider):
     assert len(api.get("/api/ctes", params={"status": "AUTORIZADO"}).json()) == 0
 
 
-def test_module_disabled_blocks_routes(api, provider):
-    api.run(api.db.module_config.insert_one({"disabled_modules": ["fiscal"]}))
+def test_fiscal_is_opt_in_per_company(api, monkeypatch):
+    """Nasce desligado (inclusive em empresa com módulos já configurados) e o
+    dono liga/desliga pela mesma lista de desligados de sempre."""
+    monkeypatch.setattr(fiscal_focus, "is_configured", lambda: True)
     assert api.get("/api/ctes").status_code == 403
+    assert "fiscal" in api.get("/api/module-config").json()["disabled_modules"]
+    api.run(api.db.module_config.replace_one({}, {"disabled_modules": ["rh"]}, upsert=True))
+    assert api.get("/api/fiscal/settings").status_code == 403
+
+    api.run(api.db.users.update_one({"id": "admin-1"}, {"$set": {"is_superadmin": True}}))
+    # Salvar a tela sem mexer (a lista efetiva já traz "fiscal") mantém desligado
+    current = api.get("/api/module-config").json()["disabled_modules"]
+    assert sorted(current) == ["fiscal", "rh"]
+    assert api.put("/api/module-config", json={"disabled_modules": current}).status_code == 200
+    assert api.get("/api/ctes").status_code == 403
+    # Ligar = tirar da lista de desligados
+    r = api.put("/api/module-config", json={"disabled_modules": ["rh"]})
+    assert r.json()["disabled_modules"] == ["rh"]
+    assert api.get("/api/ctes").status_code == 200
+    stored = api.run(api.db.module_config.find_one({}, {"_id": 0}))
+    assert stored == {"disabled_modules": ["rh"], "enabled_opt_in": ["fiscal"]}
+    # Um item do grupo continua podendo ser desligado sozinho
+    api.put("/api/module-config", json={"disabled_modules": ["fiscal.cte"]})
+    assert api.get("/api/ctes").status_code == 403 and api.get("/api/fiscal/settings").status_code == 200
+    # Desligar de novo
+    api.put("/api/module-config", json={"disabled_modules": ["fiscal"]})
     assert api.get("/api/fiscal/settings").status_code == 403
 
 
@@ -464,7 +489,7 @@ def test_provider_error_message_parsing():
     assert "homologacao" in fiscal_focus.base_url("homologacao")
 
 
-def test_municipality_codes_come_from_local_ibge_table(api):
+def test_municipality_codes_come_from_local_ibge_table(api, provider):
     rows = {m["nome"]: m["codigo"] for m in api.get("/api/fiscal/municipios/ce").json()}
     assert rows["Fortaleza"] == "2304400" and rows["São Gonçalo do Amarante"] == "2312403"
     assert len(api.get("/api/fiscal/municipios/SP").json()) == 645

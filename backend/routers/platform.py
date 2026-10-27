@@ -27,7 +27,7 @@ from pydantic import BaseModel
 
 from auth import get_password_hash
 import shared
-from shared import MODULE_KEYS, db, get_current_superadmin_user
+from shared import db, get_current_superadmin_user
 import tenancy
 from tenancy import CENTRAL_DB_NAME
 from tenants import TenantCreate, ensure_central_indexes, get_tenant, list_tenants, register_tenant, set_tenant_status, update_tenant
@@ -104,13 +104,13 @@ async def platform_list_tenants(current_user: dict = Depends(get_current_superad
     for tenant in await list_tenants(_central()):
         tdb = mongo[tenant["db_name"]]
         last = await tdb.movements.find_one({}, {"_id": 0, "created_at": 1}, sort=[("created_at", -1)])
-        modules = await tdb.module_config.find_one({}, {"_id": 0, "disabled_modules": 1})
+        modules = await tdb.module_config.find_one({}, {"_id": 0, "disabled_modules": 1, "enabled_opt_in": 1})
         rows.append({
             **tenant,
             "users": await tdb.users.count_documents({}),
             "movements": await tdb.movements.count_documents({}),
             "last_movement_at": (last or {}).get("created_at"),
-            "disabled_modules": (modules or {}).get("disabled_modules", []),
+            "disabled_modules": shared.effective_disabled_modules(modules),
             "current": tenant["slug"] == tenancy.current_tenant_slug(),
         })
     return rows
@@ -161,8 +161,8 @@ async def platform_create_tenant(data: PlatformTenantCreate, current_user: dict 
             "role": "admin", "must_change_password": False, "active": True, "is_superadmin": True, "created_at": now,
         })
     await tdb.company_settings.insert_one({"name": tenant_data.name})
-    disabled = list(dict.fromkeys(k for k in data.disabled_modules if k in MODULE_KEYS))
-    await tdb.module_config.insert_one({"disabled_modules": disabled})
+    # Empresa nova nasce sem os módulos sob contratação (o dono liga depois)
+    await tdb.module_config.insert_one(shared.module_config_document([*data.disabled_modules, *shared.OPT_IN_MODULES]))
     await tdb.users.create_index("email", unique=True)
     await tdb.users.create_index("id")
     _changed()
@@ -197,11 +197,11 @@ async def platform_tenant_status(slug: str, data: PlatformTenantStatus, current_
 async def platform_tenant_modules(slug: str, data: PlatformTenantModules, current_user: dict = Depends(get_current_superadmin_user)):
     """Módulos contratados de qualquer empresa, sem precisar entrar nela."""
     tenant = await _tenant_or_404(slug)
-    disabled = list(dict.fromkeys(k for k in data.disabled_modules if k in MODULE_KEYS))
-    await _mongo()[tenant["db_name"]].module_config.replace_one({}, {"disabled_modules": disabled}, upsert=True)
+    doc = shared.module_config_document(data.disabled_modules)
+    await _mongo()[tenant["db_name"]].module_config.replace_one({}, doc, upsert=True)
     shared._module_config_cache_by_tenant.pop(tenant["slug"], None)
     shared.invalidate_module_config_cache()  # instância única: o cache é um só
-    return {"disabled_modules": disabled}
+    return {"disabled_modules": shared.effective_disabled_modules(doc)}
 
 
 # ---------------------------------------------------------------- Cópia dos arquivos (Etapa 6)

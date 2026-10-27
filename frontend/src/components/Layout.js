@@ -693,8 +693,9 @@ function LayoutFrame({ children }) {
     { path: '/loading-orders', label: 'Ordem de Carregamento', icon: PackageCheck, moduleKey: 'operacional.ordem_carregamento' },
     { path: '/freight-routes', label: 'Rota', icon: Route, moduleKey: 'cadastro.rota' },
     { path: '/freight-payments', label: 'Pagamento Frete', icon: HandCoins, moduleKey: 'financeiro.pagamento_frete' },
-    // CT-e em piloto: só o dono do sistema vê até a liberação para os clientes
-    ...(isSuperadmin ? [
+    // CT-e: módulo "sob contratação" (nasce desligado; o dono liga por empresa em
+    // Clientes do Sistema / Módulos Contratados) e restrito a administradores
+    ...(isAdmin ? [
       { path: '/fiscal/cte', label: 'CT-e', icon: FileCheck, moduleKey: 'fiscal.cte' },
       { path: '/fiscal/configuracao', label: 'Configuração Fiscal', icon: FileCog, moduleKey: 'fiscal.configuracao' },
     ] : []),

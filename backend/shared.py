@@ -563,7 +563,7 @@ MODULE_CATALOG = [
         {"key": "gestao_container.representante", "label": "Cadastro de Representantes"},
         {"key": "gestao_container.venda", "label": "Registro de Venda"},
     ]},
-    {"key": "fiscal", "label": "Fiscal", "items": [
+    {"key": "fiscal", "label": "Fiscal (CT-e) - sob contratação", "items": [
         {"key": "fiscal.cte", "label": "CT-e"},
         {"key": "fiscal.configuracao", "label": "Configuração Fiscal"},
     ]},
@@ -691,8 +691,8 @@ async def get_disabled_modules() -> list:
     cache = _module_cache()
     if cache["value"] is not None and now < cache["expires_at"]:
         return cache["value"]
-    doc = await db.module_config.find_one({}, {"_id": 0, "disabled_modules": 1})
-    disabled = (doc or {}).get("disabled_modules", [])
+    doc = await db.module_config.find_one({}, {"_id": 0, "disabled_modules": 1, "enabled_opt_in": 1})
+    disabled = effective_disabled_modules(doc)
     cache["value"] = disabled
     cache["expires_at"] = now + _MODULE_CONFIG_CACHE_TTL
     return disabled
@@ -717,6 +717,34 @@ def match_module_for_path(path: str):
 # bloqueava junto o Abastecimento.
 MODULE_GROUP_OF = {item["key"]: group["key"] for group in MODULE_CATALOG for item in group["items"]}
 MODULE_KEYS = set(MODULE_GROUP_OF) | {group["key"] for group in MODULE_CATALOG}
+
+
+# Grupos "sob contratação": ao contrário dos demais (que nascem liberados e
+# o dono desliga), estes nascem DESLIGADOS em toda empresa e só aparecem
+# depois que o dono liga em Módulos Contratados / Clientes do Sistema. O
+# banco guarda os ligados em "enabled_opt_in"; as telas continuam lidando só
+# com a lista de desligados (a efetiva, já com estes grupos quando não ligados).
+OPT_IN_MODULES = ("fiscal",)
+
+
+def effective_disabled_modules(doc) -> list:
+    """Lista de desligados que vale de fato (inclui os grupos sob contratação não ligados)."""
+    doc = doc or {}
+    disabled = list(doc.get("disabled_modules") or [])
+    enabled = doc.get("enabled_opt_in") or []
+    for group in OPT_IN_MODULES:
+        if group not in enabled and group not in disabled:
+            disabled.append(group)
+    return disabled
+
+
+def module_config_document(disabled_modules: list) -> dict:
+    """Documento a gravar a partir da lista de desligados vinda das telas."""
+    disabled = list(dict.fromkeys(key for key in disabled_modules if key in MODULE_KEYS))
+    return {
+        "disabled_modules": [key for key in disabled if key not in OPT_IN_MODULES],
+        "enabled_opt_in": [group for group in OPT_IN_MODULES if group not in disabled],
+    }
 
 
 def is_module_disabled(module_key: str, disabled_modules: list) -> bool:

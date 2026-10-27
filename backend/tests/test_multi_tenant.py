@@ -223,7 +223,8 @@ def test_platform_creates_a_working_company(mt):
     users = mt.run(mt.db["containerlogix_t3"].users.find({}, {"_id": 0}).to_list(None))
     assert {(u["email"], u["is_superadmin"], u["must_change_password"]) for u in users} == {
         ("ana@tres.com", False, True), ("admin@empresa.com", True, False)}
-    assert mt.run(mt.db["containerlogix_t3"].module_config.find_one({}))["disabled_modules"] == ["rh"]
+    config = mt.run(mt.db["containerlogix_t3"].module_config.find_one({}, {"_id": 0}))
+    assert config == {"disabled_modules": ["rh"], "enabled_opt_in": []}  # Fiscal nasce desligado
 
     # o admin novo entra com a senha provisória (e é obrigado a trocar)
     login = mt.request("POST", "/api/auth/login", headers={"X-Tenant-Host": "t3.containerlogix.com.br"},
@@ -259,6 +260,21 @@ def test_platform_edits_suspends_and_sets_modules(mt):
     assert mt.request("PUT", "/api/platform/tenants/t2/modules", token=owner, json={"disabled_modules": ["rh"]}).status_code == 200
     assert mt.request("GET", "/api/hr/positions", token=t2).status_code == 403
     assert mt.request("PUT", "/api/platform/tenants/nao-existe/modules", token=owner, json={"disabled_modules": []}).status_code == 404
+
+
+def test_platform_turns_on_opt_in_module_for_one_company(mt):
+    """Fiscal (CT-e) nasce desligado em toda empresa; o dono liga só na que contratou."""
+    _make_owner(mt)
+    owner = mt.token("t1")
+    rows = {r["slug"]: r for r in mt.request("GET", "/api/platform/tenants", token=owner).json()}
+    assert "fiscal" in rows["t1"]["disabled_modules"] and "fiscal" in rows["t2"]["disabled_modules"]
+    assert mt.request("GET", "/api/ctes", token=mt.token("t2")).status_code == 403
+    r = mt.request("PUT", "/api/platform/tenants/t2/modules", token=owner, json={"disabled_modules": []})
+    assert r.status_code == 200 and r.json()["disabled_modules"] == []
+    assert mt.request("GET", "/api/ctes", token=mt.token("t2")).status_code == 200
+    assert mt.request("GET", "/api/ctes", token=owner).status_code == 403  # a outra empresa continua sem
+    rows = {r["slug"]: r for r in mt.request("GET", "/api/platform/tenants", token=owner).json()}
+    assert "fiscal" not in rows["t2"]["disabled_modules"] and "fiscal" in rows["t1"]["disabled_modules"]
 
 
 # ---------------------------------------------------------------- Etapa 5: isolamento do resto
