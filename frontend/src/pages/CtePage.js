@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -14,19 +14,22 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import {
   CFOP_OPTIONS, CTE_EDITABLE, CTE_STATUS_LABELS, CTE_STATUS_TONES, ICMS_CST_OPTIONS, ICMS_WITH_RATE,
-  IE_TOMADOR_OPTIONS, TOMADOR_OPTIONS, UNIDADE_OPTIONS, downloadBlob, formatCnpjCpf, fromAddressFields, toAddressFields,
+  IE_TOMADOR_OPTIONS, TOMADOR_OPTIONS, UNIDADE_OPTIONS, accessKeyOk, cfopForRoute, downloadBlob, formatCnpjCpf,
+  fromAddressFields, indicadorIe, onlyDigits, toAddressFields, waitWhilePending,
 } from '../lib/fiscal';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import {
-  Ban, CheckCircle2, Clock, FileCheck, FileCode, FileCog, Loader2, PackageCheck, Pencil, Plus, Printer, RefreshCw,
-  Save, Send, Trash2, Truck, X, XCircle,
+  AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, FileCheck, FileCode, FileCog, Loader2, MapPin,
+  PackageCheck, Pencil, Plus, Printer, RefreshCw, Save, Send, Trash2, Truck, X, XCircle,
 } from 'lucide-react';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -37,6 +40,10 @@ const toNumber = (v) => {
 };
 // Número digitado (pt-BR) a partir do valor salvo
 const toInput = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','));
+
+const TAB_LABELS = { basicos: 'Dados básicos', carga: 'Carga e documentos', frete: 'Frete e impostos', conferencia: 'Conferência' };
+// Componentes mais usados na composição do frete (o nome vai no CT-e, até 15 caracteres)
+const COMPONENT_PRESETS = [['FRETE VALOR', 'Frete'], ['PEDAGIO', 'Pedágio'], ['SEGURO', 'Seguro'], ['OUTROS', 'Outros']];
 
 const emptyParty = () => ({ client_id: null, nome: '', cnpj_cpf: '', ie: '', fone: '', email: '', endereco: {} });
 
@@ -51,6 +58,8 @@ function buildEmpty(settings) {
     remetente: emptyParty(),
     destinatario: emptyParty(),
     tomador: emptyParty(),
+    // Início/fim da prestação seguem as cidades do remetente e do destinatário
+    percurso_auto: true,
     origem: { cidade: '', uf: '' },
     destino: { cidade: '', uf: '' },
     valor_total: '',
@@ -68,10 +77,15 @@ function buildEmpty(settings) {
   };
 }
 
+const sameCity = (place, endereco) => (place?.cidade || '').trim().toUpperCase() === (endereco?.cidade || '').trim().toUpperCase()
+  && (place?.uf || '') === (endereco?.uf || '');
+
 // Documento salvo -> formulário (números viram texto pt-BR)
 function toForm(doc, settings) {
   const base = buildEmpty(settings);
   const party = (p) => ({ ...emptyParty(), ...(p || {}), cnpj_cpf: p?.cnpj_cpf ? formatCnpjCpf(p.cnpj_cpf) : '' });
+  const origem = doc.origem || base.origem;
+  const destino = doc.destino || base.destino;
   return {
     ...base,
     ...doc,
@@ -80,8 +94,10 @@ function toForm(doc, settings) {
     remetente: party(doc.remetente),
     destinatario: party(doc.destinatario),
     tomador: party(doc.tomador),
-    origem: doc.origem || base.origem,
-    destino: doc.destino || base.destino,
+    percurso_auto: (!origem.cidade && !destino.cidade)
+      || (sameCity(origem, doc.remetente?.endereco) && sameCity(destino, doc.destinatario?.endereco)),
+    origem,
+    destino,
     valor_total: toInput(doc.valor_total),
     valor_receber: toInput(doc.valor_receber),
     icms_cst: doc.icms_cst || base.icms_cst,
@@ -93,6 +109,101 @@ function toForm(doc, settings) {
     containers: doc.containers || [],
     observacoes: doc.observacoes || '',
   };
+}
+
+const placeOf = (party) => {
+  const e = party?.endereco || {};
+  return { cidade: e.cidade || '', uf: e.uf || '', codigo_municipio: e.codigo_municipio || null };
+};
+const payerOf = (f) => ({ 0: f.remetente, 3: f.destinatario, 4: f.tomador })[f.tomador_papel];
+
+/**
+ * Preenchimentos automáticos a cada alteração do formulário: percurso pelos
+ * envolvidos, CFOP 5/6 pelo percurso, indicador de IE pelo pagador do frete e
+ * valor total pela soma da composição do frete.
+ */
+function derive(prev, next) {
+  let f = next;
+  if (f.percurso_auto) f = { ...f, origem: placeOf(f.remetente), destino: placeOf(f.destinatario) };
+  const cfop = cfopForRoute(f.cfop, f.origem.uf, f.destino.uf);
+  if (cfop !== f.cfop) f = { ...f, cfop };
+  if (payerOf(f) !== payerOf(prev)) f = { ...f, indicador_ie_tomador: indicadorIe(payerOf(f)) };
+  if (f.componentes !== prev.componentes) {
+    const values = f.componentes.map((c) => toNumber(c.valor)).filter((v) => v !== null);
+    if (values.length) f = { ...f, valor_total: values.reduce((a, b) => a + b, 0).toFixed(2).replace('.', ',') };
+  }
+  return f;
+}
+
+function cnpjCpfOk(value) {
+  const d = onlyDigits(value);
+  if (!/^(\d{11}|\d{14})$/.test(d) || /^(\d)\1+$/.test(d)) return false;
+  const dv = (base, weights) => {
+    const sum = base.split('').reduce((acc, n, i) => acc + Number(n) * weights[i], 0);
+    const rest = sum % 11;
+    return rest < 2 ? 0 : 11 - rest;
+  };
+  if (d.length === 11) {
+    const w = (n) => Array.from({ length: n }, (_, i) => n + 1 - i);
+    return dv(d.slice(0, 9), w(9)) === Number(d[9]) && dv(d.slice(0, 10), w(10)) === Number(d[10]);
+  }
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  return dv(d.slice(0, 12), w1) === Number(d[12]) && dv(d.slice(0, 13), [6, ...w1]) === Number(d[13]);
+}
+
+/** Conferência local antes de transmitir (as mesmas regras do backend, sem ir à Sefaz). */
+function validateCte(f, settings) {
+  const issues = [];
+  const add = (tab, msg) => issues.push({ tab, msg });
+  if (settings && (!settings.provider_configured || !settings.provider_synced_at || !settings.certificate)) {
+    add('basicos', 'Configuração Fiscal incompleta (emissor, cadastro da empresa ou certificado A1)');
+  }
+  if (!/^\d{4}$/.test(f.cfop || '')) add('basicos', 'Escolha o CFOP');
+  if (!(f.natureza_operacao || '').trim()) add('basicos', 'Informe a Natureza da Operação');
+
+  const parties = [['Remetente', f.remetente], ['Destinatário', f.destinatario]];
+  if (f.tomador_papel === '4') parties.push(['Tomador', f.tomador]);
+  parties.forEach(([label, p]) => {
+    const e = p?.endereco || {};
+    if ((p?.nome || '').trim().length < 2) add('basicos', `${label}: informe o nome / razão social`);
+    if (!cnpjCpfOk(p?.cnpj_cpf)) add('basicos', `${label}: CNPJ/CPF inválido`);
+    if ((e.logradouro || '').trim().length < 2 || !(e.numero || '').trim() || (e.bairro || '').trim().length < 2) {
+      add('basicos', `${label}: endereço incompleto (logradouro, número e bairro)`);
+    }
+    if ((e.cidade || '').trim().length < 2 || !e.uf) add('basicos', `${label}: informe a cidade e a UF do endereço`);
+  });
+  [['Início da prestação', f.origem], ['Término da prestação', f.destino]].forEach(([label, p]) => {
+    if ((p?.cidade || '').trim().length < 2 || !p?.uf) add('basicos', `${label}: informe a cidade e a UF`);
+  });
+
+  if (!(f.produto_predominante || '').trim()) add('carga', 'Informe o produto predominante');
+  if (!f.quantidades.some((q) => toNumber(q.quantidade) > 0)) add('carga', 'Informe ao menos uma quantidade da carga (ex.: peso bruto)');
+  const keys = [];
+  let docs = 0;
+  f.documentos.forEach((d, i) => {
+    if (d.tipo === 'NFE' && onlyDigits(d.chave)) {
+      docs += 1;
+      keys.push(onlyDigits(d.chave));
+      if (!accessKeyOk(d.chave, '55')) add('carga', `NF-e ${i + 1}: chave inválida (44 dígitos, confira o dígito verificador)`);
+    }
+    if (d.tipo === 'OUTROS' && (d.descricao || d.numero)) {
+      docs += 1;
+      if (d.tipo_outros === '99' && !(d.descricao || '').trim()) add('carga', `Documento ${i + 1}: informe a descrição`);
+    }
+  });
+  if (!docs) add('carga', 'Informe ao menos um documento transportado (chave da NF-e ou outro documento)');
+  if (new Set(keys).size !== keys.length) add('carga', 'A mesma chave de NF-e aparece mais de uma vez');
+
+  const total = toNumber(f.valor_total) || 0;
+  if (total <= 0) add('frete', 'Informe o valor total da prestação (ou a composição do frete)');
+  const receber = toNumber(f.valor_receber);
+  if (receber !== null && receber > total) add('frete', 'Valor a receber maior que o valor total');
+  if (f.componentes.some((c) => toNumber(c.valor) && !(c.nome || '').trim())) add('frete', 'Componente do frete sem nome');
+  if (ICMS_WITH_RATE.includes(f.icms_cst)) {
+    const rate = toNumber(f.icms_aliquota);
+    if (!rate || rate <= 0 || rate > 100) add('frete', 'Informe a alíquota do ICMS');
+  }
+  return issues;
 }
 
 function toPayload(form) {
@@ -135,9 +246,15 @@ function toPayload(form) {
   };
 }
 
-/** Remetente / Destinatário / Tomador: escolhe do cadastro de clientes ou digita. */
+/**
+ * Remetente / Destinatário / Tomador numa linha (cadastro de clientes ou
+ * digitado); endereço e contato ficam recolhidos e só abrem sozinhos quando
+ * o endereço está incompleto.
+ */
 function PartyFields({ title, value, onChange, clients, testId }) {
+  const [open, setOpen] = useState(null);
   const v = value || emptyParty();
+  const e = v.endereco || {};
   const set = (field, val) => onChange({ ...v, [field]: val });
   const pick = (client) => {
     const d = client.address_details || {};
@@ -151,11 +268,14 @@ function PartyFields({ title, value, onChange, clients, testId }) {
       endereco: fromAddressFields({ street: d.street, number: d.number, neighborhood: d.neighborhood, zip: d.zip, city: d.city, state: d.state }, {}),
     });
   };
+  const incomplete = !((e.logradouro || '').trim() && (e.numero || '').trim() && (e.bairro || '').trim() && e.cidade && e.uf);
+  const expanded = open ?? (incomplete && !!(v.nome || '').trim());
+  const summary = [[e.logradouro, e.numero].filter(Boolean).join(', '), e.bairro, e.cidade && `${e.cidade}/${e.uf || ''}`]
+    .filter(Boolean).join(' - ');
   return (
-    <div className="space-y-3" data-testid={testId}>
-      <FormSectionTitle>{title}</FormSectionTitle>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <Field label="Nome / Razão Social" required className="md:col-span-2">
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2" data-testid={testId}>
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+        <Field label={title} required className="md:col-span-6">
           <ClientNamePicker
             testId={testId ? `${testId}-name` : undefined}
             text={v.nome || ''}
@@ -165,20 +285,35 @@ function PartyFields({ title, value, onChange, clients, testId }) {
             clients={clients}
           />
         </Field>
-        <Field label="CNPJ / CPF" required>
-          <Input value={v.cnpj_cpf || ''} onChange={(e) => set('cnpj_cpf', formatCnpjCpf(e.target.value))} className="font-mono" />
+        <Field label="CNPJ / CPF" required className="md:col-span-3">
+          <Input value={v.cnpj_cpf || ''} onChange={(ev) => set('cnpj_cpf', formatCnpjCpf(ev.target.value))} className="font-mono" />
         </Field>
-        <Field label="Inscrição Estadual" hint='ou "ISENTO"'>
-          <Input value={v.ie || ''} onChange={(e) => set('ie', e.target.value.toUpperCase())} />
-        </Field>
-        <Field label="Telefone">
-          <Input value={v.fone || ''} onChange={(e) => set('fone', e.target.value)} />
-        </Field>
-        <Field label="E-mail" className="md:col-span-3">
-          <Input value={v.email || ''} onChange={(e) => set('email', e.target.value)} />
+        <Field label="Inscrição Estadual" className="md:col-span-3">
+          <Input value={v.ie || ''} placeholder='ou "ISENTO"' onChange={(ev) => set('ie', ev.target.value.toUpperCase())} />
         </Field>
       </div>
-      <AddressFields value={toAddressFields(v.endereco)} onChange={(addr) => set('endereco', fromAddressFields(addr, v.endereco))} />
+      <button type="button" onClick={() => setOpen(!expanded)}
+        className="flex w-full items-center gap-1.5 text-left text-xs text-slate-500 hover:text-primary" data-testid={testId ? `${testId}-address-toggle` : undefined}>
+        <MapPin className="w-3.5 h-3.5 shrink-0" />
+        <span className="truncate">{summary || 'Endereço não informado'}</span>
+        {incomplete && (v.nome || '').trim() && <span className="shrink-0 font-medium text-amber-600">· endereço incompleto</span>}
+        <span className="ml-auto flex shrink-0 items-center gap-0.5 font-medium">
+          {expanded ? 'Ocultar' : 'Endereço e contato'} {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </span>
+      </button>
+      {expanded && (
+        <div className="space-y-3 pt-1">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <Field label="Telefone">
+              <Input value={v.fone || ''} onChange={(ev) => set('fone', ev.target.value)} />
+            </Field>
+            <Field label="E-mail" className="md:col-span-3">
+              <Input value={v.email || ''} onChange={(ev) => set('email', ev.target.value)} />
+            </Field>
+          </div>
+          <AddressFields value={toAddressFields(v.endereco)} onChange={(addr) => set('endereco', fromAddressFields(addr, v.endereco))} />
+        </div>
+      )}
     </div>
   );
 }
@@ -189,6 +324,11 @@ function RowRemove({ onClick }) {
       <X className="w-4 h-4" />
     </Button>
   );
+}
+
+function TabCount({ n }) {
+  if (!n) return null;
+  return <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{n}</span>;
 }
 
 export default function CtePage() {
@@ -205,6 +345,9 @@ export default function CtePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(buildEmpty());
+  const [formKey, setFormKey] = useState(0);
+  const [tab, setTab] = useState('basicos');
+  const [emitted, setEmitted] = useState(null);
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState('');
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
@@ -212,14 +355,18 @@ export default function CtePage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [justificativa, setJustificativa] = useState('');
   const debounceRef = useRef(null);
+  const activeRef = useRef(true);
 
   const filtered = statusFilter ? list.filter((c) => c.status === statusFilter) : list;
   const { pageItems, paginationProps } = usePagination(filtered, { resetKey: `${search}|${statusFilter}` });
+  const issues = useMemo(() => validateCte(form, settings), [form, settings]);
+  const issuesIn = (t) => issues.filter((i) => i.tab === t).length;
 
   useEffect(() => {
     api.getFiscalSettings().then((r) => setSettings(r.data)).catch(() => setSettings({}));
     api.getClients().then((r) => setClients((r.data || []).filter((c) => c.status !== 'INATIVO'))).catch(() => {});
     api.getLoadingOrders().then((r) => setOrders(r.data || [])).catch(() => {});
+    return () => { activeRef.current = false; };
   }, []);
 
   useEffect(() => {
@@ -242,37 +389,55 @@ export default function CtePage() {
   };
 
   const replaceInList = (doc) => setList((prev) => prev.map((c) => (c.id === doc.id ? doc : c)));
-  const set = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
-  const setRow = (field, index, patch) => setForm((prev) => ({
+  const update = (fn) => setForm((prev) => derive(prev, fn(prev)));
+  const set = (field, value) => update((prev) => ({ ...prev, [field]: value }));
+  const setRow = (field, index, patch) => update((prev) => ({
     ...prev, [field]: prev[field].map((row, i) => (i === index ? { ...row, ...patch } : row)),
   }));
-  const addRow = (field, row) => setForm((prev) => ({ ...prev, [field]: [...prev[field], row] }));
-  const removeRow = (field, index) => setForm((prev) => ({ ...prev, [field]: prev[field].filter((_, i) => i !== index) }));
+  const addRow = (field, row) => update((prev) => ({ ...prev, [field]: [...prev[field], row] }));
+  const removeRow = (field, index) => update((prev) => ({ ...prev, [field]: prev[field].filter((_, i) => i !== index) }));
 
-  const openCreate = () => {
-    setEditingId(null);
-    setForm(buildEmpty(settings));
+  const openForm = (f, { id = null, startTab = 'basicos' } = {}) => {
+    setEditingId(id);
+    setEmitted(null);
+    setForm(derive(f, f));
+    setTab(startTab);
+    setFormKey((k) => k + 1);
     setDialogOpen(true);
   };
 
-  const openEdit = (doc) => {
-    setEditingId(doc.id);
-    setForm(toForm(doc, settings));
-    setDialogOpen(true);
-  };
+  const openCreate = () => openForm(buildEmpty(settings));
+  const openEdit = (doc) => openForm(toForm(doc, settings), { id: doc.id });
 
   const openFromOrder = async (order) => {
     if (!order) return;
     try {
       const r = await api.getCteDraftFromLoadingOrder(order.id);
-      setEditingId(null);
-      setForm(toForm(r.data, settings));
+      const f = toForm(r.data, settings);
       setOrderDialogOpen(false);
       setOrderText('');
-      setDialogOpen(true);
+      openForm({ ...f, indicador_ie_tomador: indicadorIe(payerOf(f)) });
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao carregar a Ordem de Carregamento');
     }
+  };
+
+  // Novo CT-e com as partes, o percurso e o frete de um já emitido; documentos e carga mudam a cada viagem
+  const openDuplicate = (doc) => {
+    if (!doc) return;
+    const base = buildEmpty(settings);
+    const f = toForm(doc, settings);
+    openForm({
+      ...f,
+      loading_order_id: null,
+      loading_order_number: null,
+      documentos: base.documentos,
+      containers: [],
+      quantidades: f.quantidades.map((q) => ({ ...q, quantidade: '' })),
+      valor_carga: '',
+      observacoes: doc.loading_order_id ? '' : f.observacoes,
+    }, { startTab: 'carga' });
+    toast.info(`Cópia do CT-e nº ${doc.numero || '-'}: informe os documentos e a carga desta viagem`);
   };
 
   const save = async ({ silent = false } = {}) => {
@@ -293,19 +458,42 @@ export default function CtePage() {
     }
   };
 
+  const download = async (doc, kind) => {
+    setBusy(kind);
+    try {
+      const r = kind === 'pdf' ? await api.getCtePDF(doc.id) : await api.getCteXML(doc.id);
+      downloadBlob(r.data, `CTe_${doc.numero}_${doc.chave || doc.id}.${kind}`);
+    } catch (e) {
+      toast.error(kind === 'pdf' ? 'Erro ao baixar o DACTE' : 'Erro ao baixar o XML');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const notifyResult = (doc) => {
+    if (doc.status === 'AUTORIZADO') {
+      toast.success(`CT-e nº ${doc.numero} autorizado`, { action: { label: 'DACTE', onClick: () => download(doc, 'pdf') } });
+    } else if (doc.status === 'PENDENTE') {
+      toast.info('A Sefaz ainda não respondeu: use "Atualizar situação" em instantes');
+    } else {
+      toast.error(`CT-e ${CTE_STATUS_LABELS[doc.status] || doc.status}: ${doc.motivo || ''}`, { duration: 12000 });
+    }
+  };
+
   const emit = async (doc) => {
-    if (!doc) return;
+    if (!doc) return null;
     const ambiente = settings?.ambiente === 'producao' ? 'PRODUÇÃO (com valor fiscal)' : 'homologação (teste, sem valor fiscal)';
-    if (!(await confirm(`Transmitir este CT-e para a Sefaz em ${ambiente}?`))) return;
+    if (!(await confirm(`Transmitir este CT-e para a Sefaz em ${ambiente}?`))) return null;
     setBusy('emit');
     try {
-      const r = await api.emitCte(doc.id);
-      replaceInList(r.data);
-      const status = r.data.status;
-      if (status === 'AUTORIZADO') toast.success(`CT-e nº ${r.data.numero} autorizado`);
-      else if (status === 'PENDENTE') toast.info('CT-e na fila do emissor: use "Atualizar situação" em instantes');
-      else toast.error(`CT-e ${CTE_STATUS_LABELS[status] || status}: ${r.data.motivo || ''}`);
-      return r.data;
+      let result = (await api.emitCte(doc.id)).data;
+      replaceInList(result);
+      if (result.status === 'PENDENTE') {
+        setBusy('wait');
+        result = await waitWhilePending(result, api.refreshCte, { onUpdate: replaceInList, isActive: () => activeRef.current });
+      }
+      notifyResult(result);
+      return result;
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao transmitir o CT-e', { duration: 12000 });
       loadList();
@@ -316,10 +504,17 @@ export default function CtePage() {
   };
 
   const saveAndEmit = async () => {
+    if (issues.length) {
+      setTab('conferencia');
+      toast.error(`Há ${issues.length} pendência(s) antes de transmitir`);
+      return;
+    }
     const doc = await save({ silent: true });
     if (!doc) return;
     const result = await emit(doc);
-    if (result && !CTE_EDITABLE.includes(result.status)) setDialogOpen(false);
+    if (!result) return;
+    if (CTE_EDITABLE.includes(result.status)) setTab('conferencia');
+    else setEmitted(result);
   };
 
   const refresh = async (doc) => {
@@ -327,21 +522,10 @@ export default function CtePage() {
     try {
       const r = await api.refreshCte(doc.id);
       replaceInList(r.data);
+      setEmitted((prev) => (prev?.id === r.data.id ? r.data : prev));
       toast.success(`Situação: ${CTE_STATUS_LABELS[r.data.status] || r.data.status}`);
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao consultar a situação');
-    } finally {
-      setBusy('');
-    }
-  };
-
-  const download = async (doc, kind) => {
-    setBusy(kind);
-    try {
-      const r = kind === 'pdf' ? await api.getCtePDF(doc.id) : await api.getCteXML(doc.id);
-      downloadBlob(r.data, `CTe_${doc.numero}_${doc.chave || doc.id}.${kind}`);
-    } catch (e) {
-      toast.error(kind === 'pdf' ? 'Erro ao baixar o DACTE' : 'Erro ao baixar o XML');
     } finally {
       setBusy('');
     }
@@ -399,7 +583,18 @@ export default function CtePage() {
   const count = (statuses) => filtered.filter((c) => statuses.includes(c.status)).length;
   const hasFilters = !!(search || statusFilter);
   const editingDoc = editingId ? list.find((c) => c.id === editingId) : null;
+  const emittedDoc = emitted ? (list.find((c) => c.id === emitted.id) || emitted) : null;
   const notReady = settings && (!settings.provider_configured || !settings.provider_synced_at || !settings.certificate);
+
+  const hasComponents = form.componentes.some((c) => toNumber(c.valor) !== null);
+  const total = toNumber(form.valor_total) || 0;
+  const icmsRate = ICMS_WITH_RATE.includes(form.icms_cst) ? (toNumber(form.icms_aliquota) || 0) : 0;
+  const icmsValue = Math.round(total * icmsRate) / 100;
+  const nfeCount = form.documentos.filter((d) => d.tipo === 'NFE' && onlyDigits(d.chave)).length;
+  const otherDocCount = form.documentos.filter((d) => d.tipo === 'OUTROS' && (d.descricao || d.numero)).length;
+  const payerLabel = (TOMADOR_OPTIONS.find(([v]) => v === form.tomador_papel) || [])[1] || '-';
+  const placeLabel = (p) => (p?.cidade ? `${p.cidade}/${p.uf}` : '-');
+  const emitting = busy === 'emit' || busy === 'wait';
 
   return (
     <Layout>
@@ -409,9 +604,12 @@ export default function CtePage() {
           title="CT-e"
           subtitle="Conhecimento de Transporte Eletrônico emitido pela Focus NFe"
           actions={(
-            <Button variant="outline" size="sm" onClick={() => navigate('/fiscal/configuracao')} data-testid="cte-settings-btn">
-              <FileCog className="w-4 h-4 mr-1.5" /> Configuração Fiscal
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate('/fiscal/mdfe')}><Truck className="w-4 h-4 mr-1.5" /> MDF-e</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/fiscal/configuracao')} data-testid="cte-settings-btn">
+                <FileCog className="w-4 h-4 mr-1.5" /> Configuração Fiscal
+              </Button>
+            </div>
           )}
         />
 
@@ -458,6 +656,7 @@ export default function CtePage() {
               primary={<ToolbarPrimary icon={Plus} label="Novo CT-e" onClick={openCreate} testId="cte-new-btn" />}
             >
               <ToolbarButton icon={PackageCheck} label="Da Ordem de Carregamento" tone="violet" onClick={() => setOrderDialogOpen(true)} testId="cte-from-order-btn" />
+              <ToolbarButton icon={Copy} label="Duplicar" tone="blue" onClick={() => openDuplicate(selected)} disabled={!selected} testId="cte-duplicate-btn" />
               <ToolbarDivider />
               <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => openEdit(selected)} disabled={!isEditable} testId="cte-edit-btn" />
               <ToolbarButton icon={Send} label="Transmitir" tone="emerald" onClick={() => emit(selected)} disabled={!isEditable || !!busy} testId="cte-emit-btn" />
@@ -497,7 +696,8 @@ export default function CtePage() {
                 </thead>
                 <tbody>
                   {pageItems.map((c) => (
-                    <tr key={c.id} onClick={() => toggleSelect(c.id)} data-selected={selectedIds.has(c.id)} className="cursor-pointer" data-testid={`cte-row-${c.id}`}>
+                    <tr key={c.id} onClick={() => toggleSelect(c.id)} onDoubleClick={() => CTE_EDITABLE.includes(c.status) && openEdit(c)}
+                      data-selected={selectedIds.has(c.id)} className="cursor-pointer" data-testid={`cte-row-${c.id}`}>
                       <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
                       </td>
@@ -575,217 +775,360 @@ export default function CtePage() {
       </Dialog>
 
       {/* Formulário */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!emitting) setDialogOpen(open); }}>
         <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto" data-testid="cte-dialog">
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="flex items-center gap-2 text-base">
               <FileCheck className="w-5 h-5 text-primary" />
-              {editingId ? 'Editar CT-e' : 'Novo CT-e'}
-              {form.loading_order_number && <span className="text-sm font-normal text-slate-500">· Ordem de Carregamento #{form.loading_order_number}</span>}
+              {emittedDoc ? `CT-e nº ${emittedDoc.numero || '-'}` : editingId ? 'Editar CT-e' : 'Novo CT-e'}
+              {!emittedDoc && form.loading_order_number && <span className="text-sm font-normal text-slate-500">· Ordem de Carregamento #{form.loading_order_number}</span>}
             </DialogTitle>
           </DialogHeader>
-          {editingDoc?.motivo && ['REJEITADO', 'ERRO'].includes(editingDoc.status) && (
-            <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-3 py-2 text-sm text-red-800 dark:text-red-200">
-              <b>Último retorno:</b> {editingDoc.motivo}
-            </div>
-          )}
 
-          <div className="space-y-6 py-2">
-            <div className="space-y-3">
-              <FormSectionTitle>Operação</FormSectionTitle>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <Field label="CFOP" required className="md:col-span-2">
-                  <Select value={form.cfop} onValueChange={(v) => set('cfop', v)}>
-                    <SelectTrigger data-testid="cte-cfop"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {CFOP_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Natureza da Operação" required className="md:col-span-2">
-                  <Input value={form.natureza_operacao} onChange={(e) => set('natureza_operacao', e.target.value.toUpperCase())} maxLength={60} />
-                </Field>
-                <Field label="Tomador do serviço" required>
-                  <Select value={form.tomador_papel} onValueChange={(v) => set('tomador_papel', v)}>
-                    <SelectTrigger data-testid="cte-tomador"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {TOMADOR_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Tomador perante o ICMS" required>
-                  <Select value={form.indicador_ie_tomador} onValueChange={(v) => set('indicador_ie_tomador', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {IE_TOMADOR_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
+          {emittedDoc ? (
+            <div className="py-6 space-y-5 text-center" data-testid="cte-emitted">
+              {emittedDoc.status === 'AUTORIZADO'
+                ? <CheckCircle2 className="w-12 h-12 mx-auto text-emerald-600" />
+                : <Clock className="w-12 h-12 mx-auto text-amber-500" />}
+              <div className="space-y-1">
+                <p className="text-lg font-semibold">
+                  {emittedDoc.status === 'AUTORIZADO' ? `CT-e nº ${emittedDoc.numero} autorizado` : `CT-e ${(CTE_STATUS_LABELS[emittedDoc.status] || emittedDoc.status).toLowerCase()}`}
+                </p>
+                {emittedDoc.status === 'PENDENTE' && <p className="text-sm text-slate-500">A Sefaz ainda não respondeu. Consulte de novo em instantes.</p>}
+                {emittedDoc.chave && <p className="text-xs font-mono text-slate-500 break-all">Chave: {emittedDoc.chave}{emittedDoc.protocolo ? ` · Protocolo: ${emittedDoc.protocolo}` : ''}</p>}
+                {emittedDoc.motivo && emittedDoc.status !== 'AUTORIZADO' && <p className="text-sm text-red-700 dark:text-red-300">{emittedDoc.motivo}</p>}
+              </div>
+              <div className="flex flex-wrap justify-center gap-2">
+                {emittedDoc.status === 'AUTORIZADO' ? (
+                  <>
+                    <Button onClick={() => download(emittedDoc, 'pdf')} disabled={!!busy} data-testid="cte-emitted-pdf">
+                      {busy === 'pdf' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Printer className="w-4 h-4 mr-1.5" />} DACTE
+                    </Button>
+                    <Button variant="outline" onClick={() => download(emittedDoc, 'xml')} disabled={!!busy}><FileCode className="w-4 h-4 mr-1.5" /> XML</Button>
+                    <Button variant="outline" onClick={() => navigate(`/fiscal/mdfe?ctes=${emittedDoc.id}`)} data-testid="cte-emitted-mdfe"><Truck className="w-4 h-4 mr-1.5" /> Gerar MDF-e</Button>
+                  </>
+                ) : (
+                  <Button variant="outline" onClick={() => refresh(emittedDoc)} disabled={!!busy}>
+                    {busy === 'refresh' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />} Atualizar situação
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => openDuplicate(emittedDoc)} data-testid="cte-emitted-duplicate"><Copy className="w-4 h-4 mr-1.5" /> Duplicar</Button>
+                <Button variant="outline" onClick={openCreate}><Plus className="w-4 h-4 mr-1.5" /> Novo CT-e</Button>
               </div>
             </div>
+          ) : (
+            <>
+              {editingDoc?.motivo && ['REJEITADO', 'ERRO'].includes(editingDoc.status) && (
+                <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900 px-3 py-2 text-sm text-red-800 dark:text-red-200">
+                  <b>Último retorno:</b> {editingDoc.motivo}
+                </div>
+              )}
 
-            <PartyFields title="Remetente" value={form.remetente} onChange={(v) => set('remetente', v)} clients={clients} testId="cte-remetente" />
-            <PartyFields title="Destinatário" value={form.destinatario} onChange={(v) => set('destinatario', v)} clients={clients} testId="cte-destinatario" />
-            {form.tomador_papel === '4' && (
-              <PartyFields title="Tomador (outros)" value={form.tomador} onChange={(v) => set('tomador', v)} clients={clients} testId="cte-tomador-outros" />
-            )}
+              <Tabs value={tab} onValueChange={setTab} key={formKey}>
+                <TabsList className="flex flex-wrap h-auto">
+                  <TabsTrigger value="basicos" data-testid="cte-tab-basicos">Dados básicos<TabCount n={issuesIn('basicos')} /></TabsTrigger>
+                  <TabsTrigger value="carga" data-testid="cte-tab-carga">Carga e documentos<TabCount n={issuesIn('carga')} /></TabsTrigger>
+                  <TabsTrigger value="frete" data-testid="cte-tab-frete">Frete e impostos<TabCount n={issuesIn('frete')} /></TabsTrigger>
+                  <TabsTrigger value="conferencia" data-testid="cte-tab-conferencia">
+                    Conferência
+                    {issues.length ? <TabCount n={issues.length} /> : <CheckCircle2 className="ml-1.5 w-3.5 h-3.5 text-emerald-600" />}
+                  </TabsTrigger>
+                </TabsList>
 
-            <div className="space-y-3">
-              <FormSectionTitle>Percurso</FormSectionTitle>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 mb-1.5">Início da prestação</p>
-                  <CityStateFields value={{ city: form.origem.cidade, state: form.origem.uf }}
-                    onChange={(v) => set('origem', { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 mb-1.5">Término da prestação</p>
-                  <CityStateFields value={{ city: form.destino.cidade, state: form.destino.uf }}
-                    onChange={(v) => set('destino', { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <FormSectionTitle>Valores e ICMS</FormSectionTitle>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <Field label="Valor total da prestação (R$)" required>
-                  <Input inputMode="decimal" value={form.valor_total} onChange={(e) => set('valor_total', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-valor-total" />
-                </Field>
-                <Field label="Valor a receber (R$)" hint="Vazio = igual ao total">
-                  <Input inputMode="decimal" value={form.valor_receber} onChange={(e) => set('valor_receber', e.target.value.replace(/[^\d,.]/g, ''))} />
-                </Field>
-                <Field label="ICMS (CST)" required>
-                  <Select value={form.icms_cst} onValueChange={(v) => set('icms_cst', v)}>
-                    <SelectTrigger data-testid="cte-icms-cst"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {ICMS_CST_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Alíquota ICMS (%)" required={ICMS_WITH_RATE.includes(form.icms_cst)}>
-                  <Input inputMode="decimal" value={form.icms_aliquota} disabled={!ICMS_WITH_RATE.includes(form.icms_cst)}
-                    onChange={(e) => set('icms_aliquota', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-icms-aliquota" />
-                </Field>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-500">Componentes do valor (opcional - a soma deve bater com o total)</p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => addRow('componentes', { nome: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Componente</Button>
-                </div>
-                {form.componentes.map((c, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input value={c.nome} maxLength={15} onChange={(e) => setRow('componentes', i, { nome: e.target.value.toUpperCase() })} className="flex-1" aria-label="Nome do componente" />
-                    <Input inputMode="decimal" value={c.valor} onChange={(e) => setRow('componentes', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} className="w-40" aria-label="Valor do componente" />
-                    <RowRemove onClick={() => removeRow('componentes', i)} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <FormSectionTitle>Carga</FormSectionTitle>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <Field label="Produto predominante" required>
-                  <Input value={form.produto_predominante} onChange={(e) => set('produto_predominante', e.target.value.toUpperCase())} maxLength={60} />
-                </Field>
-                <Field label="Outras características">
-                  <Input value={form.outras_caracteristicas || ''} onChange={(e) => set('outras_caracteristicas', e.target.value.toUpperCase())} maxLength={30} />
-                </Field>
-                <Field label="Valor da carga (R$)">
-                  <Input inputMode="decimal" value={form.valor_carga} onChange={(e) => set('valor_carga', e.target.value.replace(/[^\d,.]/g, ''))} />
-                </Field>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-500">Quantidades *</p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => addRow('quantidades', { unidade: '01', tipo_medida: 'PESO BRUTO', quantidade: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Quantidade</Button>
-                </div>
-                {form.quantidades.map((q, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Select value={q.unidade} onValueChange={(v) => setRow('quantidades', i, { unidade: v })}>
-                      <SelectTrigger className="w-32" aria-label="Unidade"><SelectValue /></SelectTrigger>
-                      <SelectContent>{UNIDADE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Input value={q.tipo_medida} maxLength={20} onChange={(e) => setRow('quantidades', i, { tipo_medida: e.target.value.toUpperCase() })} className="flex-1" aria-label="Tipo da medida" />
-                    <Input inputMode="decimal" value={q.quantidade} onChange={(e) => setRow('quantidades', i, { quantidade: e.target.value.replace(/[^\d,.]/g, '') })} className="w-40" aria-label="Quantidade" data-testid={`cte-qtd-${i}`} />
-                    <RowRemove onClick={() => removeRow('quantidades', i)} />
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-slate-500">Containers (vão como unidades de carga)</p>
-                  <Button type="button" variant="outline" size="sm" onClick={() => addRow('containers', { numero: '', lacre: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Container</Button>
-                </div>
-                {form.containers.map((c, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input value={c.numero} onChange={(e) => setRow('containers', i, { numero: e.target.value.toUpperCase() })} className="flex-1 font-mono" maxLength={20} aria-label="Container" />
-                    <Input value={c.lacre || ''} onChange={(e) => setRow('containers', i, { lacre: e.target.value.toUpperCase() })} className="w-48 font-mono" maxLength={20} aria-label="Lacre" />
-                    <RowRemove onClick={() => removeRow('containers', i)} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <FormSectionTitle bare>Documentos transportados *</FormSectionTitle>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'NFE', chave: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> NF-e</Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'OUTROS', tipo_outros: '99', descricao: '', numero: '', data_emissao: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Outro documento</Button>
-                </div>
-              </div>
-              {form.documentos.map((d, i) => (
-                <div key={i} className="flex gap-2 items-end">
-                  {d.tipo === 'NFE' ? (
-                    <Field label="Chave da NF-e (44 dígitos)" className="flex-1">
-                      <Input value={d.chave || ''} onChange={(e) => setRow('documentos', i, { chave: e.target.value.replace(/\D/g, '').slice(0, 44) })} className="font-mono" data-testid={`cte-nfe-${i}`} />
-                    </Field>
-                  ) : (
-                    <>
-                      <Field label="Tipo" className="w-36">
-                        <Select value={d.tipo_outros || '99'} onValueChange={(v) => setRow('documentos', i, { tipo_outros: v })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
+                <TabsContent value="basicos" className="space-y-6 pt-3">
+                  <div className="space-y-3">
+                    <FormSectionTitle>Operação</FormSectionTitle>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <Field label="CFOP" required className="md:col-span-2" hint="5xxx/6xxx ajustado pelo percurso (dentro da UF / interestadual)">
+                        <Select value={form.cfop} onValueChange={(v) => set('cfop', v)}>
+                          <SelectTrigger data-testid="cte-cfop"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="99">Outros</SelectItem>
-                            <SelectItem value="00">Declaração</SelectItem>
+                            {CFOP_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </Field>
-                      <Field label="Descrição" className="flex-1">
-                        <Input value={d.descricao || ''} maxLength={100} onChange={(e) => setRow('documentos', i, { descricao: e.target.value })} />
+                      <Field label="Natureza da Operação" required className="md:col-span-2">
+                        <Input value={form.natureza_operacao} onChange={(e) => set('natureza_operacao', e.target.value.toUpperCase())} maxLength={60} />
                       </Field>
-                      <Field label="Número" className="w-32">
-                        <Input value={d.numero || ''} maxLength={20} onChange={(e) => setRow('documentos', i, { numero: e.target.value })} />
-                      </Field>
-                      <Field label="Emissão" className="w-40">
-                        <Input type="date" value={d.data_emissao || ''} onChange={(e) => setRow('documentos', i, { data_emissao: e.target.value })} />
-                      </Field>
-                      <Field label="Valor (R$)" className="w-32">
-                        <Input inputMode="decimal" value={d.valor || ''} onChange={(e) => setRow('documentos', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} />
-                      </Field>
-                    </>
-                  )}
-                  <RowRemove onClick={() => removeRow('documentos', i)} />
-                </div>
-              ))}
-            </div>
+                    </div>
+                  </div>
 
-            <div className="space-y-3">
-              <FormSectionTitle>Observações</FormSectionTitle>
-              <Textarea value={form.observacoes} onChange={(e) => set('observacoes', e.target.value.slice(0, 2000))} rows={3} />
-            </div>
-          </div>
+                  <div className="space-y-3">
+                    <FormSectionTitle>Envolvidos</FormSectionTitle>
+                    <PartyFields title="Remetente" value={form.remetente} onChange={(v) => set('remetente', v)} clients={clients} testId="cte-remetente" />
+                    <PartyFields title="Destinatário" value={form.destinatario} onChange={(v) => set('destinatario', v)} clients={clients} testId="cte-destinatario" />
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                      <Field label="Pagador do frete (tomador)" required className="md:col-span-7">
+                        <RadioGroup value={form.tomador_papel} onValueChange={(v) => set('tomador_papel', v)} className="flex flex-wrap gap-x-5 gap-y-2 min-h-9 items-center" data-testid="cte-tomador">
+                          {TOMADOR_OPTIONS.map(([v, l]) => (
+                            <label key={v} className="flex items-center gap-2 text-sm cursor-pointer">
+                              <RadioGroupItem value={v} data-testid={`cte-tomador-${v}`} /> {v === '4' ? 'Outro' : l}
+                            </label>
+                          ))}
+                        </RadioGroup>
+                      </Field>
+                      <Field label="Tomador perante o ICMS" required className="md:col-span-5" hint="Sugerido pela IE do pagador">
+                        <Select value={form.indicador_ie_tomador} onValueChange={(v) => set('indicador_ie_tomador', v)}>
+                          <SelectTrigger data-testid="cte-ie-tomador"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {IE_TOMADOR_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                    </div>
+                    {form.tomador_papel === '4' && (
+                      <PartyFields title="Tomador (outro)" value={form.tomador} onChange={(v) => set('tomador', v)} clients={clients} testId="cte-tomador-outros" />
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <FormSectionTitle>Percurso</FormSectionTitle>
+                    <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                      <Checkbox checked={form.percurso_auto} onCheckedChange={(c) => set('percurso_auto', !!c)} data-testid="cte-percurso-auto" />
+                      Início/fim da prestação nas cidades do remetente e do destinatário
+                    </label>
+                    {form.percurso_auto ? (
+                      <p className="text-sm text-slate-700 dark:text-slate-200" data-testid="cte-percurso">
+                        <MapPin className="inline w-4 h-4 mr-1 text-primary" />{placeLabel(form.origem)} → {placeLabel(form.destino)}
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 mb-1.5">Início da prestação</p>
+                          <CityStateFields value={{ city: form.origem.cidade, state: form.origem.uf }}
+                            onChange={(v) => set('origem', { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-500 mb-1.5">Término da prestação</p>
+                          <CityStateFields value={{ city: form.destino.cidade, state: form.destino.uf }}
+                            onChange={(v) => set('destino', { cidade: v.city || '', uf: v.state || '', codigo_municipio: null })} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="carga" className="space-y-6 pt-3">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <FormSectionTitle bare>Documentos transportados *</FormSectionTitle>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'NFE', chave: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> NF-e</Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'OUTROS', tipo_outros: '99', descricao: '', numero: '', data_emissao: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Outro documento</Button>
+                      </div>
+                    </div>
+                    {form.documentos.map((d, i) => {
+                      const key = onlyDigits(d.chave);
+                      const keyState = d.tipo !== 'NFE' || !key ? null : accessKeyOk(key, '55') ? 'ok' : key.length < 44 ? 'short' : 'bad';
+                      return (
+                        <div key={i} className="flex gap-2 items-end">
+                          {d.tipo === 'NFE' ? (
+                            <Field label="Chave da NF-e (44 dígitos)" className="flex-1"
+                              hint={keyState === 'ok' ? `NF-e nº ${Number(key.slice(25, 34))} · série ${Number(key.slice(22, 25))}` : keyState === 'short' ? `${key.length}/44 dígitos` : keyState === 'bad' ? 'Chave inválida: confira os dígitos' : undefined}>
+                              <div className="relative">
+                                <Input value={d.chave || ''} onChange={(e) => setRow('documentos', i, { chave: onlyDigits(e.target.value).slice(0, 44) })}
+                                  className={`font-mono pr-8 ${keyState === 'bad' ? 'border-red-400' : ''}`} data-testid={`cte-nfe-${i}`} />
+                                {keyState === 'ok' && <CheckCircle2 className="absolute right-2.5 top-2.5 w-4 h-4 text-emerald-600" />}
+                                {keyState === 'bad' && <AlertTriangle className="absolute right-2.5 top-2.5 w-4 h-4 text-red-500" />}
+                              </div>
+                            </Field>
+                          ) : (
+                            <>
+                              <Field label="Tipo" className="w-36">
+                                <Select value={d.tipo_outros || '99'} onValueChange={(v) => setRow('documentos', i, { tipo_outros: v })}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="99">Outros</SelectItem>
+                                    <SelectItem value="00">Declaração</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </Field>
+                              <Field label="Descrição" className="flex-1">
+                                <Input value={d.descricao || ''} maxLength={100} onChange={(e) => setRow('documentos', i, { descricao: e.target.value })} />
+                              </Field>
+                              <Field label="Número" className="w-32">
+                                <Input value={d.numero || ''} maxLength={20} onChange={(e) => setRow('documentos', i, { numero: e.target.value })} />
+                              </Field>
+                              <Field label="Emissão" className="w-40">
+                                <Input type="date" value={d.data_emissao || ''} onChange={(e) => setRow('documentos', i, { data_emissao: e.target.value })} />
+                              </Field>
+                              <Field label="Valor (R$)" className="w-32">
+                                <Input inputMode="decimal" value={d.valor || ''} onChange={(e) => setRow('documentos', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} />
+                              </Field>
+                            </>
+                          )}
+                          <RowRemove onClick={() => removeRow('documentos', i)} />
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="space-y-3">
+                    <FormSectionTitle>Carga</FormSectionTitle>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <Field label="Produto predominante" required>
+                        <Input value={form.produto_predominante} onChange={(e) => set('produto_predominante', e.target.value.toUpperCase())} maxLength={60} />
+                      </Field>
+                      <Field label="Outras características">
+                        <Input value={form.outras_caracteristicas || ''} onChange={(e) => set('outras_caracteristicas', e.target.value.toUpperCase())} maxLength={30} />
+                      </Field>
+                      <Field label="Valor da carga (R$)">
+                        <Input inputMode="decimal" value={form.valor_carga} onChange={(e) => set('valor_carga', e.target.value.replace(/[^\d,.]/g, ''))} />
+                      </Field>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold text-slate-500">Quantidades *</p>
+                        <Button type="button" variant="outline" size="sm" onClick={() => addRow('quantidades', { unidade: '01', tipo_medida: 'PESO BRUTO', quantidade: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Quantidade</Button>
+                      </div>
+                      {form.quantidades.map((q, i) => (
+                        <div key={i} className="flex gap-2">
+                          <Select value={q.unidade} onValueChange={(v) => setRow('quantidades', i, { unidade: v })}>
+                            <SelectTrigger className="w-32" aria-label="Unidade"><SelectValue /></SelectTrigger>
+                            <SelectContent>{UNIDADE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+                          </Select>
+                          <Input value={q.tipo_medida} maxLength={20} onChange={(e) => setRow('quantidades', i, { tipo_medida: e.target.value.toUpperCase() })} className="flex-1" aria-label="Tipo da medida" />
+                          <Input inputMode="decimal" value={q.quantidade} onChange={(e) => setRow('quantidades', i, { quantidade: e.target.value.replace(/[^\d,.]/g, '') })} className="w-40" aria-label="Quantidade" data-testid={`cte-qtd-${i}`} />
+                          <RowRemove onClick={() => removeRow('quantidades', i)} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <FormSectionTitle bare>Contêineres (vão como unidades de carga)</FormSectionTitle>
+                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('containers', { numero: '', lacre: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Contêiner</Button>
+                    </div>
+                    {form.containers.map((c, i) => (
+                      <div key={i} className="flex gap-2">
+                        <Input value={c.numero} placeholder="Número" onChange={(e) => setRow('containers', i, { numero: e.target.value.toUpperCase() })} className="flex-1 font-mono" maxLength={20} aria-label="Container" />
+                        <Input value={c.lacre || ''} placeholder="Lacre" onChange={(e) => setRow('containers', i, { lacre: e.target.value.toUpperCase() })} className="w-48 font-mono" maxLength={20} aria-label="Lacre" />
+                        <RowRemove onClick={() => removeRow('containers', i)} />
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="frete" className="space-y-6 pt-3">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <FormSectionTitle bare>Composição do frete</FormSectionTitle>
+                      <div className="flex flex-wrap gap-1.5">
+                        {COMPONENT_PRESETS.filter(([nome]) => !form.componentes.some((c) => c.nome === nome)).map(([nome, label]) => (
+                          <Button key={nome} type="button" variant="outline" size="sm" onClick={() => addRow('componentes', { nome, valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> {label}</Button>
+                        ))}
+                        <Button type="button" variant="ghost" size="sm" onClick={() => addRow('componentes', { nome: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Nome livre</Button>
+                      </div>
+                    </div>
+                    {form.componentes.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {form.componentes.map((c, i) => (
+                          <div key={i} className="flex gap-1 items-end">
+                            <div className="flex-1 space-y-1.5 min-w-0">
+                              <Input value={c.nome} maxLength={15} onChange={(e) => setRow('componentes', i, { nome: e.target.value.toUpperCase() })} className="h-7 text-xs font-semibold" aria-label="Nome do componente" />
+                              <Input inputMode="decimal" value={c.valor} placeholder="0,00" onChange={(e) => setRow('componentes', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} aria-label="Valor do componente" data-testid={`cte-comp-${i}`} />
+                            </div>
+                            <RowRemove onClick={() => removeRow('componentes', i)} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <Field label="Total da prestação (R$)" required hint={hasComponents ? 'Soma da composição' : 'Ou use a composição acima'}>
+                        <Input inputMode="decimal" value={form.valor_total} readOnly={hasComponents}
+                          className={hasComponents ? 'bg-slate-50 dark:bg-slate-800 font-semibold' : 'font-semibold'}
+                          onChange={(e) => set('valor_total', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-valor-total" />
+                      </Field>
+                      <Field label="Valor a receber (R$)" hint="Vazio = igual ao total">
+                        <Input inputMode="decimal" value={form.valor_receber} onChange={(e) => set('valor_receber', e.target.value.replace(/[^\d,.]/g, ''))} />
+                      </Field>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <FormSectionTitle>ICMS</FormSectionTitle>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <Field label="Situação tributária (CST)" required className="col-span-2">
+                        <Select value={form.icms_cst} onValueChange={(v) => set('icms_cst', v)}>
+                          <SelectTrigger data-testid="cte-icms-cst"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {ICMS_CST_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </Field>
+                      <Field label="Alíquota (%)" required={ICMS_WITH_RATE.includes(form.icms_cst)}>
+                        <Input inputMode="decimal" value={form.icms_aliquota} disabled={!ICMS_WITH_RATE.includes(form.icms_cst)}
+                          onChange={(e) => set('icms_aliquota', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-icms-aliquota" />
+                      </Field>
+                      <Field label="Valor do ICMS" hint={icmsRate ? `Base de cálculo ${fmtMoney(total)}` : undefined}>
+                        <Input value={icmsRate ? fmtMoney(icmsValue) : '-'} readOnly className="bg-slate-50 dark:bg-slate-800 tabular-nums" data-testid="cte-icms-valor" />
+                      </Field>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <FormSectionTitle>Observações</FormSectionTitle>
+                    <Textarea value={form.observacoes} onChange={(e) => set('observacoes', e.target.value.slice(0, 2000))} rows={3} />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="conferencia" className="space-y-5 pt-3" data-testid="cte-conferencia">
+                  {issues.length === 0 ? (
+                    <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" /> Tudo certo para transmitir.
+                    </div>
+                  ) : (
+                    <ul className="space-y-1.5" data-testid="cte-issues">
+                      {issues.map((it, i) => (
+                        <li key={i}>
+                          <button type="button" onClick={() => setTab(it.tab)}
+                            className="flex w-full items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-left text-sm text-amber-900 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                            <span className="flex-1">{it.msg}</span>
+                            <span className="shrink-0 text-xs opacity-80">{TAB_LABELS[it.tab]} →</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                    {[
+                      ['Remetente', form.remetente?.nome || '-'],
+                      ['Destinatário', form.destinatario?.nome || '-'],
+                      ['Pagador do frete', form.tomador_papel === '4' ? (form.tomador?.nome || 'Outro') : payerLabel],
+                      ['Percurso', `${placeLabel(form.origem)} → ${placeLabel(form.destino)}`],
+                      ['CFOP', form.cfop],
+                      ['Total da prestação', fmtMoney(total)],
+                      ['ICMS', icmsRate ? `${fmtMoney(icmsValue)} (${toInput(icmsRate)}%)` : (ICMS_CST_OPTIONS.find(([v]) => v === form.icms_cst) || [])[1]],
+                      ['Documentos', `${nfeCount} NF-e${otherDocCount ? ` + ${otherDocCount} outro(s)` : ''}`],
+                      ['Contêineres', form.containers.filter((c) => (c.numero || '').trim()).map((c) => c.numero).join(', ') || '-'],
+                      ['Ambiente', settings?.ambiente === 'producao' ? 'Produção' : 'Homologação (sem valor fiscal)'],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex justify-between gap-3 border-b border-slate-100 dark:border-slate-800 py-1">
+                        <dt className="text-slate-500">{label}</dt>
+                        <dd className="text-right font-medium truncate">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Fechar</Button>
-            <Button variant="outline" onClick={() => save()} disabled={saving || !!busy} data-testid="cte-save-btn">
-              {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />} Salvar rascunho
-            </Button>
-            <Button onClick={saveAndEmit} disabled={saving || !!busy} data-testid="cte-save-emit-btn">
-              {busy === 'emit' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Send className="w-4 h-4 mr-1.5" />} Salvar e transmitir
-            </Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={emitting}>Fechar</Button>
+            {!emittedDoc && (
+              <>
+                <Button variant="outline" onClick={() => save()} disabled={saving || !!busy} data-testid="cte-save-btn">
+                  {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />} Salvar rascunho
+                </Button>
+                <Button onClick={saveAndEmit} disabled={saving || !!busy} data-testid="cte-save-emit-btn">
+                  {emitting ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Send className="w-4 h-4 mr-1.5" />}
+                  {busy === 'wait' ? 'Aguardando a Sefaz...' : 'Salvar e transmitir'}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

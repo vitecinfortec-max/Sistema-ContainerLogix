@@ -143,6 +143,129 @@ export function formatCnpjCpf(value) {
     .replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2');
 }
 
+/** CFOP 5xxx (dentro da UF) ou 6xxx (interestadual) conforme o percurso. */
+export function cfopForRoute(cfop, ufOrigem, ufDestino) {
+  if (!/^[56]\d{3}$/.test(cfop || '') || !ufOrigem || !ufDestino) return cfop;
+  const candidate = `${ufOrigem === ufDestino ? '5' : '6'}${cfop.slice(1)}`;
+  return CFOP_OPTIONS.some(([v]) => v === candidate) ? candidate : cfop;
+}
+
+/** Indicador de IE do tomador sugerido pela Inscrição Estadual do cadastro. */
+export function indicadorIe(party) {
+  const ie = String(party?.ie || '').trim().toUpperCase();
+  if (ie === 'ISENTO') return '2';
+  return onlyDigits(ie) ? '1' : '9';
+}
+
+/** Chave de 44 dígitos com o dígito verificador (módulo 11) correto. */
+export function accessKeyOk(key, modelo) {
+  const d = onlyDigits(key);
+  if (d.length !== 44 || (modelo && d.slice(20, 22) !== modelo)) return false;
+  let sum = 0;
+  let weight = 2;
+  for (let i = 42; i >= 0; i -= 1) {
+    sum += Number(d[i]) * weight;
+    weight = weight === 9 ? 2 : weight + 1;
+  }
+  const rest = sum % 11;
+  return Number(d[43]) === (rest < 2 ? 0 : 11 - rest);
+}
+
+/** Peso digitado no cadastro ("24.500", "3800 kg", "24,5 t") em kg inteiros (igual ao _kg do backend). */
+export function kgFromText(value) {
+  const text = String(value ?? '').trim().toLowerCase();
+  if (!text) return null;
+  const tons = text.replace('kg', '').includes('t');
+  let number = text.replace(/[^\d,.]/g, '');
+  if (!number) return null;
+  if (number.includes(',')) number = number.replace(/\./g, '').replace(',', '.');
+  else if ((number.match(/\./g) || []).length === 1 && number.split('.')[1].length === 3) number = number.replace('.', '');
+  const kg = Math.round(Number(number) * (tons ? 1000 : 1));
+  return Number.isFinite(kg) && kg > 0 ? kg : null;
+}
+
+/** Tipo de carroceria do MDF-e a partir do texto livre do Cadastro de Veículo. */
+function bodyTypeCode(text) {
+  const t = String(text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
+  if (!t) return null;
+  if (/CONT|PORTA/.test(t)) return '04';
+  if (/BAU|FECHAD/.test(t)) return '02';
+  if (/GRANEL/.test(t)) return '03';
+  if (/SIDER/.test(t)) return '05';
+  if (/ABERT|SECA|GRADE/.test(t)) return '01';
+  return null;
+}
+
+/**
+ * Dados do MDF-e a partir do Cadastro de Veículo: rodado e carroceria pelo
+ * tipo, tara/capacidade em kg e, quando o veículo não é próprio, o
+ * proprietário (transportadora vinculada ou o motorista autônomo).
+ */
+export function vehicleFromRegistry(vehicle, { trailer = false, companies = [], drivers = [] } = {}) {
+  const type = String(vehicle.vehicle_type || '').toUpperCase();
+  const isTraction = type === 'CAVALO' || String(vehicle.category || '').toUpperCase() === 'TRACAO';
+  const out = {
+    vehicle_id: vehicle.id,
+    placa: String(vehicle.plate || '').toUpperCase().replace(/[^A-Z0-9]/g, ''),
+    renavam: onlyDigits(vehicle.renavam),
+    tara: kgFromText(vehicle.tare_weight) ? String(kgFromText(vehicle.tare_weight)) : '',
+    capacidade_kg: kgFromText(vehicle.load_capacity) ? String(kgFromText(vehicle.load_capacity)) : '',
+  };
+  if (trailer) {
+    out.tipo_carroceria = bodyTypeCode(vehicle.body_type) || '04';
+  } else {
+    if (isTraction) out.tipo_rodado = '03';
+    else if (type.startsWith('CAMINH')) out.tipo_rodado = Number(vehicle.axle_count) >= 3 ? '01' : '02';
+    else if (type === 'VAN') out.tipo_rodado = '04';
+    out.tipo_carroceria = isTraction ? '00' : (bodyTypeCode(vehicle.body_type) || '00');
+  }
+
+  const ownerType = String(vehicle.owner_type || '').toUpperCase();
+  const status = String(vehicle.ownership_status || '').toUpperCase();
+  out.terceiro = ['TERCEIRIZADO', 'AUTONOMO'].includes(ownerType) || ['AGREGADO', 'ALUGADO'].includes(status);
+  if (out.terceiro) {
+    const tipo = status === 'AGREGADO' ? '0' : ownerType === 'AUTONOMO' ? '1' : '2';
+    const company = vehicle.transport_company
+      && companies.find((c) => (c.name || '').trim().toUpperCase() === vehicle.transport_company.trim().toUpperCase());
+    const driver = vehicle.driver_id && drivers.find((d) => d.id === vehicle.driver_id);
+    if (company) {
+      out.proprietario = {
+        cnpj_cpf: formatCnpjCpf(company.cnpj || ''), nome: company.name || '', rntrc: onlyDigits(company.antt).slice(0, 8),
+        ie: (company.state_registration || 'ISENTO').toUpperCase(), uf: company.address_details?.state || '', tipo,
+      };
+    } else if (ownerType === 'AUTONOMO' && driver) {
+      out.proprietario = {
+        cnpj_cpf: formatCnpjCpf(driver.cpf || ''), nome: driver.name || '', rntrc: '', ie: 'ISENTO',
+        uf: driver.address_details?.state || '', tipo,
+      };
+    } else {
+      out.proprietario = { cnpj_cpf: '', nome: '', rntrc: '', ie: '', uf: '', tipo };
+    }
+  }
+  return out;
+}
+
+/**
+ * Depois de transmitir: consulta a situação sozinho enquanto o emissor
+ * devolver PENDENTE (cerca de 1 minuto), em vez de o usuário clicar em
+ * "Atualizar situação". `onUpdate` recebe cada retorno; `isActive` interrompe
+ * quando a tela é fechada.
+ */
+export async function waitWhilePending(doc, refresh, { tries = 15, interval = 4000, onUpdate, isActive } = {}) {
+  let current = doc;
+  for (let i = 0; i < tries && current?.status === 'PENDENTE'; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, interval));
+    if (isActive && !isActive()) break;
+    try {
+      current = (await refresh(current.id)).data;
+      if (onUpdate) onUpdate(current);
+    } catch {
+      break;
+    }
+  }
+  return current;
+}
+
 export function downloadBlob(data, filename) {
   const url = window.URL.createObjectURL(new Blob([data]));
   const link = document.createElement('a');
