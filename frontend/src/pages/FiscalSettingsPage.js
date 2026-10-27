@@ -9,18 +9,19 @@ import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { api } from '../lib/api';
 import {
-  AMBIENTE_OPTIONS, CFOP_OPTIONS, CRT_OPTIONS, ICMS_CST_OPTIONS, ICMS_WITH_RATE,
+  AMBIENTE_OPTIONS, CFOP_OPTIONS, CRT_OPTIONS, ICMS_CST_OPTIONS, ICMS_WITH_RATE, SEGURO_RESPONSAVEL_OPTIONS, TIPO_CARGA_OPTIONS,
   formatCnpjCpf, fromAddressFields, toAddressFields,
 } from '../lib/fiscal';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Building2, FileCog, KeyRound, Landmark, Loader2, Save, Send, ShieldCheck, Truck } from 'lucide-react';
+import { Building2, FileCog, KeyRound, Landmark, Loader2, Save, Send, ShieldCheck, ShieldPlus, Truck } from 'lucide-react';
 
 const EMPTY_FORM = {
   ambiente: 'homologacao', cnpj: '', ie: '', razao_social: '', nome_fantasia: '', email: '', fone: '',
   endereco: {}, crt: '3', rntrc: '', cte_serie: '1', cte_proximo_numero: '', cfop_padrao: '5353',
   natureza_operacao: '', icms_cst: '00', icms_aliquota: '', produto_predominante: '',
   ibs_cbs_cst: '', ibs_cbs_classificacao: '', ibs_uf_aliquota: '', ibs_mun_aliquota: '', cbs_aliquota: '',
+  seguro_responsavel: '1', seguradora_nome: '', seguradora_cnpj: '', seguro_apolice: '', mdfe_tipo_carga: '04',
 };
 
 const fmtDate = (value) => (value ? format(new Date(value), 'dd/MM/yyyy') : '-');
@@ -66,6 +67,11 @@ export default function FiscalSettingsPage() {
       ibs_uf_aliquota: fromRate(data.ibs_uf_aliquota),
       ibs_mun_aliquota: fromRate(data.ibs_mun_aliquota),
       cbs_aliquota: fromRate(data.cbs_aliquota),
+      seguro_responsavel: String(data.seguro_responsavel || 1),
+      seguradora_nome: data.seguradora_nome || '',
+      seguradora_cnpj: data.seguradora_cnpj ? formatCnpjCpf(data.seguradora_cnpj) : '',
+      seguro_apolice: data.seguro_apolice || '',
+      mdfe_tipo_carga: data.mdfe_tipo_carga || '04',
     });
   };
 
@@ -116,6 +122,11 @@ export default function FiscalSettingsPage() {
       ibs_uf_aliquota: toRate(form.ibs_uf_aliquota),
       ibs_mun_aliquota: toRate(form.ibs_mun_aliquota),
       cbs_aliquota: toRate(form.cbs_aliquota),
+      seguro_responsavel: Number(form.seguro_responsavel),
+      seguradora_nome: form.seguradora_nome.trim() || null,
+      seguradora_cnpj: form.seguradora_cnpj || null,
+      seguro_apolice: form.seguro_apolice.trim() || null,
+      mdfe_tipo_carga: form.mdfe_tipo_carga,
     };
     // Só manda o próximo número quando ele foi alterado na tela
     if (form.cte_proximo_numero && Number(form.cte_proximo_numero) !== Number(nextNumber)) {
@@ -191,7 +202,7 @@ export default function FiscalSettingsPage() {
         <PageHeader
           icon={FileCog}
           title="Configuração Fiscal"
-          subtitle="Emitente, certificado A1 e padrões do CT-e emitido pela Focus NFe"
+          subtitle="Emitente, certificado A1 e padrões do CT-e e do MDF-e emitidos pela Focus NFe"
           backTo="/fiscal/cte"
         />
 
@@ -314,6 +325,39 @@ export default function FiscalSettingsPage() {
           <p className="text-xs text-slate-500 dark:text-slate-400">
             CFOP, CST e alíquota dependem da operação e do estado: confirme com o contador antes de passar para Produção.
           </p>
+        </FormSection>
+
+        <FormSection title="MDF-e: seguro da carga e tipo de carga" icon={ShieldPlus}>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Padrões que já vêm preenchidos em cada MDF-e (o seguro da carga é obrigatório no transporte rodoviário).
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <Field label="Responsável pelo seguro">
+              <Select value={form.seguro_responsavel} onValueChange={(v) => set('seguro_responsavel', v)}>
+                <SelectTrigger data-testid="fiscal-seguro-resp"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SEGURO_RESPONSAVEL_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Seguradora">
+              <Input value={form.seguradora_nome} maxLength={30} onChange={(e) => set('seguradora_nome', e.target.value)} data-testid="fiscal-seguradora" />
+            </Field>
+            <Field label="CNPJ da seguradora">
+              <Input value={form.seguradora_cnpj} onChange={(e) => set('seguradora_cnpj', formatCnpjCpf(e.target.value))} className="font-mono" />
+            </Field>
+            <Field label="Apólice">
+              <Input value={form.seguro_apolice} maxLength={20} onChange={(e) => set('seguro_apolice', e.target.value)} />
+            </Field>
+            <Field label="Tipo de carga">
+              <Select value={form.mdfe_tipo_carga} onValueChange={(v) => set('mdfe_tipo_carga', v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TIPO_CARGA_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
         </FormSection>
 
         <FormSection title="Reforma Tributária (IBS/CBS)" icon={Landmark}>

@@ -4338,6 +4338,12 @@ class FiscalSettingsUpdate(BaseModel):
     ibs_uf_aliquota: Optional[float] = None
     ibs_mun_aliquota: Optional[float] = None
     cbs_aliquota: Optional[float] = None
+    # MDF-e: padrões do seguro da carga (obrigatório no rodoviário) e da carga
+    seguro_responsavel: Optional[int] = None  # 1 Emitente do MDF-e, 2 Contratante
+    seguradora_nome: Optional[str] = None
+    seguradora_cnpj: Optional[str] = None
+    seguro_apolice: Optional[str] = None
+    mdfe_tipo_carga: Optional[str] = None  # 04 Conteinerizada, 05 Carga Geral...
 
 
 class CteParty(BaseModel):
@@ -4410,3 +4416,92 @@ class CteCreate(BaseModel):
 
 class CteCancelRequest(BaseModel):
     justificativa: str
+
+
+# ==================== FISCAL - MDF-e (emissão via Focus NFe) ====================
+
+MDFE_STATUS_OPTIONS = ["RASCUNHO", "ENVIANDO", "PENDENTE", "AUTORIZADO", "REJEITADO", "DENEGADO", "ENCERRADO", "CANCELADO", "ERRO"]
+
+
+class MdfeUnloading(BaseModel):
+    """Município de descarregamento com as chaves de CT-e entregues nele."""
+    cidade: Optional[str] = None
+    uf: Optional[str] = None
+    codigo_municipio: Optional[str] = None
+    ctes: List[str] = []  # chaves de acesso (44 dígitos)
+
+
+class MdfeOwner(BaseModel):
+    """Proprietário do veículo quando não é do emitente (terceiro / TAC)."""
+    cnpj_cpf: Optional[str] = None
+    nome: Optional[str] = None
+    rntrc: Optional[str] = None
+    ie: Optional[str] = None
+    uf: Optional[str] = None
+    tipo: Optional[str] = None  # 0 TAC Agregado, 1 TAC Independente, 2 Outros
+
+
+class MdfeVehicle(BaseModel):
+    vehicle_id: Optional[str] = None
+    placa: Optional[str] = None
+    renavam: Optional[str] = None
+    tara: Optional[int] = None  # kg
+    capacidade_kg: Optional[int] = None
+    tipo_rodado: Optional[str] = None  # 01 Truck, 02 Toco, 03 Cavalo Mecânico, 04 VAN, 05 Utilitário, 06 Outros
+    tipo_carroceria: Optional[str] = None  # 00 Não aplicável, 01 Aberta, 02 Fechada/Baú, 03 Granelera, 04 Porta Container, 05 Sider
+    uf_licenciamento: Optional[str] = None
+    proprietario: Optional[MdfeOwner] = None
+
+
+class MdfeDriver(BaseModel):
+    driver_id: Optional[str] = None
+    nome: Optional[str] = None
+    cpf: Optional[str] = None
+
+
+class MdfeCiot(BaseModel):
+    numero: Optional[str] = None  # 12 dígitos
+    responsavel_cnpj_cpf: Optional[str] = None
+
+
+class MdfeContractor(BaseModel):
+    nome: Optional[str] = None
+    cnpj_cpf: Optional[str] = None
+
+
+class MdfeCreate(BaseModel):
+    cte_ids: List[str] = []  # CT-es do sistema que entraram neste manifesto
+    uf_inicio: Optional[str] = None
+    uf_fim: Optional[str] = None
+    municipios_carregamento: List[CtePlace] = []
+    percursos: List[str] = []  # UFs atravessadas entre início e fim
+    data_inicio_viagem: Optional[str] = None
+    descarregamentos: List[MdfeUnloading] = []
+    veiculo: Optional[MdfeVehicle] = None
+    reboques: List[MdfeVehicle] = []
+    condutores: List[MdfeDriver] = []
+    ciots: List[MdfeCiot] = []
+    contratantes: List[MdfeContractor] = []
+    seguro_responsavel: Optional[int] = None
+    seguro_responsavel_cnpj_cpf: Optional[str] = None
+    seguradora_nome: Optional[str] = None
+    seguradora_cnpj: Optional[str] = None
+    seguro_apolice: Optional[str] = None
+    averbacoes: List[str] = []
+    tipo_carga: Optional[str] = None
+    descricao_produto: Optional[str] = None
+    valor_total_carga: Optional[float] = None
+    unidade_peso: str = "01"  # 01 KG, 02 TON
+    peso_bruto: Optional[float] = None
+    observacoes: Optional[str] = None
+
+
+class MdfeCloseRequest(BaseModel):
+    data: Optional[str] = None  # AAAA-MM-DD (vazio = hoje)
+    cidade: str
+    uf: str
+
+
+class MdfeDriverRequest(BaseModel):
+    nome: str
+    cpf: str

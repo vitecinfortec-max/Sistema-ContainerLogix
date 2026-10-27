@@ -801,6 +801,18 @@ export const api = {
   cancelCte: (id, justificativa) => axios.post(`${API}/ctes/${id}/cancelar`, { justificativa }),
   getCtePDF: (id) => axios.get(`${API}/ctes/${id}/pdf`, { responseType: 'blob' }),
   getCteXML: (id) => axios.get(`${API}/ctes/${id}/xml`, { responseType: 'blob' }),
+  getMdfes: (params) => axios.get(`${API}/mdfes`, { params }),
+  getMdfeDraftFromCtes: (ids) => axios.get(`${API}/mdfes/from-ctes`, { params: { ids: ids.join(',') } }),
+  createMdfe: (data) => axios.post(`${API}/mdfes`, data),
+  updateMdfe: (id, data) => axios.put(`${API}/mdfes/${id}`, data),
+  deleteMdfe: (id) => axios.delete(`${API}/mdfes/${id}`),
+  emitMdfe: (id) => axios.post(`${API}/mdfes/${id}/emitir`),
+  refreshMdfe: (id) => axios.post(`${API}/mdfes/${id}/atualizar`),
+  closeMdfe: (id, data) => axios.post(`${API}/mdfes/${id}/encerrar`, data),
+  addMdfeDriver: (id, data) => axios.post(`${API}/mdfes/${id}/incluir-condutor`, data),
+  cancelMdfe: (id, justificativa) => axios.post(`${API}/mdfes/${id}/cancelar`, { justificativa }),
+  getMdfePDF: (id) => axios.get(`${API}/mdfes/${id}/pdf`, { responseType: 'blob' }),
+  getMdfeXML: (id) => axios.get(`${API}/mdfes/${id}/xml`, { responseType: 'blob' }),
 
   // Rota (Transporte)
   getFreightRoutes: () => axios.get(`${API}/freight-routes`),

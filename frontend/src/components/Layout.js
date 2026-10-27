@@ -128,6 +128,7 @@ const PAGE_TITLES = {
   '/estoque/relatorio': 'Relatórios do Estoque',
   '/loading-orders': 'Ordem de Carregamento',
   '/fiscal/cte': 'CT-e',
+  '/fiscal/mdfe': 'MDF-e',
   '/fiscal/configuracao': 'Configuração Fiscal',
   '/freight-routes': 'Rota',
   '/freight-payments': 'Pagamento Frete',
@@ -697,6 +698,7 @@ function LayoutFrame({ children }) {
     // Clientes do Sistema / Módulos Contratados) e restrito a administradores
     ...(isAdmin ? [
       { path: '/fiscal/cte', label: 'CT-e', icon: FileCheck, moduleKey: 'fiscal.cte' },
+      { path: '/fiscal/mdfe', label: 'MDF-e', icon: Truck, moduleKey: 'fiscal.mdfe' },
       { path: '/fiscal/configuracao', label: 'Configuração Fiscal', icon: FileCog, moduleKey: 'fiscal.configuracao' },
     ] : []),
   ].filter((item) => isModuleEnabled(item.moduleKey));

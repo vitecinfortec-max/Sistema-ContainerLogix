@@ -132,3 +132,27 @@ async def get_cte(ambiente: str, token: str, ref: str) -> dict:
 
 async def cancel_cte(ambiente: str, token: str, ref: str, justificativa: str) -> dict:
     return await request("DELETE", f"{base_url(ambiente)}/v2/cte/{ref}", token, json={"justificativa": justificativa})
+
+
+# ---------- MDF-e (token da empresa, servidor do ambiente) ----------
+
+async def emit_mdfe(ambiente: str, token: str, ref: str, payload: dict) -> dict:
+    return await request("POST", f"{base_url(ambiente)}/v2/mdfe", token, params={"ref": ref}, json=payload)
+
+
+async def get_mdfe(ambiente: str, token: str, ref: str) -> dict:
+    return await request("GET", f"{base_url(ambiente)}/v2/mdfe/{ref}", token)
+
+
+async def cancel_mdfe(ambiente: str, token: str, ref: str, justificativa: str) -> dict:
+    return await request("DELETE", f"{base_url(ambiente)}/v2/mdfe/{ref}", token, json={"justificativa": justificativa})
+
+
+async def close_mdfe(ambiente: str, token: str, ref: str, data: str, uf: str, municipio: str) -> dict:
+    return await request("POST", f"{base_url(ambiente)}/v2/mdfe/{ref}/encerrar", token,
+                         json={"data": data, "sigla_uf": uf, "nome_municipio": municipio})
+
+
+async def add_driver_mdfe(ambiente: str, token: str, ref: str, nome: str, cpf: str) -> dict:
+    return await request("POST", f"{base_url(ambiente)}/v2/mdfe/{ref}/inclusao_condutor", token,
+                         json={"nome": nome, "cpf": cpf})

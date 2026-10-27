@@ -563,8 +563,9 @@ MODULE_CATALOG = [
         {"key": "gestao_container.representante", "label": "Cadastro de Representantes"},
         {"key": "gestao_container.venda", "label": "Registro de Venda"},
     ]},
-    {"key": "fiscal", "label": "Fiscal (CT-e) - sob contratação", "items": [
+    {"key": "fiscal", "label": "Fiscal (CT-e/MDF-e) - sob contratação", "items": [
         {"key": "fiscal.cte", "label": "CT-e"},
+        {"key": "fiscal.mdfe", "label": "MDF-e"},
         {"key": "fiscal.configuracao", "label": "Configuração Fiscal"},
     ]},
 ]
@@ -668,6 +669,7 @@ PATH_MODULE_MAP = [
     ("/api/reports/hr", "rh.relatorios"),
     ("/api/hr/", "rh"),
     ("/api/ctes", "fiscal.cte"),
+    ("/api/mdfes", "fiscal.mdfe"),
     ("/api/fiscal", "fiscal"),
 ]
 

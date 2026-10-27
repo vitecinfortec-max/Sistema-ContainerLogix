@@ -26,7 +26,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import {
   Ban, CheckCircle2, Clock, FileCheck, FileCode, FileCog, Loader2, PackageCheck, Pencil, Plus, Printer, RefreshCw,
-  Save, Send, Trash2, X, XCircle,
+  Save, Send, Trash2, Truck, X, XCircle,
 } from 'lucide-react';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -393,6 +393,9 @@ export default function CtePage() {
   const selected = selectedIds.size === 1 ? list.find((c) => c.id === [...selectedIds][0]) : null;
   const isEditable = selected && CTE_EDITABLE.includes(selected.status);
   const isDone = selected && ['AUTORIZADO', 'CANCELADO'].includes(selected.status);
+  // MDF-e: um ou mais CT-es autorizados da mesma viagem
+  const selectedDocs = list.filter((c) => selectedIds.has(c.id));
+  const canManifest = selectedDocs.length > 0 && selectedDocs.every((c) => c.status === 'AUTORIZADO');
   const count = (statuses) => filtered.filter((c) => statuses.includes(c.status)).length;
   const hasFilters = !!(search || statusFilter);
   const editingDoc = editingId ? list.find((c) => c.id === editingId) : null;
@@ -461,6 +464,7 @@ export default function CtePage() {
               <ToolbarButton icon={RefreshCw} label="Atualizar situação" tone="slate" onClick={() => refresh(selected)} disabled={!selected?.provider_id || !!busy} testId="cte-refresh-btn" />
               <ToolbarButton icon={Printer} label="DACTE" tone="emerald" onClick={() => download(selected, 'pdf')} disabled={!isDone || !!busy} testId="cte-pdf-btn" />
               <ToolbarButton icon={FileCode} label="XML" tone="slate" onClick={() => download(selected, 'xml')} disabled={!isDone || !!busy} testId="cte-xml-btn" />
+              <ToolbarButton icon={Truck} label="Gerar MDF-e" tone="violet" onClick={() => navigate(`/fiscal/mdfe?ctes=${selectedDocs.map((c) => c.id).join(',')}`)} disabled={!canManifest} testId="cte-mdfe-btn" />
               <ToolbarButton icon={Ban} label="Cancelar CT-e" tone="red" onClick={() => setCancelOpen(true)} disabled={selected?.status !== 'AUTORIZADO'} testId="cte-cancel-btn" />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => remove(selected)} disabled={!isEditable} testId="cte-delete-btn" />
             </Toolbar>
@@ -512,6 +516,7 @@ export default function CtePage() {
                           {CTE_STATUS_LABELS[c.status] || c.status}
                         </StatusPill>
                         {c.ambiente === 'homologacao' && <span className="ml-1 text-[10px] text-slate-400 uppercase">homolog.</span>}
+                        {c.mdfe_numero && <div className="text-[11px] text-slate-500">MDF-e nº {c.mdfe_numero}</div>}
                       </td>
                       <td className="tabular-nums">{c.loading_order_number ? `#${c.loading_order_number}` : '-'}</td>
                       <td className="whitespace-nowrap tabular-nums">{c.created_at ? format(new Date(c.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>

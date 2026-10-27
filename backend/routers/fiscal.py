@@ -17,6 +17,7 @@ from fastapi.responses import Response
 
 import fiscal_cte
 import fiscal_focus
+import fiscal_mdfe
 from fiscal_focus import FiscalProviderError
 from models import CteCancelRequest, CteCreate, FiscalSettingsUpdate
 from shared import ROOT_DIR, db, get_current_admin_user
@@ -152,9 +153,15 @@ async def update_fiscal_settings(data: FiscalSettingsUpdate, current_user: dict 
     for field in ("icms_aliquota", "ibs_uf_aliquota", "ibs_mun_aliquota", "cbs_aliquota"):
         if update.get(field) is not None and not (0 <= update[field] <= 100):
             raise HTTPException(status_code=400, detail="Alíquotas devem estar entre 0 e 100")
-    for field in ("ibs_cbs_cst", "ibs_cbs_classificacao"):
+    for field in ("ibs_cbs_cst", "ibs_cbs_classificacao", "seguradora_cnpj"):
         if field in update:
             update[field] = fiscal_cte.only_digits(update[field]) or None
+    if update.get("seguro_responsavel") is not None and update["seguro_responsavel"] not in (1, 2):
+        raise HTTPException(status_code=400, detail="Responsável pelo seguro inválido")
+    if update.get("seguradora_cnpj") and len(update["seguradora_cnpj"]) != 14:
+        raise HTTPException(status_code=400, detail="CNPJ da seguradora inválido")
+    if update.get("mdfe_tipo_carga") is not None and update["mdfe_tipo_carga"] not in fiscal_mdfe.TIPO_CARGA:
+        raise HTTPException(status_code=400, detail="Tipo de carga inválido")
     settings = {**await get_fiscal_settings(), **update}
     if proximo is not None:
         if proximo < 1 or proximo > 999999999:
@@ -190,6 +197,8 @@ def _company_payload(settings: dict) -> dict:
         "habilita_mdfe": True,
         "serie_cte_homologacao": serie,
         "serie_cte_producao": serie,
+        "serie_mdfe_homologacao": serie,
+        "serie_mdfe_producao": serie,
     }
     if endereco.get("complemento"):
         payload["complemento"] = endereco["complemento"]

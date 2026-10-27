@@ -128,6 +128,7 @@ const FuelSupplyOrderPage = lazyPage(() => import('./pages/FuelSupplyOrderPage')
 const LoadingOrderPage = lazyPage(() => import('./pages/LoadingOrderPage'));
 const CtePage = lazyPage(() => import('./pages/CtePage'));
 const FiscalSettingsPage = lazyPage(() => import('./pages/FiscalSettingsPage'));
+const MdfePage = lazyPage(() => import('./pages/MdfePage'));
 const FreightRoutesPage = lazyPage(() => import('./pages/FreightRoutesPage'));
 const FreightPaymentsPage = lazyPage(() => import('./pages/FreightPaymentsPage'));
 const ContainerRepresentativesPage = lazyPage(() => import('./pages/ContainerRepresentativesPage'));
@@ -411,6 +412,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="fiscal.cte">
                 <CtePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fiscal/mdfe"
+            element={
+              <ProtectedRoute adminOnly moduleKey="fiscal.mdfe">
+                <MdfePage />
               </ProtectedRoute>
             }
           />

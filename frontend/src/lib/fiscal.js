@@ -81,6 +81,27 @@ export const CTE_STATUS_TONES = {
 };
 export const CTE_EDITABLE = ['RASCUNHO', 'REJEITADO', 'ERRO'];
 
+// MDF-e
+export const MDFE_STATUS_LABELS = { ...CTE_STATUS_LABELS, ENCERRADO: 'Encerrado' };
+export const MDFE_STATUS_TONES = { ...CTE_STATUS_TONES, ENCERRADO: 'blue' };
+
+export const TIPO_RODADO_OPTIONS = [
+  ['03', 'Cavalo mecânico'], ['01', 'Truck'], ['02', 'Toco'], ['04', 'VAN'], ['05', 'Utilitário'], ['06', 'Outros'],
+];
+export const TIPO_CARROCERIA_OPTIONS = [
+  ['00', 'Não aplicável'], ['04', 'Porta container'], ['01', 'Aberta'], ['02', 'Fechada/Baú'], ['03', 'Graneleira'], ['05', 'Sider'],
+];
+export const TIPO_CARGA_OPTIONS = [
+  ['04', '04 - Conteinerizada'], ['05', '05 - Carga geral'], ['01', '01 - Granel sólido'], ['02', '02 - Granel líquido'],
+  ['03', '03 - Frigorificada'], ['06', '06 - Neogranel'], ['07', '07 - Perigosa (granel sólido)'],
+  ['08', '08 - Perigosa (granel líquido)'], ['09', '09 - Perigosa (frigorificada)'], ['10', '10 - Perigosa (conteinerizada)'],
+  ['11', '11 - Perigosa (carga geral)'],
+];
+export const TIPO_PROPRIETARIO_OPTIONS = [['1', 'TAC - Independente'], ['0', 'TAC - Agregado'], ['2', 'Outros']];
+export const SEGURO_RESPONSAVEL_OPTIONS = [['1', 'Emitente do MDF-e'], ['2', 'Contratante do transporte']];
+export const UF_LIST = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR',
+  'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
+
 /** Endereço fiscal -> formato do AddressFields. */
 export function toAddressFields(endereco) {
   const e = endereco || {};
