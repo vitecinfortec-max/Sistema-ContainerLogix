@@ -14,6 +14,8 @@ import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
+import { QuickAddButton } from '../components/QuickCreate';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -78,6 +80,8 @@ function buildEmpty() {
 
 export default function LoadingOrderPage() {
   const { confirm, ConfirmDialog } = useConfirm();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -248,6 +252,18 @@ export default function LoadingOrderPage() {
       truck_plate: d.default_truck_plate || p.truck_plate,
       trailer_plate: d.default_trailer_plate || p.trailer_plate,
     }));
+  };
+
+  // Cadastro rápido (o "+" ao lado do campo): entra na lista e já fica
+  // selecionado no formulário
+  const appendTo = (setter) => (record) => setter((prev) => [...prev, record]);
+  const onRouteCreated = (route) => {
+    appendTo(setFreightRoutes)(route);
+    setForm((p) => ({ ...p, route_id: route.id, route_name: `${route.origin} x ${route.destination}`, freight_value: route.freight_value }));
+  };
+  const onVehicleCreated = (field) => (vehicle) => {
+    appendTo(setVehicles)(vehicle);
+    onChange(field, vehicle.plate);
   };
 
   const addContainerItem = () => {
@@ -540,14 +556,20 @@ export default function LoadingOrderPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="mb-1.5 block">Terminal de Origem</Label>
-                <Autocomplete
-                  value={form.origin_terminal}
-                  onChange={(v) => onChange('origin_terminal', v)}
-                  onSelect={(t) => onChange('origin_terminal', t.name)}
-                  options={terminals}
-                  displayField="name"
-                  className="h-9 text-sm"
-                />
+                <div className="flex gap-1.5">
+                  <div className="flex-1 min-w-0">
+                    <Autocomplete
+                      value={form.origin_terminal}
+                      onChange={(v) => onChange('origin_terminal', v)}
+                      onSelect={(t) => onChange('origin_terminal', t.name)}
+                      options={terminals}
+                      displayField="name"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <QuickAddButton kind="terminal" initial={{ name: form.origin_terminal }}
+                    onCreated={(t) => { appendTo(setTerminals)(t); onChange('origin_terminal', t.name); }} />
+                </div>
               </div>
               <Field label="Destino" value={form.port} onChange={(v) => onChange('port', v)} testid="loading-order-port" />
             </div>
@@ -558,19 +580,24 @@ export default function LoadingOrderPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="mb-1.5 block">Rota</Label>
-                    <Select value={form.route_id || '_empty'} onValueChange={(v) => onSelectRoute(v === '_empty' ? '' : v)}>
-                      <SelectTrigger className="h-9 text-sm" data-testid="loading-order-route"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="_empty">-</SelectItem>
-                        {freightRoutes
-                          .filter((r) => r.status === 'ATIVO' || r.id === form.route_id)
-                          .map((r) => (
-                            <SelectItem key={r.id} value={r.id}>{r.origin} x {r.destination}</SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-1.5">
+                      <Select value={form.route_id || '_empty'} onValueChange={(v) => onSelectRoute(v === '_empty' ? '' : v)}>
+                        <SelectTrigger className="h-9 text-sm flex-1 min-w-0" data-testid="loading-order-route"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_empty">-</SelectItem>
+                          {freightRoutes
+                            .filter((r) => r.status === 'ATIVO' || r.id === form.route_id)
+                            .map((r) => (
+                              <SelectItem key={r.id} value={r.id}>{r.origin} x {r.destination}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      {isAdmin && <QuickAddButton kind="route" onCreated={onRouteCreated} />}
+                    </div>
                     {freightRoutes.length === 0 && (
-                      <p className="text-xs text-amber-600 mt-1">Nenhuma rota cadastrada. Vá em "Transporte &gt; Rota" para adicionar.</p>
+                      <p className="text-xs text-amber-600 mt-1">
+                        {isAdmin ? 'Nenhuma rota cadastrada. Use o + para cadastrar.' : 'Nenhuma rota cadastrada. Peça ao administrador para cadastrar em "Transporte > Rota".'}
+                      </p>
                     )}
                   </div>
                   <div>
@@ -593,16 +620,22 @@ export default function LoadingOrderPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="mb-1.5 block">Representante</Label>
-                    <Autocomplete
-                      value={form.representative_name}
-                      onChange={(v) => setForm((p) => ({ ...p, representative_name: v, representative_id: '' }))}
-                      onSelect={(r) => setForm((p) => ({ ...p, representative_id: r.id, representative_name: r.name }))}
-                      options={representatives.filter((r) => r.status !== 'INATIVO')}
-                      displayField="name"
-                      className="h-9 text-sm"
-                    />
+                    <div className="flex gap-1.5">
+                      <div className="flex-1 min-w-0">
+                        <Autocomplete
+                          value={form.representative_name}
+                          onChange={(v) => setForm((p) => ({ ...p, representative_name: v, representative_id: '' }))}
+                          onSelect={(r) => setForm((p) => ({ ...p, representative_id: r.id, representative_name: r.name }))}
+                          options={representatives.filter((r) => r.status !== 'INATIVO')}
+                          displayField="name"
+                          className="h-9 text-sm"
+                        />
+                      </div>
+                      <QuickAddButton kind="representative" initial={{ name: form.representative_name }}
+                        onCreated={(r) => { appendTo(setRepresentatives)(r); setForm((p) => ({ ...p, representative_id: r.id, representative_name: r.name })); }} />
+                    </div>
                     {representatives.length === 0 && (
-                      <p className="text-xs text-amber-600 mt-1">Nenhum representante cadastrado. Vá em "Gestão de Container &gt; Cadastro de Representantes" para adicionar.</p>
+                      <p className="text-xs text-amber-600 mt-1">Nenhum representante cadastrado. Use o + para cadastrar.</p>
                     )}
                   </div>
                 </div>
@@ -627,16 +660,22 @@ export default function LoadingOrderPage() {
               ) : (
                 <Field label="Booking/Ref." value={form.booking} onChange={(v) => onChange('booking', v)} testid="loading-order-booking" />
               )}
-              <div>
+              <div className="col-span-2">
                 <Label className="mb-1.5 block">Cliente</Label>
-                <Autocomplete
-                  value={form.client_name}
-                  onChange={(v) => onChange('client_name', v)}
-                  onSelect={(c) => onChange('client_name', c.name)}
-                  options={clients}
-                  displayField="name"
-                  className="h-9 text-sm"
-                />
+                <div className="flex gap-1.5">
+                  <div className="flex-1 min-w-0">
+                    <Autocomplete
+                      value={form.client_name}
+                      onChange={(v) => onChange('client_name', v)}
+                      onSelect={(c) => onChange('client_name', c.name)}
+                      options={clients}
+                      displayField="name"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <QuickAddButton kind="client" initial={{ name: form.client_name }}
+                    onCreated={(c) => { appendTo(setClients)(c); onChange('client_name', c.name); }} />
+                </div>
               </div>
             </div>
 
@@ -650,7 +689,7 @@ export default function LoadingOrderPage() {
               {form.items.map((it, idx) => (
                 <div key={idx} className="flex flex-col gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
                   <div className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-4">
+                    <div className="col-span-3">
                       <Label className="mb-1.5 block">ID do Container <span className="text-destructive">*</span></Label>
                       <Input
                         value={it.container_number}
@@ -660,7 +699,7 @@ export default function LoadingOrderPage() {
                         data-testid={`loading-order-item-container-${idx}`}
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <Label className="mb-1.5 block">Status</Label>
                       <Select value={it.status || 'CHEIO'} onValueChange={(v) => updateContainerItem(idx, 'status', v)}>
                         <SelectTrigger className="h-8 text-sm" data-testid={`loading-order-item-status-${idx}`}><SelectValue /></SelectTrigger>
@@ -679,10 +718,11 @@ export default function LoadingOrderPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-4">
                       <Label className="mb-1.5 block">Armador</Label>
+                      <div className="flex gap-1.5">
                       <Select value={it.shipping_line || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'shipping_line', v === '_empty' ? '' : v)}>
-                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 text-sm flex-1 min-w-0" data-testid={`loading-order-item-line-${idx}`}><SelectValue /></SelectTrigger>
                         <SelectContent className="max-h-80 overflow-y-auto">
                           <SelectItem value="_empty">-</SelectItem>
                           {it.shipping_line && !shippingLines.some((l) => l.name === it.shipping_line) && (
@@ -691,6 +731,9 @@ export default function LoadingOrderPage() {
                           {shippingLines.map((line) => <SelectItem key={line.id} value={line.name}>{line.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
+                      <QuickAddButton kind="shipping_line" size="sm" testId={`quick-add-shipping-line-${idx}`}
+                        onCreated={(line) => { appendTo(setShippingLines)(line); updateContainerItem(idx, 'shipping_line', line.name); }} />
+                      </div>
                     </div>
                   </div>
                   <div className="grid grid-cols-12 gap-2 items-end">
@@ -721,56 +764,80 @@ export default function LoadingOrderPage() {
               ))}
             </div>
             {shippingLines.length === 0 && (
-              <p className="text-xs text-amber-600 -mt-1">Nenhum armador cadastrado. Vá em "Cadastro" para adicionar.</p>
+              <p className="text-xs text-amber-600 -mt-1">Nenhum armador cadastrado. Use o + ao lado do campo Armador para cadastrar.</p>
             )}
 
             <SectionTitle>Dados do Transporte (Transportador/Motorista)</SectionTitle>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="mb-1.5 block">Motorista <span className="text-destructive">*</span></Label>
-                <Autocomplete
-                  value={form.driver_name}
-                  onChange={(v) => onChange('driver_name', v)}
-                  onSelect={onSelectDriver}
-                  options={drivers}
-                  displayField="name"
-                  className="h-9 text-sm"
-                />
+                <div className="flex gap-1.5">
+                  <div className="flex-1 min-w-0">
+                    <Autocomplete
+                      value={form.driver_name}
+                      onChange={(v) => onChange('driver_name', v)}
+                      onSelect={onSelectDriver}
+                      options={drivers}
+                      displayField="name"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <QuickAddButton kind="driver" initial={{ name: form.driver_name, cpf: form.driver_cpf }}
+                    onCreated={(d) => { appendTo(setDrivers)(d); onSelectDriver(d); }} />
+                </div>
               </div>
               <Field label="CPF" value={form.driver_cpf} onChange={(v) => onChange('driver_cpf', v)} testid="loading-order-cpf" />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <Label className="mb-1.5 block">Transportadora Contratada</Label>
-                <Autocomplete
-                  value={form.transport_company}
-                  onChange={(v) => onChange('transport_company', v)}
-                  options={companies}
-                  displayField="name"
-                  className="h-9 text-sm"
-                />
+                <div className="flex gap-1.5">
+                  <div className="flex-1 min-w-0">
+                    <Autocomplete
+                      value={form.transport_company}
+                      onChange={(v) => onChange('transport_company', v)}
+                      options={companies}
+                      displayField="name"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <QuickAddButton kind="company" initial={{ name: form.transport_company }}
+                    onCreated={(c) => { appendTo(setCompanies)(c); onChange('transport_company', c.name); }} />
+                </div>
               </div>
               <div>
                 <Label className="mb-1.5 block">Placa do Cavalo</Label>
-                <Autocomplete
-                  value={form.truck_plate}
-                  onChange={(v) => onChange('truck_plate', v.toUpperCase())}
-                  onSelect={(v) => onChange('truck_plate', v.plate)}
-                  options={vehicles}
-                  displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                  className="h-9 text-sm font-mono"
-                />
+                <div className="flex gap-1.5">
+                  <div className="flex-1 min-w-0">
+                    <Autocomplete
+                      value={form.truck_plate}
+                      onChange={(v) => onChange('truck_plate', v.toUpperCase())}
+                      onSelect={(v) => onChange('truck_plate', v.plate)}
+                      options={vehicles}
+                      displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                      className="h-9 text-sm font-mono"
+                    />
+                  </div>
+                  <QuickAddButton kind="vehicle" testId="quick-add-truck-plate" initial={{ plate: form.truck_plate, vehicle_type: 'CAVALO' }}
+                    onCreated={onVehicleCreated('truck_plate')} />
+                </div>
               </div>
               <div>
                 <Label className="mb-1.5 block">Placa da Carreta</Label>
-                <Autocomplete
-                  value={form.trailer_plate}
-                  onChange={(v) => onChange('trailer_plate', v.toUpperCase())}
-                  onSelect={(v) => onChange('trailer_plate', v.plate)}
-                  options={vehicles}
-                  displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                  className="h-9 text-sm font-mono"
-                />
+                <div className="flex gap-1.5">
+                  <div className="flex-1 min-w-0">
+                    <Autocomplete
+                      value={form.trailer_plate}
+                      onChange={(v) => onChange('trailer_plate', v.toUpperCase())}
+                      onSelect={(v) => onChange('trailer_plate', v.plate)}
+                      options={vehicles}
+                      displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                      className="h-9 text-sm font-mono"
+                    />
+                  </div>
+                  <QuickAddButton kind="vehicle" testId="quick-add-trailer-plate" initial={{ plate: form.trailer_plate, vehicle_type: 'CARRETA' }}
+                    onCreated={onVehicleCreated('trailer_plate')} />
+                </div>
               </div>
             </div>
 
