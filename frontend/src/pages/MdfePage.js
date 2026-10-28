@@ -10,6 +10,7 @@ import {
 import { Field, IssueSection } from '../components/FormKit';
 import { CityStateFields } from '../components/AddressFields';
 import { Autocomplete } from '../components/Autocomplete';
+import { WithQuickAdd } from '../components/QuickCreate';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
@@ -290,7 +291,7 @@ function RowRemove({ onClick }) {
 }
 
 /** Veículo de tração ou reboque: escolhe do Cadastro de Veículo (que preenche o resto) ou digita. */
-function VehicleFields({ value, onChange, vehicles, registry, onPicked, trailer = false, testId }) {
+function VehicleFields({ value, onChange, vehicles, registry, onPicked, onVehicleCreated, trailer = false, testId }) {
   const v = value;
   const set = (field, val) => onChange({ ...v, [field]: val });
   const setOwner = (field, val) => onChange({ ...v, proprietario: { ...v.proprietario, [field]: val } });
@@ -301,15 +302,19 @@ function VehicleFields({ value, onChange, vehicles, registry, onPicked, trailer 
   return (
     <div className="space-y-3" data-testid={testId}>
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-        <Field label="Placa" required>
-          <Autocomplete
-            value={v.placa || ''}
-            onChange={(text) => onChange({ ...v, placa: text.toUpperCase(), vehicle_id: null })}
-            options={vehicles}
-            displayField={(o) => `${o.plate}${o.model ? ` · ${o.model}` : ''}`}
-            onSelect={pick}
-            testId={testId ? `${testId}-placa` : undefined}
-          />
+        <Field label="Placa" required className="col-span-2 md:col-span-2">
+          <WithQuickAdd kind="vehicle" testId={testId ? `${testId}-quick-add` : undefined}
+            initial={{ plate: v.placa, vehicle_type: trailer ? 'CARRETA' : 'CAVALO' }}
+            onCreated={(vehicle) => { if (onVehicleCreated) onVehicleCreated(vehicle); pick(vehicle); }}>
+            <Autocomplete
+              value={v.placa || ''}
+              onChange={(text) => onChange({ ...v, placa: text.toUpperCase(), vehicle_id: null })}
+              options={vehicles}
+              displayField={(o) => `${o.plate}${o.model ? ` · ${o.model}` : ''}`}
+              onSelect={pick}
+              testId={testId ? `${testId}-placa` : undefined}
+            />
+          </WithQuickAdd>
         </Field>
         <Field label="RENAVAM">
           <Input value={v.renavam || ''} onChange={(e) => set('renavam', onlyDigits(e.target.value).slice(0, 11))} className="font-mono" />
@@ -373,6 +378,9 @@ export default function MdfePage() {
   const [settings, setSettings] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
+  // Cadastro rápido (o "+" ao lado do campo): entra na lista da tela
+  const addVehicle = (vehicle) => setVehicles((prev) => [...prev, vehicle]);
+  const addDriver = (driver) => setDrivers((prev) => [...prev, driver]);
   const [companies, setCompanies] = useState([]);
   const [registryReady, setRegistryReady] = useState(false);
   const [authorizedCtes, setAuthorizedCtes] = useState([]);
@@ -871,8 +879,11 @@ export default function MdfePage() {
           <DialogHeader><DialogTitle className="flex items-center gap-2 text-base"><UserPlus className="w-5 h-5 text-primary" /> Incluir condutor no MDF-e nº {selected?.numero}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Field label="Nome" required className="md:col-span-2">
-              <Autocomplete value={driverForm.nome} onChange={(t) => setDriverForm((p) => ({ ...p, nome: t }))} options={drivers}
-                displayField={(d) => d.name} onSelect={(d) => setDriverForm({ nome: d.name, cpf: formatCnpjCpf(d.cpf || '') })} />
+              <WithQuickAdd kind="driver" testId="mdfe-driver-dialog-quick-add" initial={{ name: driverForm.nome, cpf: driverForm.cpf }}
+                onCreated={(d) => { addDriver(d); setDriverForm({ nome: d.name, cpf: formatCnpjCpf(d.cpf || '') }); }}>
+                <Autocomplete value={driverForm.nome} onChange={(t) => setDriverForm((p) => ({ ...p, nome: t }))} options={drivers}
+                  displayField={(d) => d.name} onSelect={(d) => setDriverForm({ nome: d.name, cpf: formatCnpjCpf(d.cpf || '') })} />
+              </WithQuickAdd>
             </Field>
             <Field label="CPF" required>
               <Input value={driverForm.cpf} onChange={(e) => setDriverForm((p) => ({ ...p, cpf: formatCnpjCpf(e.target.value).slice(0, 14) }))} className="font-mono" />
@@ -1071,10 +1082,13 @@ export default function MdfePage() {
                   {form.condutores.map((c, i) => (
                     <div key={i} className="flex gap-2 items-end">
                       <Field label={i === 0 ? 'Motorista (condutor)' : undefined} required={i === 0} className="flex-1">
-                        <Autocomplete value={c.nome || ''} onChange={(t) => setRow('condutores', i, { nome: t, driver_id: null })} options={drivers}
-                          displayField={(d) => d.name}
-                          onSelect={(d) => { setRow('condutores', i, { driver_id: d.id, nome: d.name, cpf: formatCnpjCpf(d.cpf || '') }); suggestFromDriver(d); }}
-                          testId={`mdfe-condutor-${i}`} />
+                        <WithQuickAdd kind="driver" testId={`mdfe-condutor-${i}-quick-add`} initial={{ name: c.nome, cpf: c.cpf }}
+                          onCreated={(d) => { addDriver(d); setRow('condutores', i, { driver_id: d.id, nome: d.name, cpf: formatCnpjCpf(d.cpf || '') }); suggestFromDriver(d); }}>
+                          <Autocomplete value={c.nome || ''} onChange={(t) => setRow('condutores', i, { nome: t, driver_id: null })} options={drivers}
+                            displayField={(d) => d.name}
+                            onSelect={(d) => { setRow('condutores', i, { driver_id: d.id, nome: d.name, cpf: formatCnpjCpf(d.cpf || '') }); suggestFromDriver(d); }}
+                            testId={`mdfe-condutor-${i}`} />
+                        </WithQuickAdd>
                       </Field>
                       <Field label={i === 0 ? 'CPF' : undefined} required={i === 0} className="w-44">
                         <Input value={c.cpf || ''} onChange={(e) => setRow('condutores', i, { cpf: formatCnpjCpf(e.target.value).slice(0, 14) })} className="font-mono" />
@@ -1084,12 +1098,12 @@ export default function MdfePage() {
                   ))}
                   <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2">
                     <p className="text-xs font-semibold text-slate-500">Veículo principal (tração)</p>
-                    <VehicleFields value={form.veiculo} onChange={(v) => set('veiculo', v)} vehicles={vehicles} registry={registry} onPicked={suggestFromTraction} testId="mdfe-veiculo" />
+                    <VehicleFields value={form.veiculo} onChange={(v) => set('veiculo', v)} vehicles={vehicles} registry={registry} onPicked={suggestFromTraction} onVehicleCreated={addVehicle} testId="mdfe-veiculo" />
                   </div>
                   {form.reboques.map((r, i) => (
                     <div key={i} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2">
                       <div className="flex justify-between items-center"><span className="text-xs font-semibold text-slate-500">Vinculado 0{i + 1} (reboque)</span><RowRemove onClick={() => removeRow('reboques', i)} /></div>
-                      <VehicleFields value={r} onChange={(v) => setRow('reboques', i, v)} vehicles={vehicles} registry={registry} trailer testId={`mdfe-reboque-${i}`} />
+                      <VehicleFields value={r} onChange={(v) => setRow('reboques', i, v)} vehicles={vehicles} registry={registry} onVehicleCreated={addVehicle} trailer testId={`mdfe-reboque-${i}`} />
                     </div>
                   ))}
                 </Section>

@@ -14,6 +14,7 @@ import { Badge } from '../components/ui/badge';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
+import { WithQuickAdd } from '../components/QuickCreate';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
@@ -436,14 +437,17 @@ export default function FuelSupplyOrderPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="mb-1.5 block">Empresa</Label>
-                <Autocomplete
-                  value={form.company_name}
-                  onChange={(v) => onChange('company_name', v)}
-                  onSelect={(c) => { onChange('company_name', c.name); onChange('company_id', c.id); }}
-                  options={companies}
-                  displayField="name"
-                  className="text-sm"
-                />
+                <WithQuickAdd kind="company" testId="fuel-order-company-quick-add" initial={{ name: form.company_name }}
+                  onCreated={(c) => { setCompanies((prev) => [...prev, c]); onChange('company_name', c.name); onChange('company_id', c.id); }}>
+                  <Autocomplete
+                    value={form.company_name}
+                    onChange={(v) => onChange('company_name', v)}
+                    onSelect={(c) => { onChange('company_name', c.name); onChange('company_id', c.id); }}
+                    options={companies}
+                    displayField="name"
+                    className="text-sm"
+                  />
+                </WithQuickAdd>
               </div>
               <Field label="Solicitante" value={form.requester} onChange={(v) => onChange('requester', v)} testid="fuel-order-requester" />
             </div>
@@ -451,28 +455,34 @@ export default function FuelSupplyOrderPage() {
               <Field type="date" label="Data *" value={form.order_date} onChange={(v) => onChange('order_date', v)} testid="fuel-order-date" />
               <div>
                 <Label className="mb-1.5 block">Equipamento <span className="text-destructive">*</span></Label>
-                <Autocomplete
-                  value={form.equipment_plate}
-                  onChange={(v) => onChange('equipment_plate', v)}
-                  onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
-                  options={vehicles}
-                  displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                  className="text-sm font-mono"
-                />
+                <WithQuickAdd kind="vehicle" testId="fuel-order-equipment-quick-add" initial={{ plate: form.equipment_plate }}
+                  onCreated={(vh) => { setVehicles((prev) => [...prev, vh]); onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}>
+                  <Autocomplete
+                    value={form.equipment_plate}
+                    onChange={(v) => onChange('equipment_plate', v)}
+                    onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
+                    options={vehicles}
+                    displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                    className="text-sm font-mono"
+                  />
+                </WithQuickAdd>
               </div>
               <Field type="number" min="0" label="KM" value={form.reading} onChange={(v) => onChange('reading', v)} testid="fuel-order-reading" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="mb-1.5 block">Fornecedor</Label>
-                <Autocomplete
-                  value={form.supplier_name}
-                  onChange={(v) => onChange('supplier_name', v)}
-                  onSelect={(sp) => { onChange('supplier_name', sp.name); onChange('supplier_id', sp.id); }}
-                  options={suppliers}
-                  displayField="name"
-                  className="text-sm"
-                />
+                <WithQuickAdd kind="supplier" testId="fuel-order-supplier-quick-add" initial={{ name: form.supplier_name }}
+                  onCreated={(sp) => { setSuppliers((prev) => [...prev, sp]); onChange('supplier_name', sp.name); onChange('supplier_id', sp.id); }}>
+                  <Autocomplete
+                    value={form.supplier_name}
+                    onChange={(v) => onChange('supplier_name', v)}
+                    onSelect={(sp) => { onChange('supplier_name', sp.name); onChange('supplier_id', sp.id); }}
+                    options={suppliers}
+                    displayField="name"
+                    className="text-sm"
+                  />
+                </WithQuickAdd>
               </div>
               <div>
                 <Label className="mb-1.5 block">Produto <span className="text-destructive">*</span></Label>

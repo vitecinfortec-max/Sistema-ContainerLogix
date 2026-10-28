@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '../components/ui/select';
 import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
+import { WithQuickAdd } from '../components/QuickCreate';
 import { CityStateFields } from '../components/AddressFields';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
@@ -441,28 +442,43 @@ export default function OrdemServicoPage() {
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Equipamento (Placa)</Label>
-                  <Autocomplete
-                    value={form.equipment_plate}
-                    onChange={(v) => onChange('equipment_plate', v)}
-                    onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
-                    options={vehicles}
-                    displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                    className="h-9 text-sm font-mono"
-                  />
+                  <WithQuickAdd kind="vehicle" testId="os-equipment-quick-add" initial={{ plate: form.equipment_plate }}
+                    onCreated={(vh) => { setVehicles((prev) => [...prev, vh]); onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}>
+                    <Autocomplete
+                      value={form.equipment_plate}
+                      onChange={(v) => onChange('equipment_plate', v)}
+                      onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
+                      options={vehicles}
+                      displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                      className="h-9 text-sm font-mono"
+                    />
+                  </WithQuickAdd>
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Apropriação (Equip. Agregador)</Label>
-                  <Autocomplete
-                    value={form.appropriation_plate}
-                    onChange={(v) => onChange('appropriation_plate', v)}
-                    onSelect={(vh) => { onChange('appropriation_plate', vh.plate); onChange('appropriation_id', vh.id); }}
-                    options={vehicles}
-                    displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                    className="h-9 text-sm font-mono"
-                  />
+                  <WithQuickAdd kind="vehicle" testId="os-appropriation-quick-add" initial={{ plate: form.appropriation_plate }}
+                    onCreated={(vh) => { setVehicles((prev) => [...prev, vh]); onChange('appropriation_plate', vh.plate); onChange('appropriation_id', vh.id); }}>
+                    <Autocomplete
+                      value={form.appropriation_plate}
+                      onChange={(v) => onChange('appropriation_plate', v)}
+                      onSelect={(vh) => { onChange('appropriation_plate', vh.plate); onChange('appropriation_id', vh.id); }}
+                      options={vehicles}
+                      displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                      className="h-9 text-sm font-mono"
+                    />
+                  </WithQuickAdd>
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Pessoa *</Label>
+                  <WithQuickAdd kind="driver" testId="os-person-quick-add" initial={{ name: form.person_name }}
+                    onCreated={(p) => {
+                      setDrivers((prev) => [...prev, p]);
+                      onChange('person_name', p.name);
+                      onChange('person_id', p.id);
+                      onChange('person_type', 'motorista');
+                      onChange('person_doc', p.cpf || '');
+                      onChange('contact_value', p.phone || '');
+                    }}>
                   <Autocomplete
                     value={form.person_name}
                     onChange={(v) => onChange('person_name', v)}
@@ -485,6 +501,7 @@ export default function OrdemServicoPage() {
                     displayField="name"
                     className="h-9 text-sm"
                   />
+                  </WithQuickAdd>
                 </div>
                 <Field label="CPF/CNPJ" value={form.person_doc} onChange={(v) => onChange('person_doc', v)} testid="os-person-doc" />
                 <Field label="Telefone" value={form.contact_value} onChange={(v) => onChange('contact_value', v)} testid="os-phone" />
@@ -520,36 +537,45 @@ export default function OrdemServicoPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label className="mb-1.5 block">Supervisor</Label>
-                  <Autocomplete
-                    value={form.supervisor_name}
-                    onChange={(v) => onChange('supervisor_name', v)}
-                    onSelect={(p) => { onChange('supervisor_name', p.name); onChange('supervisor_id', p.id); onChange('supervisor_type', p._type); }}
-                    options={people}
-                    displayField="name"
-                    className="h-9 text-sm"
-                  />
+                  <WithQuickAdd kind="employee" testId="os-supervisor-quick-add" initial={{ name: form.supervisor_name }}
+                    onCreated={(p) => { setEmployees((prev) => [...prev, p]); onChange('supervisor_name', p.name); onChange('supervisor_id', p.id); onChange('supervisor_type', 'funcionario'); }}>
+                    <Autocomplete
+                      value={form.supervisor_name}
+                      onChange={(v) => onChange('supervisor_name', v)}
+                      onSelect={(p) => { onChange('supervisor_name', p.name); onChange('supervisor_id', p.id); onChange('supervisor_type', p._type); }}
+                      options={people}
+                      displayField="name"
+                      className="h-9 text-sm"
+                    />
+                  </WithQuickAdd>
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Técnico</Label>
-                  <Autocomplete
-                    value={form.technician_name}
-                    onChange={(v) => onChange('technician_name', v)}
-                    onSelect={(p) => { onChange('technician_name', p.name); onChange('technician_id', p.id); onChange('technician_type', p._type); }}
-                    options={people}
-                    displayField="name"
-                    className="h-9 text-sm"
-                  />
+                  <WithQuickAdd kind="employee" testId="os-technician-quick-add" initial={{ name: form.technician_name }}
+                    onCreated={(p) => { setEmployees((prev) => [...prev, p]); onChange('technician_name', p.name); onChange('technician_id', p.id); onChange('technician_type', 'funcionario'); }}>
+                    <Autocomplete
+                      value={form.technician_name}
+                      onChange={(v) => onChange('technician_name', v)}
+                      onSelect={(p) => { onChange('technician_name', p.name); onChange('technician_id', p.id); onChange('technician_type', p._type); }}
+                      options={people}
+                      displayField="name"
+                      className="h-9 text-sm"
+                    />
+                  </WithQuickAdd>
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Ajudante</Label>
-                  <Autocomplete
-                    value={form.helper_name}
-                    onChange={(v) => onChange('helper_name', v)}
-                    onSelect={(p) => { onChange('helper_name', p.name); onChange('helper_id', p.id); onChange('helper_type', p._type); }}
-                    options={people}
-                    displayField="name"
-                    className="h-9 text-sm"
-                  />
+                  <WithQuickAdd kind="employee" testId="os-helper-quick-add" initial={{ name: form.helper_name }}
+                    onCreated={(p) => { setEmployees((prev) => [...prev, p]); onChange('helper_name', p.name); onChange('helper_id', p.id); onChange('helper_type', 'funcionario'); }}>
+                    <Autocomplete
+                      value={form.helper_name}
+                      onChange={(v) => onChange('helper_name', v)}
+                      onSelect={(p) => { onChange('helper_name', p.name); onChange('helper_id', p.id); onChange('helper_type', p._type); }}
+                      options={people}
+                      displayField="name"
+                      className="h-9 text-sm"
+                    />
+                  </WithQuickAdd>
                 </div>
               </div>
 

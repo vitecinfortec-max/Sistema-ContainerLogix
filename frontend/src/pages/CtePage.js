@@ -11,6 +11,7 @@ import { Field, IssueSection } from '../components/FormKit';
 import { AddressFields, CityStateFields } from '../components/AddressFields';
 import { ClientNamePicker } from '../components/ClientNamePicker';
 import { Autocomplete } from '../components/Autocomplete';
+import { WithQuickAdd } from '../components/QuickCreate';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
@@ -391,7 +392,7 @@ function toPayload(form) {
  * digitado); endereço e contato ficam recolhidos e só abrem sozinhos quando
  * o endereço está incompleto.
  */
-function PartyFields({ title, value, onChange, clients, testId }) {
+function PartyFields({ title, value, onChange, clients, onClientCreated, testId }) {
   const [open, setOpen] = useState(null);
   const v = value || emptyParty();
   const e = v.endereco || {};
@@ -416,14 +417,18 @@ function PartyFields({ title, value, onChange, clients, testId }) {
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2" data-testid={testId}>
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
         <Field label={title} required className="md:col-span-6">
-          <ClientNamePicker
-            testId={testId ? `${testId}-name` : undefined}
-            text={v.nome || ''}
-            onTextChange={(text) => onChange({ ...v, nome: text, client_id: null })}
-            onPick={pick}
-            onClear={() => onChange(emptyParty())}
-            clients={clients}
-          />
+          <WithQuickAdd kind="client" testId={testId ? `${testId}-quick-add` : undefined}
+            initial={{ name: v.nome, cnpj: v.cnpj_cpf }}
+            onCreated={(client) => { if (onClientCreated) onClientCreated(client); pick(client); }}>
+            <ClientNamePicker
+              testId={testId ? `${testId}-name` : undefined}
+              text={v.nome || ''}
+              onTextChange={(text) => onChange({ ...v, nome: text, client_id: null })}
+              onPick={pick}
+              onClear={() => onChange(emptyParty())}
+              clients={clients}
+            />
+          </WithQuickAdd>
         </Field>
         <Field label="CNPJ / CPF" required className="md:col-span-3">
           <Input value={v.cnpj_cpf || ''} onChange={(ev) => set('cnpj_cpf', formatCnpjCpf(ev.target.value))} className="font-mono" />
@@ -542,6 +547,11 @@ export default function CtePage() {
   const addRow = (field, row) => update((prev) => ({ ...prev, [field]: [...prev[field], row] }));
   const removeRow = (field, index) => update((prev) => ({ ...prev, [field]: prev[field].filter((_, i) => i !== index) }));
   const setTrailer = (index, plate) => update((prev) => ({ ...prev, reboque_placas: prev.reboque_placas.map((p, i) => (i === index ? plate : p)) }));
+
+  // Cadastro rápido (o "+" ao lado do campo): entra na lista da tela
+  const addClient = (client) => setClients((prev) => [...prev, client]);
+  const addDriver = (driver) => setDrivers((prev) => [...prev, driver]);
+  const addVehicle = (vehicle) => setVehicles((prev) => [...prev, vehicle]);
 
   // Motorista escolhido: cavalo e carreta padrão dele, se ainda não há placa
   const pickDriver = (driver) => update((prev) => ({
@@ -1070,10 +1080,10 @@ export default function CtePage() {
                 </Section>
 
                 <Section id="envolvidos" title="Envolvidos" count={issuesIn('envolvidos')}>
-                  <PartyFields title="Remetente" value={form.remetente} onChange={(v) => set('remetente', v)} clients={clients} testId="cte-remetente" />
-                  <PartyFields title="Destinatário" value={form.destinatario} onChange={(v) => set('destinatario', v)} clients={clients} testId="cte-destinatario" />
+                  <PartyFields title="Remetente" value={form.remetente} onChange={(v) => set('remetente', v)} clients={clients} onClientCreated={addClient} testId="cte-remetente" />
+                  <PartyFields title="Destinatário" value={form.destinatario} onChange={(v) => set('destinatario', v)} clients={clients} onClientCreated={addClient} testId="cte-destinatario" />
                   {form.tomador_papel === '4' && (
-                    <PartyFields title="Tomador (outro)" value={form.tomador} onChange={(v) => set('tomador', v)} clients={clients} testId="cte-tomador-outros" />
+                    <PartyFields title="Tomador (outro)" value={form.tomador} onChange={(v) => set('tomador', v)} clients={clients} onClientCreated={addClient} testId="cte-tomador-outros" />
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                     <Field label="Pagador do frete" required className="md:col-span-8">
@@ -1125,9 +1135,12 @@ export default function CtePage() {
                 <Section id="viagem" title="Motorista e veículo" count={issuesIn('viagem')}>
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                     <Field label="Motorista" className="md:col-span-6">
-                      <Autocomplete value={form.motorista.nome || ''} options={drivers} displayField={(d) => d.name}
-                        onChange={(t) => set('motorista', { ...form.motorista, nome: t.toUpperCase(), driver_id: null })}
-                        onSelect={pickDriver} testId="cte-motorista" />
+                      <WithQuickAdd kind="driver" testId="cte-motorista-quick-add" initial={{ name: form.motorista.nome, cpf: form.motorista.cpf }}
+                        onCreated={(d) => { addDriver(d); pickDriver(d); }}>
+                        <Autocomplete value={form.motorista.nome || ''} options={drivers} displayField={(d) => d.name}
+                          onChange={(t) => set('motorista', { ...form.motorista, nome: t.toUpperCase(), driver_id: null })}
+                          onSelect={pickDriver} testId="cte-motorista" />
+                      </WithQuickAdd>
                     </Field>
                     <Field label="CPF do motorista" className="md:col-span-3">
                       <Input value={form.motorista.cpf || ''} onChange={(e) => set('motorista', { ...form.motorista, cpf: formatCnpjCpf(e.target.value).slice(0, 14) })} className="font-mono" data-testid="cte-motorista-cpf" />
@@ -1135,13 +1148,19 @@ export default function CtePage() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <Field label="Veículo principal (placa)">
-                      <Autocomplete value={form.veiculo_placa || ''} options={vehicles} displayField={(v) => v.plate}
-                        onChange={(t) => set('veiculo_placa', normPlate(t).slice(0, 7))} onSelect={pickTraction} testId="cte-veiculo" />
+                      <WithQuickAdd kind="vehicle" testId="cte-veiculo-quick-add" initial={{ plate: form.veiculo_placa, vehicle_type: 'CAVALO' }}
+                        onCreated={(v) => { addVehicle(v); pickTraction(v); }}>
+                        <Autocomplete value={form.veiculo_placa || ''} options={vehicles} displayField={(v) => v.plate}
+                          onChange={(t) => set('veiculo_placa', normPlate(t).slice(0, 7))} onSelect={pickTraction} testId="cte-veiculo" />
+                      </WithQuickAdd>
                     </Field>
                     {[0, 1].map((i) => (
                       <Field key={i} label={`Vinculado 0${i + 1} (placa)`}>
-                        <Autocomplete value={form.reboque_placas[i] || ''} options={vehicles} displayField={(v) => v.plate}
-                          onChange={(t) => setTrailer(i, normPlate(t).slice(0, 7))} onSelect={(v) => setTrailer(i, normPlate(v.plate))} testId={`cte-reboque-${i}`} />
+                        <WithQuickAdd kind="vehicle" testId={`cte-reboque-${i}-quick-add`} initial={{ plate: form.reboque_placas[i], vehicle_type: 'CARRETA' }}
+                          onCreated={(v) => { addVehicle(v); setTrailer(i, normPlate(v.plate)); }}>
+                          <Autocomplete value={form.reboque_placas[i] || ''} options={vehicles} displayField={(v) => v.plate}
+                            onChange={(t) => setTrailer(i, normPlate(t).slice(0, 7))} onSelect={(v) => setTrailer(i, normPlate(v.plate))} testId={`cte-reboque-${i}`} />
+                        </WithQuickAdd>
                       </Field>
                     ))}
                   </div>

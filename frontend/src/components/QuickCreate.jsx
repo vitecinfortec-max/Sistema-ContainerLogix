@@ -109,7 +109,38 @@ export const QUICK_CREATE = {
     ],
     create: (d) => api.createTerminal(d),
   },
+  supplier: {
+    title: 'Novo fornecedor',
+    done: 'Fornecedor cadastrado',
+    fields: [
+      { key: 'name', label: 'Razão social / Nome', required: true },
+      { key: 'cnpj', label: 'CNPJ / CPF' },
+      { key: 'phone', label: 'Telefone' },
+    ],
+    create: (d) => api.createSupplier(d),
+  },
+  employee: {
+    title: 'Novo funcionário',
+    done: 'Funcionário cadastrado',
+    fields: [
+      { key: 'name', label: 'Nome', required: true },
+      { key: 'cpf', label: 'CPF', required: true },
+      { key: 'position', label: 'Cargo' },
+      { key: 'phone', label: 'Telefone' },
+    ],
+    create: (d) => api.createEmployee(d),
+  },
 };
+
+/** Campo + botão "+" lado a lado: `children` é o campo; o resto vai pro QuickAddButton. */
+export function WithQuickAdd({ children, ...buttonProps }) {
+  return (
+    <div className="flex gap-1.5">
+      <div className="flex-1 min-w-0">{children}</div>
+      <QuickAddButton {...buttonProps} />
+    </div>
+  );
+}
 
 function emptyValues(config, initial) {
   const values = {};
