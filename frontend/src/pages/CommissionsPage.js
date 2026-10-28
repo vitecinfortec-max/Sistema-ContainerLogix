@@ -74,9 +74,10 @@ function calculate(form, link) {
   return { freight, discount, base, pct, commission: pct === null ? null : Math.round(base * pct) / 100 };
 }
 
+// Lançamento por representante: rows = { client_id: valor faturado }
 const emptyBatch = () => ({
-  representative_id: '', billing_date: today(), period_start: monthPeriod()[0], period_end: monthPeriod()[1],
-  document_type: 'FATURA', rows: {}, advances: [],
+  representative_id: '', period_start: monthPeriod()[0], period_end: monthPeriod()[1],
+  rows: {}, advances: [{ value: '', advance_date: '' }],
 });
 const emptyAdvance = () => ({ representative_id: '', advance_date: today(), value: '', description: '' });
 
@@ -365,15 +366,11 @@ export default function CommissionsPage() {
   const batchLinks = links.filter((l) => l.representative_id === batch.representative_id)
     .sort((a, b) => (a.client_name || '').localeCompare(b.client_name || ''));
   const batchRows = batchLinks.map((l) => {
-    const row = batch.rows[l.client_id] || {};
-    const freight = toNumber(row.freight_value) || 0;
-    return {
-      link: l, row, freight, commission: Math.round(freight * l.commission_percentage) / 100,
-      period_start: row.period_start ?? batch.period_start, period_end: row.period_end ?? batch.period_end,
-    };
+    const freight = toNumber(batch.rows[l.client_id]) || 0;
+    return { link: l, freight, commission: Math.round(freight * l.commission_percentage) / 100 };
   });
   const batchFilled = batchRows.filter((r) => r.freight > 0);
-  const batchNewAdv = batch.advances.filter((a) => toNumber(a.value) || a.description.trim());
+  const batchNewAdv = batch.advances.filter((a) => toNumber(a.value));
   const batchTotals = {
     freight: batchFilled.reduce((s, r) => s + r.freight, 0),
     commission: batchFilled.reduce((s, r) => s + r.commission, 0),
@@ -382,12 +379,11 @@ export default function CommissionsPage() {
   const batchIssues = [];
   if (!batch.representative_id) batchIssues.push('Escolha o representante');
   else if (!batchLinks.length) batchIssues.push('Representante sem clientes no Vínculo de Clientes');
-  if (!batch.billing_date) batchIssues.push('Informe a data do faturamento');
-  if (batchRows.some((r) => r.period_start && r.period_end && r.period_start > r.period_end)) batchIssues.push('O início do período não pode ser depois do fim');
-  if (batchNewAdv.some((a) => !(toNumber(a.value) > 0) || !a.advance_date)) batchIssues.push('Informe a data e o valor de cada adiantamento');
-  if (batch.representative_id && !batchFilled.length && !batchNewAdv.length) batchIssues.push('Informe o frete faturado de pelo menos um cliente');
+  if (!batch.period_start || !batch.period_end) batchIssues.push('Informe o período de pagamento da comissão');
+  else if (batch.period_start > batch.period_end) batchIssues.push('O início do período não pode ser depois do fim');
+  if (batchNewAdv.some((a) => !(toNumber(a.value) > 0) || !a.advance_date)) batchIssues.push('Informe o dia de cada adiantamento');
+  if (batch.representative_id && !batchFilled.length && !batchNewAdv.length) batchIssues.push('Informe o valor faturado de pelo menos um cliente');
 
-  const setBatchRow = (clientId, patch) => setBatch((p) => ({ ...p, rows: { ...p.rows, [clientId]: { ...p.rows[clientId], ...patch } } }));
   const setBatchAdv = (i, patch) => setBatch((p) => ({ ...p, advances: p.advances.map((a, j) => (j === i ? { ...a, ...patch } : a)) }));
   const openBatch = () => {
     setBatch({ ...emptyBatch(), representative_id: repFilter || '', ...(period[0] && period[1] ? { period_start: period[0], period_end: period[1] } : {}) });
@@ -405,13 +401,11 @@ export default function CommissionsPage() {
     setBusy('batch');
     try {
       const r = await api.createCommissionBatch({
-        representative_id: batch.representative_id, billing_date: batch.billing_date, document_type: batch.document_type,
-        period_start: batch.period_start || null, period_end: batch.period_end || null,
-        items: batchFilled.map((x) => ({
-          client_id: x.link.client_id, freight_value: x.freight, document_number: (x.row.document_number || '').trim() || null,
-          period_start: x.period_start || null, period_end: x.period_end || null,
-        })),
-        advances: batchNewAdv.map((a) => ({ representative_id: batch.representative_id, advance_date: a.advance_date, value: toNumber(a.value), description: a.description.trim() || null })),
+        // A comissão fecha no fim do período de pagamento
+        representative_id: batch.representative_id, billing_date: batch.period_end, document_type: 'FATURA',
+        period_start: batch.period_start, period_end: batch.period_end,
+        items: batchFilled.map((x) => ({ client_id: x.link.client_id, freight_value: x.freight })),
+        advances: batchNewAdv.map((a) => ({ representative_id: batch.representative_id, advance_date: a.advance_date, value: toNumber(a.value) })),
       });
       const { created, advances: adv } = r.data;
       toast.success([created.length && `${created.length} lançamento(s) · comissão de ${fmtMoney(sumBy(created, 'commission_value'))}`,
@@ -544,8 +538,8 @@ export default function CommissionsPage() {
           count={loading ? '...' : entries.length}
           footer={<TablePagination {...paginationProps} />}
           toolbar={(
-            <Toolbar selectedCount={selectedIds.size} primary={<ToolbarPrimary icon={Plus} label="Novo lançamento" onClick={openCreate} testId="commission-new-btn" />}>
-              <ToolbarButton icon={Users} label="Lançar por representante" tone="violet" onClick={openBatch} testId="commission-batch-btn" />
+            <Toolbar selectedCount={selectedIds.size} primary={<ToolbarPrimary icon={Plus} label="Novo lançamento" onClick={openBatch} testId="commission-batch-btn" />}>
+              <ToolbarButton icon={Users} label="Lançamento avulso (um cliente, com descontos)" tone="violet" onClick={openCreate} testId="commission-new-btn" />
               <ToolbarButton icon={FileCheck} label="Lançar de CT-es" tone="violet" onClick={openCtes} testId="commission-from-ctes-btn" />
               <ToolbarDivider />
               <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => openEdit(single)} disabled={!single || single.status !== 'PENDENTE'} testId="commission-edit-btn" />
@@ -886,11 +880,11 @@ export default function CommissionsPage() {
       </Dialog>
       {/* Lançamento por representante */}
       <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
-        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto" data-testid="commission-batch-dialog">
-          <DialogHeader><DialogTitle className="flex items-center gap-2 text-base"><Users className="w-5 h-5 text-primary" />Lançamento por representante</DialogTitle></DialogHeader>
-          <div className="space-y-4">
+        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="commission-batch-dialog">
+          <DialogHeader><DialogTitle className="flex items-center gap-2 text-base"><Percent className="w-5 h-5 text-primary" />Lançamento de comissão</DialogTitle></DialogHeader>
+          <div className="space-y-5">
             <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
-              <Field label="Representante" required className="col-span-2 md:col-span-4">
+              <Field label="Representante" required className="col-span-2 md:col-span-6">
                 <Select value={batch.representative_id || undefined} onValueChange={(v) => setBatch((p) => ({ ...p, representative_id: v, rows: {} }))}>
                   <SelectTrigger data-testid="commission-batch-rep"><SelectValue placeholder="Escolha o representante" /></SelectTrigger>
                   <SelectContent>
@@ -899,20 +893,12 @@ export default function CommissionsPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Período referente: de" className="md:col-span-2">
-                <Input type="date" value={batch.period_start} onChange={(e) => setBatch((p) => ({ ...p, period_start: e.target.value }))} data-testid="commission-batch-period-start" />
-              </Field>
-              <Field label="até" className="md:col-span-2">
-                <Input type="date" value={batch.period_end} onChange={(e) => setBatch((p) => ({ ...p, period_end: e.target.value }))} data-testid="commission-batch-period-end" />
-              </Field>
-              <Field label="Data do faturamento" required className="md:col-span-2">
-                <Input type="date" value={batch.billing_date} onChange={(e) => setBatch((p) => ({ ...p, billing_date: e.target.value }))} data-testid="commission-batch-date" />
-              </Field>
-              <Field label="Documento" className="md:col-span-2">
-                <Select value={batch.document_type} onValueChange={(v) => setBatch((p) => ({ ...p, document_type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{DOCUMENT_TYPES.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
-                </Select>
+              <Field label="Período de pagamento da comissão" required className="col-span-2 md:col-span-6">
+                <div className="flex items-center gap-2">
+                  <Input type="date" value={batch.period_start} onChange={(e) => setBatch((p) => ({ ...p, period_start: e.target.value }))} aria-label="Período de pagamento: início" data-testid="commission-batch-period-start" />
+                  <span className="text-sm text-slate-500">a</span>
+                  <Input type="date" value={batch.period_end} onChange={(e) => setBatch((p) => ({ ...p, period_end: e.target.value }))} aria-label="Período de pagamento: fim" data-testid="commission-batch-period-end" />
+                </div>
               </Field>
             </div>
 
@@ -924,28 +910,29 @@ export default function CommissionsPage() {
                 </p>
               ) : (
                 <div className="space-y-1.5">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Clientes e frete faturado <span className="text-xs font-normal text-slate-500">(deixe em branco quem não faturou; o período de cada um pode ser ajustado)</span></p>
+                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Clientes</p>
                   <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
                     <table className="data-table">
                       <thead>
-                        <tr><th>Cliente</th><th className="!text-right">%</th><th>Nº documento</th><th>Período de</th><th>até</th><th className="!text-right">Frete faturado (R$)</th><th className="!text-right">Comissão</th></tr>
+                        <tr><th>Cliente</th><th className="!text-right">Valor faturado (R$)</th><th className="!text-right">Percentual</th><th className="!text-right">Comissão</th></tr>
                       </thead>
                       <tbody>
-                        {batchRows.map(({ link: l, row, commission, freight, period_start: ps, period_end: pe }) => (
+                        {batchRows.map(({ link: l, commission, freight }) => (
                           <tr key={l.client_id} data-testid={`commission-batch-row-${l.client_id}`}>
-                            <td><div className="max-w-[220px] truncate cell-strong" title={l.client_name}>{l.client_name}</div></td>
-                            <td className="text-right tabular-nums">{fmtPct(l.commission_percentage)}</td>
-                            <td><Input value={row.document_number || ''} maxLength={30} className="h-8 w-28" aria-label="Nº do documento"
-                              onChange={(e) => setBatchRow(l.client_id, { document_number: e.target.value })} /></td>
-                            <td><Input type="date" value={ps || ''} className="h-8 w-36" aria-label="Período de"
-                              onChange={(e) => setBatchRow(l.client_id, { period_start: e.target.value })} /></td>
-                            <td><Input type="date" value={pe || ''} className="h-8 w-36" aria-label="Período até"
-                              onChange={(e) => setBatchRow(l.client_id, { period_end: e.target.value })} /></td>
-                            <td><Input inputMode="decimal" value={row.freight_value || ''} placeholder="0,00" className="h-8 w-32 ml-auto text-right font-semibold" aria-label="Frete faturado"
-                              onChange={(e) => setBatchRow(l.client_id, { freight_value: moneyMask(e.target.value) })} data-testid={`commission-batch-freight-${l.client_id}`} /></td>
+                            <td><div className="max-w-[260px] truncate cell-strong" title={l.client_name}>{l.client_name}</div></td>
+                            <td><Input inputMode="decimal" value={batch.rows[l.client_id] || ''} placeholder="0,00" className="h-8 w-36 ml-auto text-right font-semibold" aria-label={`Valor faturado de ${l.client_name}`}
+                              onChange={(e) => { const v = moneyMask(e.target.value); setBatch((p) => ({ ...p, rows: { ...p.rows, [l.client_id]: v } })); }}
+                              data-testid={`commission-batch-freight-${l.client_id}`} /></td>
+                            <td className="text-right tabular-nums" title="Cadastrado no Vínculo de Clientes">{fmtPct(l.commission_percentage)}</td>
                             <td className="text-right tabular-nums font-semibold">{freight > 0 ? fmtMoney(commission) : '-'}</td>
                           </tr>
                         ))}
+                        <tr className="font-semibold">
+                          <td>Total</td>
+                          <td className="text-right tabular-nums">{fmtMoney(batchTotals.freight)}</td>
+                          <td />
+                          <td className="text-right tabular-nums" data-testid="commission-batch-total">{fmtMoney(batchTotals.commission)}</td>
+                        </tr>
                       </tbody>
                     </table>
                   </div>
@@ -955,39 +942,45 @@ export default function CommissionsPage() {
 
             {batch.representative_id && (
               <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Adiantamentos <span className="text-xs font-normal text-slate-500">(se houver; descontados do total da comissão)</span></p>
-                  <Button type="button" variant="outline" size="sm" data-testid="commission-batch-add-advance"
-                    onClick={() => setBatch((p) => ({ ...p, advances: [...p.advances, { advance_date: today(), value: '', description: '' }] }))}>
-                    <Plus className="w-3.5 h-3.5 mr-1" /> Adiantamento
-                  </Button>
-                </div>
-                {batchPendingAdv.length > 0 && (
-                  <p className="text-xs text-slate-500" data-testid="commission-batch-pending-adv">
-                    Já lançados e ainda a descontar: {batchPendingAdv.map((a) => `${fmtDate(a.advance_date)} ${fmtMoney(a.value)}`).join(' · ')}
-                  </p>
-                )}
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Adiantamento <span className="text-xs font-normal text-slate-500">(se houver; é descontado do total da comissão)</span></p>
                 {batch.advances.map((a, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input type="date" value={a.advance_date} onChange={(e) => setBatchAdv(i, { advance_date: e.target.value })} className="w-40" aria-label="Data do adiantamento" />
-                    <Input value={a.description} placeholder="Descrição (ex.: PIX, vale)" maxLength={100} onChange={(e) => setBatchAdv(i, { description: e.target.value })} className="flex-1" aria-label="Descrição do adiantamento" />
-                    <Input inputMode="decimal" value={a.value} placeholder="0,00" onChange={(e) => setBatchAdv(i, { value: moneyMask(e.target.value) })} className="w-36 text-right" aria-label="Valor do adiantamento" data-testid={`commission-batch-advance-${i}`} />
-                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-red-600" aria-label="Remover"
-                      onClick={() => setBatch((p) => ({ ...p, advances: p.advances.filter((_, j) => j !== i) }))}><X className="w-4 h-4" /></Button>
+                  <div key={i} className="grid grid-cols-12 gap-3 items-end">
+                    <Field label="Valor do adiantamento (R$)" className="col-span-6 md:col-span-4">
+                      <Input inputMode="decimal" value={a.value} placeholder="0,00" className="text-right"
+                        onChange={(e) => { const v = moneyMask(e.target.value); setBatchAdv(i, { value: v, advance_date: a.advance_date || (v ? today() : '') }); }}
+                        data-testid={`commission-batch-advance-${i}`} />
+                    </Field>
+                    <Field label="Dia do adiantamento" className="col-span-5 md:col-span-4">
+                      <Input type="date" value={a.advance_date} onChange={(e) => setBatchAdv(i, { advance_date: e.target.value })} data-testid={`commission-batch-advance-date-${i}`} />
+                    </Field>
+                    {batch.advances.length > 1 && (
+                      <Button type="button" variant="ghost" size="icon" className="col-span-1 h-9 w-9 text-slate-400 hover:text-red-600" aria-label="Remover adiantamento"
+                        onClick={() => setBatch((p) => ({ ...p, advances: p.advances.filter((_, j) => j !== i) }))}><X className="w-4 h-4" /></Button>
+                    )}
                   </div>
                 ))}
+                <button type="button" className="text-xs font-medium text-primary hover:underline" data-testid="commission-batch-add-advance"
+                  onClick={() => setBatch((p) => ({ ...p, advances: [...p.advances, { value: '', advance_date: '' }] }))}>
+                  + Outro adiantamento
+                </button>
+                {batchPendingAdv.length > 0 && (
+                  <p className="text-xs text-slate-500" data-testid="commission-batch-pending-adv">
+                    Adiantamentos anteriores ainda a descontar: {batchPendingAdv.map((a) => `${fmtDate(a.advance_date)} ${fmtMoney(a.value)}`).join(' · ')}
+                  </p>
+                )}
               </div>
             )}
 
-            <dl className="ml-auto max-w-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3 text-sm space-y-1" data-testid="commission-batch-calc">
-              <div className="flex justify-between"><dt className="text-slate-500">Frete faturado ({batchFilled.length} cliente(s))</dt><dd className="tabular-nums">{fmtMoney(batchTotals.freight)}</dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">Comissão</dt><dd className="tabular-nums">{fmtMoney(batchTotals.commission)}</dd></div>
-              <div className="flex justify-between"><dt className="text-slate-500">(-) Adiantamentos</dt><dd className="tabular-nums">{fmtMoney(batchTotals.advances)}</dd></div>
-              <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 font-semibold">
-                <dt>Líquido a pagar</dt>
-                <dd className={`tabular-nums ${batchTotals.commission - batchTotals.advances < 0 ? 'text-red-600' : 'text-primary'}`} data-testid="commission-batch-net">{fmtMoney(batchTotals.commission - batchTotals.advances)}</dd>
-              </div>
-            </dl>
+            {batch.representative_id && (
+              <dl className="ml-auto max-w-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3 text-sm space-y-1" data-testid="commission-batch-calc">
+                <div className="flex justify-between"><dt className="text-slate-500">Total da comissão</dt><dd className="tabular-nums">{fmtMoney(batchTotals.commission)}</dd></div>
+                <div className="flex justify-between"><dt className="text-slate-500">(-) Adiantamento</dt><dd className="tabular-nums">{fmtMoney(batchTotals.advances)}</dd></div>
+                <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 font-semibold">
+                  <dt>Líquido a pagar</dt>
+                  <dd className={`tabular-nums ${batchTotals.commission - batchTotals.advances < 0 ? 'text-red-600' : 'text-primary'}`} data-testid="commission-batch-net">{fmtMoney(batchTotals.commission - batchTotals.advances)}</dd>
+                </div>
+              </dl>
+            )}
             {batchIssues.length > 0 && batch.representative_id && (
               <p className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300"><AlertTriangle className="w-3.5 h-3.5" /> {batchIssues[0]}</p>
             )}
@@ -995,7 +988,7 @@ export default function CommissionsPage() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setBatchOpen(false)}>Fechar</Button>
             <Button onClick={saveBatch} disabled={busy === 'batch'} data-testid="commission-batch-save">
-              {busy === 'batch' && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />} Salvar lançamentos
+              {busy === 'batch' && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />} Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
