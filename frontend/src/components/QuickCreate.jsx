@@ -131,6 +131,15 @@ export const QUICK_CREATE = {
     ],
     create: (d) => api.createEmployee(d),
   },
+  service_type: {
+    title: 'Novo tipo de serviço',
+    done: 'Tipo de serviço cadastrado',
+    fields: [
+      { key: 'name', label: 'Nome', required: true, upper: true },
+      { key: 'description', label: 'Descrição' },
+    ],
+    create: (d) => api.createServiceType(d),
+  },
   product: {
     title: 'Novo produto',
     done: 'Produto cadastrado',

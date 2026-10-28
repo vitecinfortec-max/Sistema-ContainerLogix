@@ -18,6 +18,7 @@ import { useForm } from 'react-hook-form';
 import { useNotifications } from '../hooks/useNotifications';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
 import { Autocomplete } from '../components/Autocomplete';
+import { WithQuickAdd } from '../components/QuickCreate';
 import ContainerValueFields from '../components/ContainerValueFields';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { format } from 'date-fns';
@@ -423,6 +424,9 @@ export default function NewMovementPage() {
     }
   };
 
+  // Cadastro rápido (o "+" ao lado do campo): entra na lista e já fica escolhido
+  const appendTo = (setter) => (record) => setter((prev) => [...prev, record]);
+
   const cavaloVehicles = vehicles.filter(v => v.vehicle_type === 'CAVALO');
   const carretaVehicles = vehicles.filter(v => v.vehicle_type === 'CARRETA');
 
@@ -511,13 +515,16 @@ export default function NewMovementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="driver_name" className="block">Nome do Motorista *</Label>
-                  <Autocomplete
-                    value={watch('driver_name') || ''}
-                    onChange={handleDriverChange}
-                    onSelect={(d) => handleDriverChange(d.name)}
-                    options={drivers}
-                    displayField="name"
-                  />
+                  <WithQuickAdd kind="driver" testId="gate-driver-quick-add" initial={() => ({ name: watch('driver_name'), cpf: watch('driver_cpf') })}
+                    onCreated={(d) => { appendTo(setDrivers)(d); setValue('driver_name', d.name); setValue('driver_cpf', d.cpf || ''); }}>
+                    <Autocomplete
+                      value={watch('driver_name') || ''}
+                      onChange={handleDriverChange}
+                      onSelect={(d) => handleDriverChange(d.name)}
+                      options={drivers}
+                      displayField="name"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div className="space-y-1.5">
@@ -534,53 +541,65 @@ export default function NewMovementPage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="truck_plate" className="block">Placa do Cavalo *</Label>
-                  <Autocomplete
-                    value={watch('truck_plate') || ''}
-                    onChange={handleTruckPlateChange}
-                    onSelect={(v) => handleTruckPlateChange(v.plate)}
-                    options={cavaloVehicles}
-                    displayField="plate"
-                    className="font-mono uppercase"
-                  />
+                  <WithQuickAdd kind="vehicle" testId="gate-truck-quick-add" initial={() => ({ plate: watch('truck_plate'), vehicle_type: 'CAVALO' })}
+                    onCreated={(v) => { appendTo(setVehicles)(v); setValue('truck_plate', (v.plate || '').toUpperCase()); }}>
+                    <Autocomplete
+                      value={watch('truck_plate') || ''}
+                      onChange={handleTruckPlateChange}
+                      onSelect={(v) => handleTruckPlateChange(v.plate)}
+                      options={cavaloVehicles}
+                      displayField="plate"
+                      className="font-mono uppercase"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="trailer_plate_1" className="block">Placa Carreta *</Label>
-                  <Autocomplete
-                    value={watch('trailer_plate_1') || ''}
-                    onChange={handleTrailerPlateChange}
-                    onSelect={(v) => handleTrailerPlateChange(v.plate)}
-                    options={carretaVehicles}
-                    displayField="plate"
-                    className="font-mono uppercase"
-                  />
+                  <WithQuickAdd kind="vehicle" testId="gate-trailer-quick-add" initial={() => ({ plate: watch('trailer_plate_1'), vehicle_type: 'CARRETA' })}
+                    onCreated={(v) => { appendTo(setVehicles)(v); setValue('trailer_plate_1', (v.plate || '').toUpperCase()); }}>
+                    <Autocomplete
+                      value={watch('trailer_plate_1') || ''}
+                      onChange={handleTrailerPlateChange}
+                      onSelect={(v) => handleTrailerPlateChange(v.plate)}
+                      options={carretaVehicles}
+                      displayField="plate"
+                      className="font-mono uppercase"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="transport_company" className="block">Transportadora *</Label>
-                  <Autocomplete
-                    value={watch('transport_company') || ''}
-                    onChange={handleCompanyChange}
-                    onSelect={(c) => handleCompanyChange(c.name)}
-                    options={companies}
-                    displayField="name"
-                  />
+                  <WithQuickAdd kind="company" testId="gate-company-quick-add" initial={() => ({ name: watch('transport_company') })}
+                    onCreated={(c) => { appendTo(setCompanies)(c); setValue('transport_company', c.name); }}>
+                    <Autocomplete
+                      value={watch('transport_company') || ''}
+                      onChange={handleCompanyChange}
+                      onSelect={(c) => handleCompanyChange(c.name)}
+                      options={companies}
+                      displayField="name"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div className="space-y-1.5 relative">
                   <Label htmlFor="client_name" className="block">Cliente</Label>
-                  <ClientNamePicker
-                    id="client_name"
-                    testId="client-name-input"
-                    text={clientSearch}
-                    clients={clients}
-                    onTextChange={(value) => {
-                      setClientSearch(value);
-                      if (value === '') setValue('client_name', '');
-                    }}
-                    onPick={(client) => { setClientSearch(client.name); setValue('client_name', client.name); }}
-                    onClear={() => { setClientSearch(''); setValue('client_name', ''); }}
-                  />
+                  <WithQuickAdd kind="client" testId="gate-client-quick-add" initial={{ name: clientSearch }}
+                    onCreated={(client) => { appendTo(setClients)(client); setClientSearch(client.name); setValue('client_name', client.name); }}>
+                    <ClientNamePicker
+                      id="client_name"
+                      testId="client-name-input"
+                      text={clientSearch}
+                      clients={clients}
+                      onTextChange={(value) => {
+                        setClientSearch(value);
+                        if (value === '') setValue('client_name', '');
+                      }}
+                      onPick={(client) => { setClientSearch(client.name); setValue('client_name', client.name); }}
+                      onClear={() => { setClientSearch(''); setValue('client_name', ''); }}
+                    />
+                  </WithQuickAdd>
                   <p className="text-xs text-muted-foreground">Este campo aparece na impressão</p>
                 </div>
               </div>
@@ -652,7 +671,12 @@ export default function NewMovementPage() {
                       {shippingLines.length > 0 ? `(${shippingLines.length} cadastrados)` : ''}
                     </span>
                   </div>
-                  <Select value={shippingLine || ''} onValueChange={(value) => setValue('shipping_line', value)}>
+                  <WithQuickAdd kind="shipping_line" testId="gate-shipping-line-quick-add"
+                    onCreated={(line) => { appendTo(setShippingLines)(line); setValue('shipping_line', line.name); }}>
+                  {/* Troca pra vazio vem do <select> escondido do Radix dentro do <form>
+                      quando o valor chega antes da opção (ex.: armador recém-cadastrado
+                      pelo +) - não há opção vazia legítima aqui, então é ignorada. */}
+                  <Select value={shippingLine || ''} onValueChange={(value) => { if (value) setValue('shipping_line', value); }}>
                     <SelectTrigger id="shipping_line" data-testid="shipping-line-select">
                       <SelectValue />
                     </SelectTrigger>
@@ -672,8 +696,9 @@ export default function NewMovementPage() {
                       )}
                     </SelectContent>
                   </Select>
+                  </WithQuickAdd>
                   {shippingLines.length === 0 && (
-                    <p className="text-xs text-amber-600">Nenhum armador cadastrado. Vá em "Cadastro de Armadores" para adicionar.</p>
+                    <p className="text-xs text-amber-600">Nenhum armador cadastrado. Use o + para cadastrar.</p>
                   )}
                 </div>
 
@@ -709,13 +734,16 @@ export default function NewMovementPage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="origin_terminal" className="block">Terminal de Origem</Label>
-                  <Autocomplete
-                    value={watch('origin_terminal') || ''}
-                    onChange={(v) => setValue('origin_terminal', v)}
-                    onSelect={(t) => setValue('origin_terminal', t.name)}
-                    options={terminals}
-                    displayField="name"
-                  />
+                  <WithQuickAdd kind="terminal" testId="gate-terminal-quick-add" initial={() => ({ name: watch('origin_terminal') })}
+                    onCreated={(t) => { appendTo(setTerminals)(t); setValue('origin_terminal', t.name); }}>
+                    <Autocomplete
+                      value={watch('origin_terminal') || ''}
+                      onChange={(v) => setValue('origin_terminal', v)}
+                      onSelect={(t) => setValue('origin_terminal', t.name)}
+                      options={terminals}
+                      displayField="name"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div className="space-y-2">
@@ -725,7 +753,9 @@ export default function NewMovementPage() {
                       {serviceTypes.length > 0 ? `(${serviceTypes.length} cadastrados)` : ''}
                     </span>
                   </div>
-                  <Select value={serviceType || 'none'} onValueChange={(value) => setValue('service_type', value === 'none' ? '' : value)}>
+                  <WithQuickAdd kind="service_type" testId="gate-service-type-quick-add"
+                    onCreated={(st) => { appendTo(setServiceTypes)(st); setValue('service_type', st.name); }}>
+                  <Select value={serviceType || 'none'} onValueChange={(value) => { if (value) setValue('service_type', value === 'none' ? '' : value); }}>
                     <SelectTrigger id="service_type" data-testid="service-type-select">
                       <SelectValue />
                     </SelectTrigger>
@@ -736,6 +766,7 @@ export default function NewMovementPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  </WithQuickAdd>
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
                 </div>
 
