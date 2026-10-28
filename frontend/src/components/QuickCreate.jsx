@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
+import { PRODUCT_UNITS } from '../lib/productUnits';
 
 // Cadastro rápido dentro de um formulário (o "+" ao lado do campo, como no
 // Bsoft): quando falta a rota, o armador, o motorista... a pessoa cadastra
@@ -129,6 +130,26 @@ export const QUICK_CREATE = {
       { key: 'phone', label: 'Telefone' },
     ],
     create: (d) => api.createEmployee(d),
+  },
+  product: {
+    title: 'Novo produto',
+    done: 'Produto cadastrado',
+    fields: [
+      { key: 'description', label: 'Descrição', required: true, upper: true },
+      { key: 'unit', label: 'Unidade', options: PRODUCT_UNITS.map(([v, l]) => [v, l]) },
+      { key: 'reference_value', label: 'Valor de referência (R$)', placeholder: '0,00', money: true },
+    ],
+    create: (d) => api.createProduct({ ...d, reference_value: parseMoney(d.reference_value) || 0 }),
+  },
+  service: {
+    title: 'Novo serviço',
+    done: 'Serviço cadastrado',
+    fields: [
+      { key: 'description', label: 'Descrição', required: true, upper: true },
+      { key: 'unit', label: 'Unidade', options: [['QUANTIDADE', 'Quantidade'], ['HORAS', 'Horas'], ['OUTROS', 'Outros']] },
+      { key: 'value', label: 'Valor (R$)', placeholder: '0,00', money: true },
+    ],
+    create: (d) => api.createServiceCatalogItem({ ...d, value: parseMoney(d.value) || 0 }),
   },
 };
 

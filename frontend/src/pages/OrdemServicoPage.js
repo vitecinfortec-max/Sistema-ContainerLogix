@@ -599,12 +599,16 @@ export default function OrdemServicoPage() {
                 onAdd={() => addItem('products')} onRemove={(i) => removeItem('products', i)}
                 onChange={(i, f, v) => setItem('products', i, f, v)}
                 catalogOptions={productCatalogOptions}
+                quickKind="product" onCatalogCreated={(prod) => setProductCatalog((prev) => [...prev, prod])}
+                toOption={(prod) => ({ code: String(prod.code), description: prod.description, unit: prod.unit, price: prod.reference_value })}
                 showUnit={true} />
 
               <ItemsSection title="Serviços" items={form.services || []} kind="services"
                 onAdd={() => addItem('services')} onRemove={(i) => removeItem('services', i)}
                 onChange={(i, f, v) => setItem('services', i, f, v)}
                 catalogOptions={serviceCatalogOptions}
+                quickKind="service" onCatalogCreated={(svc) => setServiceCatalog((prev) => [...prev, svc])}
+                toOption={(svc) => ({ code: String(svc.code), description: svc.description, unit: svc.unit, price: svc.value })}
                 showUnit={true} />
 
               <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-200 dark:border-slate-700">
@@ -699,7 +703,16 @@ function TextAreaField({ label, value, onChange, testid }) {
   );
 }
 
-function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit, catalogOptions = [] }) {
+// `quickKind`: tipo do cadastro rápido (o "+" ao lado da Descrição) - o
+// produto/serviço novo entra no catálogo (`onCatalogCreated`) e já preenche a
+// linha, convertido por `toOption` pro mesmo formato do catálogo.
+function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit, catalogOptions = [], quickKind, onCatalogCreated, toOption }) {
+  const fillFromCatalog = (idx, cat) => {
+    onChange(idx, 'description', cat.description);
+    onChange(idx, 'code', cat.code);
+    if (cat.unit) onChange(idx, 'unit', cat.unit);
+    onChange(idx, 'unit_price', cat.price ?? 0);
+  };
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -722,19 +735,17 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
             </div>
             <div className="col-span-4">
               <Label className="mb-1.5 block">Descrição</Label>
-              <Autocomplete
-                value={it.description || ''}
-                onChange={(v) => onChange(idx, 'description', v)}
-                onSelect={(cat) => {
-                  onChange(idx, 'description', cat.description);
-                  onChange(idx, 'code', cat.code);
-                  if (cat.unit) onChange(idx, 'unit', cat.unit);
-                  onChange(idx, 'unit_price', cat.price ?? 0);
-                }}
-                options={catalogOptions}
-                displayField="description"
-                className="h-8 text-sm"
-              />
+              <WithQuickAdd kind={quickKind} size="sm" testId={`${kind}-quick-add-${idx}`} initial={{ description: (it.description || '').toUpperCase() }}
+                onCreated={(record) => { if (onCatalogCreated) onCatalogCreated(record); fillFromCatalog(idx, toOption(record)); }}>
+                <Autocomplete
+                  value={it.description || ''}
+                  onChange={(v) => onChange(idx, 'description', v)}
+                  onSelect={(cat) => fillFromCatalog(idx, cat)}
+                  options={catalogOptions}
+                  displayField="description"
+                  className="h-8 text-sm"
+                />
+              </WithQuickAdd>
             </div>
             <div className="col-span-1">
               <Label className="mb-1.5 block">Qtd</Label>
