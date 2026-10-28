@@ -17,7 +17,7 @@ export function FormSection({ title, icon: Icon, actions, children, className, c
         </CardTitle>
         {actions}
       </CardHeader>
-      <CardContent className={cn('p-4 space-y-4', contentClassName)}>{children}</CardContent>
+      <CardContent className={cn('form-dense p-4 space-y-4', contentClassName)}>{children}</CardContent>
     </Card>
   );
 }
@@ -34,7 +34,7 @@ function IssueCount({ n }) {
  */
 export function IssueSection({ idPrefix, id, title, count, actions, children }) {
   return (
-    <section id={`${idPrefix}-sec-${id}`} className="scroll-mt-3 space-y-3" data-testid={`${idPrefix}-sec-${id}`}>
+    <section id={`${idPrefix}-sec-${id}`} className="form-dense scroll-mt-3 space-y-3" data-testid={`${idPrefix}-sec-${id}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-1.5 dark:border-slate-700">
         <h3 className="flex items-center text-sm font-semibold text-slate-800 dark:text-slate-100">{title}<IssueCount n={count} /></h3>
         {actions && <div className="flex flex-wrap gap-1.5">{actions}</div>}

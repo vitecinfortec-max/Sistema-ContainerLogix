@@ -546,14 +546,14 @@ export default function LoadingOrderPage() {
 
           <div className="space-y-5">
             <SectionTitle>Dados do Agendamento e Controle</SectionTitle>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <SelectField label="Tipo *" value={form.order_type} onChange={onChangeOrderType} options={ORDER_TYPE_OPTIONS} testid="loading-order-type" />
               <SelectField label="Status" value={form.status} onChange={(v) => onChange('status', v)} options={STATUS_OPTIONS} testid="loading-order-status" />
               <WindowField value={form.collection_window} onChange={(v) => onChange('collection_window', v)} />
             </div>
 
             <SectionTitle>Origem e Destino</SectionTitle>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="mb-1.5 block">Terminal de Origem</Label>
                 <div className="flex gap-1.5">
@@ -577,7 +577,7 @@ export default function LoadingOrderPage() {
             {form.order_type === 'COLETA' && (
               <>
                 <SectionTitle>Rota e Frete</SectionTitle>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="mb-1.5 block">Rota</Label>
                     <div className="flex gap-1.5">
@@ -617,7 +617,7 @@ export default function LoadingOrderPage() {
             {form.order_type === 'ENTREGA' && (
               <>
                 <SectionTitle>Representante</SectionTitle>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="mb-1.5 block">Representante</Label>
                     <div className="flex gap-1.5">
@@ -643,7 +643,7 @@ export default function LoadingOrderPage() {
             )}
 
             <SectionTitle>Especificações do Container e Carga</SectionTitle>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {form.order_type === 'ENTREGA' && nextBookingPreview ? (
                 <div>
                   <Label className="mb-1.5 block">Booking/Ref.</Label>
@@ -660,7 +660,7 @@ export default function LoadingOrderPage() {
               ) : (
                 <Field label="Booking/Ref." value={form.booking} onChange={(v) => onChange('booking', v)} testid="loading-order-booking" />
               )}
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <Label className="mb-1.5 block">Cliente</Label>
                 <div className="flex gap-1.5">
                   <div className="flex-1 min-w-0">
@@ -688,8 +688,8 @@ export default function LoadingOrderPage() {
             <div className="space-y-2">
               {form.items.map((it, idx) => (
                 <div key={idx} className="flex flex-col gap-2 p-2 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
-                  <div className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-end">
+                    <div className="col-span-1 sm:col-span-3">
                       <Label className="mb-1.5 block">ID do Container <span className="text-destructive">*</span></Label>
                       <Input
                         value={it.container_number}
@@ -699,7 +699,7 @@ export default function LoadingOrderPage() {
                         data-testid={`loading-order-item-container-${idx}`}
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       <Label className="mb-1.5 block">Status</Label>
                       <Select value={it.status || 'CHEIO'} onValueChange={(v) => updateContainerItem(idx, 'status', v)}>
                         <SelectTrigger className="h-8 text-sm" data-testid={`loading-order-item-status-${idx}`}><SelectValue /></SelectTrigger>
@@ -708,7 +708,7 @@ export default function LoadingOrderPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-1 sm:col-span-3">
                       <Label className="mb-1.5 block">Tipo/Tamanho</Label>
                       <Select value={it.size_type || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'size_type', v === '_empty' ? '' : v)}>
                         <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
@@ -718,7 +718,7 @@ export default function LoadingOrderPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-4">
+                    <div className="col-span-2 sm:col-span-4">
                       <Label className="mb-1.5 block">Armador</Label>
                       <div className="flex gap-1.5">
                       <Select value={it.shipping_line || '_empty'} onValueChange={(v) => updateContainerItem(idx, 'shipping_line', v === '_empty' ? '' : v)}>
@@ -736,17 +736,17 @@ export default function LoadingOrderPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-end">
+                    <div className="col-span-1 sm:col-span-3">
                       <Label className="mb-1.5 block">Peso Bruto</Label>
                       <Input value={it.gross_weight} onChange={(e) => updateContainerItem(idx, 'gross_weight', e.target.value)} className="h-8 text-sm" />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-1 sm:col-span-3">
                       <Label className="mb-1.5 block">Lacre</Label>
                       <Input value={it.seal} onChange={(e) => updateContainerItem(idx, 'seal', e.target.value)} className="h-8 text-sm" />
                     </div>
-                    <div className="col-span-4" />
-                    <div className="col-span-2 flex justify-end">
+                    <div className="hidden sm:block sm:col-span-4" />
+                    <div className="col-span-2 sm:col-span-2 flex justify-end">
                       <Button title="Excluir" aria-label="Excluir"
                         type="button"
                         variant="ghost"
@@ -768,7 +768,7 @@ export default function LoadingOrderPage() {
             )}
 
             <SectionTitle>Dados do Transporte (Transportador/Motorista)</SectionTitle>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label className="mb-1.5 block">Motorista <span className="text-destructive">*</span></Label>
                 <div className="flex gap-1.5">
@@ -788,7 +788,7 @@ export default function LoadingOrderPage() {
               </div>
               <Field label="CPF" value={form.driver_cpf} onChange={(v) => onChange('driver_cpf', v)} testid="loading-order-cpf" />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <Label className="mb-1.5 block">Transportadora Contratada</Label>
                 <div className="flex gap-1.5">

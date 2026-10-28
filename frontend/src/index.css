@@ -429,3 +429,45 @@ body > div[style*="position:fixed"][style*="bottom"] {
     animation-iteration-count: infinite !important;
   }
 }
+
+/* Formulários compactos (referência: Bsoft TMS). Vale em toda janela de
+   formulário (DialogContent e seções do FormKit levam a classe .form-dense)
+   e em todo <form> dentro do <main> do Layout. Campos de 32px, rótulo mais
+   perto do campo e menos espaço entre linhas e seções: a ordem/cadastro
+   cabe na tela quase sem rolar. Só do tablet pra cima - no celular os campos
+   seguem maiores pro toque. Fica fora das @layer pra ganhar das classes
+   h-9/gap-3 escritas nas telas. */
+@media (min-width: 768px) {
+  :is(.form-dense, main form) :is(input, textarea, select, button):is(.h-9, .h-10, .md\:h-9) {
+    height: 2rem;
+  }
+  :is(.form-dense, main form) button:is(.w-9, .md\:w-9) {
+    width: 2rem;
+  }
+  :is(.form-dense, main form) label {
+    font-size: 12px;
+  }
+  :is(.form-dense, main form) label:is(.mb-1\.5, .mb-2) {
+    margin-bottom: 0.25rem;
+  }
+  :is(.form-dense, main form) :is(.space-y-1\.5, .space-y-2) > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.25rem;
+  }
+  :is(.form-dense, main form) .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.75rem;
+  }
+  :is(.form-dense, main form) .space-y-5 > :not([hidden]) ~ :not([hidden]),
+  :is(.form-dense, main form) .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.875rem;
+  }
+  :is(.form-dense, main form) .gap-3 {
+    row-gap: 0.5rem;
+  }
+  :is(.form-dense, main form) .gap-4 {
+    row-gap: 0.625rem;
+  }
+  :is(.form-dense, main form) textarea.min-h-\[60px\],
+  :is(.form-dense, main form) textarea.min-h-\[80px\] {
+    min-height: 52px;
+  }
+}
