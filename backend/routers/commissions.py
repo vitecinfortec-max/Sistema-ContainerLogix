@@ -13,7 +13,7 @@ from fastapi.responses import StreamingResponse
 
 from models import (CommissionAdvanceCreate, CommissionBatchCreate, CommissionEntryCreate, CommissionFromCtesRequest,
                     CommissionPayRequest)
-from reports import BRT_TZ, generate_commission_statement_pdf
+from reports import BRT_TZ, format_currency, generate_commission_statement_pdf
 from shared import db, get_company_settings, get_current_active_user, round_money
 
 api_router = APIRouter(prefix="/api")
@@ -290,26 +290,36 @@ async def _insert(fields: dict, current_user: dict) -> dict:
 
 @api_router.post("/commission-entries/pay")
 async def pay_commission_entries(data: CommissionPayRequest, current_user: dict = Depends(get_current_active_user)):
-    """Baixa (prestação de contas paga): marca os lançamentos pendentes como pagos."""
+    """Baixa (prestação de contas paga): marca os lançamentos pendentes como
+    pagos e desconta os adiantamentos escolhidos. Se os adiantamentos de um
+    representante passam da comissão, a baixa fecha com líquido zero e o
+    saldo negativo vira um desconto pendente, descontado na próxima comissão."""
     payment_date = _day(data.payment_date, "Data do pagamento")
     if not data.ids or not payment_date:
         raise HTTPException(status_code=400, detail="Escolha os lançamentos e a data do pagamento")
     entries = await db.commission_entries.find({"id": {"$in": data.ids}, "status": "PENDENTE"}, {"_id": 0}).to_list(None)
     if not entries:
-        return {"paid": 0, "advances_deducted": 0, "net": 0}
+        return {"paid": 0, "advances_deducted": 0, "net": 0, "carried_over": []}
     advance_ids = set(data.advance_ids)
     advances = await db.commission_advances.find({"id": {"$in": list(advance_ids)}, "status": "PENDENTE"}, {"_id": 0}).to_list(None)
     reps = {e["representative_id"] for e in entries}
     if len(advances) != len(advance_ids) or any(a["representative_id"] not in reps for a in advances):
         raise HTTPException(status_code=400, detail="Adiantamento já descontado ou de outro representante")
-    for rep_id in reps:
-        commission = sum(e["commission_value"] for e in entries if e["representative_id"] == rep_id)
-        advanced = sum(a["value"] for a in advances if a["representative_id"] == rep_id)
-        if advanced > commission + 0.005:
-            name = next(e["representative_name"] for e in entries if e["representative_id"] == rep_id)
-            raise HTTPException(status_code=400, detail=f"Os adiantamentos de {name} passam da comissão desta baixa: "
-                                                        "deixe algum para o próximo pagamento")
     payment_id = str(uuid.uuid4())
+    carried, net = [], 0
+    for rep_id in reps:
+        commission = round_money(sum(e["commission_value"] for e in entries if e["representative_id"] == rep_id))
+        advanced = round_money(sum(a["value"] for a in advances if a["representative_id"] == rep_id))
+        net += max(commission - advanced, 0)
+        if advanced > commission + 0.005:
+            carried.append({
+                "representative_id": rep_id,
+                "representative_name": next(e["representative_name"] for e in entries if e["representative_id"] == rep_id),
+                "advance_date": payment_date, "value": round_money(advanced - commission),
+                "description": (f"Saldo negativo da comissão paga em {date.fromisoformat(payment_date).strftime('%d/%m/%Y')}: "
+                                f"adiantamentos de {format_currency(advanced)} maiores que a comissão de {format_currency(commission)}"),
+                "origin": "SALDO_NEGATIVO", "source_payment_id": payment_id,
+            })
     result = await db.commission_entries.update_many(
         {"id": {"$in": [e["id"] for e in entries]}, "status": "PENDENTE"},
         {"$set": {"status": "PAGO", "payment_date": payment_date, "payment_notes": (data.payment_notes or "").strip() or None,
@@ -320,16 +330,25 @@ async def pay_commission_entries(data: CommissionPayRequest, current_user: dict 
             {"id": {"$in": [a["id"] for a in advances]}},
             {"$set": {"status": "DESCONTADO", "deducted_on": payment_date, "payment_id": payment_id}},
         )
-    deducted = round_money(sum(a["value"] for a in advances))
-    return {"paid": result.modified_count, "advances_deducted": deducted,
-            "net": round_money(sum(e["commission_value"] for e in entries) - deducted)}
+    carried = [await _insert_advance(c, current_user) for c in carried]
+    return {"paid": result.modified_count, "advances_deducted": round_money(sum(a["value"] for a in advances)),
+            "net": round_money(net), "carried_over": carried}
 
 
 @api_router.post("/commission-entries/unpay")
 async def unpay_commission_entries(data: CommissionFromCtesRequest, current_user: dict = Depends(get_current_active_user)):
     """Estorna a baixa (volta para pendente). Quando a baixa inteira é
-    estornada, os adiantamentos descontados nela voltam a ficar a descontar."""
+    estornada, os adiantamentos descontados nela voltam a ficar a descontar e
+    o saldo negativo que ela levou para a próxima comissão é cancelado."""
     payment_ids = set(await db.commission_entries.distinct("payment_id", {"id": {"$in": data.ids}, "status": "PAGO"})) - {None}
+    closing = {pid for pid in payment_ids
+               if not await db.commission_entries.count_documents({"payment_id": pid, "status": "PAGO", "id": {"$nin": data.ids}})}
+    used = await db.commission_advances.find_one({"source_payment_id": {"$in": list(closing)}, "status": "DESCONTADO"}, {"_id": 0})
+    if used:
+        raise HTTPException(status_code=400, detail=(
+            f"O saldo negativo desta baixa ({format_currency(used['value'])}) já foi descontado no pagamento de "
+            f"{date.fromisoformat(used['deducted_on']).strftime('%d/%m/%Y')}: estorne aquele pagamento antes"))
+    await db.commission_advances.delete_many({"source_payment_id": {"$in": list(closing)}, "status": "PENDENTE"})
     result = await db.commission_entries.update_many(
         {"id": {"$in": data.ids}, "status": "PAGO"},
         {"$set": {"status": "PENDENTE", "payment_date": None, "payment_notes": None, "payment_id": None,
@@ -406,6 +425,8 @@ async def _advance_or_404(advance_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Adiantamento não encontrado")
     if advance["status"] != "PENDENTE":
         raise HTTPException(status_code=400, detail="Adiantamento já descontado: estorne o pagamento antes de alterar")
+    if advance.get("origin") == "SALDO_NEGATIVO":
+        raise HTTPException(status_code=400, detail="Saldo negativo de uma baixa anterior: para desfazer, estorne aquele pagamento")
     return advance
 
 

@@ -54,7 +54,7 @@ def test_filters_pay_and_unpay(api):
     assert api.get("/api/commission-entries", params={"search": "102"}).json()[0]["id"] == b["id"]
 
     r = api.post("/api/commission-entries/pay", json={"ids": [a["id"], b["id"]], "payment_date": "2026-10-27", "payment_notes": "PIX"})
-    assert r.json() == {"paid": 2, "advances_deducted": 0, "net": 1000}
+    assert r.json() == {"paid": 2, "advances_deducted": 0, "net": 1000, "carried_over": []}
     paid = api.get(f"/api/commission-entries/{a['id']}").json()
     assert (paid["status"], paid["payment_date"], paid["payment_notes"]) == ("PAGO", "2026-10-27", "PIX")
     # pago fica travado
@@ -163,10 +163,8 @@ def test_batch_by_representative_with_advances(api):
     ids = [e["id"] for e in created]
     adv_id = advances[0]["id"]
     too_much = api.post("/api/commission-advances", json={"representative_id": rep["id"], "advance_date": "2026-10-20", "value": 5000}).json()
-    r = api.post("/api/commission-entries/pay", json={"ids": ids, "payment_date": "2026-11-05", "advance_ids": [adv_id, too_much["id"]]})
-    assert r.status_code == 400 and "passam da comissão" in r.json()["detail"]
     r = api.post("/api/commission-entries/pay", json={"ids": ids, "payment_date": "2026-11-05", "advance_ids": [adv_id]})
-    assert r.json() == {"paid": 2, "advances_deducted": 300, "net": 900}
+    assert r.json() == {"paid": 2, "advances_deducted": 300, "net": 900, "carried_over": []}
     adv = api.get("/api/commission-advances", params={"status": "DESCONTADO"}).json()
     assert [(a["id"], a["deducted_on"]) for a in adv] == [(adv_id, "2026-11-05")]
     assert api.delete(f"/api/commission-advances/{adv_id}").status_code == 400
@@ -198,3 +196,32 @@ def test_advance_crud(api):
     assert api.get("/api/commission-advances", params={"start_date": "2026-10-03"}).json() == []
     assert api.get("/api/commission-advances", params={"search": "vale"}).json()[0]["id"] == a["id"]
     assert api.delete(f"/api/commission-advances/{a['id']}").status_code == 200
+
+
+def test_negative_balance_carried_to_next_commission(api):
+    client, rep = _setup(api, pct=10)
+    first = _entry(api, client, freight_value=5000).json()  # comissão 500
+    adv = api.post("/api/commission-advances", json={"representative_id": rep["id"], "advance_date": "2026-10-05", "value": 800}).json()
+    r = api.post("/api/commission-entries/pay", json={"ids": [first["id"]], "payment_date": "2026-10-31", "advance_ids": [adv["id"]]})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert (body["paid"], body["advances_deducted"], body["net"]) == (1, 800, 0)
+    saldo = body["carried_over"][0]
+    assert (saldo["value"], saldo["status"], saldo["origin"], saldo["advance_date"]) == (300, "PENDENTE", "SALDO_NEGATIVO", "2026-10-31")
+    assert saldo["description"] == ("Saldo negativo da comissão paga em 31/10/2026: adiantamentos de R$ 800,00 "
+                                    "maiores que a comissão de R$ 500,00")
+    # é automático: não se edita nem exclui à mão
+    assert api.delete(f"/api/commission-advances/{saldo['id']}").status_code == 400
+
+    # próxima comissão desconta o saldo
+    second = _entry(api, client, freight_value=20000, billing_date="2026-11-30").json()  # comissão 2000
+    r = api.post("/api/commission-entries/pay", json={"ids": [second["id"]], "payment_date": "2026-11-30", "advance_ids": [saldo["id"]]})
+    assert (r.json()["net"], r.json()["carried_over"]) == (1700, [])
+
+    # a primeira baixa não pode ser estornada enquanto o saldo dela estiver descontado na segunda
+    r = api.post("/api/commission-entries/unpay", json={"ids": [first["id"]]})
+    assert r.status_code == 400 and "30/11/2026" in r.json()["detail"]
+    api.post("/api/commission-entries/unpay", json={"ids": [second["id"]]})
+    assert api.post("/api/commission-entries/unpay", json={"ids": [first["id"]]}).json() == {"reverted": 1, "advances_reverted": 1}
+    left = api.get("/api/commission-advances").json()
+    assert [(a["id"], a["status"]) for a in left] == [(adv["id"], "PENDENTE")]  # o saldo foi cancelado

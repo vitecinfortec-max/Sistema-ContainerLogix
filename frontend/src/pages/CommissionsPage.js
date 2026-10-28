@@ -81,16 +81,8 @@ const emptyBatch = () => ({
 });
 const emptyAdvance = () => ({ representative_id: '', advance_date: today(), value: '', description: '' });
 
-/** Na baixa, já marca os adiantamentos mais antigos que cabem na comissão de cada representante. */
-function pickAdvances(advances, entries) {
-  const room = {};
-  entries.forEach((e) => { room[e.representative_id] = (room[e.representative_id] || 0) + e.commission_value; });
-  const ids = new Set();
-  [...advances].sort((a, b) => a.advance_date.localeCompare(b.advance_date)).forEach((a) => {
-    if (a.value <= (room[a.representative_id] || 0) + 0.005) { ids.add(a.id); room[a.representative_id] -= a.value; }
-  });
-  return ids;
-}
+// Saldo negativo de uma baixa anterior, lançado sozinho para a próxima comissão
+const isCarried = (a) => a.origin === 'SALDO_NEGATIVO';
 
 export default function CommissionsPage() {
   const navigate = useNavigate();
@@ -274,9 +266,13 @@ export default function CommissionsPage() {
   // ----- pagamento -----
   const payCommission = sumBy(selectedPending, 'commission_value');
   const payAdvTotal = sumBy(payAdvances.filter((a) => payAdvIds.has(a.id)), 'value');
-  const payOverReps = [...new Set(selectedPending.map((e) => e.representative_id))].filter((id) => (
-    sumBy(payAdvances.filter((a) => payAdvIds.has(a.id) && a.representative_id === id), 'value')
-      > sumBy(selectedPending.filter((e) => e.representative_id === id), 'commission_value') + 0.005));
+  // Por representante: o que os adiantamentos passam da comissão vai para a próxima
+  const payCarry = [...new Set(selectedPending.map((e) => e.representative_id))].map((id) => {
+    const commission = sumBy(selectedPending.filter((e) => e.representative_id === id), 'commission_value');
+    const advanced = sumBy(payAdvances.filter((a) => payAdvIds.has(a.id) && a.representative_id === id), 'value');
+    return { id, name: selectedPending.find((e) => e.representative_id === id).representative_name, commission, advanced };
+  }).filter((r) => r.advanced > r.commission + 0.005);
+  const payNet = payCommission - payAdvTotal + sumBy(payCarry.map((r) => ({ v: r.advanced - r.commission })), 'v');
   const openPay = async () => {
     setPayForm({ payment_date: today(), payment_notes: '' });
     setPayAdvances([]);
@@ -287,7 +283,7 @@ export default function CommissionsPage() {
       const r = await api.getCommissionAdvances({ status: 'PENDENTE' });
       const list = (r.data || []).filter((a) => reps.has(a.representative_id));
       setPayAdvances(list);
-      setPayAdvIds(pickAdvances(list, selectedPending));
+      setPayAdvIds(new Set(list.map((a) => a.id)));
     } catch (e) {
       toast.error('Erro ao buscar os adiantamentos do representante');
     }
@@ -298,6 +294,7 @@ export default function CommissionsPage() {
       const r = await api.payCommissionEntries({ ids: selectedPending.map((e) => e.id), ...payForm, advance_ids: [...payAdvIds] });
       toast.success(`${r.data.paid} lançamento(s) baixado(s) como pago(s)${r.data.advances_deducted
         ? ` · ${fmtMoney(r.data.advances_deducted)} de adiantamento descontado · líquido ${fmtMoney(r.data.net)}` : ''}`);
+      r.data.carried_over.forEach((c) => toast.info(`${c.representative_name}: saldo negativo de ${fmtMoney(c.value)} lançado para descontar na próxima comissão`, { duration: 8000 }));
       setPayOpen(false);
       setSelectedIds(new Set());
       loadList();
@@ -422,6 +419,7 @@ export default function CommissionsPage() {
   // ----- adiantamentos -----
   const openAdvance = (a = null) => {
     if (a && a.status !== 'PENDENTE') { toast.info('Adiantamento já descontado: estorne o pagamento para alterar'); return; }
+    if (a && isCarried(a)) { toast.info('Saldo negativo lançado automaticamente: para desfazer, estorne o pagamento que o gerou'); return; }
     setAdvEditingId(a?.id || null);
     setAdvForm(a ? { representative_id: a.representative_id, advance_date: a.advance_date, value: toMoneyInput(a.value), description: a.description || '' }
       : { ...emptyAdvance(), representative_id: repFilter || '' });
@@ -634,12 +632,13 @@ export default function CommissionsPage() {
                         {a.status === 'DESCONTADO'
                           ? <StatusPill tone="emerald" title={`Descontado na baixa de ${fmtDate(a.deducted_on)}`}>Descontado</StatusPill>
                           : <StatusPill tone="violet">A descontar</StatusPill>}
+                        {isCarried(a) && <StatusPill tone="amber" className="ml-1" title="Lançado sozinho na baixa em que os adiantamentos passaram da comissão">Saldo anterior</StatusPill>}
                       </td>
                       <td className="cell-strong">{a.representative_name}</td>
-                      <td><div className="max-w-[320px] truncate" title={a.description || ''}>{a.description || '-'}</div></td>
+                      <td><div className="max-w-[420px] whitespace-normal text-[13px]">{a.description || '-'}</div></td>
                       <td className="text-right tabular-nums font-semibold">{fmtMoney(a.value)}</td>
                       <td className="text-right whitespace-nowrap">
-                        {a.status === 'PENDENTE' && (
+                        {a.status === 'PENDENTE' && !isCarried(a) && (
                           <>
                             <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Editar" onClick={() => openAdvance(a)}><Edit className="w-3.5 h-3.5" /></Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-red-600" aria-label="Excluir" onClick={() => removeAdvance(a)}><Trash2 className="w-3.5 h-3.5" /></Button>
@@ -783,7 +782,7 @@ export default function CommissionsPage() {
             </p>
             {payAdvances.length > 0 && (
               <div className="space-y-1.5" data-testid="commission-pay-advances">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Adiantamentos a descontar</p>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Descontos (adiantamentos e saldo anterior)</p>
                 {payAdvances.map((a) => (
                   <label key={a.id} className="flex items-center gap-2 text-sm cursor-pointer">
                     <Checkbox checked={payAdvIds.has(a.id)} onCheckedChange={() => setPayAdvIds((prev) => {
@@ -792,21 +791,24 @@ export default function CommissionsPage() {
                       return next;
                     })} />
                     <span className="tabular-nums">{fmtDate(a.advance_date)}</span>
-                    <span className="flex-1 truncate text-slate-500">{a.description || a.representative_name}</span>
+                    <span className="flex-1 truncate text-slate-500" title={a.description || ''}>{isCarried(a) ? 'Saldo negativo anterior' : (a.description || 'Adiantamento')}</span>
                     <span className="tabular-nums font-medium">{fmtMoney(a.value)}</span>
                   </label>
                 ))}
                 <dl className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3 text-sm space-y-1">
                   <div className="flex justify-between"><dt className="text-slate-500">Comissão</dt><dd className="tabular-nums">{fmtMoney(payCommission)}</dd></div>
-                  <div className="flex justify-between"><dt className="text-slate-500">(-) Adiantamentos</dt><dd className="tabular-nums">{fmtMoney(payAdvTotal)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-slate-500">(-) Descontos</dt><dd className="tabular-nums">{fmtMoney(payAdvTotal)}</dd></div>
                   <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 font-semibold">
-                    <dt>Líquido a pagar</dt><dd className="tabular-nums text-primary" data-testid="commission-pay-net">{fmtMoney(payCommission - payAdvTotal)}</dd>
+                    <dt>Líquido a pagar</dt><dd className="tabular-nums text-primary" data-testid="commission-pay-net">{fmtMoney(payNet)}</dd>
                   </div>
                 </dl>
-                {payOverReps.length > 0 && (
-                  <p className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300"><AlertTriangle className="w-3.5 h-3.5" />
-                    Os adiantamentos passam da comissão: desmarque algum (fica para o próximo pagamento).</p>
-                )}
+                {payCarry.map((r) => (
+                  <p key={r.id} className="flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-300" data-testid="commission-pay-carry">
+                    <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span>Saldo negativo{payCarry.length > 1 ? ` de ${r.name}` : ''}: os descontos ({fmtMoney(r.advanced)}) passam da comissão ({fmtMoney(r.commission)}).
+                      A baixa fecha com líquido zero e <b>{fmtMoney(r.advanced - r.commission)}</b> serão descontados automaticamente na próxima comissão.</span>
+                  </p>
+                ))}
               </div>
             )}
             <Field label="Data do pagamento" required>
@@ -818,7 +820,7 @@ export default function CommissionsPage() {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPayOpen(false)}>Cancelar</Button>
-            <Button onClick={pay} disabled={!payForm.payment_date || busy === 'pay' || payOverReps.length > 0} data-testid="commission-pay-confirm">
+            <Button onClick={pay} disabled={!payForm.payment_date || busy === 'pay'} data-testid="commission-pay-confirm">
               {busy === 'pay' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Wallet className="w-4 h-4 mr-1.5" />} Confirmar pagamento
             </Button>
           </DialogFooter>
@@ -965,7 +967,9 @@ export default function CommissionsPage() {
                 </button>
                 {batchPendingAdv.length > 0 && (
                   <p className="text-xs text-slate-500" data-testid="commission-batch-pending-adv">
-                    Adiantamentos anteriores ainda a descontar: {batchPendingAdv.map((a) => `${fmtDate(a.advance_date)} ${fmtMoney(a.value)}`).join(' · ')}
+                    Também serão descontados:{' '}
+                    {batchPendingAdv.map((a) => (isCarried(a) ? `saldo negativo anterior ${fmtMoney(a.value)} (${a.description})`
+                      : `adiantamento de ${fmtDate(a.advance_date)} ${fmtMoney(a.value)}`)).join(' · ')}
                   </p>
                 )}
               </div>
@@ -974,7 +978,7 @@ export default function CommissionsPage() {
             {batch.representative_id && (
               <dl className="ml-auto max-w-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3 text-sm space-y-1" data-testid="commission-batch-calc">
                 <div className="flex justify-between"><dt className="text-slate-500">Total da comissão</dt><dd className="tabular-nums">{fmtMoney(batchTotals.commission)}</dd></div>
-                <div className="flex justify-between"><dt className="text-slate-500">(-) Adiantamento</dt><dd className="tabular-nums">{fmtMoney(batchTotals.advances)}</dd></div>
+                <div className="flex justify-between"><dt className="text-slate-500">(-) Adiantamento{batchPendingAdv.some(isCarried) ? ' e saldo anterior' : ''}</dt><dd className="tabular-nums">{fmtMoney(batchTotals.advances)}</dd></div>
                 <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 font-semibold">
                   <dt>Líquido a pagar</dt>
                   <dd className={`tabular-nums ${batchTotals.commission - batchTotals.advances < 0 ? 'text-red-600' : 'text-primary'}`} data-testid="commission-batch-net">{fmtMoney(batchTotals.commission - batchTotals.advances)}</dd>
