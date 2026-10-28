@@ -54,7 +54,7 @@ def test_filters_pay_and_unpay(api):
     assert api.get("/api/commission-entries", params={"search": "102"}).json()[0]["id"] == b["id"]
 
     r = api.post("/api/commission-entries/pay", json={"ids": [a["id"], b["id"]], "payment_date": "2026-10-27", "payment_notes": "PIX"})
-    assert r.json() == {"paid": 2}
+    assert r.json() == {"paid": 2, "advances_deducted": 0, "net": 1000}
     paid = api.get(f"/api/commission-entries/{a['id']}").json()
     assert (paid["status"], paid["payment_date"], paid["payment_notes"]) == ("PAGO", "2026-10-27", "PIX")
     # pago fica travado
@@ -62,7 +62,7 @@ def test_filters_pay_and_unpay(api):
     assert api.delete(f"/api/commission-entries/{a['id']}").status_code == 400
     assert api.get("/api/commission-entries", params={"status": "PENDENTE"}).json() == []
 
-    assert api.post("/api/commission-entries/unpay", json={"ids": [a["id"]]}).json() == {"reverted": 1}
+    assert api.post("/api/commission-entries/unpay", json={"ids": [a["id"]]}).json() == {"reverted": 1, "advances_reverted": 0}
     assert api.delete(f"/api/commission-entries/{a['id']}").status_code == 200
 
 
@@ -123,3 +123,78 @@ def test_client_and_representative_in_use(api):
     r = api.delete(f"/api/representatives/{rep['id']}")
     assert r.status_code == 400 and "lançamento(s) de comissão" in r.json()["detail"]
     assert api.delete(f"/api/clients/{client['id']}").status_code == 400
+
+
+def test_period_of_entry(api):
+    client, _ = _setup(api)
+    e = _entry(api, client, period_start="2026-09-01", period_end="2026-09-30").json()
+    assert (e["period_start"], e["period_end"]) == ("2026-09-01", "2026-09-30")
+    assert _entry(api, client, period_start="2026-10-01", period_end="2026-09-30").status_code == 400
+    assert _entry(api, client, period_start="01/09/2026").status_code == 400
+
+
+def test_batch_by_representative_with_advances(api):
+    client, rep = _setup(api, pct=10)
+    other = api.post("/api/clients", json={"name": "Cliente Dois"}).json()
+    api.post("/api/client-representative-links", json={"client_id": other["id"], "representative_id": rep["id"], "commission_percentage": 5})
+    body = {"representative_id": rep["id"], "billing_date": "2026-10-31", "period_start": "2026-10-01", "period_end": "2026-10-31",
+            "items": [{"client_id": client["id"], "freight_value": 10000},
+                      {"client_id": other["id"], "freight_value": 4000, "document_number": "F-7", "period_start": "2026-09-15"}],
+            "advances": [{"representative_id": "", "advance_date": "2026-10-10", "value": 300, "description": "PIX"}]}
+    r = api.post("/api/commission-entries/batch", json=body)
+    assert r.status_code == 200, r.text
+    created, advances = r.json()["created"], r.json()["advances"]
+    assert [(e["client_name"], e["commission_value"], e["period_start"], e["document_type"]) for e in created] == [
+        ("Cliente Frete", 1000, "2026-10-01", "FATURA"), ("Cliente Dois", 200, "2026-09-15", "FATURA")]
+    assert (advances[0]["representative_name"], advances[0]["value"], advances[0]["status"]) == ("Rep Comissão", 300, "PENDENTE")
+
+    # cliente de outro representante não entra no lote (e nada é gravado)
+    rep2 = api.post("/api/representatives", json={"name": "Outro Rep"}).json()
+    third = api.post("/api/clients", json={"name": "Cliente Três"}).json()
+    api.post("/api/client-representative-links", json={"client_id": third["id"], "representative_id": rep2["id"], "commission_percentage": 5})
+    bad = {**body, "items": [{"client_id": client["id"], "freight_value": 1}, {"client_id": third["id"], "freight_value": 1}], "advances": []}
+    r = api.post("/api/commission-entries/batch", json=bad)
+    assert r.status_code == 400 and "outro representante" in r.json()["detail"]
+    bad["items"] = [{"client_id": client["id"], "freight_value": 0}]
+    assert "Cliente Frete:" in api.post("/api/commission-entries/batch", json=bad).json()["detail"]
+    assert len(api.get("/api/commission-entries").json()) == 2
+
+    # adiantamento descontado na baixa e devolvido no estorno
+    ids = [e["id"] for e in created]
+    adv_id = advances[0]["id"]
+    too_much = api.post("/api/commission-advances", json={"representative_id": rep["id"], "advance_date": "2026-10-20", "value": 5000}).json()
+    r = api.post("/api/commission-entries/pay", json={"ids": ids, "payment_date": "2026-11-05", "advance_ids": [adv_id, too_much["id"]]})
+    assert r.status_code == 400 and "passam da comissão" in r.json()["detail"]
+    r = api.post("/api/commission-entries/pay", json={"ids": ids, "payment_date": "2026-11-05", "advance_ids": [adv_id]})
+    assert r.json() == {"paid": 2, "advances_deducted": 300, "net": 900}
+    adv = api.get("/api/commission-advances", params={"status": "DESCONTADO"}).json()
+    assert [(a["id"], a["deducted_on"]) for a in adv] == [(adv_id, "2026-11-05")]
+    assert api.delete(f"/api/commission-advances/{adv_id}").status_code == 400
+
+    pdf = api.get("/api/commission-entries/pdf", params={"start_date": "2026-09-01", "end_date": "2026-11-30"})
+    text = " ".join(extract_text(io.BytesIO(pdf.content)).split())
+    assert "01/10 a 31/10/2026" in text and "Descontado" in text and "Saldo adiantado a descontar R$ 5.000,00" in text
+
+    # estorno parcial não devolve o adiantamento; o da baixa inteira devolve
+    assert api.post("/api/commission-entries/unpay", json={"ids": ids[:1]}).json() == {"reverted": 1, "advances_reverted": 0}
+    assert api.post("/api/commission-entries/unpay", json={"ids": ids[1:]}).json() == {"reverted": 1, "advances_reverted": 1}
+    assert api.get("/api/commission-advances", params={"status": "PENDENTE"}).json()[1]["id"] == adv_id
+
+    r = api.delete(f"/api/representatives/{rep2['id']}")
+    assert r.status_code == 400  # vínculo
+    api.run(api.db.commission_entries.delete_many({}))
+    api.run(api.db.client_representative_links.delete_many({}))
+    r = api.delete(f"/api/representatives/{rep['id']}")
+    assert r.status_code == 400 and "adiantamento(s)" in r.json()["detail"]
+
+
+def test_advance_crud(api):
+    _, rep = _setup(api)
+    assert api.post("/api/commission-advances", json={"representative_id": rep["id"], "advance_date": "2026-10-01", "value": 0}).status_code == 400
+    assert api.post("/api/commission-advances", json={"representative_id": "x", "advance_date": "2026-10-01", "value": 10}).status_code == 404
+    a = api.post("/api/commission-advances", json={"representative_id": rep["id"], "advance_date": "2026-10-01", "value": 150.5}).json()
+    r = api.put(f"/api/commission-advances/{a['id']}", json={"representative_id": rep["id"], "advance_date": "2026-10-02", "value": 200, "description": "Vale"})
+    assert (r.json()["value"], r.json()["description"], r.json()["advance_date"]) == (200, "Vale", "2026-10-02")
+    assert api.get("/api/commission-advances", params={"start_date": "2026-10-03"}).json() == []
+    assert api.get("/api/commission-advances", params={"search": "vale"}).json()[0]["id"] == a["id"]
+    assert api.delete(f"/api/commission-advances/{a['id']}").status_code == 200

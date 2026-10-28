@@ -20,7 +20,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
-  AlertTriangle, CheckCircle2, Clock, Edit, FileCheck, FileDown, Loader2, Percent, Plus, RotateCcw, Trash2, Truck, Wallet, X,
+  AlertTriangle, CheckCircle2, Clock, Edit, FileCheck, FileDown, HandCoins, Loader2, Percent, Plus, RotateCcw, Trash2, Truck, Users, Wallet, X,
 } from 'lucide-react';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -34,6 +34,16 @@ const toNumber = (v) => {
 const toMoneyInput = (v) => (v === null || v === undefined || v === '' ? '' : Number(v).toFixed(2).replace('.', ','));
 const moneyMask = (v) => v.replace(/[^\d,.]/g, '');
 const today = () => format(new Date(), 'yyyy-MM-dd');
+const monthPeriod = () => [format(startOfMonth(new Date()), 'yyyy-MM-dd'), format(endOfMonth(new Date()), 'yyyy-MM-dd')];
+const fmtPeriod = (start, end) => {
+  if (!start && !end) return '-';
+  // Mesmo ano: "01/10 a 31/10/2026", para caber na lista
+  const from = start && end && start.slice(0, 4) === end.slice(0, 4) ? fmtDate(start).slice(0, 5) : (start ? fmtDate(start) : '...');
+  return `${from} a ${end ? fmtDate(end) : '...'}`;
+};
+const sumBy = (items, key) => items.reduce((s, x) => s + (x[key] || 0), 0);
+// Situação do filtro (lançamento) -> situação do adiantamento
+const ADVANCE_STATUS = { PENDENTE: 'PENDENTE', PAGO: 'DESCONTADO' };
 
 const DOCUMENT_TYPES = [['CTE', 'CT-e'], ['NF', 'Nota fiscal'], ['FATURA', 'Fatura'], ['OUTRO', 'Outro']];
 const DOC_LABELS = Object.fromEntries(DOCUMENT_TYPES);
@@ -42,12 +52,14 @@ const DISCOUNT_PRESETS = ['Impostos', 'Pedágio', 'Seguro', 'Descarga', 'Avaria'
 
 const emptyForm = () => ({
   client_id: null, client_name: '', document_type: 'CTE', document_number: '', billing_date: today(),
+  period_start: monthPeriod()[0], period_end: monthPeriod()[1],
   freight_value: '', discounts: [], use_table: true, commission_percentage: '', observations: '',
 });
 
 const toForm = (e) => ({
   client_id: e.client_id, client_name: e.client_name, document_type: e.document_type || 'CTE',
   document_number: e.document_number || '', billing_date: e.billing_date, freight_value: toMoneyInput(e.freight_value),
+  period_start: e.period_start || '', period_end: e.period_end || '',
   discounts: (e.discounts || []).map((d) => ({ description: d.description, value: toMoneyInput(d.value) })),
   use_table: !e.percentage_overridden, commission_percentage: String(e.commission_percentage).replace('.', ','),
   observations: e.observations || '',
@@ -60,6 +72,23 @@ function calculate(form, link) {
   const base = Math.max(freight - discount, 0);
   const pct = form.use_table ? (link?.commission_percentage ?? null) : toNumber(form.commission_percentage);
   return { freight, discount, base, pct, commission: pct === null ? null : Math.round(base * pct) / 100 };
+}
+
+const emptyBatch = () => ({
+  representative_id: '', billing_date: today(), period_start: monthPeriod()[0], period_end: monthPeriod()[1],
+  document_type: 'FATURA', rows: {}, advances: [],
+});
+const emptyAdvance = () => ({ representative_id: '', advance_date: today(), value: '', description: '' });
+
+/** Na baixa, já marca os adiantamentos mais antigos que cabem na comissão de cada representante. */
+function pickAdvances(advances, entries) {
+  const room = {};
+  entries.forEach((e) => { room[e.representative_id] = (room[e.representative_id] || 0) + e.commission_value; });
+  const ids = new Set();
+  [...advances].sort((a, b) => a.advance_date.localeCompare(b.advance_date)).forEach((a) => {
+    if (a.value <= (room[a.representative_id] || 0) + 0.005) { ids.add(a.id); room[a.representative_id] -= a.value; }
+  });
+  return ids;
 }
 
 export default function CommissionsPage() {
@@ -85,6 +114,15 @@ export default function CommissionsPage() {
   const [candidates, setCandidates] = useState([]);
   const [cteIds, setCteIds] = useState(() => new Set());
   const [busy, setBusy] = useState('');
+  const [advances, setAdvances] = useState([]);
+  const [advOpen, setAdvOpen] = useState(false);
+  const [advEditingId, setAdvEditingId] = useState(null);
+  const [advForm, setAdvForm] = useState(emptyAdvance());
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [batch, setBatch] = useState(emptyBatch());
+  const [batchPendingAdv, setBatchPendingAdv] = useState([]);
+  const [payAdvances, setPayAdvances] = useState([]);
+  const [payAdvIds, setPayAdvIds] = useState(() => new Set());
   const debounceRef = useRef(null);
 
   const params = useMemo(() => {
@@ -116,8 +154,10 @@ export default function CommissionsPage() {
     if (period[0] && period[1] && period[0] > period[1]) return;
     setLoading(true);
     try {
-      const r = await api.getCommissionEntries(params);
+      const advParams = { ...params, status: ADVANCE_STATUS[params.status] };
+      const [r, a] = await Promise.all([api.getCommissionEntries(params), api.getCommissionAdvances(advParams)]);
       setEntries(r.data || []);
+      setAdvances(a.data || []);
       setSelectedIds((prev) => new Set([...prev].filter((id) => (r.data || []).some((e) => e.id === id))));
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao carregar as comissões');
@@ -127,22 +167,25 @@ export default function CommissionsPage() {
   };
 
   const totals = useMemo(() => {
-    const sum = (items, key) => items.reduce((s, e) => s + (e[key] || 0), 0);
     const pending = entries.filter((e) => e.status === 'PENDENTE');
+    const advPending = advances.filter((a) => a.status === 'PENDENTE');
     const byRep = {};
+    const repOf = (id, name) => byRep[id] || (byRep[id] = { name, count: 0, freight: 0, commission: 0, pending: 0, advances: 0 });
     entries.forEach((e) => {
-      const r = byRep[e.representative_id] || (byRep[e.representative_id] = { name: e.representative_name, count: 0, freight: 0, commission: 0, pending: 0 });
+      const r = repOf(e.representative_id, e.representative_name);
       r.count += 1;
       r.freight += e.freight_value || 0;
       r.commission += e.commission_value || 0;
       if (e.status === 'PENDENTE') r.pending += e.commission_value || 0;
     });
+    advPending.forEach((a) => { repOf(a.representative_id, a.representative_name).advances += a.value; });
     return {
-      freight: sum(entries, 'freight_value'), discount: sum(entries, 'discount_total'),
-      pending: sum(pending, 'commission_value'), paid: sum(entries, 'commission_value') - sum(pending, 'commission_value'),
+      freight: sumBy(entries, 'freight_value'), discount: sumBy(entries, 'discount_total'),
+      pending: sumBy(pending, 'commission_value'), paid: sumBy(entries, 'commission_value') - sumBy(pending, 'commission_value'),
+      advances: sumBy(advPending, 'value'),
       byRep: Object.values(byRep).sort((a, b) => a.name.localeCompare(b.name)),
     };
-  }, [entries]);
+  }, [entries, advances]);
 
   const selected = entries.filter((e) => selectedIds.has(e.id));
   const single = selected.length === 1 ? selected[0] : null;
@@ -185,6 +228,7 @@ export default function CommissionsPage() {
   if (form.discounts.some((d) => toNumber(d.value) && !(d.description || '').trim())) formIssues.push('Informe a descrição de cada desconto');
   if (!form.use_table && (calc.pct === null || calc.pct < 0 || calc.pct > 100)) formIssues.push('Percentual de comissão entre 0 e 100');
   if (!form.billing_date) formIssues.push('Informe a data do faturamento');
+  if (form.period_start && form.period_end && form.period_start > form.period_end) formIssues.push('O início do período não pode ser depois do fim');
 
   const save = async ({ again = false } = {}) => {
     if (formIssues.length) { toast.error(formIssues[0]); return; }
@@ -193,6 +237,7 @@ export default function CommissionsPage() {
       const payload = {
         client_id: form.client_id, document_type: form.document_type, document_number: form.document_number.trim() || null,
         billing_date: form.billing_date, freight_value: calc.freight,
+        period_start: form.period_start || null, period_end: form.period_end || null,
         discounts: form.discounts.filter((d) => (d.description || '').trim() || toNumber(d.value))
           .map((d) => ({ description: d.description.trim(), value: toNumber(d.value) || 0 })),
         commission_percentage: form.use_table ? null : calc.pct, observations: form.observations.trim() || null,
@@ -226,11 +271,32 @@ export default function CommissionsPage() {
   };
 
   // ----- pagamento -----
+  const payCommission = sumBy(selectedPending, 'commission_value');
+  const payAdvTotal = sumBy(payAdvances.filter((a) => payAdvIds.has(a.id)), 'value');
+  const payOverReps = [...new Set(selectedPending.map((e) => e.representative_id))].filter((id) => (
+    sumBy(payAdvances.filter((a) => payAdvIds.has(a.id) && a.representative_id === id), 'value')
+      > sumBy(selectedPending.filter((e) => e.representative_id === id), 'commission_value') + 0.005));
+  const openPay = async () => {
+    setPayForm({ payment_date: today(), payment_notes: '' });
+    setPayAdvances([]);
+    setPayAdvIds(new Set());
+    setPayOpen(true);
+    try {
+      const reps = new Set(selectedPending.map((e) => e.representative_id));
+      const r = await api.getCommissionAdvances({ status: 'PENDENTE' });
+      const list = (r.data || []).filter((a) => reps.has(a.representative_id));
+      setPayAdvances(list);
+      setPayAdvIds(pickAdvances(list, selectedPending));
+    } catch (e) {
+      toast.error('Erro ao buscar os adiantamentos do representante');
+    }
+  };
   const pay = async () => {
     setBusy('pay');
     try {
-      const r = await api.payCommissionEntries({ ids: selectedPending.map((e) => e.id), ...payForm });
-      toast.success(`${r.data.paid} lançamento(s) baixado(s) como pago(s)`);
+      const r = await api.payCommissionEntries({ ids: selectedPending.map((e) => e.id), ...payForm, advance_ids: [...payAdvIds] });
+      toast.success(`${r.data.paid} lançamento(s) baixado(s) como pago(s)${r.data.advances_deducted
+        ? ` · ${fmtMoney(r.data.advances_deducted)} de adiantamento descontado · líquido ${fmtMoney(r.data.net)}` : ''}`);
       setPayOpen(false);
       setSelectedIds(new Set());
       loadList();
@@ -244,7 +310,8 @@ export default function CommissionsPage() {
     if (!(await confirm(`Estornar o pagamento de ${selectedPaid.length} lançamento(s)? Eles voltam para pendente.`))) return;
     try {
       const r = await api.unpayCommissionEntries(selectedPaid.map((e) => e.id));
-      toast.success(`${r.data.reverted} pagamento(s) estornado(s)`);
+      toast.success(`${r.data.reverted} pagamento(s) estornado(s)${r.data.advances_reverted
+        ? ` · ${r.data.advances_reverted} adiantamento(s) voltaram a ficar a descontar` : ''}`);
       loadList();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao estornar');
@@ -294,6 +361,105 @@ export default function CommissionsPage() {
 
   const selectedCandidates = candidates.filter((c) => cteIds.has(c.cte_id));
 
+  // ----- lançamento por representante -----
+  const batchLinks = links.filter((l) => l.representative_id === batch.representative_id)
+    .sort((a, b) => (a.client_name || '').localeCompare(b.client_name || ''));
+  const batchRows = batchLinks.map((l) => {
+    const row = batch.rows[l.client_id] || {};
+    const freight = toNumber(row.freight_value) || 0;
+    return {
+      link: l, row, freight, commission: Math.round(freight * l.commission_percentage) / 100,
+      period_start: row.period_start ?? batch.period_start, period_end: row.period_end ?? batch.period_end,
+    };
+  });
+  const batchFilled = batchRows.filter((r) => r.freight > 0);
+  const batchNewAdv = batch.advances.filter((a) => toNumber(a.value) || a.description.trim());
+  const batchTotals = {
+    freight: batchFilled.reduce((s, r) => s + r.freight, 0),
+    commission: batchFilled.reduce((s, r) => s + r.commission, 0),
+    advances: batchNewAdv.reduce((s, a) => s + (toNumber(a.value) || 0), 0) + sumBy(batchPendingAdv, 'value'),
+  };
+  const batchIssues = [];
+  if (!batch.representative_id) batchIssues.push('Escolha o representante');
+  else if (!batchLinks.length) batchIssues.push('Representante sem clientes no Vínculo de Clientes');
+  if (!batch.billing_date) batchIssues.push('Informe a data do faturamento');
+  if (batchRows.some((r) => r.period_start && r.period_end && r.period_start > r.period_end)) batchIssues.push('O início do período não pode ser depois do fim');
+  if (batchNewAdv.some((a) => !(toNumber(a.value) > 0) || !a.advance_date)) batchIssues.push('Informe a data e o valor de cada adiantamento');
+  if (batch.representative_id && !batchFilled.length && !batchNewAdv.length) batchIssues.push('Informe o frete faturado de pelo menos um cliente');
+
+  const setBatchRow = (clientId, patch) => setBatch((p) => ({ ...p, rows: { ...p.rows, [clientId]: { ...p.rows[clientId], ...patch } } }));
+  const setBatchAdv = (i, patch) => setBatch((p) => ({ ...p, advances: p.advances.map((a, j) => (j === i ? { ...a, ...patch } : a)) }));
+  const openBatch = () => {
+    setBatch({ ...emptyBatch(), representative_id: repFilter || '', ...(period[0] && period[1] ? { period_start: period[0], period_end: period[1] } : {}) });
+    setBatchOpen(true);
+  };
+  useEffect(() => {
+    setBatchPendingAdv([]);
+    if (!batchOpen || !batch.representative_id) return;
+    api.getCommissionAdvances({ representative_id: batch.representative_id, status: 'PENDENTE' })
+      .then((r) => setBatchPendingAdv(r.data || [])).catch(() => {});
+  }, [batchOpen, batch.representative_id]);
+
+  const saveBatch = async () => {
+    if (batchIssues.length) { toast.error(batchIssues[0]); return; }
+    setBusy('batch');
+    try {
+      const r = await api.createCommissionBatch({
+        representative_id: batch.representative_id, billing_date: batch.billing_date, document_type: batch.document_type,
+        period_start: batch.period_start || null, period_end: batch.period_end || null,
+        items: batchFilled.map((x) => ({
+          client_id: x.link.client_id, freight_value: x.freight, document_number: (x.row.document_number || '').trim() || null,
+          period_start: x.period_start || null, period_end: x.period_end || null,
+        })),
+        advances: batchNewAdv.map((a) => ({ representative_id: batch.representative_id, advance_date: a.advance_date, value: toNumber(a.value), description: a.description.trim() || null })),
+      });
+      const { created, advances: adv } = r.data;
+      toast.success([created.length && `${created.length} lançamento(s) · comissão de ${fmtMoney(sumBy(created, 'commission_value'))}`,
+        adv.length && `${adv.length} adiantamento(s) de ${fmtMoney(sumBy(adv, 'value'))}`].filter(Boolean).join(' · '));
+      setBatchOpen(false);
+      loadList();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Erro ao salvar o lançamento');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  // ----- adiantamentos -----
+  const openAdvance = (a = null) => {
+    if (a && a.status !== 'PENDENTE') { toast.info('Adiantamento já descontado: estorne o pagamento para alterar'); return; }
+    setAdvEditingId(a?.id || null);
+    setAdvForm(a ? { representative_id: a.representative_id, advance_date: a.advance_date, value: toMoneyInput(a.value), description: a.description || '' }
+      : { ...emptyAdvance(), representative_id: repFilter || '' });
+    setAdvOpen(true);
+  };
+  const saveAdvance = async () => {
+    const value = toNumber(advForm.value);
+    if (!advForm.representative_id || !advForm.advance_date || !(value > 0)) { toast.error('Informe o representante, a data e o valor'); return; }
+    setBusy('advance');
+    try {
+      const payload = { ...advForm, value, description: advForm.description.trim() || null };
+      if (advEditingId) await api.updateCommissionAdvance(advEditingId, payload); else await api.createCommissionAdvance(payload);
+      toast.success(`Adiantamento de ${fmtMoney(value)} ${advEditingId ? 'atualizado' : 'lançado'}`);
+      setAdvOpen(false);
+      loadList();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Erro ao salvar o adiantamento');
+    } finally {
+      setBusy('');
+    }
+  };
+  const removeAdvance = async (a) => {
+    if (a.status !== 'PENDENTE') { toast.info('Adiantamento já descontado: estorne o pagamento antes de excluir'); return; }
+    if (!(await confirm(`Excluir o adiantamento de ${fmtMoney(a.value)} de ${a.representative_name}?`))) return;
+    try {
+      await api.deleteCommissionAdvance(a.id);
+      loadList();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Erro ao excluir');
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-4" data-testid="commissions-page">
@@ -309,10 +475,11 @@ export default function CommissionsPage() {
         />
 
         <StatGrid>
-          <StatCard label="Frete faturado" value={fmtMoney(totals.freight)} icon={Truck} tone="blue" hint={`${entries.length} lançamento(s)`} />
-          <StatCard label="Descontos" value={fmtMoney(totals.discount)} icon={X} tone="slate" />
-          <StatCard label="Comissão a pagar" value={fmtMoney(totals.pending)} icon={Clock} tone="amber" />
-          <StatCard label="Comissão paga" value={fmtMoney(totals.paid)} icon={CheckCircle2} tone="primary" />
+          <StatCard label="Frete faturado" value={fmtMoney(totals.freight)} icon={Truck} tone="blue"
+            hint={`${entries.length} lançamento(s)${totals.discount ? ` · descontos ${fmtMoney(totals.discount)}` : ''}`} />
+          <StatCard label="Comissão a pagar" value={fmtMoney(totals.pending)} icon={Clock} tone="amber" hint={`Paga: ${fmtMoney(totals.paid)}`} />
+          <StatCard label="Adiantamentos a descontar" value={fmtMoney(totals.advances)} icon={HandCoins} tone="violet" testId="commission-stat-advances" />
+          <StatCard label="Líquido a pagar" value={fmtMoney(totals.pending - totals.advances)} icon={CheckCircle2} tone="primary" testId="commission-stat-net" />
         </StatGrid>
 
         <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setRepFilter(''); setStatusFilter(''); setPeriod(['', '']); }}>
@@ -344,12 +511,15 @@ export default function CommissionsPage() {
           {period[0] && period[1] && period[0] > period[1] && <p className="mt-2 text-xs text-red-600">A data inicial não pode ser depois da data final.</p>}
         </FilterCard>
 
-        {totals.byRep.length > 1 && (
-          <DataCard title="Resumo por representante" count={totals.byRep.length}>
+        {(totals.byRep.length > 1 || totals.advances > 0) && (
+          <DataCard title="Resumo por representante" count={totals.byRep.length} testId="commission-rep-summary">
             <div className="overflow-x-auto">
               <table className="data-table">
                 <thead>
-                  <tr><th>Representante</th><th className="!text-right">Lançamentos</th><th className="!text-right">Frete faturado</th><th className="!text-right">Comissão</th><th className="!text-right">A pagar</th></tr>
+                  <tr>
+                    <th>Representante</th><th className="!text-right">Lançamentos</th><th className="!text-right">Frete faturado</th><th className="!text-right">Comissão</th>
+                    <th className="!text-right">A pagar</th><th className="!text-right">(-) Adiantamentos</th><th className="!text-right">Líquido a pagar</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {totals.byRep.map((r) => (
@@ -358,7 +528,9 @@ export default function CommissionsPage() {
                       <td className="text-right tabular-nums">{r.count}</td>
                       <td className="text-right tabular-nums">{fmtMoney(r.freight)}</td>
                       <td className="text-right tabular-nums">{fmtMoney(r.commission)}</td>
-                      <td className="text-right tabular-nums font-semibold">{fmtMoney(r.pending)}</td>
+                      <td className="text-right tabular-nums">{fmtMoney(r.pending)}</td>
+                      <td className="text-right tabular-nums">{r.advances ? fmtMoney(r.advances) : '-'}</td>
+                      <td className={`text-right tabular-nums font-semibold ${r.pending - r.advances < 0 ? 'text-red-600' : ''}`}>{fmtMoney(r.pending - r.advances)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -373,12 +545,13 @@ export default function CommissionsPage() {
           footer={<TablePagination {...paginationProps} />}
           toolbar={(
             <Toolbar selectedCount={selectedIds.size} primary={<ToolbarPrimary icon={Plus} label="Novo lançamento" onClick={openCreate} testId="commission-new-btn" />}>
+              <ToolbarButton icon={Users} label="Lançar por representante" tone="violet" onClick={openBatch} testId="commission-batch-btn" />
               <ToolbarButton icon={FileCheck} label="Lançar de CT-es" tone="violet" onClick={openCtes} testId="commission-from-ctes-btn" />
               <ToolbarDivider />
               <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => openEdit(single)} disabled={!single || single.status !== 'PENDENTE'} testId="commission-edit-btn" />
               <ToolbarButton icon={Plus} label="Duplicar" tone="blue" onClick={() => openDuplicate(single)} disabled={!single} testId="commission-duplicate-btn" />
               <ToolbarButton icon={Wallet} label={`Baixar pagamento${selectedPending.length ? ` (${selectedPending.length})` : ''}`} tone="emerald"
-                onClick={() => { setPayForm({ payment_date: today(), payment_notes: '' }); setPayOpen(true); }} disabled={!selectedPending.length} testId="commission-pay-btn" />
+                onClick={openPay} disabled={!selectedPending.length} testId="commission-pay-btn" />
               <ToolbarButton icon={RotateCcw} label="Estornar pagamento" tone="slate" onClick={unpay} disabled={!selectedPaid.length} testId="commission-unpay-btn" />
               <ToolbarButton icon={FileDown} label="Prestação de contas (PDF)" tone="red" onClick={downloadPdf} disabled={!entries.length || !!busy} testId="commission-pdf-btn" />
               <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => remove(selected)} disabled={!selectedPending.length} testId="commission-delete-btn" />
@@ -395,7 +568,7 @@ export default function CommissionsPage() {
                 <thead>
                   <tr>
                     <th className="w-10 pr-0"><Checkbox checked={pageItems.length > 0 && pageItems.every((e) => selectedIds.has(e.id))} onCheckedChange={toggleAllOnPage} /></th>
-                    <th>Data</th>
+                    <th>Data / Período</th>
                     <th>Situação</th>
                     <th>Documento</th>
                     <th>Cliente</th>
@@ -412,7 +585,10 @@ export default function CommissionsPage() {
                     <tr key={e.id} onClick={() => toggleSelect(e.id)} onDoubleClick={() => openEdit(e)} data-selected={selectedIds.has(e.id)}
                       className="cursor-pointer" data-testid={`commission-row-${e.id}`}>
                       <td className="pr-0" onClick={(ev) => ev.stopPropagation()}><Checkbox checked={selectedIds.has(e.id)} onCheckedChange={() => toggleSelect(e.id)} /></td>
-                      <td className="whitespace-nowrap tabular-nums">{fmtDate(e.billing_date)}</td>
+                      <td className="whitespace-nowrap tabular-nums">
+                        <div>{fmtDate(e.billing_date)}</div>
+                        {(e.period_start || e.period_end) && <div className="text-[11px] text-slate-500" title="Período referente">{fmtPeriod(e.period_start, e.period_end)}</div>}
+                      </td>
                       <td className="whitespace-nowrap">
                         {e.status === 'PAGO'
                           ? <StatusPill tone="emerald" title={`Paga em ${fmtDate(e.payment_date)}${e.payment_notes ? ` · ${e.payment_notes}` : ''}`}>Paga</StatusPill>
@@ -433,6 +609,49 @@ export default function CommissionsPage() {
                         {fmtPct(e.commission_percentage)}{e.percentage_overridden && <span className="text-amber-600">*</span>}
                       </td>
                       <td className="text-right tabular-nums font-semibold">{fmtMoney(e.commission_value)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </DataCard>
+
+        <DataCard
+          title="Adiantamentos"
+          count={advances.length}
+          meta={<span className="text-[11px] text-slate-500">descontados da comissão na baixa do pagamento</span>}
+          testId="commission-advances"
+          toolbar={<Toolbar primary={<ToolbarPrimary icon={Plus} label="Novo adiantamento" onClick={() => openAdvance()} testId="commission-advance-new-btn" />} />}
+        >
+          {advances.length === 0 ? (
+            <EmptyState icon={HandCoins} title="Nenhum adiantamento" hint="Valores adiantados ao representante, com a data, para descontar no total da comissão" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr><th>Data</th><th>Situação</th><th>Representante</th><th>Descrição</th><th className="!text-right">Valor</th><th className="w-20" /></tr>
+                </thead>
+                <tbody>
+                  {advances.map((a) => (
+                    <tr key={a.id} onDoubleClick={() => openAdvance(a)} data-testid={`commission-advance-${a.id}`}>
+                      <td className="whitespace-nowrap tabular-nums">{fmtDate(a.advance_date)}</td>
+                      <td className="whitespace-nowrap">
+                        {a.status === 'DESCONTADO'
+                          ? <StatusPill tone="emerald" title={`Descontado na baixa de ${fmtDate(a.deducted_on)}`}>Descontado</StatusPill>
+                          : <StatusPill tone="violet">A descontar</StatusPill>}
+                      </td>
+                      <td className="cell-strong">{a.representative_name}</td>
+                      <td><div className="max-w-[320px] truncate" title={a.description || ''}>{a.description || '-'}</div></td>
+                      <td className="text-right tabular-nums font-semibold">{fmtMoney(a.value)}</td>
+                      <td className="text-right whitespace-nowrap">
+                        {a.status === 'PENDENTE' && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Editar" onClick={() => openAdvance(a)}><Edit className="w-3.5 h-3.5" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-red-600" aria-label="Excluir" onClick={() => removeAdvance(a)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                          </>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -481,6 +700,14 @@ export default function CommissionsPage() {
               </Field>
               <Field label="Frete faturado (R$)" required className="col-span-2 md:col-span-5">
                 <Input inputMode="decimal" value={form.freight_value} onChange={(e) => set('freight_value', moneyMask(e.target.value))} className="text-right font-semibold" data-testid="commission-freight" />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
+              <Field label="Período referente: de" className="md:col-span-4">
+                <Input type="date" value={form.period_start} onChange={(e) => set('period_start', e.target.value)} data-testid="commission-period-start" />
+              </Field>
+              <Field label="até" className="md:col-span-4">
+                <Input type="date" value={form.period_end} onChange={(e) => set('period_end', e.target.value)} data-testid="commission-period-end" />
               </Field>
             </div>
 
@@ -557,9 +784,37 @@ export default function CommissionsPage() {
           <DialogHeader><DialogTitle>Baixar pagamento da comissão</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              {selectedPending.length} lançamento(s) · <b>{fmtMoney(selectedPending.reduce((s, e) => s + e.commission_value, 0))}</b>
+              {selectedPending.length} lançamento(s) · comissão de <b>{fmtMoney(payCommission)}</b>
               {new Set(selectedPending.map((e) => e.representative_id)).size > 1 && <span className="block text-xs text-amber-700 dark:text-amber-300">Atenção: mais de um representante selecionado.</span>}
             </p>
+            {payAdvances.length > 0 && (
+              <div className="space-y-1.5" data-testid="commission-pay-advances">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Adiantamentos a descontar</p>
+                {payAdvances.map((a) => (
+                  <label key={a.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox checked={payAdvIds.has(a.id)} onCheckedChange={() => setPayAdvIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(a.id)) next.delete(a.id); else next.add(a.id);
+                      return next;
+                    })} />
+                    <span className="tabular-nums">{fmtDate(a.advance_date)}</span>
+                    <span className="flex-1 truncate text-slate-500">{a.description || a.representative_name}</span>
+                    <span className="tabular-nums font-medium">{fmtMoney(a.value)}</span>
+                  </label>
+                ))}
+                <dl className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3 text-sm space-y-1">
+                  <div className="flex justify-between"><dt className="text-slate-500">Comissão</dt><dd className="tabular-nums">{fmtMoney(payCommission)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-slate-500">(-) Adiantamentos</dt><dd className="tabular-nums">{fmtMoney(payAdvTotal)}</dd></div>
+                  <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 font-semibold">
+                    <dt>Líquido a pagar</dt><dd className="tabular-nums text-primary" data-testid="commission-pay-net">{fmtMoney(payCommission - payAdvTotal)}</dd>
+                  </div>
+                </dl>
+                {payOverReps.length > 0 && (
+                  <p className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300"><AlertTriangle className="w-3.5 h-3.5" />
+                    Os adiantamentos passam da comissão: desmarque algum (fica para o próximo pagamento).</p>
+                )}
+              </div>
+            )}
             <Field label="Data do pagamento" required>
               <Input type="date" value={payForm.payment_date} onChange={(e) => setPayForm((p) => ({ ...p, payment_date: e.target.value }))} data-testid="commission-pay-date" />
             </Field>
@@ -569,7 +824,7 @@ export default function CommissionsPage() {
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPayOpen(false)}>Cancelar</Button>
-            <Button onClick={pay} disabled={!payForm.payment_date || busy === 'pay'} data-testid="commission-pay-confirm">
+            <Button onClick={pay} disabled={!payForm.payment_date || busy === 'pay' || payOverReps.length > 0} data-testid="commission-pay-confirm">
               {busy === 'pay' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Wallet className="w-4 h-4 mr-1.5" />} Confirmar pagamento
             </Button>
           </DialogFooter>
@@ -625,6 +880,154 @@ export default function CommissionsPage() {
             <Button variant="outline" onClick={() => setCteOpen(false)}>Fechar</Button>
             <Button onClick={launchCtes} disabled={!cteIds.size || busy === 'launch'} data-testid="commission-cte-launch">
               {busy === 'launch' && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />} Lançar {selectedCandidates.length} comissão(ões)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Lançamento por representante */}
+      <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
+        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto" data-testid="commission-batch-dialog">
+          <DialogHeader><DialogTitle className="flex items-center gap-2 text-base"><Users className="w-5 h-5 text-primary" />Lançamento por representante</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-12 gap-3">
+              <Field label="Representante" required className="col-span-2 md:col-span-4">
+                <Select value={batch.representative_id || undefined} onValueChange={(v) => setBatch((p) => ({ ...p, representative_id: v, rows: {} }))}>
+                  <SelectTrigger data-testid="commission-batch-rep"><SelectValue placeholder="Escolha o representante" /></SelectTrigger>
+                  <SelectContent>
+                    {representatives.filter((r) => r.status !== 'INATIVO' || r.id === batch.representative_id)
+                      .map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Período referente: de" className="md:col-span-2">
+                <Input type="date" value={batch.period_start} onChange={(e) => setBatch((p) => ({ ...p, period_start: e.target.value }))} data-testid="commission-batch-period-start" />
+              </Field>
+              <Field label="até" className="md:col-span-2">
+                <Input type="date" value={batch.period_end} onChange={(e) => setBatch((p) => ({ ...p, period_end: e.target.value }))} data-testid="commission-batch-period-end" />
+              </Field>
+              <Field label="Data do faturamento" required className="md:col-span-2">
+                <Input type="date" value={batch.billing_date} onChange={(e) => setBatch((p) => ({ ...p, billing_date: e.target.value }))} data-testid="commission-batch-date" />
+              </Field>
+              <Field label="Documento" className="md:col-span-2">
+                <Select value={batch.document_type} onValueChange={(v) => setBatch((p) => ({ ...p, document_type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{DOCUMENT_TYPES.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+                </Select>
+              </Field>
+            </div>
+
+            {batch.representative_id && (
+              batchLinks.length === 0 ? (
+                <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-300">
+                  <AlertTriangle className="w-4 h-4" /> Nenhum cliente vinculado a este representante.
+                  <button type="button" className="underline" onClick={() => navigate('/comercial/vinculo-clientes')}>Vincular</button>
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Clientes e frete faturado <span className="text-xs font-normal text-slate-500">(deixe em branco quem não faturou; o período de cada um pode ser ajustado)</span></p>
+                  <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                    <table className="data-table">
+                      <thead>
+                        <tr><th>Cliente</th><th className="!text-right">%</th><th>Nº documento</th><th>Período de</th><th>até</th><th className="!text-right">Frete faturado (R$)</th><th className="!text-right">Comissão</th></tr>
+                      </thead>
+                      <tbody>
+                        {batchRows.map(({ link: l, row, commission, freight, period_start: ps, period_end: pe }) => (
+                          <tr key={l.client_id} data-testid={`commission-batch-row-${l.client_id}`}>
+                            <td><div className="max-w-[220px] truncate cell-strong" title={l.client_name}>{l.client_name}</div></td>
+                            <td className="text-right tabular-nums">{fmtPct(l.commission_percentage)}</td>
+                            <td><Input value={row.document_number || ''} maxLength={30} className="h-8 w-28" aria-label="Nº do documento"
+                              onChange={(e) => setBatchRow(l.client_id, { document_number: e.target.value })} /></td>
+                            <td><Input type="date" value={ps || ''} className="h-8 w-36" aria-label="Período de"
+                              onChange={(e) => setBatchRow(l.client_id, { period_start: e.target.value })} /></td>
+                            <td><Input type="date" value={pe || ''} className="h-8 w-36" aria-label="Período até"
+                              onChange={(e) => setBatchRow(l.client_id, { period_end: e.target.value })} /></td>
+                            <td><Input inputMode="decimal" value={row.freight_value || ''} placeholder="0,00" className="h-8 w-32 ml-auto text-right font-semibold" aria-label="Frete faturado"
+                              onChange={(e) => setBatchRow(l.client_id, { freight_value: moneyMask(e.target.value) })} data-testid={`commission-batch-freight-${l.client_id}`} /></td>
+                            <td className="text-right tabular-nums font-semibold">{freight > 0 ? fmtMoney(commission) : '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            )}
+
+            {batch.representative_id && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Adiantamentos <span className="text-xs font-normal text-slate-500">(se houver; descontados do total da comissão)</span></p>
+                  <Button type="button" variant="outline" size="sm" data-testid="commission-batch-add-advance"
+                    onClick={() => setBatch((p) => ({ ...p, advances: [...p.advances, { advance_date: today(), value: '', description: '' }] }))}>
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Adiantamento
+                  </Button>
+                </div>
+                {batchPendingAdv.length > 0 && (
+                  <p className="text-xs text-slate-500" data-testid="commission-batch-pending-adv">
+                    Já lançados e ainda a descontar: {batchPendingAdv.map((a) => `${fmtDate(a.advance_date)} ${fmtMoney(a.value)}`).join(' · ')}
+                  </p>
+                )}
+                {batch.advances.map((a, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input type="date" value={a.advance_date} onChange={(e) => setBatchAdv(i, { advance_date: e.target.value })} className="w-40" aria-label="Data do adiantamento" />
+                    <Input value={a.description} placeholder="Descrição (ex.: PIX, vale)" maxLength={100} onChange={(e) => setBatchAdv(i, { description: e.target.value })} className="flex-1" aria-label="Descrição do adiantamento" />
+                    <Input inputMode="decimal" value={a.value} placeholder="0,00" onChange={(e) => setBatchAdv(i, { value: moneyMask(e.target.value) })} className="w-36 text-right" aria-label="Valor do adiantamento" data-testid={`commission-batch-advance-${i}`} />
+                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:text-red-600" aria-label="Remover"
+                      onClick={() => setBatch((p) => ({ ...p, advances: p.advances.filter((_, j) => j !== i) }))}><X className="w-4 h-4" /></Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <dl className="ml-auto max-w-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3 text-sm space-y-1" data-testid="commission-batch-calc">
+              <div className="flex justify-between"><dt className="text-slate-500">Frete faturado ({batchFilled.length} cliente(s))</dt><dd className="tabular-nums">{fmtMoney(batchTotals.freight)}</dd></div>
+              <div className="flex justify-between"><dt className="text-slate-500">Comissão</dt><dd className="tabular-nums">{fmtMoney(batchTotals.commission)}</dd></div>
+              <div className="flex justify-between"><dt className="text-slate-500">(-) Adiantamentos</dt><dd className="tabular-nums">{fmtMoney(batchTotals.advances)}</dd></div>
+              <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1 font-semibold">
+                <dt>Líquido a pagar</dt>
+                <dd className={`tabular-nums ${batchTotals.commission - batchTotals.advances < 0 ? 'text-red-600' : 'text-primary'}`} data-testid="commission-batch-net">{fmtMoney(batchTotals.commission - batchTotals.advances)}</dd>
+              </div>
+            </dl>
+            {batchIssues.length > 0 && batch.representative_id && (
+              <p className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300"><AlertTriangle className="w-3.5 h-3.5" /> {batchIssues[0]}</p>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setBatchOpen(false)}>Fechar</Button>
+            <Button onClick={saveBatch} disabled={busy === 'batch'} data-testid="commission-batch-save">
+              {busy === 'batch' && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />} Salvar lançamentos
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Adiantamento */}
+      <Dialog open={advOpen} onOpenChange={setAdvOpen}>
+        <DialogContent className="max-w-md" data-testid="commission-advance-dialog">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><HandCoins className="w-5 h-5 text-primary" />{advEditingId ? 'Editar adiantamento' : 'Novo adiantamento'}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Field label="Representante" required>
+              <Select value={advForm.representative_id || undefined} onValueChange={(v) => setAdvForm((p) => ({ ...p, representative_id: v }))}>
+                <SelectTrigger data-testid="commission-advance-rep"><SelectValue placeholder="Escolha o representante" /></SelectTrigger>
+                <SelectContent>{representatives.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Data" required>
+                <Input type="date" value={advForm.advance_date} onChange={(e) => setAdvForm((p) => ({ ...p, advance_date: e.target.value }))} data-testid="commission-advance-date" />
+              </Field>
+              <Field label="Valor (R$)" required>
+                <Input inputMode="decimal" value={advForm.value} onChange={(e) => setAdvForm((p) => ({ ...p, value: moneyMask(e.target.value) }))} className="text-right font-semibold" data-testid="commission-advance-value" />
+              </Field>
+            </div>
+            <Field label="Descrição" hint="Ex.: PIX, vale, nº do recibo">
+              <Input value={advForm.description} maxLength={100} onChange={(e) => setAdvForm((p) => ({ ...p, description: e.target.value }))} />
+            </Field>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAdvOpen(false)}>Cancelar</Button>
+            <Button onClick={saveAdvance} disabled={busy === 'advance'} data-testid="commission-advance-save">
+              {busy === 'advance' && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />} Salvar
             </Button>
           </DialogFooter>
         </DialogContent>

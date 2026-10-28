@@ -593,6 +593,7 @@ PATH_MODULE_MAP = [
     ("/api/reports/commission", "comercial.vinculo_clientes"),
     ("/api/commercial-proposals", "comercial.proposta"),
     ("/api/commission-entries", "comercial.comissao"),
+    ("/api/commission-advances", "comercial.comissao"),
     ("/api/container-purchases", "gestao_container.compra"),
     ("/api/container-representatives", "gestao_container.representante"),
     ("/api/container-sales", "gestao_container.venda"),

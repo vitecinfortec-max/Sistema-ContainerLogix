@@ -420,6 +420,11 @@ export const api = {
   getCommissionCteCandidates: (params) => axios.get(`${API}/commission-entries/cte-candidates`, { params }),
   createCommissionFromCtes: (ids) => axios.post(`${API}/commission-entries/from-ctes`, { ids }),
   downloadCommissionStatementPdf: (params) => axios.get(`${API}/commission-entries/pdf`, { params, responseType: 'blob' }),
+  createCommissionBatch: (data) => axios.post(`${API}/commission-entries/batch`, data),
+  getCommissionAdvances: (params) => axios.get(`${API}/commission-advances`, { params }),
+  createCommissionAdvance: (data) => axios.post(`${API}/commission-advances`, data),
+  updateCommissionAdvance: (id, data) => axios.put(`${API}/commission-advances/${id}`, data),
+  deleteCommissionAdvance: (id) => axios.delete(`${API}/commission-advances/${id}`),
 
   // Comercial: Proposta Comercial
   getCommercialProposals: () => axios.get(`${API}/commercial-proposals`),

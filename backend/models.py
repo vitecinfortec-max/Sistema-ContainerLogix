@@ -962,6 +962,8 @@ class CommissionEntryCreate(BaseModel):
     document_type: str = "CTE"  # CTE, NF, FATURA, OUTRO
     document_number: Optional[str] = None
     billing_date: str  # AAAA-MM-DD (data do faturamento)
+    period_start: Optional[str] = None  # período a que o frete se refere (AAAA-MM-DD)
+    period_end: Optional[str] = None
     freight_value: float
     discounts: List[CommissionDiscount] = []
     commission_percentage: Optional[float] = None  # vazio = o do Vínculo de Clientes
@@ -969,10 +971,41 @@ class CommissionEntryCreate(BaseModel):
     cte_id: Optional[str] = None  # CT-e do sistema que originou o lançamento
 
 
+class CommissionBatchItem(BaseModel):
+    client_id: str
+    freight_value: float
+    document_number: Optional[str] = None
+    period_start: Optional[str] = None  # vazio = o período do lote
+    period_end: Optional[str] = None
+    observations: Optional[str] = None
+
+
+class CommissionAdvanceCreate(BaseModel):
+    """Adiantamento de comissão pago ao representante: fica "a descontar" até
+    entrar na baixa de um pagamento, que desconta o valor da comissão."""
+    representative_id: str
+    advance_date: str  # AAAA-MM-DD
+    value: float
+    description: Optional[str] = None
+
+
+class CommissionBatchCreate(BaseModel):
+    """Lançamento por representante: o frete faturado de cada cliente dele no
+    período, mais os adiantamentos que ele recebeu (opcionais)."""
+    representative_id: str
+    billing_date: str
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None
+    document_type: str = "FATURA"
+    items: List[CommissionBatchItem] = []
+    advances: List[CommissionAdvanceCreate] = []
+
+
 class CommissionPayRequest(BaseModel):
     ids: List[str]
     payment_date: str  # AAAA-MM-DD
     payment_notes: Optional[str] = None
+    advance_ids: List[str] = []  # adiantamentos descontados nesta baixa
 
 
 class CommissionFromCtesRequest(BaseModel):
