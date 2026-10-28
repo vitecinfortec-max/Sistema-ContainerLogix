@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
-  AlertTriangle, Ban, CheckCircle2, ClipboardList, Clock, Edit, Eye, FileDown, HandCoins, HardHat, Loader2, Plus,
+  AlertTriangle, Ban, CheckCircle2, ClipboardList, Clock, Edit, Eye, FileDown, FileSpreadsheet, HandCoins, HardHat, Loader2, Plus,
   Receipt, RotateCcw, Trash2, Users, Wallet, X,
 } from 'lucide-react';
 
@@ -326,6 +326,14 @@ export default function ServiceProvidersPage() {
       downloadBlob(r.data, `Fechamentos_Prestadores_${period[0] || 'inicio'}_${period[1] || 'hoje'}.pdf`);
     });
   };
+  // Conferência: serviços executados no período dos filtros, item a item, com a situação de cada um
+  const conference = async (kind) => {
+    if (period[0] && period[1] && period[0] > period[1]) { toast.error('A data inicial não pode ser depois da data final'); return; }
+    await run(`conference-${kind}`, async () => {
+      const r = await api.downloadServiceProviderConference(params, kind);
+      downloadBlob(r.data, `Conferencia_Prestadores_${period[0] || 'inicio'}_${period[1] || 'hoje'}.${kind === 'pdf' ? 'pdf' : 'xlsx'}`);
+    });
+  };
 
   const providerSelect = (value, onChange, testId, list = activeProviders) => (
     <Select value={value || undefined} onValueChange={onChange}>
@@ -374,7 +382,20 @@ export default function ServiceProvidersPage() {
     <Layout>
       <div className="space-y-4" data-testid="service-providers-page">
         <PageHeader icon={HardHat} title="Prestadores de Serviço"
-          subtitle="Soldador, Pintor, Ajudante Geral, Vigia, Motorista... serviços, vales, fechamentos, pagamentos e recibos" />
+          subtitle="Soldador, Pintor, Ajudante Geral, Vigia, Motorista... serviços, vales, fechamentos, pagamentos e recibos"
+          actions={(
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => conference('pdf')} disabled={!!busy} data-testid="sp-conference-pdf"
+                title="Serviços executados no período dos filtros, item a item, com a situação de cada um">
+                {busy === 'conference-pdf' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <FileDown className="w-4 h-4 mr-1.5 text-red-600" />}
+                Relatório de conferência (PDF)
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => conference('excel')} disabled={!!busy} data-testid="sp-conference-excel">
+                {busy === 'conference-excel' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-1.5 text-emerald-600" />}
+                Excel
+              </Button>
+            </div>
+          )} />
 
         <StatGrid>
           <StatCard label="Serviços em aberto" value={fmtMoney(totals.open)} icon={ClipboardList} tone="blue" hint="ainda sem fechamento" />

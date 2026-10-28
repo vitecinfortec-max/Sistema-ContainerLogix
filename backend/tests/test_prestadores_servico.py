@@ -120,3 +120,36 @@ def test_negative_balance_goes_to_next_closing(api):
     assert api.delete(f"/api/service-provider-closings/{c2['id']}").status_code == 200
     assert api.delete(f"/api/service-provider-closings/{c1['id']}").status_code == 200
     assert [a["origin"] for a in api.get("/api/service-provider-advances").json()] == ["VALE"]  # saldo cancelado
+
+
+def test_conference_report(api):
+    soldador = _provider(api)
+    vigia = _provider(api, name="Pedro Vigia", role="Vigia", default_rate=120)
+    a = _service(api, soldador, "2026-10-01")
+    b = _service(api, soldador, "2026-10-02", qty=2)
+    _service(api, soldador, "2026-10-20", description="Reforço da rampa")  # fica em aberto
+    _service(api, vigia, "2026-10-05", qty=3, value=120, description="Vigia noturno")
+    _service(api, vigia, "2026-11-02", value=120)  # fora do período
+    vale = api.post("/api/service-provider-advances", json={"provider_id": soldador["id"], "date": "2026-10-03", "value": 100, "description": "PIX"}).json()
+    c = api.post("/api/service-provider-closings", json={"provider_id": soldador["id"], "period_start": "2026-10-01", "period_end": "2026-10-15",
+                                                          "entry_ids": [a["id"], b["id"]], "advance_ids": [vale["id"]]}).json()
+    api.post(f"/api/service-provider-closings/{c['id']}/pay", json={"payment_date": "2026-10-16"})
+
+    period = {"start_date": "2026-10-01", "end_date": "2026-10-31"}
+    data = api.get("/api/service-provider-report", params=period).json()
+    assert data["summary"] == {"providers": 2, "count": 4, "total": 1360, "open": 610, "to_pay": 0, "paid": 750, "advances": 100}
+    by_name = {p["provider_name"]: p for p in data["providers"]}
+    assert (by_name["João Soldador"]["PAGO"], by_name["João Soldador"]["EM_ABERTO"], by_name["João Soldador"]["advances"]) == (750, 250, 100)
+    assert [(i["date"], i["units"], i["situation_label"]) for i in data["items"]][:2] == [
+        ("2026-10-01", "1 diária", "Fech. nº 1 · pago 16/10/2026"), ("2026-10-02", "2 diárias", "Fech. nº 1 · pago 16/10/2026")]
+    assert data["advances"][0]["situation_label"] == "Descontado no fech. nº 1"
+    only = api.get("/api/service-provider-report", params={**period, "provider_id": vigia["id"]}).json()
+    assert (only["summary"]["count"], only["summary"]["total"]) == (1, 360)
+
+    pdf = api.get("/api/service-provider-report/pdf", params={**period, "provider_id": soldador["id"]})
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+    text = _text(pdf.content)
+    assert "Conferência de Serviços Prestados" in text and "Prestador: João Soldador" in text
+    assert "Reforço da rampa" in text and "Em aberto" in text and "2 diárias" in text
+    xls = api.get("/api/service-provider-report/excel", params=period)
+    assert xls.status_code == 200 and xls.content[:2] == b"PK"

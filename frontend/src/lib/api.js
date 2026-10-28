@@ -442,6 +442,7 @@ export const api = {
   unpayServiceProviderClosing: (id) => axios.post(`${API}/service-provider-closings/${id}/unpay`),
   downloadServiceProviderReceipt: (id) => axios.get(`${API}/service-provider-closings/${id}/receipt-pdf`, { responseType: 'blob' }),
   downloadServiceProviderReport: (params) => axios.get(`${API}/service-provider-closings/pdf`, { params, responseType: 'blob' }),
+  downloadServiceProviderConference: (params, kind = 'pdf') => axios.get(`${API}/service-provider-report/${kind}`, { params, responseType: 'blob' }),
   getCommissionAdvances: (params) => axios.get(`${API}/commission-advances`, { params }),
   createCommissionAdvance: (data) => axios.post(`${API}/commission-advances`, data),
   updateCommissionAdvance: (id, data) => axios.put(`${API}/commission-advances/${id}`, data),
