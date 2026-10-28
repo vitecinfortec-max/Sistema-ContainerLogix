@@ -6,6 +6,7 @@ import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   StatusPill, PlateTag, EmptyState, TablePagination,
+  rowTone,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import PeriodReportDialog from '../components/PeriodReportDialog';
@@ -42,6 +43,16 @@ const MAINTENANCE_BADGES = {
 };
 
 const VEHICLE_STATUS_TONES = { ATIVO: 'emerald', INATIVO: 'slate', MANUTENCAO: 'amber' };
+
+// Cor da linha na lista: inativo apagado, documento vencido em vermelho,
+// documento vencendo ou veículo em manutenção em amarelo
+function vehicleRowSituation(vehicle, today) {
+  if (vehicle.status === 'INATIVO') return 'off';
+  const docs = vehicleDocsStatus(vehicle, today);
+  if (docs?.status === 'EXPIRED') return 'alert';
+  if (docs?.status === 'SOON' || vehicle.status === 'MANUTENCAO') return 'warn';
+  return null;
+}
 
 // Vencimentos do cadastro do veículo - avisa com 30 dias de antecedência
 const VEHICLE_DOCS = [
@@ -943,6 +954,7 @@ export default function FleetPage() {
                           key={vehicle.id}
                           onClick={() => toggleSelectVehicle(vehicle.id)}
                           data-selected={selectedVehicleIds.has(vehicle.id)}
+                          data-row-tone={rowTone(vehicleRowSituation(vehicle, today))}
                           className="cursor-pointer"
                         >
                           <td className="pr-0" onClick={(e) => e.stopPropagation()}>

@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, PeriodFilterFields, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
   StatusPill, UserTag, EmptyState, TablePagination, PageSkeleton,
+  rowTone,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -900,6 +901,7 @@ export default function BillingPage() {
                       <tr
                         key={invoice.id}
                         data-selected={selectedIds.has(invoice.id)}
+                        data-row-tone={rowTone(isOverdue(invoice) ? 'alert' : invoice.status === 'CANCELADO' ? 'off' : null)}
                         className="cursor-pointer"
                         onClick={() => toggleSelect(invoice.id)}
                         data-testid="invoice-row"

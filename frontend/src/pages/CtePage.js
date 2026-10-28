@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   ToolbarDivider, StatusPill, EmptyState, TablePagination, usePagination,
+  fiscalRowTone,
 } from '../components/DataPage';
 import { Field, IssueSection } from '../components/FormKit';
 import { AddressFields, CityStateFields } from '../components/AddressFields';
@@ -913,7 +914,7 @@ export default function CtePage() {
                 <tbody>
                   {pageItems.map((c) => (
                     <tr key={c.id} onClick={() => toggleSelect(c.id)} onDoubleClick={() => CTE_EDITABLE.includes(c.status) && openEdit(c)}
-                      data-selected={selectedIds.has(c.id)} className="cursor-pointer" data-testid={`cte-row-${c.id}`}>
+                      data-selected={selectedIds.has(c.id)} data-row-tone={fiscalRowTone(c.status)} className="cursor-pointer" data-testid={`cte-row-${c.id}`}>
                       <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggleSelect(c.id)} />
                       </td>

@@ -259,6 +259,23 @@ export function ToolbarPrimary({ icon: Icon, label, onClick, disabled, testId })
   );
 }
 
+/**
+ * Cor da linha da tabela pela situação (atributo data-row-tone do <tr>,
+ * estilos no index.css). `situation`: 'alert' (pede ação), 'warn' (vence
+ * logo) ou 'off' (cancelado/inativo); qualquer outro valor deixa a linha
+ * normal. Uso: <tr data-row-tone={rowTone(cond ? 'alert' : null)}>.
+ */
+export function rowTone(situation) {
+  return ['alert', 'warn', 'off'].includes(situation) ? situation : undefined;
+}
+
+/** Tom da linha a partir do status de CT-e/MDF-e. */
+export function fiscalRowTone(status) {
+  if (['REJEITADO', 'DENEGADO', 'ERRO'].includes(status)) return 'alert';
+  if (status === 'CANCELADO') return 'off';
+  return undefined;
+}
+
 /** Selo de status (Entrada/Saída, Cheio/Vazio, Pago/Pendente...). */
 export function StatusPill({ tone = 'slate', children, dot = true, className, title }) {
   return (

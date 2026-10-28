@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   StatusPill, PlateTag, EmptyState, TablePagination, usePagination,
+  rowTone,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -375,6 +376,7 @@ export default function OrdemServicoPage() {
                       key={o.id}
                       onClick={() => toggleSelect(o.id)}
                       data-selected={selectedIds.has(o.id)}
+                      data-row-tone={rowTone(o.status === 'CANCELADO' ? 'off' : null)}
                       className="cursor-pointer"
                       data-testid={`os-row-${o.os_number}`}
                     >

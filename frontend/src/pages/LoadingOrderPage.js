@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   StatusPill, EmptyState, TablePagination, usePagination,
+  rowTone,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -495,6 +496,7 @@ export default function LoadingOrderPage() {
                       key={o.id}
                       onClick={() => toggleSelect(o.id)}
                       data-selected={selectedIds.has(o.id)}
+                      data-row-tone={rowTone(o.status === 'CANCELADA' ? 'off' : null)}
                       className="cursor-pointer"
                       data-testid={`loading-order-row-${o.order_number}`}
                     >

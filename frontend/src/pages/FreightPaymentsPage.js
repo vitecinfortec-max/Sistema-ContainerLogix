@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, DataCard, Toolbar, ToolbarButton, ToolbarDivider,
   StatusPill, EmptyState, TablePagination, usePagination,
+  rowTone,
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -345,6 +346,7 @@ export default function FreightPaymentsPage() {
                       key={p.id}
                       onClick={() => toggleSelect(p.id)}
                       data-selected={selectedIds.has(p.id)}
+                      data-row-tone={rowTone(p.status === 'CANCELADO' ? 'off' : null)}
                       className="cursor-pointer"
                       data-testid={`freight-payment-row-${p.payment_number}`}
                     >

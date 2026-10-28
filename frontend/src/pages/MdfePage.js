@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarPrimary,
   ToolbarDivider, StatusPill, EmptyState, TablePagination, usePagination, PlateTag,
+  fiscalRowTone,
 } from '../components/DataPage';
 import { Field, IssueSection } from '../components/FormKit';
 import { CityStateFields } from '../components/AddressFields';
@@ -813,7 +814,7 @@ export default function MdfePage() {
                     const destinos = [...new Set((m.descarregamentos || []).map((d) => d.cidade).filter(Boolean))].join(', ');
                     return (
                       <tr key={m.id} onClick={() => toggleSelect(m.id)} onDoubleClick={() => CTE_EDITABLE.includes(m.status) && openEdit(m)}
-                        data-selected={selectedIds.has(m.id)} className="cursor-pointer" data-testid={`mdfe-row-${m.id}`}>
+                        data-selected={selectedIds.has(m.id)} data-row-tone={fiscalRowTone(m.status)} className="cursor-pointer" data-testid={`mdfe-row-${m.id}`}>
                         <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                           <Checkbox checked={selectedIds.has(m.id)} onCheckedChange={() => toggleSelect(m.id)} />
                         </td>
