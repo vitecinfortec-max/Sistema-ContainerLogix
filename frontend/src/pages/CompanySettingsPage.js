@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout';
 import { PageSkeleton } from '../components/DataPage';
 import PageHeader from '../components/PageHeader';
+import LoginNoticesManager from '../components/LoginNoticesManager';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -394,6 +395,9 @@ export default function CompanySettingsPage() {
             </div>
           )}
         </form>
+
+        {/* Fora do <form>: tem o próprio salvar, por aviso */}
+        {isAdmin && <LoginNoticesManager />}
       </div>
     </Layout>
   );

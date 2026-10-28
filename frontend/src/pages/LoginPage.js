@@ -9,6 +9,7 @@ import { LogIn, Mail, Lock, Eye, EyeOff, KeyRound, Building2 } from 'lucide-reac
 import { api } from '../lib/api';
 import { getTenantCode, setTenantCode } from '../lib/tenant';
 import LoginScene3D from '../components/LoginScene3D';
+import LoginNotices from '../components/LoginNotices';
 import { motion, riseIn, staggerParent } from '../components/Motion';
 
 export default function LoginPage() {
@@ -21,6 +22,8 @@ export default function LoginPage() {
   // Multi-cliente: { status: 'single' | 'ok' | 'need-code', name, slug, logo_filename }
   const [tenant, setTenant] = useState({ status: 'loading' });
   const [companyCode, setCompanyCode] = useState(getTenantCode());
+  // Avisos do painel ao lado do formulário (cadastrados em Dados da Empresa)
+  const [notices, setNotices] = useState([]);
 
   const loadTenant = () => api.getTenantInfo()
     .then((res) => {
@@ -40,6 +43,14 @@ export default function LoginPage() {
     });
 
   useEffect(() => { loadTenant(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sem empresa definida (app pedindo o código) não há de onde ler os avisos
+  useEffect(() => {
+    if (tenant.status !== 'ok' && tenant.status !== 'single') return;
+    api.getLoginNotices()
+      .then((res) => setNotices(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setNotices([]));
+  }, [tenant.status, tenant.slug]);
 
   const changeCompany = () => {
     setTenantCode('');
@@ -101,20 +112,27 @@ export default function LoginPage() {
           variants={staggerParent(0.12, 0.2)}
           initial="hidden"
           animate="show"
-          className="relative z-10 flex flex-col justify-end w-full p-10 xl:p-12 pointer-events-none"
+          className={`relative z-10 flex flex-col w-full p-10 xl:p-12 pointer-events-none ${notices.length ? 'justify-between' : 'justify-end'}`}
         >
           <div>
-            <motion.h1 variants={riseIn} className="text-4xl xl:text-5xl font-black tracking-tight">
+            <motion.h1 variants={riseIn} className={`font-black tracking-tight ${notices.length ? 'text-2xl xl:text-3xl' : 'text-4xl xl:text-5xl'}`}>
               ContainerLogix
             </motion.h1>
             {/* Uma linha só: o tamanho da letra acompanha a largura da tela */}
             <motion.p variants={riseIn} className="text-white/85 mt-3 whitespace-nowrap text-[clamp(13px,1.25vw,18px)]">
               Sistema completo para gestão de movimentação de contêineres
             </motion.p>
-            <motion.div variants={riseIn} className="mt-8 text-white/55 text-sm">
-              Versão 2.0.0
-            </motion.div>
+            {!notices.length && (
+              <motion.div variants={riseIn} className="mt-8 text-white/55 text-sm">
+                Versão 2.0.0
+              </motion.div>
+            )}
           </div>
+          {notices.length > 0 && (
+            <motion.div variants={riseIn} className="max-w-xl">
+              <LoginNotices notices={notices} />
+            </motion.div>
+          )}
         </motion.div>
       </div>
 
@@ -246,6 +264,12 @@ export default function LoginPage() {
               </Link>
             </motion.div>
           </form>
+
+          {notices.length > 0 && (
+            <motion.div variants={riseIn} className="lg:hidden mt-8">
+              <LoginNotices notices={notices} variant="card" />
+            </motion.div>
+          )}
 
           {/* Rodapé */}
           <motion.div variants={riseIn} className="mt-12 text-center">

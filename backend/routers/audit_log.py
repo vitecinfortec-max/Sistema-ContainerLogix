@@ -21,6 +21,7 @@ MODULE_LABELS = {item["key"]: item["label"] for group in MODULE_CATALOG for item
 COLLECTION_LABELS = {
     "users": "Usuários",
     "company_settings": "Dados da Empresa",
+    "login_notices": "Avisos da tela de login",
     "module_config": "Módulos Contratados",
     "tank_settings": "Configuração de Tanque",
     "user_shortcuts": "Atalhos",

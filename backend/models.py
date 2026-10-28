@@ -4669,3 +4669,14 @@ class ServiceProviderPayRequest(BaseModel):
     payment_date: str  # AAAA-MM-DD
     payment_method: Optional[str] = None  # PIX, dinheiro, transferência...
     payment_notes: Optional[str] = None
+
+
+# Avisos da tela de login (routers/login_notices.py)
+class LoginNoticeCreate(BaseModel):
+    title: str
+    message: Optional[str] = None
+    link_label: Optional[str] = None
+    link_url: Optional[str] = None
+    start_date: Optional[str] = None  # AAAA-MM-DD; vazio = desde já
+    end_date: Optional[str] = None  # AAAA-MM-DD; vazio = sem fim
+    active: bool = True

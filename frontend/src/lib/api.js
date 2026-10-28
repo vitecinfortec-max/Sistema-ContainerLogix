@@ -13,6 +13,12 @@ export const api = {
   getDashboardStats: () => axios.get(`${API}/dashboard`),
   // Tela de login: de qual empresa é este endereço (nome e logo)
   getTenantInfo: () => axios.get(`${API}/tenant-info`),
+  // Avisos da tela de login: a lista pública (sem token) e o cadastro (admin)
+  getLoginNotices: () => axios.get(`${API}/login-notices`),
+  listLoginNotices: () => axios.get(`${API}/login-notices/manage`),
+  createLoginNotice: (data) => axios.post(`${API}/login-notices`, data),
+  updateLoginNotice: (id, data) => axios.put(`${API}/login-notices/${id}`, data),
+  deleteLoginNotice: (id) => axios.delete(`${API}/login-notices/${id}`),
   
   // Drivers
   getDrivers: () => axios.get(`${API}/drivers`),
