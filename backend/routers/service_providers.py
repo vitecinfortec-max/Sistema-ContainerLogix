@@ -459,15 +459,20 @@ def _empty_person(name, role) -> dict:
     return {"provider_name": name, "role": role, "count": 0, "total": 0.0, "EM_ABERTO": 0.0, "A_PAGAR": 0.0, "PAGO": 0.0, "advances": 0.0}
 
 
-async def build_service_provider_report(provider_id=None, start_date=None, end_date=None, search=None) -> dict:
+async def build_service_provider_report(provider_id=None, start_date=None, end_date=None, search=None, role=None) -> dict:
     """Serviços executados no período (pela data do serviço), com a situação
     de cada um (em aberto, fechado a pagar, pago), os vales do período e o
-    resumo por prestador - para conferência."""
+    resumo por prestador - para conferência. Pode ser de um prestador só ou
+    de todos os prestadores de uma função."""
     entries = await list_service_provider_entries(provider_id, None, start_date, end_date, search, current_user={})
     advances = await list_service_provider_advances(provider_id, None, start_date, end_date, search, current_user={})
+    roles = {p["id"]: p.get("role") for p in await db.service_providers.find({}, {"_id": 0, "id": 1, "role": 1}).to_list(None)}
+    if role and role.strip():
+        wanted = role.strip().lower()
+        entries = [e for e in entries if (roles.get(e["provider_id"]) or e.get("role") or "").lower() == wanted]
+        advances = [a for a in advances if (roles.get(a["provider_id"]) or "").lower() == wanted]
     closing_ids = {x["closing_id"] for x in entries + advances if x.get("closing_id")}
     closings = {c["id"]: c for c in await db.service_provider_closings.find({"id": {"$in": list(closing_ids)}}, {"_id": 0}).to_list(None)}
-    roles = {p["id"]: p.get("role") for p in await db.service_providers.find({}, {"_id": 0, "id": 1, "role": 1}).to_list(None)}
 
     def situation(entry):
         closing = closings.get(entry.get("closing_id"))
@@ -530,24 +535,26 @@ def _report_sections(data: dict) -> list:
     ]
 
 
-async def _report_data(provider_id, start_date, end_date, search):
-    data = await build_service_provider_report(provider_id, start_date, end_date, search)
+async def _report_data(provider_id, start_date, end_date, search, role):
+    data = await build_service_provider_report(provider_id, start_date, end_date, search, role)
     provider = await db.service_providers.find_one({"id": provider_id}, {"_id": 0, "name": 1}) if provider_id else None
     parts = [period_text("Data do serviço", start_date, end_date), provider and f"Prestador: {provider['name']}",
-             search and search.strip() and f"Busca: {search.strip()}"]
+             role and role.strip() and f"Função: {role.strip()}", search and search.strip() and f"Busca: {search.strip()}"]
     return data, " • ".join(p for p in parts if p) or None
 
 
 @api_router.get("/service-provider-report")
 async def service_provider_report(provider_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None,
-                                  search: Optional[str] = None, current_user: dict = Depends(get_current_admin_user)):
-    return await build_service_provider_report(provider_id, start_date, end_date, search)
+                                  search: Optional[str] = None, role: Optional[str] = None,
+                                  current_user: dict = Depends(get_current_admin_user)):
+    return await build_service_provider_report(provider_id, start_date, end_date, search, role)
 
 
 @api_router.get("/service-provider-report/pdf")
 async def service_provider_report_pdf(provider_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None,
-                                      search: Optional[str] = None, current_user: dict = Depends(get_current_admin_user)):
-    data, subtitle = await _report_data(provider_id, start_date, end_date, search)
+                                      search: Optional[str] = None, role: Optional[str] = None,
+                                      current_user: dict = Depends(get_current_admin_user)):
+    data, subtitle = await _report_data(provider_id, start_date, end_date, search, role)
     s = data["summary"]
     money = lambda v: format_currency(v, "BRL")  # noqa: E731
     info = [("Prestadores", str(s["providers"])), ("Serviços", str(s["count"])), ("Total dos serviços", money(s["total"])),
@@ -558,6 +565,7 @@ async def service_provider_report_pdf(provider_id: Optional[str] = None, start_d
 
 @api_router.get("/service-provider-report/excel")
 async def service_provider_report_excel(provider_id: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None,
-                                        search: Optional[str] = None, current_user: dict = Depends(get_current_admin_user)):
-    data, subtitle = await _report_data(provider_id, start_date, end_date, search)
+                                        search: Optional[str] = None, role: Optional[str] = None,
+                                        current_user: dict = Depends(get_current_admin_user)):
+    data, subtitle = await _report_data(provider_id, start_date, end_date, search, role)
     return await excel_response("Conferência de Serviços Prestados", subtitle, _report_sections(data), "conferencia_prestadores_servico")

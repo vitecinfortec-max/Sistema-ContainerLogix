@@ -91,6 +91,8 @@ export default function ServiceProvidersPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [payForm, setPayForm] = useState({ payment_date: today(), payment_method: 'PIX', payment_notes: '' });
   const [detail, setDetail] = useState(null);
+  const [confOpen, setConfOpen] = useState(false);
+  const [confForm, setConfForm] = useState({ start_date: '', end_date: '', provider_id: '', role: '' });
 
   const params = useMemo(() => {
     const p = {};
@@ -326,12 +328,22 @@ export default function ServiceProvidersPage() {
       downloadBlob(r.data, `Fechamentos_Prestadores_${period[0] || 'inicio'}_${period[1] || 'hoje'}.pdf`);
     });
   };
-  // Conferência: serviços executados no período dos filtros, item a item, com a situação de cada um
+  // Conferência: serviços executados no período, item a item, com a situação de cada um - de todos, de um prestador ou de uma função
+  const openConference = () => {
+    setConfForm({ start_date: period[0] || '', end_date: period[1] || '', provider_id: providerFilter || '', role: '' });
+    setConfOpen(true);
+  };
+  const confProvider = providerById[confForm.provider_id];
   const conference = async (kind) => {
-    if (period[0] && period[1] && period[0] > period[1]) { toast.error('A data inicial não pode ser depois da data final'); return; }
+    const { start_date: start, end_date: end } = confForm;
+    if (start && end && start > end) { toast.error('A data inicial não pode ser depois da data final'); return; }
     await run(`conference-${kind}`, async () => {
-      const r = await api.downloadServiceProviderConference(params, kind);
-      downloadBlob(r.data, `Conferencia_Prestadores_${period[0] || 'inicio'}_${period[1] || 'hoje'}.${kind === 'pdf' ? 'pdf' : 'xlsx'}`);
+      const r = await api.downloadServiceProviderConference({
+        start_date: start || undefined, end_date: end || undefined, provider_id: confForm.provider_id || undefined,
+        role: confForm.provider_id ? undefined : confForm.role || undefined,
+      }, kind);
+      const who = (confProvider?.name || confForm.role || 'Todos').replace(/\W+/g, '_');
+      downloadBlob(r.data, `Conferencia_${who}_${start || 'inicio'}_${end || 'hoje'}.${kind === 'pdf' ? 'pdf' : 'xlsx'}`);
     });
   };
 
@@ -384,17 +396,10 @@ export default function ServiceProvidersPage() {
         <PageHeader icon={HardHat} title="Prestadores de Serviço"
           subtitle="Soldador, Pintor, Ajudante Geral, Vigia, Motorista... serviços, vales, fechamentos, pagamentos e recibos"
           actions={(
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => conference('pdf')} disabled={!!busy} data-testid="sp-conference-pdf"
-                title="Serviços executados no período dos filtros, item a item, com a situação de cada um">
-                {busy === 'conference-pdf' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <FileDown className="w-4 h-4 mr-1.5 text-red-600" />}
-                Relatório de conferência (PDF)
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => conference('excel')} disabled={!!busy} data-testid="sp-conference-excel">
-                {busy === 'conference-excel' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-1.5 text-emerald-600" />}
-                Excel
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={openConference} data-testid="sp-conference-btn"
+              title="Serviços executados no período, item a item, com a situação de cada um">
+              <FileDown className="w-4 h-4 mr-1.5 text-red-600" /> Relatório de conferência
+            </Button>
           )} />
 
         <StatGrid>
@@ -741,6 +746,52 @@ export default function ServiceProvidersPage() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Relatório de conferência */}
+      <Dialog open={confOpen} onOpenChange={setConfOpen}>
+        <DialogContent className="max-w-lg" data-testid="sp-conference-dialog">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><FileDown className="w-5 h-5 text-primary" />Relatório de conferência</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-500">Serviços executados no período, item a item, com a situação de cada um (em aberto, fechado a pagar ou pago) e os vales.</p>
+            <Field label="Período (data do serviço)">
+              <div className="flex items-center gap-2">
+                <Input type="date" value={confForm.start_date} onChange={(e) => setConfForm((f) => ({ ...f, start_date: e.target.value }))} aria-label="Período: início" data-testid="sp-conf-start" />
+                <span className="text-sm text-slate-500">a</span>
+                <Input type="date" value={confForm.end_date} onChange={(e) => setConfForm((f) => ({ ...f, end_date: e.target.value }))} aria-label="Período: fim" data-testid="sp-conf-end" />
+              </div>
+            </Field>
+            <Field label="Prestador">
+              <Select value={confForm.provider_id || '_all'} onValueChange={(v) => setConfForm((f) => ({ ...f, provider_id: v === '_all' ? '' : v }))}>
+                <SelectTrigger data-testid="sp-conf-provider"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">Todos os prestadores</SelectItem>
+                  {providers.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} · {p.role}{p.status === 'INATIVO' ? ' (inativo)' : ''}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            {!confForm.provider_id && (
+              <Field label="Função">
+                <Select value={confForm.role || '_all'} onValueChange={(v) => setConfForm((f) => ({ ...f, role: v === '_all' ? '' : v }))}>
+                  <SelectTrigger data-testid="sp-conf-role"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">Todas as funções</SelectItem>
+                    {roles.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfOpen(false)}>Fechar</Button>
+            <Button variant="outline" onClick={() => conference('excel')} disabled={!!busy} data-testid="sp-conference-excel">
+              {busy === 'conference-excel' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-1.5 text-emerald-600" />} Excel
+            </Button>
+            <Button onClick={() => conference('pdf')} disabled={!!busy} data-testid="sp-conference-pdf">
+              {busy === 'conference-pdf' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <FileDown className="w-4 h-4 mr-1.5" />} Gerar PDF
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

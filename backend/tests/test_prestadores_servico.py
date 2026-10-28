@@ -145,6 +145,9 @@ def test_conference_report(api):
     assert data["advances"][0]["situation_label"] == "Descontado no fech. nº 1"
     only = api.get("/api/service-provider-report", params={**period, "provider_id": vigia["id"]}).json()
     assert (only["summary"]["count"], only["summary"]["total"]) == (1, 360)
+    by_role = api.get("/api/service-provider-report", params={**period, "role": "soldador"}).json()
+    assert ([p["provider_name"] for p in by_role["providers"]], by_role["summary"]["advances"]) == (["João Soldador"], 100)
+    assert "Função: Vigia" in _text(api.get("/api/service-provider-report/pdf", params={**period, "role": "Vigia"}).content)
 
     pdf = api.get("/api/service-provider-report/pdf", params={**period, "provider_id": soldador["id"]})
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
