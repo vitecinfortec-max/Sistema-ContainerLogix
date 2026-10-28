@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, riseIn, staggerParent, AnimatedNumber, EASE, DURATION } from './Motion';
 import { scrollBehavior } from '../lib/reducedMotion';
@@ -87,22 +87,53 @@ export function StatGrid({ children, className }) {
 // Os filtros agem sozinhos enquanto se digita/escolhe (ver
 // hooks/useDebouncedValue) - não há botão "Filtrar"; o "Limpar filtros" fica
 // no cabeçalho do bloco.
+// O bloco recolhe (como o "Filtrar" do Bsoft) pra lista ganhar espaço; a
+// escolha fica guardada por tela neste navegador. Recolhido com filtro
+// aplicado, o selo "ativos" e o "Limpar filtros" continuam à vista.
+const filterStateKey = () => `cl:filters-open:${window.location.pathname}`;
+
+function readFilterOpen() {
+  try {
+    return window.localStorage.getItem(filterStateKey()) !== '0';
+  } catch {
+    return true;
+  }
+}
+
 export function FilterCard({ children, hasFilters, onClear, actions, title = 'Filtros', clearLinkTestId = 'clear-all-filters' }) {
+  const [open, setOpen] = useState(readFilterOpen);
+  const toggle = () => {
+    setOpen((prev) => {
+      try {
+        window.localStorage.setItem(filterStateKey(), prev ? '0' : '1');
+      } catch {
+        // sem armazenamento: só não lembra a escolha
+      }
+      return !prev;
+    });
+  };
   return (
     <motion.section {...blockIn(0.06)} className={SURFACE}>
-      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
-        <span className="flex items-center gap-2 text-[13px] font-semibold text-slate-700 dark:text-slate-200">
+      <div className={cn('flex items-center justify-between gap-2 px-2 py-1.5', open && 'border-b border-slate-100 dark:border-slate-800')}>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          className="flex items-center gap-2 rounded-md px-2 py-1 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+          data-testid="filter-card-toggle"
+        >
+          <ChevronDown className={cn('w-4 h-4 text-slate-500 transition-transform', !open && '-rotate-90')} />
           <SlidersHorizontal className="w-4 h-4 text-primary" />
           {title}
           {hasFilters && (
             <span className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold px-1.5 py-px">ativos</span>
           )}
-        </span>
+        </button>
         {hasFilters && onClear && (
           <button
             type="button"
             onClick={onClear}
-            className="text-xs text-slate-500 dark:text-slate-400 hover:text-primary flex items-center gap-1"
+            className="text-xs text-slate-500 dark:text-slate-400 hover:text-primary flex items-center gap-1 px-2"
             data-testid={clearLinkTestId}
           >
             <X className="w-3.5 h-3.5" />
@@ -110,7 +141,7 @@ export function FilterCard({ children, hasFilters, onClear, actions, title = 'Fi
           </button>
         )}
       </div>
-      <div className="p-4">
+      <div className={cn('p-4', !open && 'hidden')}>
         {children}
         {actions && (
           <div className="flex items-center justify-end gap-2 mt-3 flex-wrap">

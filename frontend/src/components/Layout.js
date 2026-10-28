@@ -1124,23 +1124,24 @@ function LayoutFrame({ children }) {
           {sidebarOpen && (
             <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
               <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/70 pointer-events-none" />
                 <input
                   ref={searchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-9 pl-3 pr-8 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                  placeholder="Pesquisar (Ctrl+K)"
+                  aria-label="Pesquisar no menu"
+                  className="w-full h-9 pl-8 pr-8 text-sm bg-primary/[0.06] dark:bg-slate-800 border border-primary/15 dark:border-slate-700 rounded-md focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary/40 focus:bg-white dark:focus:bg-slate-800 placeholder:text-slate-500 dark:placeholder:text-slate-500"
                   data-testid="sidebar-search"
                 />
-                {searchQuery ? (
+                {searchQuery && (
                   <button title="Limpar" aria-label="Limpar"
                     onClick={() => setSearchQuery('')}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
                   >
                     <X className="w-4 h-4" />
                   </button>
-                ) : (
-                  <X className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 dark:text-slate-600" />
                 )}
               </div>
             </div>
