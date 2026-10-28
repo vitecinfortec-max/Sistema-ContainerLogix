@@ -4433,6 +4433,153 @@ def generate_commission_statement_pdf(entries: list, filters: dict, company: dic
     return buffer.getvalue()
 
 
+SERVICE_PROVIDER_UNIT_LABELS = {"DIARIA": "Diária", "HORA": "Hora", "SERVICO": "Serviço", "MES": "Mês"}
+SERVICE_PROVIDER_UNIT_PLURALS = {"DIARIA": "diárias", "HORA": "horas", "SERVICO": "serviços", "MES": "meses"}
+
+
+def _fmt_qty(value) -> str:
+    return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
+def generate_service_provider_receipt_pdf(closing: dict, provider: dict, amount_in_words: str = '', company: dict = None) -> bytes:
+    """Recibo do fechamento de um Prestador de Serviço (Financeiro >
+    Prestadores de Serviço): serviços do período, vales e descontos, o
+    líquido (por extenso), a declaração de recebimento e as assinaturas."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15 * mm, leftMargin=15 * mm, topMargin=12 * mm, bottomMargin=15 * mm)
+    elements = []
+    styles = getSampleStyleSheet()
+    money = format_currency
+    name = closing.get("provider_name") or "-"
+    document = provider.get("document") or closing.get("provider_document") or "-"
+    elements.extend(_build_pdf_header(styles, download_logo(company), "Recibo de Prestação de Serviço",
+                                      generation_info=f"Fechamento nº {closing['number']}", company=company, content_width=doc.width))
+    elements.append(_pdf_info_grid([
+        ("Prestador", name, 2),
+        ("CPF/CNPJ", document),
+        ("Função", closing.get("role") or "-"),
+        ("Período", f"{fmt_date(closing['period_start'])} a {fmt_date(closing['period_end'])}"),
+        ("Pagamento", " · ".join(x for x in [fmt_date(closing["payment_date"]) if closing.get("payment_date") else "",
+                                             closing.get("payment_method") or ""] if x) or "-"),
+    ], doc.width, cols=3))
+    elements.append(Spacer(1, 10))
+
+    cell = _pdf_cell_factory(styles, font_size=8.5)
+    rows = [_pdf_header_cells(["Data", "Serviço", "Qtd.", "Valor unit.", "Total"], font_size=8.5)]
+    for e in closing.get("entries") or []:
+        unit = (SERVICE_PROVIDER_UNIT_PLURALS.get(e.get("unit"), "") if e["quantity"] > 1
+                else SERVICE_PROVIDER_UNIT_LABELS.get(e.get("unit"), "").lower())
+        qty = f"{_fmt_qty(e['quantity'])} {unit}".strip()
+        rows.append([cell(fmt_date(e["date"]), "center"), cell(e.get("description") or "-"), cell(qty, "center"),
+                     cell(money(e["unit_value"]), "right"), cell(money(e["total"]), "right", bold=True)])
+    rows.append(["", cell("TOTAL DOS SERVIÇOS", "right", bold=True), "", "", cell(money(closing["gross_total"]), "right", bold=True)])
+    table = Table(rows, colWidths=[doc.width * w for w in (0.13, 0.47, 0.13, 0.13, 0.14)], repeatRows=1)
+    table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
+    elements.append(table)
+
+    deductions = [(fmt_date(a["date"]), a.get("description") or ("Saldo negativo anterior" if a.get("origin") == "SALDO_NEGATIVO" else "Vale"), a["value"])
+                  for a in closing.get("advances") or []]
+    deductions += [("-", d["description"], d["value"]) for d in closing.get("discounts") or []]
+    if deductions:
+        elements.append(Spacer(1, 8))
+        rows = [_pdf_header_cells(["Data", "Vales e descontos", "Valor"], font_size=8.5)]
+        rows += [[cell(d, "center"), cell(desc), cell(money(v), "right")] for d, desc, v in deductions]
+        table = Table(rows, colWidths=[doc.width * w for w in (0.13, 0.73, 0.14)], repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style()))
+        elements.append(table)
+
+    elements.append(Spacer(1, 8))
+    box = [("Total dos serviços", money(closing["gross_total"]))]
+    if closing.get("advances_total"):
+        box.append(("(-) Vales", money(closing["advances_total"])))
+    if closing.get("discount_total"):
+        box.append(("(-) Descontos", money(closing["discount_total"])))
+    box.append(("Líquido a receber", money(closing["net_total"])))
+    elements.append(_pdf_totals_box(box, doc.width, width=260))
+    if closing.get("carried_over"):
+        elements.append(Spacer(1, 4))
+        elements.append(Paragraph(f"Saldo negativo de {money(closing['carried_over'])} será descontado no próximo fechamento.",
+                                  ParagraphStyle("SPCarry", fontName="Helvetica", fontSize=8, textColor=_hex(BRAND_MUTED), alignment=TA_RIGHT)))
+    if closing.get("observations"):
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph(f"<b>Observações:</b> {xml_escape(closing['observations'])}",
+                                  ParagraphStyle("SPObs", fontName="Helvetica", fontSize=8.5, textColor=_hex(BRAND_TEXT))))
+    elements.append(Spacer(1, 16))
+
+    total_str = money(closing["net_total"]).replace(" ", "&nbsp;")
+    in_words = f" ({xml_escape(amount_in_words)})" if amount_in_words else ""
+    declaration = (
+        f"Eu, <b>{xml_escape(name)}</b>, CPF/CNPJ <b>{xml_escape(document)}</b>, declaro ter recebido de "
+        f"<b>{xml_escape(c['name'])}</b> a quantia de <b>{total_str}</b>{in_words}, referente aos serviços de "
+        f"{xml_escape((closing.get('role') or 'prestação de serviço').lower())} prestados no período de "
+        f"{fmt_date(closing['period_start'])} a {fmt_date(closing['period_end'])}, discriminados acima, dando plena quitação do valor recebido."
+    )
+    elements.append(Paragraph(declaration, ParagraphStyle("SPDeclaration", parent=styles["Normal"], fontSize=10, alignment=TA_LEFT,
+                                                          leading=15, textColor=_hex(BRAND_TEXT))))
+    elements.append(_pdf_signatures([
+        ("Assinatura do Prestador", f"{name}  ·  CPF/CNPJ {document}"),
+        ("Assinatura do Responsável", f"{closing.get('paid_by_name') or closing.get('created_by_name') or '-'}  ·  {now_brt().strftime('%d/%m/%Y')}"),
+    ], doc.width, space_above=40))
+
+    footer = _make_pdf_footer(c["name"])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
+def generate_service_provider_report_pdf(closings: list, filters: dict, company: dict = None) -> bytes:
+    """Relatório dos fechamentos de Prestadores de Serviço, por prestador,
+    com serviços, vales, descontos, líquido e situação."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=10*mm, leftMargin=10*mm, topMargin=12*mm, bottomMargin=15*mm)
+    elements = []
+    styles = getSampleStyleSheet()
+    money = format_currency
+    period = (f"{fmt_date(filters.get('start_date')) if filters.get('start_date') else 'Início'} a "
+              f"{fmt_date(filters.get('end_date')) if filters.get('end_date') else 'Hoje'}")
+    situation = {"FECHADO": "A pagar", "PAGO": "Pagos"}.get(filters.get("status"), "Todos")
+    elements.extend(_build_pdf_header(styles, download_logo(company), "Fechamentos - Prestadores de Serviço",
+                                      generation_info=f"Período: {period} · {situation}", company=company, content_width=doc.width))
+    total = lambda key, items=closings: round(sum(x.get(key) or 0 for x in items), 2)  # noqa: E731
+    to_pay = round(sum(x["net_total"] for x in closings if x["status"] == "FECHADO"), 2)
+    elements.extend(_build_pdf_summary([
+        ("Fechamentos", str(len(closings))),
+        ("Serviços", money(total("gross_total"))),
+        ("Vales e descontos", money(round(total("advances_total") + total("discount_total"), 2))),
+        ("Líquido", money(total("net_total"))),
+        ("A pagar", money(to_pay)),
+    ], doc.width, max_box_width=200))
+    if not closings:
+        elements.append(_pdf_empty_state("Nenhum fechamento para os filtros informados.", doc.width))
+
+    cell = _pdf_cell_factory(styles, font_size=8)
+    groups = {}
+    for x in closings:
+        groups.setdefault(x["provider_name"], []).append(x)
+    widths = [0.06, 0.16, 0.14, 0.07, 0.11, 0.1, 0.1, 0.11, 0.07, 0.08]
+    for name, items in groups.items():
+        elements.extend(_pdf_section_title(f"{name} · {items[0].get('role') or ''}", doc.width))
+        rows = [_pdf_header_cells(["Nº", "Período", "Função", "Serviços", "Total serviços", "Vales", "Descontos", "Líquido", "Situação", "Pago em"],
+                                  font_size=8)]
+        for x in items:
+            rows.append([cell(x["number"], "center", bold=True), cell(f"{fmt_date(x['period_start'])} a {fmt_date(x['period_end'])}", "center"),
+                         cell(x.get("role") or "-"), cell(x.get("entries_count") or 0, "center"), cell(money(x["gross_total"]), "right"),
+                         cell(money(x.get("advances_total") or 0), "right"), cell(money(x.get("discount_total") or 0), "right"),
+                         cell(money(x["net_total"]), "right", bold=True), cell("Pago" if x["status"] == "PAGO" else "A pagar", "center"),
+                         cell(fmt_date(x["payment_date"]) if x.get("payment_date") else "-", "center")])
+        rows.append(["", "", cell("TOTAL", "right", bold=True), "", cell(money(total("gross_total", items)), "right", bold=True),
+                     cell(money(total("advances_total", items)), "right", bold=True), cell(money(total("discount_total", items)), "right", bold=True),
+                     cell(money(total("net_total", items)), "right", bold=True), "", ""])
+        table = Table(rows, colWidths=[doc.width * w for w in widths], repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
+        elements.append(table)
+
+    footer = _make_pdf_footer(c["name"])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
 def generate_service_price_table_pdf(client_name: str, entries: list, company: dict = None) -> bytes:
     """Gera o PDF da Tabela de Serviços de um cliente (Comercial > Tabela de
     Serviços): lista simples de serviço + valor cadastrados para ele."""

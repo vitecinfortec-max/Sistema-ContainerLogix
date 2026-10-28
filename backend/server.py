@@ -60,6 +60,7 @@ from routers.loading_orders import api_router as loading_orders_router
 from routers.freight_routes import api_router as freight_routes_router
 from routers.freight_payments import api_router as freight_payments_router
 from routers.gratifications import api_router as gratifications_router
+from routers.service_providers import api_router as service_providers_router
 from routers.hr import api_router as hr_router
 from routers.payroll import api_router as payroll_router
 from routers.container_representatives import api_router as container_representatives_router
@@ -314,6 +315,7 @@ app.include_router(loading_orders_router)
 app.include_router(freight_routes_router)
 app.include_router(freight_payments_router)
 app.include_router(gratifications_router)
+app.include_router(service_providers_router)
 app.include_router(hr_router)
 app.include_router(payroll_router)
 app.include_router(container_representatives_router)
@@ -531,6 +533,7 @@ async def prepare_database():
     for collection_name in (
         "movements", "invoices", "products", "stock_movements", "stock_entries",
         "fuel_supplies", "fuel_supply_orders", "checks", "repair_estimates", "client_credit_entries", "gratifications",
+        "service_provider_entries", "service_provider_advances", "service_provider_closings",
         "hr_contracts", "hr_payslips", "hr_payroll_runs", "hr_vacations", "hr_occurrences", "hr_documents", "hr_time_bank",
     ):
         await db[collection_name].create_index("id")

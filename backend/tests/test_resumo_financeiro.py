@@ -55,11 +55,11 @@ def test_inflows_outflows_and_positions(api):
     ins = {r["key"]: r["total"] for r in data["inflows"]}
     outs = {r["key"]: r["total"] for r in data["outflows"]}
     assert ins == {"invoices": 1000, "port_billing": 400, "container_sales": 7500, "client_credits": 0}
-    assert outs == {"checks": 300, "freight": 900, "daily": 200, "gratifications": 100, "payroll": 2000, "vacations": 800, "expense_deposits": 500, "container_purchases": 5000, "client_credit_refunds": 0}
+    assert outs == {"checks": 300, "freight": 900, "daily": 200, "gratifications": 100, "service_providers": 0, "service_provider_advances": 0, "payroll": 2000, "vacations": 800, "expense_deposits": 500, "container_purchases": 5000, "client_credit_refunds": 0}
     s = data["summary"]
     assert s["inflow_total"] == 8900 and s["outflow_total"] == 9800 and s["balance"] == -900
     assert {r["key"]: r["total"] for r in data["receivable"]} == {"invoices_open": 700, "port_open": 0, "sales_open": 2000}
-    assert {r["key"]: r["total"] for r in data["payable"]} == {"checks_open": 120, "freight_open": 250, "daily_open": 80, "gratifications_open": 60,
+    assert {r["key"]: r["total"] for r in data["payable"]} == {"checks_open": 120, "freight_open": 250, "daily_open": 80, "gratifications_open": 60, "service_providers_open": 0,
                                                                  "payroll_open": 1500, "vacations_open": 400, "client_credit_balance": 0}
     invoices_line = next(r for r in data["inflows"] if r["key"] == "invoices")
     assert "1 fatura" in invoices_line["note"]

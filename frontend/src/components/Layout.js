@@ -173,6 +173,7 @@ const PAGE_TITLES = {
   '/expense-reports/dashboard': 'Custos por Grupo',
   '/checks': 'Controle de Cheque',
   '/gratifications': 'Controle de Gratificação',
+  '/service-providers': 'Prestadores de Serviço',
   '/rh': 'Painel do RH',
   '/rh/contratos': 'Admissão e Contratos',
   '/rh/cargos': 'Cargos e Salários',
@@ -406,7 +407,7 @@ function LayoutFrame({ children }) {
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/repair-estimates' || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname === '/unit-segregation';
   const isCadastroActive = location.pathname === '/cadastro' || location.pathname === '/company-settings';
-  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/checks' || location.pathname === '/gratifications' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/client-credits' || location.pathname === '/port-services-billing';
+  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/checks' || location.pathname === '/gratifications' || location.pathname === '/service-providers' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/client-credits' || location.pathname === '/port-services-billing';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
   // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
@@ -733,6 +734,7 @@ function LayoutFrame({ children }) {
     { path: '/expense-reports', label: 'Prestação de Contas', icon: Calculator, moduleKey: 'financeiro.prestacao_contas' },
     { path: '/checks', label: 'Controle de Cheque', icon: Banknote, moduleKey: 'financeiro.controle_cheque' },
     { path: '/gratifications', label: 'Controle de Gratificação', icon: Award, moduleKey: 'financeiro.gratificacao' },
+    { path: '/service-providers', label: 'Prestadores de Serviço', icon: HardHat, moduleKey: 'financeiro.prestadores_servico' },
     { path: '/port-services-billing', label: 'Faturamento Portuário', icon: Anchor, moduleKey: 'financeiro.faturamento_portuario' },
   ].filter((item) => isModuleEnabled(item.moduleKey));
 

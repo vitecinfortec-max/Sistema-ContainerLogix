@@ -4596,3 +4596,76 @@ class MdfeCloseRequest(BaseModel):
 class MdfeDriverRequest(BaseModel):
     nome: str
     cpf: str
+
+
+# ==================== PRESTADORES DE SERVIÇO (Financeiro) ====================
+
+DEFAULT_SERVICE_PROVIDER_ROLES = ["Soldador", "Pintor", "Ajudante Geral", "Vigia", "Motorista"]
+SERVICE_PROVIDER_UNITS = ["DIARIA", "HORA", "SERVICO", "MES"]
+
+
+class ServiceProviderCreate(BaseModel):
+    """Prestador de serviço da empresa (Soldador, Pintor, Vigia...), com a
+    forma de cobrança e o valor padrão que preenchem os serviços lançados."""
+    name: str
+    document: Optional[str] = None  # CPF ou CNPJ
+    role: str  # função
+    payment_unit: str = "DIARIA"  # DIARIA, HORA, SERVICO, MES
+    default_rate: Optional[float] = None
+    phone: Optional[str] = None
+    pix_key: Optional[str] = None
+    bank_info: Optional[str] = None
+    status: str = "ATIVO"
+    observations: Optional[str] = None
+
+
+class ServiceProviderEntryCreate(BaseModel):
+    """Serviço/diária feito pelo prestador; entra no fechamento do período."""
+    provider_id: str
+    date: str  # AAAA-MM-DD
+    description: Optional[str] = None
+    quantity: float = 1
+    unit: Optional[str] = None  # vazio = a do cadastro do prestador
+    unit_value: float
+
+
+class ServiceProviderAdvanceCreate(BaseModel):
+    """Vale/adiantamento pago ao prestador; descontado no fechamento."""
+    provider_id: str
+    date: str  # AAAA-MM-DD
+    value: float
+    description: Optional[str] = None
+
+
+class ServiceProviderClosingLine(BaseModel):
+    date: str
+    description: Optional[str] = None
+    quantity: float = 1
+    unit_value: float
+
+
+class ServiceProviderDiscount(BaseModel):
+    description: str
+    value: float
+
+
+class ServiceProviderClosingCreate(BaseModel):
+    """Fechamento do prestador no período: serviços lançados (entry_ids) e
+    novos (new_entries), vales pendentes (advance_ids) e novos (new_advances),
+    outros descontos. Se os descontos passam dos serviços, o saldo negativo
+    vai para o próximo fechamento."""
+    provider_id: str
+    period_start: str
+    period_end: str
+    entry_ids: List[str] = []
+    new_entries: List[ServiceProviderClosingLine] = []
+    advance_ids: List[str] = []
+    new_advances: List[ServiceProviderAdvanceCreate] = []
+    discounts: List[ServiceProviderDiscount] = []
+    observations: Optional[str] = None
+
+
+class ServiceProviderPayRequest(BaseModel):
+    payment_date: str  # AAAA-MM-DD
+    payment_method: Optional[str] = None  # PIX, dinheiro, transferência...
+    payment_notes: Optional[str] = None
