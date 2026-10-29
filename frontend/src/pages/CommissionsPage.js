@@ -470,7 +470,7 @@ export default function CommissionsPage() {
           <StatCard label="Frete faturado" value={fmtMoney(totals.freight)} icon={Truck} tone="blue"
             hint={`${entries.length} lançamento(s)${totals.discount ? ` · descontos ${fmtMoney(totals.discount)}` : ''}`} />
           <StatCard label="Comissão a pagar" value={fmtMoney(totals.pending)} icon={Clock} tone="amber" hint={`Paga: ${fmtMoney(totals.paid)}`} />
-          <StatCard label="Adiantamentos a descontar" value={fmtMoney(totals.advances)} icon={HandCoins} tone="violet" testId="commission-stat-advances" />
+          <StatCard label="Adiantamentos" value={fmtMoney(totals.advances)} hint="a descontar" icon={HandCoins} tone="violet" testId="commission-stat-advances" />
           <StatCard label="Líquido a pagar" value={fmtMoney(totals.pending - totals.advances)} icon={CheckCircle2} tone="primary" testId="commission-stat-net" />
         </StatGrid>
 

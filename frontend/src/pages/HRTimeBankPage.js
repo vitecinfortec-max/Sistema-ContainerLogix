@@ -97,7 +97,7 @@ export default function HRTimeBankPage() {
         <PageHeader icon={Hourglass} title="Banco de Horas" subtitle="Horas a compensar (crédito) e horas devidas (débito) de cada funcionário" />
 
         <StatGrid>
-          <StatCard label="Saldo a favor dos funcionários" value={fmtMinutes(positive)} icon={TrendingUp} tone="amber" hint="horas a compensar ou pagar" />
+          <StatCard label="Saldo a compensar" value={fmtMinutes(positive)} icon={TrendingUp} tone="amber" hint="a favor dos funcionários" />
           <StatCard label="Saldo devedor" value={fmtMinutes(negative)} icon={TrendingDown} tone="blue" hint="horas devidas à empresa" />
           <StatCard label="Funcionários com saldo" value={filteredBalances.filter((b) => b.balance !== 0).length} icon={Users} tone="slate" />
         </StatGrid>

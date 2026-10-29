@@ -94,9 +94,9 @@ export default function ReceivablesPage() {
           <StatCard label="Vencido" value={formatMoney(s?.overdue_total)} icon={AlertTriangle} tone="red" hint="em aberto e já vencido" testId="receivables-kpi-overdue" />
           <StatCard label="Recebido" value={formatMoney(s?.paid_total)} icon={CheckCircle2} tone="emerald" hint={status === 'PENDENTE' ? 'mostre "Todas" ou "Recebidas"' : 'no filtro'} testId="receivables-kpi-paid" />
           <StatCard
-            label="Prazo médio de recebimento"
+            label="Prazo médio"
             value={s?.avg_days_to_receive != null ? `${Math.round(s.avg_days_to_receive)} dias` : '-'}
-            icon={Timer} tone="violet" hint="da emissão ao recebimento"
+            icon={Timer} tone="violet" hint="de recebimento, da emissão à baixa"
           />
         </StatGrid>
 

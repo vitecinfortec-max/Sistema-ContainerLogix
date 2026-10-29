@@ -132,7 +132,7 @@ export default function HROccurrencesPage() {
           subtitle="Advertências, suspensões, atestados, faltas e afastamentos. Faltas injustificadas e suspensões descontam na folha" />
 
         <StatGrid>
-          <StatCard label="Advertências e suspensões" value={count(['ADVERTENCIA', 'SUSPENSAO'])} icon={ShieldAlert} tone="amber" hint="com os filtros atuais" />
+          <StatCard label="Advertências" value={count(['ADVERTENCIA', 'SUSPENSAO'])} icon={ShieldAlert} tone="amber" hint="e suspensões, com os filtros" />
           <StatCard label="Atestados" value={count(['ATESTADO'])} icon={Stethoscope} tone="blue" />
           <StatCard label="Faltas injustificadas" value={count(['FALTA_INJUSTIFICADA'])} icon={Ban} tone="red" />
           <StatCard label="Afastamentos" value={count(['AFASTAMENTO_INSS', 'ACIDENTE_TRABALHO', 'LICENCA_MATERNIDADE', 'LICENCA_PATERNIDADE'])} icon={MessageSquareWarning} tone="slate" />

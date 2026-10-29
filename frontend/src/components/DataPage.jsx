@@ -48,17 +48,18 @@ export function StatCard({ label, value, icon: Icon, tone = 'primary', hint, tes
   return (
     <motion.div
       variants={riseIn}
-      className={cn(SURFACE, 'p-3 sm:p-4 flex items-center gap-3 min-w-0')}
+      className={cn(SURFACE, 'px-3 py-2.5 flex items-center gap-2.5 min-w-0')}
       data-testid={testId}
+      title={[label, hint].filter(Boolean).join(' · ')}
     >
       {Icon && (
-        <div className={cn('hidden sm:flex w-10 h-10 rounded-full items-center justify-center shrink-0', SOFT_TONES[tone] || SOFT_TONES.primary)}>
-          <Icon className="w-5 h-5" />
+        <div className={cn('hidden xl:flex w-9 h-9 rounded-full items-center justify-center shrink-0', SOFT_TONES[tone] || SOFT_TONES.primary)}>
+          <Icon className="w-[18px] h-[18px]" />
         </div>
       )}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{label}</p>
-        <p className="text-xl sm:text-2xl font-semibold leading-tight tabular-nums text-slate-900 dark:text-slate-100 truncate"><AnimatedNumber value={value} /></p>
+        <p className="text-lg xl:text-xl font-semibold leading-tight tabular-nums text-slate-900 dark:text-slate-100 truncate whitespace-nowrap"><AnimatedNumber value={value} /></p>
         {hint && <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{hint}</p>}
       </div>
     </motion.div>

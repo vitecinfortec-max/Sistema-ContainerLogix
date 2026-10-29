@@ -851,7 +851,7 @@ export default function CtePage() {
         <StatGrid>
           <StatCard label="CT-e" value={filtered.length} icon={FileCheck} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'cadastrados'} />
           <StatCard label="Autorizados" value={count(['AUTORIZADO'])} icon={CheckCircle2} tone="primary" />
-          <StatCard label="A transmitir / com pendência" value={count(['RASCUNHO', 'PENDENTE', 'REJEITADO', 'ERRO', 'ENVIANDO'])} icon={Clock} tone="amber" />
+          <StatCard label="A transmitir" hint="ou com pendência" value={count(['RASCUNHO', 'PENDENTE', 'REJEITADO', 'ERRO', 'ENVIANDO'])} icon={Clock} tone="amber" />
           <StatCard label="Cancelados" value={count(['CANCELADO', 'DENEGADO'])} icon={XCircle} tone="red" />
         </StatGrid>
 

@@ -725,7 +725,7 @@ export default function MdfePage() {
         <StatGrid>
           <StatCard label="MDF-e" value={filtered.length} icon={Truck} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'cadastrados'} />
           <StatCard label="Em viagem (autorizados)" value={count(['AUTORIZADO'])} icon={CheckCircle2} tone="primary" hint="encerre ao fim da viagem" />
-          <StatCard label="A transmitir / com pendência" value={count(['RASCUNHO', 'PENDENTE', 'REJEITADO', 'ERRO', 'ENVIANDO'])} icon={Clock} tone="amber" />
+          <StatCard label="A transmitir" hint="ou com pendência" value={count(['RASCUNHO', 'PENDENTE', 'REJEITADO', 'ERRO', 'ENVIANDO'])} icon={Clock} tone="amber" />
           <StatCard label="Encerrados / cancelados" value={count(['ENCERRADO', 'CANCELADO', 'DENEGADO'])} icon={XCircle} tone="slate" />
         </StatGrid>
 
