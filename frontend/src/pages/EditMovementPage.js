@@ -16,6 +16,7 @@ import { Save, Container as ContainerIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import ContainerPhotoUpload from '../components/ContainerPhotoUpload';
 import { Autocomplete } from '../components/Autocomplete';
+import { WithQuickAdd } from '../components/QuickCreate';
 import ContainerValueFields from '../components/ContainerValueFields';
 import { formatContainerNumber } from '../lib/containerNumber';
 
@@ -186,10 +187,20 @@ export default function EditMovementPage() {
     }
   };
 
+  // Armador é um Select fora do register: a obrigatoriedade é conferida aqui
+  const [triedSubmit, setTriedSubmit] = useState(false);
+
   // Obrigatório em branco: o formulário não envia e o campo mostra o motivo
-  const onInvalid = () => toast.error('Preencha os campos obrigatórios destacados');
+  const onInvalid = () => {
+    setTriedSubmit(true);
+    toast.error('Preencha os campos obrigatórios destacados');
+  };
 
   const onSubmit = async (data) => {
+    if (!String(data.shipping_line || '').trim()) {
+      onInvalid();
+      return;
+    }
     setLoading(true);
     try {
       // Moeda vem da Tabela de Serviços do cliente quando o usuário trocou
@@ -214,6 +225,8 @@ export default function EditMovementPage() {
       setLoading(false);
     }
   };
+
+  const appendTo = (setter) => (record) => setter((prev) => [...prev, record]);
 
   const cavaloVehicles = vehicles.filter(v => v.vehicle_type === 'CAVALO');
   const carretaVehicles = vehicles.filter(v => v.vehicle_type === 'CARRETA');
@@ -299,7 +312,10 @@ export default function EditMovementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="driver_name" className="block">Nome do Motorista *</Label>
-                  <Input id="driver_name" {...register('driver_name', { required: true })} aria-invalid={!!errors.driver_name} />
+                  <WithQuickAdd kind="driver" testId="edit-gate-driver-quick-add" initial={() => ({ name: watch('driver_name'), cpf: watch('driver_cpf') })}
+                    onCreated={(d) => { setValue('driver_name', d.name, { shouldValidate: true }); setValue('driver_cpf', d.cpf || '', { shouldValidate: true }); }}>
+                    <Input id="driver_name" {...register('driver_name', { required: true })} aria-invalid={!!errors.driver_name} />
+                  </WithQuickAdd>
                   {errors.driver_name && <FieldError />}
                 </div>
                 <div className="space-y-1.5">
@@ -309,13 +325,16 @@ export default function EditMovementPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="truck_plate" className="block">Placa do Cavalo *</Label>
-                  <Input
-                    id="truck_plate"
-                    {...register('truck_plate', { required: true })}
-                    onChange={(e) => handleTruckPlateChange(e.target.value)}
-                    className="font-mono uppercase"
-                    list="trucks-list"
-                  />
+                  <WithQuickAdd kind="vehicle" testId="edit-gate-truck-quick-add" initial={() => ({ plate: watch('truck_plate'), vehicle_type: 'CAVALO' })}
+                    onCreated={(v) => { appendTo(setVehicles)(v); setValue('truck_plate', (v.plate || '').toUpperCase(), { shouldValidate: true }); }}>
+                    <Input
+                      id="truck_plate"
+                      {...register('truck_plate', { required: true })}
+                      onChange={(e) => handleTruckPlateChange(e.target.value)}
+                      className="font-mono uppercase"
+                      list="trucks-list"
+                    />
+                  </WithQuickAdd>
                   {errors.truck_plate && <FieldError />}
                   <datalist id="trucks-list">
                     {cavaloVehicles.map(vehicle => (
@@ -325,13 +344,16 @@ export default function EditMovementPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="trailer_plate_1" className="block">Placa Carreta *</Label>
-                  <Input
-                    id="trailer_plate_1"
-                    {...register('trailer_plate_1', { required: true })}
-                    onChange={(e) => handleTrailerPlateChange(e.target.value)}
-                    className="font-mono uppercase"
-                    list="trailers-list"
-                  />
+                  <WithQuickAdd kind="vehicle" testId="edit-gate-trailer-quick-add" initial={() => ({ plate: watch('trailer_plate_1'), vehicle_type: 'CARRETA' })}
+                    onCreated={(v) => { appendTo(setVehicles)(v); setValue('trailer_plate_1', (v.plate || '').toUpperCase(), { shouldValidate: true }); }}>
+                    <Input
+                      id="trailer_plate_1"
+                      {...register('trailer_plate_1', { required: true })}
+                      onChange={(e) => handleTrailerPlateChange(e.target.value)}
+                      className="font-mono uppercase"
+                      list="trailers-list"
+                    />
+                  </WithQuickAdd>
                   {errors.trailer_plate_1 && <FieldError />}
                   <datalist id="trailers-list">
                     {carretaVehicles.map(vehicle => (
@@ -341,23 +363,29 @@ export default function EditMovementPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="transport_company" className="block">Transportadora *</Label>
-                  <Input id="transport_company" {...register('transport_company', { required: true })} aria-invalid={!!errors.transport_company} />
+                  <WithQuickAdd kind="company" testId="edit-gate-company-quick-add" initial={() => ({ name: watch('transport_company') })}
+                    onCreated={(c) => setValue('transport_company', c.name, { shouldValidate: true })}>
+                    <Input id="transport_company" {...register('transport_company', { required: true })} aria-invalid={!!errors.transport_company} />
+                  </WithQuickAdd>
                   {errors.transport_company && <FieldError />}
                 </div>
                 <div className="space-y-1.5 relative">
                   <Label htmlFor="client_name" className="block">Cliente</Label>
-                  <ClientNamePicker
-                    id="client_name"
-                    testId="client-name-input"
-                    text={clientSearch}
-                    clients={clients}
-                    onTextChange={(value) => {
-                      setClientSearch(value);
-                      if (value === '') setValue('client_name', '');
-                    }}
-                    onPick={(client) => { userChangedPricingInputRef.current = true; setClientSearch(client.name); setValue('client_name', client.name); }}
-                    onClear={() => { setClientSearch(''); setValue('client_name', ''); }}
-                  />
+                  <WithQuickAdd kind="client" testId="edit-gate-client-quick-add" initial={{ name: clientSearch }}
+                    onCreated={(client) => { appendTo(setClients)(client); userChangedPricingInputRef.current = true; setClientSearch(client.name); setValue('client_name', client.name); }}>
+                    <ClientNamePicker
+                      id="client_name"
+                      testId="client-name-input"
+                      text={clientSearch}
+                      clients={clients}
+                      onTextChange={(value) => {
+                        setClientSearch(value);
+                        if (value === '') setValue('client_name', '');
+                      }}
+                      onPick={(client) => { userChangedPricingInputRef.current = true; setClientSearch(client.name); setValue('client_name', client.name); }}
+                      onClear={() => { setClientSearch(''); setValue('client_name', ''); }}
+                    />
+                  </WithQuickAdd>
                   <p className="text-xs text-muted-foreground">Este campo aparece na impressão</p>
                 </div>
               </div>
@@ -417,7 +445,9 @@ export default function EditMovementPage() {
                       {shippingLines.length > 0 ? `(${shippingLines.length} cadastrados)` : ''}
                     </span>
                   </div>
-                  <Select value={shippingLine || ''} onValueChange={(value) => setValue('shipping_line', value)}>
+                  <WithQuickAdd kind="shipping_line" testId="edit-gate-shipping-line-quick-add"
+                    onCreated={(line) => { appendTo(setShippingLines)(line); setValue('shipping_line', line.name); }}>
+                  <Select value={shippingLine || ''} onValueChange={(value) => { if (value) setValue('shipping_line', value); }}>
                     <SelectTrigger id="shipping_line" data-testid="shipping-line-select">
                       <SelectValue />
                     </SelectTrigger>
@@ -439,8 +469,10 @@ export default function EditMovementPage() {
                       )}
                     </SelectContent>
                   </Select>
+                  </WithQuickAdd>
+                  {triedSubmit && !String(shippingLine || '').trim() && <FieldError testId="shipping-line-error" />}
                   {shippingLines.length === 0 && !shippingLine && (
-                    <p className="text-xs text-amber-600">Nenhum armador cadastrado. Vá em "Cadastro de Armadores" para adicionar.</p>
+                    <p className="text-xs text-amber-600">Nenhum armador cadastrado. Use o + para cadastrar.</p>
                   )}
                 </div>
                 <div className="space-y-1.5">
@@ -457,13 +489,16 @@ export default function EditMovementPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="origin_terminal" className="block">Terminal de Origem</Label>
-                  <Autocomplete
-                    value={watch('origin_terminal') || ''}
-                    onChange={(v) => setValue('origin_terminal', v)}
-                    onSelect={(t) => setValue('origin_terminal', t.name)}
-                    options={terminals}
-                    displayField="name"
-                  />
+                  <WithQuickAdd kind="terminal" testId="edit-gate-terminal-quick-add" initial={() => ({ name: watch('origin_terminal') })}
+                    onCreated={(t) => { appendTo(setTerminals)(t); setValue('origin_terminal', t.name); }}>
+                    <Autocomplete
+                      value={watch('origin_terminal') || ''}
+                      onChange={(v) => setValue('origin_terminal', v)}
+                      onSelect={(t) => setValue('origin_terminal', t.name)}
+                      options={terminals}
+                      displayField="name"
+                    />
+                  </WithQuickAdd>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -472,7 +507,9 @@ export default function EditMovementPage() {
                       {serviceTypes.length > 0 ? `(${serviceTypes.length} cadastrados)` : ''}
                     </span>
                   </div>
-                  <Select value={serviceType || 'none'} onValueChange={(value) => { userChangedPricingInputRef.current = true; setValue('service_type', value === 'none' ? '' : value); }}>
+                  <WithQuickAdd kind="service_type" testId="edit-gate-service-type-quick-add"
+                    onCreated={(st) => { appendTo(setServiceTypes)(st); userChangedPricingInputRef.current = true; setValue('service_type', st.name); }}>
+                  <Select value={serviceType || 'none'} onValueChange={(value) => { if (!value) return; userChangedPricingInputRef.current = true; setValue('service_type', value === 'none' ? '' : value); }}>
                     <SelectTrigger id="service_type" data-testid="service-type-select">
                       <SelectValue />
                     </SelectTrigger>
@@ -483,6 +520,7 @@ export default function EditMovementPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  </WithQuickAdd>
                   <p className="text-xs text-muted-foreground">Este campo aparecerá no relatório de faturamento</p>
                 </div>
                 <div className="space-y-1.5">

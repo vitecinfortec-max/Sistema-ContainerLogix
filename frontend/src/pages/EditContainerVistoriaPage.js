@@ -12,6 +12,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
+import { WithQuickAdd } from '../components/QuickCreate';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Save, Loader2, Camera, Upload, X, ShieldCheck } from 'lucide-react';
@@ -112,6 +113,8 @@ export default function EditContainerVistoriaPage() {
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const appendTo = (setter) => (record) => setter((prev) => [...prev, record]);
 
   // Motorista já cadastrado: puxa o CPF do cadastro
   const handleDriverChange = (name) => {
@@ -255,27 +258,33 @@ export default function EditContainerVistoriaPage() {
 
                 <div>
                   <Label htmlFor="client_name" className="mb-1.5 block">Cliente</Label>
-                  <Autocomplete
-                    value={formData.client_name}
-                    onChange={(v) => handleInputChange('client_name', v)}
-                    onSelect={(c) => handleInputChange('client_name', c.name)}
-                    options={clients}
-                    displayField="name"
-                  />
+                  <WithQuickAdd kind="client" testId="edit-vistoria-client-quick-add" initial={() => ({ name: formData.client_name })}
+                    onCreated={(c) => { appendTo(setClients)(c); handleInputChange('client_name', c.name); }}>
+                    <Autocomplete
+                      value={formData.client_name}
+                      onChange={(v) => handleInputChange('client_name', v)}
+                      onSelect={(c) => handleInputChange('client_name', c.name)}
+                      options={clients}
+                      displayField="name"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div>
                   <Label htmlFor="shipping_line" className="mb-1.5 block">Armador</Label>
-                  <Select value={formData.shipping_line} onValueChange={(value) => handleInputChange('shipping_line', value)}>
-                    <SelectTrigger id="shipping_line" data-testid="shipping-line-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {shippingLines.map((line) => (
-                        <SelectItem key={line.id} value={line.name}>{line.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <WithQuickAdd kind="shipping_line" testId="edit-vistoria-shipping-line-quick-add"
+                    onCreated={(line) => { appendTo(setShippingLines)(line); handleInputChange('shipping_line', line.name); }}>
+                    <Select value={formData.shipping_line} onValueChange={(value) => { if (value) handleInputChange('shipping_line', value); }}>
+                      <SelectTrigger id="shipping_line" data-testid="shipping-line-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shippingLines.map((line) => (
+                          <SelectItem key={line.id} value={line.name}>{line.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </WithQuickAdd>
                 </div>
 
                 <div>
@@ -310,13 +319,16 @@ export default function EditContainerVistoriaPage() {
 
                 <div>
                   <Label htmlFor="driver_name" className="mb-1.5 block">Nome do Motorista</Label>
-                  <Autocomplete
-                    value={formData.driver_name}
-                    onChange={handleDriverChange}
-                    onSelect={(d) => handleDriverChange(d.name)}
-                    options={drivers}
-                    displayField="name"
-                  />
+                  <WithQuickAdd kind="driver" testId="edit-vistoria-driver-quick-add" initial={() => ({ name: formData.driver_name, cpf: formData.driver_cpf })}
+                    onCreated={(d) => { appendTo(setDrivers)(d); setFormData(prev => ({ ...prev, driver_name: d.name, driver_cpf: d.cpf || prev.driver_cpf })); }}>
+                    <Autocomplete
+                      value={formData.driver_name}
+                      onChange={handleDriverChange}
+                      onSelect={(d) => handleDriverChange(d.name)}
+                      options={drivers}
+                      displayField="name"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div>
@@ -333,35 +345,44 @@ export default function EditContainerVistoriaPage() {
 
                 <div>
                   <Label htmlFor="truck_plate" className="mb-1.5 block">Placa do Cavalo</Label>
-                  <Autocomplete
-                    value={formData.truck_plate}
-                    onChange={(v) => handleInputChange('truck_plate', v.toUpperCase())}
-                    onSelect={(v) => handleInputChange('truck_plate', v.plate)}
-                    options={vehicles}
-                    displayField="plate"
-                  />
+                  <WithQuickAdd kind="vehicle" testId="edit-vistoria-truck-quick-add" initial={() => ({ plate: formData.truck_plate, vehicle_type: 'CAVALO' })}
+                    onCreated={(v) => { appendTo(setVehicles)(v); handleInputChange('truck_plate', (v.plate || '').toUpperCase()); }}>
+                    <Autocomplete
+                      value={formData.truck_plate}
+                      onChange={(v) => handleInputChange('truck_plate', v.toUpperCase())}
+                      onSelect={(v) => handleInputChange('truck_plate', v.plate)}
+                      options={vehicles}
+                      displayField="plate"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div>
                   <Label htmlFor="trailer_plate" className="mb-1.5 block">Placa da Carreta</Label>
-                  <Autocomplete
-                    value={formData.trailer_plate}
-                    onChange={(v) => handleInputChange('trailer_plate', v.toUpperCase())}
-                    onSelect={(v) => handleInputChange('trailer_plate', v.plate)}
-                    options={vehicles}
-                    displayField="plate"
-                  />
+                  <WithQuickAdd kind="vehicle" testId="edit-vistoria-trailer-quick-add" initial={() => ({ plate: formData.trailer_plate, vehicle_type: 'CARRETA' })}
+                    onCreated={(v) => { appendTo(setVehicles)(v); handleInputChange('trailer_plate', (v.plate || '').toUpperCase()); }}>
+                    <Autocomplete
+                      value={formData.trailer_plate}
+                      onChange={(v) => handleInputChange('trailer_plate', v.toUpperCase())}
+                      onSelect={(v) => handleInputChange('trailer_plate', v.plate)}
+                      options={vehicles}
+                      displayField="plate"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div>
                   <Label htmlFor="transport_company" className="mb-1.5 block">Transportadora</Label>
-                  <Autocomplete
-                    value={formData.transport_company}
-                    onChange={(v) => handleInputChange('transport_company', v)}
-                    onSelect={(c) => handleInputChange('transport_company', c.name)}
-                    options={transportCompanies}
-                    displayField="name"
-                  />
+                  <WithQuickAdd kind="company" testId="edit-vistoria-company-quick-add" initial={() => ({ name: formData.transport_company })}
+                    onCreated={(c) => { appendTo(setTransportCompanies)(c); handleInputChange('transport_company', c.name); }}>
+                    <Autocomplete
+                      value={formData.transport_company}
+                      onChange={(v) => handleInputChange('transport_company', v)}
+                      onSelect={(c) => handleInputChange('transport_company', c.name)}
+                      options={transportCompanies}
+                      displayField="name"
+                    />
+                  </WithQuickAdd>
                 </div>
               </div>
 
@@ -405,13 +426,16 @@ export default function EditContainerVistoriaPage() {
                   <p className="text-sm text-muted-foreground mb-3">
                     Busque e adicione os serviços de reparo constatados na vistoria.
                   </p>
-                  <Autocomplete
-                    value={serviceSearch}
-                    onChange={setServiceSearch}
-                    onSelect={addService}
-                    options={repairServices}
-                    displayField="name"
-                  />
+                  <WithQuickAdd kind="service_type" testId="edit-vistoria-service-quick-add" initial={() => ({ name: serviceSearch })}
+                    onCreated={(st) => { appendTo(setRepairServices)(st); addService(st); }}>
+                    <Autocomplete
+                      value={serviceSearch}
+                      onChange={setServiceSearch}
+                      onSelect={addService}
+                      options={repairServices}
+                      displayField="name"
+                    />
+                  </WithQuickAdd>
                   {damageItems.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3">
                       {damageItems.map((name) => (

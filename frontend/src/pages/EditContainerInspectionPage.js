@@ -12,6 +12,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Autocomplete } from '../components/Autocomplete';
+import { WithQuickAdd } from '../components/QuickCreate';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Save, Loader2, Plus, Camera, Upload, X, ClipboardCheck } from 'lucide-react';
@@ -151,6 +152,8 @@ export default function EditContainerInspectionPage() {
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const appendTo = (setter) => (record) => setter((prev) => [...prev, record]);
 
   const handleClientSelect = (client) => {
     setFormData(prev => ({
@@ -313,13 +316,16 @@ export default function EditContainerInspectionPage() {
 
                 <div>
                   <Label htmlFor="origin_terminal" className="mb-1.5 block">Terminal de Origem</Label>
-                  <Autocomplete
-                    value={formData.origin_terminal}
-                    onChange={(v) => handleInputChange('origin_terminal', v)}
-                    onSelect={(t) => handleInputChange('origin_terminal', t.name)}
-                    options={terminals}
-                    displayField="name"
-                  />
+                  <WithQuickAdd kind="terminal" testId="edit-inspection-terminal-quick-add" initial={() => ({ name: formData.origin_terminal })}
+                    onCreated={(t) => { appendTo(setTerminals)(t); handleInputChange('origin_terminal', t.name); }}>
+                    <Autocomplete
+                      value={formData.origin_terminal}
+                      onChange={(v) => handleInputChange('origin_terminal', v)}
+                      onSelect={(t) => handleInputChange('origin_terminal', t.name)}
+                      options={terminals}
+                      displayField="name"
+                    />
+                  </WithQuickAdd>
                 </div>
 
                 <div>
@@ -334,64 +340,74 @@ export default function EditContainerInspectionPage() {
                 
                 <div className="relative">
                   <Label htmlFor="client" className="mb-1.5 block">Cliente</Label>
-                  <Input
-                    id="client"
-                    value={clientSearch}
-                    onChange={(e) => {
-                      setClientSearch(e.target.value);
-                      setShowClientDropdown(true);
-                      if (!e.target.value) {
-                        setFormData(prev => ({ ...prev, client_id: '', client_name: '' }));
-                      }
-                    }}
-                    onFocus={() => setShowClientDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
-                    data-testid="client-input"
-                  />
-                  {showClientDropdown && filteredClients.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
-                      {filteredClients.map(client => (
-                        <div
-                          key={client.id}
-                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
-                          onMouseDown={() => handleClientSelect(client)}
-                        >
-                          {client.name}
+                  <WithQuickAdd kind="client" testId="edit-inspection-client-quick-add" initial={() => ({ name: clientSearch })}
+                    onCreated={(r) => { appendTo(setClients)(r); handleClientSelect(r); }}>
+                    <div className="relative">
+                      <Input
+                        id="client"
+                        value={clientSearch}
+                        onChange={(e) => {
+                          setClientSearch(e.target.value);
+                          setShowClientDropdown(true);
+                          if (!e.target.value) {
+                            setFormData(prev => ({ ...prev, client_id: '', client_name: '' }));
+                          }
+                        }}
+                        onFocus={() => setShowClientDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
+                        data-testid="client-input"
+                      />
+                      {showClientDropdown && filteredClients.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
+                          {filteredClients.map(client => (
+                            <div
+                              key={client.id}
+                              className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
+                              onMouseDown={() => handleClientSelect(client)}
+                            >
+                              {client.name}
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
                     </div>
-                  )}
+                  </WithQuickAdd>
                 </div>
                 
                 <div className="relative">
                   <Label htmlFor="shipping_line" className="mb-1.5 block">Armador</Label>
-                  <Input
-                    id="shipping_line"
-                    value={shippingLineSearch}
-                    onChange={(e) => {
-                      setShippingLineSearch(e.target.value);
-                      setShowShippingLineDropdown(true);
-                      if (!e.target.value) {
-                        setFormData(prev => ({ ...prev, shipping_line_id: '', shipping_line_name: '' }));
-                      }
-                    }}
-                    onFocus={() => setShowShippingLineDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowShippingLineDropdown(false), 200)}
-                    data-testid="shipping-line-input"
-                  />
-                  {showShippingLineDropdown && filteredShippingLines.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
-                      {filteredShippingLines.map(line => (
-                        <div
-                          key={line.id}
-                          className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
-                          onMouseDown={() => handleShippingLineSelect(line)}
-                        >
-                          {line.name}
+                  <WithQuickAdd kind="shipping_line" testId="edit-inspection-shipping-line-quick-add" initial={() => ({ name: shippingLineSearch })}
+                    onCreated={(r) => { appendTo(setShippingLines)(r); handleShippingLineSelect(r); }}>
+                    <div className="relative">
+                      <Input
+                        id="shipping_line"
+                        value={shippingLineSearch}
+                        onChange={(e) => {
+                          setShippingLineSearch(e.target.value);
+                          setShowShippingLineDropdown(true);
+                          if (!e.target.value) {
+                            setFormData(prev => ({ ...prev, shipping_line_id: '', shipping_line_name: '' }));
+                          }
+                        }}
+                        onFocus={() => setShowShippingLineDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowShippingLineDropdown(false), 200)}
+                        data-testid="shipping-line-input"
+                      />
+                      {showShippingLineDropdown && filteredShippingLines.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-48 overflow-auto">
+                          {filteredShippingLines.map(line => (
+                            <div
+                              key={line.id}
+                              className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 cursor-pointer"
+                              onMouseDown={() => handleShippingLineSelect(line)}
+                            >
+                              {line.name}
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
                     </div>
-                  )}
+                  </WithQuickAdd>
                 </div>
               </div>
               
