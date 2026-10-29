@@ -10,7 +10,7 @@ import { Scale, ArrowDownCircle, ArrowUpCircle, Wallet, Hourglass, Printer, File
 import { todayISO } from '../lib/dates';
 import { cn } from '../lib/utils';
 
-const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 function monthRange(month) {
   const [y, m] = month.split('-').map(Number);

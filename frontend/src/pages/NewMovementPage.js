@@ -23,6 +23,7 @@ import ContainerValueFields from '../components/ContainerValueFields';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatCPF, formatPlate, plateKey } from '../lib/masks';
 
 const AUTO_SAVE_KEY = 'containerlogix_movement_draft';
 
@@ -445,18 +446,18 @@ export default function NewMovementPage() {
   const carretaVehicles = vehicles.filter(v => v.vehicle_type === 'CARRETA');
 
   const handleTruckPlateChange = (plate) => {
-    const upper = plate.toUpperCase();
+    const upper = formatPlate(plate);
     setValue('truck_plate', upper);
-    const vehicle = cavaloVehicles.find(v => v.plate.toUpperCase() === upper);
+    const vehicle = cavaloVehicles.find(v => plateKey(v.plate) === plateKey(upper));
     if (vehicle) {
       toast.success('Placa encontrada no cadastro de veículos');
     }
   };
 
   const handleTrailerPlateChange = (plate) => {
-    const upper = plate.toUpperCase();
+    const upper = formatPlate(plate);
     setValue('trailer_plate_1', upper);
-    const vehicle = carretaVehicles.find(v => v.plate.toUpperCase() === upper);
+    const vehicle = carretaVehicles.find(v => plateKey(v.plate) === plateKey(upper));
     if (vehicle) {
       toast.success('Placa encontrada no cadastro de veículos');
     }
@@ -547,7 +548,7 @@ export default function NewMovementPage() {
                   <Input
                     id="driver_cpf"
                     data-testid="driver-cpf-input"
-                    {...register('driver_cpf', { required: true })}
+                    {...register('driver_cpf', { required: true, onChange: (e) => setValue('driver_cpf', formatCPF(e.target.value)) })}
                     aria-invalid={!!errors.driver_cpf}
                     className="font-mono"
                   />

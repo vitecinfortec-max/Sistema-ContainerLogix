@@ -24,6 +24,7 @@ import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, PackageCheck, Download, Printer, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { toLocalDay } from '../lib/dates';
+import { formatPlate } from '../lib/masks';
 
 const ORDER_TYPE_OPTIONS = [
   ['COLETA', 'Coleta de Container'],
@@ -53,7 +54,7 @@ const CONTAINER_STATUS_OPTIONS = [
   ['VAZIO', 'Vazio'],
 ];
 
-const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 function emptyItem() {
   return { container_number: '', status: 'CHEIO', size_type: '', gross_weight: '', seal: '', shipping_line: '' };
@@ -813,8 +814,8 @@ export default function LoadingOrderPage() {
                   <div className="flex-1 min-w-0">
                     <Autocomplete
                       value={form.truck_plate}
-                      onChange={(v) => onChange('truck_plate', v.toUpperCase())}
-                      onSelect={(v) => onChange('truck_plate', v.plate)}
+                      onChange={(v) => onChange('truck_plate', formatPlate(v))}
+                      onSelect={(v) => onChange('truck_plate', formatPlate(v.plate))}
                       options={vehicles}
                       displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                       className="h-9 text-sm font-mono"
@@ -830,8 +831,8 @@ export default function LoadingOrderPage() {
                   <div className="flex-1 min-w-0">
                     <Autocomplete
                       value={form.trailer_plate}
-                      onChange={(v) => onChange('trailer_plate', v.toUpperCase())}
-                      onSelect={(v) => onChange('trailer_plate', v.plate)}
+                      onChange={(v) => onChange('trailer_plate', formatPlate(v))}
+                      onSelect={(v) => onChange('trailer_plate', formatPlate(v.plate))}
                       options={vehicles}
                       displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                       className="h-9 text-sm font-mono"

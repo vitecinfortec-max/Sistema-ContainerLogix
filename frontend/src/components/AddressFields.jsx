@@ -7,6 +7,7 @@ import { Autocomplete } from './Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Search, Loader2 } from 'lucide-react';
+import { formatCEP } from '../lib/masks';
 
 const UF_OPTIONS = [
   ['AC', 'Acre'], ['AL', 'Alagoas'], ['AP', 'Amapá'], ['AM', 'Amazonas'], ['BA', 'Bahia'],
@@ -17,12 +18,6 @@ const UF_OPTIONS = [
   ['RO', 'Rondônia'], ['RR', 'Roraima'], ['SC', 'Santa Catarina'], ['SP', 'São Paulo'],
   ['SE', 'Sergipe'], ['TO', 'Tocantins'],
 ];
-
-const formatCEP = (value) => {
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 5) return digits;
-  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
-};
 
 const FieldLabel = ({ children }) => (
   <Label className="mb-1.5 block">{children}</Label>

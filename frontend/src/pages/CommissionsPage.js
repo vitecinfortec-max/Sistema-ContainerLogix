@@ -882,7 +882,7 @@ export default function CommissionsPage() {
       </Dialog>
       {/* Lançamento por representante */}
       <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
-        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="commission-batch-dialog">
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto" data-testid="commission-batch-dialog">
           <DialogHeader><DialogTitle className="flex items-center gap-2 text-base"><Percent className="w-5 h-5 text-primary" />Lançamento de comissão</DialogTitle></DialogHeader>
           <div className="space-y-5">
             <div className="grid grid-cols-2 md:grid-cols-12 gap-3">

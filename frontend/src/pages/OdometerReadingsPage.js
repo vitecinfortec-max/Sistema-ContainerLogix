@@ -21,6 +21,7 @@ import { Gauge, Plus, Trash2, Truck, CheckCircle2, Clock, AlertTriangle, Edit } 
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
+import { formatPlate } from '../lib/masks';
 
 const fmtKm = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR')} km`;
 
@@ -412,11 +413,11 @@ export default function OdometerReadingsPage() {
                 <Label className="mb-1.5 block">Veículo *</Label>
                 <Autocomplete
                   value={formData.vehicle_plate}
-                  onChange={(val) => setFormData(prev => ({ ...prev, vehicle_plate: val.toUpperCase(), vehicle_id: '' }))}
+                  onChange={(val) => setFormData(prev => ({ ...prev, vehicle_plate: formatPlate(val), vehicle_id: '' }))}
                   options={cavalos}
                   displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                   valueField="id"
-                  onSelect={(vehicle) => setFormData(prev => ({ ...prev, vehicle_id: vehicle.id, vehicle_plate: vehicle.plate }))}
+                  onSelect={(vehicle) => setFormData(prev => ({ ...prev, vehicle_id: vehicle.id, vehicle_plate: formatPlate(vehicle.plate) }))}
                 />
               </div>
               <div>

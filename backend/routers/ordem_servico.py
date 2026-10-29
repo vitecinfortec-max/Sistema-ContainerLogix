@@ -15,7 +15,7 @@ from reports import (
     generate_service_orders_report_pdf, generate_service_orders_report_excel, now_brt, merge_company
 )
 
-from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, refuse_negative
+from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, refuse_negative, plate_regex
 
 api_router = APIRouter(prefix="/api")
 
@@ -535,7 +535,7 @@ async def _filter_ordem_servico_report(
     query = {}
     # Por trecho, sem diferenciar maiúsculas: a tela filtra enquanto se digita
     if equipment_plate and equipment_plate != 'all':
-        query['equipment_plate'] = {"$regex": re.escape(equipment_plate.strip()), "$options": "i"}
+        query['equipment_plate'] = {"$regex": plate_regex(equipment_plate), "$options": "i"}
     if status and status != 'all':
         query['status'] = status
     if category and category != 'all':

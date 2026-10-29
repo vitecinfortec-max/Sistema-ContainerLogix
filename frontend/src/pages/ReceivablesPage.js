@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { todayISO, calendarDate } from '../lib/dates';
 import { cn } from '../lib/utils';
 
-const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatDay = (value) => (value ? format(calendarDate(value), 'dd/MM/yyyy') : '-');
 
 const AGING_TONES = {

@@ -23,6 +23,7 @@ import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
 import PeriodReportDialog from '../components/PeriodReportDialog';
 import { FileBarChart } from 'lucide-react';
+import { formatPlate } from '../lib/masks';
 
 const brl = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -382,7 +383,7 @@ export default function DailyRateRequestPage() {
     return <StatusPill tone={tones[status] || 'amber'}>{labels[status] || status}</StatusPill>;
   };
 
-  const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <Layout>
@@ -559,11 +560,11 @@ export default function DailyRateRequestPage() {
                         <Label className="mb-1.5 block">Placa *</Label>
                         <Autocomplete
                           value={item.vehicle_plate}
-                          onChange={(val) => handleItemChange(index, 'vehicle_plate', val.toUpperCase())}
+                          onChange={(val) => handleItemChange(index, 'vehicle_plate', formatPlate(val))}
                           options={vehicles}
                           displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                           valueField="id"
-                          onSelect={(vehicle) => handleItemChange(index, 'vehicle_plate', vehicle.plate)}
+                          onSelect={(vehicle) => handleItemChange(index, 'vehicle_plate', formatPlate(vehicle.plate))}
                         />
                       </div>
                       <div>
@@ -632,7 +633,7 @@ export default function DailyRateRequestPage() {
 
       {/* Modal Detalhes */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" data-testid="daily-rate-detail-dialog">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Solicitação #{selectedRequest?.request_number}
@@ -667,9 +668,9 @@ export default function DailyRateRequestPage() {
                         <tr key={idx} className="border-t">
                           <td>{idx + 1}</td>
                           <td>{item.driver_name}</td>
-                          <td className="font-mono">{item.vehicle_plate}</td>
+                          <td className="font-mono whitespace-nowrap">{item.vehicle_plate}</td>
                           <td>{item.client_name}</td>
-                          <td>{item.departure_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(item.departure_date) ? `${item.departure_date}T00:00:00` : item.departure_date), 'dd/MM/yyyy') : '-'}</td>
+                          <td className="whitespace-nowrap">{item.departure_date ? format(new Date(/^\d{4}-\d{2}-\d{2}$/.test(item.departure_date) ? `${item.departure_date}T00:00:00` : item.departure_date), 'dd/MM/yyyy') : '-'}</td>
                           <td className="text-right">{formatMoney(item.others_value)}</td>
                           <td className="text-right">{formatMoney(item.commission_value)}</td>
                           <td className="text-right">{formatMoney(item.lunch_value)}</td>

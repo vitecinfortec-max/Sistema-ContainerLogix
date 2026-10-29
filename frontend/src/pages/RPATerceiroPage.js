@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import {
   Plus, Pencil, Trash2, FileText, Printer, X, Save, Calculator, Banknote, HandCoins, Wallet,
 } from 'lucide-react';
+import { formatPlate } from '../lib/masks';
 
 const buildEmptyForm = () => {
   return Object.freeze({
@@ -834,7 +835,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 <Autocomplete
                   className="text-sm"
                   value={form.truck_plate}
-                  onChange={(v) => onChange('truck_plate', v.toUpperCase())}
+                  onChange={(v) => onChange('truck_plate', formatPlate(v))}
                   options={vehicles}
                   displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                   valueField="id"
@@ -850,7 +851,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                 <Autocomplete
                   className="text-sm"
                   value={form.trailer_plate}
-                  onChange={(v) => onChange('trailer_plate', v.toUpperCase())}
+                  onChange={(v) => onChange('trailer_plate', formatPlate(v))}
                   options={vehicles}
                   displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                   valueField="id"

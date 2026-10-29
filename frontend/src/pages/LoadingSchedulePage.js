@@ -22,6 +22,7 @@ import { Calendar, Plus, Eye, Trash2, Printer, Pencil, X, FileText, Clock, Check
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
+import { formatCPF, formatPlate } from '../lib/masks';
 
 // Cliente para o qual exibimos o campo "Nº da Bolsa" (flexitank) na Programação
 // de Carregamento e no Status de Entrega
@@ -595,13 +596,13 @@ export default function LoadingSchedulePage() {
                       </div>
                       <div>
                         <Label className="mb-1.5 block">CPF</Label>
-                        <Input className="h-9" value={item.driver_cpf} onChange={(e) => handleItemChange(index, 'driver_cpf', e.target.value)} />
+                        <Input className="h-9" value={item.driver_cpf} onChange={(e) => handleItemChange(index, 'driver_cpf', formatCPF(e.target.value))} />
                       </div>
                       <div>
                         <Label className="mb-1.5 block">Cavalo *</Label>
                         <Autocomplete
                           value={item.cavalo_plate}
-                          onChange={(val) => handleItemChange(index, 'cavalo_plate', val.toUpperCase())}
+                          onChange={(val) => handleItemChange(index, 'cavalo_plate', formatPlate(val))}
                           options={cavalos}
                           displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                           valueField="id"
@@ -614,7 +615,7 @@ export default function LoadingSchedulePage() {
                         <Label className="mb-1.5 block">Carreta</Label>
                         <Autocomplete
                           value={item.carreta_plate}
-                          onChange={(val) => handleItemChange(index, 'carreta_plate', val.toUpperCase())}
+                          onChange={(val) => handleItemChange(index, 'carreta_plate', formatPlate(val))}
                           options={carretas}
                           displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                           valueField="id"

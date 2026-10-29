@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List
 import io
 import os
+import re
 import time
 import uuid
 from collections import defaultdict
@@ -147,6 +148,30 @@ def round_money(value):
     if value is None:
         return None
     return round(float(value), 2)
+
+
+def plate_key(plate) -> str:
+    """'abc-1d23 ' -> 'ABC1D23': para comparar placa com e sem traço."""
+    return ''.join(ch for ch in str(plate or '').upper() if ch.isascii() and ch.isalnum())
+
+
+def format_plate(plate) -> str:
+    """Placa no formato das telas, com traço depois das 3 letras (ABC-1234,
+    ABC-1D23). O que não tem cara de placa (código de equipamento) só vai
+    para maiúsculas, como foi digitado."""
+    text = str(plate or '').strip().upper()
+    key = plate_key(text)
+    if len(key) == 7 and key[:3].isalpha() and key[3].isdigit():
+        return f"{key[:3]}-{key[3:]}"
+    return text
+
+
+def plate_regex(plate, exact: bool = False) -> str:
+    """Regex de busca que acha a placa com ou sem traço/espaço: "ABC1D"
+    acha "ABC-1D23". Com `exact`, só a placa inteira."""
+    key = plate_key(plate)
+    body = r'[\s-]*'.join(re.escape(ch) for ch in key)
+    return f"^[\\s-]*{body}[\\s-]*$" if exact else body
 
 
 def refuse_negative(values: dict, labels: dict):

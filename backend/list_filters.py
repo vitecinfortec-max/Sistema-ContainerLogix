@@ -48,7 +48,10 @@ def text_query(fields: Iterable[str], search: Optional[str]) -> dict:
     if not search:
         return {}
     regex = {"$regex": re.escape(search), "$options": "i"}
-    return {"$or": [{f: regex} for f in fields]}
+    # Placa gravada com ou sem traço: "ABC1D23" acha "ABC-1D23" e vice-versa
+    key = "".join(ch for ch in search.upper() if ch.isascii() and ch.isalnum())
+    plate_regex = {"$regex": r"[\s-]*".join(re.escape(ch) for ch in key), "$options": "i"} if key else regex
+    return {"$or": [{f: plate_regex if "plate" in f else regex} for f in fields]}
 
 
 def combine(*queries: dict) -> dict:

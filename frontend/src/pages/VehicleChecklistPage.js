@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatCPF, formatPhone, formatPlate } from '../lib/masks';
 
 // Toggle SIM/NÃO compacto por item
 function SimNaoToggle({ value, onChange, testId }) {
@@ -712,11 +713,11 @@ export default function VehicleChecklistPage() {
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Telefone</Label>
-                  <Input value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} />
+                  <Input value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: formatPhone(e.target.value) }))} />
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Fax</Label>
-                  <Input value={formData.fax} onChange={(e) => setFormData(prev => ({ ...prev, fax: e.target.value }))} />
+                  <Input value={formData.fax} onChange={(e) => setFormData(prev => ({ ...prev, fax: formatPhone(e.target.value) }))} />
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Cliente</Label>
@@ -773,7 +774,7 @@ export default function VehicleChecklistPage() {
                 </div>
                 <div>
                   <Label className="mb-1.5 block">CPF do Motorista</Label>
-                  <Input value={formData.driver_cpf} onChange={(e) => setFormData(prev => ({ ...prev, driver_cpf: e.target.value }))} />
+                  <Input value={formData.driver_cpf} onChange={(e) => setFormData(prev => ({ ...prev, driver_cpf: formatCPF(e.target.value) }))} />
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Nº CNH / Categoria</Label>
@@ -790,10 +791,10 @@ export default function VehicleChecklistPage() {
                   <Label className="mb-1.5 block">Placa do Cavalo *</Label>
                   <Autocomplete
                     value={formData.cavalo_plate}
-                    onChange={(val) => setFormData(prev => ({ ...prev, cavalo_plate: val.toUpperCase() }))}
+                    onChange={(val) => setFormData(prev => ({ ...prev, cavalo_plate: formatPlate(val) }))}
                     options={cavalos}
                     displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                    onSelect={(v) => setFormData(prev => ({ ...prev, cavalo_plate: v.plate, cavalo_year: v.year ? String(v.year) : prev.cavalo_year }))}
+                    onSelect={(v) => setFormData(prev => ({ ...prev, cavalo_plate: formatPlate(v.plate), cavalo_year: v.year ? String(v.year) : prev.cavalo_year }))}
                   />
                 </div>
                 <div>
@@ -804,10 +805,10 @@ export default function VehicleChecklistPage() {
                   <Label className="mb-1.5 block">Placa Carreta 1</Label>
                   <Autocomplete
                     value={formData.carreta1_plate}
-                    onChange={(val) => setFormData(prev => ({ ...prev, carreta1_plate: val.toUpperCase() }))}
+                    onChange={(val) => setFormData(prev => ({ ...prev, carreta1_plate: formatPlate(val) }))}
                     options={carretas}
                     displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                    onSelect={(v) => setFormData(prev => ({ ...prev, carreta1_plate: v.plate, carreta1_year: v.year ? String(v.year) : prev.carreta1_year }))}
+                    onSelect={(v) => setFormData(prev => ({ ...prev, carreta1_plate: formatPlate(v.plate), carreta1_year: v.year ? String(v.year) : prev.carreta1_year }))}
                   />
                 </div>
                 <div>
@@ -822,10 +823,10 @@ export default function VehicleChecklistPage() {
                   <Label className="mb-1.5 block">Placa Carreta 2</Label>
                   <Autocomplete
                     value={formData.carreta2_plate}
-                    onChange={(val) => setFormData(prev => ({ ...prev, carreta2_plate: val.toUpperCase() }))}
+                    onChange={(val) => setFormData(prev => ({ ...prev, carreta2_plate: formatPlate(val) }))}
                     options={carretas}
                     displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                    onSelect={(v) => setFormData(prev => ({ ...prev, carreta2_plate: v.plate, carreta2_year: v.year ? String(v.year) : prev.carreta2_year }))}
+                    onSelect={(v) => setFormData(prev => ({ ...prev, carreta2_plate: formatPlate(v.plate), carreta2_year: v.year ? String(v.year) : prev.carreta2_year }))}
                   />
                 </div>
                 <div>

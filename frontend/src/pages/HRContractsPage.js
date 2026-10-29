@@ -28,6 +28,7 @@ import {
   UserPlus, Pencil, Trash2, Save, UserX, Undo2, FileText, FileSignature, PauseCircle, PlayCircle, Users, Wallet,
   Hourglass, Plus, Calculator,
 } from 'lucide-react';
+import { formatCPF, formatPhone } from '../lib/masks';
 
 function emptyForm() {
   return {
@@ -486,7 +487,7 @@ export default function HRContractsPage() {
                     </div>
                     <div>
                       <Label className="mb-1.5 block">CPF *</Label>
-                      <Input value={form.new_cpf} onChange={(e) => setField('new_cpf', e.target.value)} className="h-9 text-sm" data-testid="hr-contract-new-cpf" />
+                      <Input value={form.new_cpf} onChange={(e) => setField('new_cpf', formatCPF(e.target.value))} className="h-9 text-sm" data-testid="hr-contract-new-cpf" />
                     </div>
                     <div>
                       <Label className="mb-1.5 block">Data de nascimento</Label>
@@ -494,7 +495,7 @@ export default function HRContractsPage() {
                     </div>
                     <div>
                       <Label className="mb-1.5 block">Telefone</Label>
-                      <Input value={form.new_phone} onChange={(e) => setField('new_phone', e.target.value)} className="h-9 text-sm" />
+                      <Input value={form.new_phone} onChange={(e) => setField('new_phone', formatPhone(e.target.value))} className="h-9 text-sm" />
                     </div>
                   </>
                 ) : (
@@ -754,7 +755,7 @@ export default function HRContractsPage() {
       </Dialog>
 
       <Dialog open={termOpen} onOpenChange={(v) => !termBusy && setTermOpen(v)}>
-        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto" data-testid="hr-termination-dialog">
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto" data-testid="hr-termination-dialog">
           <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
             <DialogTitle className="flex items-center gap-2 text-base"><UserX className="w-5 h-5 text-destructive" />Desligamento</DialogTitle>
             <DialogDescription>{single?.person_name} · admissão em {fmtDate(single?.admission_date)}. Simule a rescisão antes de confirmar.</DialogDescription>

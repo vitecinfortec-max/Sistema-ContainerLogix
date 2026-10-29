@@ -26,6 +26,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, FileText, Printer, Clock, Wrench, Wallet } from 'lucide-react';
 import { nowLocalInput } from '../lib/dates';
+import { formatPlate } from '../lib/masks';
 
 const STATUS_TONES = {
   ABERTO: 'blue',
@@ -446,8 +447,8 @@ export default function OrdemServicoPage() {
                     onCreated={(vh) => { setVehicles((prev) => [...prev, vh]); onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}>
                     <Autocomplete
                       value={form.equipment_plate}
-                      onChange={(v) => onChange('equipment_plate', v)}
-                      onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
+                      onChange={(v) => onChange('equipment_plate', formatPlate(v))}
+                      onSelect={(vh) => { onChange('equipment_plate', formatPlate(vh.plate)); onChange('equipment_id', vh.id); }}
                       options={vehicles}
                       displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                       className="h-9 text-sm font-mono"
@@ -460,8 +461,8 @@ export default function OrdemServicoPage() {
                     onCreated={(vh) => { setVehicles((prev) => [...prev, vh]); onChange('appropriation_plate', vh.plate); onChange('appropriation_id', vh.id); }}>
                     <Autocomplete
                       value={form.appropriation_plate}
-                      onChange={(v) => onChange('appropriation_plate', v)}
-                      onSelect={(vh) => { onChange('appropriation_plate', vh.plate); onChange('appropriation_id', vh.id); }}
+                      onChange={(v) => onChange('appropriation_plate', formatPlate(v))}
+                      onSelect={(vh) => { onChange('appropriation_plate', formatPlate(vh.plate)); onChange('appropriation_id', vh.id); }}
                       options={vehicles}
                       displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                       className="h-9 text-sm font-mono"

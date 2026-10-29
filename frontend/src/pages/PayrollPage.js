@@ -471,7 +471,7 @@ function PayslipDialog({ slip, run, events, onClose, onSaved }) {
   const t = slip.totals || {};
   return (
     <Dialog open onOpenChange={(v) => !v && !saving && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="payslip-dialog">
+      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto" data-testid="payslip-dialog">
         <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
           <DialogTitle className="text-base">{slip.person_name}</DialogTitle>
           <DialogDescription>

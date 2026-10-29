@@ -459,7 +459,7 @@ export default function ExpenseReportsPage() {
     return <StatusPill tone={tones[status] || 'amber'}>{labels[status] || status}</StatusPill>;
   };
 
-  const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const formatPeriodDate = (value) => {
     if (!value) return '-';
     try {

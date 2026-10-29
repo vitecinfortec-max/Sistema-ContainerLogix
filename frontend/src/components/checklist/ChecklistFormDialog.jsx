@@ -25,6 +25,7 @@ import {
   CHECKLIST_PHOTO_LABELS, MAX_VEHICLE_CHECKLIST_PHOTOS, RESULT_META, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_OPTIONS,
   checklistTypeForVehicle, countAnswers, photoSlotsFor, resultFromCounts,
 } from './checklistShared';
+import { formatPlate } from '../../lib/masks';
 
 // Formulário do Checklist de Veículo (modelo atual), em quatro etapas: veículo,
 // itens de verificação, fotos guiadas pelo modelo 3D e conclusão. O resultado
@@ -500,6 +501,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
         onOpenAutoFocus={(e) => { e.preventDefault(); e.currentTarget.focus(); }}
         className="flex h-dvh max-h-dvh w-full max-w-3xl flex-col gap-0 overflow-hidden p-0 outline-none sm:h-[min(780px,92vh)] sm:rounded-xl"
         data-testid="checklist-form-dialog"
+        expandable
       >
         {/* Topo: título, resultado ao vivo e as etapas */}
         <div className="border-b border-slate-200 px-4 pt-4 dark:border-slate-700 sm:px-6">
@@ -603,7 +605,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                       <Label className="mb-1.5 block">Placa do Veículo *</Label>
                       <Autocomplete
                         value={form.vehicle_plate}
-                        onChange={(value) => setField('vehicle_plate', value.toUpperCase())}
+                        onChange={(value) => setField('vehicle_plate', formatPlate(value))}
                         options={vehicles}
                         displayField={(v) => `${v.plate}${v.model ? ` - ${v.model}` : ''}`}
                         onSelect={selectVehicle}

@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, ClipboardCheck, Download, Printer, Clock, CheckCircle2 } from 'lucide-react';
 import { scrollBehavior } from '../lib/reducedMotion';
 import { todayISO } from '../lib/dates';
+import { formatPlate } from '../lib/masks';
 
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
@@ -459,8 +460,8 @@ export default function FuelSupplyOrderPage() {
                   onCreated={(vh) => { setVehicles((prev) => [...prev, vh]); onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}>
                   <Autocomplete
                     value={form.equipment_plate}
-                    onChange={(v) => onChange('equipment_plate', v)}
-                    onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
+                    onChange={(v) => onChange('equipment_plate', formatPlate(v))}
+                    onSelect={(vh) => { onChange('equipment_plate', formatPlate(vh.plate)); onChange('equipment_id', vh.id); }}
                     options={vehicles}
                     displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                     className="text-sm font-mono"

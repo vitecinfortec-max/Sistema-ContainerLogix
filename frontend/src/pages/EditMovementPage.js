@@ -19,6 +19,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { WithQuickAdd } from '../components/QuickCreate';
 import ContainerValueFields from '../components/ContainerValueFields';
 import { formatContainerNumber } from '../lib/containerNumber';
+import { formatCPF, formatPlate, plateKey } from '../lib/masks';
 
 export default function EditMovementPage() {
   const { id } = useParams();
@@ -232,18 +233,18 @@ export default function EditMovementPage() {
   const carretaVehicles = vehicles.filter(v => v.vehicle_type === 'CARRETA');
 
   const handleTruckPlateChange = (plate) => {
-    const upper = plate.toUpperCase();
+    const upper = formatPlate(plate);
     setValue('truck_plate', upper);
-    const vehicle = cavaloVehicles.find(v => v.plate.toUpperCase() === upper);
+    const vehicle = cavaloVehicles.find(v => plateKey(v.plate) === plateKey(upper));
     if (vehicle) {
       toast.success('Placa encontrada no cadastro de veículos');
     }
   };
 
   const handleTrailerPlateChange = (plate) => {
-    const upper = plate.toUpperCase();
+    const upper = formatPlate(plate);
     setValue('trailer_plate_1', upper);
-    const vehicle = carretaVehicles.find(v => v.plate.toUpperCase() === upper);
+    const vehicle = carretaVehicles.find(v => plateKey(v.plate) === plateKey(upper));
     if (vehicle) {
       toast.success('Placa encontrada no cadastro de veículos');
     }
@@ -320,7 +321,7 @@ export default function EditMovementPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="driver_cpf" className="block">CPF *</Label>
-                  <Input id="driver_cpf" {...register('driver_cpf', { required: true })} aria-invalid={!!errors.driver_cpf} className="font-mono" />
+                  <Input id="driver_cpf" {...register('driver_cpf', { required: true, onChange: (e) => setValue('driver_cpf', formatCPF(e.target.value)) })} aria-invalid={!!errors.driver_cpf} className="font-mono" />
                   {errors.driver_cpf && <FieldError />}
                 </div>
                 <div className="space-y-1.5">

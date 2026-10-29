@@ -500,7 +500,7 @@ export default function PortServiceBillingPage() {
 
       {/* Modal Detalhes */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Fatura de Serviço Portuário #{selectedBatch?.batch_number}</DialogTitle>
           </DialogHeader>

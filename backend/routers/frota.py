@@ -20,6 +20,7 @@ from reports import merge_company
 from shared import (
     db, get_current_active_user, get_company_settings, parse_datetime_value, load_logo_buffer,
     validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR, refuse_negative,
+    format_plate, plate_regex,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -82,7 +83,7 @@ async def get_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_
 async def create_vehicle(data: VehicleCreate, current_user: dict = Depends(get_current_active_user)):
     """Cadastra novo veículo"""
     # Verificar se placa já existe
-    existing = await db.vehicles.find_one({"plate": data.plate.upper()})
+    existing = await db.vehicles.find_one({"plate": {"$regex": plate_regex(data.plate, exact=True), "$options": "i"}})
     if existing:
         raise HTTPException(status_code=400, detail="Placa já cadastrada")
 
@@ -96,7 +97,7 @@ async def create_vehicle(data: VehicleCreate, current_user: dict = Depends(get_c
     vehicle_data = {
         **data.model_dump(),
         "id": str(uuid.uuid4()),
-        "plate": data.plate.upper(),
+        "plate": format_plate(data.plate),
         "vehicle_type": data.vehicle_type.upper(),
         "status": data.status.upper(),
         "driver_name": driver_name,
@@ -126,10 +127,10 @@ async def update_vehicle(vehicle_id: str, data: VehicleUpdate, current_user: dic
 
     if data.plate is not None:
         # Verificar se placa já existe em outro veículo
-        existing = await db.vehicles.find_one({"plate": data.plate.upper(), "id": {"$ne": vehicle_id}})
+        existing = await db.vehicles.find_one({"plate": {"$regex": plate_regex(data.plate, exact=True), "$options": "i"}, "id": {"$ne": vehicle_id}})
         if existing:
             raise HTTPException(status_code=400, detail="Placa já cadastrada em outro veículo")
-        update_data["plate"] = data.plate.upper()
+        update_data["plate"] = format_plate(data.plate)
     if data.vehicle_type is not None:
         update_data["vehicle_type"] = data.vehicle_type.upper()
     if data.status is not None:
@@ -162,7 +163,8 @@ async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_curre
     # Com histórico, as leituras de Hodômetro e as Revisões dele ficavam
     # órfãs (sumiam do Controle de Revisão). Alguns lançamentos guardam o id,
     # outros só a placa.
-    plate = vehicle.get("plate")
+    # A placa pode estar gravada com ou sem traço ("ABC-1D23"/"ABC1D23")
+    plate = {"$regex": plate_regex(vehicle.get("plate"), exact=True), "$options": "i"} if vehicle.get("plate") else None
     by_id_or_plate = lambda id_field, plate_field: {"$or": [{id_field: vehicle_id}, {plate_field: plate}]}
     checks = [
         ("odometer_readings", {"vehicle_id": vehicle_id}, "leitura(s) de hodômetro"),
@@ -489,7 +491,7 @@ async def get_vehicle_revisions(
     """Lista todas as revisões de veículos"""
     query = {}
     if vehicle_plate:
-        query["vehicle_plate"] = {"$regex": re.escape(vehicle_plate.upper()), "$options": "i"}
+        query["vehicle_plate"] = {"$regex": plate_regex(vehicle_plate), "$options": "i"}
     
     skip = (page - 1) * per_page
     
@@ -838,7 +840,7 @@ async def _compute_vehicle_maintenance_status(vehicle: dict) -> Optional[dict]:
         return None
 
     revision = await db.vehicle_revisions.find_one(
-        {"vehicle_plate": {"$regex": f"^{re.escape(plate)}$", "$options": "i"}},
+        {"vehicle_plate": {"$regex": plate_regex(plate, exact=True), "$options": "i"}},
         {"_id": 0},
         sort=[("created_at", -1)]
     )
@@ -923,7 +925,7 @@ async def get_odometer_readings(
     excluíveis por aqui (a exclusão é feita editando/removendo o Abastecimento em si)."""
     query = {}
     if vehicle_plate:
-        query["vehicle_plate"] = {"$regex": re.escape(vehicle_plate.upper()), "$options": "i"}
+        query["vehicle_plate"] = {"$regex": plate_regex(vehicle_plate), "$options": "i"}
 
     manual = [] if source == "ABASTECIMENTO" else await db.odometer_readings.find(query, {"_id": 0}).to_list(None)
     for r in manual:
@@ -931,7 +933,7 @@ async def get_odometer_readings(
 
     fuel_query = {"reading": {"$ne": None}, "equipment_id": {"$ne": None}}
     if vehicle_plate:
-        fuel_query["equipment_plate"] = {"$regex": re.escape(vehicle_plate.upper()), "$options": "i"}
+        fuel_query["equipment_plate"] = {"$regex": plate_regex(vehicle_plate), "$options": "i"}
     fuel_supplies = [] if source == "MANUAL" else await db.fuel_supplies.find(
         fuel_query,
         {"_id": 0, "id": 1, "supply_number": 1, "equipment_id": 1, "equipment_plate": 1,

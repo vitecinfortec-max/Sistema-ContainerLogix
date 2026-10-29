@@ -36,7 +36,7 @@ const STATUS = {
 
 const DATE_FIELDS = { due_date: 'Vencimento', issue_date: 'Emissão', compensation_date: 'Compensação' };
 
-const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatDay = (value) => (value ? format(calendarDate(value), 'dd/MM/yyyy') : '-');
 
 // Dias entre hoje e o vencimento (negativo = vencido)

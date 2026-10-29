@@ -27,7 +27,7 @@ const STATUS_TONES = {
   INATIVO: 'slate',
 };
 
-const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 function buildEmpty() {
   return { origin: '', destination: '', freight_value: '', status: 'ATIVO', observations: '' };

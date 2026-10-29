@@ -36,7 +36,7 @@ const METHODS = {
   PIX: 'PIX', TED: 'TED/DOC', BOLETO: 'Boleto', DEPOSITO: 'Depósito', DINHEIRO: 'Dinheiro', CHEQUE: 'Cheque', OUTRO: 'Outro',
 };
 
-const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatDay = (value) => (value ? format(calendarDate(value), 'dd/MM/yyyy') : '-');
 const toCents = (value) => Math.round((Number(value) || 0) * 100);
 const errorText = (error, fallback) => error.response?.data?.detail || fallback;
@@ -524,7 +524,7 @@ export default function ClientCreditsPage() {
 
       {/* Baixa em faturas */}
       <Dialog open={!!applyState} onOpenChange={(open) => !open && setApplyState(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-5xl">
           {applyState && (
             <>
               <DialogHeader>

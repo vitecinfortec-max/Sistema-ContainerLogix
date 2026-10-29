@@ -19,6 +19,7 @@ import { Save, Loader2, Camera, Upload, X, ShieldCheck } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
 import { VISTORIA_PHOTO_TYPES, MAX_VISTORIA_PHOTOS, formatCPF } from './NewContainerVistoriaPage';
+import { formatPlate } from '../lib/masks';
 
 const PHOTO_LABELS = VISTORIA_PHOTO_TYPES.reduce((acc, { value, label }) => {
   acc[value] = label;
@@ -349,8 +350,8 @@ export default function EditContainerVistoriaPage() {
                     onCreated={(v) => { appendTo(setVehicles)(v); handleInputChange('truck_plate', (v.plate || '').toUpperCase()); }}>
                     <Autocomplete
                       value={formData.truck_plate}
-                      onChange={(v) => handleInputChange('truck_plate', v.toUpperCase())}
-                      onSelect={(v) => handleInputChange('truck_plate', v.plate)}
+                      onChange={(v) => handleInputChange('truck_plate', formatPlate(v))}
+                      onSelect={(v) => handleInputChange('truck_plate', formatPlate(v.plate))}
                       options={vehicles}
                       displayField="plate"
                     />
@@ -363,8 +364,8 @@ export default function EditContainerVistoriaPage() {
                     onCreated={(v) => { appendTo(setVehicles)(v); handleInputChange('trailer_plate', (v.plate || '').toUpperCase()); }}>
                     <Autocomplete
                       value={formData.trailer_plate}
-                      onChange={(v) => handleInputChange('trailer_plate', v.toUpperCase())}
-                      onSelect={(v) => handleInputChange('trailer_plate', v.plate)}
+                      onChange={(v) => handleInputChange('trailer_plate', formatPlate(v))}
+                      onSelect={(v) => handleInputChange('trailer_plate', formatPlate(v.plate))}
                       options={vehicles}
                       displayField="plate"
                     />

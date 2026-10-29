@@ -32,7 +32,7 @@ const STATUS_LABELS = { PENDENTE: 'Pendente', PAGO: 'Pago', CANCELADO: 'Cancelad
 const STATUS_TONES = { PENDENTE: 'amber', PAGO: 'emerald', CANCELADO: 'red' };
 const PAYMENT_METHODS = ['PIX', 'Dinheiro', 'Transferência', 'Depósito', 'Cheque', 'Folha de pagamento'];
 
-const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (v) => (v ? format(new Date(`${String(v).slice(0, 10)}T00:00:00`), 'dd/MM/yyyy') : '-');
 const personKey = (g) => `${g.person_type}:${g.person_id}`;
 

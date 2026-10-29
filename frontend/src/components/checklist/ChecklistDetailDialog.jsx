@@ -87,6 +87,7 @@ export default function ChecklistDetailDialog({ open, onOpenChange, checklist, o
         onOpenAutoFocus={(e) => { e.preventDefault(); e.currentTarget.focus(); }}
         className="flex h-dvh max-h-dvh w-full max-w-3xl flex-col gap-0 overflow-hidden p-0 outline-none sm:h-auto sm:max-h-[92vh] sm:rounded-xl"
         data-testid="checklist-detail-dialog"
+        expandable
       >
         {/* Topo: resultado em destaque */}
         <div className={cn('border-b border-slate-200 bg-gradient-to-b to-transparent px-4 pb-4 pt-5 dark:border-slate-700 sm:px-6', look.band)}>

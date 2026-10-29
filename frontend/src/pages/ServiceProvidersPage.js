@@ -21,6 +21,7 @@ import {
   AlertTriangle, Ban, CheckCircle2, ClipboardList, Clock, Edit, Eye, FileDown, FileSpreadsheet, HandCoins, HardHat, Loader2, Plus,
   Receipt, RotateCcw, Trash2, Users, Wallet, X,
 } from 'lucide-react';
+import { formatPhone } from '../lib/masks';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (v) => (v ? v.slice(0, 10).split('-').reverse().join('/') : '-');
@@ -706,7 +707,7 @@ export default function ServiceProvidersPage() {
 
       {/* Detalhe do fechamento */}
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="sp-detail-dialog">
+        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto" data-testid="sp-detail-dialog">
           {detail && (
             <>
               <DialogHeader><DialogTitle>Fechamento nº {detail.number} · {detail.provider_name}</DialogTitle></DialogHeader>
@@ -852,7 +853,7 @@ export default function ServiceProvidersPage() {
               <Input inputMode="decimal" value={providerForm.default_rate} className="text-right" onChange={(e) => setProviderForm((f) => ({ ...f, default_rate: moneyMask(e.target.value) }))} data-testid="sp-provider-rate" />
             </Field>
             <Field label="Telefone" className="md:col-span-4">
-              <Input value={providerForm.phone} maxLength={30} onChange={(e) => setProviderForm((f) => ({ ...f, phone: e.target.value }))} />
+              <Input value={providerForm.phone} maxLength={30} onChange={(e) => setProviderForm((f) => ({ ...f, phone: formatPhone(e.target.value) }))} />
             </Field>
             <Field label="Chave PIX" className="md:col-span-4">
               <Input value={providerForm.pix_key} maxLength={100} onChange={(e) => setProviderForm((f) => ({ ...f, pix_key: e.target.value }))} />

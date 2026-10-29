@@ -6,7 +6,7 @@ from list_filters import combine, period_query, text_query
 from period_reports import Column, Section, DAY, INT, pdf_response, excel_response, period_text
 from routers.container_reports import _day
 from routers.frota import _compute_vehicle_maintenance_status
-from shared import db, get_current_active_user
+from shared import db, get_current_active_user, plate_key
 
 api_router = APIRouter(prefix="/api")
 
@@ -50,7 +50,7 @@ async def build_revision_report(date_from=None, date_to=None, plate=None) -> dic
     plate_re = (plate or "").strip().upper()
     maintenance, without_revision = [], []
     for vehicle in active:
-        if plate_re and plate_re not in (vehicle.get("plate") or "").upper() and plate_re not in (vehicle.get("model") or "").upper():
+        if plate_re and plate_key(plate_re) not in plate_key(vehicle.get("plate")) and plate_re not in (vehicle.get("model") or "").upper():
             continue
         status = await _compute_vehicle_maintenance_status(vehicle)
         if status:

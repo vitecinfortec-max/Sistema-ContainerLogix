@@ -12,6 +12,7 @@ import { formatContainerNumber } from '../lib/containerNumber';
 import {
   offlineMovements, offlineDrivers, offlineTransportCompanies, offlineClients, offlineShippingLines,
 } from '../lib/offlineDb';
+import { formatPlate } from '../lib/masks';
 
 const SIZE_TYPES = ['20DC', '20RF', '20OT', '20FR', '40HC', '40RF', '40OT', '40FR', '40DRY'];
 
@@ -222,11 +223,11 @@ export default function OfflineMovementsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Placa Cavalo</Label>
-                <Input value={formData.truck_plate} onChange={(e) => handleChange('truck_plate', e.target.value.toUpperCase())} />
+                <Input value={formData.truck_plate} onChange={(e) => handleChange('truck_plate', formatPlate(e.target.value))} />
               </div>
               <div>
                 <Label>Placa Carreta</Label>
-                <Input value={formData.trailer_plate_1} onChange={(e) => handleChange('trailer_plate_1', e.target.value.toUpperCase())} />
+                <Input value={formData.trailer_plate_1} onChange={(e) => handleChange('trailer_plate_1', formatPlate(e.target.value))} />
               </div>
             </div>
 

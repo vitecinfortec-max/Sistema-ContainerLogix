@@ -20,6 +20,7 @@ import { Anchor, Plus, Eye, Trash2, Printer, Pencil, Wallet, Clock, Receipt } fr
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
+import { formatPlate } from '../lib/masks';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -466,11 +467,11 @@ export default function PortServicePage() {
                 <Label className="mb-1.5 block">Placa do Cavalo *</Label>
                 <Autocomplete
                   value={formData.cavalo_plate}
-                  onChange={(val) => setFormData(prev => ({ ...prev, cavalo_plate: val.toUpperCase() }))}
+                  onChange={(val) => setFormData(prev => ({ ...prev, cavalo_plate: formatPlate(val) }))}
                   options={cavalos}
                   displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                   valueField="id"
-                  onSelect={(vehicle) => setFormData(prev => ({ ...prev, cavalo_plate: vehicle.plate }))}
+                  onSelect={(vehicle) => setFormData(prev => ({ ...prev, cavalo_plate: formatPlate(vehicle.plate) }))}
                 />
               </div>
               <div>

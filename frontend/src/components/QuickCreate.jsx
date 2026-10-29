@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
 import { PRODUCT_UNITS } from '../lib/productUnits';
+import { formatCNPJ, formatCnpjCpf, formatCPF, formatPhone, formatPlate } from '../lib/masks';
 
 // Cadastro rápido dentro de um formulário (o "+" ao lado do campo, como no
 // Bsoft): quando falta a rota, o armador, o motorista... a pessoa cadastra
@@ -53,8 +54,8 @@ export const QUICK_CREATE = {
     done: 'Cliente cadastrado',
     fields: [
       { key: 'name', label: 'Razão social / Nome', required: true },
-      { key: 'cnpj', label: 'CNPJ / CPF' },
-      { key: 'phone', label: 'Telefone' },
+      { key: 'cnpj', label: 'CNPJ / CPF', mask: formatCnpjCpf },
+      { key: 'phone', label: 'Telefone', mask: formatPhone },
     ],
     create: (d) => api.createClient(d),
   },
@@ -63,8 +64,8 @@ export const QUICK_CREATE = {
     done: 'Motorista cadastrado',
     fields: [
       { key: 'name', label: 'Nome', required: true },
-      { key: 'cpf', label: 'CPF', required: true },
-      { key: 'phone', label: 'Telefone' },
+      { key: 'cpf', label: 'CPF', required: true, mask: formatCPF },
+      { key: 'phone', label: 'Telefone', mask: formatPhone },
       { key: 'cnh_number', label: 'Nº da CNH' },
     ],
     create: (d) => api.createDriver(d),
@@ -73,7 +74,7 @@ export const QUICK_CREATE = {
     title: 'Novo veículo',
     done: 'Veículo cadastrado',
     fields: [
-      { key: 'plate', label: 'Placa', required: true, upper: true },
+      { key: 'plate', label: 'Placa', required: true, mask: formatPlate },
       { key: 'vehicle_type', label: 'Tipo', required: true, options: VEHICLE_TYPES },
       { key: 'brand', label: 'Marca' },
       { key: 'model', label: 'Modelo' },
@@ -85,7 +86,7 @@ export const QUICK_CREATE = {
     done: 'Transportadora cadastrada',
     fields: [
       { key: 'name', label: 'Razão social', required: true },
-      { key: 'cnpj', label: 'CNPJ' },
+      { key: 'cnpj', label: 'CNPJ', mask: formatCNPJ },
       { key: 'antt', label: 'RNTRC / ANTT' },
     ],
     create: (d) => api.createTransportCompany(d),
@@ -95,7 +96,7 @@ export const QUICK_CREATE = {
     done: 'Representante cadastrado',
     fields: [
       { key: 'name', label: 'Nome', required: true },
-      { key: 'phone', label: 'Telefone' },
+      { key: 'phone', label: 'Telefone', mask: formatPhone },
       { key: 'email', label: 'E-mail' },
     ],
     create: (d) => api.createContainerRepresentative(d),
@@ -105,8 +106,8 @@ export const QUICK_CREATE = {
     done: 'Terminal cadastrado',
     fields: [
       { key: 'name', label: 'Nome', required: true },
-      { key: 'cnpj', label: 'CNPJ' },
-      { key: 'phone', label: 'Telefone' },
+      { key: 'cnpj', label: 'CNPJ', mask: formatCNPJ },
+      { key: 'phone', label: 'Telefone', mask: formatPhone },
     ],
     create: (d) => api.createTerminal(d),
   },
@@ -115,8 +116,8 @@ export const QUICK_CREATE = {
     done: 'Fornecedor cadastrado',
     fields: [
       { key: 'name', label: 'Razão social / Nome', required: true },
-      { key: 'cnpj', label: 'CNPJ / CPF' },
-      { key: 'phone', label: 'Telefone' },
+      { key: 'cnpj', label: 'CNPJ / CPF', mask: formatCnpjCpf },
+      { key: 'phone', label: 'Telefone', mask: formatPhone },
     ],
     create: (d) => api.createSupplier(d),
   },
@@ -125,9 +126,9 @@ export const QUICK_CREATE = {
     done: 'Funcionário cadastrado',
     fields: [
       { key: 'name', label: 'Nome', required: true },
-      { key: 'cpf', label: 'CPF', required: true },
+      { key: 'cpf', label: 'CPF', required: true, mask: formatCPF },
       { key: 'position', label: 'Cargo' },
-      { key: 'phone', label: 'Telefone' },
+      { key: 'phone', label: 'Telefone', mask: formatPhone },
     ],
     create: (d) => api.createEmployee(d),
   },
@@ -174,7 +175,10 @@ export function WithQuickAdd({ children, ...buttonProps }) {
 
 function emptyValues(config, initial) {
   const values = {};
-  config.fields.forEach((f) => { values[f.key] = (initial && initial[f.key]) || (f.options ? f.options[0][0] : ''); });
+  config.fields.forEach((f) => {
+    const given = initial && initial[f.key];
+    values[f.key] = given ? (f.mask ? f.mask(given) : given) : (f.options ? f.options[0][0] : '');
+  });
   return values;
 }
 
@@ -273,7 +277,7 @@ export function QuickAddButton({ kind, initial, onCreated, size = 'md', classNam
                     autoFocus={i === 0}
                     placeholder={f.placeholder}
                     inputMode={f.money ? 'decimal' : undefined}
-                    onChange={(e) => set(f.key, f.upper ? e.target.value.toUpperCase() : e.target.value)}
+                    onChange={(e) => set(f.key, f.mask ? f.mask(e.target.value) : f.upper ? e.target.value.toUpperCase() : e.target.value)}
                     className="h-9 text-sm"
                     data-testid={`${testBase}-${f.key}`}
                   />

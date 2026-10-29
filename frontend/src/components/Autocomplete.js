@@ -19,9 +19,14 @@ export function Autocomplete({ value, onChange, options, displayField = 'name', 
 
   useEffect(() => {
     if (inputValue.length > 0) {
+      // Também compara sem pontuação: "ABC-1" acha a placa "ABC1D23" e
+      // "12345678" acha o CPF "123.456.78..." (e vice-versa)
+      const compact = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const typed = compact(inputValue);
       const filtered = options.filter(opt => {
         const display = typeof displayField === 'function' ? displayField(opt) : opt[displayField];
-        return display?.toLowerCase().includes(inputValue.toLowerCase());
+        if (display?.toLowerCase().includes(inputValue.toLowerCase())) return true;
+        return typed.length > 0 && compact(display).includes(typed);
       });
       setFilteredOptions(filtered.slice(0, 10));
     } else {

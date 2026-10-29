@@ -21,6 +21,7 @@ from reports import fmt_datetime, today_brt, generate_fuel_supply_report_pdf, ge
 from shared import (
     db, get_current_active_user, get_current_admin_user, get_company_settings, refuse_negative,
     validate_and_read_upload, ALLOWED_RECEIPT_EXTENSIONS, UPLOADS_DIR,
+    plate_regex,
 )
 from routers.stock import _create_stock_movement, _delete_stock_movement
 
@@ -220,7 +221,7 @@ async def get_fuel_consumption_history(
     """Lista de todos os pares de abastecimento já calculados, mais recente primeiro."""
     pairs = await _compute_fuel_consumption_pairs()
     if vehicle_plate:
-        regex = re.compile(re.escape(vehicle_plate.upper()), re.IGNORECASE)
+        regex = re.compile(plate_regex(vehicle_plate), re.IGNORECASE)
         pairs = [p for p in pairs if regex.search(p["vehicle_plate"] or "")]
     return pairs
 
@@ -456,7 +457,7 @@ async def _filter_fuel_supplies(
     query = {}
     # Por trecho, sem diferenciar maiúsculas: a tela filtra enquanto se digita
     if equipment_plate and equipment_plate != 'all':
-        query['equipment_plate'] = {"$regex": re.escape(equipment_plate.strip()), "$options": "i"}
+        query['equipment_plate'] = {"$regex": plate_regex(equipment_plate), "$options": "i"}
     if supplier_name and supplier_name != 'all':
         query['supplier_name'] = {"$regex": re.escape(supplier_name.strip()), "$options": "i"}
     if fuel_type and fuel_type != 'all':

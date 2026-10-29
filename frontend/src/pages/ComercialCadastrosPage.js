@@ -17,37 +17,10 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { useModuleConfig } from '../context/ModuleConfigContext';
 import { Plus, Trash2, Edit, UserCog } from 'lucide-react';
+import { formatCNPJ, formatCPF, formatCnpjCpf, formatPhone } from '../lib/masks';
 
 const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 
-const formatCNPJ = (value) => {
-  const digits = value.replace(/\D/g, '').slice(0, 14);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
-  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
-  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
-  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
-};
-const formatPhone = (value) => {
-  const digits = value.replace(/\D/g, '').slice(0, 11);
-  if (digits.length <= 2) return digits.length ? `(${digits}` : '';
-  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-};
-const formatCPF = (value) => {
-  const digits = value.replace(/\D/g, '').slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
-};
-// Campo único "CNPJ ou CPF": aplica a máscara de CPF enquanto tiver até 11
-// dígitos (senão um CPF saía formatado como CNPJ, ex. "026.496.043/28"
-// em vez de "026.496.043-28"), e passa a formatar como CNPJ a partir do 12º.
-const formatCnpjCpf = (value) => {
-  const digits = value.replace(/\D/g, '');
-  return digits.length > 11 ? formatCNPJ(value) : formatCPF(value);
-};
 const MASKS = { cnpj: formatCNPJ, doc: formatCnpjCpf, tel: formatPhone };
 
 const TYPES = [

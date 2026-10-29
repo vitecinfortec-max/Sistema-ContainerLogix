@@ -27,7 +27,7 @@ const STATUS_TONES = {
   CANCELADO: 'red',
 };
 
-const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export default function FreightPaymentsPage() {
   const [list, setList] = useState([]);

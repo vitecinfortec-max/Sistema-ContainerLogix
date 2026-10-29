@@ -36,7 +36,7 @@ const STATUS = {
 
 const SIZE_TYPES = ['20DC', '20RF', '20OT', '20FR', '40HC', '40RF', '40OT', '40FR', '40DRY'];
 
-const formatMoney = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const estimateCode = (number) => `OR${String(number || 0).padStart(6, '0')}`;
 const vistoriaCode = (number) => `VC${String(number || 0).padStart(6, '0')}`;
 const toNumber = (value) => {
@@ -756,7 +756,7 @@ export default function RepairEstimatesPage() {
 
       {/* Detalhes */}
       <Dialog open={!!detailEstimate} onOpenChange={(open) => !open && setDetailEstimate(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Orçamento {detailEstimate && estimateCode(detailEstimate.estimate_number)}

@@ -32,6 +32,7 @@ import {
   DocumentImportButton, DocumentImportNotice, DocumentAttachments, applyDocumentFields, addAttachment, IMPORTED_FIELD_CLASS,
 } from '../components/DocumentImport';
 import { calendarDate, dateInputToISO, toDateInput, todayISO } from '../lib/dates';
+import { formatPlate, plateKey } from '../lib/masks';
 
 const VEHICLE_STATUS_LABELS = { ATIVO: 'Ativo', INATIVO: 'Inativo', MANUTENCAO: 'Manutenção' };
 // Mesma margem do backend (MAINTENANCE_ALERT_MARGIN_KM em routers/frota.py)
@@ -639,7 +640,7 @@ export default function FleetPage() {
       if (formData.vehicle_type_revision === 'CAVALO') {
         data = {
           vehicle_type_revision: 'CAVALO',
-          vehicle_plate: formData.vehicle_plate.toUpperCase(),
+          vehicle_plate: formatPlate(formData.vehicle_plate),
           vehicle_model: formData.vehicle_model || null,
           revision_date: dateInputToISO(formData.revision_date),
           oil_used: formData.oil_used,
@@ -664,7 +665,7 @@ export default function FleetPage() {
         // CARRETA - formulário simplificado
         data = {
           vehicle_type_revision: 'CARRETA',
-          vehicle_plate: formData.vehicle_plate.toUpperCase(),
+          vehicle_plate: formatPlate(formData.vehicle_plate),
           vehicle_model: formData.vehicle_model || null,
           revision_date: dateInputToISO(formData.revision_date),
           oil_used: formData.carreta_revision_type, // Usar tipo de revisão como "oil_used" para manter compatibilidade
@@ -727,7 +728,7 @@ export default function FleetPage() {
   // guarda o tipo de revisão no campo do óleo, ver handleSubmit)
   const openEditRevision = (revision) => {
     if (!revision) return;
-    const vehicle = allVehicles.find((v) => v.plate === revision.vehicle_plate);
+    const vehicle = allVehicles.find((v) => plateKey(v.plate) === plateKey(revision.vehicle_plate));
     const isCarreta = vehicle ? vehicle.vehicle_type === 'CARRETA' : !revision.current_km;
     const km = (v) => (v === null || v === undefined ? '' : String(v));
     resetForm();
@@ -1151,8 +1152,8 @@ export default function FleetPage() {
                     <Label className="mb-1.5 block">Placa do Veículo *</Label>
                     <Autocomplete
                       value={formData.vehicle_plate}
-                      onChange={(v) => handleInputChange('vehicle_plate', v.toUpperCase())}
-                      onSelect={(v) => { handleInputChange('vehicle_plate', v.plate); handleInputChange('vehicle_model', v.model || ''); }}
+                      onChange={(v) => handleInputChange('vehicle_plate', formatPlate(v))}
+                      onSelect={(v) => { handleInputChange('vehicle_plate', formatPlate(v.plate)); handleInputChange('vehicle_model', v.model || ''); }}
                       options={allVehicles}
                       displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                     />
@@ -1319,8 +1320,8 @@ export default function FleetPage() {
                     <Label className="mb-1.5 block">Placa *</Label>
                     <Autocomplete
                       value={formData.vehicle_plate}
-                      onChange={(v) => handleInputChange('vehicle_plate', v.toUpperCase())}
-                      onSelect={(v) => { handleInputChange('vehicle_plate', v.plate); handleInputChange('vehicle_model', v.model || ''); }}
+                      onChange={(v) => handleInputChange('vehicle_plate', formatPlate(v))}
+                      onSelect={(v) => { handleInputChange('vehicle_plate', formatPlate(v.plate)); handleInputChange('vehicle_model', v.model || ''); }}
                       options={allVehicles}
                       displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                     />
@@ -1552,7 +1553,7 @@ export default function FleetPage() {
                 <Label className="mb-1.5 block">Placa *</Label>
                 <Input
                   className={importedClass('plate')} value={vehicleForm.plate}
-                  onChange={(e) => handleVehicleFormChange('plate', e.target.value.toUpperCase())}
+                  onChange={(e) => handleVehicleFormChange('plate', formatPlate(e.target.value))}
                   data-testid="input-vehicle-plate-form"
                 />
               </div>

@@ -25,6 +25,7 @@ import { Plus, Pencil, Trash2, Save, Fuel, Droplet, Wallet, Gauge, Camera, Uploa
 import { compressImage } from '../lib/imageCompression';
 import { scrollBehavior } from '../lib/reducedMotion';
 import { todayISO } from '../lib/dates';
+import { formatPlate } from '../lib/masks';
 
 const SOURCE_OPTIONS = [
   ['POSTO_EXTERNO', 'Posto Externo'],
@@ -556,8 +557,8 @@ export default function FuelSupplyPage() {
                   onCreated={(vh) => { setVehicles((prev) => [...prev, vh]); onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}>
                   <Autocomplete
                     value={form.equipment_plate}
-                    onChange={(v) => onChange('equipment_plate', v)}
-                    onSelect={(vh) => { onChange('equipment_plate', vh.plate); onChange('equipment_id', vh.id); }}
+                    onChange={(v) => onChange('equipment_plate', formatPlate(v))}
+                    onSelect={(vh) => { onChange('equipment_plate', formatPlate(vh.plate)); onChange('equipment_id', vh.id); }}
                     options={vehicles}
                     displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
                     className="text-sm font-mono"

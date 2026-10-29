@@ -18,6 +18,8 @@ import { toast } from 'sonner';
 import { Save, Camera, Upload, X, Loader2, FileText, ShieldCheck } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
+import { formatCPF, formatPlate } from '../lib/masks';
+export { formatCPF } from '../lib/masks';
 
 export const VISTORIA_PHOTO_TYPES = [
   { value: 'front', label: 'Frente' },
@@ -29,14 +31,6 @@ export const VISTORIA_PHOTO_TYPES = [
 ];
 
 export const MAX_VISTORIA_PHOTOS = 12;
-
-export const formatCPF = (value) => {
-  const digits = (value || '').replace(/\D/g, '').slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
-};
 
 export default function NewContainerVistoriaPage() {
   const navigate = useNavigate();
@@ -326,8 +320,8 @@ export default function NewContainerVistoriaPage() {
                     onCreated={(v) => { appendTo(setVehicles)(v); handleInputChange('truck_plate', (v.plate || '').toUpperCase()); }}>
                     <Autocomplete
                       value={formData.truck_plate}
-                      onChange={(v) => handleInputChange('truck_plate', v.toUpperCase())}
-                      onSelect={(v) => handleInputChange('truck_plate', v.plate)}
+                      onChange={(v) => handleInputChange('truck_plate', formatPlate(v))}
+                      onSelect={(v) => handleInputChange('truck_plate', formatPlate(v.plate))}
                       options={vehicles}
                       displayField="plate"
                     />
@@ -340,8 +334,8 @@ export default function NewContainerVistoriaPage() {
                     onCreated={(v) => { appendTo(setVehicles)(v); handleInputChange('trailer_plate', (v.plate || '').toUpperCase()); }}>
                     <Autocomplete
                       value={formData.trailer_plate}
-                      onChange={(v) => handleInputChange('trailer_plate', v.toUpperCase())}
-                      onSelect={(v) => handleInputChange('trailer_plate', v.plate)}
+                      onChange={(v) => handleInputChange('trailer_plate', formatPlate(v))}
+                      onSelect={(v) => handleInputChange('trailer_plate', formatPlate(v.plate))}
                       options={vehicles}
                       displayField="plate"
                     />

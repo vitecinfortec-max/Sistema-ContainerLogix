@@ -18,6 +18,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Package, Clock, AlertTriangle, FileText, FileSpreadsheet, Eye, LogOut, Users, Ship } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatPlate } from '../lib/masks';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -653,7 +654,7 @@ export default function YardControlPage() {
                 <Label className="mb-1.5 block">Placa do Veículo</Label>
                 <Input
                   value={exitData.vehicle_plate}
-                  onChange={(e) => setExitData(prev => ({ ...prev, vehicle_plate: e.target.value.toUpperCase() }))}
+                  onChange={(e) => setExitData(prev => ({ ...prev, vehicle_plate: formatPlate(e.target.value) }))}
                 />
               </div>
 
