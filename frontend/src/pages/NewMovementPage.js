@@ -221,10 +221,24 @@ export default function NewMovementPage() {
     }
   };
 
+  // Campos com componente próprio (autocomplete/select) ficam fora do register,
+  // então a obrigatoriedade deles é conferida aqui; a mensagem embaixo de cada
+  // um aparece depois da primeira tentativa de salvar e some ao preencher.
+  const [triedSubmit, setTriedSubmit] = useState(false);
+  const CUSTOM_REQUIRED = ['driver_name', 'truck_plate', 'trailer_plate_1', 'transport_company', 'shipping_line'];
+  const isMissing = (field) => triedSubmit && !String(formData[field] || '').trim();
+
   // Obrigatório em branco: o formulário não envia e o campo mostra o motivo
-  const onInvalid = () => toast.error('Preencha os campos obrigatórios destacados');
+  const onInvalid = () => {
+    setTriedSubmit(true);
+    toast.error('Preencha os campos obrigatórios destacados');
+  };
 
   const onSubmit = async (data) => {
+    if (CUSTOM_REQUIRED.some((field) => !String(data[field] || '').trim())) {
+      onInvalid();
+      return;
+    }
     if (containerDuplicateError) {
       toast.error(containerDuplicateError);
       return;
@@ -525,6 +539,7 @@ export default function NewMovementPage() {
                       displayField="name"
                     />
                   </WithQuickAdd>
+                  {isMissing('driver_name') && <FieldError testId="driver-name-error" />}
                 </div>
 
                 <div className="space-y-1.5">
@@ -552,6 +567,7 @@ export default function NewMovementPage() {
                       className="font-mono uppercase"
                     />
                   </WithQuickAdd>
+                  {isMissing('truck_plate') && <FieldError testId="truck-plate-error" />}
                 </div>
 
                 <div className="space-y-1.5">
@@ -567,6 +583,7 @@ export default function NewMovementPage() {
                       className="font-mono uppercase"
                     />
                   </WithQuickAdd>
+                  {isMissing('trailer_plate_1') && <FieldError testId="trailer-plate-error" />}
                 </div>
 
                 <div className="space-y-1.5">
@@ -581,6 +598,7 @@ export default function NewMovementPage() {
                       displayField="name"
                     />
                   </WithQuickAdd>
+                  {isMissing('transport_company') && <FieldError testId="transport-company-error" />}
                 </div>
 
                 <div className="space-y-1.5 relative">
@@ -697,6 +715,7 @@ export default function NewMovementPage() {
                     </SelectContent>
                   </Select>
                   </WithQuickAdd>
+                  {isMissing('shipping_line') && <FieldError testId="shipping-line-error" />}
                   {shippingLines.length === 0 && (
                     <p className="text-xs text-amber-600">Nenhum armador cadastrado. Use o + para cadastrar.</p>
                   )}
