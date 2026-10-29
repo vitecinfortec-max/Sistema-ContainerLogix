@@ -4527,6 +4527,84 @@ def generate_service_provider_receipt_pdf(closing: dict, provider: dict, amount_
     return buffer.getvalue()
 
 
+def generate_invoice_receipt_pdf(invoice: dict, services: list, amount_in_words: str = '', issued_by: str = '',
+                                 company: dict = None) -> bytes:
+    """Recibo de pagamento de uma fatura paga (Faturamento): dados da fatura,
+    os serviços cobrados, o valor recebido (por extenso), a declaração de
+    quitação dada pela empresa ao cliente e a assinatura do responsável.
+    `services`: [(serviço, quantidade, total)]."""
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=15 * mm, leftMargin=15 * mm, topMargin=12 * mm, bottomMargin=15 * mm)
+    elements = []
+    styles = getSampleStyleSheet()
+    money = format_currency
+    number = invoice["invoice_number"]
+    client = invoice.get("client_name") or "-"
+    cnpj = invoice.get("client_cnpj") or "-"
+    total = round(invoice.get("total_value") or 0, 2)
+    credit = round(min(invoice.get("credit_applied") or 0, total), 2)
+    received = round(total - credit, 2)
+
+    elements.extend(_build_pdf_header(styles, download_logo(company), "Recibo de Pagamento",
+                                      generation_info=f"Fatura nº {number}", company=company, content_width=doc.width))
+    elements.append(_pdf_info_grid([
+        ("Cliente", client, 2),
+        ("CNPJ/CPF", cnpj),
+        ("Fatura nº", str(number)),
+        ("Emissão", fmt_date_local(invoice.get("created_at"))),
+        ("Vencimento", fmt_date(invoice["due_date"]) if invoice.get("due_date") else "-"),
+        ("Pagamento", fmt_date(invoice["paid_date"]) if invoice.get("paid_date") else "-"),
+        ("Valor da fatura", money(total)),
+    ], doc.width, cols=4))
+    elements.append(Spacer(1, 10))
+
+    if services:
+        cell = _pdf_cell_factory(styles, font_size=8.5)
+        rows = [_pdf_header_cells(["Serviço", "Qtd.", "Total"], font_size=8.5)]
+        rows += [[cell(name or "Sem tipo de serviço"), cell(str(qty), "center"), cell(money(value), "right")] for name, qty, value in services]
+        rows.append([cell("TOTAL DA FATURA", "right", bold=True), cell(str(sum(q for _, q, _ in services)), "center", bold=True),
+                     cell(money(total), "right", bold=True)])
+        table = Table(rows, colWidths=[doc.width * w for w in (0.66, 0.14, 0.2)], repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
+        elements.append(table)
+        elements.append(Spacer(1, 8))
+
+    box = [("Valor da fatura", money(total))]
+    if credit:
+        box.append(("(-) Crédito do cliente", money(credit)))
+    box.append(("Valor recebido", money(received)))
+    elements.append(_pdf_totals_box(box, doc.width, width=260))
+    elements.append(Spacer(1, 16))
+
+    paid_on = f" em {fmt_date(invoice['paid_date'])}" if invoice.get("paid_date") else ""
+    in_words = f" ({xml_escape(amount_in_words)})" if amount_in_words else ""
+    if received > 0:
+        amount = money(received).replace(" ", "&nbsp;")
+        declaration = (
+            f"Recebemos de <b>{xml_escape(client)}</b>, CNPJ/CPF <b>{xml_escape(cnpj)}</b>, a quantia de "
+            f"<b>{amount}</b>{in_words}{paid_on}, referente ao pagamento da <b>Fatura nº {number}</b>"
+        )
+        if credit:
+            declaration += f", já descontado o crédito de {money(credit).replace(' ', '&nbsp;')} do cliente"
+        declaration += ", pelo que damos plena e geral quitação do valor recebido."
+    else:
+        declaration = (
+            f"Declaramos que a <b>Fatura nº {number}</b> de <b>{xml_escape(client)}</b>, CNPJ/CPF <b>{xml_escape(cnpj)}</b>, "
+            f"no valor de <b>{money(total).replace(' ', '&nbsp;')}</b>, foi quitada integralmente com o crédito do cliente{paid_on}, "
+            "pelo que damos plena e geral quitação."
+        )
+    elements.append(Paragraph(declaration, ParagraphStyle("InvReceiptDeclaration", parent=styles["Normal"], fontSize=10,
+                                                          alignment=TA_LEFT, leading=15, textColor=_hex(BRAND_TEXT))))
+    elements.append(_pdf_signatures([
+        (c["name"], f"{issued_by or '-'}  ·  {now_brt().strftime('%d/%m/%Y')}"),
+    ], doc.width, space_above=40))
+
+    footer = _make_pdf_footer(c["name"])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
 def generate_service_provider_report_pdf(closings: list, filters: dict, company: dict = None) -> bytes:
     """Relatório dos fechamentos de Prestadores de Serviço, por prestador,
     com serviços, vales, descontos, líquido e situação."""

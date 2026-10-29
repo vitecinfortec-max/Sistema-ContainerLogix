@@ -204,6 +204,7 @@ export const api = {
   getUnbilledMovements: (params) => axios.get(`${API}/movements/unbilled`, { params }),
   findMovementForInvoice: (search) => axios.get(`${API}/movements/find-for-invoice`, { params: { search } }),
   downloadInvoicePdf: (id) => axios.get(`${API}/invoices/${id}/pdf`, { responseType: 'blob' }),
+  downloadInvoiceReceiptPdf: (id) => axios.get(`${API}/invoices/${id}/receipt-pdf`, { responseType: 'blob' }),
   downloadInvoiceExcel: (id) => axios.get(`${API}/invoices/${id}/excel`, { responseType: 'blob' }),
   
   // Financeiro - Resumo Financeiro (entradas e saídas de todos os módulos)

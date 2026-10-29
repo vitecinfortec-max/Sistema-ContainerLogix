@@ -122,6 +122,7 @@ export default function BillingPage() {
   const [invoiceToDelete, setInvoiceToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(null);
+  const [downloadingReceipt, setDownloadingReceipt] = useState(null);
   const [downloadingExcel, setDownloadingExcel] = useState(null);
 
   // Estado de Seleção (toolbar)
@@ -663,6 +664,28 @@ export default function BillingPage() {
     }
   };
 
+  // Recibo de pagamento: só para fatura paga
+  const downloadReceipt = async (invoice) => {
+    setDownloadingReceipt(invoice.id);
+    try {
+      const response = await api.downloadInvoiceReceiptPdf(invoice.id);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `recibo_fatura_${invoice.invoice_number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Recibo baixado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao gerar o recibo da fatura');
+    } finally {
+      setDownloadingReceipt(null);
+    }
+  };
+
   const downloadExcel = async (invoice) => {
     setDownloadingExcel(invoice.id);
     try {
@@ -850,6 +873,14 @@ export default function BillingPage() {
                 onClick={() => singleSelectedInvoice && downloadExcel(singleSelectedInvoice)}
                 disabled={!singleSelectedInvoice || downloadingExcel === singleSelectedInvoice?.id}
                 testId={singleSelectedInvoice ? `download-invoice-${singleSelectedInvoice.id}` : undefined}
+              />
+              <ToolbarButton
+                icon={Receipt}
+                label={singleSelectedInvoice && downloadingReceipt === singleSelectedInvoice.id ? 'Gerando recibo...' : 'Recibo'}
+                tone="primary"
+                onClick={() => singleSelectedInvoice && downloadReceipt(singleSelectedInvoice)}
+                disabled={!singleSelectedInvoice || singleSelectedInvoice.status !== 'PAGO' || downloadingReceipt === singleSelectedInvoice?.id}
+                testId="invoice-receipt-button"
               />
               <ToolbarDivider />
               <ToolbarButton

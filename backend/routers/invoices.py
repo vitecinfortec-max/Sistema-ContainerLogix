@@ -631,6 +631,39 @@ async def download_invoice_excel(invoice_id: str, current_user: dict = Depends(g
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+@api_router.get("/invoices/{invoice_id}/receipt-pdf")
+async def download_invoice_receipt_pdf(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Recibo de pagamento da fatura (só fatura Paga): valor recebido por
+    extenso, serviços cobrados e a quitação dada ao cliente."""
+    from reports import generate_invoice_receipt_pdf
+    from routers.fuel_supply import _valor_por_extenso
+
+    invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Fatura não encontrada")
+    if invoice.get('status') != 'PAGO':
+        raise HTTPException(status_code=400, detail="O recibo só pode ser gerado para fatura paga")
+
+    # Serviços cobrados, agrupados por tipo (quantidade e valor)
+    services = {}
+    async for m in db.movements.find({"id": {"$in": invoice.get('movement_ids') or []}}, {"_id": 0, "service_type": 1, "service_value": 1}):
+        name = m.get('service_type') or ''
+        qty, value = services.get(name, (0, 0.0))
+        services[name] = (qty + 1, value + (m.get('service_value') or 0))
+    rows = sorted(((name, qty, round_money(value)) for name, (qty, value) in services.items()), key=lambda r: (r[0] == '', r[0]))
+
+    received = round_money((invoice.get('total_value') or 0) - min(invoice.get('credit_applied') or 0, invoice.get('total_value') or 0))
+    pdf = generate_invoice_receipt_pdf(
+        invoice, rows, _valor_por_extenso(received) if received > 0 else '',
+        issued_by=current_user.get('name') or '', company=await get_company_settings(),
+    )
+    return StreamingResponse(
+        io.BytesIO(pdf),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="recibo_fatura_{invoice["invoice_number"]}.pdf"'}
+    )
+
+
 @api_router.delete("/invoices/{invoice_id}")
 async def delete_invoice(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Exclui uma fatura e desmarca as movimentações como faturadas"""
