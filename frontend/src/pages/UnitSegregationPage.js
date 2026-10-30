@@ -15,10 +15,71 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Checkbox } from '../components/ui/checkbox';
-import { Package, Plus, Eye, Trash2, Printer, Pencil, Unlock, X, Tag, CheckCircle2, Clock } from 'lucide-react';
+import { Package, Plus, Eye, Trash2, Printer, Pencil, Unlock, X, Tag, CheckCircle2, Clock, Camera, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatContainerNumber } from '../lib/containerNumber';
+import { compressImage } from '../lib/imageCompression';
+import PhotoLightbox from '../components/checklist/PhotoLightbox';
+
+// Mesmo limite do backend (MAX_PHOTOS_PER_CONTAINER em routers/unit_segregation.py)
+const MAX_PHOTOS_PER_CONTAINER = 6;
+
+const emptyItem = () => ({ container_number: '', tare: '', shipping_line: '', photos: [], staged: [] });
+
+const photoSrc = (photo) => photo.preview || api.getFileUrl(photo.url);
+
+// Miniaturas do container + botão da câmera. `photos`: as já salvas e as que
+// ainda serão enviadas ({ preview }); capture="environment" abre a câmera
+// traseira no celular.
+function ContainerPhotos({ photos, busy, canEdit, onAdd, onRemove, onOpen, testId }) {
+  const inputRef = useRef(null);
+  const full = photos.length >= MAX_PHOTOS_PER_CONTAINER;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {photos.map((photo, index) => (
+        <div key={photo.id} className="relative">
+          <button type="button" title="Ampliar foto" aria-label="Ampliar foto" onClick={() => onOpen(index)} className="block">
+            <img src={photoSrc(photo)} alt="Foto do container" className="w-12 h-12 object-cover rounded border border-slate-200 dark:border-slate-700" />
+          </button>
+          {canEdit && (
+            <button
+              type="button"
+              title="Remover foto"
+              aria-label="Remover foto"
+              onClick={() => onRemove(photo)}
+              disabled={busy}
+              className="absolute -top-1.5 -right-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 p-0.5 text-slate-500 hover:text-red-600"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+      ))}
+      {canEdit && !full && (
+        <>
+          <Button type="button" variant="outline" size="sm" className="h-8 text-xs" disabled={busy} onClick={() => inputRef.current?.click()} data-testid={testId}>
+            {busy ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Camera className="w-3.5 h-3.5 mr-1" />}
+            Bater foto
+          </Button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) onAdd(file);
+            }}
+          />
+        </>
+      )}
+      {!canEdit && photos.length === 0 && <span className="text-xs text-slate-400 dark:text-slate-500">-</span>}
+    </div>
+  );
+}
 
 export default function UnitSegregationPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -41,9 +102,13 @@ export default function UnitSegregationPage() {
   // Formulário - agora com items (múltiplos containers)
   const [formData, setFormData] = useState({
     client_id: '',
-    items: [{ container_number: '', tare: '', shipping_line: '' }],
+    items: [emptyItem()],
     observations: ''
   });
+
+  // Foto ampliada (de qualquer uma das janelas) e container enviando foto
+  const [lightbox, setLightbox] = useState({ photos: [], index: null });
+  const [photoBusy, setPhotoBusy] = useState(null);
 
   // Autocomplete de cliente
   const [clientSearch, setClientSearch] = useState('');
@@ -166,21 +231,39 @@ export default function UnitSegregationPage() {
       return;
     }
     
+    // A linha incompleta não é salva: sem este aviso, a foto dela sumiria calada
+    if (formData.items.some(item => item.staged.length > 0 && !validItems.includes(item))) {
+      toast.error('Preencha o número e o armador dos containers que têm foto');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
         client_id: formData.client_id,
-        items: validItems,
+        items: validItems.map(({ container_number, tare, shipping_line }) => ({ container_number, tare, shipping_line })),
         observations: formData.observations
       };
-      
+
+      let saved;
       if (editingItem) {
-        await api.updateUnitSegregation(editingItem.id, payload);
+        saved = (await api.updateUnitSegregation(editingItem.id, payload)).data;
         toast.success('Segregação atualizada!');
       } else {
-        await api.createUnitSegregation(payload);
+        saved = (await api.createUnitSegregation(payload)).data;
         toast.success('Segregação criada com sucesso!');
       }
+
+      // Só aqui a segregação existe com certeza: as fotos batidas na janela vão agora.
+      // Se alguma falhar a reserva já está salva, então avisa em vez de perder calado.
+      const uploads = validItems.flatMap(item => item.staged.map(photo => (
+        api.uploadUnitSegregationPhoto(saved.id, item.container_number, photo.file)
+      )));
+      const failed = (await Promise.allSettled(uploads)).filter(r => r.status === 'rejected').length;
+      if (failed > 0) {
+        toast.error(`${failed} foto(s) não foram enviadas. Abra "Ver detalhes" e bata de novo.`);
+      }
+
       setModalOpen(false);
       resetForm();
       loadSegregations();
@@ -192,9 +275,10 @@ export default function UnitSegregationPage() {
   };
 
   const resetForm = () => {
+    formData.items.forEach(item => item.staged.forEach(photo => URL.revokeObjectURL(photo.preview)));
     setFormData({
       client_id: '',
-      items: [{ container_number: '', tare: '', shipping_line: '' }],
+      items: [emptyItem()],
       observations: ''
     });
     setEditingItem(null);
@@ -211,9 +295,11 @@ export default function UnitSegregationPage() {
         ? item.items.map(i => ({
             container_number: i.container_number || '',
             tare: i.tare || '',
-            shipping_line: i.shipping_line || ''
+            shipping_line: i.shipping_line || '',
+            photos: i.photos || [],
+            staged: []
           }))
-        : [{ container_number: '', tare: '', shipping_line: '' }],
+        : [emptyItem()],
       observations: item.observations || ''
     });
     setClientSearch(item.client_name || '');
@@ -225,17 +311,89 @@ export default function UnitSegregationPage() {
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { container_number: '', tare: '', shipping_line: '' }]
+      items: [...prev.items, emptyItem()]
     }));
   };
 
-  const removeItem = (index) => {
-    if (formData.items.length > 1) {
+  const removeItem = async (index) => {
+    if (formData.items.length <= 1) return;
+    const item = formData.items[index];
+    if (item.photos.length > 0 && !(await confirm(`Tirar o container ${item.container_number} da segregação? As fotos dele serão apagadas ao salvar.`))) return;
+    item.staged.forEach(photo => URL.revokeObjectURL(photo.preview));
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index)
+    }));
+  };
+
+  // Na janela de criar/editar a foto só fica guardada aqui e vai junto ao salvar
+  const stagePhoto = async (index, original) => {
+    const file = await compressImage(original);
+    const photo = { id: `local-${Date.now()}-${Math.random()}`, file, preview: URL.createObjectURL(file) };
+    setFormData(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => (i === index ? { ...item, staged: [...item.staged, photo] } : item))
+    }));
+  };
+
+  const removeFormPhoto = async (index, photo) => {
+    if (photo.file) {
+      URL.revokeObjectURL(photo.preview);
       setFormData(prev => ({
         ...prev,
-        items: prev.items.filter((_, i) => i !== index)
+        items: prev.items.map((item, i) => (i === index ? { ...item, staged: item.staged.filter(p => p.id !== photo.id) } : item))
       }));
+      return;
     }
+    if (!(await confirm('Remover esta foto?'))) return;
+    try {
+      await api.deleteUnitSegregationPhoto(editingItem.id, formData.items[index].container_number, photo.id);
+      setFormData(prev => ({
+        ...prev,
+        items: prev.items.map((item, i) => (i === index ? { ...item, photos: item.photos.filter(p => p.id !== photo.id) } : item))
+      }));
+      loadSegregations();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao remover foto');
+    }
+  };
+
+  // Na janela de detalhes a segregação já existe: a foto vai direto pro servidor
+  const syncSelected = (updated) => {
+    setSelectedItem(updated);
+    setSegregations(prev => prev.map(s => (s.id === updated.id ? updated : s)));
+  };
+
+  const addDetailPhoto = async (container, original) => {
+    setPhotoBusy(container.container_number);
+    try {
+      const file = await compressImage(original);
+      const response = await api.uploadUnitSegregationPhoto(selectedItem.id, container.container_number, file);
+      syncSelected(response.data);
+      toast.success('Foto anexada');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao enviar foto');
+    } finally {
+      setPhotoBusy(null);
+    }
+  };
+
+  const removeDetailPhoto = async (container, photo) => {
+    if (!(await confirm(`Remover esta foto do container ${container.container_number}?`))) return;
+    setPhotoBusy(container.container_number);
+    try {
+      const response = await api.deleteUnitSegregationPhoto(selectedItem.id, container.container_number, photo.id);
+      syncSelected(response.data);
+      toast.success('Foto removida');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao remover foto');
+    } finally {
+      setPhotoBusy(null);
+    }
+  };
+
+  const openLightbox = (photos, index, containerNumber) => {
+    setLightbox({ photos: photos.map(p => ({ id: p.id, src: photoSrc(p), label: containerNumber || 'Foto do container' })), index });
   };
 
   const updateItem = (index, field, value) => {
@@ -565,7 +723,8 @@ export default function UnitSegregationPage() {
               <div className="space-y-2">
                 {formData.items.map((item, index) => (
                   <div key={index} className="flex gap-2 items-start p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <div className="flex-1 grid grid-cols-3 gap-3">
+                    <div className="flex-1 space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <div>
                         <Label className="mb-1.5 block">Container *</Label>
                         <Input
@@ -573,6 +732,8 @@ export default function UnitSegregationPage() {
                           onChange={(e) => updateItem(index, 'container_number', e.target.value)}
                           onBlur={(e) => updateItem(index, 'container_number', formatContainerNumber(e.target.value))}
                           className="font-mono"
+                          disabled={item.photos.length > 0}
+                          title={item.photos.length > 0 ? 'Este container já tem foto salva: remova as fotos para trocar o número' : undefined}
                           data-testid={`container-${index}`}
                         />
                       </div>
@@ -597,6 +758,15 @@ export default function UnitSegregationPage() {
                           </SelectContent>
                         </Select>
                       </div>
+                    </div>
+                    <ContainerPhotos
+                      photos={[...item.photos, ...item.staged]}
+                      canEdit
+                      onAdd={(file) => stagePhoto(index, file)}
+                      onRemove={(photo) => removeFormPhoto(index, photo)}
+                      onOpen={(i) => openLightbox([...item.photos, ...item.staged], i, item.container_number)}
+                      testId={`photo-button-${index}`}
+                    />
                     </div>
                     {formData.items.length > 1 && (
                       <Button title="Excluir" aria-label="Excluir"
@@ -637,7 +807,7 @@ export default function UnitSegregationPage() {
 
       {/* Modal Detalhes */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="w-5 h-5" />
@@ -646,7 +816,7 @@ export default function UnitSegregationPage() {
           </DialogHeader>
 
           {selectedItem && (
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 min-w-0">
               <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                 <div>
                   <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Cliente Reservado</span>
@@ -687,6 +857,7 @@ export default function UnitSegregationPage() {
                   <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 border-b">
                     <span className="text-[11px] text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">Containers Segregados</span>
                   </div>
+                  <div className="overflow-x-auto">
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -721,6 +892,32 @@ export default function UnitSegregationPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Fora da tabela: no celular, onde a foto é batida, o botão ficava cortado */}
+              {selectedItem.items && selectedItem.items.length > 0 && (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 border-b">
+                    <span className="text-[11px] text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">Fotos</span>
+                  </div>
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {selectedItem.items.map((container, idx) => (
+                      <div key={idx} className="px-4 py-3 space-y-2">
+                        <span className="block font-mono text-xs text-slate-600 dark:text-slate-400">{container.container_number}</span>
+                        <ContainerPhotos
+                          photos={container.photos || []}
+                          busy={photoBusy === container.container_number}
+                          canEdit={selectedItem.status === 'ATIVO'}
+                          onAdd={(file) => addDetailPhoto(container, file)}
+                          onRemove={(photo) => removeDetailPhoto(container, photo)}
+                          onOpen={(i) => openLightbox(container.photos, i, container.container_number)}
+                          testId={`detail-photo-button-${idx}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -759,6 +956,11 @@ export default function UnitSegregationPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PhotoLightbox
+        photos={lightbox.photos}
+        index={lightbox.index}
+        onIndexChange={(index) => setLightbox(prev => ({ ...prev, index }))}
+      />
       <ConfirmDialog />
     </Layout>
   );

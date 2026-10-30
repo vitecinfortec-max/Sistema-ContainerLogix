@@ -742,6 +742,14 @@ export const api = {
   updateUnitSegregation: (id, data) => axios.put(`${API}/unit-segregations/${id}`, data),
   deleteUnitSegregation: (id) => axios.delete(`${API}/unit-segregations/${id}`),
   releaseUnitSegregation: (id) => axios.post(`${API}/unit-segregations/${id}/release`),
+  uploadUnitSegregationPhoto: (id, containerNumber, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/unit-segregations/${id}/items/${encodeURIComponent(containerNumber)}/photos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteUnitSegregationPhoto: (id, containerNumber, photoId) => axios.delete(`${API}/unit-segregations/${id}/items/${encodeURIComponent(containerNumber)}/photos/${photoId}`),
   getUnitSegregationPDF: (id) => axios.get(`${API}/unit-segregations/${id}/pdf`, { responseType: 'blob' }),
   getUnitSegregationLabel: (id) => axios.get(`${API}/unit-segregations/${id}/label`, { responseType: 'blob' }),
   checkContainerSegregation: (containerNumber) => axios.get(`${API}/check-segregation/${containerNumber}`),

@@ -2578,6 +2578,9 @@ class UnitSegregationItem(BaseModel):
     retrieved: bool = False
     retrieved_at: Optional[datetime] = None
     retrieved_transaction_id: Optional[int] = None  # Nº da Transação (EIR) que deu baixa
+    # Fotos do container: [{id, url, uploaded_at, uploaded_by_name}]. Gravadas
+    # só pelas rotas de foto - o que vier no formulário é ignorado.
+    photos: List[dict] = []
 
 
 class UnitSegregation(BaseModel):

@@ -2,8 +2,10 @@ from datetime import datetime, timezone
 from typing import Optional, List
 import io
 import re
+import shutil
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel as PydanticBaseModel
@@ -13,10 +15,15 @@ from reports import now_brt, merge_company
 
 from shared import (
     db, get_current_active_user, get_current_admin_user, get_company_settings, parse_datetime_value,
-    load_logo_buffer
+    load_logo_buffer, validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR,
 )
+from container_ocr import format_container_number
+from routers.container_audits import _remove_photo_file
 
 api_router = APIRouter(prefix="/api")
+
+# Mesmo limite usado na tela (MAX_PHOTOS_PER_CONTAINER em UnitSegregationPage.js)
+MAX_PHOTOS_PER_CONTAINER = 6
 
 # ==================== SEGREGAÇÃO DE UNIDADE ENDPOINTS ====================
 
@@ -190,9 +197,17 @@ async def update_unit_segregation(segregation_id: str, data: UnitSegregationUpda
                 "retrieved": previous.get("retrieved", False),
                 "retrieved_at": previous.get("retrieved_at"),
                 "retrieved_transaction_id": previous.get("retrieved_transaction_id"),
+                "photos": previous.get("photos") or [],
             })
         update_data["items"] = processed_items
-    
+        kept_numbers = {i["container_number"] for i in processed_items}
+        removed_photos = [
+            photo for number, item in existing_by_number.items() if number not in kept_numbers
+            for photo in item.get("photos") or []
+        ]
+    else:
+        removed_photos = []
+
     # Se está liberando a segregação
     if update_data.get("status") == "LIBERADO":
         update_data["released_at"] = datetime.now(timezone.utc)
@@ -203,6 +218,89 @@ async def update_unit_segregation(segregation_id: str, data: UnitSegregationUpda
         {"id": segregation_id},
         {"$set": update_data}
     )
+    # Container tirado da reserva leva as fotos junto (senão ficam no disco para sempre)
+    for photo in removed_photos:
+        _remove_photo_file(photo)
+
+    updated = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
+    return _unit_segregation_serialize(updated)
+
+
+async def _open_segregation_item(segregation_id: str, container_number: str) -> tuple:
+    """Segregação ativa e o item do container. Mesma regra da tela: depois de
+    liberada, a reserva (e as fotos dela) não muda mais."""
+    segregation = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
+    if not segregation:
+        raise HTTPException(status_code=404, detail="Segregação não encontrada")
+    if segregation.get("status") != "ATIVO":
+        raise HTTPException(status_code=400, detail="Segregação já foi liberada ou cancelada")
+    target = format_container_number(container_number)
+    item = next(
+        (i for i in segregation.get("items") or [] if format_container_number(i.get("container_number")) == target),
+        None,
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Container não encontrado nesta segregação")
+    return segregation, item
+
+
+@api_router.post("/unit-segregations/{segregation_id}/items/{container_number}/photos")
+async def upload_unit_segregation_photo(
+    segregation_id: str,
+    container_number: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Anexa uma foto ao container segregado"""
+    _, item = await _open_segregation_item(segregation_id, container_number)
+    if len(item.get("photos") or []) >= MAX_PHOTOS_PER_CONTAINER:
+        raise HTTPException(status_code=400, detail=f"Máximo de {MAX_PHOTOS_PER_CONTAINER} fotos por container")
+
+    file_ext, content = await validate_and_read_upload(file, ALLOWED_EXTENSIONS)
+
+    photo_dir = UPLOADS_DIR / "unit_segregations" / segregation_id
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    photo_id = str(uuid.uuid4())
+    file_path = photo_dir / f"{photo_id}{file_ext}"
+    with open(file_path, "wb") as buffer:
+        buffer.write(content)
+
+    photo = {
+        "id": photo_id,
+        "url": f"/api/uploads/unit_segregations/{segregation_id}/{photo_id}{file_ext}",
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        "uploaded_by_name": current_user.get("name", "Sistema"),
+    }
+    # $push no item (e não regravar a lista): duas fotos enviadas juntas não se apagam
+    result = await db.unit_segregations.update_one(
+        {"id": segregation_id, "status": "ATIVO", "items": {"$elemMatch": {"container_number": item["container_number"]}}},
+        {"$push": {"items.$.photos": photo}}
+    )
+    if result.matched_count == 0:
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=409, detail="A segregação foi alterada por outra pessoa, recarregue a tela")
+
+    updated = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
+    return _unit_segregation_serialize(updated)
+
+
+@api_router.delete("/unit-segregations/{segregation_id}/items/{container_number}/photos/{photo_id}")
+async def delete_unit_segregation_photo(
+    segregation_id: str,
+    container_number: str,
+    photo_id: str,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """Remove uma foto do container segregado"""
+    _, item = await _open_segregation_item(segregation_id, container_number)
+    photo = next((p for p in item.get("photos") or [] if p.get("id") == photo_id), None)
+    if not photo:
+        raise HTTPException(status_code=404, detail="Foto não encontrada")
+    await db.unit_segregations.update_one(
+        {"id": segregation_id, "items": {"$elemMatch": {"container_number": item["container_number"]}}},
+        {"$pull": {"items.$.photos": {"id": photo_id}}}
+    )
+    _remove_photo_file(photo)
 
     updated = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
     return _unit_segregation_serialize(updated)
@@ -214,6 +312,7 @@ async def delete_unit_segregation(segregation_id: str, current_user: dict = Depe
     result = await db.unit_segregations.delete_one({"id": segregation_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Segregação não encontrada")
+    shutil.rmtree(UPLOADS_DIR / "unit_segregations" / segregation_id, ignore_errors=True)
     return {"message": "Segregação excluída com sucesso"}
 
 
@@ -252,7 +351,7 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
     from reports import (
         _build_pdf_header, _make_pdf_footer, _fmt_int, _pdf_info_grid, _pdf_section_title,
         _pdf_header_cells, _pdf_cell_factory, _pdf_table_style, _pdf_note_box, _pdf_barcode_block,
-        _pdf_empty_state, _pdf_tone_markup,
+        _pdf_empty_state, _pdf_tone_markup, _photo_for_pdf,
     )
 
     segregation = await db.unit_segregations.find_one({"id": segregation_id}, {"_id": 0})
@@ -330,6 +429,31 @@ async def get_unit_segregation_pdf(segregation_id: str, current_user: dict = Dep
     if segregation.get('observations'):
         elements.append(Spacer(1, 10))
         elements.append(_pdf_note_box("Observações", segregation['observations'], SECTION_WIDTH))
+
+    # ========== Fotos ==========
+    photos = [(item, photo) for item in items for photo in item.get('photos') or []]
+    if photos:
+        columns = 4
+        col_w = SECTION_WIDTH / columns
+        caption_style = ParagraphStyle('SegPhotoCaption', fontName='Helvetica-Bold', fontSize=7.5, leading=9.5)
+        missing_style = ParagraphStyle('SegPhotoMissing', fontName='Helvetica', fontSize=7.5, leading=9.5)
+
+        def photo_cell(item, photo):
+            image = _photo_for_pdf(photo.get('url'), UPLOADS_DIR, col_w - 10, 120)
+            return [image or Paragraph('Foto indisponível', missing_style), Spacer(1, 3), Paragraph(item.get('container_number', '-'), caption_style)]
+
+        cells = [photo_cell(item, photo) for item, photo in photos]
+        rows = [cells[i:i + columns] for i in range(0, len(cells), columns)]
+        rows[-1] += [''] * (columns - len(rows[-1]))
+        photo_table = Table(rows, colWidths=[col_w] * columns)
+        photo_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        elements.extend(_pdf_section_title(f"Fotos ({len(photos)})", SECTION_WIDTH))
+        elements.append(photo_table)
 
     # Código de barras de controle (mesmo valor do layout anterior: SEG + nº)
     elements.append(Spacer(1, 16))

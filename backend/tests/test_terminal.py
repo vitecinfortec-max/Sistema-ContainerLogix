@@ -126,6 +126,81 @@ def test_edit_segregation_blocks_container_reserved_elsewhere(api):
     assert ok.status_code == 200, ok.text
 
 
+@pytest.fixture
+def segregation_photos(api, monkeypatch, tmp_path):
+    from routers import container_audits, unit_segregation
+    monkeypatch.setattr(unit_segregation, "UPLOADS_DIR", tmp_path)
+    monkeypatch.setattr(container_audits, "UPLOADS_DIR", tmp_path)
+    client = api.post("/api/clients", json={"name": "Cliente Alfa"}).json()
+    seg = api.post("/api/unit-segregations", json={"client_id": client["id"], "items": [
+        {"container_number": "AAAU1111111", "shipping_line": "MSC"},
+        {"container_number": "BBBU2222222", "shipping_line": "MSC"},
+    ]}).json()
+
+    def upload(number="AAAU1111111"):
+        return api.post(f"/api/unit-segregations/{seg['id']}/items/{number}/photos", files={"file": ("x.png", io.BytesIO(PNG), "image/png")})
+
+    return seg, upload, tmp_path
+
+
+def _seg_item(seg_json, number):
+    return next(i for i in seg_json["items"] if i["container_number"] == number)
+
+
+def _saved_file(tmp_path, photo):
+    return tmp_path / photo["url"].split("/api/uploads/", 1)[1]
+
+
+def test_segregation_photo_upload_and_remove(api, segregation_photos):
+    seg, upload, tmp_path = segregation_photos
+    r = upload()
+    assert r.status_code == 200, r.text
+    photo = _seg_item(r.json(), "AAAU1111111")["photos"][0]
+    assert _saved_file(tmp_path, photo).is_file() and photo["uploaded_by_name"]
+    assert _seg_item(r.json(), "BBBU2222222")["photos"] == []
+
+    gone = api.delete(f"/api/unit-segregations/{seg['id']}/items/AAAU1111111/photos/{photo['id']}")
+    assert gone.status_code == 200, gone.text
+    assert _seg_item(gone.json(), "AAAU1111111")["photos"] == []
+    assert not _saved_file(tmp_path, photo).exists()
+
+
+def test_segregation_photo_limits(api, segregation_photos):
+    seg, upload, _ = segregation_photos
+    assert upload("ZZZU9999999").status_code == 404
+    for _ in range(6):
+        assert upload().status_code == 200
+    r = upload()
+    assert r.status_code == 400 and "6" in r.json()["detail"]
+    assert api.post(f"/api/unit-segregations/{seg['id']}/release").status_code == 200
+    assert upload("BBBU2222222").status_code == 400
+
+
+def test_segregation_edit_keeps_photos_and_ignores_payload_photos(api, segregation_photos):
+    seg, upload, tmp_path = segregation_photos
+    kept = _seg_item(upload("AAAU1111111").json(), "AAAU1111111")["photos"][0]
+    dropped = _seg_item(upload("BBBU2222222").json(), "BBBU2222222")["photos"][0]
+
+    r = api.put(f"/api/unit-segregations/{seg['id']}", json={"items": [
+        {"container_number": "AAAU1111111", "shipping_line": "MSC", "photos": [{"id": "x", "url": "/api/uploads/alheio.png"}]},
+    ]})
+    assert r.status_code == 200, r.text
+    assert _seg_item(r.json(), "AAAU1111111")["photos"] == [kept]
+    assert _saved_file(tmp_path, kept).is_file()
+    assert not _saved_file(tmp_path, dropped).exists()  # o container saiu da reserva
+
+
+def test_segregation_delete_removes_photos_and_pdf_includes_them(api, segregation_photos):
+    seg, upload, tmp_path = segregation_photos
+    without_photo = api.get(f"/api/unit-segregations/{seg['id']}/pdf")
+    photo = _seg_item(upload().json(), "AAAU1111111")["photos"][0]
+    with_photo = api.get(f"/api/unit-segregations/{seg['id']}/pdf")
+    assert with_photo.status_code == 200 and len(with_photo.content) > len(without_photo.content)
+
+    assert api.delete(f"/api/unit-segregations/{seg['id']}").status_code == 200
+    assert not _saved_file(tmp_path, photo).exists()
+
+
 def test_audit_item_updates_do_not_overwrite_each_other(api, stock_history):
     client = api.post("/api/clients", json={"name": "Cliente Alfa"}).json()
     audit = api.post("/api/container-audits", json={"client_id": client["id"]}).json()
