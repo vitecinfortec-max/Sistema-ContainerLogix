@@ -87,6 +87,12 @@ def test_closing_pay_receipt_and_cancel(api):
 
     report = api.get("/api/service-provider-closings/pdf", params={"start_date": "2026-10-01", "end_date": "2026-10-31"})
     assert report.status_code == 200 and "Fechamentos Prestadores de Serviço" in _text(report.content)
+    # Detalhado dia a dia: data, dia da semana, observação e valor de cada serviço
+    text = _text(report.content)
+    assert "Fechamento nº 1" in text and "Serviço / Observação" in text
+    for expected in ("10/10/2026", "Sáb", "Pintura portão", "02/10/2026", "Sex", "Solda de chassi", "2 diárias"):
+        assert expected in text, expected
+    assert "Ferramenta quebrada" in text and "PIX" in text and "Primeira quinzena" in text
 
     summary = api.get("/api/reports/financial-summary", params={"date_from": "2026-10-01", "date_to": "2026-10-31"}).json()
     outs = {x["key"]: x["total"] for x in summary["outflows"]}

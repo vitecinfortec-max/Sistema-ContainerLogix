@@ -4449,6 +4449,12 @@ def _fmt_qty(value) -> str:
     return f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
 
 
+def _service_provider_qty(entry: dict) -> str:
+    unit = (SERVICE_PROVIDER_UNIT_PLURALS.get(entry.get("unit"), "") if entry["quantity"] > 1
+            else SERVICE_PROVIDER_UNIT_LABELS.get(entry.get("unit"), "").lower())
+    return f"{_fmt_qty(entry['quantity'])} {unit}".strip()
+
+
 def generate_service_provider_receipt_pdf(closing: dict, provider: dict, amount_in_words: str = '', company: dict = None) -> bytes:
     """Recibo do fechamento de um Prestador de Serviço (Financeiro >
     Prestadores de Serviço): serviços do período, vales e descontos, o
@@ -4476,10 +4482,7 @@ def generate_service_provider_receipt_pdf(closing: dict, provider: dict, amount_
     cell = _pdf_cell_factory(styles, font_size=8.5)
     rows = [_pdf_header_cells(["Data", "Serviço", "Qtd.", "Valor unit.", "Total"], font_size=8.5)]
     for e in closing.get("entries") or []:
-        unit = (SERVICE_PROVIDER_UNIT_PLURALS.get(e.get("unit"), "") if e["quantity"] > 1
-                else SERVICE_PROVIDER_UNIT_LABELS.get(e.get("unit"), "").lower())
-        qty = f"{_fmt_qty(e['quantity'])} {unit}".strip()
-        rows.append([cell(fmt_date(e["date"]), "center"), cell(e.get("description") or "-"), cell(qty, "center"),
+        rows.append([cell(fmt_date(e["date"]), "center"), cell(e.get("description") or "-"), cell(_service_provider_qty(e), "center"),
                      cell(money(e["unit_value"]), "right"), cell(money(e["total"]), "right", bold=True)])
     rows.append(["", cell("TOTAL DOS SERVIÇOS", "right", bold=True), "", "", cell(money(closing["gross_total"]), "right", bold=True)])
     table = Table(rows, colWidths=[doc.width * w for w in (0.13, 0.47, 0.13, 0.13, 0.14)], repeatRows=1)
@@ -4614,8 +4617,9 @@ def generate_invoice_receipt_pdf(invoice: dict, services: list, amount_in_words:
 
 
 def generate_service_provider_report_pdf(closings: list, filters: dict, company: dict = None) -> bytes:
-    """Relatório dos fechamentos de Prestadores de Serviço, por prestador,
-    com serviços, vales, descontos, líquido e situação."""
+    """Relatório dos fechamentos de Prestadores de Serviço, por prestador:
+    o resumo de cada um e, abaixo, cada fechamento detalhado dia a dia (data,
+    dia da semana, observação, quantidade e valor), com vales e descontos."""
     c = merge_company(company)
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=10*mm, leftMargin=10*mm, topMargin=12*mm, bottomMargin=15*mm)
@@ -4661,9 +4665,52 @@ def generate_service_provider_report_pdf(closings: list, filters: dict, company:
         table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(table)
 
+        for x in items:
+            elements.extend(_service_provider_closing_detail(x, doc.width, cell))
+
     footer = _make_pdf_footer(c["name"])
     doc.build(elements, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
+
+
+_WEEKDAYS = ("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom")
+
+
+def _service_provider_closing_detail(closing: dict, width: float, cell) -> list:
+    """Dias trabalhados de um fechamento, com vales, descontos e observações."""
+    money = format_currency
+    elements = _pdf_section_title(
+        f"Fechamento nº {closing['number']} · {fmt_date(closing['period_start'])} a {fmt_date(closing['period_end'])}", width)
+    rows = [_pdf_header_cells(["Data", "Dia", "Serviço / Observação", "Qtd.", "Valor unit.", "Total"], font_size=8)]
+    entries = closing.get("entries") or []
+    for e in entries:
+        weekday = _WEEKDAYS[datetime.strptime(e["date"], "%Y-%m-%d").weekday()]
+        rows.append([cell(fmt_date(e["date"]), "center"), cell(weekday, "center"), cell(e.get("description") or "-"),
+                     cell(_service_provider_qty(e), "center"), cell(money(e["unit_value"]), "right"),
+                     cell(money(e["total"]), "right", bold=True)])
+    units = {e.get("unit") for e in entries}
+    quantity = _service_provider_qty({"quantity": round(sum(e["quantity"] for e in entries), 2), "unit": units.pop()}) if len(units) == 1 else ""
+    rows.append(["", "", cell("TOTAL", "right", bold=True), cell(quantity, "center", bold=True), "",
+                 cell(money(closing["gross_total"]), "right", bold=True)])
+    table = Table(rows, colWidths=[width * w for w in (0.1, 0.06, 0.5, 0.11, 0.11, 0.12)], repeatRows=1)
+    table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
+    elements.append(table)
+
+    deductions = [(fmt_date(a["date"]), a.get("description") or ("Saldo negativo anterior" if a.get("origin") == "SALDO_NEGATIVO" else "Vale"), a["value"])
+                  for a in closing.get("advances") or []]
+    deductions += [("-", d["description"], d["value"]) for d in closing.get("discounts") or []]
+    if deductions:
+        elements.append(Spacer(1, 6))
+        rows = [_pdf_header_cells(["Data", "Vales e descontos", "Valor"], font_size=8)]
+        rows += [[cell(day, "center"), cell(description), cell(money(value), "right")] for day, description, value in deductions]
+        table = Table(rows, colWidths=[width * w for w in (0.1, 0.78, 0.12)], repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style()))
+        elements.append(table)
+
+    if closing.get("observations"):
+        elements.append(Spacer(1, 6))
+        elements.append(_pdf_note_box("Observações", closing["observations"], width))
+    return elements
 
 
 def generate_service_price_table_pdf(client_name: str, entries: list, company: dict = None) -> bytes:

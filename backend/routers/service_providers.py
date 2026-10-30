@@ -308,9 +308,11 @@ async def list_service_provider_closings(provider_id: Optional[str] = None, stat
 async def service_provider_closings_pdf(provider_id: Optional[str] = None, status: Optional[str] = None,
                                         start_date: Optional[str] = None, end_date: Optional[str] = None,
                                         search: Optional[str] = None, current_user: dict = Depends(get_current_admin_user)):
-    """Relatório dos fechamentos dos filtros, por prestador."""
+    """Relatório dos fechamentos dos filtros, por prestador, com os dias trabalhados."""
     closings = await db.service_provider_closings.find(_closings_query(provider_id, status, start_date, end_date, search), {"_id": 0}).sort(
         [("provider_name", 1), ("period_start", 1)]).to_list(None)
+    for closing in closings:
+        await _attach_closing_items(closing)
     pdf = generate_service_provider_report_pdf(closings, {"start_date": _day(start_date, "Data inicial", False),
                                                           "end_date": _day(end_date, "Data final", False), "status": status},
                                                company=await get_company_settings())
@@ -385,12 +387,15 @@ async def _closing_or_404(closing_id: str) -> dict:
     return await _find_or_404("service_provider_closings", closing_id, "Fechamento")
 
 
-@api_router.get("/service-provider-closings/{closing_id}")
-async def get_service_provider_closing(closing_id: str, current_user: dict = Depends(get_current_admin_user)):
-    closing = await _closing_or_404(closing_id)
+async def _attach_closing_items(closing: dict) -> dict:
     closing["entries"] = await db.service_provider_entries.find({"id": {"$in": closing["entry_ids"]}}, {"_id": 0}).sort("date", 1).to_list(None)
     closing["advances"] = await db.service_provider_advances.find({"id": {"$in": closing["advance_ids"]}}, {"_id": 0}).sort("date", 1).to_list(None)
     return closing
+
+
+@api_router.get("/service-provider-closings/{closing_id}")
+async def get_service_provider_closing(closing_id: str, current_user: dict = Depends(get_current_admin_user)):
+    return await _attach_closing_items(await _closing_or_404(closing_id))
 
 
 @api_router.delete("/service-provider-closings/{closing_id}")
