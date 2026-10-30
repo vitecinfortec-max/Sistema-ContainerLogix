@@ -17,13 +17,14 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Checkbox } from '../components/ui/checkbox';
 import { api } from '../lib/api';
+import { compressImage } from '../lib/imageCompression';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import {
   Calculator, Plus, Eye, Trash2, Printer, Pencil, X,
-  CheckCircle2, RotateCcw, Camera, Receipt, Banknote
+  CheckCircle2, RotateCcw, Camera, Paperclip, Receipt, Banknote
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -228,22 +229,28 @@ export default function ExpenseReportsPage() {
     setFormData(prev => ({ ...prev, purchases: prev.purchases.filter((_, i) => i !== index) }));
   };
 
-  const handlePurchaseFilesSelected = (index, fileList) => {
+  const handlePurchaseFilesSelected = async (index, fileList) => {
     if (!fileList || fileList.length === 0) return;
-    const newPurchases = [...formData.purchases];
-    const purchase = { ...newPurchases[index] };
-    const incoming = Array.from(fileList).map(file => ({ localId: newItemId(), file }));
-    purchase.pendingFiles = [...(purchase.pendingFiles || []), ...incoming];
-    newPurchases[index] = purchase;
-    setFormData(prev => ({ ...prev, purchases: newPurchases }));
+    // Resolução maior que a padrão: o texto do comprovante precisa continuar legível
+    const files = await Promise.all(Array.from(fileList).map(file => compressImage(file, { maxDimension: 2000, quality: 0.85 })));
+    const incoming = files.map(file => ({ localId: newItemId(), file, preview: URL.createObjectURL(file) }));
+    setFormData(prev => ({
+      ...prev,
+      purchases: prev.purchases.map((purchase, i) => (
+        i === index ? { ...purchase, pendingFiles: [...(purchase.pendingFiles || []), ...incoming] } : purchase
+      ))
+    }));
   };
 
   const removePendingFile = (index, localId) => {
-    const newPurchases = [...formData.purchases];
-    const purchase = { ...newPurchases[index] };
-    purchase.pendingFiles = (purchase.pendingFiles || []).filter(f => f.localId !== localId);
-    newPurchases[index] = purchase;
-    setFormData(prev => ({ ...prev, purchases: newPurchases }));
+    setFormData(prev => ({
+      ...prev,
+      purchases: prev.purchases.map((purchase, i) => {
+        if (i !== index) return purchase;
+        (purchase.pendingFiles || []).filter(f => f.localId === localId).forEach(f => URL.revokeObjectURL(f.preview));
+        return { ...purchase, pendingFiles: (purchase.pendingFiles || []).filter(f => f.localId !== localId) };
+      })
+    }));
   };
 
   const removeSavedReceipt = async (index, receiptId) => {
@@ -324,10 +331,20 @@ export default function ExpenseReportsPage() {
         toast.success('Prestação de contas criada com sucesso!');
       }
 
+      // A prestação já está salva: se uma foto falhar, avisa e fecha. Ficar com a
+      // janela aberta fazia o próximo clique em Salvar criar outra prestação.
+      let failed = 0;
       for (const purchase of formData.purchases) {
         for (const pending of purchase.pendingFiles || []) {
-          await api.uploadExpenseReportReceipt(reportId, purchase.item_id, pending.file);
+          try {
+            await api.uploadExpenseReportReceipt(reportId, purchase.item_id, pending.file);
+          } catch (error) {
+            failed += 1;
+          }
         }
+      }
+      if (failed > 0) {
+        toast.error(`${failed} comprovante(s) não foram enviados. Abra a prestação em Editar e bata de novo.`);
       }
 
       setModalOpen(false);
@@ -733,7 +750,7 @@ export default function ExpenseReportsPage() {
                       </div>
                       <div>
                         <Label className="mb-1.5 block">Observação</Label>
-                        <Input className="h-9" value={purchase.observation} onChange={(e) => handlePurchaseChange(index, 'observation', e.target.value)} />
+                        <Input className="h-9" value={purchase.observation || ''} onChange={(e) => handlePurchaseChange(index, 'observation', e.target.value)} />
                       </div>
                     </div>
 
@@ -756,7 +773,7 @@ export default function ExpenseReportsPage() {
                         ))}
                         {(purchase.pendingFiles || []).map((pending) => (
                           <div key={pending.localId} className="relative">
-                            <img src={URL.createObjectURL(pending.file)} alt="Recibo (pendente)" className="w-16 h-16 object-cover rounded border border-dashed border-primary" />
+                            <img src={pending.preview} alt="Recibo (pendente)" className="w-16 h-16 object-cover rounded border border-dashed border-primary" />
                             <button aria-label="Remover"
                               type="button"
                               onClick={() => removePendingFile(index, pending.localId)}
@@ -767,13 +784,30 @@ export default function ExpenseReportsPage() {
                             </button>
                           </div>
                         ))}
+                        {/* capture="environment": no celular abre direto a câmera traseira */}
                         <label className="w-16 h-16 flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded cursor-pointer text-muted-foreground hover:border-primary hover:text-primary transition-colors">
                           <Camera className="w-5 h-5" />
+                          <span className="text-[10px] text-center leading-none">Bater foto</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            data-testid={`receipt-camera-${index}`}
+                            onChange={(e) => {
+                              handlePurchaseFilesSelected(index, e.target.files);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                        <label className="w-16 h-16 flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded cursor-pointer text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                          <Paperclip className="w-5 h-5" />
                           <span className="text-[10px]">Anexar</span>
                           <input
                             type="file"
                             accept="image/*"
                             multiple
+                            data-testid={`receipt-attach-${index}`}
                             className="hidden"
                             onChange={(e) => {
                               handlePurchaseFilesSelected(index, e.target.files);
