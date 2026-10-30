@@ -329,7 +329,8 @@ export default function LoadingOrderPage() {
     try {
       const payload = { ...form, items };
       if (editingId) {
-        await api.updateLoadingOrder(editingId, payload);
+        const response = await api.updateLoadingOrder(editingId, payload);
+        (response.data?.movement_notes || []).forEach((note) => toast.info(note));
         toast.success('Ordem de Carregamento atualizada!');
       } else {
         await api.createLoadingOrder(payload);
@@ -344,11 +345,12 @@ export default function LoadingOrderPage() {
   };
 
   const handleDelete = async (id, num, status) => {
-    const note = status === 'APROVADA' ? ' O Pagamento Frete ainda pendente desta ordem será cancelado.' : '';
+    const note = status === 'APROVADA' ? ' O Pagamento Frete ainda pendente desta ordem será cancelado e a EIR de saída será desfeita.' : '';
     if (!(await confirm(`Excluir Ordem de Carregamento Nº ${num}?${note}`))) return;
     try {
-      await api.deleteLoadingOrder(id);
+      const response = await api.deleteLoadingOrder(id);
       toast.success('Ordem de Carregamento excluída');
+      (response.data?.movement_notes || []).forEach((item) => toast.info(item));
       setSelectedIds(prev => {
         if (!prev.has(id)) return prev;
         const next = new Set(prev);

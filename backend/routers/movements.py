@@ -277,6 +277,45 @@ async def _mark_segregation_retrieved(container_number: str, transaction_id: int
     )
 
 
+async def _release_segregation_retrieval(transaction_id: int):
+    """Desfaz a baixa dada por essa EIR: a saída não aconteceu, então o
+    container volta a constar como Pendente de retirada na segregação."""
+    await db.unit_segregations.update_one(
+        {"items": {"$elemMatch": {"retrieved_transaction_id": transaction_id}}},
+        {"$set": {
+            "items.$.retrieved": False,
+            "items.$.retrieved_at": None,
+            "items.$.retrieved_transaction_id": None,
+        }}
+    )
+
+
+async def revert_exit_movements_for_loading_order(order_id: str) -> List[str]:
+    """Ordem aprovada que deixou de valer (cancelada, voltou a pendente ou foi
+    excluída): apaga a EIR de Saída que ela gerou, e o container volta ao
+    estoque e à segregação. Fica de fora a EIR faturada ou já seguida de outra
+    movimentação do container: desfazê-la deixaria a fatura ou o histórico
+    errados, então só avisa. Devolve as mensagens para a tela."""
+    notes = []
+    exits = await db.movements.find(
+        {"loading_order_id": order_id, "operation_type": "SAIDA"}, {"_id": 0}
+    ).to_list(None)
+    for movement in exits:
+        number, transaction_id = movement['container_number'], movement['transaction_id']
+        if movement.get('billed'):
+            notes.append(f"EIR #{transaction_id} (container {number}) já faturada: não foi desfeita")
+            continue
+        last = await _find_last_movement(number)
+        if last and last.get('transaction_id') != transaction_id:
+            notes.append(f"EIR #{transaction_id} (container {number}) não foi desfeita: o container já tem movimentação posterior")
+            continue
+        await db.movements.delete_one({"id": movement['id']})
+        await _release_segregation_retrieval(transaction_id)
+        await manager.broadcast({"type": "MOVEMENT_DELETED", "data": {"id": movement['id']}})
+        notes.append(f"EIR #{transaction_id} desfeita: container {number} voltou ao estoque")
+    return notes
+
+
 async def _inherit_from_open_entry(movement_input: ContainerMovementCreate, before: Optional[str] = None) -> dict:
     """Valor do container e data de fabricação são informados na Entrada
     (opcionais). Numa Saída, o que a entrada do container tiver preenchido
@@ -986,6 +1025,9 @@ async def update_movement(movement_id: str, movement_input: ContainerMovementCre
     if existing.get('billed') and update_data.get('service_value') != existing.get('service_value'):
         await sync_invoice_with_movement(update_data, deleted=False, current_user=current_user)
 
+    # Trocou o container ou deixou de ser Saída: a baixa antiga não vale mais
+    if changed_identity:
+        await _release_segregation_retrieval(update_data['transaction_id'])
     if update_data['operation_type'] == 'SAIDA':
         await _mark_segregation_retrieved(update_data['container_number'], update_data['transaction_id'])
 
@@ -1016,6 +1058,8 @@ async def delete_movement(movement_id: str, current_user: dict = Depends(get_cur
     # Era faturada: sai da lista da fatura e o total é recalculado.
     if existing.get('billed'):
         await sync_invoice_with_movement(existing, deleted=True, current_user=current_user)
+
+    await _release_segregation_retrieval(existing['transaction_id'])
 
     # Notificar todos os clientes conectados via WebSocket
     await manager.broadcast({

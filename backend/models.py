@@ -3495,7 +3495,7 @@ class LoadingOrderUpdate(LoadingOrderCreate):
 
 
 class LoadingOrderResponse(LoadingOrder):
-    pass
+    movement_notes: List[str] = []  # o que aconteceu com as EIRs ao cancelar a ordem
 
 
 # ==================== TRANSPORTE - ROTA / PAGAMENTO DE FRETE ====================

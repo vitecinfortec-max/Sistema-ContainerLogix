@@ -13,7 +13,9 @@ from reports import fmt_datetime, merge_company, now_brt
 from routers.freight_payments import (
     create_freight_payment_for_order, cancel_pending_freight_payment_for_order, sync_pending_freight_payment_for_order,
 )
-from routers.movements import validate_loading_order_movements, create_movements_for_loading_order
+from routers.movements import (
+    validate_loading_order_movements, create_movements_for_loading_order, revert_exit_movements_for_loading_order,
+)
 from routers.container_purchases import create_purchase_records_for_order
 from routers.container_sales import create_sale_records_for_order, release_purchase_of_sale, unlink_sales_of_purchase
 
@@ -146,6 +148,7 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
     if not data.items:
         raise HTTPException(status_code=400, detail="A Ordem de Carregamento deve conter ao menos 1 container")
     old_status = existing.get('status')
+    movement_notes = []
     # Campo enviado vazio (null) apaga o valor salvo (ex.: valor do frete
     # de uma ordem que deixou de ser Coleta)
     update_data = data.model_dump(exclude_unset=True)
@@ -177,15 +180,16 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
         await create_sale_records_for_order(updated, current_user)
     elif old_status == 'APROVADA' and new_status != 'APROVADA':
         await cancel_pending_freight_payment_for_order(order_id, current_user)
-        # Compra/Venda de Container nunca são revertidas automaticamente -
-        # mesma filosofia de "registro permanente" já usada em Pagamento
-        # Frete (Pago) e Movimentação de Estoque.
+        # A saída que não aconteceu é desfeita. Compra/Venda de Container nunca
+        # são revertidas automaticamente - mesma filosofia de "registro
+        # permanente" já usada em Pagamento Frete (Pago).
+        movement_notes = await revert_exit_movements_for_loading_order(order_id)
     elif new_status == 'APROVADA':
         # Ordem continua Aprovada mas foi editada: o lançamento ainda
         # Pendente acompanha valor, motorista e rota.
         await sync_pending_freight_payment_for_order(updated, current_user)
 
-    return updated
+    return {**updated, "movement_notes": movement_notes}
 
 
 @api_router.delete("/loading-orders/{order_id}")
@@ -195,8 +199,9 @@ async def delete_loading_order(order_id: str, current_user: dict = Depends(get_c
         raise HTTPException(status_code=404, detail="Ordem de Carregamento não encontrada")
     # Lançamento de frete ainda Pendente não pode ser pago sem a ordem
     await cancel_pending_freight_payment_for_order(order_id, current_user)
+    movement_notes = await revert_exit_movements_for_loading_order(order_id)
     # Compra/Venda de Container nascidas dessa ordem não fazem sentido sem
-    # ela - ao contrário de Pagamento Frete e Movimentação de Estoque, que
+    # ela - ao contrário de Pagamento Frete e da Entrada de uma Coleta, que
     # continuam existindo mesmo se a ordem de origem for apagada. Os vínculos
     # com registros de outras ordens (ou manuais) são desfeitos antes: a
     # Compra vendida por esta ordem volta a ficar Disponível, e a Venda de
@@ -207,7 +212,7 @@ async def delete_loading_order(order_id: str, current_user: dict = Depends(get_c
         await unlink_sales_of_purchase(purchase)
     await db.container_purchases.delete_many({"loading_order_id": order_id})
     await db.container_sales.delete_many({"loading_order_id": order_id})
-    return {"message": "Ordem de Carregamento removida"}
+    return {"message": "Ordem de Carregamento removida", "movement_notes": movement_notes}
 
 
 @api_router.get("/loading-orders/{order_id}/pdf")
