@@ -62,11 +62,17 @@ const buildEmptyForm = () => {
     inss_ceiling: '', contratado_monthly_inss_discount: '',
     // Dados de pagamento
     ciot: '',
+    // Origem dos dados puxados
+    loading_order_id: null, loading_order_number: null, cte_id: null,
     // Dados bancários
     bank_agency: '', bank_account: '', bank_pix: '', bank_beneficiary: '',
     observations: '',
   });
 };
+
+const CARGO_FIELDS = ['nf_number', 'fiscal_date', 'nature', 'species', 'mark', 'batch_number', 'quantity', 'weight_kg', 'cubage_m3', 'value'];
+// Linha de carga vinda do servidor: todo campo com valor, pra os inputs seguirem controlados
+const normalizeCargo = (items) => (items || []).map((c) => Object.fromEntries(CARGO_FIELDS.map((f) => [f, c[f] ?? ''])));
 
 const fmtMoney = (v) => {
   const n = Number(v || 0);
@@ -125,6 +131,12 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
   // Autocomplete de placa (cavalo/carreta) - reaproveita o cadastro de veículos
   const [vehicles, setVehicles] = useState([]);
 
+  // Puxar dados da Ordem de Coleta ou do CT-e
+  const [sources, setSources] = useState({ orders: [], ctes: [] });
+  const [orderSearch, setOrderSearch] = useState('');
+  const [cteSearch, setCteSearch] = useState('');
+  const [importing, setImporting] = useState(false);
+
   useEffect(() => { loadRpas(); loadDrivers(); loadClients(); loadCompanies(); loadVehicles(); }, [rpaType]);
 
   useEffect(() => {
@@ -176,6 +188,36 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       setVehicles(r.data?.items || r.data || []);
     } catch (e) {
       console.error('Erro ao carregar veículos:', e);
+    }
+  };
+
+  const loadSources = async () => {
+    try {
+      const r = await api.getRPASources();
+      setSources(r.data || { orders: [], ctes: [] });
+    } catch (e) {
+      console.error('Erro ao carregar ordens e CT-es:', e);
+    }
+  };
+
+  // Sobrescreve só o que veio preenchido na origem; o resto do formulário fica como está
+  const importDraft = async (load, label) => {
+    setImporting(true);
+    try {
+      const { draft, used_in: usedIn } = (await load()).data;
+      const filled = Object.fromEntries(Object.entries(draft).filter(([, v]) => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0)));
+      if (filled.cargo_items) filled.cargo_items = normalizeCargo(filled.cargo_items);
+      setForm((prev) => ({ ...prev, ...filled }));
+      if (draft.driver_name) setDriverSearch(draft.driver_name);
+      if (draft.client_name) setClientSearch(draft.client_name);
+      if (draft.contratado_name) setContratadoSearch(draft.contratado_name);
+      toast.success(`Dados puxados de ${label}. Confira antes de salvar.`);
+      if (usedIn?.length) toast.warning(`Já usado no(s) contrato(s) Nº ${usedIn.join(', ')}`);
+      if (!draft.service_value) toast.info('O Frete não veio da origem: informe o valor do contrato');
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Erro ao puxar os dados');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -363,6 +405,11 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
     setShowClientSuggestions(false);
     setContratadoSearch('');
     setShowContratadoSuggestions(false);
+    setOrderSearch('');
+    setCteSearch('');
+    // Sem data gravada, o PDF imprimia o dia da impressão como Emissão
+    onChange('emission_date', toLocalDay(new Date()));
+    loadSources();
     try {
       const r = await api.getRPATerceiroNextNumber(rpaType);
       setNextNumber(r.data?.next_number || 1);
@@ -382,7 +429,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
         ...buildEmptyForm(),
         ...d,
         services: (d.services && d.services.length > 0) ? d.services : [{ description: '', value: 0 }],
-        cargo_items: d.cargo_items || [],
+        cargo_items: normalizeCargo(d.cargo_items),
         service_date: d.service_date || '',
         collection_date: d.collection_date || '',
         delivery_date: d.delivery_date || '',
@@ -396,6 +443,9 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       setShowClientSuggestions(false);
       setContratadoSearch(d.contratado_name || '');
       setShowContratadoSuggestions(false);
+      setOrderSearch('');
+      setCteSearch('');
+      loadSources();
       setDialogOpen(true);
     } catch (e) {
       toast.error('Erro ao carregar contrato');
@@ -702,6 +752,39 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
           </DialogHeader>
 
           <div className="space-y-5 py-2">
+            {/* PUXAR DADOS */}
+            <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg" data-testid="rpa-import">
+              <p className="text-sm font-semibold text-primary mb-2">Puxar dados</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="mb-1.5 block">Ordem de Coleta / Entrega</Label>
+                  <Autocomplete
+                    className="text-sm"
+                    value={orderSearch}
+                    onChange={setOrderSearch}
+                    options={sources.orders}
+                    displayField="label"
+                    valueField="id"
+                    onSelect={(o) => importDraft(() => api.getRPADraftFromOrder(o.id), 'a Ordem')}
+                    testId="rpa-import-order"
+                  />
+                </div>
+                <div>
+                  <Label className="mb-1.5 block">CT-e</Label>
+                  <Autocomplete
+                    className="text-sm"
+                    value={cteSearch}
+                    onChange={setCteSearch}
+                    options={sources.ctes}
+                    displayField="label"
+                    valueField="id"
+                    onSelect={(c) => importDraft(() => api.getRPADraftFromCte(c.id), 'o CT-e')}
+                    testId="rpa-import-cte"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* DADOS DO CONTRATO */}
             <SectionHeader title="Dados do Contrato" noMargin />
             <div className="grid grid-cols-2 gap-3">
@@ -860,7 +943,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
               </div>
               <Field label="Renavam Vinculado 01" value={form.trailer_renavam} onChange={(v) => onChange('trailer_renavam', v)} testid="rpa-trailer-renavam" />
               <Field label="Proprietário Vinculado 01" value={form.trailer_owner} onChange={(v) => onChange('trailer_owner', v)} testid="rpa-trailer-owner" />
-              <Field label="Vinculado 02 (Placa)" value={form.trailer2_plate} onChange={(v) => onChange('trailer2_plate', v)} testid="rpa-trailer2-plate" />
+              <Field label="Vinculado 02 (Placa)" value={form.trailer2_plate} onChange={(v) => onChange('trailer2_plate', formatPlate(v))} testid="rpa-trailer2-plate" />
               <Field label="Renavam Vinculado 02" value={form.trailer2_renavam} onChange={(v) => onChange('trailer2_renavam', v)} testid="rpa-trailer2-renavam" />
               <Field label="Proprietário Vinculado 02" value={form.trailer2_owner} onChange={(v) => onChange('trailer2_owner', v)} testid="rpa-trailer2-owner" />
             </div>

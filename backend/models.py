@@ -2762,6 +2762,10 @@ class RPATerceiro(BaseModel):
     contratado_monthly_inss_discount: Optional[float] = None
 
     ciot: Optional[str] = None
+    # De onde os dados foram puxados - é o que avisa contrato em duplicidade
+    loading_order_id: Optional[str] = None
+    loading_order_number: Optional[int] = None
+    cte_id: Optional[str] = None
 
     bank_agency: Optional[str] = None
     bank_account: Optional[str] = None
@@ -2860,6 +2864,10 @@ class RPATerceiroCreate(BaseModel):
     contratado_monthly_inss_discount: Optional[float] = None
 
     ciot: Optional[str] = None
+    # De onde os dados foram puxados - é o que avisa contrato em duplicidade
+    loading_order_id: Optional[str] = None
+    loading_order_number: Optional[int] = None
+    cte_id: Optional[str] = None
 
     bank_agency: Optional[str] = None
     bank_account: Optional[str] = None
@@ -2960,6 +2968,10 @@ class RPATerceiroResponse(BaseModel):
     contratado_monthly_inss_discount: Optional[float] = None
 
     ciot: Optional[str] = None
+    # De onde os dados foram puxados - é o que avisa contrato em duplicidade
+    loading_order_id: Optional[str] = None
+    loading_order_number: Optional[int] = None
+    cte_id: Optional[str] = None
 
     bank_agency: Optional[str] = None
     bank_account: Optional[str] = None

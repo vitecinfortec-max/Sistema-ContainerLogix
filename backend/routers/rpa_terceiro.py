@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 import io
 import re
+from xml.sax.saxutils import escape as xml_escape
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -131,6 +132,225 @@ async def get_rpa_driver_info(driver_id: str, current_user: dict = Depends(get_c
     }
 
 
+def _parse_weight(value) -> float:
+    """Peso digitado como texto na Ordem ("28.500" ou "28500,5"), mesma leitura do CT-e."""
+    try:
+        return float(str(value or "0").replace(".", "").replace(",", "."))
+    except ValueError:
+        return 0.0
+
+
+def _format_weight(value: float) -> str:
+    return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+async def _vehicle_by_plate(plate: Optional[str]) -> dict:
+    """Veículo cadastrado com essa placa, com ou sem o traço."""
+    compact = re.sub(r"[^A-Z0-9]", "", (plate or "").upper())
+    if len(compact) < 4:
+        return {}
+    vehicle = await db.vehicles.find_one(
+        {"plate": {"$regex": f"^{compact[:3]}-?{compact[3:]}$", "$options": "i"}}, {"_id": 0}
+    )
+    return vehicle or {}
+
+
+async def _driver_fields(driver_id: Optional[str], name: Optional[str], cpf: Optional[str]) -> dict:
+    query = {"id": driver_id} if driver_id else {"name": name} if name else None
+    driver = (await db.drivers.find_one(query, {"_id": 0}) if query else None) or {}
+    return {
+        "driver_name": driver.get("name") or name,
+        "driver_cpf": driver.get("cpf") or cpf,
+        "driver_phone": driver.get("phone"),
+    }
+
+
+async def _vehicle_fields(truck_plate: Optional[str], trailer_plates: List[str]) -> dict:
+    truck = await _vehicle_by_plate(truck_plate)
+    out = {
+        "truck_plate": truck.get("plate") or truck_plate,
+        "truck_renavam": truck.get("renavam"),
+        "truck_owner": truck.get("transport_company"),
+        "vehicle_type": truck.get("vehicle_type"),
+    }
+    for prefix, plate in zip(("trailer", "trailer2"), trailer_plates):
+        trailer = await _vehicle_by_plate(plate)
+        out.update({
+            f"{prefix}_plate": trailer.get("plate") or plate,
+            f"{prefix}_renavam": trailer.get("renavam"),
+            f"{prefix}_owner": trailer.get("transport_company"),
+        })
+    return out
+
+
+async def _contratado_fields(name: Optional[str]) -> dict:
+    """Transportadora cadastrada com esse nome, com os dados bancários dela."""
+    if not name:
+        return {}
+    company = await db.transport_companies.find_one(
+        {"name": {"$regex": f"^{re.escape(name.strip())}$", "$options": "i"}}, {"_id": 0}
+    )
+    if not company:
+        return {"contratado_name": name}
+    return {
+        "contratado_id": company.get("id"),
+        "contratado_name": company.get("name"),
+        "bank_agency": company.get("bank_agency"),
+        "bank_account": company.get("bank_account"),
+        "bank_pix": company.get("pix_key"),
+        "bank_beneficiary": company.get("trade_name") or company.get("name"),
+    }
+
+
+async def _draft_from_order(order: dict) -> dict:
+    route = await db.freight_routes.find_one({"id": order.get("route_id")}, {"_id": 0}) if order.get("route_id") else None
+    items = [i for i in order.get("items") or [] if i.get("container_number")]
+    weight = sum(_parse_weight(i.get("gross_weight")) for i in items)
+    freight = order.get("freight_value")
+    type_label = "Ordem de Entrega" if order.get("order_type") == "ENTREGA" else "Ordem de Coleta"
+    draft = {
+        **await _driver_fields(order.get("driver_id"), order.get("driver_name"), order.get("driver_cpf")),
+        **await _vehicle_fields(order.get("truck_plate"), [p for p in [order.get("trailer_plate")] if p]),
+        **await _contratado_fields(order.get("transport_company")),
+        "loading_order_id": order["id"],
+        "loading_order_number": order.get("order_number"),
+        "client_name": order.get("client_name"),
+        "origin": (route or {}).get("origin") or order.get("origin_terminal"),
+        "destination": (route or {}).get("destination") or order.get("port"),
+        "container_number": ", ".join(i["container_number"] for i in items),
+        "documents_list": f"{type_label} Nº {order.get('order_number')}",
+        "cargo_items": [
+            {"nature": i.get("size_type"), "species": "CONTAINER", "quantity": "1",
+             "weight_kg": _parse_weight(i.get("gross_weight")) or None}
+            for i in items
+        ],
+    }
+    if weight:
+        draft["weight"] = _format_weight(weight)
+        draft["collection_weight"] = weight
+    if freight:
+        # Frete da Rota, o mesmo que vai para o Pagamento Frete do motorista
+        description = f"FRETE - {order['route_name']}" if order.get("route_name") else "FRETE"
+        draft["service_value"] = freight
+        draft["services"] = [{"description": description, "value": freight}]
+    return draft
+
+
+def _cte_client(cte: dict) -> Optional[str]:
+    roles = {3: "destinatario", 4: "tomador"}
+    party = cte.get(roles.get(cte.get("tomador_papel"), "remetente")) or {}
+    return party.get("nome")
+
+
+def _cte_place(place: Optional[dict]) -> Optional[str]:
+    place = place or {}
+    return "/".join(filter(None, [place.get("cidade"), place.get("uf")])) or None
+
+
+def _cte_weight(cte: dict) -> float:
+    factors = {"01": 1, "02": 1000}
+    return sum(q.get("quantidade", 0) * factors[q.get("unidade")] for q in cte.get("quantidades") or [] if q.get("unidade") in factors)
+
+
+def _cte_cargo_items(cte: dict) -> list:
+    product = cte.get("produto_predominante")
+    items = []
+    for document in cte.get("documentos") or []:
+        # Na chave da NF-e, as posições 26 a 34 são o número da nota
+        number = document.get("numero") or (document.get("chave") or "")[25:34].lstrip("0")
+        items.append({"nf_number": number or None, "fiscal_date": document.get("data_emissao"), "nature": product, "value": document.get("valor")})
+    if not items and (product or cte.get("valor_carga")):
+        items.append({"nature": product, "value": cte.get("valor_carga")})
+    return items
+
+
+async def _draft_from_cte(cte: dict) -> dict:
+    """Parte da Ordem ligada ao CT-e, quando houver, e o CT-e prevalece. O
+    valor do CT-e é o que o cliente paga, não o que se paga ao contratado:
+    por isso o Frete só vem da Ordem."""
+    order = await db.loading_orders.find_one({"id": cte.get("loading_order_id")}, {"_id": 0}) if cte.get("loading_order_id") else None
+    draft = await _draft_from_order(order) if order else {}
+    driver = cte.get("motorista") or {}
+    if driver.get("nome") or driver.get("driver_id"):
+        draft.update(await _driver_fields(driver.get("driver_id"), driver.get("nome"), driver.get("cpf")))
+    if cte.get("veiculo_placa"):
+        draft.update(await _vehicle_fields(cte["veiculo_placa"], cte.get("reboque_placas") or []))
+    weight = _cte_weight(cte)
+    containers = ", ".join(c["numero"] for c in cte.get("containers") or [] if c.get("numero"))
+    fields = {
+        "cte_id": cte["id"],
+        "cte": str(cte["numero"]) if cte.get("numero") else None,
+        "client_name": _cte_client(cte),
+        "origin": _cte_place(cte.get("origem")),
+        "destination": _cte_place(cte.get("destino")),
+        "container_number": containers,
+        "cargo_items": _cte_cargo_items(cte),
+        "weight": _format_weight(weight) if weight else None,
+        "collection_weight": weight or None,
+    }
+    draft.update({k: v for k, v in fields.items() if v})
+    number = f"CT-e Nº {cte['numero']}" if cte.get("numero") else "CT-e em rascunho"
+    draft["documents_list"] = " / ".join(filter(None, [draft.get("documents_list"), number]))
+    return draft
+
+
+async def _contract_numbers(query: dict) -> list:
+    rows = await db.rpa_terceiro.find(query, {"_id": 0, "rpa_number": 1}).sort("rpa_number", 1).to_list(None)
+    return [r["rpa_number"] for r in rows]
+
+
+@api_router.get("/rpa-terceiro/sources")
+async def list_rpa_sources(current_user: dict = Depends(get_current_admin_user)):
+    """Ordens e CT-es que podem preencher um contrato (os mais recentes).
+    Fica aqui, e não em /api/ctes, porque quem cuida do contrato pode não ter
+    o módulo Fiscal liberado."""
+    orders = await db.loading_orders.find(
+        {"status": {"$ne": "CANCELADA"}},
+        {"_id": 0, "id": 1, "order_number": 1, "order_type": 1, "client_name": 1, "driver_name": 1, "items.container_number": 1},
+    ).sort("created_at", -1).to_list(300)
+    ctes = await db.ctes.find(
+        {"status": {"$nin": ["CANCELADO", "DENEGADO"]}},
+        {"_id": 0, "id": 1, "numero": 1, "status": 1, "motorista.nome": 1, "containers.numero": 1,
+         "tomador_papel": 1, "remetente.nome": 1, "destinatario.nome": 1, "tomador.nome": 1},
+    ).sort("created_at", -1).to_list(300)
+
+    def order_label(o):
+        containers = ", ".join(i["container_number"] for i in o.get("items") or [] if i.get("container_number"))
+        kind = "Entrega" if o.get("order_type") == "ENTREGA" else "Coleta"
+        return " · ".join(filter(None, [f"{kind} Nº {o.get('order_number')}", o.get("client_name"), o.get("driver_name"), containers]))
+
+    def cte_label(c):
+        containers = ", ".join(i["numero"] for i in c.get("containers") or [] if i.get("numero"))
+        number = f"CT-e Nº {c['numero']}" if c.get("numero") else f"CT-e {str(c.get('status') or '').lower()}"
+        return " · ".join(filter(None, [number, _cte_client(c), (c.get("motorista") or {}).get("nome"), containers]))
+
+    return {
+        "orders": [{"id": o["id"], "label": order_label(o)} for o in orders],
+        "ctes": [{"id": c["id"], "label": cte_label(c)} for c in ctes],
+    }
+
+
+@api_router.get("/rpa-terceiro/from-loading-order/{order_id}")
+async def rpa_draft_from_loading_order(order_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Rascunho (não salvo) do contrato com os dados da Ordem de Coleta/Entrega."""
+    order = await db.loading_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Ordem não encontrada")
+    return {"draft": await _draft_from_order(order), "used_in": await _contract_numbers({"loading_order_id": order_id})}
+
+
+@api_router.get("/rpa-terceiro/from-cte/{cte_id}")
+async def rpa_draft_from_cte(cte_id: str, current_user: dict = Depends(get_current_admin_user)):
+    """Rascunho (não salvo) do contrato com os dados do CT-e."""
+    cte = await db.ctes.find_one({"id": cte_id}, {"_id": 0})
+    if not cte:
+        raise HTTPException(status_code=404, detail="CT-e não encontrado")
+    conditions = [{"cte_id": cte_id}]
+    if cte.get("loading_order_id"):
+        conditions.append({"loading_order_id": cte["loading_order_id"]})
+    return {"draft": await _draft_from_cte(cte), "used_in": await _contract_numbers({"$or": conditions})}
+
+
 @api_router.get("/rpa-terceiro/{rpa_id}", response_model=RPATerceiroResponse)
 async def get_rpa_terceiro(rpa_id: str, current_user: dict = Depends(get_current_admin_user)):
     rpa = await db.rpa_terceiro.find_one({"id": rpa_id}, {"_id": 0})
@@ -237,6 +457,16 @@ CONTRATO_FRETE_VIAS = [
 ]
 
 
+def _escape_for_pdf(value):
+    if isinstance(value, str):
+        return xml_escape(value)
+    if isinstance(value, dict):
+        return {k: _escape_for_pdf(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_escape_for_pdf(v) for v in value]
+    return value
+
+
 @api_router.get("/rpa-terceiro/{rpa_id}/pdf")
 async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Gera o PDF do Contrato de Frete (Contrato de Afretamento, Dec. 89874/84) em 5 vias."""
@@ -245,7 +475,7 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak, KeepInFrame
     from reports import download_logo, PRIMARY_COLOR
 
     rpa = await db.rpa_terceiro.find_one({"id": rpa_id}, {"_id": 0})
@@ -253,7 +483,11 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
         raise HTTPException(status_code=404, detail="RPA não encontrado")
 
     rpa['balance'] = _rpa_calc_balance(rpa)
+    filename = f"ContratoFrete_{rpa['rpa_number']}_{(rpa.get('driver_name') or 'motorista').upper().replace(' ', '_')}.pdf"
+    # O texto vira marcação do reportlab: sem isto, "T&L" saía como "T&L;"
+    rpa = _escape_for_pdf(rpa)
     company = merge_company(await get_company_settings())
+    company = {k: xml_escape(v) if k in ("name", "address", "phone", "cnpj", "email") and isinstance(v, str) else v for k, v in company.items()}
 
     contratado = None
     if rpa.get('contratado_id'):
@@ -375,8 +609,9 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
         contratado_cnpj = (contratado or {}).get('cnpj')
         elements += box("Contratado", [
             [field_cell("Nome/CNPJ", f"{contratado_name or '-'}{(' / ' + contratado_cnpj) if contratado_cnpj else ''}"),
-             field_cell("Talão", rpa.get('talao'))],
-        ], [130 * mm, 62 * mm])
+             field_cell("Talão", rpa.get('talao')),
+             field_cell("CIOT", rpa.get('ciot'))],
+        ], [116 * mm, 30 * mm, 46 * mm])
         elements.append(Spacer(1, 3))
 
         # ===== MOTORISTA / VEÍCULOS =====
@@ -413,6 +648,9 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
             [field_cell("Data Inicial da Viagem", fmt_date_br(rpa.get('trip_start_date'))),
              field_cell("Data Final da Viagem", fmt_date_br(rpa.get('trip_end_date'))),
              field_cell("Forma de Pagamento", rpa.get('payment_method'))],
+            [field_cell("Cliente", rpa.get('client_name')),
+             field_cell("CT-e", rpa.get('cte')),
+             field_cell("Container", rpa.get('container_number'))],
         ], [64 * mm, 64 * mm, 64 * mm])
         elements.append(Spacer(1, 3))
 
@@ -511,13 +749,13 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
     for i, (via_num, via_label) in enumerate(CONTRATO_FRETE_VIAS):
         if i > 0:
             all_elements.append(PageBreak())
-        all_elements += build_via(via_num, via_label)
+        # Cada via é uma folha: com muita carga ou observação longa, reduz em vez de quebrar
+        all_elements.append(KeepInFrame(doc.width, doc.height - 12, build_via(via_num, via_label), mode="shrink"))
 
     doc.build(all_elements)
     pdf_bytes = buffer.getvalue()
     buffer.close()
 
-    filename = f"ContratoFrete_{rpa['rpa_number']}_{(rpa.get('driver_name') or 'motorista').upper().replace(' ', '_')}.pdf"
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
