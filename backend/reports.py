@@ -410,6 +410,14 @@ def _make_pdf_footer(company_name):
     return _footer
 
 
+def short_person_name(full_name, fallback='-'):
+    """Primeiro e segundo nome, sem contar as preposições (JOSE DA SILVA
+    SANTOS vira JOSE SILVA) - para as colunas de nome dos relatórios."""
+    parts = str(full_name or '').split()
+    names = [p for p in parts if p.upper() not in ('DE', 'DA', 'DO', 'DOS', 'DAS', 'E')] or parts
+    return ' '.join(names[:2]) or fallback
+
+
 def _fmt_int(value):
     """Inteiro com separador de milhar brasileiro (1.234)."""
     try:
@@ -856,7 +864,7 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
             cell(created_at),
             cell(None, centered=True, markup=type_markup),
             cell(m.get('container_number', '-')),
-            cell(m.get('driver_name', '-')),
+            cell(short_person_name(m.get('driver_name'))),
             cell(m.get('truck_plate', '-')),
             cell(m.get('trailer_plate_1', '') or '-'),
             cell(m.get('transport_company', '-')),
@@ -1737,7 +1745,7 @@ def generate_delivery_status_excel(status: dict, company: dict = None) -> bytes:
         for idx, item in enumerate(items, 1):
             row = [
                 idx,
-                item.get('driver_name', '-') or '-',
+                short_person_name(item.get('driver_name')),
                 item.get('driver_cpf', '-') or '-',
                 item.get('cavalo_plate', '-') or '-',
                 item.get('carreta_plate', '-') or '-',
@@ -1824,7 +1832,7 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
                 created_at,
                 "ENTRADA" if m.get('operation_type') == 'ENTRADA' else "SAÍDA",
                 m.get('container_number', '-'),
-                m.get('driver_name', '-'),
+                short_person_name(m.get('driver_name')),
                 m.get('truck_plate', '-'),
                 m.get('trailer_plate_1', '-') or '-',
                 m.get('transport_company', '-'),
@@ -2207,7 +2215,7 @@ def generate_fuel_supply_report_excel(supplies: list, company: dict = None, repo
 
         headers = ['Ordem', 'Data', 'Equipamento', 'Motorista', 'Fornecedor', 'Combustível', 'Litros', 'Preço Unit.', 'Valor Total']
         data_rows = [[
-            order_cell(s), _xl_date(s.get('supply_date')), s.get('equipment_plate') or '-', s.get('driver_name') or '-',
+            order_cell(s), _xl_date(s.get('supply_date')), s.get('equipment_plate') or '-', short_person_name(s.get('driver_name')),
             s.get('supplier_name') or '-', s.get('fuel_type_label') or '-',
             s.get('liters') or 0, s.get('unit_price') or 0, s.get('total_value') or 0,
         ] for s in supplies]
@@ -2301,7 +2309,7 @@ def _port_service_xl_rows(services):
     """Linhas da tabela de Serviço Portuário (relatório e fatura usam as mesmas colunas)."""
     return [[
         s.get('service_number'), _xl_date(s.get('service_date')), s.get('client_name') or '-',
-        s.get('driver_name') or '-', s.get('cavalo_plate') or '-',
+        short_person_name(s.get('driver_name')), s.get('cavalo_plate') or '-',
         _TURNO_LABELS_XLSX.get(s.get('turno'), s.get('turno') or '-'),
         s.get('entry_time') or '-', s.get('exit_time') or '-', s.get('operation_value') or 0,
     ] for s in services]
@@ -2782,7 +2790,7 @@ def generate_fuel_supply_report_pdf(supplies: list, company: dict = None, report
                 cell(s.get('order_number_label') or '-', 'center', bold=True),
                 cell(fmt_date(s.get('supply_date')), 'center'),
                 cell(s.get('equipment_plate') or '-', bold=True),
-                cell(s.get('driver_name') or '-'),
+                cell(short_person_name(s.get('driver_name'))),
                 cell(s.get('supplier_name') or '-'),
                 cell(s.get('fuel_type_label') or '-'),
                 cell(fmt_liters(s.get('liters')), 'right'),
@@ -2884,7 +2892,7 @@ def _port_service_rows(services, cell):
             cell(s.get('service_number') or '-', 'center', bold=True),
             cell(date_display, 'center'),
             cell(s.get('client_name') or '-'),
-            cell(s.get('driver_name') or '-'),
+            cell(short_person_name(s.get('driver_name'))),
             cell(s.get('cavalo_plate') or '-', 'center'),
             cell(_TURNO_LABELS_PDF.get(s.get('turno'), s.get('turno') or '-'), 'center'),
             cell(s.get('entry_time') or '-', 'center'),
@@ -3037,7 +3045,7 @@ def generate_port_service_shifts_pdf(items: list, summary: dict, date_from: str,
                 cell(date_display, 'center'),
                 cell(_TURNO_LABELS_PDF.get(i.get('turno'), i.get('turno') or '-'), 'center'),
                 cell(i.get('client_name') or '-'),
-                cell(i.get('driver_name') or '-'),
+                cell(short_person_name(i.get('driver_name'))),
                 cell(i.get('cavalo_plate') or '-', 'center'),
                 cell(i.get('entry_time') or '-', 'center'),
                 cell(i.get('exit_time') or '-', 'center'),
@@ -3097,7 +3105,7 @@ def generate_port_service_shifts_excel(items: list, summary: dict, date_from: st
         data_rows = [[
             i.get('service_number'), _xl_date(i.get('service_date')),
             _TURNO_LABELS_XLSX.get(i.get('turno'), i.get('turno') or '-'),
-            i.get('client_name') or '-', i.get('driver_name') or '-', i.get('cavalo_plate') or '-',
+            i.get('client_name') or '-', short_person_name(i.get('driver_name')), i.get('cavalo_plate') or '-',
             i.get('entry_time') or '-', i.get('exit_time') or '-',
             fmt_shift_minutes(i.get('entry_diff')), fmt_shift_minutes(i.get('exit_diff')), fmt_shift_minutes(i.get('balance')),
             *([i.get('discount')] if show_discount else []),

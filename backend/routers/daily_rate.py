@@ -9,7 +9,7 @@ from list_filters import combine, period_query, text_query
 from fastapi.responses import StreamingResponse
 
 from models import DailyRateRequestItem, DailyRateRequestCreate, DailyRateRequestResponse, DailyRatePaidItemsUpdate
-from reports import merge_company
+from reports import merge_company, short_person_name
 
 from shared import db, get_current_admin_user, get_company_settings, parse_datetime_value, load_logo_buffer
 
@@ -330,7 +330,7 @@ async def generate_daily_rate_request_pdf(request_id: str, current_user: dict = 
                 pass
         table_data.append([
             cell(idx, 'center'),
-            cell(item.get('driver_name', '-'), bold=True),
+            cell(short_person_name(item.get('driver_name')), bold=True),
             cell(item.get('vehicle_plate', '-'), 'center'),
             cell(item.get('client_name', '-')),
             cell(departure_date or '-', 'center'),

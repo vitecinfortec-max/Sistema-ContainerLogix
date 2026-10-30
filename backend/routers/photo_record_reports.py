@@ -7,6 +7,7 @@ from period_reports import Column, Section, DAY, INT, pdf_response, excel_respon
 from routers.container_inspections import inspection_query
 from routers.container_reports import _day
 from routers.container_vistorias import DAMAGE_PATTERN, vistoria_query
+from reports import short_person_name
 from shared import db, get_current_active_user
 
 api_router = APIRouter(prefix="/api")
@@ -96,7 +97,7 @@ def _sections(data, is_vistoria, item_label):
                    Column("Transportadora", width=18), Column("Motorista", width=18), Column("Placa", width=9, align="center"),
                    Column("EIR", INT, 7), Column("Estado", width=11, align="center"), Column("Serviços", INT, 7),
                    Column("Fotos", INT, 6), Column("Pendências", width=22)]
-        values = lambda r: [r["number"], r["day"], r["container_number"], r["client_name"], r["transport_company"], r["driver_name"],
+        values = lambda r: [r["number"], r["day"], r["container_number"], r["client_name"], r["transport_company"], short_person_name(r["driver_name"]),
                             r["truck_plate"], r["eir_number"], DAMAGE_LABELS[r["state"]], r["damage_count"], r["photos"], r["pending"]]
     else:
         columns = [Column("Nº", INT, 6), Column("Data", DAY, 9), Column("Container", width=14), Column("Cliente", width=22),

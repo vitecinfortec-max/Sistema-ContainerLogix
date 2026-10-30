@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from period_reports import Column, Section, MONEY, DAY, INT, pdf_response, excel_response, period_text
 from routers.movements import _parse_filter_day
 from routers.daily_rate import item_is_paid, item_paid_at
+from reports import short_person_name
 from shared import db, get_current_admin_user
 
 api_router = APIRouter(prefix="/api")
@@ -112,7 +113,7 @@ def _daily_sections(data):
         [Column("Motorista", width=30), Column("Viagens", INT, 8), Column("Qtd. diárias", INT, 9),
          Column("Diárias", MONEY, 12), Column("Comissão", MONEY, 12), Column("Almoço", MONEY, 11),
          Column("Outros", MONEY, 11), Column("Total", MONEY, 13), Column("Pago", MONEY, 13), Column("A pagar", MONEY, 13)],
-        [[d["driver_name"], d["trips"], d["days"], d["daily"], d["commission"], d["lunch"], d["others"], d["total"], d["paid"], d["pending"]]
+        [[short_person_name(d["driver_name"]), d["trips"], d["days"], d["daily"], d["commission"], d["lunch"], d["others"], d["total"], d["paid"], d["pending"]]
          for d in data["drivers"]],
         total=["TOTAL", s["count"], s["days"], s["daily"], s["commission"], s["lunch"], s["others"], s["total"], s["paid"], s["pending"]],
         empty_text="Nenhuma diária no período.", sheet_name="Por motorista",
@@ -123,7 +124,7 @@ def _daily_sections(data):
          Column("Cliente", width=20), Column("Status", width=9, align="center"), Column("Pago em", DAY, 9), Column("Qtd.", INT, 6),
          Column("Diárias", MONEY, 11), Column("Comissão", MONEY, 11), Column("Almoço", MONEY, 10),
          Column("Outros", MONEY, 10), Column("Total", MONEY, 12)],
-        [[r["request_number"], r["departure_date"], r["driver_name"], r["vehicle_plate"], r["client_name"],
+        [[r["request_number"], r["departure_date"], short_person_name(r["driver_name"]), r["vehicle_plate"], r["client_name"],
           DAILY_STATUS_LABELS.get(r["status"], r["status"]), r["paid_at"], r["days"], r["daily"], r["commission"], r["lunch"], r["others"], r["total"]]
          for r in data["items"]],
         total=["TOTAL", None, None, None, None, None, None, s["days"], s["daily"], s["commission"], s["lunch"], s["others"], s["total"]],

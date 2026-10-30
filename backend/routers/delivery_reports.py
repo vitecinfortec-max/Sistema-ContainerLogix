@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query
 
 from list_filters import combine, day_query, text_query
 from period_reports import Column, Section, DAY, INT, pdf_response, excel_response, period_text
-from reports import BRT_TZ
+from reports import BRT_TZ, short_person_name
 from shared import db, get_current_active_user
 
 api_router = APIRouter(prefix="/api")
@@ -115,13 +115,13 @@ def _sections(data):
         "Pendências de lançamento",
         [Column("Status nº", INT, 9), Column("Data", DAY, 10), Column("Cliente", width=28), Column("Motorista", width=24),
          Column("Pendência", width=40)],
-        [[i["status_number"], i["day"], i["client_name"], i["driver_name"], i["issue"]] for i in data["issues"]],
+        [[i["status_number"], i["day"], i["client_name"], short_person_name(i["driver_name"]), i["issue"]] for i in data["issues"]],
         empty_text="Nenhuma pendência no período.", sheet_name="Pendências",
     )
     by_client = Section("Por cliente", group_cols("Cliente"), group_rows(data["clients"]),
                         total=["TOTAL", s["trips"], _hhmm(s["avg_at_client"]), _hhmm(s["avg_loading"])],
                         empty_text="Nenhuma viagem no período.", sheet_name="Por cliente")
-    by_driver = Section("Por motorista", group_cols("Motorista"), group_rows(data["drivers"]),
+    by_driver = Section("Por motorista", group_cols("Motorista"), group_rows([{**g, "name": short_person_name(g["name"])} for g in data["drivers"]]),
                         empty_text="Nenhuma viagem no período.", sheet_name="Por motorista")
     detail = Section(
         "Viagens",
@@ -129,7 +129,7 @@ def _sections(data):
          Column("Motorista", width=18), Column("Placa", width=9, align="center"), Column("Container", width=13),
          Column("Chegada", width=7, align="center"), Column("Saída", width=7, align="center"),
          Column("No cliente", width=8, align="center"), Column("Finalizada", width=8, align="center")],
-        [[t["status_number"], t["day"], STATUS_LABELS.get(t["status"], t["status"]), t["client_name"], t["driver_name"],
+        [[t["status_number"], t["day"], STATUS_LABELS.get(t["status"], t["status"]), t["client_name"], short_person_name(t["driver_name"]),
           t["cavalo_plate"], t["container_number"], t["arrival_time"], t["departure_time"], _hhmm(t["minutes_at_client"]),
           t["delivery_completed"]] for t in data["trips"]],
         empty_text="Nenhuma viagem no período.", sheet_name="Viagens",

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 
 from list_filters import combine, period_query
 from period_reports import Column, Section, MONEY, DAY, INT, pdf_response, excel_response, period_text
-from reports import format_currency
+from reports import format_currency, short_person_name
 from routers.container_reports import _day
 from routers.financial_reports import _in_period, _r
 from shared import db, get_current_admin_user
@@ -143,7 +143,7 @@ def _sections(data):
          Column("Valor ordem", MONEY, 12), Column("Valor frete", MONEY, 12)],
         [[i["issue"], i["order_number"], ORDER_STATUS_LABELS.get(i["order_status"], i["order_status"] or "Excluída"),
           i["payment_number"], FREIGHT_STATUS_LABELS.get(i["payment_status"], i["payment_status"] or "-"),
-          i["driver_name"], i["order_value"], i["payment_value"]] for i in data["issues"]],
+          short_person_name(i["driver_name"]), i["order_value"], i["payment_value"]] for i in data["issues"]],
         empty_text="Nenhuma divergência: todas as ordens aprovadas têm o frete lançado com o mesmo valor.",
         sheet_name="Divergências",
     )
@@ -161,7 +161,7 @@ def _sections(data):
          Column("Rota", width=20), Column("Valor ordem", MONEY, 11), Column("Frete nº", INT, 7),
          Column("Status frete", width=9, align="center"), Column("Valor frete", MONEY, 11), Column("Pago em", DAY, 9),
          Column("Situação", width=24)],
-        [[r["order_number"], r["order_day"], r["driver_name"], r["transport_company"], r["route_name"], r["order_value"],
+        [[r["order_number"], r["order_day"], short_person_name(r["driver_name"]), r["transport_company"], r["route_name"], r["order_value"],
           r["payment_number"], FREIGHT_STATUS_LABELS.get(r["payment_status"], "-"), r["payment_value"], r["paid_day"], r["situation"]]
          for r in data["rows"]],
         empty_text="Nenhuma ordem de coleta aprovada no período.", sheet_name="Ordens",
