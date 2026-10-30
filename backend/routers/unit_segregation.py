@@ -28,7 +28,7 @@ MAX_PHOTOS_PER_CONTAINER = 6
 # ==================== SEGREGAÇÃO DE UNIDADE ENDPOINTS ====================
 
 from models import UnitSegregation, UnitSegregationCreate, UnitSegregationUpdate, UnitSegregationResponse
-from routers.movements import _normalize_client_name
+from routers.movements import _normalize_client_name, container_number_pattern
 
 
 def _unit_segregation_serialize(doc: dict) -> dict:
@@ -597,7 +597,7 @@ async def get_unit_segregation_label(segregation_id: str, current_user: dict = D
 async def check_container_segregation(container_number: str, current_user: dict = Depends(get_current_active_user)):
     """Verifica se um container está segregado"""
     segregation = await db.unit_segregations.find_one({
-        "items.container_number": container_number.upper(),
+        "items.container_number": {"$regex": container_number_pattern(container_number)},
         "status": "ATIVO"
     }, {"_id": 0})
     
@@ -651,14 +651,17 @@ async def resync_unit_segregation_retrievals(current_user: dict = Depends(get_cu
     retroativa se achar. Necessário porque a baixa só é registrada no
     momento em que a EIR é emitida (ver _mark_segregation_retrieved em
     routers/movements.py); uma EIR de Saída emitida ANTES desse campo
-    reconhecer o Comprador nunca dispara a baixa sozinha até ser reemitida."""
+    reconhecer o Comprador nunca dispara a baixa sozinha até ser reemitida.
+    Saída anterior à própria reserva não conta: o container saiu antes de
+    ser segregado (ex: em outra passagem pelo pátio)."""
     segregations = await db.unit_segregations.find(
-        {"status": "ATIVO", "items.retrieved": False}, {"_id": 0}
+        {"status": "ATIVO", "items": {"$elemMatch": {"retrieved": {"$ne": True}}}}, {"_id": 0}
     ).to_list(None)
     items_checked = 0
     items_updated = 0
     for segregation in segregations:
         reserved = _normalize_client_name(segregation.get("client_name"))
+        reserved_at = parse_datetime_value(segregation.get("created_at"))
         for item in segregation.get("items", []):
             if item.get("retrieved"):
                 continue
@@ -667,13 +670,13 @@ async def resync_unit_segregation_retrievals(current_user: dict = Depends(get_cu
             if not container_number:
                 continue
             candidates = await db.movements.find(
-                {"container_number": container_number, "operation_type": "SAIDA"},
+                {"container_number": {"$regex": container_number_pattern(container_number)}, "operation_type": "SAIDA"},
                 {"_id": 0, "transaction_id": 1, "client_name": 1, "buyer_name": 1, "created_at": 1},
             ).sort("created_at", -1).to_list(None)
             movement = next(
                 (m for m in candidates if reserved in (
                     _normalize_client_name(m.get("client_name")), _normalize_client_name(m.get("buyer_name"))
-                )),
+                ) and parse_datetime_value(m.get("created_at")) >= reserved_at),
                 None
             )
             if not movement:
@@ -681,8 +684,7 @@ async def resync_unit_segregation_retrievals(current_user: dict = Depends(get_cu
             result = await db.unit_segregations.update_one(
                 {
                     "id": segregation["id"],
-                    "items.container_number": item["container_number"],
-                    "items.retrieved": False,
+                    "items": {"$elemMatch": {"container_number": item["container_number"], "retrieved": {"$ne": True}}},
                 },
                 {"$set": {
                     "items.$.retrieved": True,

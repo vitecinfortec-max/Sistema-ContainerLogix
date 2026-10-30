@@ -5,6 +5,8 @@ import io
 import re
 import logging
 
+from container_ocr import format_container_number
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel as PydanticBaseModel, ValidationError
@@ -209,6 +211,16 @@ def _normalize_client_name(name: Optional[str]) -> str:
     return (name or '').strip().casefold()
 
 
+def container_number_pattern(container_number: str) -> str:
+    """Regex que acha o container gravado com ou sem o traço do dígito
+    verificador: a reserva e a EIR podem ter sido digitadas em formatos
+    diferentes, e a comparação exata deixava a saída passar sem baixa."""
+    formatted = format_container_number(container_number)
+    if re.fullmatch(r'[A-Z]{4}[0-9]{6}-[0-9]', formatted):
+        return f"^{formatted[:10]}-?[0-9]?$"
+    return f"^{re.escape(formatted)}$"
+
+
 async def _check_segregation_conflict(
     container_number: str, operation_type: str,
     client_name: Optional[str], buyer_name: Optional[str] = None,
@@ -224,7 +236,7 @@ async def _check_segregation_conflict(
     if operation_type != 'SAIDA':
         return None
     segregation = await db.unit_segregations.find_one(
-        {"items.container_number": container_number.strip().upper(), "status": "ATIVO"},
+        {"items.container_number": {"$regex": container_number_pattern(container_number)}, "status": "ATIVO"},
         {"_id": 0, "client_name": 1}
     )
     if not segregation:
@@ -243,14 +255,19 @@ async def _mark_segregation_retrieved(container_number: str, transaction_id: int
     de Saída pro cliente certo é emitida - chamado incondicionalmente em toda
     Saída (criação ou edição); só tem efeito se existir mesmo uma segregação
     ATIVA pra ele com o item ainda Pendente (query não casa e o update vira
-    no-op, senão) - a guarda "items.retrieved": {"$ne": True} evita que uma
+    no-op, senão) - a guarda "retrieved": {"$ne": True} evita que uma
     edição posterior da mesma EIR (ex: corrigindo um campo não relacionado)
-    fique reescrevendo retrieved_at/retrieved_transaction_id a cada save."""
+    fique reescrevendo retrieved_at/retrieved_transaction_id a cada save.
+    O $elemMatch é obrigatório: com "items.retrieved": {"$ne": True} solto, o
+    $ne vale pra lista inteira, e depois da primeira baixa da reserva os
+    outros containers nunca mais recebiam a deles."""
     await db.unit_segregations.update_one(
         {
             "status": "ATIVO",
-            "items.container_number": container_number.strip().upper(),
-            "items.retrieved": {"$ne": True},
+            "items": {"$elemMatch": {
+                "container_number": {"$regex": container_number_pattern(container_number)},
+                "retrieved": {"$ne": True},
+            }},
         },
         {"$set": {
             "items.$.retrieved": True,

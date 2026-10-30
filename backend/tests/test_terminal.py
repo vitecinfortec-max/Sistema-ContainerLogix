@@ -126,6 +126,59 @@ def test_edit_segregation_blocks_container_reserved_elsewhere(api):
     assert ok.status_code == 200, ok.text
 
 
+def _reserve(api, numbers):
+    client = api.post("/api/clients", json={"name": "Cliente Alfa"}).json()
+    r = api.post("/api/unit-segregations", json={"client_id": client["id"], "items": [
+        {"container_number": n, "shipping_line": "MSC"} for n in numbers
+    ]})
+    assert r.status_code == 200, r.text
+    return r.json()["id"]
+
+
+def _retrieved(api, seg_id):
+    doc = api.run(api.db.unit_segregations.find_one({"id": seg_id}))
+    return {i["container_number"]: i.get("retrieved_transaction_id") for i in doc["items"]}
+
+
+def test_exit_marks_each_container_of_a_multi_container_segregation(api):
+    """Só o primeiro container da reserva recebia baixa: o $ne solto valia pra
+    lista inteira e barrava os demais."""
+    from routers.movements import _mark_segregation_retrieved
+    seg_id = _reserve(api, ["AAAU111111-1", "BBBU222222-2", "CCCU333333-3"])
+    api.run(_mark_segregation_retrieved("BBBU222222-2", 10))
+    api.run(_mark_segregation_retrieved("AAAU111111-1", 11))
+    assert _retrieved(api, seg_id) == {"AAAU111111-1": 11, "BBBU222222-2": 10, "CCCU333333-3": None}
+    api.run(_mark_segregation_retrieved("CCCU333333-3", 12))
+    assert api.get(f"/api/unit-segregations/{seg_id}").json()["retrieval_status"] == "CONCLUIDO"
+    # Editar a EIR depois não troca a transação da baixa
+    api.run(_mark_segregation_retrieved("AAAU111111-1", 99))
+    assert _retrieved(api, seg_id)["AAAU111111-1"] == 11
+
+
+def test_exit_matches_container_with_or_without_check_digit_dash(api):
+    from routers.movements import _check_segregation_conflict, _mark_segregation_retrieved
+    seg_id = _reserve(api, ["MSCU1234565"])
+    assert "segregado" in api.run(_check_segregation_conflict("MSCU123456-5", "SAIDA", "Outro Cliente"))
+    api.run(_mark_segregation_retrieved("MSCU123456-5", 20))
+    assert _retrieved(api, seg_id) == {"MSCU1234565": 20}
+
+
+def test_resync_marks_every_pending_container_but_ignores_exit_before_reservation(api):
+    numbers = ["AAAU111111-1", "BBBU222222-2", "CCCU333333-3"]
+    seg_id = _reserve(api, numbers)
+    api.run(api.db.unit_segregations.update_one(
+        {"id": seg_id}, {"$set": {"items.0.retrieved": True, "items.0.retrieved_transaction_id": 1}}
+    ))
+    after = "2099-01-01T00:00:00+00:00"
+    api.run(api.db.movements.insert_many([
+        {"id": "s1", "transaction_id": 2, "container_number": "BBBU222222-2", "operation_type": "SAIDA", "client_name": "cliente alfa", "created_at": after},
+        {"id": "s2", "transaction_id": 3, "container_number": "CCCU333333-3", "operation_type": "SAIDA", "client_name": "Cliente Alfa", "created_at": "2020-01-01T00:00:00+00:00"},
+    ]))
+    r = api.post("/api/unit-segregations/resync-retrievals")
+    assert r.status_code == 200 and r.json()["items_updated"] == 1, r.text
+    assert _retrieved(api, seg_id) == {"AAAU111111-1": 1, "BBBU222222-2": 2, "CCCU333333-3": None}
+
+
 @pytest.fixture
 def segregation_photos(api, monkeypatch, tmp_path):
     from routers import container_audits, unit_segregation

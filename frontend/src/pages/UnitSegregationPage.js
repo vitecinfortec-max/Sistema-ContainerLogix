@@ -405,6 +405,34 @@ export default function UnitSegregationPage() {
     }));
   };
 
+  // Ao sair do campo Container, puxa tara e armador da entrada em aberto.
+  // Só preenche o que está em branco, pra não apagar o que já foi digitado.
+  const fillFromEntry = async (index, raw) => {
+    const number = formatContainerNumber(raw);
+    updateItem(index, 'container_number', number);
+    if (!/^[A-Z]{4}\d{6}-\d$/.test(number)) return;
+    try {
+      const { entry } = (await api.getOpenEntryForContainer(number)).data;
+      if (!entry) {
+        toast.info(`Container ${number} sem entrada em aberto: preencha a tara e o armador`);
+        return;
+      }
+      const lineName = (entry.shipping_line || '').trim().toLowerCase();
+      const line = shippingLines.find(sl => sl.id === entry.shipping_line || sl.name.trim().toLowerCase() === lineName);
+      // Confere o número de novo: a linha pode ter mudado enquanto a busca respondia
+      setFormData(prev => ({
+        ...prev,
+        items: prev.items.map((item, i) => (i === index && item.container_number === number ? {
+          ...item,
+          tare: item.tare || entry.tare || '',
+          shipping_line: item.shipping_line || line?.id || ''
+        } : item))
+      }));
+    } catch (error) {
+      console.error('Erro ao buscar a entrada do container:', error);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (!(await confirm('Tem certeza que deseja excluir esta segregação?'))) return;
     try {
@@ -730,7 +758,7 @@ export default function UnitSegregationPage() {
                         <Input
                           value={item.container_number}
                           onChange={(e) => updateItem(index, 'container_number', e.target.value)}
-                          onBlur={(e) => updateItem(index, 'container_number', formatContainerNumber(e.target.value))}
+                          onBlur={(e) => fillFromEntry(index, e.target.value)}
                           className="font-mono"
                           disabled={item.photos.length > 0}
                           title={item.photos.length > 0 ? 'Este container já tem foto salva: remova as fotos para trocar o número' : undefined}
