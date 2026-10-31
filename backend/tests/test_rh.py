@@ -682,6 +682,16 @@ def test_payroll_check_report(api):
     left = {row[1]: row[3] for row in data["sections"][3]["rows"]}
     assert "PJ" in left["Caio PJ"] and "Recalcular" in left["Davi Novo"] and pj["id"] and late["id"]
     assert data["summary"]["errors"] >= 1 and data["summary"]["left_out"] == 2
+    # detalhamento: proventos e descontos separados e o líquido de cada funcionário
+    detail = data["sections"][4]["rows"]
+    bia = [row for row in detail if row[1] == "Bia Baixo"]
+    assert ["Provento", "Salário"] == [bia[0][3], bia[0][5]] and bia[0][7] and bia[0][8] is None
+    loan = next(row for row in bia if row[5] == "Empréstimo consignado (lançado)")
+    assert loan[3] == "Desconto" and loan[7] is None and loan[8] == 900
+    assert bia[-1][3] == "Líquido" and bia[-1][9] == round(sum(r[7] or 0 for r in bia) - sum(r[8] or 0 for r in bia), 2)
+    assert bia[-1][9] == people["Bia Baixo"][7]
+    total = data["sections"][4]["total"]
+    assert total[7:] == [round(sum(r[col] or 0 for r in detail), 2) for col in (7, 8, 9)]
     assert api.get(f"/api/hr/payroll-runs/{run['id']}/check/pdf").content.startswith(b"%PDF")
     assert api.get(f"/api/hr/payroll-runs/{run['id']}/check/excel").status_code == 200
 

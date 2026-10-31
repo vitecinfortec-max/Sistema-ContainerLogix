@@ -7,6 +7,7 @@ Os cálculos ficam em hr_payroll.py."""
 import re
 import uuid
 from datetime import date, timedelta
+from itertools import zip_longest
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,7 +18,7 @@ from hr_payroll import (
     months_by_fifteen, overlap_days, parse_day, r2,
 )
 from models import HRPayrollPay, HRPayrollRunCreate, HRPayrollSettings, HRPayslipInputs
-from period_reports import Column, Section, MONEY, INT, excel_response, pdf_response
+from period_reports import Block, Column, Section, MONEY, INT, excel_response, pdf_response
 from reports import format_currency, merge_company
 from routers.hr import (
     DOCUMENT_TYPES, LEAVE_TYPES, OCCURRENCE_TYPES, PAYROLL_ABSENCE_TYPES, contract_ctx, contract_snapshot, leave_ranges,
@@ -479,11 +480,42 @@ def _previous_competence(competence: str) -> str:
     return f"{year - 1}-12" if month == 1 else f"{year}-{month - 1:02d}"
 
 
+def _detail_footer(gross, deductions, net) -> list:
+    return [[None, "Total de proventos", None, gross, None, None, "Total de descontos", None, deductions],
+            [None, None, None, None, None, None, "Líquido a receber", None, net]]
+
+
+def _employee_detail(slip: dict, monthly: bool) -> tuple:
+    """Rubricas de um contracheque: o bloco do PDF (proventos ao lado dos
+    descontos) e as linhas do Excel (uma por rubrica, para filtrar, e uma com o
+    líquido). No Excel os valores ficam em colunas separadas para os totais
+    somarem certo."""
+    t = slip.get("totals") or {}
+    gross, deductions, net = t.get("gross") or 0, t.get("deductions") or 0, t.get("net") or 0
+    events = [{**e, "label": e["label"] if e.get("auto") else f"{e['label']} (lançado)"} for e in slip.get("events") or []]
+    credits = [[e.get("number"), e["label"], e.get("reference"), e["value"]] for e in events if e["kind"] == "P"]
+    debits = [[e.get("number"), e["label"], e.get("reference"), e["value"]] for e in events if e["kind"] == "D"]
+    empty = [None] * 4
+    period = f"{slip.get('days_worked')} dias" if monthly else f"{slip.get('months_13th')}/12 avos"
+    title = " · ".join(str(part) for part in (
+        f"Mat. {slip.get('contract_number')}", slip.get("person_name"), slip.get("position_name"), period,
+        f"Salário base {format_currency(slip.get('base_salary') or 0, 'BRL')}") if part)
+    block = Block(title, [left + [None] + right for left, right in zip_longest(credits, debits, fillvalue=empty)],
+                  _detail_footer(gross, deductions, net))
+    person = [slip.get("contract_number"), slip.get("person_name"), slip.get("position_name")]
+    rows = [person + ["Provento" if e["kind"] == "P" else "Desconto", e.get("number"), e["label"], e.get("reference"),
+                      e["value"] if e["kind"] == "P" else None, e["value"] if e["kind"] == "D" else None, None] for e in events]
+    summary = f"Proventos {format_currency(gross, 'BRL')} - Descontos {format_currency(deductions, 'BRL')}"
+    rows.append(person + ["Líquido", None, summary, None, None, None, net])
+    return block, rows
+
+
 async def build_payroll_check(run: dict) -> dict:
     """Relatório para o RH conferir a folha antes de fechar e imprimir os
     contracheques: pendências de cada contracheque, a lista com a variação do
-    líquido sobre a folha anterior do mesmo tipo, o resumo por rubrica e os
-    contratos vigentes que ficaram de fora."""
+    líquido sobre a folha anterior do mesmo tipo, o resumo por rubrica, os
+    contratos vigentes que ficaram de fora e o detalhamento de proventos,
+    descontos e líquido de cada funcionário."""
     settings = await load_payroll_settings()
     slips = sorted(await db.hr_payslips.find({"run_id": run["id"]}, {"_id": 0}).to_list(None),
                    key=lambda p: (p.get("person_name") or "").lower())
@@ -497,6 +529,7 @@ async def build_payroll_check(run: dict) -> dict:
     monthly = run["run_type"] in ("MENSAL", "ADIANTAMENTO")
 
     alerts, people, rubrics = [], [], {}
+    detail_blocks, detail_rows, detail_net_rows = [], [], []
 
     def alert(slip, level, text):
         alerts.append([level, slip.get("person_name"), slip.get("position_name"), text])
@@ -552,6 +585,10 @@ async def build_payroll_check(run: dict) -> dict:
                                                "kind": e["kind"], "people": 0, "total": 0.0})
             r["people"] += 1
             r["total"] += e["value"]
+        block, rows = _employee_detail(p, monthly)
+        detail_blocks.append(block)
+        detail_rows += rows
+        detail_net_rows.append(len(detail_rows) - 1)
 
     # contratos vigentes que ficaram fora (para não esquecer ninguém)
     in_run = {p["contract_id"] for p in slips}
@@ -577,6 +614,9 @@ async def build_payroll_check(run: dict) -> dict:
     totals = run.get("totals") or {}
     rubric_rows = [[r["number"], r["label"], "Provento" if r["kind"] == "P" else "Desconto", r["people"], r2(r["total"])]
                    for r in sorted(rubrics.values(), key=lambda r: (r["kind"] != "P", r["number"] or ""))]
+    if slips:
+        detail_blocks.append(Block(f"TOTAL DA FOLHA · {len(slips)} funcionário(s)", [],
+                                   _detail_footer(totals.get("gross"), totals.get("deductions"), totals.get("net"))))
     sections = [
         Section("Pendências e pontos a conferir", [Column("Nível", width=9), Column("Funcionário", width=26), Column("Cargo", width=18),
                                                    Column("Detalhe", width=60)],
@@ -594,6 +634,15 @@ async def build_payroll_check(run: dict) -> dict:
         Section("Contratos vigentes fora desta folha", [Column("Mat.", INT, 5), Column("Nome", width=28), Column("Cargo", width=20),
                                                         Column("Motivo", width=40)],
                 left_out, empty_text="Todos os contratos vigentes estão na folha.", sheet_name="Fora da folha"),
+        Section("Detalhamento por funcionário", [Column("Mat.", INT, 5), Column("Funcionário", width=24), Column("Cargo", width=16),
+                                                 Column("Tipo", width=9), Column("Cód.", width=6), Column("Rubrica", width=40), Column("Ref.", width=12),
+                                                 Column("Proventos", MONEY, 12), Column("Descontos", MONEY, 12), Column("Líquido", MONEY, 12)],
+                detail_rows, total=[None] * 7 + [totals.get("gross"), totals.get("deductions"), totals.get("net")] if slips else None,
+                empty_text="Nenhum contracheque nesta folha.", sheet_name="Detalhado por funcionário",
+                blocks=detail_blocks, strong_rows=detail_net_rows,
+                block_columns=[Column("Cód.", width=5), Column("Provento", width=30), Column("Ref.", width=11), Column("Valor", MONEY, 12),
+                               Column("", width=2), Column("Cód.", width=5), Column("Desconto", width=30), Column("Ref.", width=11),
+                               Column("Valor", MONEY, 12)]),
     ]
     errors = sum(1 for a in alerts if a[0] == "Erro")
     info = [("Contracheques", str(len(slips))), ("Líquido", format_currency(totals.get("net") or 0, "BRL")),

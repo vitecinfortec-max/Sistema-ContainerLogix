@@ -38,6 +38,14 @@ class Column:
 
 
 @dataclass
+class Block:
+    """Tabela própria dentro de uma seção do PDF (ex.: um funcionário), que não se parte entre páginas."""
+    title: str
+    rows: list
+    footer: list = field(default_factory=list)  # linhas finais em negrito (None = vazio)
+
+
+@dataclass
 class Section:
     title: str
     columns: List[Column]
@@ -45,6 +53,9 @@ class Section:
     total: Optional[list] = None  # linha de total (mesmo número de colunas; None = vazio)
     empty_text: str = "Nada a mostrar."
     sheet_name: Optional[str] = None
+    blocks: Optional[List[Block]] = None  # só no PDF: troca `rows` por uma tabela por bloco, com `block_columns`
+    block_columns: Optional[List[Column]] = None
+    strong_rows: list = field(default_factory=list)  # só no Excel: índices das linhas em destaque
 
 
 def fmt_day(value) -> str:
@@ -77,12 +88,36 @@ def _pdf_text(value, kind):
     return str(value)
 
 
+def _pdf_block(block: Block, columns: List[Column], width: float, cell):
+    from reportlab.lib import colors
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import Paragraph, Table, TableStyle
+    from xml.sax.saxutils import escape
+    from reports import BRAND_SOFT, _hex, _pdf_header_cells, _pdf_table_style
+
+    def line(values, bold=False):
+        return [cell(_pdf_text(v, c.kind), c.pdf_align, bold=bold) if v is not None else cell("", markup="")
+                for v, c in zip(values, columns)]
+
+    title_style = ParagraphStyle("BlockTitle", fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=colors.white)
+    data = [[Paragraph(escape(block.title), title_style)] + [""] * (len(columns) - 1),
+            _pdf_header_cells([c.label for c in columns], font_size=7.5)]
+    data += [line(row) for row in block.rows] + [line(row, bold=True) for row in block.footer]
+    scale = width / sum(c.width for c in columns)
+    table = Table(data, colWidths=[c.width * scale for c in columns])
+    commands = _pdf_table_style(header_rows=2) + [("SPAN", (0, 0), (-1, 0))]
+    if block.footer:
+        commands.append(("BACKGROUND", (0, -len(block.footer)), (-1, -1), _hex(BRAND_SOFT)))
+    table.setStyle(TableStyle(commands))
+    return table
+
+
 async def pdf_response(title: str, subtitle: Optional[str], info: list, sections: List[Section], filename: str, user_name: str,
                        dashboard=None):
     """`dashboard(width)`: flowables extras (gráficos) entre os indicadores e as tabelas."""
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.units import mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
+    from reportlab.platypus import KeepTogether, SimpleDocTemplate, Table, TableStyle, Spacer
     from reportlab.lib.styles import getSampleStyleSheet
     from reports import (
         _build_pdf_header, _make_pdf_footer, _pdf_info_grid, _pdf_section_title, _pdf_header_cells,
@@ -105,6 +140,9 @@ async def pdf_response(title: str, subtitle: Optional[str], info: list, sections
         elements.extend(_pdf_section_title(section.title, width))
         if not section.rows:
             elements.append(_pdf_empty_state(section.empty_text, width))
+            continue
+        if section.blocks:
+            elements.extend(KeepTogether([_pdf_block(b, section.block_columns, width, cell), Spacer(1, 8)]) for b in section.blocks)
             continue
         data = [_pdf_header_cells([c.label for c in section.columns], font_size=7.5)]
         for row in section.rows:
@@ -135,8 +173,9 @@ def _xl_value(value, kind):
 
 async def excel_response(title: str, stats: str, sections: List[Section], filename: str):
     from openpyxl import Workbook
+    from openpyxl.styles import Font
     from openpyxl.utils import get_column_letter
-    from reports import _bsoft_style_excel, _xl_extend_print_area, _xl_error_workbook, XL_DATE, download_logo
+    from reports import BRAND_DARK, BRAND_SOFT, _bsoft_style_excel, _xl_extend_print_area, _xl_error_workbook, _xl_fill, XL_DATE, download_logo
 
     formats = {MONEY: "R$ #,##0.00", DAY: XL_DATE, INT: "0"}
     try:
@@ -158,6 +197,11 @@ async def excel_response(title: str, stats: str, sections: List[Section], filena
                 total_col=total_cols, stats_text=stats, company_name=company_name, logo_buffer=download_logo(company),
                 company=company, autofilter=bool(rows), empty_message=section.empty_text,
             )
+            for offset in section.strong_rows:
+                for column in range(2, len(section.columns) + 2):
+                    target = ws.cell(row=9 + offset, column=column)
+                    target.font = Font(name="Calibri", size=10, bold=True, color=BRAND_DARK)
+                    target.fill = _xl_fill(BRAND_SOFT)
             last_row = 9 + max(len(rows), 1) + (1 if total_cols else 0)
             _xl_extend_print_area(ws, get_column_letter(len(section.columns) + 1), last_row)
         buffer = io.BytesIO()
