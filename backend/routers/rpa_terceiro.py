@@ -476,7 +476,8 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT, TA_JUSTIFY
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak, KeepInFrame
-    from reports import download_logo, PRIMARY_COLOR
+    from branding import BRAND_BAR, BRAND_DARK, BRAND_LINE, BRAND_MUTED, BRAND_SOFT
+    from reports import download_logo
 
     rpa = await db.rpa_terceiro.find_one({"id": rpa_id}, {"_id": 0})
     if not rpa:
@@ -501,10 +502,10 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
     )
 
     styles = getSampleStyleSheet()
-    PRIMARY = colors.HexColor(f'#{PRIMARY_COLOR}')
-    RULE_COLOR = colors.HexColor('#2D3748')
-    VALUE_COLOR = colors.HexColor('#1A202C')
-    MUTED_COLOR = colors.HexColor('#718096')
+    PRIMARY = colors.HexColor(f'#{BRAND_BAR}')
+    RULE_COLOR = colors.HexColor(f'#{BRAND_BAR}')
+    VALUE_COLOR = colors.HexColor(f'#{BRAND_DARK}')
+    MUTED_COLOR = colors.HexColor(f'#{BRAND_MUTED}')
     CONTENT_WIDTH = 192 * mm
 
     def money(v):
@@ -531,8 +532,8 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
 
     def field_cell(label, val, size=7, val_size=8):
         return Paragraph(
-            f"<font color='#4A5568' size='{size}'>{label}</font><br/>"
-            f"<font color='#1A202C' size='{val_size}'><b>{val if val not in (None, '') else '-'}</b></font>",
+            f"<font color='#{BRAND_MUTED}' size='{size}'>{label}</font><br/>"
+            f"<font color='#{BRAND_DARK}' size='{val_size}'><b>{val if val not in (None, '') else '-'}</b></font>",
             ParagraphStyle('Cell', parent=styles['Normal'], leading=val_size + 2)
         )
 
@@ -552,7 +553,7 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
         grid = Table(rows, colWidths=col_widths)
         style_cmds = [
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E0')),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor(f'#{BRAND_LINE}')),
             ('LEFTPADDING', (0, 0), (-1, -1), 5),
             ('RIGHTPADDING', (0, 0), (-1, -1), 5),
             ('TOPPADDING', (0, 0), (-1, -1), 2),
@@ -674,8 +675,8 @@ async def download_rpa_terceiro_pdf(rpa_id: str, current_user: dict = Depends(ge
                 ])
         cargo_table = Table(cargo_data, colWidths=[28 * mm, 46 * mm, 28 * mm, 18 * mm, 22 * mm, 20 * mm, 30 * mm])
         cargo_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#EDF2F7')),
-            ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#CBD5E0')),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(f'#{BRAND_SOFT}')),
+            ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor(f'#{BRAND_LINE}')),
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('TOPPADDING', (0, 0), (-1, -1), 2), ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
             ('LEFTPADDING', (0, 0), (-1, -1), 3), ('RIGHTPADDING', (0, 0), (-1, -1), 3),

@@ -865,14 +865,14 @@ def _fuel_orders_pdf(orders: list, company: dict, current_user: dict) -> bytes:
             elements.append(PageBreak())  # uma ordem por folha, com as 2 vias
         elements += build_via(order)
         elements.append(Spacer(1, 6))
-        elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#94A3B8'),
+        elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#475569'),
                                    dash=(4, 3), spaceBefore=0, spaceAfter=0))
         elements.append(Paragraph(
             "&#9986;  corte aqui  &#9986;",
-            ParagraphStyle('CutLine', parent=styles['Normal'], fontSize=6.5, textColor=colors.HexColor('#94A3B8'),
+            ParagraphStyle('CutLine', parent=styles['Normal'], fontSize=6.5, textColor=colors.HexColor('#475569'),
                            alignment=TA_CENTER, spaceBefore=1, spaceAfter=1)
         ))
-        elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#94A3B8'),
+        elements.append(HRFlowable(width="100%", thickness=0.75, color=colors.HexColor('#475569'),
                                    dash=(4, 3), spaceBefore=0, spaceAfter=0))
         elements.append(Spacer(1, 8))
         elements += build_via(order)

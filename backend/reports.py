@@ -116,9 +116,6 @@ def fmt_date_local(value, empty='-'):
 # da Empresa", ou via variável de ambiente se quiser um logo padrão pré-configurado.
 LOGO_URL = os.environ.get('LOGO_URL')
 
-PRIMARY_COLOR = "008B7B"
-HEADER_BG_COLOR = "E8F4F5"
-
 ROOT_DIR = Path(__file__).parent
 from tenancy import TenantUploadsRoot, is_multi_tenant  # noqa: E402
 # Mesma pasta de shared.UPLOADS_DIR (com MULTI_TENANT, a da empresa atual)
@@ -188,14 +185,9 @@ def download_logo(company: dict = None):
 
 
 # ==================== IDENTIDADE VISUAL DOS DOCUMENTOS ====================
-# Paleta única dos PDFs e planilhas Excel do sistema - mudar aqui muda o
-# visual de todos os documentos que usam os helpers abaixo de uma vez.
-BRAND_DARK = "0F172A"    # nome da empresa, valores de destaque
-BRAND_TEXT = "334155"    # texto das tabelas
-BRAND_MUTED = "64748B"   # textos secundários (CNPJ, rótulos, rodapé)
-BRAND_LINE = "E2E8F0"    # linhas finas entre as linhas das tabelas
-BRAND_ZEBRA = "F5F9F9"   # fundo das linhas alternadas
-BRAND_SOFT = "E8F4F3"    # fundo suave na cor da marca (indicadores, totais)
+# Paleta única dos PDFs e planilhas Excel do sistema: fica em branding.py, que
+# também guarda a cor de destaque da empresa atual (accent()).
+from branding import BRAND_BAR, BRAND_DARK, BRAND_LINE, BRAND_MUTED, BRAND_SOFT, BRAND_TEXT, BRAND_ZEBRA, accent  # noqa: E402
 
 
 def _hex(color_hex):
@@ -298,7 +290,7 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
     title_style = ParagraphStyle(
         'HeaderReportTitle', parent=styles['Normal'], fontName='Helvetica-Bold',
         fontSize=13 if not compact else 11, leading=16 if not compact else 13.5,
-        textColor=_hex(PRIMARY_COLOR), alignment=TA_RIGHT,
+        textColor=_hex(BRAND_DARK), alignment=TA_RIGHT,
     )
     subtitle_style = ParagraphStyle(
         'HeaderReportSubtitle', parent=styles['Normal'], fontName='Helvetica-Bold',
@@ -340,7 +332,7 @@ def _build_pdf_header(styles, logo_buffer, report_title, generation_info=None, c
     # Faixa na cor da marca como tabela de 1 célula (e não HRFlowable, que
     # limita a largura à área do Frame e ficaria mais curta que as tabelas).
     rule = Table([['']], colWidths=[content_width], rowHeights=[2 if not compact else 1.5])
-    rule.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), _hex(PRIMARY_COLOR))]))
+    rule.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), _hex(accent()))]))
     elements.append(rule)
     elements.append(Spacer(1, 10 if not compact else 5))
 
@@ -466,7 +458,7 @@ def _build_pdf_summary(items, content_width, max_box_width=175):
     for ci in box_cols:
         cmds += [
             ('BACKGROUND', (ci, 0), (ci, 0), _hex(BRAND_SOFT)),
-            ('LINEBEFORE', (ci, 0), (ci, 0), 2.5, _hex(PRIMARY_COLOR)),
+            ('LINEBEFORE', (ci, 0), (ci, 0), 2.5, _hex(BRAND_BAR)),
             ('LEFTPADDING', (ci, 0), (ci, 0), 9),
             ('RIGHTPADDING', (ci, 0), (ci, 0), 6),
         ]
@@ -495,7 +487,7 @@ def _pdf_section_title(text, content_width):
     alinhado na mesma margem das tabelas. Retorna uma lista de flowables."""
     style = ParagraphStyle(
         'SectionTitle', fontName='Helvetica-Bold', fontSize=9.5, leading=12,
-        textColor=_hex(PRIMARY_COLOR),
+        textColor=_hex(accent()),
     )
     return [Spacer(1, 14), _pdf_align_left(Paragraph(xml_escape(text), style), content_width), Spacer(1, 5)]
 
@@ -520,7 +512,7 @@ def _pdf_table_style(header_rows=1, zebra=True, total_row=False, last_col=-1):
     lc = last_col
     last_header = header_rows - 1
     cmds = [
-        ('BACKGROUND', (0, 0), (lc, last_header), _hex(PRIMARY_COLOR)),
+        ('BACKGROUND', (0, 0), (lc, last_header), _hex(BRAND_BAR)),
         ('TEXTCOLOR', (0, 0), (lc, last_header), colors.white),
         ('FONTNAME', (0, 0), (lc, last_header), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (lc, -1), 7),
@@ -540,7 +532,7 @@ def _pdf_table_style(header_rows=1, zebra=True, total_row=False, last_col=-1):
         cmds += [
             ('BACKGROUND', (0, -1), (lc, -1), _hex(BRAND_SOFT)),
             ('FONTNAME', (0, -1), (lc, -1), 'Helvetica-Bold'),
-            ('LINEABOVE', (0, -1), (lc, -1), 0.8, _hex(PRIMARY_COLOR)),
+            ('LINEABOVE', (0, -1), (lc, -1), 0.8, _hex(BRAND_BAR)),
         ]
     return cmds
 
@@ -565,7 +557,7 @@ def _pdf_narrow_table(data, col_widths, content_width, extra_style=None, header_
 # Cores de destaque pra texto de status nas tabelas (ENTRADA/SAÍDA, PAGO,
 # PENDENTE, VENCIDO...) e fundos suaves correspondentes pra alertas em célula.
 PDF_TONES = {
-    'primary': PRIMARY_COLOR,
+    'primary': '047857',  # Entrada/Saída: mesmo verde de status, não muda por empresa
     'amber': 'B45309',
     'red': 'B91C1C',
     'emerald': '047857',
@@ -684,7 +676,7 @@ def _pdf_totals_box(rows, content_width, width=230, highlight_last=True):
         ('LINEBELOW', (1, 0), (-1, -2), 0.4, _hex(BRAND_LINE)),
     ]
     if highlight_last:
-        cmds.append(('BACKGROUND', (1, -1), (-1, -1), _hex(PRIMARY_COLOR)))
+        cmds.append(('BACKGROUND', (1, -1), (-1, -1), _hex(BRAND_BAR)))
     table.setStyle(TableStyle(cmds))
     return table
 
@@ -692,14 +684,14 @@ def _pdf_totals_box(rows, content_width, width=230, highlight_last=True):
 def _pdf_note_box(title, text, content_width):
     """Caixa de observações/notas: título pequeno na cor da marca + texto
     (quebras de linha preservadas) sobre fundo suave."""
-    title_style = ParagraphStyle('NoteTitle', fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=_hex(PRIMARY_COLOR))
+    title_style = ParagraphStyle('NoteTitle', fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=_hex(accent()))
     text_style = ParagraphStyle('NoteText', fontName='Helvetica', fontSize=8, leading=10.5, textColor=_hex(BRAND_TEXT))
     body = xml_escape(str(text or '-')).replace('\n', '<br/>')
     table = Table([[[Paragraph(xml_escape(title.upper()), title_style), Spacer(1, 2), Paragraph(body, text_style)]]], colWidths=[content_width])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
         ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
-        ('LINEBEFORE', (0, 0), (0, -1), 2.5, _hex(PRIMARY_COLOR)),
+        ('LINEBEFORE', (0, 0), (0, -1), 2.5, _hex(BRAND_BAR)),
         ('LEFTPADDING', (0, 0), (-1, -1), 9),
         ('RIGHTPADDING', (0, 0), (-1, -1), 8),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
@@ -850,7 +842,7 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
         created_at = dt_brt.strftime('%d/%m/%Y %H:%M') if dt_brt else str(m.get('created_at', '-'))
         is_entry = m.get('operation_type') == 'ENTRADA'
         type_markup = (
-            f'<font color="#{PRIMARY_COLOR}"><b>ENTRADA</b></font>' if is_entry
+            f'<font color="#{PDF_TONES["emerald"]}"><b>ENTRADA</b></font>' if is_entry
             else '<font color="#B45309"><b>SAÍDA</b></font>'
         )
         status = m.get('status', 'VAZIO')
@@ -1066,11 +1058,11 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
     last_letter = get_column_letter(last_col)
     header_row = 8
 
-    brand_fill = _xl_fill(PRIMARY_COLOR)
+    brand_fill = _xl_fill(BRAND_BAR)
     soft_fill = _xl_fill(BRAND_SOFT)
     zebra_fill = _xl_fill(BRAND_ZEBRA)
     line_side = Side(style='thin', color=BRAND_LINE)
-    brand_side = Side(style='medium', color=PRIMARY_COLOR)
+    brand_side = Side(style='medium', color=BRAND_BAR)
     white_side = Side(style='thin', color='FFFFFF')
 
     # Coluna A é só uma margem
@@ -1166,7 +1158,7 @@ def _bsoft_style_excel(ws, title, info_text, headers, data_rows, col_widths, cen
     ws.merge_cells(f'{first_letter}6:{last_letter}6')
     c = ws[f'{first_letter}6']
     c.value = stats_text if stats_text else info_text
-    c.font = Font(name='Calibri', size=11, bold=True, color=PRIMARY_COLOR)
+    c.font = Font(name='Calibri', size=11, bold=True, color=accent())
     c.alignment = Alignment(horizontal='left', vertical='center', indent=1)
     ws.row_dimensions[6].height = 22
     band(6, fill=soft_fill)
@@ -1329,7 +1321,7 @@ def _xl_section_title(ws, row, first_col, last_col, text):
     if last_col > first_col:
         ws.merge_cells(start_row=row, start_column=first_col, end_row=row, end_column=last_col)
     c = ws.cell(row=row, column=first_col, value=text)
-    c.font = Font(name='Calibri', size=11, bold=True, color=PRIMARY_COLOR)
+    c.font = Font(name='Calibri', size=11, bold=True, color=accent())
     c.alignment = Alignment(horizontal='left', vertical='center')
     ws.row_dimensions[row].height = 20
     return row + 1
@@ -1343,7 +1335,7 @@ def _xl_table(ws, start_row, first_col, headers, rows, number_formats=None, cent
     center_cols = center_cols or set()
     line_side = Side(style='thin', color=BRAND_LINE)
     white_side = Side(style='thin', color='FFFFFF')
-    brand_side = Side(style='medium', color=PRIMARY_COLOR)
+    brand_side = Side(style='medium', color=BRAND_BAR)
     left = Alignment(horizontal='left', vertical='center')
     center = Alignment(horizontal='center', vertical='center')
     right = Alignment(horizontal='right', vertical='center')
@@ -1352,7 +1344,7 @@ def _xl_table(ws, start_row, first_col, headers, rows, number_formats=None, cent
     for i, h in enumerate(headers):
         cell = ws.cell(row=r, column=first_col + i, value=h)
         cell.font = Font(name='Calibri', size=10, bold=True, color='FFFFFF')
-        cell.fill = _xl_fill(PRIMARY_COLOR)
+        cell.fill = _xl_fill(BRAND_BAR)
         cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         cell.border = Border(left=white_side, right=white_side, bottom=brand_side)
     ws.row_dimensions[r].height = 20
@@ -1405,7 +1397,7 @@ def _xl_totals(ws, start_row, label_first_col, label_last_col, value_col, rows, 
         for ci in list(range(label_first_col, label_last_col + 1)) + [value_col]:
             cell = ws.cell(row=r, column=ci)
             if grand:
-                cell.fill = _xl_fill(PRIMARY_COLOR)
+                cell.fill = _xl_fill(BRAND_BAR)
             else:
                 cell.border = Border(bottom=line_side)
         lc.font = Font(name='Calibri', size=11 if grand else 10, bold=grand, color='FFFFFF' if grand else BRAND_TEXT)
@@ -1422,7 +1414,7 @@ def _xl_note(ws, row, first_col, last_col, title, text):
     preservadas) numa faixa mesclada de fundo suave. Retorna a próxima linha livre."""
     import math
     t = ws.cell(row=row, column=first_col, value=title)
-    t.font = Font(name='Calibri', size=10, bold=True, color=PRIMARY_COLOR)
+    t.font = Font(name='Calibri', size=10, bold=True, color=accent())
     ws.row_dimensions[row].height = 18
     body_row = row + 1
     if last_col > first_col:
@@ -1434,7 +1426,7 @@ def _xl_note(ws, row, first_col, last_col, title, text):
         cell = ws.cell(row=body_row, column=ci)
         cell.fill = _xl_fill('F8FAFC')
         cell.border = Border(
-            left=Side(style='medium', color=PRIMARY_COLOR) if ci == first_col else None,
+            left=Side(style='medium', color=BRAND_BAR) if ci == first_col else None,
             top=Side(style='thin', color=BRAND_LINE), bottom=Side(style='thin', color=BRAND_LINE),
         )
     chars_per_line = max(20, int(_xl_col_span_width(ws, first_col, last_col) * 1.1))
@@ -1872,7 +1864,7 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
 
         # Tipo e Status com a mesma cor usada no PDF (Entrada na cor da marca,
         # Saída em âmbar, Cheio em destaque) - dados começam na linha 9.
-        entry_font = Font(name='Calibri', size=10, bold=True, color=PRIMARY_COLOR)
+        entry_font = Font(name='Calibri', size=10, bold=True, color=PDF_TONES['emerald'])
         exit_font = Font(name='Calibri', size=10, bold=True, color='B45309')
         full_font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
         for offset, m in enumerate(movements):
@@ -1892,8 +1884,8 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
         if booking_counts:
             line_border = Border(bottom=Side(style='thin', color=BRAND_LINE))
             header_border = Border(left=Side(style='thin', color='FFFFFF'), right=Side(style='thin', color='FFFFFF'))
-            total_border = Border(top=Side(style='medium', color=PRIMARY_COLOR), bottom=Side(style='thin', color=BRAND_LINE))
-            header_fill = _xl_fill(PRIMARY_COLOR)
+            total_border = Border(top=Side(style='medium', color=BRAND_BAR), bottom=Side(style='thin', color=BRAND_LINE))
+            header_fill = _xl_fill(BRAND_BAR)
             total_fill = _xl_fill(BRAND_SOFT)
             zebra_fill = _xl_fill(BRAND_ZEBRA)
 
@@ -1907,7 +1899,7 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
             total_exits_summary = sum(booking_counts.values())
             ws.cell(row=start_row, column=col_a,
                     value=f"Saídas por Booking ({_fmt_int(total_exits_summary)} container{'s' if total_exits_summary != 1 else ''})")
-            ws.cell(row=start_row, column=col_a).font = Font(name='Calibri', size=11, bold=True, color=PRIMARY_COLOR)
+            ws.cell(row=start_row, column=col_a).font = Font(name='Calibri', size=11, bold=True, color=accent())
             ws.merge_cells(start_row=start_row, start_column=col_a, end_row=start_row, end_column=col_b)
 
             # Cabeçalho da tabela
@@ -1964,7 +1956,7 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
         wb = Workbook()
         ws = wb.active
         ws['A1'] = "Erro ao gerar relatório."
-        ws['A1'].font = Font(size=14, bold=True, color="FF0000")
+        ws['A1'].font = Font(size=14, bold=True, color=PDF_TONES['red'])
         buffer = io.BytesIO()
         wb.save(buffer)
         return buffer.getvalue()
@@ -1976,7 +1968,7 @@ def _xl_error_workbook(message="Erro ao gerar relatório."):
     wb = Workbook()
     ws = wb.active
     ws['A1'] = message
-    ws['A1'].font = Font(size=14, bold=True, color="FF0000")
+    ws['A1'].font = Font(size=14, bold=True, color=PDF_TONES['red'])
     buffer = io.BytesIO()
     wb.save(buffer)
     return buffer.getvalue()
@@ -3847,7 +3839,7 @@ def generate_intl_invoice_pdf(invoice: dict, company: dict = None) -> bytes:
 # ==================== GRÁFICOS DE CUSTO (Prestação de Contas) ====================
 # Desenhados com o reportlab (sem imagem): barras horizontais por grupo de
 # custo e colunas por mês, na paleta dos documentos.
-CHART_PALETTE = [PRIMARY_COLOR, 'F59E0B', '10B981', '6366F1', 'EF4444', '06B6D4', 'A855F7', '84CC16', '94A3B8']
+CHART_PALETTE = [BRAND_BAR, '0F766E', '64748B', '94A3B8', 'CBD5E1']
 
 
 def _short(text, limit):
@@ -3899,7 +3891,7 @@ def pdf_month_cost_columns(months, width, height=120):
     for i, m in enumerate(months):
         x = i * slot + (slot - bar) / 2
         h = max(1.5, height * m["total"] / top)
-        drawing.add(Rect(x, 16, bar, h, fillColor=_hex(PRIMARY_COLOR), strokeColor=None))
+        drawing.add(Rect(x, 16, bar, h, fillColor=_hex(BRAND_BAR), strokeColor=None))
         drawing.add(String(x + bar / 2, 18 + h, format_currency(m["total"]), fontName='Helvetica-Bold', fontSize=7,
                            fillColor=_hex(BRAND_DARK), textAnchor='middle'))
         drawing.add(String(x + bar / 2, 4, f"{m['month'][5:7]}/{m['month'][:4]}", fontName='Helvetica', fontSize=7.5,
@@ -5394,7 +5386,7 @@ def _voucher_boxed_section(title, row_tables, width, box_title_style, extra=None
     """Seção de comprovante: título na cor da marca e campos numa caixa de
     fundo suave com barra lateral - mesmo acabamento dos quadros de
     informação dos relatórios (_pdf_info_grid)."""
-    inner = [Paragraph(f'<font color="#{PRIMARY_COLOR}"><b>{title}</b></font>', box_title_style)]
+    inner = [Paragraph(f'<font color="#{accent()}"><b>{title}</b></font>', box_title_style)]
     for i, rt in enumerate(row_tables):
         inner.append(Spacer(1, 5 if i == 0 else 7))
         inner.append(rt)
@@ -5405,7 +5397,7 @@ def _voucher_boxed_section(title, row_tables, width, box_title_style, extra=None
     wrapper.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
         ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
-        ('LINEBEFORE', (0, 0), (0, -1), 2.5, _hex(PRIMARY_COLOR)),
+        ('LINEBEFORE', (0, 0), (0, -1), 2.5, _hex(BRAND_BAR)),
         ('LEFTPADDING', (0, 0), (-1, -1), 10),
         ('RIGHTPADDING', (0, 0), (-1, -1), 10),
         ('TOPPADDING', (0, 0), (-1, -1), 6),
@@ -5464,7 +5456,7 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
         elements.append(boxed_section('Informações da Operação', [
             field_row([
                 ('ID Transação', f"#{m.get('transaction_id')}"),
-                ('Tipo de Operação', f'<font color="#{PRIMARY_COLOR if is_entry else PDF_TONES["amber"]}">{m.get("operation_type")}</font>'),
+                ('Tipo de Operação', f'<font color="#{PDF_TONES["emerald"] if is_entry else PDF_TONES["amber"]}">{m.get("operation_type")}</font>'),
                 ('Status', m.get('status')),
                 ('Data/Hora', created_str),
             ]),
@@ -5750,7 +5742,7 @@ def generate_container_photo_document_pdf(record: dict, kind: str, company: dict
             label = PHOTO_TYPE_LABELS.get(photo.get('type'), photo.get('type') or '')
             return [Paragraph(xml_escape(str(label)).upper(), photo_label_style), Spacer(1, 2), box]
 
-        title = Paragraph(f'<font color="#{PRIMARY_COLOR}"><b>{cfg["photos_title"]} ({len(photos)})</b></font>', box_title_style)
+        title = Paragraph(f'<font color="#{accent()}"><b>{cfg["photos_title"]} ({len(photos)})</b></font>', box_title_style)
         data = [[title] + [''] * (columns - 1)]
         for start in range(0, len(photos), columns):
             row = [photo_cell(p) for p in photos[start:start + columns]]
@@ -5762,7 +5754,7 @@ def generate_container_photo_document_pdf(record: dict, kind: str, company: dict
         photo_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
             ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
-            ('LINEBEFORE', (0, 0), (0, -1), 2.5, _hex(PRIMARY_COLOR)),
+            ('LINEBEFORE', (0, 0), (0, -1), 2.5, _hex(BRAND_BAR)),
             ('SPAN', (0, 0), (-1, 0)),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
             ('ALIGN', (0, 1), (-1, -1), 'CENTER'),

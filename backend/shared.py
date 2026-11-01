@@ -19,6 +19,7 @@ from fastapi import Depends, HTTPException, Request, UploadFile, WebSocket, stat
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 from audit import AuditedDatabase, set_actor
+from branding import set_accent
 from tenancy import (
     CENTRAL_DB_NAME, TenantRoutedDatabase, TenantUploadsRoot, configure as configure_tenants, current_tenant_slug,
     is_multi_tenant,
@@ -357,6 +358,7 @@ manager = ConnectionManager()
 async def get_company_settings() -> dict:
     """Retorna os dados cadastrados em 'Dados da Empresa', ou {} se ainda não configurado."""
     settings = await db.company_settings.find_one({}, {"_id": 0})
+    set_accent((settings or {}).get("accent_color"))  # os documentos gerados nesta requisição saem com a cor da empresa
     return settings or {}
 
 

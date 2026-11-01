@@ -10,10 +10,10 @@
 // esconde essas tags na impressão.
 
 export const PRINT_COLORS = {
-  primary: '#008B7B',
+  primary: 'hsl(var(--primary))',
   dark: '#0F172A',
   text: '#334155',
-  muted: '#64748B',
+  muted: '#475569',
   line: '#E2E8F0',
   box: '#F8FAFC',
 };

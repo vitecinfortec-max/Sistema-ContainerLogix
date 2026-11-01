@@ -1295,7 +1295,7 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
     from xml.sax.saxutils import escape as xml_escape
     from reports import (
         download_logo, _build_pdf_header, _voucher_field_row, _voucher_boxed_section,
-        merge_company, now_brt, PRIMARY_COLOR, PDF_TONES,
+        merge_company, now_brt, PDF_TONES,
         _pdf_table_style, _pdf_header_cells, _pdf_totals_box, _hex, BRAND_LINE, BRAND_DARK, BRAND_MUTED, BRAND_TEXT,
     )
 
@@ -1323,7 +1323,7 @@ async def download_stock_movement_pdf(movement_id: str, current_user: dict = Dep
         return xml_escape(str(value)) if value not in (None, '') else ''
 
     OPERATION_LABELS = {'ENTRADA': 'Entrada', 'SAIDA': 'Saída'}
-    OPERATION_HEX = {'ENTRADA': f'#{PRIMARY_COLOR}', 'SAIDA': f"#{PDF_TONES['amber']}"}.get(movement.get('operation_type'), f'#{BRAND_DARK}')
+    OPERATION_HEX = {'ENTRADA': f"#{PDF_TONES['emerald']}", 'SAIDA': f"#{PDF_TONES['amber']}"}.get(movement.get('operation_type'), f'#{BRAND_DARK}')
 
     buffer = io.BytesIO()
     pdf_doc = SimpleDocTemplate(

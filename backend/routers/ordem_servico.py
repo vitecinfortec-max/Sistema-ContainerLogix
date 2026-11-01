@@ -234,8 +234,8 @@ async def download_ordem_servico_pdf(os_id: str, current_user: dict = Depends(ge
 
     STATUS_LABELS = {'ABERTO': 'Aberto', 'ANDAMENTO': 'Em Andamento', 'FECHADO': 'Fechado', 'CANCELADO': 'Cancelado'}
     STATUS_HEX = {
-        'ABERTO': '#1D4ED8', 'ANDAMENTO': '#B45309', 'FECHADO': '#15803D', 'CANCELADO': '#B91C1C',
-    }.get(os_doc.get('status'), '#000000')
+        'ABERTO': '#1D4ED8', 'ANDAMENTO': '#B45309', 'FECHADO': '#047857', 'CANCELADO': '#B91C1C',
+    }.get(os_doc.get('status'), '#0F172A')
     PRIORITY_LABELS = {'ALTA': 'Alta', 'MEDIA': 'Média', 'BAIXA': 'Baixa'}
 
     buffer = io.BytesIO()

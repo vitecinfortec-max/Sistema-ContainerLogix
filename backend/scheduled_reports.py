@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 from datetime import date, datetime, time, timedelta, timezone
+from html import escape
 from typing import Optional
 
 import resend
@@ -16,6 +17,7 @@ from apscheduler.triggers.cron import CronTrigger
 from fastapi import APIRouter, Depends
 from pymongo.errors import DuplicateKeyError
 
+from branding import email_layout
 from reports import generate_pdf_report, now_brt, merge_company, BRT_TZ
 from shared import db, get_company_settings, get_current_admin_user
 from tenancy import active_tenants, is_multi_tenant, sender_email, tenant_context
@@ -50,23 +52,12 @@ async def _movements_for_client(client_name: str, day: date) -> list:
     return await db.movements.find(query, {"_id": 0}).sort("created_at", 1).to_list(None)
 
 
-def _build_email_html(client_name: str, day: date, total: int) -> str:
+def _build_email_html(company_name: str, client_name: str, day: date, total: int) -> str:
     day_str = day.strftime('%d/%m/%Y')
-    return f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #3B9BA8;">ContainerLogix</h1>
-        </div>
-        <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px;">
-            <h3 style="color: #333; margin-top: 0;">Relatório de Movimentações</h3>
+    return email_layout(company_name, "Relatório de Movimentações", f"""
             <p>Olá,</p>
-            <p>Segue em anexo o relatório de movimentações de <strong>{client_name}</strong> referente ao dia <strong>{day_str}</strong> ({total} movimentação{'ões' if total != 1 else ''}).</p>
-        </div>
-        <p style="color: #666; font-size: 12px; margin-top: 30px; text-align: center;">
-            E-mail automático - ContainerLogix
-        </p>
-    </div>
-    """
+            <p>Segue em anexo o relatório de movimentações de <strong>{escape(client_name)}</strong> referente ao dia <strong>{day_str}</strong>, com <strong>{total}</strong> movimentação(ões).</p>
+    """, f"E-mail automático - {company_name}")
 
 
 async def send_daily_client_movement_reports(day: date = None) -> dict:
@@ -76,7 +67,9 @@ async def send_daily_client_movement_reports(day: date = None) -> dict:
     if day is None:
         day = (now_brt() - timedelta(days=1)).date()
 
-    company = merge_company(await get_company_settings())
+    settings = await get_company_settings()
+    company = merge_company(settings)
+    company_name = settings.get('name') or 'ContainerLogix'
 
     clients = await db.clients.find(
         {
@@ -115,8 +108,8 @@ async def send_daily_client_movement_reports(day: date = None) -> dict:
             params = {
                 "from": sender_email(SENDER_EMAIL),
                 "to": recipient_emails,
-                "subject": f"ContainerLogix - Relatório de Movimentações - {day.strftime('%d/%m/%Y')}",
-                "html": _build_email_html(c["name"], day, len(movements)),
+                "subject": f"{company_name} - Relatório de Movimentações - {day.strftime('%d/%m/%Y')}",
+                "html": _build_email_html(company_name, c["name"], day, len(movements)),
                 "attachments": [{
                     "filename": f"relatorio_movimentacoes_{day.strftime('%d-%m-%Y')}.pdf",
                     "content": list(pdf_bytes),

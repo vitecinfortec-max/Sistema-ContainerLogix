@@ -248,6 +248,7 @@ export const api = {
   // Company Settings (Dados da Empresa)
   getCompanySettings: () => axios.get(`${API}/company-settings`),
   updateCompanySettings: (data) => axios.put(`${API}/company-settings`, data),
+  getAccentSuggestion: (logoFilename) => axios.get(`${API}/company-settings/accent-suggestion`, { params: { logo_filename: logoFilename } }),
 
   // Gestão de Usuários (admin)
   getUsers: () => axios.get(`${API}/users`),

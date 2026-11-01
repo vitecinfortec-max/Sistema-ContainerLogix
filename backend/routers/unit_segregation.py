@@ -4,6 +4,7 @@ import io
 import re
 import shutil
 import uuid
+from branding import BRAND_BAR, BRAND_DARK, BRAND_LINE, BRAND_MUTED
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from list_filters import combine, period_query, text_query
@@ -497,9 +498,9 @@ async def get_unit_segregation_label(segregation_id: str, current_user: dict = D
     COLS, ROWS = 4, 2
     PER_PAGE = COLS * ROWS
 
-    PRIMARY_GREEN = colors.HexColor('#047857')
-    BLACK = colors.HexColor('#1F2937')
-    BORDER_GRAY = colors.HexColor('#D1D5DB')
+    BAR = colors.HexColor(f'#{BRAND_BAR}')
+    BLACK = colors.HexColor(f'#{BRAND_DARK}')
+    BORDER_GRAY = colors.HexColor(f'#{BRAND_LINE}')
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -511,13 +512,13 @@ async def get_unit_segregation_label(segregation_id: str, current_user: dict = D
     CELL_WIDTH = doc.width / COLS
     CELL_TEXT_WIDTH = CELL_WIDTH - 6 * mm  # descontando o padding esquerdo/direito da célula
 
-    company_style = ParagraphStyle('LblCompany', parent=styles['Normal'], fontSize=7, leading=9, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
+    company_style = ParagraphStyle('LblCompany', parent=styles['Normal'], fontSize=7, leading=9, fontName='Helvetica-Bold', textColor=BAR, alignment=TA_CENTER)
     title_style = ParagraphStyle('LblTitle', parent=styles['Normal'], fontSize=8, leading=10, fontName='Helvetica-Bold', textColor=colors.white, alignment=TA_CENTER)
     container_style = ParagraphStyle('LblContainer', parent=styles['Normal'], fontSize=18, leading=21, fontName='Helvetica-Bold', textColor=BLACK, alignment=TA_CENTER)
     client_label_style = ParagraphStyle('LblClientLabel', parent=styles['Normal'], fontSize=6, leading=8, fontName='Helvetica', textColor=colors.grey, alignment=TA_CENTER)
-    client_style = ParagraphStyle('LblClient', parent=styles['Normal'], fontSize=9, leading=11, fontName='Helvetica-Bold', textColor=PRIMARY_GREEN, alignment=TA_CENTER)
+    client_style = ParagraphStyle('LblClient', parent=styles['Normal'], fontSize=9, leading=11, fontName='Helvetica-Bold', textColor=BAR, alignment=TA_CENTER)
     detail_style = ParagraphStyle('LblDetail', parent=styles['Normal'], fontSize=6.5, leading=8.5, fontName='Helvetica', textColor=BLACK, alignment=TA_CENTER)
-    footer_style = ParagraphStyle('LblFooter', parent=styles['Normal'], fontSize=8, textColor=colors.grey, alignment=TA_CENTER)
+    footer_style = ParagraphStyle('LblFooter', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor(f'#{BRAND_MUTED}'), alignment=TA_CENTER)
 
     def build_label_cell(item):
         cell = [
@@ -526,7 +527,7 @@ async def get_unit_segregation_label(segregation_id: str, current_user: dict = D
         ]
         title_tbl = Table([[Paragraph('UNIDADE SEGREGADA', title_style)]], colWidths=[CELL_TEXT_WIDTH])
         title_tbl.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, -1), PRIMARY_GREEN),
+            ('BACKGROUND', (0, 0), (-1, -1), BAR),
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
         ]))

@@ -138,7 +138,7 @@ export default function MovementDetailPage() {
         <PrintSection title="Informações da Operação">
           <PrintFieldGrid fields={[
             ['ID Transação', `#${movement.transaction_id}`],
-            ['Tipo de Operação', <span style={{ color: isEntry ? PRINT_COLORS.primary : '#B45309' }}>{movement.operation_type}</span>],
+            ['Tipo de Operação', <span style={{ color: isEntry ? '#047857' : '#B45309' }}>{movement.operation_type}</span>],
             ['Status', movement.status],
             ['Data/Hora', format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm')],
           ]} />

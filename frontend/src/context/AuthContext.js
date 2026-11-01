@@ -1,4 +1,5 @@
 import { createContext, useState, useContext, useEffect } from 'react';
+import { applyBrandAccent } from '../lib/brandTheme';
 import axios from 'axios';
 import '../lib/tenant'; // empresa em toda chamada (multi-cliente)
 
@@ -52,6 +53,14 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
+  // Cor de destaque de "Dados da Empresa" nas telas
+  useEffect(() => {
+    if (!user) return;
+    axios.get(`${API}/company-settings`)
+      .then((response) => applyBrandAccent(response.data?.accent_color || null))
+      .catch(() => {});
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fetchUser = async () => {
     try {
       const response = await axios.get(`${API}/auth/me`);
@@ -87,6 +96,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('fileToken');
+    applyBrandAccent(null);
     setToken(null);
     setUser(null);
     delete axios.defaults.headers.common['Authorization'];

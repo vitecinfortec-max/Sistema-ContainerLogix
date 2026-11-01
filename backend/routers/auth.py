@@ -1,3 +1,5 @@
+import asyncio
+from html import escape
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -6,10 +8,11 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel as PydanticBaseModel
 
+from branding import BRAND_BAR, email_layout, readable_accent, suggest_accent
 from models import UserLogin, UserResponse, Token, CompanySettingsUpdate
 from auth import get_password_hash, verify_password, create_access_token, FILE_TOKEN_SCOPE
 
-from shared import db, get_current_active_user, get_company_settings, check_rate_limit, client_ip
+from shared import UPLOADS_DIR, db, get_current_active_user, get_current_admin_user, get_company_settings, check_rate_limit, client_ip
 from tenancy import sender_email
 from routers.users import email_query
 
@@ -91,38 +94,23 @@ async def forgot_password(request: ForgotPasswordRequest, http_request: Request)
 
     # Enviar email com senha provisória
     try:
-        html_content = f"""
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #3B9BA8;">ContainerLogix</h1>
+        company_name = (await get_company_settings()).get('name') or 'ContainerLogix'
+        html_content = email_layout(company_name, "Recuperação de Senha", f"""
+            <p>Olá <strong>{escape(user_doc['name'])}</strong>,</p>
+            <p>Recebemos uma solicitação de recuperação de senha para sua conta.</p>
+            <p>Sua senha provisória é:</p>
+            <div style="background-color: #{BRAND_BAR}; color: white; padding: 15px; border-radius: 4px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px;">
+                {temp_password}
             </div>
-            
-            <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                <h3 style="color: #333; margin-top: 0;">Recuperação de Senha</h3>
-                <p>Olá <strong>{user_doc['name']}</strong>,</p>
-                <p>Recebemos uma solicitação de recuperação de senha para sua conta.</p>
-                <p>Sua senha provisória é:</p>
-                <div style="background-color: #3B9BA8; color: white; padding: 15px; border-radius: 4px; text-align: center; font-size: 24px; font-family: monospace; letter-spacing: 2px;">
-                    {temp_password}
-                </div>
-            </div>
-            
-            <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">
-                <p style="margin: 0; color: #856404;">
-                    <strong>Importante:</strong> Ao fazer login com esta senha, você será solicitado a criar uma nova senha.
-                </p>
-            </div>
-            
-            <p style="color: #666; font-size: 12px; margin-top: 30px; text-align: center;">
-                Se você não solicitou esta recuperação, ignore este email.
+            <p style="margin: 16px 0 0; padding: 12px; background-color: #FEF3C7; border-left: 4px solid #B45309; color: #B45309;">
+                <strong>Importante:</strong> Ao fazer login com esta senha, você será solicitado a criar uma nova senha.
             </p>
-        </div>
-        """
-        
+        """, "Se você não solicitou esta recuperação, ignore este e-mail.")
+
         params = {
             "from": sender_email(SENDER_EMAIL),
             "to": [user_doc['email']],
-            "subject": "ContainerLogix - Recuperação de Senha",
+            "subject": f"{company_name} - Recuperação de Senha",
             "html": html_content
         }
         
@@ -260,6 +248,18 @@ async def get_company_settings_endpoint(current_user: dict = Depends(get_current
     """Retorna os dados cadastrados em 'Dados da Empresa' (usados nos PDFs/Excel gerados pelo sistema)."""
     return await get_company_settings()
 
+@api_router.get("/company-settings/accent-suggestion")
+async def company_accent_suggestion(logo_filename: str, current_user: dict = Depends(get_current_admin_user)):
+    """Cor sugerida a partir da logo enviada; quem decide é o administrador. color=null: logo sem cor (preta, branca ou cinza)."""
+    path = UPLOADS_DIR / os.path.basename(logo_filename)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Logo não encontrada")
+    try:
+        return await asyncio.to_thread(suggest_accent, path) or {"color": None}
+    except OSError:
+        raise HTTPException(status_code=400, detail="Não foi possível ler a imagem da logo")
+
+
 @api_router.put("/company-settings")
 async def update_company_settings(data: CompanySettingsUpdate, current_user: dict = Depends(get_current_active_user)):
     """Atualiza os dados da empresa. Restrito a administradores."""
@@ -279,6 +279,10 @@ async def update_company_settings(data: CompanySettingsUpdate, current_user: dic
         name = changes['logo_filename']
         if name != os.path.basename(name) or name.startswith('.') or '\\' in name:
             raise HTTPException(status_code=400, detail="Arquivo de logo inválido")
+    if changes.get('accent_color'):
+        if not re.fullmatch(r"#[0-9A-Fa-f]{6}", changes['accent_color']):
+            raise HTTPException(status_code=400, detail="Cor de destaque inválida")
+        changes['accent_color'] = f"#{readable_accent(changes['accent_color'])}"
     if changes.get('auto_booking_prefix'):
         # Vira o começo do Booking das Ordens de Entrega (ex.: TLL00001)
         prefix = changes['auto_booking_prefix'].upper()

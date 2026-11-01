@@ -79,8 +79,8 @@ def generate_cte_preview_pdf(cte: dict, settings: dict, company: dict = None) ->
                                ParagraphStyle("CteBannerSub", parent=banner_style, fontName="Helvetica", fontSize=7.5, leading=9.5))]],
                    colWidths=[width])
     banner.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), _hex("FEF2F2")),
-        ("BOX", (0, 0), (-1, -1), 0.8, _hex("FCA5A5")),
+        ("BACKGROUND", (0, 0), (-1, -1), _hex("FEE2E2")),
+        ("BOX", (0, 0), (-1, -1), 0.8, _hex("B91C1C")),
         ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     elements += [banner, Spacer(1, 8)]

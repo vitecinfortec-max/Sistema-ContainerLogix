@@ -12,9 +12,9 @@
     --card-foreground: 215 25% 15%;
     --popover: 0 0% 100%;
     --popover-foreground: 215 25% 15%;
-    --primary: 174 100% 26%;
+    --primary: 175 84% 26%;  /* #0F766E: empresas com cor própria sobrescrevem em lib/brandTheme.js */
     --primary-foreground: 0 0% 100%;
-    --secondary: 24 95% 53%;
+    --secondary: 215 25% 27%;
     --secondary-foreground: 0 0% 100%;
     --muted: 210 20% 96%;
     --muted-foreground: 215 16% 47%;
@@ -24,7 +24,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 214 15% 84%;
     --input: 214 15% 84%;
-    --ring: 174 100% 26%;
+    --ring: 175 84% 26%;
     --radius: 0.375rem;
 
     /* Cores de destaque por grupo do menu lateral (Layout.js GROUP_COLORS) */
@@ -53,7 +53,7 @@
     --popover-foreground: 210 20% 90%;
     --primary: 174 70% 45%;
     --primary-foreground: 222 25% 8%;
-    --secondary: 24 90% 58%;
+    --secondary: 215 20% 65%;
     --secondary-foreground: 222 25% 8%;
     --muted: 222 18% 16%;
     --muted-foreground: 215 15% 65%;

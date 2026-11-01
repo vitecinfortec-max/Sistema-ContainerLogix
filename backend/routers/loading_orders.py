@@ -243,10 +243,10 @@ async def download_loading_order_pdf(order_id: str, current_user: dict = Depends
         return fmt_datetime(s, empty='')
 
     STATUS_HEX = {
-        "APROVADA": "#15803D",
+        "APROVADA": "#047857",
         "PENDENTE": "#B45309",
         "CANCELADA": "#B91C1C",
-    }.get(order.get('status'), "#000000")
+    }.get(order.get('status'), "#0F172A")
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
