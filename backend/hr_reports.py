@@ -5,17 +5,18 @@ import io
 from xml.sax.saxutils import escape as xml_escape
 
 from reportlab.lib.enums import TA_LEFT
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import KeepInFrame, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import CondPageBreak, KeepInFrame, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from reportlab.platypus.flowables import HRFlowable
 
 from hr_payroll import CONTRACT_TYPES, RUN_TYPES
+from period_reports import _pdf_block
 from reports import (
-    BRAND_MUTED, BRAND_TEXT, _build_pdf_header, _hex, _make_pdf_footer,
-    _pdf_cell_factory, _pdf_header_cells, _pdf_info_grid, _pdf_note_box, _pdf_section_title, _pdf_signatures,
-    _pdf_table_style, _pdf_totals_box, download_logo, fmt_date, format_currency,
+    BRAND_MUTED, BRAND_TEXT, _build_pdf_header, _build_pdf_summary, _hex, _make_pdf_footer,
+    _pdf_cell_factory, _pdf_empty_state, _pdf_header_cells, _pdf_info_grid, _pdf_note_box, _pdf_section_title, _pdf_signatures,
+    _pdf_table_style, _pdf_tone_markup, _pdf_totals_box, download_logo, fmt_date, format_currency,
 )
 
 MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
@@ -132,6 +133,91 @@ def generate_payslips_pdf(slips: list, runs: dict, company: dict) -> bytes:
             logo.seek(0)
         block = _payslip_via(slip, runs.get(slip["run_id"], {}), company, logo, doc.width)
         elements.append(KeepInFrame(doc.width, half, block, mode="shrink"))
+    _build(doc, elements, company)
+    return buffer.getvalue()
+
+
+# ---------------------------------------------------------------- Conferência da folha
+
+def _table(rows, widths, width, total_row=False):
+    scale = width / sum(widths)
+    table = Table(rows, colWidths=[w * scale for w in widths], repeatRows=1)
+    table.setStyle(TableStyle(_pdf_table_style(total_row=total_row)))
+    return table
+
+
+def _variation_cell(cell, text):
+    """Destaca a variação do líquido a partir de 20%, o mesmo corte das pendências da tela."""
+    if text == "-" or abs(float(text.rstrip("%").replace(",", "."))) < 20:
+        return cell(text, "center")
+    return cell(text, "center", markup=_pdf_tone_markup(text, "amber"))
+
+
+def generate_payroll_check_pdf(run: dict, status_label: str, data: dict, company: dict, user_name: str) -> bytes:
+    """Conferência da folha para arquivo e assinatura: indicadores, funcionários,
+    contratos fora da folha (só quando há), detalhamento por funcionário e, por
+    último, o resumo por rubrica fechando no líquido. As pendências ficam na tela e no Excel."""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=12 * mm, leftMargin=12 * mm, topMargin=10 * mm, bottomMargin=14 * mm)
+    width = doc.width
+    styles = getSampleStyleSheet()
+    cell = _pdf_cell_factory(styles, font_size=7.5)
+    totals = run.get("totals") or {}
+    blank = cell("", markup="")
+    info = f"{RUN_TYPES.get(run['run_type'], run['run_type'])} · {competence_label(run['competence'])} · {status_label}"
+    if data.get("previous_competence"):
+        info += f" · Variação sobre {competence_label(data['previous_competence'])}"
+
+    elements = list(_build_pdf_header(styles, download_logo(company), "Conferência da Folha de Pagamento",
+                                      generation_info=info, company=company, content_width=width))
+    elements.extend(_build_pdf_summary([
+        ("Contracheques", len(data["people"])), ("Total de proventos", _money(totals.get("gross"))),
+        ("Total de descontos", _money(totals.get("deductions"))), ("Líquido a pagar", _money(totals.get("net"))),
+        ("FGTS do mês", _money(totals.get("fgts"))),
+    ], width))
+
+    elements.extend(_pdf_section_title("Funcionários", width))
+    if data["people"]:
+        rows = [_pdf_header_cells(["Mat.", "Funcionário", "Cargo", "Dias" if data["monthly"] else "Avos", "Salário base", "Proventos",
+                                   "Descontos", "Líquido", "INSS", "IRRF", "FGTS", "Var. líquido"], font_size=7.5)]
+        for r in data["people"]:
+            qty = r[3]
+            rows.append([cell(r[0], "center"), cell(r[1]), cell(r[2]), cell("-" if qty is None else f"{qty:g}".replace(".", ","), "center"),
+                         *[cell(_money(v), "right") for v in r[4:7]], cell(_money(r[7]), "right", bold=True),
+                         *[cell(_money(v), "right") for v in r[8:11]], _variation_cell(cell, r[11])])
+        t = data["people_total"]
+        rows.append([cell("Total", bold=True), blank, blank, blank, *[cell(_money(v), "right", bold=True) for v in t[4:11]], blank])
+        elements.append(_table(rows, [6, 28, 19, 6, 13, 13, 13, 13, 11, 11, 11, 9], width, total_row=True))
+    else:
+        elements.append(_pdf_empty_state("Nenhum contracheque nesta folha.", width))
+
+    if data["left_out"]:
+        elements.extend([CondPageBreak(70)] + _pdf_section_title("Contratos vigentes fora desta folha", width))
+        rows = [_pdf_header_cells(["Mat.", "Funcionário", "Cargo", "Motivo"], font_size=7.5)]
+        rows += [[cell(r[0], "center"), cell(r[1]), cell(r[2]), cell(r[3])] for r in data["left_out"]]
+        elements.append(_table(rows, [6, 30, 22, 50], width))
+
+    if data["detail"].rows:
+        elements.extend([CondPageBreak(130)] + _pdf_section_title("Detalhamento por funcionário", width))
+        elements.extend(KeepTogether([_pdf_block(b, data["detail"].block_columns, width, cell), Spacer(1, 8)]) for b in data["detail"].blocks)
+
+    elements.extend([CondPageBreak(110)] + _pdf_section_title("Resumo por rubrica", width))
+    if data["rubrics"]:
+        rows = [_pdf_header_cells(["Cód.", "Rubrica", "Funcionários", "Proventos", "Descontos"], font_size=7.5)]
+        for r in data["rubrics"]:
+            value = _money(round(r["total"], 2))
+            rows.append([cell(r["number"], "center"), cell(r["label"]), cell(r["people"], "center"),
+                         cell(value, "right") if r["kind"] == "P" else blank, cell(value, "right") if r["kind"] == "D" else blank])
+        rows.append([blank, cell("Total", bold=True), blank, cell(_money(totals.get("gross")), "right", bold=True),
+                     cell(_money(totals.get("deductions")), "right", bold=True)])
+        elements.append(_table(rows, [6, 44, 10, 16, 16], width, total_row=True))
+    else:
+        elements.append(_pdf_empty_state("Nenhuma rubrica.", width))
+
+    elements.append(KeepTogether([
+        Spacer(1, 6), _pdf_totals_box([("Líquido a pagar", _money(totals.get("net")))], width, width=230),
+        _pdf_signatures([("Elaborado por", user_name), ("Conferido por", "Nome e data"), ("Aprovado por", "Nome e data")], width, space_above=28),
+    ]))
     _build(doc, elements, company)
     return buffer.getvalue()
 

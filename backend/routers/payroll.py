@@ -18,7 +18,7 @@ from hr_payroll import (
     months_by_fifteen, overlap_days, parse_day, r2,
 )
 from models import HRPayrollPay, HRPayrollRunCreate, HRPayrollSettings, HRPayslipInputs
-from period_reports import Block, Column, Section, MONEY, INT, excel_response, pdf_response
+from period_reports import Block, Column, Section, MONEY, INT, excel_response
 from reports import format_currency, merge_company
 from routers.hr import (
     DOCUMENT_TYPES, LEAVE_TYPES, OCCURRENCE_TYPES, PAYROLL_ABSENCE_TYPES, contract_ctx, contract_snapshot, leave_ranges,
@@ -612,8 +612,10 @@ async def build_payroll_check(run: dict) -> dict:
     order = {"Erro": 0, "Atenção": 1, "Conferir": 2}
     alerts.sort(key=lambda a: (order[a[0]], (a[1] or "").lower()))
     totals = run.get("totals") or {}
-    rubric_rows = [[r["number"], r["label"], "Provento" if r["kind"] == "P" else "Desconto", r["people"], r2(r["total"])]
-                   for r in sorted(rubrics.values(), key=lambda r: (r["kind"] != "P", r["number"] or ""))]
+    rubric_list = sorted(rubrics.values(), key=lambda r: (r["kind"] != "P", r["number"] or ""))
+    rubric_rows = [[r["number"], r["label"], "Provento" if r["kind"] == "P" else "Desconto", r["people"], r2(r["total"])] for r in rubric_list]
+    people_total = ["TOTAL", None, None, None, r2(sum(r[4] or 0 for r in people)), totals.get("gross"), totals.get("deductions"),
+                    totals.get("net"), totals.get("inss"), totals.get("irrf"), totals.get("fgts"), None] if people else None
     if slips:
         detail_blocks.append(Block(f"TOTAL DA FOLHA · {len(slips)} funcionário(s)", [],
                                    _detail_footer(totals.get("gross"), totals.get("deductions"), totals.get("net"))))
@@ -625,9 +627,7 @@ async def build_payroll_check(run: dict) -> dict:
                                  Column("Dias" if monthly else "Avos", INT, 6), Column("Salário base", MONEY, 12), Column("Proventos", MONEY, 12),
                                  Column("Descontos", MONEY, 12), Column("Líquido", MONEY, 12), Column("INSS", MONEY, 10),
                                  Column("IRRF", MONEY, 10), Column("FGTS", MONEY, 10), Column("Var. líquido", width=9, align="center")],
-                people, total=["TOTAL", None, None, None, r2(sum(r[4] or 0 for r in people)), totals.get("gross"), totals.get("deductions"),
-                               totals.get("net"), totals.get("inss"), totals.get("irrf"), totals.get("fgts"), None] if people else None,
-                empty_text="Nenhum contracheque nesta folha.", sheet_name="Funcionários"),
+                people, total=people_total, empty_text="Nenhum contracheque nesta folha.", sheet_name="Funcionários"),
         Section("Resumo por rubrica", [Column("Cód.", width=6), Column("Rubrica", width=40), Column("Tipo", width=10),
                                        Column("Funcionários", INT, 10), Column("Total", MONEY, 14)],
                 rubric_rows, empty_text="Nenhuma rubrica.", sheet_name="Rubricas"),
@@ -652,7 +652,11 @@ async def build_payroll_check(run: dict) -> dict:
         subtitle += f" · variação sobre {previous_competence[5:]}/{previous_competence[:4]}"
     return {"summary": {"count": len(slips), "errors": errors, "alerts": len(alerts), "left_out": len(left_out),
                         "net": totals.get("net") or 0},
-            "sections": sections, "info": info, "subtitle": subtitle}
+            "sections": sections, "info": info, "subtitle": subtitle,
+            # o PDF tem layout próprio (generate_payroll_check_pdf), sem as pendências
+            "people": people, "people_total": people_total, "rubrics": rubric_list, "left_out": left_out, "monthly": monthly,
+            "detail": sections[4],
+            "previous_competence": previous_competence if previous else None}
 
 
 @api_router.get("/hr/payroll-runs/{run_id}/check")
@@ -665,10 +669,12 @@ async def payroll_check(run_id: str, current_user: dict = Depends(get_current_ad
 
 @api_router.get("/hr/payroll-runs/{run_id}/check/pdf")
 async def payroll_check_pdf(run_id: str, current_user: dict = Depends(get_current_admin_user)):
+    from hr_reports import generate_payroll_check_pdf
     run = await _get_run(run_id)
     data = await build_payroll_check(run)
-    return await pdf_response(CHECK_TITLE, data["subtitle"], data["info"], data["sections"],
-                              f"conferencia_folha_{run['competence']}_{run['run_type'].lower()}", current_user.get("name", "Sistema"))
+    company = merge_company(await get_company_settings())
+    pdf = generate_payroll_check_pdf(run, RUN_STATUS.get(run.get("status"), run.get("status")), data, company, current_user.get("name", "Sistema"))
+    return pdf_stream(pdf, f"conferencia_folha_{run['competence']}_{run['run_type'].lower()}.pdf")
 
 
 @api_router.get("/hr/payroll-runs/{run_id}/check/excel")

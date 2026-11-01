@@ -2,7 +2,10 @@
 da API - cargos, admissão, folha mensal com lançamentos e ocorrências,
 fechamento/pagamento, férias, 13º, desligamento, documentos, banco de horas,
 painel e relatórios."""
+import io
 from datetime import date
+
+from pypdf import PdfReader
 
 from hr_payroll import (
     DEFAULT_PAYROLL_SETTINGS as S, calc_inss, calc_irrf, compute_13th_payslip, compute_monthly_payslip, compute_termination,
@@ -692,7 +695,11 @@ def test_payroll_check_report(api):
     assert bia[-1][9] == people["Bia Baixo"][7]
     total = data["sections"][4]["total"]
     assert total[7:] == [round(sum(r[col] or 0 for r in detail), 2) for col in (7, 8, 9)]
-    assert api.get(f"/api/hr/payroll-runs/{run['id']}/check/pdf").content.startswith(b"%PDF")
+    pdf = api.get(f"/api/hr/payroll-runs/{run['id']}/check/pdf")
+    assert pdf.content.startswith(b"%PDF")
+    text = " ".join(page.extract_text() for page in PdfReader(io.BytesIO(pdf.content)).pages)
+    assert "Pendências" not in text and "Sem PIS" not in text  # só na tela e no Excel
+    assert text.index("Contratos vigentes fora") < text.index("Detalhamento por funcionário") < text.index("Resumo por rubrica")
     assert api.get(f"/api/hr/payroll-runs/{run['id']}/check/excel").status_code == 200
 
 
