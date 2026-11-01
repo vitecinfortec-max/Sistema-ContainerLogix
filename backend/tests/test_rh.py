@@ -7,6 +7,7 @@ from datetime import date
 
 from pypdf import PdfReader
 
+from hr_reports import generate_payslips_pdf
 from hr_payroll import (
     DEFAULT_PAYROLL_SETTINGS as S, calc_inss, calc_irrf, compute_13th_payslip, compute_monthly_payslip, compute_termination,
     compute_vacation, months_by_fifteen, notice_days, vacation_periods,
@@ -701,6 +702,17 @@ def test_payroll_check_report(api):
     assert "Pendências" not in text and "Sem PIS" not in text  # só na tela e no Excel
     assert text.index("Contratos vigentes fora") < text.index("Detalhamento por funcionário") < text.index("Resumo por rubrica")
     assert api.get(f"/api/hr/payroll-runs/{run['id']}/check/excel").status_code == 200
+
+
+def test_payslips_pdf_gives_a_long_slip_its_own_page():
+    def slip(name, events):
+        return {"run_id": "r", "run_type": "MENSAL", "competence": "2026-10", "person_name": name, "totals": {"net": 1000},
+                "events": [{"number": "001", "label": f"Evento {i}", "kind": "P", "value": 10, "reference": None} for i in range(events)]}
+
+    pdf = generate_payslips_pdf([slip("Curto", 3), slip("Longo", 30), slip("Outro", 5), slip("Mais um", 5)], {}, {"name": "Empresa"})
+    pages = PdfReader(io.BytesIO(pdf)).pages
+    assert ["Curto" in p.extract_text() for p in pages] == [True, False, False] and len(pages) == 3
+    assert "Longo" in pages[1].extract_text() and "Outro" in pages[2].extract_text() and "Mais um" in pages[2].extract_text()
 
 
 def test_new_recurring_events_service_bonus_basket_and_union_fees(api):

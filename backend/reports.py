@@ -492,23 +492,25 @@ def _pdf_section_title(text, content_width):
     return [Spacer(1, 14), _pdf_align_left(Paragraph(xml_escape(text), style), content_width), Spacer(1, 5)]
 
 
-def _pdf_header_cells(labels, font_size=7):
+def _pdf_header_cells(labels, font_size=7, light=False):
     """Células de cabeçalho de tabela em Paragraph (quebram linha dentro da
-    célula em vez de vazar pra vizinha, como acontecia com "Terminal de Origem")."""
+    célula em vez de vazar pra vizinha, como acontecia com "Terminal de Origem").
+    `light`: texto preto, para o cabeçalho em fundo branco (_pdf_table_style)."""
     style = ParagraphStyle(
         'TableHeaderCell', fontName='Helvetica-Bold', fontSize=font_size,
-        leading=font_size + 1.5, textColor=colors.white, alignment=TA_CENTER,
+        leading=font_size + 1.5, textColor=colors.black if light else colors.white, alignment=TA_CENTER,
     )
     return [Paragraph(xml_escape(label), style) for label in labels]
 
 
-def _pdf_table_style(header_rows=1, zebra=True, total_row=False, last_col=-1):
+def _pdf_table_style(header_rows=1, zebra=True, total_row=False, last_col=-1, light_header=False):
     """Estilo padrão das tabelas de dados: cabeçalho na cor da marca, linhas
     separadas só por filetes horizontais claros, listras alternadas e, se
     houver, linha de total com fundo suave. Retorna a lista de comandos pra
     o gerador poder somar ajustes próprios (alinhamentos por coluna etc.).
     `last_col` limita o estilo às colunas reais quando a tabela tem uma coluna
-    de preenchimento no fim (ver _pdf_narrow_table)."""
+    de preenchimento no fim (ver _pdf_narrow_table). `light_header`: fundo branco,
+    texto preto e filetes pretos, para documentos que vão para a impressora."""
     lc = last_col
     last_header = header_rows - 1
     cmds = [
@@ -528,11 +530,18 @@ def _pdf_table_style(header_rows=1, zebra=True, total_row=False, last_col=-1):
     ]
     if zebra:
         cmds.append(('ROWBACKGROUNDS', (0, header_rows), (lc, -1), [colors.white, _hex(BRAND_ZEBRA)]))
+    if light_header:
+        cmds += [
+            ('BACKGROUND', (0, 0), (lc, last_header), colors.white),
+            ('TEXTCOLOR', (0, 0), (lc, last_header), colors.black),
+            ('LINEABOVE', (0, 0), (lc, 0), 0.8, colors.black),
+            ('LINEBELOW', (0, last_header), (lc, last_header), 0.8, colors.black),
+        ]
     if total_row:
         cmds += [
             ('BACKGROUND', (0, -1), (lc, -1), _hex(BRAND_SOFT)),
             ('FONTNAME', (0, -1), (lc, -1), 'Helvetica-Bold'),
-            ('LINEABOVE', (0, -1), (lc, -1), 0.8, _hex(BRAND_BAR)),
+            ('LINEABOVE', (0, -1), (lc, -1), 0.8, colors.black if light_header else _hex(BRAND_BAR)),
         ]
     return cmds
 
@@ -606,11 +615,12 @@ def _pdf_cell_factory(styles, font_size=7):
     return cell
 
 
-def _pdf_info_grid(pairs, content_width, cols=4):
+def _pdf_info_grid(pairs, content_width, cols=4, plain=False, tight=False):
     """Quadro de informações de um registro (fatura, ordem, comprovante...):
     pares (rótulo, valor) em grade, rótulo pequeno em cima e valor em negrito
     embaixo, sobre fundo suave. Um item (rótulo, valor, n) ocupa n colunas.
-    `valor` pode ser um Paragraph pronto (ex.: com cor de status)."""
+    `valor` pode ser um Paragraph pronto (ex.: com cor de status). `plain`: fundo branco.
+    `tight`: menos espaço entre as linhas (documentos que dividem a folha)."""
     label_style = ParagraphStyle(
         'InfoGridLabel', fontName='Helvetica', fontSize=6.5, leading=8,
         textColor=_hex(BRAND_MUTED),
@@ -639,25 +649,27 @@ def _pdf_info_grid(pairs, content_width, cols=4):
     table = Table(grid, colWidths=[content_width / cols] * cols)
     cmds += [
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('BACKGROUND', (0, 0), (-1, -1), _hex('F8FAFC')),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.white if plain else _hex('F8FAFC')),
         ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
         ('LINEBELOW', (0, 0), (-1, -2), 0.4, _hex(BRAND_LINE)),
         ('LEFTPADDING', (0, 0), (-1, -1), 7),
         ('RIGHTPADDING', (0, 0), (-1, -1), 5),
-        ('TOPPADDING', (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 2 if tight else 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3 if tight else 5),
     ]
     table.setStyle(TableStyle(cmds))
     return table
 
 
-def _pdf_totals_box(rows, content_width, width=230, highlight_last=True):
+def _pdf_totals_box(rows, content_width, width=230, highlight_last=True, light=False):
     """Quadro de totais encostado à direita: [(rótulo, valor), ...]. A última
-    linha (total geral) vai em destaque na cor da marca."""
+    linha (total geral) vai em destaque na faixa escura ou, com `light`, em
+    texto preto dentro de um quadro, sem fundo."""
     label_style = ParagraphStyle('TotalsLabel', fontName='Helvetica', fontSize=8, leading=10, textColor=_hex(BRAND_TEXT))
     value_style = ParagraphStyle('TotalsValue', fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=_hex(BRAND_DARK), alignment=TA_RIGHT)
-    grand_label = ParagraphStyle('TotalsGrandLabel', parent=label_style, fontName='Helvetica-Bold', fontSize=9.5, leading=12, textColor=colors.white)
-    grand_value = ParagraphStyle('TotalsGrandValue', parent=value_style, fontSize=10.5, leading=13, textColor=colors.white)
+    grand_color = colors.black if light else colors.white
+    grand_label = ParagraphStyle('TotalsGrandLabel', parent=label_style, fontName='Helvetica-Bold', fontSize=9.5, leading=12, textColor=grand_color)
+    grand_value = ParagraphStyle('TotalsGrandValue', parent=value_style, fontSize=10.5, leading=13, textColor=grand_color)
     filler = max(content_width - width, 0)
     data = []
     for i, (label, value) in enumerate(rows):
@@ -676,7 +688,7 @@ def _pdf_totals_box(rows, content_width, width=230, highlight_last=True):
         ('LINEBELOW', (1, 0), (-1, -2), 0.4, _hex(BRAND_LINE)),
     ]
     if highlight_last:
-        cmds.append(('BACKGROUND', (1, -1), (-1, -1), _hex(BRAND_BAR)))
+        cmds.append(('BOX', (1, -1), (-1, -1), 0.8, colors.black) if light else ('BACKGROUND', (1, -1), (-1, -1), _hex(BRAND_BAR)))
     table.setStyle(TableStyle(cmds))
     return table
 

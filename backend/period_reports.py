@@ -88,7 +88,7 @@ def _pdf_text(value, kind):
     return str(value)
 
 
-def _pdf_block(block: Block, columns: List[Column], width: float, cell):
+def _pdf_block(block: Block, columns: List[Column], width: float, cell, light: bool = False):
     from reportlab.lib import colors
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.platypus import Paragraph, Table, TableStyle
@@ -99,13 +99,13 @@ def _pdf_block(block: Block, columns: List[Column], width: float, cell):
         return [cell(_pdf_text(v, c.kind), c.pdf_align, bold=bold) if v is not None else cell("", markup="")
                 for v, c in zip(values, columns)]
 
-    title_style = ParagraphStyle("BlockTitle", fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=colors.white)
+    title_style = ParagraphStyle("BlockTitle", fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=colors.black if light else colors.white)
     data = [[Paragraph(escape(block.title), title_style)] + [""] * (len(columns) - 1),
-            _pdf_header_cells([c.label for c in columns], font_size=7.5)]
+            _pdf_header_cells([c.label for c in columns], font_size=7.5, light=light)]
     data += [line(row) for row in block.rows] + [line(row, bold=True) for row in block.footer]
     scale = width / sum(c.width for c in columns)
     table = Table(data, colWidths=[c.width * scale for c in columns])
-    commands = _pdf_table_style(header_rows=2) + [("SPAN", (0, 0), (-1, 0))]
+    commands = _pdf_table_style(header_rows=2, light_header=light, zebra=not light) + [("SPAN", (0, 0), (-1, 0))]
     if block.footer:
         commands.append(("BACKGROUND", (0, -len(block.footer)), (-1, -1), _hex(BRAND_SOFT)))
     table.setStyle(TableStyle(commands))
