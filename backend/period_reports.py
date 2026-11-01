@@ -105,8 +105,8 @@ def _pdf_block(block: Block, columns: List[Column], width: float, cell, light: b
     data += [line(row) for row in block.rows] + [line(row, bold=True) for row in block.footer]
     scale = width / sum(c.width for c in columns)
     table = Table(data, colWidths=[c.width * scale for c in columns])
-    commands = _pdf_table_style(header_rows=2, light_header=light, zebra=not light) + [("SPAN", (0, 0), (-1, 0))]
-    if block.footer:
+    commands = _pdf_table_style(header_rows=2, light_header=light, zebra=not light, ruled_rows=(1, -1) if light else None) + [("SPAN", (0, 0), (-1, 0))]
+    if block.footer and not light:
         commands.append(("BACKGROUND", (0, -len(block.footer)), (-1, -1), _hex(BRAND_SOFT)))
     table.setStyle(TableStyle(commands))
     return table

@@ -418,10 +418,11 @@ def _fmt_int(value):
         return str(value)
 
 
-def _build_pdf_summary(items, content_width, max_box_width=175):
+def _build_pdf_summary(items, content_width, max_box_width=175, boxed=False):
     """Faixa de indicadores logo abaixo do cabeçalho: cada (rótulo, valor) vira
     uma caixinha com fundo suave e barra lateral na cor da marca - substitui a
-    antiga linha de texto "Total: X | Entradas: Y" centralizada."""
+    antiga linha de texto "Total: X | Entradas: Y" centralizada. `boxed`: fundo
+    branco e contorno preto, para documentos que vão para a impressora."""
     label_style = ParagraphStyle(
         'SummaryLabel', fontName='Helvetica-Bold', fontSize=6.5, leading=8,
         textColor=_hex(BRAND_MUTED),
@@ -456,9 +457,11 @@ def _build_pdf_summary(items, content_width, max_box_width=175):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
     ]
     for ci in box_cols:
-        cmds += [
+        cmds += [('BOX', (ci, 0), (ci, 0), 0.8, colors.black)] if boxed else [
             ('BACKGROUND', (ci, 0), (ci, 0), _hex(BRAND_SOFT)),
             ('LINEBEFORE', (ci, 0), (ci, 0), 2.5, _hex(BRAND_BAR)),
+        ]
+        cmds += [
             ('LEFTPADDING', (ci, 0), (ci, 0), 9),
             ('RIGHTPADDING', (ci, 0), (ci, 0), 6),
         ]
@@ -503,14 +506,16 @@ def _pdf_header_cells(labels, font_size=7, light=False):
     return [Paragraph(xml_escape(label), style) for label in labels]
 
 
-def _pdf_table_style(header_rows=1, zebra=True, total_row=False, last_col=-1, light_header=False):
+def _pdf_table_style(header_rows=1, zebra=True, total_row=False, last_col=-1, light_header=False, ruled_rows=None):
     """Estilo padrão das tabelas de dados: cabeçalho na cor da marca, linhas
     separadas só por filetes horizontais claros, listras alternadas e, se
     houver, linha de total com fundo suave. Retorna a lista de comandos pra
     o gerador poder somar ajustes próprios (alinhamentos por coluna etc.).
     `last_col` limita o estilo às colunas reais quando a tabela tem uma coluna
     de preenchimento no fim (ver _pdf_narrow_table). `light_header`: fundo branco,
-    texto preto e filetes pretos, para documentos que vão para a impressora."""
+    texto preto e filetes pretos, para documentos que vão para a impressora.
+    `ruled_rows` (primeira, última): colunas separadas por linhas pretas nessas
+    linhas da tabela, dentro de um contorno preto."""
     lc = last_col
     last_header = header_rows - 1
     cmds = [
@@ -537,9 +542,14 @@ def _pdf_table_style(header_rows=1, zebra=True, total_row=False, last_col=-1, li
             ('LINEABOVE', (0, 0), (lc, 0), 0.8, colors.black),
             ('LINEBELOW', (0, last_header), (lc, last_header), 0.8, colors.black),
         ]
+    if ruled_rows:
+        cmds += [
+            ('LINEAFTER', (0, ruled_rows[0]), (lc - 1, ruled_rows[1]), 0.5, colors.black),
+            ('BOX', (0, 0), (lc, -1), 0.8, colors.black),
+        ]
     if total_row:
         cmds += [
-            ('BACKGROUND', (0, -1), (lc, -1), _hex(BRAND_SOFT)),
+            ('BACKGROUND', (0, -1), (lc, -1), colors.white if light_header else _hex(BRAND_SOFT)),
             ('FONTNAME', (0, -1), (lc, -1), 'Helvetica-Bold'),
             ('LINEABOVE', (0, -1), (lc, -1), 0.8, colors.black if light_header else _hex(BRAND_BAR)),
         ]
@@ -619,7 +629,7 @@ def _pdf_info_grid(pairs, content_width, cols=4, plain=False, tight=False):
     """Quadro de informações de um registro (fatura, ordem, comprovante...):
     pares (rótulo, valor) em grade, rótulo pequeno em cima e valor em negrito
     embaixo, sobre fundo suave. Um item (rótulo, valor, n) ocupa n colunas.
-    `valor` pode ser um Paragraph pronto (ex.: com cor de status). `plain`: fundo branco.
+    `valor` pode ser um Paragraph pronto (ex.: com cor de status). `plain`: fundo branco e linhas pretas.
     `tight`: menos espaço entre as linhas (documentos que dividem a folha)."""
     label_style = ParagraphStyle(
         'InfoGridLabel', fontName='Helvetica', fontSize=6.5, leading=8,
@@ -650,8 +660,8 @@ def _pdf_info_grid(pairs, content_width, cols=4, plain=False, tight=False):
     cmds += [
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
         ('BACKGROUND', (0, 0), (-1, -1), colors.white if plain else _hex('F8FAFC')),
-        ('BOX', (0, 0), (-1, -1), 0.6, _hex(BRAND_LINE)),
-        ('LINEBELOW', (0, 0), (-1, -2), 0.4, _hex(BRAND_LINE)),
+        ('BOX', (0, 0), (-1, -1), 0.8 if plain else 0.6, colors.black if plain else _hex(BRAND_LINE)),
+        ('LINEBELOW', (0, 0), (-1, -2), 0.5 if plain else 0.4, colors.black if plain else _hex(BRAND_LINE)),
         ('LEFTPADDING', (0, 0), (-1, -1), 7),
         ('RIGHTPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 2 if tight else 4),

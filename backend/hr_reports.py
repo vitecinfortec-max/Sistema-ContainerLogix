@@ -97,7 +97,7 @@ def _payslip_via(slip: dict, run: dict, company: dict, logo, width: float, via_l
     widths = [32, 230, 70, 80, 80]
     scale = width / sum(widths)
     table = Table(data, colWidths=[w * scale for w in widths], repeatRows=1)
-    table.setStyle(TableStyle(_pdf_table_style(light_header=True, zebra=False) + PAYSLIP_ROW_STYLE))
+    table.setStyle(TableStyle(_pdf_table_style(light_header=True, zebra=False, ruled_rows=(0, -2)) + PAYSLIP_ROW_STYLE))
     parts.append(table)
     parts.append(Spacer(1, 4))
 
@@ -107,7 +107,7 @@ def _payslip_via(slip: dict, run: dict, company: dict, logo, width: float, via_l
         ("Base FGTS", _money(t.get("fgts_base"))),
         ("FGTS do mês", _money(t.get("fgts"))),
         ("Base IRRF", _money(t.get("irrf_base"))),
-        ("Faixa IRRF (simpl.)" if t.get("irrf_simplified") else "Faixa IRRF", f"{_num(t.get('irrf_rate'))}%"),
+        ("IRRF simplif." if t.get("irrf_simplified") else "Faixa IRRF", f"{_num(t.get('irrf_rate'))}%"),
         ("Dependentes IR", slip.get("irrf_dependents") or 0),
     ], width, cols=7, plain=True, tight=True))
     if slip.get("observations"):
@@ -163,7 +163,7 @@ def generate_payslips_pdf(slips: list, runs: dict, company: dict) -> bytes:
 def _table(rows, widths, width, total_row=False):
     scale = width / sum(widths)
     table = Table(rows, colWidths=[w * scale for w in widths], repeatRows=1)
-    table.setStyle(TableStyle(_pdf_table_style(total_row=total_row, light_header=True, zebra=False)))
+    table.setStyle(TableStyle(_pdf_table_style(total_row=total_row, light_header=True, zebra=False, ruled_rows=(0, -1))))
     return table
 
 
@@ -195,7 +195,7 @@ def generate_payroll_check_pdf(run: dict, status_label: str, data: dict, company
         ("Contracheques", len(data["people"])), ("Total de proventos", _money(totals.get("gross"))),
         ("Total de descontos", _money(totals.get("deductions"))), ("Líquido a pagar", _money(totals.get("net"))),
         ("FGTS do mês", _money(totals.get("fgts"))),
-    ], width))
+    ], width, boxed=True))
 
     elements.extend(_pdf_section_title("Funcionários", width))
     if data["people"]:
