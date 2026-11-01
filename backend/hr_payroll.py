@@ -11,6 +11,8 @@ from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
+import re
+import unicodedata
 
 DEFAULT_PAYROLL_SETTINGS = {
     "valid_from": "2026-01-01",
@@ -122,6 +124,17 @@ MANUAL_EVENT_CODES = [code for code, ev in EVENTS.items() if ev[3] != "AUTO"]
 
 RUN_TYPES = {"MENSAL": "Folha mensal", "ADIANTAMENTO": "Adiantamento quinzenal (sem descontos)", "DECIMO_1": "13º salário - 1ª parcela",
              "DECIMO_2": "13º salário - 2ª parcela"}
+
+# Administrador de empresas recebe só na folha mensal, sem adiantamento
+# quinzenal. Pelo nome do cargo, para valer em qualquer grafia cadastrada
+# ("Adm. de Empresas", "Administrador de Empresas", com ou sem acento).
+ADVANCE_BLOCKED_POSITION = re.compile(r"\badm(inistrador|inistradora|inistrato|inistracao)?\.?\s+(de\s+)?empresas?\b")
+
+
+def advance_blocked_position(position_name: Optional[str]) -> bool:
+    name = unicodedata.normalize("NFD", position_name or "").encode("ascii", "ignore").decode().lower()
+    return bool(ADVANCE_BLOCKED_POSITION.search(name))
+
 
 TERMINATION_TYPES = {
     "SEM_JUSTA_CAUSA": "Dispensa sem justa causa",
@@ -355,6 +368,13 @@ def _totals(events: list, ctx: dict, s: dict, allow_simplified=True, irrf_events
 
     contract_type = ctx.get("contract_type") or "CLT"
     inss_base, irrf_income, fgts_base = base(4), base(5), base(6)
+    # Licença por acidente de trabalho: depois do 15º dia quem paga é o INSS, mas
+    # o depósito do FGTS continua sobre a remuneração (Lei 8.036, art. 15, § 5º)
+    accident_days = ctx.get("accident_leave_days") or 0
+    if accident_days:
+        insal, peric = fixed_additions(ctx, s)
+        monthly = (ctx.get("base_salary") or 0) + insal + peric + service_bonus(ctx)
+        fgts_base = r2(fgts_base + monthly / 30 * accident_days)
     if contract_type == "ESTAGIO":
         inss_base, fgts_base = 0.0, 0.0
     # INSS é da competência: as férias gozadas no mês já tiveram INSS no
@@ -678,14 +698,14 @@ def compute_termination(ctx: dict, s: dict) -> dict:
             add("1/3 sobre férias proporcionais", "P", proportional / 3)
 
     # 13º proporcional
-    thirteenth = 0.0
+    thirteenth = first_13th_discount = 0.0
     if kind != "JUSTA_CAUSA":
         year_start = max(admission, date(projected_end.year, 1, 1))
         avos = months_by_fifteen(year_start, projected_end, leaves)
         thirteenth = add("13º salário proporcional", "P", monthly / 12 * avos, f"{avos}/12")
         first_paid = ctx.get("first_13th_paid") or 0
         if first_paid and thirteenth:
-            add("13º salário - adiantamento já pago", "D", min(first_paid, thirteenth))
+            first_13th_discount = add("13º salário - adiantamento já pago", "D", min(first_paid, thirteenth))
 
     if ctx.get("salary_advance_paid"):
         add("Adiantamento salarial (quinzena) já pago", "D", ctx["salary_advance_paid"])
@@ -706,7 +726,8 @@ def compute_termination(ctx: dict, s: dict) -> dict:
     deductions = r2(sum(i["value"] for i in items if i["kind"] == "D"))
 
     fgts_rate = s["fgts_apprentice_rate"] if ctx.get("contract_type") == "APRENDIZ" else s["fgts_rate"]
-    fgts_month = 0.0 if exempt else r2((saldo + thirteenth + aviso) * fgts_rate / 100)
+    # a 1ª parcela do 13º já teve FGTS quando foi paga
+    fgts_month = 0.0 if exempt else r2((saldo + thirteenth - first_13th_discount + aviso) * fgts_rate / 100)
     fgts_balance = r2((ctx.get("fgts_balance") or 0) + fgts_month)
     fine_rate = {"SEM_JUSTA_CAUSA": 40, "ACORDO": 20}.get(kind, 0)
     withdraw = {"SEM_JUSTA_CAUSA": "100% do saldo", "ACORDO": "até 80% do saldo", "FIM_CONTRATO": "100% do saldo"}.get(kind, "não pode sacar")

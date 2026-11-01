@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from hr_payroll import (
     CONTRACT_TYPES, EVENTS, MANUAL_EVENT_CODES, NOTICE_TYPES, PAYROLL_CONTRACT_TYPES, RUN_TYPES,
-    TERMINATION_TYPES, commercial_days, commercial_overlap, competence_bounds, compute_13th_payslip, compute_advance_payslip, compute_monthly_payslip,
+    TERMINATION_TYPES, advance_blocked_position, commercial_days, commercial_overlap, competence_bounds, compute_13th_payslip, compute_advance_payslip, compute_monthly_payslip,
     months_by_fifteen, overlap_days, parse_day, r2,
 )
 from models import HRPayrollPay, HRPayrollRunCreate, HRPayrollSettings, HRPayslipInputs
@@ -117,6 +117,10 @@ async def reset_payroll_settings(current_user: dict = Depends(get_current_admin_
 
 # ---------------------------------------------------------------- Montagem do contracheque
 
+def _receives_advance(contract: dict) -> bool:
+    return bool(contract.get("salary_advance")) and not advance_blocked_position(contract.get("position_name"))
+
+
 def _eligible(contract: dict, run: dict) -> bool:
     if contract.get("status") == "DESLIGADO" or contract.get("contract_type") not in PAYROLL_CONTRACT_TYPES:
         return False
@@ -126,7 +130,7 @@ def _eligible(contract: dict, run: dict) -> bool:
         return admission <= last
     if run["run_type"] == "ADIANTAMENTO":
         # só quem optou e foi admitido até o dia 15
-        return bool(contract.get("salary_advance")) and admission <= first.replace(day=15)
+        return _receives_advance(contract) and admission <= first.replace(day=15)
     return admission <= date(first.year, 12, 31)
 
 
@@ -148,7 +152,7 @@ async def _month_days(contract: dict, first: date, last: date) -> dict:
         calc = v.get("calc") or {}
         vacation_inss_base += ((calc.get("vacation_pay") or 0) + (calc.get("one_third") or 0)) * share
         vacation_inss += (calc.get("inss") or 0) * share
-    leave_days = 0
+    leave_days = accident_leave_days = 0
     absence_days = 0
     for o in await db.hr_occurrences.find({"contract_id": contract["id"],
                                            "occurrence_type": {"$in": list(LEAVE_TYPES) + list(PAYROLL_ABSENCE_TYPES)}},
@@ -157,11 +161,15 @@ async def _month_days(contract: dict, first: date, last: date) -> dict:
             start = parse_day(o.get("start_date"))
             end = parse_day(o.get("end_date")) or last
             if start:
-                leave_days += commercial_overlap(start + timedelta(days=15), end, first, last)
+                days_on_leave = commercial_overlap(start + timedelta(days=15), end, first, last)
+                leave_days += days_on_leave
+                if o["occurrence_type"] == "ACIDENTE_TRABALHO":
+                    accident_leave_days += days_on_leave
         else:
             absence_days += int(occurrence_days_in(o, first, last))
     paid = max(0, min(30, days - min(vacation_days, 30) - leave_days))
-    return {"days": paid, "vacation_days": vacation_days, "leave_days": leave_days, "absence_days": absence_days,
+    return {"days": paid, "vacation_days": vacation_days, "leave_days": leave_days, "accident_leave_days": min(accident_leave_days, 30),
+            "absence_days": absence_days,
             "vacation_inss_base": r2(vacation_inss_base), "vacation_inss": r2(vacation_inss)}
 
 
@@ -187,6 +195,7 @@ async def _calc_payslip(run: dict, contract: dict, settings: dict, inputs: list,
         info = await _month_days(contract, first, last)
         ctx["days_worked"] = info["days"] if days_override is None else days_override
         ctx["absence_days"] = info["absence_days"]
+        ctx["accident_leave_days"] = info["accident_leave_days"]
         ctx["other_inss_base"] = info["vacation_inss_base"]
         ctx["other_inss_withheld"] = info["vacation_inss"]
         ctx["salary_advance_paid"] = await salary_advance_paid(contract["id"], run["competence"])
@@ -339,7 +348,7 @@ async def _empty_reason(run: dict) -> str:
     if not vigentes:
         return ("Esta empresa não tem contratos no RH. A folha é gerada a partir dos contratos de RH → Admissão e Contratos "
                 "(o cadastro de funcionários e motoristas sozinho não basta).")
-    if run["run_type"] == "ADIANTAMENTO" and not any(c.get("salary_advance") for c in vigentes):
+    if run["run_type"] == "ADIANTAMENTO" and not any(_receives_advance(c) for c in vigentes):
         return (f"Nenhum dos {len(vigentes)} contratos vigentes recebe adiantamento quinzenal. Em Admissão e Contratos, selecione "
                 "os contratos e use o botão \"Adiantamento quinzenal\" (ou ligue a opção em cada contrato) e clique em Recalcular.")
     if run["run_type"] == "ADIANTAMENTO":
@@ -601,6 +610,8 @@ async def build_payroll_check(run: dict) -> dict:
             reason = "PJ / prestador: não entra na folha"
         elif parse_day(c.get("admission_date")) > last:
             reason = "admitido depois da competência"
+        elif run["run_type"] == "ADIANTAMENTO" and advance_blocked_position(c.get("position_name")):
+            reason = "cargo de administrador de empresas: recebe só na folha mensal"
         elif run["run_type"] == "ADIANTAMENTO" and not c.get("salary_advance"):
             reason = "não recebe adiantamento quinzenal"
         elif run["run_type"] == "ADIANTAMENTO":

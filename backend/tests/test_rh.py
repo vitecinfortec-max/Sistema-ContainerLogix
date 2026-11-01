@@ -9,7 +9,7 @@ from pypdf import PdfReader
 
 from hr_reports import generate_payslips_pdf
 from hr_payroll import (
-    DEFAULT_PAYROLL_SETTINGS as S, calc_inss, calc_irrf, compute_13th_payslip, compute_monthly_payslip, compute_termination,
+    DEFAULT_PAYROLL_SETTINGS as S, advance_blocked_position, calc_inss, calc_irrf, compute_13th_payslip, compute_monthly_payslip, compute_termination,
     compute_vacation, months_by_fifteen, notice_days, vacation_periods,
 )
 
@@ -655,6 +655,25 @@ def test_biweekly_salary_advance(api):
     assert items["Adiantamento salarial (quinzena) já pago"] == 1200
 
 
+def test_business_administrator_gets_no_salary_advance(api):
+    for name in ("Adm. de Empresas", "ADM DE EMPRESAS", "Administrador de Empresas", "Administrato de Empresas", "Administradora de Empresa"):
+        assert advance_blocked_position(name), name
+    for name in ("Auxiliar Administrativo", "Motorista Carreteiro", "Administrador de Redes", None):
+        assert not advance_blocked_position(name), name
+
+    position = api.post("/api/hr/positions", json={"name": "Adm. de Empresas"}).json()
+    admin = _contract(api, _employee(api), dependents=[], vt_opt_in=False, salary_advance=True, position_id=position["id"])
+    driver = _contract(api, _employee(api, "Bia", "222.333.444-55"), dependents=[], vt_opt_in=False, salary_advance=True)
+    advance = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "ADIANTAMENTO"}).json()
+    assert [p["contract_id"] for p in api.get(f"/api/hr/payroll-runs/{advance['id']}").json()["payslips"]] == [driver["id"]]
+    left = api.get(f"/api/hr/payroll-runs/{advance['id']}/check").json()["sections"][3]["rows"]
+    assert "folha mensal" in next(row[3] for row in left if row[1] == "Ana Souza")
+    api.post(f"/api/hr/payroll-runs/{advance['id']}/close")
+    monthly = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    slips = {p["contract_id"]: p for p in api.get(f"/api/hr/payroll-runs/{monthly['id']}").json()["payslips"]}
+    assert not any(e["code"] == "ADIANT_QUINZENA_DESC" for e in slips[admin["id"]]["events"]) and len(slips) == 2
+
+
 def test_payroll_check_report(api):
     ok = _contract(api, _employee(api), dependents=[], vt_opt_in=False, pis="123.45678.90-1", pix_key="ana@pix.com")
     low = _contract(api, _employee(api, "Bia Baixo", "222.333.444-55"), dependents=[], vt_opt_in=False, base_salary=1000)
@@ -702,6 +721,31 @@ def test_payroll_check_report(api):
     assert "Pendências" not in text and "Sem PIS" not in text  # só na tela e no Excel
     assert text.index("Contratos vigentes fora") < text.index("Detalhamento por funcionário") < text.index("Resumo por rubrica")
     assert api.get(f"/api/hr/payroll-runs/{run['id']}/check/excel").status_code == 200
+
+
+def test_fgts_continues_during_work_accident_leave(api):
+    def slip_for(contract, run):
+        return next(p for p in api.get(f"/api/hr/payroll-runs/{run['id']}").json()["payslips"] if p["contract_id"] == contract["id"])
+
+    accident = _contract(api, _employee(api), base_salary=3000, dependents=[], vt_opt_in=False, admission_date="2024-01-02")
+    sick = _contract(api, _employee(api, "Bia", "222.333.444-55"), base_salary=3000, dependents=[], vt_opt_in=False, admission_date="2024-01-02")
+    for contract, kind in ((accident, "ACIDENTE_TRABALHO"), (sick, "AFASTAMENTO_INSS")):
+        r = api.post("/api/hr/occurrences", json={"contract_id": contract["id"], "occurrence_type": kind, "start_date": "2026-08-25", "end_date": "2026-12-31"})
+        assert r.status_code < 300, r.text
+    run = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "MENSAL"}).json()
+    # mês inteiro afastado: sem salário nem INSS; no acidente o FGTS segue sobre a remuneração
+    totals = slip_for(accident, run)["totals"]
+    assert totals["gross"] == 0 and totals["inss"] == 0 and totals["fgts_base"] == 3000 and totals["fgts"] == 240
+    assert slip_for(sick, run)["totals"]["fgts"] == 0
+
+
+def test_termination_fgts_does_not_repeat_first_13th_installment():
+    ctx = {"base_salary": 3600, "contract_type": "CLT", "admission_date": "2024-01-02", "termination_date": "2026-11-30",
+           "termination_type": "SEM_JUSTA_CAUSA", "notice_type": "TRABALHADO", "fgts_balance": 1000}
+    full = compute_termination(ctx, S)
+    paid = compute_termination({**ctx, "first_13th_paid": 1800}, S)
+    assert round(full["fgts_month"] - paid["fgts_month"], 2) == 144  # 8% de R$ 1.800
+    assert round(full["fgts_fine"] - paid["fgts_fine"], 2) == 57.6
 
 
 def test_payslips_pdf_gives_a_long_slip_its_own_page():
