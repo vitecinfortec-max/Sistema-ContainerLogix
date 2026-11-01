@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
 from hr_payroll import (
+    advance_blocked_position,
     CONTRACT_TYPES, MANUAL_EVENT_CODES, NOTICE_TYPES, TERMINATION_TYPES, VARIABLE_EVENT_CODES, add_months, age_on,
     compute_termination, compute_vacation, employer_charges, merge_settings, overlap_days, parse_day, r2, time_bank_status,
     vacation_periods,
@@ -355,7 +356,7 @@ async def _validate_contract(data: HRContractCreate, current_id: Optional[str]) 
         "base_salary": r2(data.base_salary), "weekly_hours": data.weekly_hours, "work_schedule": _clean(data.work_schedule),
         "insalubridade_grade": data.insalubridade_grade, "periculosidade": data.periculosidade,
         "vt_opt_in": data.vt_opt_in, "vt_monthly_cost": r2(data.vt_monthly_cost) if data.vt_monthly_cost else None,
-        "salary_advance": data.salary_advance,
+        "salary_advance": data.salary_advance and not advance_blocked_position(position["name"] if position else None),
         "pis": _clean(data.pis), "ctps_number": _clean(data.ctps_number), "ctps_series": _clean(data.ctps_series),
         "bank_name": _clean(data.bank_name), "bank_agency": _clean(data.bank_agency), "bank_account": _clean(data.bank_account),
         "pix_key": _clean(data.pix_key), "dependents": dependents, "recurring_events": recurring,
@@ -466,7 +467,11 @@ async def set_salary_advance(data: HRSalaryAdvanceBulk, current_user: dict = Dep
     """Liga/desliga o adiantamento quinzenal de vários contratos de uma vez."""
     if not data.contract_ids:
         raise HTTPException(status_code=400, detail="Selecione os contratos")
-    result = await db.hr_contracts.update_many({"id": {"$in": data.contract_ids}, "status": {"$ne": "DESLIGADO"}},
+    ids = data.contract_ids
+    if data.enabled:
+        chosen = await db.hr_contracts.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "position_name": 1}).to_list(None)
+        ids = [c["id"] for c in chosen if not advance_blocked_position(c.get("position_name"))]
+    result = await db.hr_contracts.update_many({"id": {"$in": ids}, "status": {"$ne": "DESLIGADO"}},
                                                {"$set": {"salary_advance": data.enabled, "updated_at": _now_iso()}})
     return {"updated": result.modified_count, "matched": result.matched_count}
 

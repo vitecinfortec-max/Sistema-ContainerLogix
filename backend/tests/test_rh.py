@@ -656,13 +656,15 @@ def test_biweekly_salary_advance(api):
 
 
 def test_business_administrator_gets_no_salary_advance(api):
-    for name in ("Adm. de Empresas", "ADM DE EMPRESAS", "Administrador de Empresas", "Administrato de Empresas", "Administradora de Empresa"):
+    for name in ("Adm. de Empresas", "Adm.de Empresas", "ADM.EMPRESAS", "ADM DE EMPRESAS", "Administrador de Empresas", "Administrato de Empresas", "Administradora de Empresa"):
         assert advance_blocked_position(name), name
     for name in ("Auxiliar Administrativo", "Motorista Carreteiro", "Administrador de Redes", None):
         assert not advance_blocked_position(name), name
 
     position = api.post("/api/hr/positions", json={"name": "Adm. de Empresas"}).json()
     admin = _contract(api, _employee(api), dependents=[], vt_opt_in=False, salary_advance=True, position_id=position["id"])
+    assert admin["salary_advance"] is False  # o contrato não aceita ligar o vale nesse cargo
+    assert api.put("/api/hr/contracts-salary-advance", json={"contract_ids": [admin["id"]], "enabled": True}).json()["updated"] == 0
     driver = _contract(api, _employee(api, "Bia", "222.333.444-55"), dependents=[], vt_opt_in=False, salary_advance=True)
     advance = api.post("/api/hr/payroll-runs", json={"competence": "2026-10", "run_type": "ADIANTAMENTO"}).json()
     assert [p["contract_id"] for p in api.get(f"/api/hr/payroll-runs/{advance['id']}").json()["payslips"]] == [driver["id"]]

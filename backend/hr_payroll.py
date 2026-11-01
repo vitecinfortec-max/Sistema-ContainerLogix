@@ -128,7 +128,7 @@ RUN_TYPES = {"MENSAL": "Folha mensal", "ADIANTAMENTO": "Adiantamento quinzenal (
 # Administrador de empresas recebe só na folha mensal, sem adiantamento
 # quinzenal. Pelo nome do cargo, para valer em qualquer grafia cadastrada
 # ("Adm. de Empresas", "Administrador de Empresas", com ou sem acento).
-ADVANCE_BLOCKED_POSITION = re.compile(r"\badm(inistrador|inistradora|inistrato|inistracao)?\.?\s+(de\s+)?empresas?\b")
+ADVANCE_BLOCKED_POSITION = re.compile(r"\badm(inistrador|inistradora|inistrato|inistracao)?\.?\s*(de\s+)?empresas?\b")
 
 
 def advance_blocked_position(position_name: Optional[str]) -> bool:
