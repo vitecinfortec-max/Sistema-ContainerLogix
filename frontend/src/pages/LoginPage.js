@@ -112,7 +112,7 @@ export default function LoginPage() {
           variants={staggerParent(0.12, 0.2)}
           initial="hidden"
           animate="show"
-          className={`relative z-10 flex flex-col w-full p-10 xl:p-12 pointer-events-none ${notices.length ? 'justify-between' : 'justify-end'}`}
+          className={`relative z-10 flex flex-col w-full p-10 xl:p-12 2xl:p-20 pointer-events-none ${notices.length ? 'justify-between' : 'justify-end'}`}
         >
           <div>
             <motion.h1 variants={riseIn} className={`font-black tracking-tight ${notices.length ? 'text-2xl xl:text-3xl' : 'text-4xl xl:text-5xl'}`}>
@@ -184,7 +184,7 @@ export default function LoginPage() {
                     autoCapitalize="none"
                     autoCorrect="off"
                     required
-                    className="h-12 pl-11 border-slate-300 dark:border-slate-600 focus:border-primary focus:ring-primary"
+                    className="h-12 md:h-12 pl-11 border-slate-500 dark:border-slate-500 focus:border-primary focus:ring-primary"
                   />
                 </div>
               </motion.div>
@@ -200,7 +200,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="h-12 pl-11 border-slate-300 dark:border-slate-600 focus:border-primary focus:ring-primary"
+                  className="h-12 md:h-12 pl-11 border-slate-500 dark:border-slate-500 focus:border-primary focus:ring-primary"
                 />
               </div>
             </motion.div>
@@ -216,12 +216,12 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="h-12 pl-11 pr-11 border-slate-300 dark:border-slate-600 focus:border-primary focus:ring-primary"
+                  className="h-12 md:h-12 pl-11 pr-11 border-slate-500 dark:border-slate-500 focus:border-primary focus:ring-primary"
                 />
                 <button title="Mostrar ou ocultar senha" aria-label="Mostrar ou ocultar senha"
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -231,7 +231,7 @@ export default function LoginPage() {
             <motion.div variants={riseIn}>
               <Button
                 type="submit"
-                className="w-full h-12 font-bold uppercase tracking-wide text-white bg-primary hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25"
+                className="w-full h-12 md:h-12 text-base font-semibold text-white bg-primary hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25"
                 disabled={loading}
                 data-testid="submit-button"
               >
@@ -271,12 +271,6 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          {/* Rodapé */}
-          <motion.div variants={riseIn} className="mt-12 text-center">
-            <p className="text-xs text-slate-400 dark:text-slate-500">
-              ContainerLogix - Sistema de Gestão de Contêineres
-            </p>
-          </motion.div>
         </motion.div>
       </div>
     </div>
