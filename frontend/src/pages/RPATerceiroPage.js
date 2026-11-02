@@ -23,7 +23,8 @@ import {
   Plus, Pencil, Trash2, FileText, Printer, X, Save, Calculator, Banknote, HandCoins, Wallet,
 } from 'lucide-react';
 import { formatPlate } from '../lib/masks';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const buildEmptyForm = () => {
   return Object.freeze({
     // Dados do Contrato
@@ -84,9 +85,9 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
 
   const [rpas, setRpas] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   // Período pela data do contrato (coluna "Data"); sem ela, pelo dia do cadastro
   const contractDay = (r) => (r.service_date ? toDateInput(r.service_date) : (r.created_at ? toLocalDay(new Date(r.created_at)) : ''));
   const filteredRpas = rpas.filter((r) => {

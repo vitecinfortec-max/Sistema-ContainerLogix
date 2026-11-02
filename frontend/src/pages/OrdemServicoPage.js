@@ -27,7 +27,8 @@ import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, Save, FileText, Printer, Clock, Wrench, Wallet } from 'lucide-react';
 import { nowLocalInput } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const STATUS_TONES = {
   ABERTO: 'blue',
   ANDAMENTO: 'amber',
@@ -51,9 +52,9 @@ export default function OrdemServicoPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
   const { pageItems, paginationProps } = usePagination(list, { resetKey: search });
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useUrlState('status', 'all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [nextNumber, setNextNumber] = useState(null);

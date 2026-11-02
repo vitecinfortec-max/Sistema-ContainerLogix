@@ -19,7 +19,8 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { HandCoins, CheckCircle2, RotateCcw, Pencil, Download, FileText, FileSpreadsheet, Receipt, Clock, ListChecks, FileBarChart } from 'lucide-react';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const STATUS_LABELS = { PENDENTE: 'Pendente', PAGO: 'Pago', CANCELADO: 'Cancelado' };
 const STATUS_TONES = {
   PENDENTE: 'amber',
@@ -39,9 +40,9 @@ export default function FreightPaymentsPage() {
 
   const [driverFilterName, setDriverFilterName] = useState('');
   const [driverFilterId, setDriverFilterId] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
 
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({ freight_value: '', observations: '' });

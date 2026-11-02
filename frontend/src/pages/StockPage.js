@@ -10,6 +10,7 @@ import { qtyWithUnit } from '../lib/productUnits';
 import { toast } from 'sonner';
 import { Boxes, PackageCheck, Wallet, AlertTriangle } from 'lucide-react';
 
+import { useUrlState } from '../hooks/useUrlState';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // Consulta de saldo (só leitura). O cadastro fica em Almoxarifado > Produto e
@@ -23,9 +24,9 @@ const BALANCE_OPTIONS = [
 export default function StockPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [balance, setBalance] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useUrlState('search', '');
+  const [balance, setBalance] = useUrlState('balance', 'all');
+  const [statusFilter, setStatusFilter] = useUrlState('status', 'all');
 
   useEffect(() => { loadItems(); }, []);
 

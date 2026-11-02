@@ -21,7 +21,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { todayISO, calendarDate } from '../lib/dates';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const PAGE_SIZE = 15;
 
 const TYPES = {
@@ -81,15 +82,15 @@ export default function ClientCreditsPage() {
   const [accountsLoading, setAccountsLoading] = useState(true);
   const [accountSearch, setAccountSearch] = useState('');
   const [onlyWithBalance, setOnlyWithBalance] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedClientId, setSelectedClientId] = useUrlState('selectedClientId', '');
   const [clients, setClients] = useState([]);
 
   const [entries, setEntries] = useState([]);
   const [entriesLoading, setEntriesLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
-  const [typeFilter, setTypeFilter] = useState('');
-  const [period, setPeriod] = useState(['', '']);
-  const [entrySearch, setEntrySearch] = useState('');
+  const [typeFilter, setTypeFilter] = useUrlState('type', '');
+  const [period, setPeriod] = useUrlState('period', ['', '']);
+  const [entrySearch, setEntrySearch] = useUrlState('entrySearch', '');
   const debouncedEntrySearch = useDebouncedValue(entrySearch.trim());
   const [selectedEntryId, setSelectedEntryId] = useState('');
 

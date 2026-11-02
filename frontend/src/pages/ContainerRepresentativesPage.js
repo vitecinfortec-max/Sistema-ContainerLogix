@@ -18,7 +18,8 @@ import { Plus, Trash2, Users, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatCNPJ, formatCPF, formatPhone } from '../lib/masks';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const TIPO_OPTIONS = [
   ['PF', 'Pessoa Física'],
   ['PJ', 'Pessoa Jurídica'],
@@ -57,7 +58,7 @@ export default function ContainerRepresentativesPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState(buildEmpty());
   const [submitting, setSubmitting] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {

@@ -20,7 +20,8 @@ import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, CheckCircle2, RotateCcw, BadgeDollarSign, Clock, FileBarChart } from 'lucide-react';
 import PeriodReportDialog from '../components/PeriodReportDialog';
 import { calendarDate } from '../lib/dates';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const STATUS_LABELS = { PENDENTE: 'Pendente', RECEBIDO: 'Recebido' };
 const STATUS_TONES = {
   PENDENTE: 'amber',
@@ -48,9 +49,9 @@ export default function ContainerSalesPage() {
   const [representatives, setRepresentatives] = useState([]);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
-  const [statusFilter, setStatusFilter] = useState('');
-  const [containerFilter, setContainerFilter] = useState('');
-  const [representativeFilter, setRepresentativeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
+  const [containerFilter, setContainerFilter] = useUrlState('container', '');
+  const [representativeFilter, setRepresentativeFilter] = useUrlState('representative', '');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);

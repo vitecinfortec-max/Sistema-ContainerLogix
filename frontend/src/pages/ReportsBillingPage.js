@@ -12,7 +12,8 @@ import { toast } from 'sonner';
 import { FileText, FileSpreadsheet, X, BarChart3, List, CheckCircle2, Clock, Warehouse } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtValue = (v, currency) => (v == null ? '-' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: currency === 'USD' ? 'USD' : 'BRL' }));
 const PREVIEW_PAGE_SIZE = 15;
@@ -23,12 +24,12 @@ const DAILY_SERIES = [
 ];
 
 export default function ReportsBillingPage() {
-  const [filterType, setFilterType] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterType, setFilterType] = useUrlState('type', 'all');
+  const [filterStatus, setFilterStatus] = useUrlState('status', 'all');
   const [filterClient, setFilterClient] = useState('all');
-  const [billedFilter, setBilledFilter] = useState('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [billedFilter, setBilledFilter] = useUrlState('billed', 'all');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState([]);
   const [dailyChart, setDailyChart] = useState([]);

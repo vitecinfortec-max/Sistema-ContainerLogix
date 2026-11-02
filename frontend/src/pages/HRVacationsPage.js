@@ -20,6 +20,7 @@ import { api } from '../lib/api';
 import { todayISO } from '../lib/dates';
 import { ContractPicker, errorDetail, fmtDate, fmtNumber, formatMoney, saveBlob, useContracts } from '../components/HRKit';
 import { toast } from 'sonner';
+import { useUrlState } from '../hooks/useUrlState';
 import {
   TreePalm, CalendarPlus, Pencil, Trash2, CheckCircle2, RotateCcw, Ban, FileText, Receipt, Save, AlertTriangle, Clock, Users, Plane,
 } from 'lucide-react';
@@ -40,10 +41,10 @@ export default function HRVacationsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   const debouncedSearch = useDebouncedValue(search.trim());
   const listKey = `${debouncedSearch}|${statusFilter}|${dateFrom}|${dateTo}`;
   const { pageItems, paginationProps } = usePagination(list, { resetKey: listKey });

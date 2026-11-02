@@ -29,6 +29,7 @@ import { parseFiscalXml } from '../lib/fiscalXml';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
+import { useUrlState } from '../hooks/useUrlState';
 import {
   AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, FileCheck, FileCode, FileCog, FileSearch, FileUp, Loader2, MapPin,
   PackageCheck, Pencil, Plus, Printer, RefreshCw, Save, Send, Trash2, Truck, X, XCircle,
@@ -478,8 +479,8 @@ export default function CtePage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
   const [settings, setSettings] = useState(null);
   const [clients, setClients] = useState([]);
   const [orders, setOrders] = useState([]);

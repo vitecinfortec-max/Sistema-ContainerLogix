@@ -24,7 +24,8 @@ import { format } from 'date-fns';
 import { Plus, Trash2, Save, ArrowLeftRight, Car, ClipboardList, Pencil, Printer, HardHat, Droplet } from 'lucide-react';
 import { todayISO } from '../lib/dates';
 import { activeRecords } from '../lib/cadastroStatus';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const OPERATION_LABELS = { ENTRADA: 'Entrada', SAIDA: 'Saída' };
@@ -36,10 +37,10 @@ const OPERATION_TONES = {
 export default function StockMovementsPage() {
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [operationFilter, setOperationFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [operationFilter, setOperationFilter] = useUrlState('operation', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
 
   const [warehouses, setWarehouses] = useState([]);
   const [suppliers, setSuppliers] = useState([]);

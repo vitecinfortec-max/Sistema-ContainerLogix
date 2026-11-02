@@ -18,7 +18,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, ShoppingCart, Package, CheckCircle2, Wallet } from 'lucide-react';
 import { calendarDate, dateInputToISO, toDateInput } from '../lib/dates';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const STATUS_LABELS = { DISPONIVEL: 'Disponível', VENDIDO: 'Vendido' };
 const STATUS_TONES = {
   DISPONIVEL: 'emerald',
@@ -45,8 +46,8 @@ export default function ContainerPurchasesPage() {
   const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
-  const [statusFilter, setStatusFilter] = useState('');
-  const [containerFilter, setContainerFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
+  const [containerFilter, setContainerFilter] = useUrlState('container', '');
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);

@@ -18,7 +18,8 @@ import { Plus, Eye, Pencil, Trash2, Package, TrendingUp, TrendingDown, FileSprea
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calendarDate } from '../lib/dates';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 export default function FlexTankPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const navigate = useNavigate();
@@ -62,7 +63,7 @@ export default function FlexTankPage() {
   const appliedFilters = useDebouncedValue(filters);
   
   // Filtros de Relatório
-  const [reportFilters, setReportFilters] = useState({
+  const [reportFilters, setReportFilters] = useUrlState('reportFilters', {
     start_date: '',
     end_date: '',
     client_id: '',

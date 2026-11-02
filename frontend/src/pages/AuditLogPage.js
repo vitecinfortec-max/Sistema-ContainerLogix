@@ -14,7 +14,8 @@ import { toast } from 'sonner';
 import { History, ListTree } from 'lucide-react';
 import { format } from 'date-fns';
 import { calendarDate } from '../lib/dates';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const PAGE_SIZE = 30;
 
 const ACTIONS = {
@@ -75,12 +76,12 @@ export default function AuditLogPage() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [options, setOptions] = useState({ users: [], areas: [] });
 
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [userId, setUserId] = useState('');
-  const [action, setAction] = useState('');
-  const [area, setArea] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
+  const [userId, setUserId] = useUrlState('userId', '');
+  const [action, setAction] = useUrlState('action', '');
+  const [area, setArea] = useUrlState('area', '');
+  const [searchQuery, setSearchQuery] = useUrlState('query', '');
   const debouncedSearch = useDebouncedValue(searchQuery.trim());
 
   const [detail, setDetail] = useState(null);

@@ -12,6 +12,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useUrlState } from '../hooks/useUrlState';
 import {
   FileText, FileSpreadsheet, Truck, TrendingUp, TrendingDown, Wallet, Percent, BarChart3, ArrowLeft,
 } from 'lucide-react';
@@ -91,9 +92,9 @@ function Breakdown({ title, icon: Icon, items, total, tone, testId }) {
 
 export default function VehicleResultsPage() {
   const [dateFrom, setDateFrom] = useState(startOfYear);
-  const [dateTo, setDateTo] = useState('');
-  const [plateText, setPlateText] = useState('');
-  const [plate, setPlate] = useState('');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
+  const [plateText, setPlateText] = useUrlState('plateText', '');
+  const [plate, setPlate] = useUrlState('plate', '');
   const [vehicles, setVehicles] = useState([]);
   const [data, setData] = useState(EMPTY);
   const [loading, setLoading] = useState(true);

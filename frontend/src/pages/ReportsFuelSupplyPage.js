@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 import { FileText, FileSpreadsheet, BarChart3, Fuel, Droplet, Wallet, Gauge } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
   ['DIESEL_S500', 'Diesel S500'],
@@ -31,12 +32,12 @@ const DAILY_SERIES = [
 ];
 
 export default function ReportsFuelSupplyPage() {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [equipmentPlate, setEquipmentPlate] = useState('');
-  const [supplierName, setSupplierName] = useState('');
-  const [fuelType, setFuelType] = useState('all');
-  const [source, setSource] = useState('all');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
+  const [equipmentPlate, setEquipmentPlate] = useUrlState('equipmentPlate', '');
+  const [supplierName, setSupplierName] = useUrlState('supplierName', '');
+  const [fuelType, setFuelType] = useUrlState('fuelType', 'all');
+  const [source, setSource] = useUrlState('source', 'all');
   const [loadingRows, setLoadingRows] = useState(true);
   const [loading, setLoading] = useState(false);
   const [vehicles, setVehicles] = useState([]);

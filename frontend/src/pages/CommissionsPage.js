@@ -18,7 +18,8 @@ import { api } from '../lib/api';
 import { downloadBlob } from '../lib/fiscal';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { useUrlState } from '../hooks/useUrlState';
 import {
   AlertTriangle, CheckCircle2, Clock, Edit, FileCheck, FileDown, HandCoins, Loader2, Percent, Plus, RotateCcw, Trash2, Truck, Users, Wallet, X,
 } from 'lucide-react';
@@ -92,9 +93,9 @@ export default function CommissionsPage() {
   const [clients, setClients] = useState([]);
   const [representatives, setRepresentatives] = useState([]);
   const [links, setLinks] = useState([]);
-  const [search, setSearch] = useState('');
-  const [repFilter, setRepFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [repFilter, setRepFilter] = useUrlState('rep', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
   const [period, setPeriod] = useState(() => [format(startOfMonth(new Date()), 'yyyy-MM-dd'), format(endOfMonth(new Date()), 'yyyy-MM-dd')]);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [dialogOpen, setDialogOpen] = useState(false);

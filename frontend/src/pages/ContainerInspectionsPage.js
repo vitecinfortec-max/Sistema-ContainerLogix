@@ -19,7 +19,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Eye, Printer, Trash2, Download, ClipboardCheck, FileBarChart } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const DAMAGE_OPTIONS = [
   { value: '', label: 'Todos' },
   { value: 'COM_AVARIA', label: 'Com avaria' },
@@ -32,10 +33,10 @@ export default function ContainerInspectionsPage() {
   const navigate = useNavigate();
   const [inspections, setInspections] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [damageFilter, setDamageFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useUrlState('term', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
+  const [damageFilter, setDamageFilter] = useUrlState('damage', '');
   const [reportOpen, setReportOpen] = useState(false);
   const debouncedSearch = useDebouncedValue(searchTerm);
   // Busca e período rodam no servidor: a lista vem paginada, e filtrar só a

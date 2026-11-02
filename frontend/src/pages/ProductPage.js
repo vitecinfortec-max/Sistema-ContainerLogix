@@ -20,7 +20,8 @@ import { activeRecords } from '../lib/cadastroStatus';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, Edit, Package, Scale } from 'lucide-react';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const ORIGIN_OPTIONS = [['NACIONAL', 'Nacional'], ['IMPORTADO', 'Importado']];
 const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 
@@ -42,8 +43,8 @@ export default function ProductPage() {
   const [families, setFamilies] = useState([]);
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useUrlState('search', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', 'all');
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [nextCode, setNextCode] = useState(null);

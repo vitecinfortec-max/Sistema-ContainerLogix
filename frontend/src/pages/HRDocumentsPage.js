@@ -20,6 +20,7 @@ import { ContractPicker, errorDetail, fmtDate, useContracts, useHRMeta } from '.
 import { toast } from 'sonner';
 import { FileBadge, Plus, Pencil, Trash2, Save, Paperclip, X, AlertTriangle, Clock, CheckCircle2, ExternalLink } from 'lucide-react';
 
+import { useUrlState } from '../hooks/useUrlState';
 const STATUS_LABELS = { VENCIDO: 'Vencido', A_VENCER: 'Vence em até 30 dias', VALIDO: 'Válido', SEM_VALIDADE: 'Sem validade' };
 const STATUS_TONES = { VENCIDO: 'red', A_VENCER: 'amber', VALIDO: 'emerald', SEM_VALIDADE: 'slate' };
 const EMPTY = { contract_id: '', doc_type: 'ASO_PERIODICO', description: '', issue_date: todayISO(), expiry_date: '', file_url: '', observations: '' };
@@ -31,9 +32,9 @@ export default function HRDocumentsPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [typeFilter, setTypeFilter] = useUrlState('type', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
   const debouncedSearch = useDebouncedValue(search.trim());
   const listKey = `${debouncedSearch}|${typeFilter}|${statusFilter}`;
   const { pageItems, paginationProps } = usePagination(list, { resetKey: listKey });

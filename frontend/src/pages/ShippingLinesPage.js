@@ -15,7 +15,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, Ship, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 export default function ShippingLinesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [lines, setLines] = useState([]);
@@ -25,7 +26,7 @@ export default function ShippingLinesPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({ name: '', code: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {

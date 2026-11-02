@@ -16,7 +16,8 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, Edit, Wrench } from 'lucide-react';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const UNIT_OPTIONS = [['HORAS', 'Horas'], ['QUANTIDADE', 'Quantidade'], ['OUTROS', 'Outros']];
 const STATUS_OPTIONS = [['true', 'Ativo'], ['false', 'Inativo']];
 
@@ -31,7 +32,7 @@ export default function ServiceCatalogPage() {
   const [items, setItems] = useState([]);
   const [families, setFamilies] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [nextCode, setNextCode] = useState(null);

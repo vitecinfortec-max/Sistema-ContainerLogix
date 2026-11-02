@@ -18,7 +18,8 @@ import { todayISO } from '../lib/dates';
 import { ContractPicker, errorDetail, fmtDate, fmtMinutes, parseHours, useContracts } from '../components/HRKit';
 import { toast } from 'sonner';
 import { Hourglass, Plus, Trash2, Save, TrendingUp, TrendingDown, Users } from 'lucide-react';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const EMPTY = { contract_id: '', date: todayISO(), kind: 'CREDITO', hours: '', description: '' };
 
 export default function HRTimeBankPage() {
@@ -28,9 +29,9 @@ export default function HRTimeBankPage() {
   const [balances, setBalances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   const debouncedSearch = useDebouncedValue(search.trim());
   const listKey = `${debouncedSearch}|${dateFrom}|${dateTo}`;
   const { pageItems, paginationProps } = usePagination(entries, { resetKey: listKey });

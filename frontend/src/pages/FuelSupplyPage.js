@@ -26,7 +26,8 @@ import { compressImage } from '../lib/imageCompression';
 import { scrollBehavior } from '../lib/reducedMotion';
 import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const SOURCE_OPTIONS = [
   ['POSTO_EXTERNO', 'Posto Externo'],
   ['TANQUE_PROPRIO', 'Tanque Próprio'],
@@ -91,11 +92,11 @@ export default function FuelSupplyPage() {
   const [list, setList] = useState([]);
   const [listMeta, setListMeta] = useState({ total: 0, pages: 1, total_liters: 0, total_value: 0 });
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
+  const [sourceFilter, setSourceFilter] = useUrlState('source', 'all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [nextNumber, setNextNumber] = useState(null);

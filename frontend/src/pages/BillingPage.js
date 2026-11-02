@@ -31,7 +31,8 @@ const formatDay = (value) => (value ? format(calendarDate(value), 'dd/MM/yyyy') 
 // Em aberto e com vencimento já passado
 const isOverdue = (invoice) => (invoice.status || 'PENDENTE') === 'PENDENTE' && !!invoice.due_date && invoice.due_date < todayISO();
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const ITEMS_PER_PAGE = 15;
 
 const INVOICE_STATUS_OPTIONS = [
@@ -68,9 +69,9 @@ export default function BillingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   // Filtro por cliente da lista: age sozinho enquanto se digita, sem botão "Filtrar"
-  const [clientFilter, setClientFilter] = useState('');
+  const [clientFilter, setClientFilter] = useUrlState('client', '');
   const appliedClient = useDebouncedValue(clientFilter.trim());
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
   const [stats, setStats] = useState(null);
   const { confirm, ConfirmDialog } = useConfirm();
 

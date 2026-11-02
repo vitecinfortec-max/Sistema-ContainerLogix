@@ -12,6 +12,7 @@ import { FileText, FileSpreadsheet, BarChart3, Anchor, Wallet, Gauge, Clock } fr
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
+import { useUrlState } from '../hooks/useUrlState';
 const TURNO_OPTIONS = [
   ['DIA', 'Dia'],
   ['NOITE', 'Noite'],
@@ -24,11 +25,11 @@ const DAILY_SERIES = [
 ];
 
 export default function ReportsPortServicesPage() {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [turno, setTurno] = useState('all');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
+  const [clientName, setClientName] = useUrlState('clientName', '');
+  const [clientId, setClientId] = useUrlState('clientId', '');
+  const [turno, setTurno] = useUrlState('turno', 'all');
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState([]);
   const [summary, setSummary] = useState({ count: 0, total_value: 0, avg_value: 0, in_progress_count: 0 });

@@ -33,7 +33,8 @@ import {
 } from '../components/DocumentImport';
 import { calendarDate, dateInputToISO, toDateInput, todayISO } from '../lib/dates';
 import { formatPlate, plateKey } from '../lib/masks';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const VEHICLE_STATUS_LABELS = { ATIVO: 'Ativo', INATIVO: 'Inativo', MANUTENCAO: 'Manutenção' };
 // Mesma margem do backend (MAINTENANCE_ALERT_MARGIN_KM em routers/frota.py)
 const MAINTENANCE_MARGIN_KM = 1000;
@@ -163,8 +164,8 @@ export default function FleetPage() {
   const [vehicles, setVehicles] = useState([]);
   const [vehiclesLoading, setVehiclesLoading] = useState(true);
   const [vehicleSearch, setVehicleSearch] = useState('');
-  const [vehicleTypeFilter, setVehicleTypeFilter] = useState('');
-  const [vehicleStatusFilter, setVehicleStatusFilter] = useState('');
+  const [vehicleTypeFilter, setVehicleTypeFilter] = useUrlState('vehicleType', '');
+  const [vehicleStatusFilter, setVehicleStatusFilter] = useUrlState('vehicleStatus', '');
   const [vehiclePagination, setVehiclePagination] = useState({ page: 1, pages: 1, total: 0 });
   const [selectedVehicleIds, setSelectedVehicleIds] = useState(() => new Set());
   

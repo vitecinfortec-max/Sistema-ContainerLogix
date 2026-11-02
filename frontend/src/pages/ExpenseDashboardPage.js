@@ -10,7 +10,8 @@ import { api } from '../lib/api';
 import { todayISO } from '../lib/dates';
 import { toast } from 'sonner';
 import { PieChart, Wallet, Receipt, Layers, AlertTriangle, FileText, FileSpreadsheet, Tags, TrendingUp, TrendingDown } from 'lucide-react';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const COLORS = [CHART_COLORS.primary, CHART_COLORS.amber, CHART_COLORS.emerald, '#6366f1', '#ef4444', '#06b6d4', '#a855f7', '#84cc16', CHART_COLORS.slate];
 const brl = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDay = (v) => (v ? v.slice(0, 10).split('-').reverse().join('/') : '-');
@@ -43,7 +44,7 @@ async function saveFile(request, filename) {
 // com o período anterior, a evolução mês a mês e os maiores custos.
 export default function ExpenseDashboardPage() {
   const [period, setPeriod] = useState(() => lastMonths(3));
-  const [status, setStatus] = useState('TODAS');
+  const [status, setStatus] = useUrlState('status', 'TODAS');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [groupsOpen, setGroupsOpen] = useState(false);

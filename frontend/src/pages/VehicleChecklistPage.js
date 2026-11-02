@@ -33,6 +33,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatCPF, formatPhone, formatPlate } from '../lib/masks';
 
+import { useUrlState } from '../hooks/useUrlState';
 // Toggle SIM/NÃO compacto por item
 function SimNaoToggle({ value, onChange, testId }) {
   return (
@@ -172,7 +173,7 @@ export default function VehicleChecklistPage() {
   const company = useCompanySettings();
   const [checklists, setChecklists] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');       // o que está no campo
+  const [searchQuery, setSearchQuery] = useUrlState('query', '');       // o que está no campo
   const [appliedSearch, setAppliedSearch] = useState('');   // o que a lista usa (pouco depois de parar de digitar)
   const [resultFilter, setResultFilter] = useState('');
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });

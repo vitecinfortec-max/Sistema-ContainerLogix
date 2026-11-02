@@ -16,7 +16,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, Tag, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 export default function OSCategoriesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [categories, setCategories] = useState([]);
@@ -26,7 +27,7 @@ export default function OSCategoriesPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({ name: '', active: true });
   const [submitting, setSubmitting] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {

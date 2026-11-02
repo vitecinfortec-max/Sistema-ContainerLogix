@@ -22,6 +22,7 @@ import { todayISO } from '../lib/dates';
 import { activeRecords } from '../lib/cadastroStatus';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useUrlState } from '../hooks/useUrlState';
 import {
   HardHat, Plus, Pencil, Trash2, Save, FileSignature, FileText, PenLine, Users, PackageCheck, AlertTriangle,
 } from 'lucide-react';
@@ -60,9 +61,9 @@ export default function EpiDeliveriesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const [people, setPeople] = useState([]);

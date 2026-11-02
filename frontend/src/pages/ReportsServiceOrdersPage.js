@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 import { FileText, FileSpreadsheet, BarChart3, ClipboardList, Wallet, Gauge, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const STATUS_OPTIONS = [
   ['ABERTO', 'Aberto'],
   ['ANDAMENTO', 'Em Andamento'],
@@ -30,11 +31,11 @@ const DAILY_SERIES = [
 ];
 
 export default function ReportsServiceOrdersPage() {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [equipmentPlate, setEquipmentPlate] = useState('');
-  const [status, setStatus] = useState('all');
-  const [category, setCategory] = useState('all');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
+  const [equipmentPlate, setEquipmentPlate] = useUrlState('equipmentPlate', '');
+  const [status, setStatus] = useUrlState('status', 'all');
+  const [category, setCategory] = useUrlState('category', 'all');
   const [loading, setLoading] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [categories, setCategories] = useState([]);

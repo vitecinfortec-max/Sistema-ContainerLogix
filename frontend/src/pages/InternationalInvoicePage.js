@@ -22,7 +22,8 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const ITEMS_PER_PAGE = 15;
 
 const CURRENCIES = [
@@ -43,8 +44,8 @@ export default function InternationalInvoicePage() {
   const [totalInvoices, setTotalInvoices] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterCurrency, setFilterCurrency] = useState('');
+  const [filterStatus, setFilterStatus] = useUrlState('status', '');
+  const [filterCurrency, setFilterCurrency] = useUrlState('currency', '');
   
   // Estado do Modal de Nova Invoice
   const [showNewInvoice, setShowNewInvoice] = useState(false);
@@ -108,7 +109,7 @@ export default function InternationalInvoicePage() {
   // Estado de Seleção (toolbar)
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
-  const [period, setPeriod] = useState(['', '']);
+  const [period, setPeriod] = useUrlState('period', ['', '']);
   const changePeriod = (value) => { setPeriod(value); setCurrentPage(1); };
 
   useEffect(() => {

@@ -14,7 +14,8 @@ import { FileText, FileSpreadsheet, X, BarChart3, Mail, List, LogIn, LogOut, Pac
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 import { toLocalDay } from '../lib/dates';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 function yesterdayISO() {
   const d = new Date();
   d.setDate(d.getDate() - 1);
@@ -34,11 +35,11 @@ export default function ReportsMovementsPage() {
   const [sendingEmails, setSendingEmails] = useState(false);
   const [emailResult, setEmailResult] = useState(null);
 
-  const [filterType, setFilterType] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterType, setFilterType] = useUrlState('type', 'all');
+  const [filterStatus, setFilterStatus] = useUrlState('status', 'all');
   const [filterClient, setFilterClient] = useState('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
 
   // Prévia do relatório: mesma lista que vai pro PDF/Excel, uma página por vez
   const PREVIEW_PAGE_SIZE = 15;

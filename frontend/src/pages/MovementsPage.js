@@ -29,7 +29,8 @@ import {
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { scrollBehavior } from '../lib/reducedMotion';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const ITEMS_PER_PAGE = 15;
 const STATUS_LABELS = { CHEIO: 'Cheio', VAZIO: 'Vazio' };
 const formatCount = (n) => n.toLocaleString('pt-BR');
@@ -48,14 +49,14 @@ export default function MovementsPage() {
   const [stats, setStats] = useState(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
-  const [filterType, setFilterType] = useState('all');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [searchClient, setSearchClient] = useState('');
-  const [searchContainer, setSearchContainer] = useState('');
-  const [searchMovement, setSearchMovement] = useState('');
-  const [searchDriver, setSearchDriver] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [filterType, setFilterType] = useUrlState('type', 'all');
+  const [filterStatus, setFilterStatus] = useUrlState('status', 'all');
+  const [searchClient, setSearchClient] = useUrlState('client', '');
+  const [searchContainer, setSearchContainer] = useUrlState('container', '');
+  const [searchMovement, setSearchMovement] = useUrlState('movement', '');
+  const [searchDriver, setSearchDriver] = useUrlState('driver', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   const [deleteId, setDeleteId] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [cloneId, setCloneId] = useState(null);

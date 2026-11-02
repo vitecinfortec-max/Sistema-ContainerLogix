@@ -25,7 +25,8 @@ import { Plus, Pencil, Trash2, Save, PackageCheck, Download, Printer, Clock, Che
 import { formatContainerNumber } from '../lib/containerNumber';
 import { toLocalDay } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const ORDER_TYPE_OPTIONS = [
   ['COLETA', 'Coleta de Container'],
   ['ENTREGA', 'Entrega de Container'],
@@ -86,11 +87,11 @@ export default function LoadingOrderPage() {
   const isAdmin = user?.role === 'admin';
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
+  const [typeFilter, setTypeFilter] = useUrlState('type', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   // Status, tipo e período filtram a lista já carregada (a busca vai ao servidor)
   const filtered = list.filter((o) => {
     if (statusFilter && o.status !== statusFilter) return false;

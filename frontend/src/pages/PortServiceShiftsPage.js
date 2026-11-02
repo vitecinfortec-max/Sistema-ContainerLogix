@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { FileText, FileSpreadsheet, Timer, Anchor, CheckCircle2, TrendingUp, TrendingDown, AlertTriangle, BadgeDollarSign } from 'lucide-react';
 
+import { useUrlState } from '../hooks/useUrlState';
 const TURNO_OPTIONS = [
   ['DIA', 'Dia'],
   ['NOITE', 'Noite'],
@@ -73,9 +74,9 @@ export default function PortServiceShiftsPage() {
   const isAdmin = user?.role === 'admin';
   const [dateFrom, setDateFrom] = useState(firstDayOfMonth);
   const [dateTo, setDateTo] = useState(todayISO);
-  const [clientName, setClientName] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [turno, setTurno] = useState('all');
+  const [clientName, setClientName] = useUrlState('clientName', '');
+  const [clientId, setClientId] = useUrlState('clientId', '');
+  const [turno, setTurno] = useUrlState('turno', 'all');
   const [clients, setClients] = useState([]);
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);

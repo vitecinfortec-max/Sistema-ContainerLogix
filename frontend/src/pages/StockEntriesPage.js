@@ -15,7 +15,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Upload, FileUp, ArrowLeft, Loader2, PackagePlus, Sparkles, Undo2, AlertTriangle } from 'lucide-react';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (v) => {
   if (!v) return '-';
@@ -37,7 +38,7 @@ export default function StockEntriesPage() {
   const [reversing, setReversing] = useState(false);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState('upload'); // 'upload' | 'review'

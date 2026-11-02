@@ -22,6 +22,7 @@ import { todayISO } from '../lib/dates';
 import { activeRecords } from '../lib/cadastroStatus';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useUrlState } from '../hooks/useUrlState';
 import {
   Award, Plus, Pencil, Trash2, Save, CheckCircle2, RotateCcw, Ban, Receipt, Clock, ListChecks, Users,
   FileBarChart, Briefcase,
@@ -62,11 +63,11 @@ export default function GratificationsPage() {
   const [roles, setRoles] = useState([]);
   const [people, setPeople] = useState([]);
 
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [roleFilter, setRoleFilter] = useUrlState('role', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   const debouncedSearch = useDebouncedValue(search.trim());
   const listKey = `${debouncedSearch}|${roleFilter}|${statusFilter}|${dateFrom}|${dateTo}`;
   const { pageItems, paginationProps } = usePagination(list, { resetKey: listKey });

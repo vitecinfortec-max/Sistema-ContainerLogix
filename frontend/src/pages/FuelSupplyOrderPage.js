@@ -23,7 +23,8 @@ import { Plus, Pencil, Trash2, Save, ClipboardCheck, Download, Printer, Clock, C
 import { scrollBehavior } from '../lib/reducedMotion';
 import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
   ['DIESEL_S500', 'Diesel S500'],
@@ -78,8 +79,8 @@ export default function FuelSupplyOrderPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all'); // all | PENDENTE | LANCADA
+  const [search, setSearch] = useUrlState('search', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', 'all'); // all | PENDENTE | LANCADA
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [nextNumber, setNextNumber] = useState(null);

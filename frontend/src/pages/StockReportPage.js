@@ -17,6 +17,7 @@ import {
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
+import { useUrlState } from '../hooks/useUrlState';
 const MODELO_OPTIONS = [
   ['INVENTARIO', 'Inventário'],
   ['MOVIMENTACOES', 'Movimentações de Estoque'],
@@ -54,14 +55,14 @@ const LEDGER_DAILY_SERIES = [
 ];
 
 export default function StockReportPage() {
-  const [modelo, setModelo] = useState('INVENTARIO');
+  const [modelo, setModelo] = useUrlState('modelo', 'INVENTARIO');
   const [loading, setLoading] = useState(false);
 
   // ---- Inventário ----
-  const [invSearch, setInvSearch] = useState('');
-  const [warehouseId, setWarehouseId] = useState('all');
-  const [familyId, setFamilyId] = useState('all');
-  const [status, setStatus] = useState('all');
+  const [invSearch, setInvSearch] = useUrlState('invSearch', '');
+  const [warehouseId, setWarehouseId] = useUrlState('warehouseId', 'all');
+  const [familyId, setFamilyId] = useUrlState('familyId', 'all');
+  const [status, setStatus] = useUrlState('status', 'all');
   const [warehouses, setWarehouses] = useState([]);
   const [families, setFamilies] = useState([]);
   const [invSummary, setInvSummary] = useState({ count: 0, total_quantity: 0, total_value: 0, zero_stock_count: 0 });
@@ -69,11 +70,11 @@ export default function StockReportPage() {
   const [invItems, setInvItems] = useState([]);
 
   // ---- Movimentações de Estoque ----
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [ledgerSearch, setLedgerSearch] = useState('');
-  const [operationType, setOperationType] = useState('all');
-  const [referenceType, setReferenceType] = useState('all');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
+  const [ledgerSearch, setLedgerSearch] = useUrlState('ledgerSearch', '');
+  const [operationType, setOperationType] = useUrlState('operationType', 'all');
+  const [referenceType, setReferenceType] = useUrlState('referenceType', 'all');
   const [ledgerSummary, setLedgerSummary] = useState({ entrada_count: 0, entrada_value: 0, saida_count: 0, saida_value: 0 });
   const [dailyChart, setDailyChart] = useState([]);
   const [ledgerRows, setLedgerRows] = useState([]);

@@ -17,7 +17,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, Route as RouteIcon, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const STATUS_OPTIONS = [
   ['ATIVO', 'Ativo'],
   ['INATIVO', 'Inativo'],
@@ -42,8 +43,8 @@ export default function FreightRoutesPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState(buildEmpty());
   const [submitting, setSubmitting] = useState(false);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   useEffect(() => {

@@ -13,7 +13,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Edit, Trash2, FileText, Printer, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 // Situação: antigas foram gravadas como "ATIVO" = em aberto
 const PROPOSAL_STATUS = {
   EM_ABERTO: { label: 'Em aberto', tone: 'blue' },
@@ -40,10 +41,10 @@ export default function ComercialProposalsPage() {
   const navigate = useNavigate();
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useUrlState('term', '');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [downloadingId, setDownloadingId] = useState(null);
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useUrlState('status', 'ALL');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
   useEffect(() => {

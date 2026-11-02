@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
@@ -19,12 +19,12 @@ import { Package, Clock, AlertTriangle, FileText, FileSpreadsheet, Eye, LogOut, 
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatPlate } from '../lib/masks';
+import { useUrlState } from '../hooks/useUrlState';
 
 const ITEMS_PER_PAGE = 20;
 
 export default function YardControlPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const [containers, setContainers] = useState([]);
   const [stats, setStats] = useState({
     total: 0,
@@ -60,16 +60,16 @@ export default function YardControlPage() {
   const [savingExit, setSavingExit] = useState(false);
   
   // Filtros
-  // Link do sino de alertas chega com ?min_days=61 para já abrir filtrado
-  const [filters, setFilters] = useState(() => ({
+  // Ficam na URL; o link do sino de alertas chega com ?min_days=61 para já abrir filtrado
+  const [filters, setFilters] = useUrlState('filters', {
     status_filter: '',
     client_name: '',
     shipping_line: '',
-    min_days: new URLSearchParams(location.search).get('min_days') || '',
+    min_days: '',
     movement_type: '',
     date_from: '',
     date_to: ''
-  }));
+  });
   // Filtra enquanto se digita/escolhe, sem botão "Filtrar"
   const appliedFilters = useDebouncedValue(filters);
   const [clientInputFocused, setClientInputFocused] = useState(false);

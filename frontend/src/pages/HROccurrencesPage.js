@@ -19,7 +19,8 @@ import { todayISO } from '../lib/dates';
 import { ContractPicker, errorDetail, fmtDate, saveBlob, useContracts, useHRMeta } from '../components/HRKit';
 import { toast } from 'sonner';
 import { MessageSquareWarning, Plus, Pencil, Trash2, Save, FileSignature, Paperclip, X, Stethoscope, Ban, ShieldAlert } from 'lucide-react';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const TONES = {
   ADVERTENCIA: 'amber', SUSPENSAO: 'red', ATESTADO: 'blue', FALTA_JUSTIFICADA: 'slate', FALTA_INJUSTIFICADA: 'red',
   AFASTAMENTO_INSS: 'amber', ACIDENTE_TRABALHO: 'red', LICENCA_MATERNIDADE: 'blue', LICENCA_PATERNIDADE: 'blue', ELOGIO: 'emerald', OUTRO: 'slate',
@@ -33,10 +34,10 @@ export default function HROccurrencesPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [typeFilter, setTypeFilter] = useUrlState('type', '');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   const debouncedSearch = useDebouncedValue(search.trim());
   const listKey = `${debouncedSearch}|${typeFilter}|${dateFrom}|${dateTo}`;
   const { pageItems, paginationProps } = usePagination(list, { resetKey: listKey });

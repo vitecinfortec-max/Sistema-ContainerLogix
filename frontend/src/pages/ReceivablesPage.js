@@ -14,7 +14,8 @@ import { PiggyBank, Clock, AlertTriangle, CheckCircle2, Timer, Printer, FileSpre
 import { format } from 'date-fns';
 import { todayISO, calendarDate } from '../lib/dates';
 import { cn } from '../lib/utils';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatDay = (value) => (value ? format(calendarDate(value), 'dd/MM/yyyy') : '-');
 
@@ -51,11 +52,11 @@ async function download(request, params, filename) {
 export default function ReceivablesPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState('PENDENTE');
-  const [clientQuery, setClientQuery] = useState('');
-  const [dateField, setDateField] = useState('issue');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [status, setStatus] = useUrlState('status', 'PENDENTE');
+  const [clientQuery, setClientQuery] = useUrlState('clientQuery', '');
+  const [dateField, setDateField] = useUrlState('dateField', 'issue');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   const debouncedClient = useDebouncedValue(clientQuery.trim());
 
   const params = () => {

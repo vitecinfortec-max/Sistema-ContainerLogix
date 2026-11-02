@@ -26,6 +26,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
 
+import { useUrlState } from '../hooks/useUrlState';
 // Status do registro (ATIVO/CONCLUIDO/CANCELADO) é derivado automaticamente
 // pelo backend a partir de items[].delivery_completed - ver
 // _compute_delivery_status em routers/delivery_status.py.
@@ -39,8 +40,8 @@ export default function DeliveryStatusPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useUrlState('query', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
 
   // Modal de novo status
@@ -71,7 +72,7 @@ export default function DeliveryStatusPage() {
   // Filtra enquanto se digita (sem botão "Filtrar"); o filtro vale também ao
   // trocar de página e ao recarregar depois de salvar.
   const debouncedNumber = useDebouncedValue(searchQuery.trim());
-  const [textSearch, setTextSearch] = useState('');
+  const [textSearch, setTextSearch] = useUrlState('textSearch', '');
   const debouncedText = useDebouncedValue(textSearch.trim());
   const [stats, setStats] = useState({ ATIVO: 0, CONCLUIDO: 0, CANCELADO: 0 });
   const [reportOpen, setReportOpen] = useState(false);

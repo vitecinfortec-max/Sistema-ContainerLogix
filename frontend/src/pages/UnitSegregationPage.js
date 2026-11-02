@@ -22,6 +22,7 @@ import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
 import PhotoLightbox from '../components/checklist/PhotoLightbox';
 
+import { useUrlState } from '../hooks/useUrlState';
 // Mesmo limite do backend (MAX_PHOTOS_PER_CONTAINER em routers/unit_segregation.py)
 const MAX_PHOTOS_PER_CONTAINER = 6;
 
@@ -85,8 +86,8 @@ export default function UnitSegregationPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [segregations, setSegregations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useUrlState('query', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
@@ -130,7 +131,7 @@ export default function UnitSegregationPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const [period, setPeriod] = useState(['', '']);
+  const [period, setPeriod] = useUrlState('period', ['', '']);
   const changePeriod = (value) => { setPeriod(value); setPagination(prev => ({ ...prev, page: 1 })); };
 
   useEffect(() => {

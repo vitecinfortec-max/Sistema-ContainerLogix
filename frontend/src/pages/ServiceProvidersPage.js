@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { formatPhone } from '../lib/masks';
 
+import { useUrlState } from '../hooks/useUrlState';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (v) => (v ? v.slice(0, 10).split('-').reverse().join('/') : '-');
 const fmtQty = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
@@ -70,9 +71,9 @@ export default function ServiceProvidersPage() {
   const [entries, setEntries] = useState([]);
   const [advances, setAdvances] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [providerFilter, setProviderFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [providerFilter, setProviderFilter] = useUrlState('provider', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
   const [period, setPeriod] = useState(monthPeriod);
   const [selectedId, setSelectedId] = useState(null);
   const [busy, setBusy] = useState('');

@@ -16,7 +16,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, ClipboardList, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 export default function ServiceTypesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [serviceTypes, setServiceTypes] = useState([]);
@@ -26,7 +27,7 @@ export default function ServiceTypesPage() {
   const [editId, setEditId] = useState(null);
   const [formData, setFormData] = useState({ name: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [pagination, setPagination] = useState({
     page: 1,

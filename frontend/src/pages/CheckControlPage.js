@@ -24,7 +24,8 @@ import {
 import { format } from 'date-fns';
 import { todayISO, calendarDate } from '../lib/dates';
 import { compressImage } from '../lib/imageCompression';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const PAGE_SIZE = 15;
 
 const STATUS = {
@@ -121,11 +122,11 @@ export default function CheckControlPage() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [suppliers, setSuppliers] = useState([]);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [dateField, setDateField] = useState('due_date');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [searchQuery, setSearchQuery] = useUrlState('query', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
+  const [dateField, setDateField] = useUrlState('dateField', 'due_date');
+  const [dateFrom, setDateFrom] = useUrlState('dateFrom', '');
+  const [dateTo, setDateTo] = useUrlState('dateTo', '');
   const debouncedSearch = useDebouncedValue(searchQuery.trim());
 
   const [modalOpen, setModalOpen] = useState(false);

@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { formatCPF, formatPhone } from '../lib/masks';
 
+import { useUrlState } from '../hooks/useUrlState';
 function emptyForm() {
   return {
     person_type: '', person_id: '', person_label: '',
@@ -53,9 +54,9 @@ export default function HRContractsPage() {
   const [positions, setPositions] = useState([]);
   const [people, setPeople] = useState([]);
 
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('VIGENTE');
-  const [typeFilter, setTypeFilter] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', 'VIGENTE');
+  const [typeFilter, setTypeFilter] = useUrlState('type', '');
   const debouncedSearch = useDebouncedValue(search.trim());
   const listKey = `${debouncedSearch}|${statusFilter}|${typeFilter}`;
   const { pageItems, paginationProps } = usePagination(list, { resetKey: listKey });

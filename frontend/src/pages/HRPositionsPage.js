@@ -19,6 +19,7 @@ import { formatMoney, errorDetail } from '../components/HRKit';
 import { toast } from 'sonner';
 import { BriefcaseBusiness, Pencil, Plus, Save, Trash2 } from 'lucide-react';
 
+import { useUrlState } from '../hooks/useUrlState';
 const EMPTY = { name: '', department: '', cbo: '', salary_min: '', salary_max: '', description: '', status: 'ATIVO' };
 
 export default function HRPositionsPage() {
@@ -26,8 +27,8 @@ export default function HRPositionsPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useUrlState('search', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
   const debouncedSearch = useDebouncedValue(search.trim());
   const listKey = `${debouncedSearch}|${statusFilter}`;
   const { pageItems, paginationProps } = usePagination(list, { resetKey: listKey });

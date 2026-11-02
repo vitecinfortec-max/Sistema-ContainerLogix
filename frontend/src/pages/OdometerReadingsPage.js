@@ -22,7 +22,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const fmtKm = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR')} km`;
 
 const fmtDate = (d) => {
@@ -81,8 +82,8 @@ export default function OdometerReadingsPage() {
   const [formData, setFormData] = useState(createEmptyForm());
 
   // Filtros da lista (filtram enquanto se digita)
-  const [plateFilter, setPlateFilter] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('all');
+  const [plateFilter, setPlateFilter] = useUrlState('plate', '');
+  const [sourceFilter, setSourceFilter] = useUrlState('source', 'all');
   const debouncedPlate = useDebouncedValue(plateFilter.trim());
 
   useEffect(() => {

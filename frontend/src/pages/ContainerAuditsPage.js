@@ -15,7 +15,8 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Eye, Trash2, ListChecks } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
+
+import { useUrlState } from '../hooks/useUrlState';
 const STATUS_TONES = {
   EM_ANDAMENTO: 'amber',
   CONCLUIDA: 'emerald',
@@ -30,9 +31,9 @@ export default function ContainerAuditsPage() {
   const navigate = useNavigate();
   const [audits, setAudits] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [period, setPeriod] = useState(['', '']);
+  const [searchTerm, setSearchTerm] = useUrlState('term', '');
+  const [statusFilter, setStatusFilter] = useUrlState('status', '');
+  const [period, setPeriod] = useUrlState('period', ['', '']);
   const debouncedSearch = useDebouncedValue(searchTerm.trim());
   // Busca e período rodam no servidor: filtrar só a página aberta escondia
   // as auditorias das outras páginas
