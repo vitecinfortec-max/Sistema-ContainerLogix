@@ -365,6 +365,7 @@ export const api = {
 
   // Terminal - Orçamento de Reparo
   getRepairEstimates: (params) => axios.get(`${API}/repair-estimates`, { params }),
+  getRepairEstimate: (id) => axios.get(`${API}/repair-estimates/${id}`),
   getRepairEstimatesSummary: () => axios.get(`${API}/repair-estimates/summary`),
   getRepairEstimatesLastPrices: () => axios.get(`${API}/repair-estimates/last-prices`),
   createRepairEstimate: (data) => axios.post(`${API}/repair-estimates`, data),

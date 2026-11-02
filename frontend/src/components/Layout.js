@@ -396,7 +396,7 @@ function LayoutFrame({ children }) {
     if (savedOpcoesSistema !== null) setOpcoesSistemaOpen(JSON.parse(savedOpcoesSistema));
   }, []);
 
-  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname === '/repair-estimates' || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname === '/unit-segregation';
+  const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname.startsWith('/repair-estimates') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname.startsWith('/unit-segregation');
   const isCadastroActive = location.pathname === '/cadastro' || location.pathname === '/company-settings';
   const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/checks' || location.pathname === '/gratifications' || location.pathname === '/service-providers' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/client-credits' || location.pathname === '/port-services-billing';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
@@ -783,6 +783,10 @@ function LayoutFrame({ children }) {
     if (location.pathname.includes('/container-vistorias/') && location.pathname !== '/container-vistorias/new') return 'Detalhes da Vistoria de Container';
     if (location.pathname.includes('/container-audits/') && location.pathname !== '/container-audits/new') return 'Detalhe da Auditoria';
     if (location.pathname.includes('/comercial/proposta/') && location.pathname !== '/comercial/proposta/new') return 'Editar Proposta Comercial';
+    if (location.pathname === '/unit-segregation/new') return 'Nova Segregação de Unidade';
+    if (location.pathname.startsWith('/unit-segregation/')) return 'Editar Segregação de Unidade';
+    if (location.pathname === '/repair-estimates/new') return 'Novo Orçamento de Reparo';
+    if (location.pathname.startsWith('/repair-estimates/')) return 'Editar Orçamento de Reparo';
     if (location.pathname.startsWith('/comercial/tabela-servicos/')) return 'Tabela de Serviços';
     return 'ContainerLogix';
   }, [location.pathname, location.search]);

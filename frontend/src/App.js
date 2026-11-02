@@ -104,6 +104,7 @@ const HRTimeBankPage = lazyPage(() => import('./pages/HRTimeBankPage'));
 const HRDocumentsPage = lazyPage(() => import('./pages/HRDocumentsPage'));
 const HRReportsPage = lazyPage(() => import('./pages/HRReportsPage'));
 const RepairEstimatesPage = lazyPage(() => import('./pages/RepairEstimatesPage'));
+const RepairEstimateFormPage = lazyPage(() => import('./pages/RepairEstimateFormPage'));
 const ReceivablesPage = lazyPage(() => import('./pages/ReceivablesPage'));
 const FinancialSummaryPage = lazyPage(() => import('./pages/FinancialSummaryPage'));
 const ClientCreditsPage = lazyPage(() => import('./pages/ClientCreditsPage'));
@@ -117,6 +118,7 @@ const PortServiceShiftsPage = lazyPage(() => import('./pages/PortServiceShiftsPa
 const PortServiceBillingPage = lazyPage(() => import('./pages/PortServiceBillingPage'));
 const InternationalInvoicePage = lazyPage(() => import('./pages/InternationalInvoicePage'));
 const UnitSegregationPage = lazyPage(() => import('./pages/UnitSegregationPage'));
+const UnitSegregationFormPage = lazyPage(() => import('./pages/UnitSegregationFormPage'));
 const RPATerceiroPage = lazyPage(() => import('./pages/RPATerceiroPage'));
 const OrdemServicoPage = lazyPage(() => import('./pages/OrdemServicoPage'));
 const FuelSupplyPage = lazyPage(() => import('./pages/FuelSupplyPage'));
@@ -630,6 +632,22 @@ function App() {
             }
           />
           <Route
+            path="/repair-estimates/new"
+            element={
+              <ProtectedRoute moduleKey="terminal.orcamento_reparo">
+                <RepairEstimateFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/repair-estimates/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="terminal.orcamento_reparo">
+                <RepairEstimateFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/container-vistorias/:id/edit"
             element={
               <ProtectedRoute moduleKey="terminal.vistoria_container">
@@ -970,6 +988,22 @@ function App() {
             element={
               <ProtectedRoute moduleKey="terminal.movimentacoes">
                 <UnitSegregationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/unit-segregation/new"
+            element={
+              <ProtectedRoute moduleKey="terminal.movimentacoes">
+                <UnitSegregationFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/unit-segregation/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="terminal.movimentacoes">
+                <UnitSegregationFormPage />
               </ProtectedRoute>
             }
           />

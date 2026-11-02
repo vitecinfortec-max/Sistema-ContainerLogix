@@ -270,7 +270,7 @@ export default function ContainerVistoriaDetailPage() {
                   </Button>
                 )}
                 {!vistoria.no_damage && vistoria.damage_items?.length > 0 && isModuleEnabled('terminal.orcamento_reparo') && (
-                  <Button variant="outline" onClick={() => navigate(`/repair-estimates?vistoria=${id}`)} data-testid="generate-estimate-btn">
+                  <Button variant="outline" onClick={() => navigate(`/repair-estimates/new?vistoria=${id}`)} data-testid="generate-estimate-btn">
                     <FileWarning className="w-4 h-4 mr-2" />
                     Gerar orçamento
                   </Button>
