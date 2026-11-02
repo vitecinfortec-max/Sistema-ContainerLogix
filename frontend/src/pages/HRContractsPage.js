@@ -424,8 +424,8 @@ export default function HRContractsPage() {
                       <td>
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="cell-strong max-w-[220px] truncate" title={c.person_name}>{c.person_name}</span>
-                          {c.person_type === 'MOTORISTA' && <StatusPill tone="slate" dot={false} className="text-[10px] px-1.5">Motorista</StatusPill>}
-                          {c.salary_advance && <StatusPill tone="blue" dot={false} className="text-[10px] px-1.5" title="Recebe adiantamento quinzenal">Vale</StatusPill>}
+                          {c.person_type === 'MOTORISTA' && <StatusPill tone="slate" dot={false} className="text-[11px] px-1.5">Motorista</StatusPill>}
+                          {c.salary_advance && <StatusPill tone="blue" dot={false} className="text-[11px] px-1.5" title="Recebe adiantamento quinzenal">Vale</StatusPill>}
                         </div>
                       </td>
                       <td>{c.position_name || '-'}</td>

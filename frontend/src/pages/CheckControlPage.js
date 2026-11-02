@@ -496,10 +496,10 @@ export default function CheckControlPage() {
               </Select>
             </FilterField>
             <div className="grid grid-cols-2 gap-2">
-              <FilterField label="De">
+              <FilterField label="Data inicial">
                 <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => changeFilter(setDateFrom)(e.target.value)} />
               </FilterField>
-              <FilterField label="Até">
+              <FilterField label="Data final">
                 <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => changeFilter(setDateTo)(e.target.value)} />
               </FilterField>
             </div>

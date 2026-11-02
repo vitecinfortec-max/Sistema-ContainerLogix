@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
   return (
     <div
       className="relative min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: 'radial-gradient(120% 90% at 18% 8%, #0c9a8a 0%, #06584f 46%, #032a27 100%)' }}
+      style={{ background: 'radial-gradient(120% 90% at 18% 8%, var(--login-glow) 0%, var(--login-mid) 46%, var(--login-deep) 100%)' }}
     >
       <Card className="w-full max-w-md relative z-10 shadow-2xl">
         <CardHeader className="space-y-1 text-center">

@@ -308,7 +308,7 @@ export default function ReportsBillingPage() {
           )}
         >
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <FilterField label="Data início">
+            <FilterField label="Data inicial">
               <Input
                 type="date"
                 value={dateFrom}
@@ -317,7 +317,7 @@ export default function ReportsBillingPage() {
                 data-testid="report-billing-date-from"
               />
             </FilterField>
-            <FilterField label="Data fim">
+            <FilterField label="Data final">
               <Input
                 type="date"
                 value={dateTo}

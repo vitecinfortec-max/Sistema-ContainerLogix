@@ -526,7 +526,7 @@ export default function YardControlPage() {
                           <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">{container.container_number}</span>
                           {container.is_segregated && (
                             <span title={`Reservado para: ${container.segregation_client}`}>
-                              <StatusPill tone="amber" dot={false} className="!text-[10px] !px-1.5">SEGREGADO</StatusPill>
+                              <StatusPill tone="amber" dot={false} className="!text-[11px] !px-1.5">SEGREGADO</StatusPill>
                             </span>
                           )}
                         </div>

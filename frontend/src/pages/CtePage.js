@@ -942,7 +942,7 @@ export default function CtePage() {
                         <StatusPill tone={CTE_STATUS_TONES[c.status] || 'slate'} title={c.motivo || c.chave || ''}>
                           {CTE_STATUS_LABELS[c.status] || c.status}
                         </StatusPill>
-                        {c.ambiente === 'homologacao' && <span className="ml-1 text-[10px] text-slate-400 uppercase">homolog.</span>}
+                        {c.ambiente === 'homologacao' && <span className="ml-1 text-[11px] text-slate-400">homologação</span>}
                         {c.mdfe_numero && <div className="text-[11px] text-slate-500">MDF-e nº {c.mdfe_numero}</div>}
                       </td>
                       <td className="tabular-nums">{c.loading_order_number ? `#${c.loading_order_number}` : '-'}</td>

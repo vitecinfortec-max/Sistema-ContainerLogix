@@ -169,10 +169,10 @@ export default function ContainerInspectionsPage() {
             <FilterField label="Container, booking ou cliente" className="sm:col-span-2">
               <SearchInput value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} data-testid="search-inspection" />
             </FilterField>
-            <FilterField label="De">
+            <FilterField label="Data inicial">
               <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="inspection-date-from" />
             </FilterField>
-            <FilterField label="Até">
+            <FilterField label="Data final">
               <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="inspection-date-to" />
             </FilterField>
             <FilterField label="Estado">

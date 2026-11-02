@@ -169,10 +169,10 @@ export default function ContainerVistoriasPage() {
             <FilterField label="Container ou cliente" className="sm:col-span-2">
               <SearchInput value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} data-testid="search-vistoria" />
             </FilterField>
-            <FilterField label="De">
+            <FilterField label="Data inicial">
               <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="vistoria-date-from" />
             </FilterField>
-            <FilterField label="Até">
+            <FilterField label="Data final">
               <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="vistoria-date-to" />
             </FilterField>
             <FilterField label="Estado">

@@ -160,10 +160,10 @@ export default function AuditLogPage() {
 
         <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-            <FilterField label="De">
+            <FilterField label="Data inicial">
               <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => changeFilter(setDateFrom)(e.target.value)} />
             </FilterField>
-            <FilterField label="Até">
+            <FilterField label="Data final">
               <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => changeFilter(setDateTo)(e.target.value)} />
             </FilterField>
             <FilterField label="Usuário">

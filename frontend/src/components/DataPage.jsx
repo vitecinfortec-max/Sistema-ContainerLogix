@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, RotateCw, Search, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, riseIn, staggerParent, AnimatedNumber, EASE, DURATION } from './Motion';
 import { scrollBehavior } from '../lib/reducedMotion';
+import { useLoadError } from './PageGuard';
 
 // Blocos compartilhados das telas de listagem (cabeçalho de filtros,
 // indicadores, card da lista com barra de ações, paginação, selos de status).
@@ -41,10 +42,19 @@ const ICON_TONES = {
   slate: 'text-slate-600 dark:text-slate-300',
 };
 
+// Ícone do indicador: neutro; só alerta (vermelho) e atenção (âmbar) ganham cor
+const STAT_ICON_TONES = {
+  neutral: 'text-slate-400 dark:text-slate-500',
+  red: ICON_TONES.red,
+  amber: ICON_TONES.amber,
+};
+
 const SURFACE = 'rounded-lg border border-slate-200 dark:border-slate-700 bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]';
 
 /** Indicador numérico (KPI) no topo da tela. */
 export function StatCard({ label, value, icon: Icon, tone = 'primary', hint, testId }) {
+  // Leitura da tela falhou: o número não é confiável, então não mostra 0
+  const { failed } = useLoadError();
   return (
     <motion.div
       variants={riseIn}
@@ -53,14 +63,12 @@ export function StatCard({ label, value, icon: Icon, tone = 'primary', hint, tes
       title={[label, hint].filter(Boolean).join(' · ')}
     >
       {Icon && (
-        <div className={cn('hidden xl:flex w-9 h-9 rounded-full items-center justify-center shrink-0', SOFT_TONES[tone] || SOFT_TONES.primary)}>
-          <Icon className="w-[18px] h-[18px]" />
-        </div>
+        <Icon className={cn('hidden xl:block w-5 h-5 shrink-0', STAT_ICON_TONES[tone] || STAT_ICON_TONES.neutral)} aria-hidden="true" />
       )}
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{label}</p>
-        <p className="text-lg xl:text-xl font-semibold leading-tight tabular-nums text-slate-900 dark:text-slate-100 truncate whitespace-nowrap"><AnimatedNumber value={value} /></p>
-        {hint && <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{hint}</p>}
+        <p className="text-lg xl:text-xl font-semibold leading-tight tabular-nums text-slate-900 dark:text-slate-100 truncate whitespace-nowrap">{failed ? '—' : <AnimatedNumber value={value} />}</p>
+        {hint && !failed && <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{hint}</p>}
       </div>
     </motion.div>
   );
@@ -93,11 +101,15 @@ export function StatGrid({ children, className }) {
 // aplicado, o selo "ativos" e o "Limpar filtros" continuam à vista.
 const filterStateKey = () => `cl:filters-open:${window.location.pathname}`;
 
+// Sem escolha salva: aberto no computador, fechado no celular (lá os filtros
+// abertos empurram a lista para fora da tela)
 function readFilterOpen() {
+  const byScreen = typeof window.matchMedia !== 'function' || window.matchMedia('(min-width: 768px)').matches;
   try {
-    return window.localStorage.getItem(filterStateKey()) !== '0';
+    const saved = window.localStorage.getItem(filterStateKey());
+    return saved === null ? byScreen : saved !== '0';
   } catch {
-    return true;
+    return byScreen;
   }
 }
 
@@ -127,7 +139,7 @@ export function FilterCard({ children, hasFilters, onClear, actions, title = 'Fi
           <SlidersHorizontal className="w-4 h-4 text-primary" />
           {title}
           {hasFilters && (
-            <span className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold px-1.5 py-px">ativos</span>
+            <span className="rounded-full bg-primary/10 text-primary text-[11px] font-semibold px-1.5 py-px">ativos</span>
           )}
         </button>
         {hasFilters && onClear && (
@@ -169,10 +181,10 @@ export function PeriodFilterFields({ value, onChange, testIdPrefix = 'period' })
   const [from, to] = value;
   return (
     <>
-      <FilterField label="De">
+      <FilterField label="Data inicial">
         <Input type="date" className="h-9 text-sm" value={from} onChange={(e) => onChange([e.target.value, to])} data-testid={`${testIdPrefix}-date-from`} />
       </FilterField>
-      <FilterField label="Até">
+      <FilterField label="Data final">
         <Input type="date" className="h-9 text-sm" value={to} onChange={(e) => onChange([from, e.target.value])} data-testid={`${testIdPrefix}-date-to`} />
       </FilterField>
     </>
@@ -309,7 +321,7 @@ export function UserTag({ name }) {
   const initials = (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
   return (
     <span className="inline-flex items-center gap-2 whitespace-nowrap">
-      <span className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[10px] font-semibold flex items-center justify-center">
+      <span className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-semibold flex items-center justify-center">
         {initials}
       </span>
       {short}
@@ -363,14 +375,33 @@ export function PageSkeleton({ rows = 6, testId }) {
 }
 
 export function EmptyState({ icon: Icon, title, hint, testId, loading = false }) {
+  const { failed, retry } = useLoadError();
   if (loading) return <TableSkeleton testId={testId} />;
+  // Lista vazia porque a leitura falhou: não diz "Nenhum registro"
+  if (failed) {
+    return (
+      <div className="px-6 py-14 text-center" role="alert" data-testid={testId ? `${testId}-load-error` : 'load-error'}>
+        <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center">
+          <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+        </div>
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Não foi possível carregar os dados</p>
+        <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">O servidor não respondeu. Verifique a conexão e tente novamente.</p>
+        {retry && (
+          <Button size="sm" variant="outline" className="mt-4" onClick={retry} data-testid="load-error-retry">
+            <RotateCw className="w-4 h-4 mr-1.5" />
+            Tentar novamente
+          </Button>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="px-6 py-14 text-center" data-testid={testId}>
       {Icon && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: DURATION.base, ease: EASE }}
           className="w-12 h-12 mx-auto mb-3 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
         >
           <Icon className="w-6 h-6 text-slate-400 dark:text-slate-500" />

@@ -450,7 +450,7 @@ export default function GratificationsPage() {
                       <td>
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="cell-strong max-w-[220px] truncate" title={g.person_name}>{g.person_name}</span>
-                          <StatusPill tone={g.person_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[10px] px-1.5">
+                          <StatusPill tone={g.person_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[11px] px-1.5">
                             {TYPE_LABELS[g.person_type]}
                           </StatusPill>
                         </div>
@@ -603,7 +603,7 @@ export default function GratificationsPage() {
               <li key={r.id} className="flex items-center justify-between px-3 py-2 text-sm">
                 <span className="flex items-center gap-2">
                   {r.name}
-                  {r.is_default && <Badge variant="outline" className="text-[10px] px-1.5 py-0">Padrão</Badge>}
+                  {r.is_default && <Badge variant="outline" className="text-[11px] px-1.5 py-0">Padrão</Badge>}
                 </span>
                 {!r.is_default && (
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" aria-label={`Excluir ${r.name}`} title="Excluir" onClick={() => handleDeleteRole(r)}>

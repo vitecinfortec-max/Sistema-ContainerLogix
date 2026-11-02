@@ -834,7 +834,7 @@ export default function MdfePage() {
                         <td className="text-right tabular-nums whitespace-nowrap">{fmtMoney(m.valor_total_carga)}</td>
                         <td>
                           <StatusPill tone={MDFE_STATUS_TONES[m.status] || 'slate'} title={m.motivo || m.chave || ''}>{MDFE_STATUS_LABELS[m.status] || m.status}</StatusPill>
-                          {m.ambiente === 'homologacao' && <span className="ml-1 text-[10px] text-slate-400 uppercase">homolog.</span>}
+                          {m.ambiente === 'homologacao' && <span className="ml-1 text-[11px] text-slate-400">homologação</span>}
                         </td>
                         <td className="whitespace-nowrap tabular-nums">{m.created_at ? format(new Date(m.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
                       </tr>
@@ -1000,7 +1000,7 @@ export default function MdfePage() {
                             <span className="flex-1 min-w-0 truncate">{c.remetente?.nome || '-'} → {c.destinatario?.nome || '-'}</span>
                             <span className="hidden md:block w-44 truncate text-slate-500">{c.destino?.cidade ? `${c.destino.cidade}/${c.destino.uf}` : '-'}</span>
                             <span className="w-28 text-right tabular-nums">{fmtMoney(c.valor_carga || c.valor_total)}</span>
-                            {c.ambiente === 'homologacao' && <span className="text-[10px] uppercase text-slate-400">homolog.</span>}
+                            {c.ambiente === 'homologacao' && <span className="text-[11px] text-slate-400">homologação</span>}
                           </label>
                         );
                       })}

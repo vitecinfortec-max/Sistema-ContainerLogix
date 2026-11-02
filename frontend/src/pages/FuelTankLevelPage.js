@@ -429,7 +429,7 @@ export default function FuelTankLevelPage() {
                     // Marca do alerta mínimo embaixo da régua da barra
                     <div className="relative h-4 mt-0.5" title="Alerta mínimo">
                       <span
-                        className="absolute flex flex-col items-center -translate-x-1/2 text-[10px] font-semibold leading-none text-red-600 dark:text-red-400"
+                        className="absolute flex flex-col items-center -translate-x-1/2 text-[11px] font-semibold leading-none text-red-600 dark:text-red-400"
                         style={{ left: `${minFraction * 100}%` }}
                       >
                         <span className="w-0 h-0 border-x-4 border-x-transparent border-b-[5px] border-b-red-500" />

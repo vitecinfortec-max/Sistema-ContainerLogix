@@ -112,7 +112,7 @@ export default function VehiclePhotoGuide({ vehicleType, slots, active, doneType
             {slot ? slot.label : 'Visão geral'}
           </motion.span>
         </AnimatePresence>
-        <span className="hidden items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[10px] font-medium text-slate-500 shadow-sm backdrop-blur group-has-[[data-stage=ready]]:inline-flex motion-reduce:!hidden dark:bg-slate-900/70 dark:text-slate-300">
+        <span className="hidden items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur group-has-[[data-stage=ready]]:inline-flex motion-reduce:!hidden dark:bg-slate-900/70 dark:text-slate-300">
           <Rotate3d className="h-3 w-3" />
           Arraste para girar
         </span>

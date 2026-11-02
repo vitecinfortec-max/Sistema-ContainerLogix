@@ -442,7 +442,7 @@ export default function EpiDeliveriesPage() {
                         <td>
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="cell-strong max-w-[220px] truncate" title={d.recipient_name}>{d.recipient_name}</span>
-                            <StatusPill tone={d.recipient_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[10px] px-1.5">
+                            <StatusPill tone={d.recipient_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[11px] px-1.5">
                               {TYPE_LABELS[d.recipient_type]}
                             </StatusPill>
                           </div>

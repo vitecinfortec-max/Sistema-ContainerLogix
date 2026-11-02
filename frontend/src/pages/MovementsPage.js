@@ -377,10 +377,10 @@ export default function MovementsPage() {
 
         <FilterCard hasFilters={hasFilters} onClear={clearAllFilters}>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-            <FilterField label="Data início">
+            <FilterField label="Data inicial">
               <Input type="date" value={dateFrom} onChange={e => onFilter(setDateFrom)(e.target.value)} className="h-9 text-sm" data-testid="date-from-input" />
             </FilterField>
-            <FilterField label="Data fim">
+            <FilterField label="Data final">
               <Input type="date" value={dateTo} onChange={e => onFilter(setDateTo)(e.target.value)} className="h-9 text-sm" data-testid="date-to-input" />
             </FilterField>
             <FilterField label="Tipo">

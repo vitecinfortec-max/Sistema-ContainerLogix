@@ -135,7 +135,7 @@ export default function CommandPalette({ open, onOpenChange, items }) {
             className="w-full h-12 text-sm bg-transparent focus:outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500"
             data-testid="command-palette-input"
           />
-          <kbd className="hidden sm:inline text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 flex-shrink-0">Esc</kbd>
+          <kbd className="hidden sm:inline text-[11px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5 flex-shrink-0">Esc</kbd>
         </div>
         <div className="max-h-96 overflow-y-auto py-1">
           {flatResults.length === 0 ? (

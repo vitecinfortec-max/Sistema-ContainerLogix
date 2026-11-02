@@ -149,10 +149,10 @@ export default function ReportsPortServicesPage() {
           )}
         >
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <FilterField label="Data início">
+            <FilterField label="Data inicial">
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="report-port-services-date-from" />
             </FilterField>
-            <FilterField label="Data fim">
+            <FilterField label="Data final">
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="report-port-services-date-to" />
             </FilterField>
             <FilterField label="Cliente">

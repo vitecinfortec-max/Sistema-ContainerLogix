@@ -101,10 +101,10 @@ export default function FinancialSummaryPage() {
               <Input type="month" className="h-9 text-sm" value={dateFrom.slice(0, 7) === dateTo.slice(0, 7) ? dateFrom.slice(0, 7) : ''}
                 onChange={(e) => e.target.value && setPeriod(monthRange(e.target.value))} data-testid="summary-month" />
             </FilterField>
-            <FilterField label="De">
+            <FilterField label="Data inicial">
               <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setPeriod([e.target.value, dateTo])} />
             </FilterField>
-            <FilterField label="Até">
+            <FilterField label="Data final">
               <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setPeriod([dateFrom, e.target.value])} />
             </FilterField>
           </div>

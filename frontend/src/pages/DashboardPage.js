@@ -570,7 +570,7 @@ export default function DashboardPage() {
                   {dailyTrend.length > 1 ? (
                     <div className="text-right" data-testid="entries-trend">
                       <Sparkline data={dailyTrend} dataKey="entries" name="Entradas" color={CHART_COLORS.primary} className="h-12 w-32 sm:w-44" />
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
                     </div>
                   ) : (
                     <ArrowDownCircle className="w-10 h-10 text-primary/20" />
@@ -595,7 +595,7 @@ export default function DashboardPage() {
                   {dailyTrend.length > 1 ? (
                     <div className="text-right" data-testid="exits-trend">
                       <Sparkline data={dailyTrend} dataKey="exits" name="Saídas" color={CHART_COLORS.amber} className="h-12 w-32 sm:w-44" />
-                      <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
                     </div>
                   ) : (
                     <ArrowUpCircle className="w-10 h-10 text-amber-500/20" />

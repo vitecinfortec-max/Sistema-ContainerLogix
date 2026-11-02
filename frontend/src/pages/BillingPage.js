@@ -1045,7 +1045,7 @@ export default function BillingPage() {
                   </p>
                 ) : (
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                    Define o cliente desta fatura — movimentações de outro cliente são bloqueadas
+                    Define o cliente desta fatura. Movimentações de outro cliente são bloqueadas
                   </p>
                 )}
               </div>

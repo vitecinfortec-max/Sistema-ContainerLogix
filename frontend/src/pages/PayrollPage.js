@@ -391,7 +391,7 @@ function PayrollRunDetail({ runId, onBack }) {
                       <td>{p.position_name || '-'}</td>
                       <td className="text-center tabular-nums">
                         {['MENSAL', 'ADIANTAMENTO'].includes(run.run_type) ? p.days_worked : `${p.months_13th}/12`}
-                        {p.vacation_days > 0 && <span className="block text-[10px] text-blue-600">{p.vacation_days}d férias</span>}
+                        {p.vacation_days > 0 && <span className="block text-[11px] text-blue-600">{p.vacation_days}d férias</span>}
                       </td>
                       <td className="text-right tabular-nums">{formatMoney(p.base_salary)}</td>
                       <td className="text-right tabular-nums">{formatMoney(p.totals?.gross)}</td>
@@ -487,7 +487,7 @@ function PayslipDialog({ slip, run, events, onClose, onSaved }) {
             {(slip.events || []).map((e, i) => (
               <tr key={i}>
                 <td className="tabular-nums">{e.number}</td>
-                <td>{e.label}{!e.auto && <span className="ml-1 text-[10px] text-blue-600">lançado</span>}</td>
+                <td>{e.label}{!e.auto && <span className="ml-1 text-[11px] text-blue-600">lançado</span>}</td>
                 <td className="tabular-nums">{e.reference}</td>
                 <td className="text-right tabular-nums">{e.kind === 'P' ? formatMoney(e.value) : ''}</td>
                 <td className="text-right tabular-nums text-destructive">{e.kind === 'D' ? formatMoney(e.value) : ''}</td>

@@ -787,7 +787,7 @@ export default function ExpenseReportsPage() {
                         {/* capture="environment": no celular abre direto a câmera traseira */}
                         <label className="w-16 h-16 flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded cursor-pointer text-muted-foreground hover:border-primary hover:text-primary transition-colors">
                           <Camera className="w-5 h-5" />
-                          <span className="text-[10px] text-center leading-none">Bater foto</span>
+                          <span className="text-[11px] text-center leading-none">Bater foto</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -802,7 +802,7 @@ export default function ExpenseReportsPage() {
                         </label>
                         <label className="w-16 h-16 flex flex-col items-center justify-center gap-1 border-2 border-dashed rounded cursor-pointer text-muted-foreground hover:border-primary hover:text-primary transition-colors">
                           <Paperclip className="w-5 h-5" />
-                          <span className="text-[10px]">Anexar</span>
+                          <span className="text-[11px]">Anexar</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -899,7 +899,7 @@ export default function ExpenseReportsPage() {
                         <span>{formatMoney(p.amount)}</span>
                       </div>
                       <div className="mt-1">
-                        <StatusPill tone={p.group_name ? 'blue' : 'amber'} dot={false} className="text-[10px]">{p.group_name || 'Sem grupo'}</StatusPill>
+                        <StatusPill tone={p.group_name ? 'blue' : 'amber'} dot={false} className="text-[11px]">{p.group_name || 'Sem grupo'}</StatusPill>
                       </div>
                       <div className="text-muted-foreground text-xs mt-1">{formatPeriodDate(p.purchase_date)}</div>
                       {p.observation && <div className="text-xs mt-1">{p.observation}</div>}

@@ -290,10 +290,10 @@ export default function PortServicePage() {
                 data-testid="search-port-service-input"
               />
             </FilterField>
-            <FilterField label="Data de">
+            <FilterField label="Data inicial">
               <Input type="date" className="h-9 text-sm" value={filters.date_from} onChange={(e) => setFilter('date_from')(e.target.value)} data-testid="port-service-date-from" />
             </FilterField>
-            <FilterField label="Até">
+            <FilterField label="Data final">
               <Input type="date" className="h-9 text-sm" value={filters.date_to} onChange={(e) => setFilter('date_to')(e.target.value)} data-testid="port-service-date-to" />
             </FilterField>
             <FilterField label="Turno">

@@ -25,7 +25,7 @@ export default function OfflineHomePage() {
   return (
     <div className="p-4 space-y-3">
       <h1 className="text-2xl font-bold mb-1">ContainerLogix</h1>
-      <p className="text-sm text-muted-foreground mb-4">Modo offline — dados salvos neste aparelho</p>
+      <p className="text-sm text-muted-foreground mb-4">Modo offline: dados salvos neste aparelho</p>
 
       {items.map(({ icon: Icon, label, count, path }) => (
         <Card key={path} className="cursor-pointer active:opacity-70" onClick={() => navigate(path)}>

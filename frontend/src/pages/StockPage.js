@@ -129,7 +129,7 @@ export default function StockPage() {
                         <td>
                           <div className="flex items-center gap-2">
                             <span className="max-w-[360px] truncate" title={item.description || ''}>{item.description}</span>
-                            {item.status === 'INATIVO' && <StatusPill tone="slate" dot={false} className="text-[10px] px-1.5">Inativo</StatusPill>}
+                            {item.status === 'INATIVO' && <StatusPill tone="slate" dot={false} className="text-[11px] px-1.5">Inativo</StatusPill>}
                           </div>
                         </td>
                         <td><div className="max-w-[200px] truncate" title={item.warehouse_name || ''}>{item.warehouse_name || '-'}</div></td>

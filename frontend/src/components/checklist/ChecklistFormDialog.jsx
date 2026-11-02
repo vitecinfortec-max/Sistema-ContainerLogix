@@ -519,7 +519,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
             </div>
             <StatusPill tone={RESULT_META[result].tone} className="hidden sm:inline-flex">{RESULT_META[result].label}</StatusPill>
             <ProgressRing value={counts.total ? counts.answered / counts.total : 0} tone={tone.ring} size={42}>
-              <span className="text-[10px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
+              <span className="text-[11px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
                 {counts.total ? Math.round((counts.answered / counts.total) * 100) : 0}%
               </span>
             </ProgressRing>
@@ -921,7 +921,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                               <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                               <span>
                                 <span className="font-medium">{item.text}</span>
-                                {item.note.trim() && <span className="opacity-80"> — {item.note.trim()}</span>}
+                                {item.note.trim() && <span className="opacity-80">: {item.note.trim()}</span>}
                               </span>
                             </li>
                           ))}

@@ -102,11 +102,11 @@ export default function LoginPage() {
       {/* Lado Esquerdo - cena 3D do pátio + marca */}
       <div
         className="hidden lg:flex lg:w-1/2 relative overflow-hidden text-white"
-        style={{ background: 'radial-gradient(120% 90% at 18% 8%, #0c9a8a 0%, #06584f 46%, #032a27 100%)' }}
+        style={{ background: 'radial-gradient(120% 90% at 18% 8%, var(--login-glow) 0%, var(--login-mid) 46%, var(--login-deep) 100%)' }}
       >
         <LoginScene3D />
         {/* Véu escuro em cima e embaixo pra marca e o texto ficarem legíveis sobre a cena */}
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent from-[56%] to-[#032a27] to-[88%]" />
+        <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent from-[56%] to-[color:var(--login-deep)] to-[88%]" />
 
         <motion.div
           variants={staggerParent(0.12, 0.2)}

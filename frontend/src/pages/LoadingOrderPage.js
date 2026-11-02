@@ -440,10 +440,10 @@ export default function LoadingOrderPage() {
                 </SelectContent>
               </Select>
             </FilterField>
-            <FilterField label="Emissão de">
+            <FilterField label="Emissão inicial">
               <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="loading-order-date-from" />
             </FilterField>
-            <FilterField label="Até">
+            <FilterField label="Emissão final">
               <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="loading-order-date-to" />
             </FilterField>
           </div>

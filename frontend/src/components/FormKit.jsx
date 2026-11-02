@@ -24,7 +24,7 @@ export function FormSection({ title, icon: Icon, actions, children, className, c
 
 function IssueCount({ n }) {
   if (!n) return null;
-  return <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{n}</span>;
+  return <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{n}</span>;
 }
 
 /**

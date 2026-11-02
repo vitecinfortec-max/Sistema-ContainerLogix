@@ -45,7 +45,7 @@ export function ChartTooltip({ active, payload, label, valueFormat = fmtChartInt
   const title = payload[0]?.payload?.fullLabel || label;
   const total = payload.reduce((sum, entry) => sum + (Number(entry.value) || 0), 0);
   return (
-    <div className="min-w-[160px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm shadow-[0_10px_28px_-10px_rgba(15,23,42,0.35)] px-3 py-2 text-xs">
+    <div className="min-w-[160px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm shadow-[0_10px_28px_-10px_theme(colors.slate.900/35%)] px-3 py-2 text-xs">
       {title && <p className="font-semibold text-slate-800 dark:text-slate-100 mb-1.5">{title}</p>}
       {payload.map((entry) => (
         <div key={entry.dataKey || entry.name} className="flex items-center justify-between gap-4 py-0.5">

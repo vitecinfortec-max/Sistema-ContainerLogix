@@ -623,7 +623,7 @@ export default function VehicleChecklistPage() {
                             <span className="inline-flex items-center gap-2">
                               <span className="max-w-[200px] truncate" title={c.client_name || ''}>{c.client_name || '-'}</span>
                               {c.template === 'petrobras_lvt' && (
-                                <StatusPill tone="emerald" dot={false} className="text-[10px] px-1.5">LVT</StatusPill>
+                                <StatusPill tone="emerald" dot={false} className="text-[11px] px-1.5">LVT</StatusPill>
                               )}
                             </span>
                           )}
@@ -675,7 +675,7 @@ export default function VehicleChecklistPage() {
               <ClipboardCheck className="w-5 h-5" />
               {editingChecklist ? 'Editar Checklist de Veículo' : 'Novo Checklist de Veículo'}
               {formData.template === 'petrobras_lvt' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
                   Modelo Petrobras (LVT)
                 </span>
               )}

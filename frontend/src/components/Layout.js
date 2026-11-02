@@ -96,6 +96,7 @@ import { useModuleConfig } from '../context/ModuleConfigContext';
 import { api } from '../lib/api';
 import CommandPalette from './CommandPalette';
 import { PageTransition } from './Motion';
+import { PageGuard } from './PageGuard';
 
 // Intervalo de checagem do alerta de containers parados no pátio
 const YARD_ALERT_POLL_MS = 5 * 60 * 1000;
@@ -959,7 +960,7 @@ function LayoutFrame({ children }) {
   return (
     <div className="min-h-screen bg-canvas flex flex-col">
       {/* Top Header Bar */}
-      <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 right-0 z-30 transition-[left] duration-300 ${
+      <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 right-0 z-30 ${
         sidebarOpen ? 'left-[225px]' : 'left-16'
       }`} data-testid="top-header">
         <div className="flex items-center h-full px-6">
@@ -996,7 +997,7 @@ function LayoutFrame({ children }) {
           >
             <Search className="w-[15px] h-[15px]" />
             <span className="hidden lg:inline">Buscar</span>
-            <kbd className="hidden lg:inline text-[10px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5">Ctrl+K</kbd>
+            <kbd className="hidden lg:inline text-[11px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5">Ctrl+K</kbd>
           </button>
           <div className="relative" ref={notificationsRef}>
             <button
@@ -1007,7 +1008,7 @@ function LayoutFrame({ children }) {
             >
               <Bell className="w-[18px] h-[18px]" />
               {unreadNotificationsCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold leading-none">
+                <span className="absolute top-0.5 right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[11px] font-semibold leading-none">
                   {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
                 </span>
               )}
@@ -1099,7 +1100,7 @@ function LayoutFrame({ children }) {
       <div className="flex flex-1">
         {/* Sidebar - Desktop */}
         <aside 
-          className={`no-print hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 transition-[width] duration-300 ${
+          className={`no-print hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 ${
             sidebarOpen ? 'w-[225px]' : 'w-16'
           }`}
           data-testid="sidebar"
@@ -1408,7 +1409,7 @@ function LayoutFrame({ children }) {
 
         {/* Mobile Bottom Navigation */}
         <nav
-          className="no-print md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 fixed bottom-0 left-0 right-0 z-50 shadow-[0_-1px_4px_rgba(0,0,0,0.06)] flex items-stretch"
+          className="no-print md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 fixed bottom-0 left-0 right-0 z-50 shadow-[0_-1px_4px_theme(colors.slate.900/6%)] flex items-stretch"
           data-testid="mobile-bottom-navigation"
         >
           <Link
@@ -1458,11 +1459,11 @@ function LayoutFrame({ children }) {
         </nav>
 
         {/* Main Content */}
-        <main className={`flex-1 min-w-0 transition-[margin] duration-300 ${
+        <main className={`flex-1 min-w-0 ${
           sidebarOpen ? 'md:ml-[225px]' : 'md:ml-16'
         } mt-14 md:mt-12 pb-20 md:pb-0`}>
           <PageTransition key={location.pathname} className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
-            {children}
+            <PageGuard>{children}</PageGuard>
           </PageTransition>
         </main>
       </div>

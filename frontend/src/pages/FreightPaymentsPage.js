@@ -284,10 +284,10 @@ export default function FreightPaymentsPage() {
                 </SelectContent>
               </Select>
             </FilterField>
-            <FilterField label="De">
+            <FilterField label="Data inicial">
               <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
             </FilterField>
-            <FilterField label="Até">
+            <FilterField label="Data final">
               <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
             </FilterField>
           </div>

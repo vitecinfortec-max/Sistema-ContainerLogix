@@ -650,10 +650,10 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <FilterField label="Motorista, cliente, container ou placa" className="col-span-2">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="rpa-search-input" />
             </FilterField>
-            <FilterField label="Data de">
+            <FilterField label="Data inicial">
               <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} data-testid="rpa-date-from" />
             </FilterField>
-            <FilterField label="Até">
+            <FilterField label="Data final">
               <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => setDateTo(e.target.value)} data-testid="rpa-date-to" />
             </FilterField>
           </div>

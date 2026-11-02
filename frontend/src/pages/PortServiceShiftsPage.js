@@ -181,10 +181,10 @@ export default function PortServiceShiftsPage() {
           )}
         >
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <FilterField label="Data início *">
+            <FilterField label="Data inicial *">
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="shifts-date-from" />
             </FilterField>
-            <FilterField label="Data fim *">
+            <FilterField label="Data final *">
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="shifts-date-to" />
             </FilterField>
             <FilterField label="Cliente">
@@ -213,7 +213,7 @@ export default function PortServiceShiftsPage() {
           </div>
           {sched && (
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-400" data-testid="shifts-schedule">
-              Horário previsto — <span className="font-semibold text-slate-700 dark:text-slate-200">Dia: {sched.DIA.entry} às {sched.DIA.exit}</span>
+              Horário previsto: <span className="font-semibold text-slate-700 dark:text-slate-200">Dia: {sched.DIA.entry} às {sched.DIA.exit}</span>
               {' • '}
               <span className="font-semibold text-slate-700 dark:text-slate-200">Noite: {sched.NOITE.entry} às {sched.NOITE.exit}</span> (dia seguinte)
               {isAdmin && summary.shift_value > 0 && (
@@ -293,11 +293,11 @@ export default function PortServiceShiftsPage() {
                         </td>
                         <td className="text-center tabular-nums whitespace-nowrap">
                           {i.entry_time || '-'}
-                          <div className="text-[10px] text-slate-400">prev. {i.expected_entry || '-'}</div>
+                          <div className="text-[11px] text-slate-400">prev. {i.expected_entry || '-'}</div>
                         </td>
                         <td className="text-center tabular-nums whitespace-nowrap">
                           {i.exit_time || '-'}
-                          <div className="text-[10px] text-slate-400">prev. {i.expected_exit || '-'}</div>
+                          <div className="text-[11px] text-slate-400">prev. {i.expected_exit || '-'}</div>
                         </td>
                         <td className="text-center whitespace-nowrap"><Diff minutes={i.entry_diff} /></td>
                         <td className="text-center whitespace-nowrap"><Diff minutes={i.exit_diff} /></td>

@@ -42,6 +42,14 @@
 
     --sidebar-bg: 210 20% 98%;          /* #F9FAFB */
     --canvas: 210 22% 96%;              /* fundo da área de conteúdo (cinza bem claro, destaca os cards brancos) */
+
+    /* Fundo verde das telas de login, recuperação e troca de senha */
+    --login-glow: #0c9a8a;
+    --login-mid: #06584f;
+    --login-deep: #032a27;
+
+    --font-sans: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
   }
 
   .dark {
@@ -90,7 +98,7 @@
     @apply w-full text-[13px];
   }
   .data-table thead th {
-    @apply px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap
+    @apply px-3 py-2.5 text-left text-xs font-semibold whitespace-nowrap
       text-slate-500 bg-slate-50 border-b border-slate-200
       dark:text-slate-400 dark:bg-slate-800/60 dark:border-slate-700;
   }
@@ -98,7 +106,7 @@
     @apply select-none;
   }
   .data-table thead th .sort-button {
-    @apply inline-flex items-center uppercase tracking-wider font-semibold rounded-sm cursor-pointer
+    @apply inline-flex items-center font-semibold rounded-sm cursor-pointer
       hover:text-slate-800 dark:hover:text-slate-200
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1;
   }
@@ -134,13 +142,13 @@
     @apply bg-red-50 hover:bg-red-100/70 dark:bg-red-500/10 dark:hover:bg-red-500/15;
   }
   .data-table tbody tr[data-row-tone="alert"] td:first-child {
-    box-shadow: inset 3px 0 0 rgb(239 68 68 / 0.75);
+    box-shadow: inset 3px 0 0 theme('colors.red.500 / 75%');
   }
   .data-table tbody tr[data-row-tone="warn"] {
     @apply bg-amber-50/80 hover:bg-amber-100/60 dark:bg-amber-500/10 dark:hover:bg-amber-500/15;
   }
   .data-table tbody tr[data-row-tone="warn"] td:first-child {
-    box-shadow: inset 3px 0 0 rgb(245 158 11 / 0.7);
+    box-shadow: inset 3px 0 0 theme('colors.amber.500 / 70%');
   }
   .data-table tbody tr[data-row-tone="off"] td {
     @apply text-slate-400 dark:text-slate-500;
@@ -233,12 +241,12 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: var(--font-mono);
   }
 }
 

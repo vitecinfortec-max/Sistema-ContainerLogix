@@ -578,7 +578,7 @@ export default function ServiceProvidersPage() {
                       {openEntries.map((e) => (
                         <tr key={e.id} className={closing.entry_ids.has(e.id) ? '' : 'opacity-60'} data-testid={`sp-closing-entry-${e.id}`}>
                           <td className="pr-0"><Checkbox checked={closing.entry_ids.has(e.id)} onCheckedChange={() => toggleIn('entry_ids', e.id)} /></td>
-                          <td className="tabular-nums whitespace-nowrap">{fmtDate(e.date)}{e.date > closing.period_end && <span className="block text-[10px] text-amber-600">depois do período</span>}</td>
+                          <td className="tabular-nums whitespace-nowrap">{fmtDate(e.date)}{e.date > closing.period_end && <span className="block text-[11px] text-amber-600">depois do período</span>}</td>
                           <td>{e.description || '-'}</td>
                           <td className="text-right tabular-nums whitespace-nowrap">{fmtUnits(e.quantity, e.unit)}</td>
                           <td className="text-right tabular-nums">{fmtMoney(e.unit_value)}</td>

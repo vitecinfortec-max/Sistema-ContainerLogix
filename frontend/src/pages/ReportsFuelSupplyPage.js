@@ -174,10 +174,10 @@ export default function ReportsFuelSupplyPage() {
           )}
         >
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <FilterField label="Data início">
+            <FilterField label="Data inicial">
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="report-fuel-supply-date-from" />
             </FilterField>
-            <FilterField label="Data fim">
+            <FilterField label="Data final">
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="report-fuel-supply-date-to" />
             </FilterField>
             <FilterField label="Equipamento">

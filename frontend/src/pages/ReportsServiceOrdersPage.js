@@ -171,10 +171,10 @@ export default function ReportsServiceOrdersPage() {
           )}
         >
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <FilterField label="Data início">
+            <FilterField label="Data inicial">
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="report-service-orders-date-from" />
             </FilterField>
-            <FilterField label="Data fim">
+            <FilterField label="Data final">
               <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="report-service-orders-date-to" />
             </FilterField>
             <FilterField label="Equipamento">

@@ -232,7 +232,7 @@ export default function UsersPage() {
                         <td>
                           <span className="inline-flex items-center gap-2">
                             <UserTag name={u.name} />
-                            {isSelf && <StatusPill tone="primary" dot={false} className="text-[10px] px-1.5">você</StatusPill>}
+                            {isSelf && <StatusPill tone="primary" dot={false} className="text-[11px] px-1.5">você</StatusPill>}
                           </span>
                         </td>
                         <td className="text-slate-500 dark:text-slate-400">{u.email}</td>

@@ -463,10 +463,10 @@ export default function RepairEstimatesPage() {
               </Select>
             </FilterField>
             <div className="grid grid-cols-2 gap-2">
-              <FilterField label="Emissão de">
+              <FilterField label="Emissão inicial">
                 <Input type="date" className="h-9 text-sm" value={dateFrom} onChange={(e) => changeFilter(setDateFrom)(e.target.value)} />
               </FilterField>
-              <FilterField label="Até">
+              <FilterField label="Emissão final">
                 <Input type="date" className="h-9 text-sm" value={dateTo} onChange={(e) => changeFilter(setDateTo)(e.target.value)} />
               </FilterField>
             </div>

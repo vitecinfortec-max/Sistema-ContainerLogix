@@ -407,10 +407,10 @@ export default function FuelSupplyPage() {
             <FilterField label="Equipamento, motorista ou fornecedor" className="col-span-2">
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="fuel-search" />
             </FilterField>
-            <FilterField label="Data início">
+            <FilterField label="Data inicial">
               <Input type="date" value={dateFrom} onChange={(e) => onFilter(setDateFrom)(e.target.value)} className="h-9 text-sm" data-testid="fuel-date-from" />
             </FilterField>
-            <FilterField label="Data fim">
+            <FilterField label="Data final">
               <Input type="date" value={dateTo} onChange={(e) => onFilter(setDateTo)(e.target.value)} className="h-9 text-sm" data-testid="fuel-date-to" />
             </FilterField>
             <FilterField label="Fonte">

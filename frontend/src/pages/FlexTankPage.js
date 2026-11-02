@@ -412,7 +412,7 @@ export default function FlexTankPage() {
               )}
             >
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <FilterField label="Data início">
+                <FilterField label="Data inicial">
                   <Input
                     type="date"
                     value={reportFilters.start_date}
@@ -421,7 +421,7 @@ export default function FlexTankPage() {
                     data-testid="report-filter-start-date"
                   />
                 </FilterField>
-                <FilterField label="Data fim">
+                <FilterField label="Data final">
                   <Input
                     type="date"
                     value={reportFilters.end_date}

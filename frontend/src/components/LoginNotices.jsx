@@ -87,7 +87,7 @@ export default function LoginNotices({ notices, variant = 'hero' }) {
               aria-label={`Ver aviso ${i + 1}`}
               aria-current={i === index}
               className={cn(
-                'h-1.5 rounded-full transition-[width,background-color]',
+                'h-1.5 rounded-full transition-colors',
                 i === index ? 'w-6' : 'w-1.5',
                 hero ? (i === index ? 'bg-white' : 'bg-white/40 hover:bg-white/70') : (i === index ? 'bg-primary' : 'bg-primary/30'),
               )}

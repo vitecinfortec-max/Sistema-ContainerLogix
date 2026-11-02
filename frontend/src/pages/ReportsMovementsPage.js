@@ -243,7 +243,7 @@ export default function ReportsMovementsPage() {
           )}
         >
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            <FilterField label="Data início">
+            <FilterField label="Data inicial">
               <Input
                 type="date"
                 value={dateFrom}
@@ -252,7 +252,7 @@ export default function ReportsMovementsPage() {
                 data-testid="report-date-from"
               />
             </FilterField>
-            <FilterField label="Data fim">
+            <FilterField label="Data final">
               <Input
                 type="date"
                 value={dateTo}

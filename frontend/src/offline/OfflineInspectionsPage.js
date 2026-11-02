@@ -167,7 +167,7 @@ export default function OfflineInspectionsPage() {
             <div key={insp.id} className="border rounded-lg p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold">#{insp.inspection_number} — {insp.container_number}</p>
+                  <p className="font-semibold">#{insp.inspection_number} · {insp.container_number}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {insp.no_damage ? 'Sem avarias' : `${insp.damage_items.length} avaria(s)`} • {(insp.photos || []).length} foto(s)
                   </p>
@@ -317,7 +317,7 @@ export default function OfflineInspectionsPage() {
                       >
                         <X className="w-3 h-3" />
                       </Button>
-                      <p className="text-[10px] text-center mt-0.5">{PHOTO_LABELS[photo.type]}</p>
+                      <p className="text-[11px] text-center mt-0.5">{PHOTO_LABELS[photo.type]}</p>
                     </div>
                   ))}
                 </div>
