@@ -192,43 +192,33 @@ const PAGE_TITLES = {
   '/port-services-billing': 'Faturamento Portuário',
 };
 
-// Cor de destaque por grupo de topo do menu lateral (subgrupos aninhados como
-// "Movimentações"/"Flex Tank" dentro de Terminal não entram aqui de propósito -
-// continuam com a cor binária ativo/inativo de sempre).
 // Alguns itens do menu apontam pra mesma rota, diferenciados só pela query
-// string `?tab=` (abas dentro de uma página, ex: Manutenção/Transporte e Flex Tank) - comparar
-// só o pathname faria o item "sem aba" (ex: Cadastro de Veículo, path=/fleet)
-// ficar sempre marcado como ativo mesmo com outra aba selecionada. Comparar
-// especificamente o parâmetro `tab` (ignorando outras query strings, como o
-// `min_days` usado em deep links de alerta) resolve isso sem quebrar nada.
+// string (abas dentro de uma página: /fleet?tab=revisions, /estoque/cadastros
+// ?type=almoxarifado...). Comparar só o pathname faria o item "sem aba" (ex:
+// Cadastro de Veículo, path=/fleet) ficar sempre ativo. Por isso entram na
+// comparação só os parâmetros que separam itens do menu (abaixo); os filtros
+// das telas, que também ficam na URL (?status=, ?type= de Gate...), e os
+// deep links de alerta (?min_days=) não tiram o destaque do item.
+// Ao criar um item de menu com query string nova, inclua a chave aqui.
+const NAV_QUERY_KEYS = {
+  '/fleet': ['tab'],
+  '/flex-tank': ['tab'],
+  '/estoque/cadastros': ['type'],
+  '/comercial/cadastros': ['type'],
+};
+
 function isNavItemActive(item, location) {
   const [itemPath, itemQuery] = item.path.split('?');
   if (location.pathname !== itemPath) return false;
-  // Compara todos os parâmetros de query (não só um fixo) pra suportar
-  // várias páginas compartilhadas por query string (?tab=, ?type=, etc.)
-  // sem cada item acender junto quando outro está selecionado.
   const itemParams = new URLSearchParams(itemQuery || '');
   const currentParams = new URLSearchParams(location.search);
-  const keys = new Set([...itemParams.keys(), ...currentParams.keys()]);
+  const keys = new Set([...itemParams.keys(), ...(NAV_QUERY_KEYS[itemPath] || [])]);
   for (const key of keys) {
     if (itemParams.get(key) !== currentParams.get(key)) return false;
   }
   return true;
 }
 
-const GROUP_COLORS = {
-  Terminal: 'chart-1',
-  Manutenção: 'chart-2',
-  Cadastro: 'chart-3',
-  Financeiro: 'chart-4',
-  Operacional: 'chart-5',
-  Transporte: 'chart-6',
-  'Opções do Sistema': 'chart-7',
-  Estoque: 'chart-8',
-  Comercial: 'chart-9',
-  'Gestão de Container': 'chart-10',
-  RH: 'chart-11',
-};
 
 // Moldura do sistema (menu lateral, cabeçalho, sino, busca). Fica montada uma
 // vez só, na rota (AppShell, usado em App.js): trocar de tela troca apenas o
@@ -832,11 +822,11 @@ function LayoutFrame({ children }) {
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
           title={item.label}
-          className={`flex items-center justify-center h-11 border-b border-slate-100 dark:border-slate-800 transition-colors ${
-            isActive ? 'text-primary' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
+          className={`flex items-center justify-center h-10 mx-2 my-0.5 rounded-md transition-colors ${
+            isActive ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
-          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
         </Link>
       );
     }
@@ -848,11 +838,10 @@ function LayoutFrame({ children }) {
           key={item.path}
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-          className={`group flex items-center py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 ${
-            isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
-          } ${deepIndent ? 'pl-14' : 'pl-10'} pr-5 text-[13px] gap-2`}
+          className={`group flex items-center mx-2 my-px rounded-md py-2 transition-colors ${
+            isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+          } ${deepIndent ? 'pl-[58px]' : 'pl-[42px]'} pr-3 text-[13px]`}
         >
-          <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
           <span>{item.label}</span>
         </Link>
       );
@@ -864,11 +853,11 @@ function LayoutFrame({ children }) {
         key={item.path}
         to={item.path}
         data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-        className={`group flex items-center py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 ${
-          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
-        } px-5 gap-3 text-[13px]`}
+        className={`group flex items-center mx-2 my-px rounded-md py-2.5 transition-colors ${
+          isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+        } px-3 gap-3 text-[13px]`}
       >
-        <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+        <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
         <span>{item.label}</span>
       </Link>
     );
@@ -879,11 +868,10 @@ function LayoutFrame({ children }) {
     const isActive = isNavItemActive(item, location);
     return (
       <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-        className={`flex items-center gap-2 ${nested ? 'pl-14' : 'pl-10'} pr-4 py-2.5 text-[13px] border-b border-slate-100 dark:border-slate-800 ${
-          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
+        className={`flex items-center mx-2 my-px rounded-md ${nested ? 'pl-[60px]' : 'pl-10'} pr-3 py-2.5 text-[13px] ${
+          isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
         }`}
       >
-        <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
         <span>{item.label}</span>
       </Link>
     );
@@ -892,19 +880,14 @@ function LayoutFrame({ children }) {
   // Mobile: cabeçalho de grupo expansível
   const renderMobileGroupToggle = (label, icon, isOpen, toggle, isActive, nested = false) => {
     const Icon = icon;
-    const accentVar = GROUP_COLORS[label];
     return (
       <button onClick={toggle}
-        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-4' : 'px-4'} py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
+        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-4' : 'px-4'} py-3 text-sm ${
           isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
         }`}
       >
         <div className="flex items-center gap-3">
-          <Icon
-            className={accentVar ? 'w-5 h-5' : 'w-5 h-5 text-slate-800 dark:text-slate-200'}
-            style={accentVar ? { color: `hsl(var(--${accentVar}))` } : undefined}
-            strokeWidth={1.8}
-          />
+          <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={1.8} />
           <span>{label}</span>
         </div>
         <ChevronRight className={`w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
@@ -915,41 +898,31 @@ function LayoutFrame({ children }) {
   // Bsoft-style group header
   const renderGroupHeader = (label, icon, isOpen, toggle, isActive, testId, nested = false) => {
     const Icon = icon;
-    const accentVar = GROUP_COLORS[label];
-    const accentStyle = accentVar ? { color: `hsl(var(--${accentVar}))` } : undefined;
     if (!sidebarOpen) {
       // Subgrupos aninhados (ex: Flex Tank dentro de Terminal) só aparecem com a
       // sidebar expandida — no modo recolhido só o grupo de topo mostra ícone.
       if (nested) return null;
       return (
         <div
-          className="flex items-center justify-center h-11 cursor-pointer border-b border-slate-100 dark:border-slate-800 transition-colors hover:text-primary"
+          className="flex items-center justify-center h-10 mx-2 my-0.5 rounded-md cursor-pointer transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/60"
           title={label}
           onClick={() => handleGroupClickCollapsed(toggle)}
           data-testid={testId}
         >
-          <Icon
-            className={accentVar ? 'w-[18px] h-[18px]' : `w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`}
-            style={accentStyle}
-            strokeWidth={1.8}
-          />
+          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={1.8} />
         </div>
       );
     }
     return (
       <button
         onClick={toggle}
-        className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-[13px] ${
-          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
+        className={`w-[calc(100%-1rem)] mx-2 my-px rounded-md flex items-center justify-between ${nested ? 'pl-7 pr-3' : 'px-3'} py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/60 text-[13px] ${
+          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
         }`}
         data-testid={testId}
       >
         <div className="flex items-center gap-3">
-          <Icon
-            className={accentVar ? 'w-[18px] h-[18px] flex-shrink-0' : `w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`}
-            style={accentStyle}
-            strokeWidth={isActive ? 2.2 : 1.8}
-          />
+          <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
           <span>{label}</span>
         </div>
         <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -961,7 +934,7 @@ function LayoutFrame({ children }) {
     <div className="min-h-screen bg-canvas flex flex-col">
       {/* Top Header Bar */}
       <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 right-0 z-30 ${
-        sidebarOpen ? 'left-[225px]' : 'left-16'
+        sidebarOpen ? 'left-[268px]' : 'left-16'
       }`} data-testid="top-header">
         <div className="flex items-center h-full px-6">
           <Breadcrumb data-testid="page-title">
@@ -1101,7 +1074,7 @@ function LayoutFrame({ children }) {
         {/* Sidebar - Desktop */}
         <aside 
           className={`no-print hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 ${
-            sidebarOpen ? 'w-[225px]' : 'w-16'
+            sidebarOpen ? 'w-[268px]' : 'w-16'
           }`}
           data-testid="sidebar"
         >
@@ -1315,11 +1288,11 @@ function LayoutFrame({ children }) {
                   const isActive = location.pathname === item.path;
                   return (
                     <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center gap-3 px-4 py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
-                        isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
+                      className={`flex items-center gap-3 px-4 py-3 text-sm rounded-md ${
+                        isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={1.8} />
+                      <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={1.8} />
                       <span>{item.label}</span>
                     </Link>
                   );
@@ -1460,7 +1433,7 @@ function LayoutFrame({ children }) {
 
         {/* Main Content */}
         <main className={`flex-1 min-w-0 ${
-          sidebarOpen ? 'md:ml-[225px]' : 'md:ml-16'
+          sidebarOpen ? 'md:ml-[268px]' : 'md:ml-16'
         } mt-14 md:mt-12 pb-20 md:pb-0`}>
           <PageTransition key={location.pathname} className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
             <PageGuard>{children}</PageGuard>

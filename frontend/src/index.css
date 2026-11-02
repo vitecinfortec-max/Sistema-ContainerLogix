@@ -27,18 +27,12 @@
     --ring: 175 84% 26%;
     --radius: 0.375rem;
 
-    /* Cores de destaque por grupo do menu lateral (Layout.js GROUP_COLORS) */
-    --chart-1: 217 91% 60%;  /* Terminal */
-    --chart-2: 262 83% 66%;  /* Manutenção */
-    --chart-3: 38 92% 50%;   /* Cadastro */
-    --chart-4: 340 82% 60%;  /* Financeiro */
-    --chart-5: 152 60% 40%;  /* Operacional */
-    --chart-6: 195 80% 45%;  /* Transporte */
-    --chart-7: 220 9% 46%;   /* Opções do Sistema */
-    --chart-8: 320 65% 52%;  /* Estoque */
-    --chart-9: 10 75% 55%;   /* Comercial */
-    --chart-10: 45 90% 48%;  /* Gestão de Container */
-    --chart-11: 330 65% 50%; /* RH */
+    /* Paleta de gráficos do tailwind (chart-1 a chart-5) */
+    --chart-1: 217 91% 60%;
+    --chart-2: 262 83% 66%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 340 82% 60%;
+    --chart-5: 152 60% 40%;
 
     --sidebar-bg: 210 20% 98%;          /* #F9FAFB */
     --canvas: 210 22% 96%;              /* fundo da área de conteúdo (cinza bem claro, destaca os cards brancos) */
@@ -73,18 +67,12 @@
     --input: 222 15% 20%;
     --ring: 174 70% 45%;
 
-    /* Cores de destaque por grupo do menu lateral - mais claras/dessaturadas pro fundo escuro */
+    /* Paleta de gráficos, mais clara para o fundo escuro */
     --chart-1: 217 85% 68%;
     --chart-2: 262 75% 73%;
     --chart-3: 38 85% 58%;
     --chart-4: 340 75% 68%;
     --chart-5: 152 55% 50%;
-    --chart-6: 195 75% 60%;
-    --chart-7: 220 10% 65%;
-    --chart-8: 320 60% 65%;
-    --chart-9: 10 80% 65%;
-    --chart-10: 45 85% 60%;
-    --chart-11: 330 65% 64%;
     --canvas: 222 30% 6%;
   }
 }
