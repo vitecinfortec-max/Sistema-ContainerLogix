@@ -685,7 +685,7 @@ export default function LoadingOrderPage() {
             </div>
 
             <div className="flex items-center justify-between mt-1">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Containers da Ordem</Label>
+              <Label className="text-xs font-semibold text-slate-500">Containers da Ordem</Label>
               <Button variant="outline" size="sm" onClick={addContainerItem} type="button" className="h-7 text-xs" data-testid="loading-order-add-item">
                 <Plus className="w-3 h-3 mr-1" />Adicionar container
               </Button>
@@ -869,7 +869,7 @@ export default function LoadingOrderPage() {
 
 function SectionTitle({ children }) {
   return (
-    <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary border-b-2 border-primary/20 pb-1">
+    <h3 className="text-[13px] font-semibold text-primary border-b-2 border-primary/20 pb-1">
       {children}
     </h3>
   );

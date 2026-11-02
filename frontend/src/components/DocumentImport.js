@@ -130,7 +130,7 @@ export function DocumentImportNotice({ notice, onClose }) {
 export function DocumentAttachments({ value, onChange }) {
   const files = Array.isArray(value) ? value : [];
   if (!files.length) {
-    return <p className="text-xs text-muted-foreground">Nenhum documento anexado. Use "Importar documento" para ler e anexar.</p>;
+    return <p className="text-xs text-muted-foreground">Nenhum documento anexado. Use “Importar documento” para ler e anexar.</p>;
   }
   return (
     <ul className="space-y-1.5">

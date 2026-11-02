@@ -110,10 +110,10 @@ export default function FreightRoutesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm('Tem certeza que deseja deletar esta rota?')) {
+    if (await confirm('Deseja realmente excluir esta rota?')) {
       try {
         await api.deleteFreightRoute(id);
-        toast.success('Rota deletada com sucesso');
+        toast.success('Rota excluída com sucesso');
         setSelectedIds(prev => {
           if (!prev.has(id)) return prev;
           const next = new Set(prev);
@@ -122,7 +122,7 @@ export default function FreightRoutesPage() {
         });
         loadRoutes();
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Erro ao deletar rota');
+        toast.error(error.response?.data?.detail || 'Erro ao excluir rota');
       }
     }
   };

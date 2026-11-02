@@ -65,7 +65,7 @@ function AlertPill({ tone, icon: Icon, onClick, testId, children }) {
       </span>
       <Icon className="w-3.5 h-3.5 shrink-0" />
       <span className="text-left">{children}</span>
-      <ArrowRight className="w-3 h-3 shrink-0 -ml-1 opacity-0 transition-all group-hover:ml-0 group-hover:opacity-100" />
+      <ArrowRight className="w-3 h-3 shrink-0 -ml-1 opacity-0 transition-[margin,opacity] group-hover:ml-0 group-hover:opacity-100" />
     </motion.button>
   );
 }
@@ -341,7 +341,7 @@ export default function DashboardPage() {
                 </motion.button>
               </motion.div>
               {activeShortcuts.length === 0 && pinnedShortcuts.length > 0 && (
-                <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">Nenhum atalho desse tipo. Use "Personalizar atalhos" para incluir.</p>
+                <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">Nenhum atalho desse tipo. Use “Personalizar atalhos” para incluir.</p>
               )}
             </CardContent>
           </Card>
@@ -411,7 +411,7 @@ export default function DashboardPage() {
               <DialogDescription className="text-sm text-slate-500 dark:text-slate-400 mb-4">Selecione as telas e relatórios que deseja ter à mão no painel:</DialogDescription>
               {['tool', 'report'].map((kind) => (
               <div key={kind} className="mb-4 last:mb-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">{kind === 'tool' ? 'Ferramentas' : 'Relatórios'}</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">{kind === 'tool' ? 'Ferramentas' : 'Relatórios'}</p>
               <div className="grid grid-cols-2 gap-2">
                 {availableShortcuts.filter((x) => x.kind === kind).map((shortcut) => {
                   const Icon = shortcut.icon;
@@ -422,7 +422,7 @@ export default function DashboardPage() {
                       type="button"
                       aria-pressed={isSelected}
                       onClick={() => toggleShortcut(shortcut.id)}
-                      className={`flex items-center gap-2.5 p-2.5 rounded-lg border-2 text-left transition-all ${
+                      className={`flex items-center gap-2.5 p-2.5 rounded-lg border-2 text-left transition-colors ${
                         isSelected
                           ? 'border-primary bg-primary/5'
                           : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
@@ -688,7 +688,7 @@ export default function DashboardPage() {
                       scene={yardScene}
                       params={{ full: stockFull, empty: stockEmpty }}
                       className="h-full w-full"
-                      ariaLabel={`Pátio com ${stockFull} contêineres cheios e ${stockEmpty} vazios`}
+                      ariaLabel={`Pátio com ${stockFull} containers cheios e ${stockEmpty} vazios`}
                       testId="stock-yard-3d"
                       fallback={(
                         <DonutChart
@@ -712,7 +712,7 @@ export default function DashboardPage() {
                     </div>
                     {yardUnit > 1 && (
                       <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                        No modelo, cada contêiner representa {yardUnit} unidades.
+                        No modelo, cada container representa {yardUnit} unidades.
                       </p>
                     )}
                   </div>

@@ -790,8 +790,8 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
             <div className="grid grid-cols-2 gap-3">
               <Field label="Data de Emissão" type="date" value={form.emission_date} onChange={(v) => onChange('emission_date', v)} testid="rpa-emission-date" />
               <Field label="Forma de Pagamento" value={form.payment_method} onChange={(v) => onChange('payment_method', v)} testid="rpa-payment-method" />
-              <Field label="Data Inicial da Viagem" type="date" value={form.trip_start_date} onChange={(v) => onChange('trip_start_date', v)} testid="rpa-trip-start" />
-              <Field label="Data Final da Viagem" type="date" value={form.trip_end_date} onChange={(v) => onChange('trip_end_date', v)} testid="rpa-trip-end" />
+              <Field label="Data inicial da viagem" type="date" value={form.trip_start_date} onChange={(v) => onChange('trip_start_date', v)} testid="rpa-trip-start" />
+              <Field label="Data final da viagem" type="date" value={form.trip_end_date} onChange={(v) => onChange('trip_end_date', v)} testid="rpa-trip-end" />
               <Field label="Tipo de Operação" value={form.operation_type} onChange={(v) => onChange('operation_type', v)} testid="rpa-operation-type" />
               <Field label="Agência" value={form.agencia} onChange={(v) => onChange('agencia', v)} testid="rpa-agencia" />
               <Field label="Talão" value={form.talao} onChange={(v) => onChange('talao', v)} testid="rpa-talao" />
@@ -1241,7 +1241,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
 function SectionHeader({ title, noMargin }) {
   return (
     <div className={noMargin ? '' : 'mt-2'}>
-      <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary border-b-2 border-primary/20 pb-1">
+      <h3 className="text-[13px] font-semibold text-primary border-b-2 border-primary/20 pb-1">
         {title}
       </h3>
     </div>

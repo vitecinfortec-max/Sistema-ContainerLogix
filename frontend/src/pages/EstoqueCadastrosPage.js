@@ -153,10 +153,10 @@ export default function EstoqueCadastrosPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm(`Tem certeza que deseja deletar este registro de ${activeType.label.toLowerCase()}?`)) {
+    if (await confirm(`Deseja realmente excluir este registro de ${activeType.label.toLowerCase()}?`)) {
       try {
         await activeType.api.remove(id);
-        toast.success(`${activeType.label} deletado com sucesso`);
+        toast.success(`${activeType.label} excluído com sucesso`);
         setSelectedIds(prev => {
           const next = new Set(prev);
           next.delete(id);
@@ -164,7 +164,7 @@ export default function EstoqueCadastrosPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || `Erro ao deletar ${activeType.label.toLowerCase()}`);
+        toast.error(error.response?.data?.detail || `Erro ao excluir ${activeType.label.toLowerCase()}`);
       }
     }
   };

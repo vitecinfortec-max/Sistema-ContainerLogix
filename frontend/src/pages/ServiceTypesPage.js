@@ -114,10 +114,10 @@ export default function ServiceTypesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm('Tem certeza que deseja deletar este tipo de serviço?')) {
+    if (await confirm('Deseja realmente excluir este tipo de serviço?')) {
       try {
         await api.deleteServiceType(id);
-        toast.success('Tipo de serviço deletado com sucesso');
+        toast.success('Tipo de serviço excluído com sucesso');
         setSelectedIds(prev => {
           if (!prev.has(id)) return prev;
           const next = new Set(prev);
@@ -126,7 +126,7 @@ export default function ServiceTypesPage() {
         });
         loadServiceTypes();
       } catch (error) {
-        toast.error('Erro ao deletar tipo de serviço');
+        toast.error('Erro ao excluir tipo de serviço');
       }
     }
   };

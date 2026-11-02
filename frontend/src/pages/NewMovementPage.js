@@ -475,7 +475,7 @@ export default function NewMovementPage() {
           <PageHeader
             icon={ContainerIcon}
             title="Novo Registro"
-            subtitle={vistoriaId ? 'EIR de entrada gerada a partir da Vistoria de Container' : 'Registre uma nova entrada ou saída de contêiner'}
+            subtitle={vistoriaId ? 'EIR de entrada gerada a partir da Vistoria de Container' : 'Registre uma nova entrada ou saída de container'}
             meta={autoSavedAt && (
               <StatusPill tone="emerald" dot={false}>
                 <Check className="w-3 h-3" />
@@ -627,7 +627,7 @@ export default function NewMovementPage() {
 
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
-              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Contêiner</CardTitle>
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Informações do Container</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

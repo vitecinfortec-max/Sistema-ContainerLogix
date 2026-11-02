@@ -14,7 +14,7 @@ export default function ProgressRing({ value, size = 44, stroke = 4, tone = 'pri
   const fraction = Math.min(1, Math.max(0, value || 0));
   return (
     <div className={cn('relative shrink-0', className)} style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+      <svg aria-hidden="true" width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} className="stroke-slate-200 dark:stroke-slate-700" />
         <motion.circle
           cx={size / 2}

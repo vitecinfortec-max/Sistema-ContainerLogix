@@ -708,7 +708,7 @@ export default function DailyRateRequestPage() {
                   <span className="font-bold">Total Geral: {formatMoney(selectedRequest.total_value)}</span>
                 </div>
                 {selectedRequest.status !== 'CANCELADO' && (
-                  <p className="text-xs text-muted-foreground mt-1">Marque "Pago" em cada motorista conforme for pagando. Com todos pagos, a solicitação fica Paga.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Marque “Pago” em cada motorista conforme for pagando. Com todos pagos, a solicitação fica Paga.</p>
                 )}
               </div>
 

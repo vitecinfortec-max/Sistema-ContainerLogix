@@ -88,10 +88,10 @@ export default function ShippingLinesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm('Tem certeza que deseja deletar este armador?')) {
+    if (await confirm('Deseja realmente excluir este armador?')) {
       try {
         await api.deleteShippingLine(id);
-        toast.success('Armador deletado com sucesso');
+        toast.success('Armador excluído com sucesso');
         setSelectedIds(prev => {
           if (!prev.has(id)) return prev;
           const next = new Set(prev);
@@ -100,7 +100,7 @@ export default function ShippingLinesPage() {
         });
         loadShippingLines();
       } catch (error) {
-        toast.error('Erro ao deletar armador');
+        toast.error('Erro ao excluir armador');
       }
     }
   };

@@ -1024,7 +1024,7 @@ class CommercialProposal(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     proposal_seq: int  # valor numérico puro do contador do ano
     proposal_number: str  # formatado "20260002"
-    subject: str = "Armazenagem e Movimentação de Contêineres"
+    subject: str = "Armazenagem e Movimentação de Containers"
     recipient_name: str
     validity_days: int = 7
     currency: str = "BRL"  # Moeda dos valores da proposta: BRL (R$) ou USD ($) - clientes do exterior
@@ -1038,7 +1038,7 @@ class CommercialProposal(BaseModel):
     updated_at: Optional[datetime] = None
 
 class CommercialProposalCreate(BaseModel):
-    subject: str = "Armazenagem e Movimentação de Contêineres"
+    subject: str = "Armazenagem e Movimentação de Containers"
     recipient_name: str
     validity_days: int = 7
     currency: str = "BRL"

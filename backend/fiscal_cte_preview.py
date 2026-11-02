@@ -143,7 +143,7 @@ def generate_cte_preview_pdf(cte: dict, settings: dict, company: dict = None) ->
         ("Outras características", cte.get("outras_caracteristicas") or "-"),
         ("Valor da carga", format_currency(cte.get("valor_carga") or 0)),
         ("Quantidades", quantidades or "-", 2),
-        ("Contêineres", containers or "-", 2),
+        ("Containers", containers or "-", 2),
     ], width))
 
     elements.extend(_pdf_section_title("Composição do frete e impostos", width))

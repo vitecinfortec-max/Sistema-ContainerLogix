@@ -574,7 +574,7 @@ export default function StockMovementsPage() {
 
             <TabsContent value="itens" className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary">Itens</h3>
+                <h3 className="text-[13px] font-semibold text-primary">Itens</h3>
                 <Button variant="outline" size="sm" type="button" onClick={addItem} className="h-7 text-xs">
                   <Plus className="w-3 h-3 mr-1" />Adicionar item
                 </Button>
@@ -632,7 +632,7 @@ export default function StockMovementsPage() {
               </div>
               <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-700">
                 <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 min-w-[220px] text-right">
-                  <div className="text-[10px] uppercase tracking-wider text-primary font-semibold">Valor Total</div>
+                  <div className="text-xs text-primary font-medium">Valor Total</div>
                   <div className="text-xl font-bold text-primary tabular-nums">{fmtMoney(total)}</div>
                 </div>
               </div>

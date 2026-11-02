@@ -88,7 +88,7 @@ export default function ContainerVistoriasPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Tem certeza que deseja excluir esta vistoria?'))) return;
+    if (!(await confirm('Deseja realmente excluir esta vistoria?'))) return;
 
     try {
       await api.deleteContainerVistoria(id);

@@ -4575,7 +4575,7 @@ def generate_invoice_receipt_pdf(invoice: dict, services: list, amount_in_words:
                                       generation_info=f"Fatura nº {number}", company=company, content_width=doc.width))
     elements.append(_pdf_info_grid([
         ("Cliente", client, 2),
-        ("CNPJ/CPF", cnpj),
+        ("CPF/CNPJ", cnpj),
         ("Fatura nº", str(number)),
         ("Emissão", fmt_date_local(invoice.get("created_at"))),
         ("Vencimento", fmt_date(invoice["due_date"]) if invoice.get("due_date") else "-"),
@@ -4607,7 +4607,7 @@ def generate_invoice_receipt_pdf(invoice: dict, services: list, amount_in_words:
     if received > 0:
         amount = money(received).replace(" ", "&nbsp;")
         declaration = (
-            f"Recebemos de <b>{xml_escape(client)}</b>, CNPJ/CPF <b>{xml_escape(cnpj)}</b>, a quantia de "
+            f"Recebemos de <b>{xml_escape(client)}</b>, CPF/CNPJ <b>{xml_escape(cnpj)}</b>, a quantia de "
             f"<b>{amount}</b>{in_words}{paid_on}, referente ao pagamento da <b>Fatura nº {number}</b>"
         )
         if credit:
@@ -4615,7 +4615,7 @@ def generate_invoice_receipt_pdf(invoice: dict, services: list, amount_in_words:
         declaration += ", pelo que damos plena e geral quitação do valor recebido."
     else:
         declaration = (
-            f"Declaramos que a <b>Fatura nº {number}</b> de <b>{xml_escape(client)}</b>, CNPJ/CPF <b>{xml_escape(cnpj)}</b>, "
+            f"Declaramos que a <b>Fatura nº {number}</b> de <b>{xml_escape(client)}</b>, CPF/CNPJ <b>{xml_escape(cnpj)}</b>, "
             f"no valor de <b>{money(total).replace(' ', '&nbsp;')}</b>, foi quitada integralmente com o crédito do cliente{paid_on}, "
             "pelo que damos plena e geral quitação."
         )
@@ -4761,7 +4761,7 @@ def generate_service_price_table_pdf(client_name: str, entries: list, company: d
             name = xml_escape(e.get('service_type_name', '-') or '-')
             if e.get('billing_type') == 'DIARIA':
                 size_label = f"{e['container_size_group']} pés" if e.get('container_size_group') else 'qualquer tamanho'
-                caption = f"Diária após {e.get('free_time_days', 0)} dias de free time · Contêiner {size_label}"
+                caption = f"Diária após {e.get('free_time_days', 0)} dias de free time · Container {size_label}"
                 service_cell = cell(None, markup=f"<b>{name}</b><br/><font size=7 color='#{BRAND_MUTED}'>{xml_escape(caption)}</font>")
                 value_str = f"{format_currency(e.get('value', 0), e.get('currency') or 'BRL')}/dia"
             else:
@@ -5498,7 +5498,7 @@ def generate_movement_voucher_pdf(movements: list, via: str, company: dict = Non
         ]))
         elements.append(Spacer(1, 6))
 
-        elements.append(boxed_section('Informações do Contêiner', [
+        elements.append(boxed_section('Informações do Container', [
             field_row([
                 ('Número Container', m.get('container_number')),
                 ('Tamanho/Tipo', m.get('size_type')),
@@ -5617,7 +5617,7 @@ _PHOTO_DOCUMENTS = {
         'note': 'Este documento é válido como registro de vistoria',
     },
     'inspection': {
-        'title': 'Registro Fotográfico de Contêiner', 'number_label': 'Registro Nº', 'number_field': 'inspection_number',
+        'title': 'Registro Fotográfico de Container', 'number_label': 'Registro Nº', 'number_field': 'inspection_number',
         'barcode_prefix': 'RFC',
         'fields': [
             ('Número do Container', 'container_number'), ('Lacre', 'container_seal'),

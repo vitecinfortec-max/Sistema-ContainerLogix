@@ -692,7 +692,7 @@ export default function RepairEstimatesPage() {
                   <Input className="h-9" type="number" min="0" value={formData.execution_days} onChange={(e) => setField('execution_days')(e.target.value)} />
                 </Field>
                 <Field label="Observações" className="col-span-2">
-                  <Textarea rows={3} value={formData.observations} onChange={(e) => setField('observations')(e.target.value)} placeholder="Ex: condições de pagamento, peças inclusas, fotos na vistoria" />
+                  <Textarea rows={3} value={formData.observations} onChange={(e) => setField('observations')(e.target.value)} />
                 </Field>
               </div>
               <div className="rounded-md border border-slate-200 dark:border-slate-700 p-3 space-y-2 text-sm self-start">

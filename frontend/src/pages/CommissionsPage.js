@@ -948,7 +948,7 @@ export default function CommissionsPage() {
                 {batch.advances.map((a, i) => (
                   <div key={i} className="grid grid-cols-12 gap-3 items-end">
                     <Field label="Valor do adiantamento (R$)" className="col-span-6 md:col-span-4">
-                      <Input inputMode="decimal" value={a.value} placeholder="0,00" className="text-right"
+                      <Input inputMode="decimal" value={a.value} className="text-right"
                         onChange={(e) => { const v = moneyMask(e.target.value); setBatchAdv(i, { value: v, advance_date: a.advance_date || (v ? today() : '') }); }}
                         data-testid={`commission-batch-advance-${i}`} />
                     </Field>

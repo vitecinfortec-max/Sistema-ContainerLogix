@@ -279,7 +279,7 @@ function validateCte(f, settings) {
   parties.forEach(([label, p]) => {
     const e = p?.endereco || {};
     if ((p?.nome || '').trim().length < 2) add('envolvidos', `${label}: informe o nome / razão social`);
-    if (!cnpjCpfOk(p?.cnpj_cpf)) add('envolvidos', `${label}: CNPJ/CPF inválido`);
+    if (!cnpjCpfOk(p?.cnpj_cpf)) add('envolvidos', `${label}: CPF/CNPJ inválido`);
     if ((e.logradouro || '').trim().length < 2 || !(e.numero || '').trim() || (e.bairro || '').trim().length < 2) {
       add('envolvidos', `${label}: endereço incompleto (logradouro, número e bairro)`);
     }
@@ -430,11 +430,11 @@ function PartyFields({ title, value, onChange, clients, onClientCreated, testId 
             />
           </WithQuickAdd>
         </Field>
-        <Field label="CNPJ / CPF" required className="md:col-span-3">
+        <Field label="CPF/CNPJ" required className="md:col-span-3">
           <Input value={v.cnpj_cpf || ''} onChange={(ev) => set('cnpj_cpf', formatCnpjCpf(ev.target.value))} className="font-mono" />
         </Field>
-        <Field label="Inscrição Estadual" className="md:col-span-3">
-          <Input value={v.ie || ''} placeholder='ou "ISENTO"' onChange={(ev) => set('ie', ev.target.value.toUpperCase())} />
+        <Field label="Inscrição Estadual (ou ISENTO)" className="md:col-span-3">
+          <Input value={v.ie || ''} onChange={(ev) => set('ie', ev.target.value.toUpperCase())} />
         </Field>
       </div>
       <button type="button" onClick={() => setOpen(!expanded)}
@@ -960,7 +960,7 @@ export default function CtePage() {
           </div>
         )}
         {selected?.chave && (
-          <p className="text-xs text-slate-500 font-mono" data-testid="cte-chave">Chave: {selected.chave}{selected.protocolo ? ` · Protocolo: ${selected.protocolo}` : ''}</p>
+          <p className="text-xs text-slate-500" data-testid="cte-chave">Chave: <span className="font-mono">{selected.chave}</span>{selected.protocolo && <> · Protocolo: <span className="font-mono">{selected.protocolo}</span></>}</p>
         )}
       </div>
 
@@ -1026,7 +1026,7 @@ export default function CtePage() {
                     {emittedDoc.status === 'AUTORIZADO' ? `CT-e nº ${emittedDoc.numero} autorizado` : `CT-e ${(CTE_STATUS_LABELS[emittedDoc.status] || emittedDoc.status).toLowerCase()}`}
                   </p>
                   {emittedDoc.status === 'PENDENTE' && <p className="text-sm text-slate-500">A Sefaz ainda não respondeu. Consulte de novo em instantes.</p>}
-                  {emittedDoc.chave && <p className="text-xs font-mono text-slate-500 break-all">Chave: {emittedDoc.chave}{emittedDoc.protocolo ? ` · Protocolo: ${emittedDoc.protocolo}` : ''}</p>}
+                  {emittedDoc.chave && <p className="text-xs text-slate-500 break-all">Chave: <span className="font-mono">{emittedDoc.chave}</span>{emittedDoc.protocolo && <> · Protocolo: <span className="font-mono">{emittedDoc.protocolo}</span></>}</p>}
                   {emittedDoc.motivo && emittedDoc.status !== 'AUTORIZADO' && <p className="text-sm text-red-700 dark:text-red-300">{emittedDoc.motivo}</p>}
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -1285,10 +1285,10 @@ export default function CtePage() {
                   </div>
                 </Section>
 
-                <Section id="containers" title="Contêineres"
-                  actions={<Button type="button" variant="outline" size="sm" onClick={() => addRow('containers', { numero: '', lacre: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Contêiner</Button>}>
+                <Section id="containers" title="Containers"
+                  actions={<Button type="button" variant="outline" size="sm" onClick={() => addRow('containers', { numero: '', lacre: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Container</Button>}>
                   {form.containers.length === 0 ? (
-                    <p className="text-xs text-slate-500">Nenhum contêiner. Os informados vão no CT-e como unidades de carga.</p>
+                    <p className="text-xs text-slate-500">Nenhum container. Os informados vão no CT-e como unidades de carga.</p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
                       {form.containers.map((c, i) => (

@@ -505,7 +505,7 @@ export default function ClientCreditsPage() {
                   </Select>
                 </Field>
                 <Field label="Documento / comprovante">
-                  <Input className="h-9" value={creditForm.reference} placeholder="ID do PIX, nº do depósito..."
+                  <Input className="h-9" value={creditForm.reference}
                     onChange={(e) => setCreditForm((f) => ({ ...f, reference: e.target.value }))} />
                 </Field>
                 <Field label="Observação" className="col-span-2">

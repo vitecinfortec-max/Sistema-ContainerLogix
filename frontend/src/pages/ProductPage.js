@@ -170,10 +170,10 @@ export default function ProductPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm('Tem certeza que deseja deletar este produto?')) {
+    if (await confirm('Deseja realmente excluir este produto?')) {
       try {
         await api.deleteProduct(id);
-        toast.success('Produto deletado com sucesso');
+        toast.success('Produto excluído com sucesso');
         setSelectedIds(prev => {
           const next = new Set(prev);
           next.delete(id);
@@ -181,7 +181,7 @@ export default function ProductPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Erro ao deletar produto');
+        toast.error(error.response?.data?.detail || 'Erro ao excluir produto');
       }
     }
   };

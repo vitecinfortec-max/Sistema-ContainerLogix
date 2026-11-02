@@ -632,14 +632,14 @@ export default function ServiceProvidersPage() {
                 {closing.new_advances.map((a, i) => (
                   <div key={i} className="grid grid-cols-12 gap-3 items-end">
                     <Field label="Valor do vale (R$)" className="col-span-6 md:col-span-3">
-                      <Input inputMode="decimal" value={a.value} placeholder="0,00" className="text-right" data-testid={`sp-new-advance-${i}`}
+                      <Input inputMode="decimal" value={a.value} className="text-right" data-testid={`sp-new-advance-${i}`}
                         onChange={(e) => { const v = moneyMask(e.target.value); setLine('new_advances', i, { value: v, date: a.date || (v ? today() : '') }); }} />
                     </Field>
                     <Field label="Dia do vale" className="col-span-6 md:col-span-3">
                       <Input type="date" value={a.date} onChange={(e) => setLine('new_advances', i, { date: e.target.value })} data-testid={`sp-new-advance-date-${i}`} />
                     </Field>
                     <Field label="Descrição" className="col-span-11 md:col-span-5">
-                      <Input value={a.description} maxLength={100} placeholder="Ex.: PIX, dinheiro" onChange={(e) => setLine('new_advances', i, { description: e.target.value })} />
+                      <Input value={a.description} maxLength={100} onChange={(e) => setLine('new_advances', i, { description: e.target.value })} />
                     </Field>
                     {closing.new_advances.length > 1 && (
                       <Button type="button" variant="ghost" size="icon" className="col-span-1 h-9 w-9 text-slate-400 hover:text-red-600" aria-label="Remover vale"
@@ -865,7 +865,7 @@ export default function ServiceProvidersPage() {
               </Select>
             </Field>
             <Field label="Dados bancários" className="col-span-2 md:col-span-12">
-              <Input value={providerForm.bank_info} maxLength={200} placeholder="Banco, agência e conta" onChange={(e) => setProviderForm((f) => ({ ...f, bank_info: e.target.value }))} />
+              <Input value={providerForm.bank_info} maxLength={200} onChange={(e) => setProviderForm((f) => ({ ...f, bank_info: e.target.value }))} />
             </Field>
             <Field label="Observações" className="col-span-2 md:col-span-12">
               <Textarea rows={2} maxLength={1000} value={providerForm.observations} onChange={(e) => setProviderForm((f) => ({ ...f, observations: e.target.value }))} />
@@ -890,7 +890,7 @@ export default function ServiceProvidersPage() {
               <Input type="date" value={entryForm.date} onChange={(e) => setEntryForm((f) => ({ ...f, date: e.target.value }))} />
             </Field>
             <Field label="Descrição do serviço" className="col-span-2 md:col-span-12">
-              <Input value={entryForm.description} maxLength={120} placeholder="Ex.: solda do chassi da carreta" onChange={(e) => setEntryForm((f) => ({ ...f, description: e.target.value }))} />
+              <Input value={entryForm.description} maxLength={120} onChange={(e) => setEntryForm((f) => ({ ...f, description: e.target.value }))} />
             </Field>
             <Field label="Unidade" className="md:col-span-3">
               <Select value={entryForm.unit || entryProvider?.payment_unit || 'DIARIA'} onValueChange={(v) => setEntryForm((f) => ({ ...f, unit: v }))}>

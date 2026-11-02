@@ -86,10 +86,10 @@ export default function OSCategoriesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm('Tem certeza que deseja deletar esta categoria?')) {
+    if (await confirm('Deseja realmente excluir esta categoria?')) {
       try {
         await api.deleteOSCategory(id);
-        toast.success('Categoria deletada com sucesso');
+        toast.success('Categoria excluída com sucesso');
         setSelectedIds(prev => {
           if (!prev.has(id)) return prev;
           const next = new Set(prev);
@@ -98,7 +98,7 @@ export default function OSCategoriesPage() {
         });
         loadCategories();
       } catch (error) {
-        toast.error('Erro ao deletar categoria');
+        toast.error('Erro ao excluir categoria');
       }
     }
   };

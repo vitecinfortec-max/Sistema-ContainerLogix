@@ -177,7 +177,7 @@ const cteKeyOk = (k) => onlyDigits(k).length === 44 && onlyDigits(k).slice(20, 2
 
 function ownerIssues(owner, label, add) {
   const o = owner || {};
-  if (!docOk(o.cnpj_cpf)) add(`${label}: CNPJ/CPF do proprietário inválido`);
+  if (!docOk(o.cnpj_cpf)) add(`${label}: CPF/CNPJ do proprietário inválido`);
   if ((o.nome || '').trim().length < 2) add(`${label}: informe o nome do proprietário`);
   if (onlyDigits(o.rntrc).length !== 8) add(`${label}: RNTRC do proprietário deve ter 8 dígitos`);
   if (!(o.ie || '').trim()) add(`${label}: informe a IE do proprietário (ou "ISENTO")`);
@@ -244,14 +244,14 @@ function validateMdfe(f, settings) {
   const antt = add('antt');
   f.ciots.filter((c) => c.numero || c.responsavel_cnpj_cpf).forEach((c) => {
     if (onlyDigits(c.numero).length !== 12) antt('CIOT deve ter 12 dígitos');
-    if (!docOk(c.responsavel_cnpj_cpf)) antt('CIOT: informe o CNPJ/CPF do responsável pela geração');
+    if (!docOk(c.responsavel_cnpj_cpf)) antt('CIOT: informe o CPF/CNPJ do responsável pela geração');
   });
   f.contratantes.filter((c) => c.nome || c.cnpj_cpf).forEach((c) => {
-    if (!docOk(c.cnpj_cpf)) antt(`Contratante ${(c.nome || '').trim() || '-'}: CNPJ/CPF inválido`);
+    if (!docOk(c.cnpj_cpf)) antt(`Contratante ${(c.nome || '').trim() || '-'}: CPF/CNPJ inválido`);
   });
 
   const seguro = add('seguro');
-  if (f.seguro_responsavel === '2' && !docOk(f.seguro_responsavel_cnpj_cpf)) seguro('Seguro da carga: informe o CNPJ/CPF do contratante responsável');
+  if (f.seguro_responsavel === '2' && !docOk(f.seguro_responsavel_cnpj_cpf)) seguro('Seguro da carga: informe o CPF/CNPJ do contratante responsável');
   if (onlyDigits(f.seguradora_cnpj) && onlyDigits(f.seguradora_cnpj).length !== 14) seguro('Seguro da carga: CNPJ da seguradora inválido');
 
   const carga = add('carga');
@@ -343,7 +343,7 @@ function VehicleFields({ value, onChange, vehicles, registry, onPicked, onVehicl
       </label>
       {v.terceiro && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-          <Field label="CNPJ / CPF" required>
+          <Field label="CPF/CNPJ" required>
             <Input value={v.proprietario.cnpj_cpf} onChange={(e) => setOwner('cnpj_cpf', formatCnpjCpf(e.target.value))} className="font-mono" />
           </Field>
           <Field label="Nome / Razão Social" required className="md:col-span-2">
@@ -850,7 +850,7 @@ export default function MdfePage() {
             <b>Retorno da Sefaz / emissor:</b> {selected.motivo}
           </div>
         )}
-        {selected?.chave && <p className="text-xs text-slate-500 font-mono" data-testid="mdfe-chave">Chave: {selected.chave}</p>}
+        {selected?.chave && <p className="text-xs text-slate-500" data-testid="mdfe-chave">Chave: <span className="font-mono">{selected.chave}</span></p>}
       </div>
 
       {/* Encerramento */}
@@ -941,7 +941,7 @@ export default function MdfePage() {
                     {emitted.status === 'AUTORIZADO' ? `MDF-e nº ${emitted.numero} autorizado` : `MDF-e ${(MDFE_STATUS_LABELS[emitted.status] || emitted.status).toLowerCase()}`}
                   </p>
                   {emitted.status === 'PENDENTE' && <p className="text-sm text-slate-500">A Sefaz ainda não respondeu. Consulte de novo em instantes.</p>}
-                  {emitted.chave && <p className="text-xs font-mono text-slate-500 break-all">Chave: {emitted.chave}</p>}
+                  {emitted.chave && <p className="text-xs text-slate-500 break-all">Chave: <span className="font-mono">{emitted.chave}</span></p>}
                   {emitted.status === 'AUTORIZADO' && <p className="text-xs text-amber-700 dark:text-amber-300">Lembre de encerrar o MDF-e ao fim da viagem.</p>}
                   {emitted.motivo && emitted.status !== 'AUTORIZADO' && <p className="text-sm text-red-700 dark:text-red-300">{emitted.motivo}</p>}
                 </div>
@@ -1123,7 +1123,7 @@ export default function MdfePage() {
                       <Field label={i === 0 ? 'Código CIOT (12 dígitos)' : undefined} className="flex-1">
                         <Input value={c.numero} onChange={(e) => setRow('ciots', i, { numero: onlyDigits(e.target.value).slice(0, 12) })} className="font-mono" />
                       </Field>
-                      <Field label={i === 0 ? 'CNPJ/CPF de quem gerou' : undefined} className="w-56">
+                      <Field label={i === 0 ? 'CPF/CNPJ de quem gerou' : undefined} className="w-56">
                         <Input value={c.responsavel_cnpj_cpf} onChange={(e) => setRow('ciots', i, { responsavel_cnpj_cpf: formatCnpjCpf(e.target.value) })} className="font-mono" />
                       </Field>
                       <RowRemove onClick={() => removeRow('ciots', i)} />
@@ -1132,7 +1132,7 @@ export default function MdfePage() {
                   {form.contratantes.map((c, i) => (
                     <div key={`contr-${i}`} className="flex gap-2 items-end">
                       <Field label={i === 0 ? 'Contratante' : undefined} className="flex-1"><Input value={c.nome || ''} onChange={(e) => setRow('contratantes', i, { nome: e.target.value })} /></Field>
-                      <Field label={i === 0 ? 'CNPJ / CPF' : undefined} className="w-56"><Input value={c.cnpj_cpf} onChange={(e) => setRow('contratantes', i, { cnpj_cpf: formatCnpjCpf(e.target.value) })} className="font-mono" /></Field>
+                      <Field label={i === 0 ? 'CPF/CNPJ' : undefined} className="w-56"><Input value={c.cnpj_cpf} onChange={(e) => setRow('contratantes', i, { cnpj_cpf: formatCnpjCpf(e.target.value) })} className="font-mono" /></Field>
                       <RowRemove onClick={() => removeRow('contratantes', i)} />
                     </div>
                   ))}
@@ -1145,7 +1145,7 @@ export default function MdfePage() {
                       <OptionSelect value={form.seguro_responsavel} onChange={(v) => set('seguro_responsavel', v)} options={SEGURO_RESPONSAVEL_OPTIONS} />
                     </Field>
                     {form.seguro_responsavel === '2' && (
-                      <Field label="CNPJ/CPF do contratante" required className="md:col-span-2">
+                      <Field label="CPF/CNPJ do contratante" required className="md:col-span-2">
                         <Input value={form.seguro_responsavel_cnpj_cpf} onChange={(e) => set('seguro_responsavel_cnpj_cpf', formatCnpjCpf(e.target.value))} className="font-mono" />
                       </Field>
                     )}
@@ -1163,7 +1163,7 @@ export default function MdfePage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                       {form.averbacoes.map((a, i) => (
                         <div key={i} className="flex gap-1">
-                          <Input value={a} maxLength={40} placeholder="Nº da averbação" onChange={(e) => setForm((p) => ({ ...p, averbacoes: p.averbacoes.map((x, j) => (j === i ? e.target.value : x)) }))} aria-label="Número da averbação" />
+                          <Input value={a} maxLength={40} onChange={(e) => setForm((p) => ({ ...p, averbacoes: p.averbacoes.map((x, j) => (j === i ? e.target.value : x)) }))} aria-label="Número da averbação" />
                           <RowRemove onClick={() => removeRow('averbacoes', i)} />
                         </div>
                       ))}

@@ -111,7 +111,7 @@ export default function UsersPage() {
   const handleStatusToggle = async (targetUser, active) => {
     const action = active ? 'reativar' : 'desativar';
     const confirmed = await confirm(
-      `Tem certeza que deseja ${action} o acesso de "${targetUser.name}"?${!active ? ' A pessoa não vai mais conseguir entrar no sistema.' : ''}`,
+      `Deseja realmente ${action} o acesso de "${targetUser.name}"?${!active ? ' A pessoa não vai mais conseguir entrar no sistema.' : ''}`,
       active ? 'Reativar acesso' : 'Desativar acesso'
     );
     if (!confirmed) return;
@@ -214,7 +214,7 @@ export default function UsersPage() {
                 <thead>
                   <tr>
                     <th>Nome</th>
-                    <th>Email</th>
+                    <th>E-mail</th>
                     <th>Nível de acesso</th>
                     <th>Cadastrado em</th>
                     <th>Acesso ativo</th>
@@ -319,7 +319,7 @@ export default function UsersPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="new-user-email" className="block">Email *</Label>
+              <Label htmlFor="new-user-email" className="block">E-mail *</Label>
               <Input
                 id="new-user-email"
                 data-testid="new-user-email"
@@ -408,7 +408,7 @@ export default function UsersPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="edit-user-email" className="block">Email *</Label>
+              <Label htmlFor="edit-user-email" className="block">E-mail *</Label>
               <Input
                 id="edit-user-email"
                 type="email"

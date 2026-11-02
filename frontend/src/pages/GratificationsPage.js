@@ -527,7 +527,7 @@ export default function GratificationsPage() {
             </div>
             <div>
               <Label className="mb-1.5 block">Descrição / motivo</Label>
-              <Input value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Ex.: meta de outubro" className="h-9 text-sm" data-testid="gratification-description-input" />
+              <Input value={form.description} onChange={(e) => setField('description', e.target.value)} className="h-9 text-sm" data-testid="gratification-description-input" />
             </div>
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Observações</Label>

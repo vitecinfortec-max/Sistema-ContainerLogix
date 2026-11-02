@@ -270,7 +270,7 @@ export default function FuelConsumptionPage() {
           <div>
             <Label className="mb-1.5 block">Meta (km/L)</Label>
             <Input
-              inputMode="decimal" placeholder="Ex.: 2,5" autoFocus
+              inputMode="decimal" autoFocus
               value={targetDialog?.value ?? ''}
               onChange={(e) => setTargetDialog((p) => ({ ...p, value: e.target.value }))}
               onKeyDown={(e) => e.key === 'Enter' && saveTarget()}

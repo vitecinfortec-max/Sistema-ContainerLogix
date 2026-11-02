@@ -52,7 +52,7 @@ export function IssueSection({ idPrefix, id, title, count, actions, children }) 
 export function FormSectionTitle({ children, bare = false, className }) {
   return (
     <h3 className={cn(
-      'text-[12px] font-bold uppercase tracking-wider text-primary',
+      'text-[13px] font-semibold text-primary',
       !bare && 'border-b-2 border-primary/20 pb-1',
       className,
     )}>

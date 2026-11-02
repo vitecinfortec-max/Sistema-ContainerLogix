@@ -1177,7 +1177,7 @@ export default function InternationalInvoicePage() {
             <DialogHeader>
               <DialogTitle className="text-red-600">Confirmar Exclusão</DialogTitle>
               <DialogDescription>
-                Tem certeza que deseja excluir a Invoice #{invoiceToDelete?.invoice_number}?
+                Deseja realmente excluir a Invoice #{invoiceToDelete?.invoice_number}?
                 Esta ação não pode ser desfeita.
               </DialogDescription>
             </DialogHeader>

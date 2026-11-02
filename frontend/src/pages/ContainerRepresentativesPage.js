@@ -117,10 +117,10 @@ export default function ContainerRepresentativesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm('Tem certeza que deseja deletar este representante?')) {
+    if (await confirm('Deseja realmente excluir este representante?')) {
       try {
         await api.deleteContainerRepresentative(id);
-        toast.success('Representante deletado com sucesso');
+        toast.success('Representante excluído com sucesso');
         setSelectedIds(prev => {
           if (!prev.has(id)) return prev;
           const next = new Set(prev);
@@ -129,7 +129,7 @@ export default function ContainerRepresentativesPage() {
         });
         loadRepresentatives();
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Erro ao deletar representante');
+        toast.error(error.response?.data?.detail || 'Erro ao excluir representante');
       }
     }
   };

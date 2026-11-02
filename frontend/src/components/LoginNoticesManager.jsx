@@ -141,7 +141,7 @@ export default function LoginNoticesManager() {
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <Label className="mb-1.5 block">Título <span className="text-destructive">*</span></Label>
-              <Input value={form.title} maxLength={80} onChange={(e) => set('title', e.target.value)} placeholder="Ex.: Feriado na sexta-feira" data-testid="login-notice-title-input" />
+              <Input value={form.title} maxLength={80} onChange={(e) => set('title', e.target.value)} data-testid="login-notice-title-input" />
             </div>
             <div className="col-span-2">
               <Label className="mb-1.5 block">Texto</Label>
@@ -150,11 +150,11 @@ export default function LoginNoticesManager() {
             </div>
             <div>
               <Label className="mb-1.5 block">Texto do botão</Label>
-              <Input value={form.link_label} maxLength={40} onChange={(e) => set('link_label', e.target.value)} placeholder="Saiba mais" />
+              <Input value={form.link_label} maxLength={40} onChange={(e) => set('link_label', e.target.value)} />
             </div>
             <div>
               <Label className="mb-1.5 block">Link do botão</Label>
-              <Input value={form.link_url} onChange={(e) => set('link_url', e.target.value)} placeholder="https://..." data-testid="login-notice-link-input" />
+              <Input value={form.link_url} onChange={(e) => set('link_url', e.target.value)} data-testid="login-notice-link-input" />
             </div>
             <div>
               <Label className="mb-1.5 block">Mostrar a partir de</Label>

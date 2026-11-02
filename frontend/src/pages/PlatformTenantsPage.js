@@ -280,7 +280,7 @@ export default function PlatformTenantsPage() {
             </div>
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Remetente dos e-mails</Label>
-              <Input type="email" value={form.sender_email} onChange={(e) => setField('sender_email', e.target.value)} placeholder="relatorios@containerlogix.com.br" className="h-9 text-sm" />
+              <Input type="email" value={form.sender_email} onChange={(e) => setField('sender_email', e.target.value)} className="h-9 text-sm" />
               <p className="text-[11px] text-slate-500 mt-1">Relatório diário e recuperação de senha. Vazio: o remetente padrão do servidor.</p>
             </div>
             <div className="sm:col-span-2">
@@ -336,7 +336,7 @@ export default function PlatformTenantsPage() {
             </div>
             <div>
               <Label className="mb-1.5 block">Remetente dos e-mails</Label>
-              <Input type="email" value={editForm.sender_email} onChange={(e) => setEditForm((f) => ({ ...f, sender_email: e.target.value }))} placeholder="relatorios@containerlogix.com.br" className="h-9 text-sm" />
+              <Input type="email" value={editForm.sender_email} onChange={(e) => setEditForm((f) => ({ ...f, sender_email: e.target.value }))} className="h-9 text-sm" />
               <p className="text-[11px] text-slate-500 mt-1">Vazio: o remetente padrão do servidor.</p>
             </div>
             <div>

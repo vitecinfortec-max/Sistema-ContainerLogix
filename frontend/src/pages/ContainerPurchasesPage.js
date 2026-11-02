@@ -152,7 +152,7 @@ export default function ContainerPurchasesPage() {
   };
 
   const handleDelete = async (purchase) => {
-    if (await confirm('Tem certeza que deseja excluir esta Compra de Container?')) {
+    if (await confirm('Deseja realmente excluir esta Compra de Container?')) {
       try {
         await api.deleteContainerPurchase(purchase.id);
         toast.success('Compra de Container excluída');

@@ -127,7 +127,7 @@ export default function TankSettingsPage() {
                   testId="tank-fuel-warehouse-input"
                 />
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  No "Reabastecer tanque", o botão "Puxar de NF-e" lista as notas importadas de produtos deste almoxarifado e dá baixa nele.
+                  No “Reabastecer tanque”, o botão “Puxar de NF-e” lista as notas importadas de produtos deste almoxarifado e dá baixa nele.
                 </p>
               </div>
               <Button type="submit" className="text-[13px] font-semibold" disabled={saving} data-testid="save-tank-settings-button">

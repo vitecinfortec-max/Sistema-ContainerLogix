@@ -333,14 +333,14 @@ export default function PortServiceShiftsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-md bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5">
-                      <div className="text-[10px] uppercase tracking-wide text-slate-400">Entrada (prev. {i.expected_entry || '-'})</div>
+                      <div className="text-xs text-slate-500">Entrada (prev. {i.expected_entry || '-'})</div>
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="font-semibold text-slate-800 dark:text-slate-100 tabular-nums">{i.entry_time || '-'}</span>
                         <Diff minutes={i.entry_diff} />
                       </div>
                     </div>
                     <div className="rounded-md bg-slate-50 dark:bg-slate-800/60 px-2.5 py-1.5">
-                      <div className="text-[10px] uppercase tracking-wide text-slate-400">Saída (prev. {i.expected_exit || '-'})</div>
+                      <div className="text-xs text-slate-500">Saída (prev. {i.expected_exit || '-'})</div>
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="font-semibold text-slate-800 dark:text-slate-100 tabular-nums">{i.exit_time || '-'}</span>
                         <Diff minutes={i.exit_diff} />

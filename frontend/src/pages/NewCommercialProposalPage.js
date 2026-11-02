@@ -13,7 +13,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Plus, Trash2, Loader2, FileText } from 'lucide-react';
 
-const DEFAULT_FREE_TIME_TEXT = '30 (trinta) dias de free time de armazenagem, contados a partir da entrada do contêiner no pátio. Após esse período, incidem as diárias de armazenagem informadas na tabela acima.';
+const DEFAULT_FREE_TIME_TEXT = '30 (trinta) dias de free time de armazenagem, contados a partir da entrada do container no pátio. Após esse período, incidem as diárias de armazenagem informadas na tabela acima.';
 const DEFAULT_PAYMENT_TERMS_TEXT = 'Pagamento de forma quinzenal, com faturamento gerado a cada 15 dias, sempre às segundas-feiras. Pagamento via Pix.';
 
 const CURRENCY_OPTIONS = [['BRL', 'R$ - Real'], ['USD', '$ - Dólar']];
@@ -26,7 +26,7 @@ export default function NewCommercialProposalPage() {
   const [clients, setClients] = useState([]);
 
   const [recipientName, setRecipientName] = useState('');
-  const [subject, setSubject] = useState('Armazenagem e Movimentação de Contêineres');
+  const [subject, setSubject] = useState('Armazenagem e Movimentação de Containers');
   const [validityDays, setValidityDays] = useState('7');
   const [currency, setCurrency] = useState('BRL');
   const [items, setItems] = useState([{ description: '', value: '' }]);

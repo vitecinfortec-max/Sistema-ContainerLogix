@@ -716,7 +716,7 @@ function ReceiptSlot({ view, busy, onPick, onRemove }) {
 
 function SectionTitle({ children }) {
   return (
-    <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary border-b-2 border-primary/20 pb-1">
+    <h3 className="text-[13px] font-semibold text-primary border-b-2 border-primary/20 pb-1">
       {children}
     </h3>
   );
@@ -801,7 +801,7 @@ function TextAreaField({ label, value, onChange, testid }) {
 function TotalBox({ label, value }) {
   return (
     <div className="p-3 rounded-lg border-2 border-primary/40 bg-primary/5">
-      <div className="text-[10px] uppercase tracking-wider text-primary font-semibold">{label}</div>
+      <div className="text-xs text-primary font-medium">{label}</div>
       <div className="text-xl font-bold text-primary">{fmtMoney(value)}</div>
     </div>
   );

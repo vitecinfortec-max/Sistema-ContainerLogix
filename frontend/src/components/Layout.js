@@ -832,7 +832,7 @@ function LayoutFrame({ children }) {
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
           title={item.label}
           className={`flex items-center justify-center h-11 border-b border-slate-100 dark:border-slate-800 transition-colors ${
-            isActive ? 'text-primary' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
+            isActive ? 'text-primary' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
           }`}
         >
           <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -848,7 +848,7 @@ function LayoutFrame({ children }) {
           to={item.path}
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
           className={`group flex items-center py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 ${
-            isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
+            isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
           } ${deepIndent ? 'pl-14' : 'pl-10'} pr-5 text-[13px] gap-2`}
         >
           <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -864,7 +864,7 @@ function LayoutFrame({ children }) {
         to={item.path}
         data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
         className={`group flex items-center py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 ${
-          isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
+          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
         } px-5 gap-3 text-[13px]`}
       >
         <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -879,7 +879,7 @@ function LayoutFrame({ children }) {
     return (
       <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
         className={`flex items-center gap-2 ${nested ? 'pl-14' : 'pl-10'} pr-4 py-2.5 text-[13px] border-b border-slate-100 dark:border-slate-800 ${
-          isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300'
+          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
         }`}
       >
         <ChevronRight className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -895,7 +895,7 @@ function LayoutFrame({ children }) {
     return (
       <button onClick={toggle}
         className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-4' : 'px-4'} py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
-          isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300'
+          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
         }`}
       >
         <div className="flex items-center gap-3">
@@ -939,7 +939,7 @@ function LayoutFrame({ children }) {
       <button
         onClick={toggle}
         className={`w-full flex items-center justify-between ${nested ? 'pl-9 pr-5' : 'px-5'} py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 text-[13px] ${
-          isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300 hover:text-primary'
+          isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:text-primary'
         }`}
         data-testid={testId}
       >
@@ -959,7 +959,7 @@ function LayoutFrame({ children }) {
   return (
     <div className="min-h-screen bg-canvas flex flex-col">
       {/* Top Header Bar */}
-      <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 right-0 z-30 transition-all duration-300 ${
+      <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 right-0 z-30 transition-[left] duration-300 ${
         sidebarOpen ? 'left-[225px]' : 'left-16'
       }`} data-testid="top-header">
         <div className="flex items-center h-full px-6">
@@ -1099,7 +1099,7 @@ function LayoutFrame({ children }) {
       <div className="flex flex-1">
         {/* Sidebar - Desktop */}
         <aside 
-          className={`no-print hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 transition-all duration-300 ${
+          className={`no-print hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 transition-[width] duration-300 ${
             sidebarOpen ? 'w-[225px]' : 'w-16'
           }`}
           data-testid="sidebar"
@@ -1151,7 +1151,7 @@ function LayoutFrame({ children }) {
           <nav className="flex-1 overflow-y-auto">
             {filteredItems ? (
               <div>
-                <p className="px-5 py-2 text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Resultados</p>
+                <p className="px-5 py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Resultados</p>
                 {filteredItems.length > 0 ? (
                   filteredItems.map((item) => renderNavItem(item))
                 ) : (
@@ -1315,7 +1315,7 @@ function LayoutFrame({ children }) {
                   return (
                     <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-center gap-3 px-4 py-3 text-sm border-b border-slate-100 dark:border-slate-800 ${
-                        isActive ? 'text-primary font-semibold' : 'text-[#1B4965] dark:text-slate-300'
+                        isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <Icon className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`} strokeWidth={1.8} />
@@ -1458,7 +1458,7 @@ function LayoutFrame({ children }) {
         </nav>
 
         {/* Main Content */}
-        <main className={`flex-1 min-w-0 transition-all duration-300 ${
+        <main className={`flex-1 min-w-0 transition-[margin] duration-300 ${
           sidebarOpen ? 'md:ml-[225px]' : 'md:ml-16'
         } mt-14 md:mt-12 pb-20 md:pb-0`}>
           <PageTransition key={location.pathname} className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">

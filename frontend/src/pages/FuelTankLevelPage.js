@@ -387,7 +387,7 @@ export default function FuelTankLevelPage() {
               <div className="flex-1 min-w-0 w-full space-y-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Disponível agora</p>
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Disponível agora</p>
                     <span className="block text-4xl font-semibold tracking-tight tabular-nums text-slate-900 dark:text-slate-50" data-testid="tank-current-liters">
                       <AnimatedNumber value={fmtLiters(level.current_liters)} />
                     </span>
@@ -615,7 +615,7 @@ export default function FuelTankLevelPage() {
                 <p className="text-xs text-slate-500 dark:text-slate-400">Carregando notas...</p>
               ) : !nfeOptions.warehouse_id ? (
                 <p className="text-xs rounded-md px-3 py-2 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300" data-testid="tank-refill-no-warehouse">
-                  Defina o "Almoxarifado do posto" em Configuração de Tanque para puxar as notas importadas.
+                  Defina o “Almoxarifado do posto” em Configuração de Tanque para puxar as notas importadas.
                   {isAdmin && <> <Link to="/tank-settings" className="font-semibold underline">Configurar agora</Link></>}
                 </p>
               ) : nfeOptions.items.length === 0 ? (

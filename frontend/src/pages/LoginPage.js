@@ -120,7 +120,7 @@ export default function LoginPage() {
             </motion.h1>
             {/* Uma linha só: o tamanho da letra acompanha a largura da tela */}
             <motion.p variants={riseIn} className="text-white/85 mt-3 whitespace-nowrap text-[clamp(13px,1.25vw,18px)]">
-              Sistema completo para gestão de movimentação de contêineres
+              Sistema completo para gestão de movimentação de containers
             </motion.p>
             {!notices.length && (
               <motion.div variants={riseIn} className="mt-8 text-white/55 text-sm">
@@ -190,7 +190,7 @@ export default function LoginPage() {
               </motion.div>
             )}
             <motion.div variants={riseIn} className="space-y-2">
-              <Label htmlFor="email" className="text-sm text-slate-700 dark:text-slate-300 font-medium">Email</Label>
+              <Label htmlFor="email" className="text-sm text-slate-700 dark:text-slate-300 font-medium">E-mail</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400 dark:text-slate-500" />
                 <Input
@@ -237,7 +237,7 @@ export default function LoginPage() {
               >
                 {loading ? (
                   <span className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg aria-hidden="true" className="animate-spin motion-reduce:animate-none -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>

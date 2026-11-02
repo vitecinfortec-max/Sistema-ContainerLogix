@@ -128,6 +128,7 @@ function DrawArea({ onChange, clearSignal }) {
 
   return (
     <canvas
+      aria-label="Área para assinar"
       ref={canvasRef}
       onPointerDown={start}
       onPointerMove={move}

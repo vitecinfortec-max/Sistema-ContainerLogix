@@ -175,8 +175,8 @@ export default function ContainerSalesPage() {
 
   const handleDelete = async (sale) => {
     const message = sale.purchase_id
-      ? 'Tem certeza que deseja excluir este Registro de Venda? A Compra vinculada volta a ficar Disponível.'
-      : 'Tem certeza que deseja excluir este Registro de Venda?';
+      ? 'Deseja realmente excluir este Registro de Venda? A Compra vinculada volta a ficar Disponível.'
+      : 'Deseja realmente excluir este Registro de Venda?';
     if (await confirm(message)) {
       try {
         await api.deleteContainerSale(sale.id);

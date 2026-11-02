@@ -88,7 +88,7 @@ export default function ContainerInspectionsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Tem certeza que deseja excluir este registro?'))) return;
+    if (!(await confirm('Deseja realmente excluir este registro?'))) return;
 
     try {
       await api.deleteContainerInspection(id);

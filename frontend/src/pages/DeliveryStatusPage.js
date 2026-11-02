@@ -223,7 +223,7 @@ export default function DeliveryStatusPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Tem certeza que deseja excluir este status de entrega?'))) return;
+    if (!(await confirm('Deseja realmente excluir este status de entrega?'))) return;
     try {
       await api.deleteDeliveryStatus(id);
       toast.success('Status de entrega excluído!');
@@ -486,7 +486,7 @@ export default function DeliveryStatusPage() {
                 <Label className="font-semibold text-slate-700 dark:text-slate-300 mb-3 mb-1.5 block">Buscar Programação de Carregamento</Label>
                 <div className="flex gap-3 items-end">
                   <div className="flex-1">
-                    <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº Programação</Label>
+                    <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">Nº Programação</Label>
                     <Input
                       type="number"
                       value={scheduleSearchNumber}
@@ -534,7 +534,7 @@ export default function DeliveryStatusPage() {
             {/* Data do Status */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Data do Status</Label>
+                <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">Data do Status</Label>
                 <Input
                   type="date"
                   value={formData.status_date}
@@ -573,7 +573,7 @@ export default function DeliveryStatusPage() {
 
                     {(scheduleData?.contracting_client_name === BAG_NUMBER_CLIENT_NAME || scheduleData?.destination_client_name === BAG_NUMBER_CLIENT_NAME) && (
                       <div className="mb-3 max-w-xs">
-                        <Label className="text-[10px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Nº da Bolsa</Label>
+                        <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">Nº da Bolsa</Label>
                         <Input
                           value={item.bag_number || ''}
                           onChange={(e) => updateItemTime(index, 'bag_number', e.target.value)}
@@ -586,7 +586,7 @@ export default function DeliveryStatusPage() {
 
                     <div className="grid grid-cols-6 gap-3">
                       <div>
-                        <Label className="text-[10px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">
+                        <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">
                           <Clock className="w-3 h-3 inline mr-1" />
                           Chegada Cliente
                         </Label>
@@ -599,7 +599,7 @@ export default function DeliveryStatusPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-[10px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">
+                        <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">
                           <Clock className="w-3 h-3 inline mr-1" />
                           Início Carreg.
                         </Label>
@@ -612,7 +612,7 @@ export default function DeliveryStatusPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-[10px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">
+                        <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">
                           <Clock className="w-3 h-3 inline mr-1" />
                           Término Carreg.
                         </Label>
@@ -625,7 +625,7 @@ export default function DeliveryStatusPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-[10px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">
+                        <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">
                           <Clock className="w-3 h-3 inline mr-1" />
                           Saída Cliente
                         </Label>
@@ -638,7 +638,7 @@ export default function DeliveryStatusPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-[10px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">
+                        <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">
                           <Clock className="w-3 h-3 inline mr-1" />
                           Agend. Porto
                         </Label>
@@ -651,7 +651,7 @@ export default function DeliveryStatusPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-[10px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">
+                        <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">
                           <Clock className="w-3 h-3 inline mr-1" />
                           Entrega Final.
                         </Label>
@@ -671,7 +671,7 @@ export default function DeliveryStatusPage() {
 
             {/* Observações */}
             <div>
-              <Label className="text-[11px] text-slate-400 dark:text-slate-500 mb-1 block uppercase tracking-wider font-semibold">Observações</Label>
+              <Label className="text-xs text-slate-500 dark:text-slate-400 mb-1 block font-medium">Observações</Label>
               <textarea
                 className="w-full h-20 p-3 border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                 value={formData.observations}
@@ -709,19 +709,19 @@ export default function DeliveryStatusPage() {
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Programação Ref.</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Programação Ref.</span>
                   <span className="text-sm font-semibold">Nº {selectedStatus.schedule_number}</span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Data do Status</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Data do Status</span>
                   <span className="text-sm">{selectedStatus.status_date ? format(new Date(selectedStatus.status_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '-'}</span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Cliente Contratante</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Cliente Contratante</span>
                   <span className="text-sm">{selectedStatus.contracting_client_name}</span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Cliente Destino</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Cliente Destino</span>
                   <span className="text-sm">{selectedStatus.destination_client_name}</span>
                 </div>
               </div>
@@ -785,7 +785,7 @@ export default function DeliveryStatusPage() {
 
               {selectedStatus.observations && (
                 <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block mb-1">Observações</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block mb-1">Observações</span>
                   <span className="text-sm">{selectedStatus.observations}</span>
                 </div>
               )}

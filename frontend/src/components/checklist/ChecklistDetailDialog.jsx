@@ -40,7 +40,7 @@ function Fact({ icon: Icon, label, value }) {
     <div className="flex items-start gap-2.5 rounded-lg border border-slate-200 px-3 py-2.5 dark:border-slate-700">
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
       <div className="min-w-0">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
+        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
         <p className="break-words text-sm font-semibold leading-snug text-slate-800 dark:text-slate-100">{value || '-'}</p>
       </div>
     </div>
@@ -150,7 +150,7 @@ export default function ChecklistDetailDialog({ open, onOpenChange, checklist, o
           {sections.length > 0 && (
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Itens de verificação</h3>
+                <h3 className="text-xs font-medium text-slate-500 dark:text-slate-400">Itens de verificação</h3>
                 <button
                   type="button"
                   onClick={() => setOpenSections(allOpen ? new Set() : new Set(sections.map((_, index) => index)))}
@@ -220,7 +220,7 @@ export default function ChecklistDetailDialog({ open, onOpenChange, checklist, o
           )}
 
           <div>
-            <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
               <Camera className="h-3.5 w-3.5" /> Fotos ({photos.length})
             </h3>
             {photos.length === 0 ? (
@@ -256,7 +256,7 @@ export default function ChecklistDetailDialog({ open, onOpenChange, checklist, o
 
           {checklist.observations && (
             <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800/60">
-              <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Observações</h3>
+              <h3 className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">Observações</h3>
               <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{checklist.observations}</p>
             </div>
           )}

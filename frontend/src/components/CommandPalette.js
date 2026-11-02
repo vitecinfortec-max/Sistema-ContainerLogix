@@ -13,7 +13,7 @@ const DATA_ICONS = {
 
 const GROUP_LABELS = {
   page: 'Páginas',
-  container: 'Contêineres',
+  container: 'Containers',
   driver: 'Motoristas',
   client: 'Clientes',
   company: 'Transportadoras',
@@ -145,7 +145,7 @@ export default function CommandPalette({ open, onOpenChange, items }) {
           ) : (
             groupedResults.map((group) => (
               <div key={group.type}>
-                <p className="px-4 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <p className="px-4 pt-2.5 pb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                   {group.label}
                 </p>
                 {group.entries.map((item) => {

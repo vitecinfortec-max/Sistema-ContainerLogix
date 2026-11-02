@@ -542,7 +542,7 @@ export default function EpiDeliveriesPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary">EPIs entregues</h3>
+                <h3 className="text-[13px] font-semibold text-primary">EPIs entregues</h3>
                 <Button variant="outline" size="sm" type="button" onClick={addItem} className="h-7 text-xs" data-testid="epi-add-item">
                   <Plus className="w-3 h-3 mr-1" />Adicionar EPI
                 </Button>

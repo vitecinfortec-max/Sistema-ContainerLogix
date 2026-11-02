@@ -38,7 +38,7 @@ export default function OfflineHomePage() {
       ))}
 
       <p className="text-xs text-muted-foreground text-center pt-4">
-        Lembre-se de fazer backup periodicamente na tela "Backup".
+        Lembre-se de fazer backup periodicamente na tela “Backup”.
       </p>
     </div>
   );

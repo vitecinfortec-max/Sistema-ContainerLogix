@@ -52,7 +52,7 @@ export default function ContainerPhotoUpload({ damages = [], onDamagesChange, no
         <div className="mb-6">
           <Label className="mb-1.5 block">Estado do Container</Label>
           <p className="text-sm text-muted-foreground mb-3">
-            Marque "Sem Avaria" se o container não apresentar nenhum problema, ou selecione as avarias constatadas.
+            Marque “Sem Avaria” se o container não apresentar nenhum problema, ou selecione as avarias constatadas.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {DAMAGE_OPTIONS.map(({ key, label }) => (

@@ -358,7 +358,7 @@ export default function StockEntriesPage() {
                     </div>
                     <div className="grid grid-cols-4 gap-2">
                       <div className="col-span-2 space-y-1">
-                        <Label className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wide">Vincular a Produto Existente</Label>
+                        <Label className="text-xs text-slate-500 dark:text-slate-400">Vincular a Produto Existente</Label>
                         <Autocomplete
                           value={item.matched_product_name || ''}
                           onChange={(v) => setPreview((p) => {
@@ -373,7 +373,7 @@ export default function StockEntriesPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wide">Quantidade</Label>
+                        <Label className="text-xs text-slate-500 dark:text-slate-400">Quantidade</Label>
                         <Input
                           type="number" step="0.01"
                           value={item.quantity}
@@ -382,7 +382,7 @@ export default function StockEntriesPage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wide">Valor Unit.</Label>
+                        <Label className="text-xs text-slate-500 dark:text-slate-400">Valor Unit.</Label>
                         <Input
                           type="number" step="0.01"
                           value={item.unit_value}

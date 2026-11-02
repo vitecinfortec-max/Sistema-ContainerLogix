@@ -54,7 +54,7 @@ export const QUICK_CREATE = {
     done: 'Cliente cadastrado',
     fields: [
       { key: 'name', label: 'Razão social / Nome', required: true },
-      { key: 'cnpj', label: 'CNPJ / CPF', mask: formatCnpjCpf },
+      { key: 'cnpj', label: 'CPF/CNPJ', mask: formatCnpjCpf },
       { key: 'phone', label: 'Telefone', mask: formatPhone },
     ],
     create: (d) => api.createClient(d),
@@ -116,7 +116,7 @@ export const QUICK_CREATE = {
     done: 'Fornecedor cadastrado',
     fields: [
       { key: 'name', label: 'Razão social / Nome', required: true },
-      { key: 'cnpj', label: 'CNPJ / CPF', mask: formatCnpjCpf },
+      { key: 'cnpj', label: 'CPF/CNPJ', mask: formatCnpjCpf },
       { key: 'phone', label: 'Telefone', mask: formatPhone },
     ],
     create: (d) => api.createSupplier(d),

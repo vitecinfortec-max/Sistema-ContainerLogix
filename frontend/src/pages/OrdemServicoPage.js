@@ -654,7 +654,7 @@ function buildEmpty() {
 
 function SectionTitle({ children }) {
   return (
-    <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary border-b-2 border-primary/20 pb-1">
+    <h3 className="text-[13px] font-semibold text-primary border-b-2 border-primary/20 pb-1">
       {children}
     </h3>
   );
@@ -717,7 +717,7 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary">{title}</h3>
+        <h3 className="text-[13px] font-semibold text-primary">{title}</h3>
         <Button variant="outline" size="sm" type="button" onClick={onAdd} className="h-7 text-xs">
           <Plus className="w-3 h-3 mr-1" />Adicionar {title === 'Produtos' ? 'Produto' : 'Serviço'}
         </Button>
@@ -785,7 +785,7 @@ function ItemsSection({ title, items, kind, onAdd, onRemove, onChange, showUnit,
 function TotalBox({ label, value, highlight }) {
   return (
     <div className={`p-3 rounded-lg border-2 ${highlight ? 'border-primary/40 bg-primary/5' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800'}`}>
-      <div className={`text-[10px] uppercase tracking-wider ${highlight ? 'text-primary' : 'text-slate-500 dark:text-slate-400'} font-semibold`}>{label}</div>
+      <div className={`text-xs ${highlight ? 'text-primary' : 'text-slate-500 dark:text-slate-400'} font-medium`}>{label}</div>
       <div className={`text-xl font-bold ${highlight ? 'text-primary' : 'text-slate-800 dark:text-slate-200'}`}>{fmtMoney(value)}</div>
     </div>
   );

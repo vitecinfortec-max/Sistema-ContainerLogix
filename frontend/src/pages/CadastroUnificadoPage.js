@@ -78,7 +78,7 @@ const TYPES = [
       { name: 'cnh_category', label: 'CNH - Categoria' },
       { name: 'cnh_expiry', label: 'CNH - Validade', type: 'date' },
       { name: 'phone', label: 'Telefone / WhatsApp', mask: 'tel' },
-      { name: 'email', label: 'Email', type: 'email' },
+      { name: 'email', label: 'E-mail', type: 'email' },
       { name: 'address_details', label: 'Endereço', type: 'address' },
       { name: 'transport_company', label: 'Transportadora Vinculada (vazio = autônomo)' },
       { name: 'default_truck_plate', mask: 'plate', label: 'Placa do Cavalo (padrão)' },
@@ -109,7 +109,7 @@ const TYPES = [
       { name: 'state_registration', label: 'Inscrição Estadual' },
       { name: 'municipal_registration', label: 'Inscrição Municipal' },
       { name: 'phone', label: 'Telefone', mask: 'tel' },
-      { name: 'email', label: 'Email' },
+      { name: 'email', label: 'E-mail' },
       { name: 'address_details', label: 'Endereço', type: 'address' },
       { name: 'contact_name', label: 'Nome do Contato' },
       { name: 'contact_phone', label: 'Telefone do Contato', mask: 'tel' },
@@ -143,7 +143,7 @@ const TYPES = [
       { name: 'admission_date', label: 'Data de Admissão', type: 'date' },
       { name: 'employee_code', label: 'Matrícula/Código Interno' },
       { name: 'phone', label: 'Telefone / WhatsApp', mask: 'tel' },
-      { name: 'email', label: 'Email' },
+      { name: 'email', label: 'E-mail' },
       { name: 'address_details', label: 'Endereço', type: 'address' },
       { name: 'access_level', label: 'Nível de Acesso (informativo)', placeholder: 'Ex: administrador, portaria, pátio, financeiro...' },
       { name: 'signature_url', label: "Assinatura (sai no Termo e na Ficha de Entrega de EPI's)", type: 'signature' },
@@ -168,7 +168,7 @@ const TYPES = [
       { name: 'municipal_registration', label: 'Inscrição Municipal' },
       { name: 'supply_type', label: 'Tipo de Fornecimento', placeholder: 'Ex: peças, manutenção, combustível...' },
       { name: 'phone', label: 'Telefone', mask: 'tel' },
-      { name: 'email', label: 'Email' },
+      { name: 'email', label: 'E-mail' },
       { name: 'address_details', label: 'Endereço', type: 'address' },
       { name: 'contact_name', label: 'Nome do Contato' },
       { name: 'contact_phone', label: 'Telefone do Contato', mask: 'tel' },
@@ -201,7 +201,7 @@ const TYPES = [
       { name: 'address_details', label: 'Endereço', type: 'address' },
       { name: 'phone', label: 'Telefone Geral', mask: 'tel' },
       { name: 'claims_phone', label: 'Telefone de Sinistro/Emergência', mask: 'tel' },
-      { name: 'email', label: 'Email' },
+      { name: 'email', label: 'E-mail' },
       { name: 'broker_name', label: 'Nome do Corretor/Contato' },
       { name: 'broker_phone', label: 'Telefone do Corretor', mask: 'tel' },
       { name: 'status', label: 'Status', type: 'select', options: STATUS_ATIVO_INATIVO },
@@ -215,7 +215,7 @@ const TYPES = [
     icon: Users,
     moduleKey: 'cadastro.cliente',
     api: { list: api.getClients, create: api.createClient, update: api.updateClient, remove: api.deleteClient },
-    listColumns: [['name', 'Razão Social / Nome'], ['cnpj', 'CNPJ/CPF'], ['phone', 'Telefone'], ['status', 'Status']],
+    listColumns: [['name', 'Razão Social / Nome'], ['cnpj', 'CPF/CNPJ'], ['phone', 'Telefone'], ['status', 'Status']],
     fields: [
       { name: 'location_type', label: 'Brasil ou Exterior', type: 'select', options: LOCATION_TYPE_OPTIONS },
       { name: 'cnpj', label: 'CNPJ ou CPF', mask: 'doc', showIf: (f) => f.location_type !== 'EXTERIOR' },
@@ -224,7 +224,7 @@ const TYPES = [
       { name: 'state_registration', label: 'Inscrição Estadual', showIf: (f) => f.location_type !== 'EXTERIOR' },
       { name: 'municipal_registration', label: 'Inscrição Municipal', showIf: (f) => f.location_type !== 'EXTERIOR' },
       { name: 'phone', label: 'Telefone', mask: 'tel' },
-      { name: 'email', label: "Email (um ou mais, separados por ';')" },
+      { name: 'email', label: "E-mail (um ou mais, separados por ';')" },
       { name: 'address_details', label: 'Endereço', type: 'address', internationalToggle: 'location_type' },
       { name: 'contact_name', label: 'Nome do Contato' },
       { name: 'contact_phone', label: 'Telefone do Contato', mask: 'tel' },
@@ -245,7 +245,7 @@ const TYPES = [
       { name: 'name', label: 'Nome do Terminal', required: true },
       { name: 'internal_code', label: 'Código/Identificação Interna' },
       { name: 'phone', label: 'Telefone', mask: 'tel' },
-      { name: 'email', label: 'Email de Contato' },
+      { name: 'email', label: 'E-mail de Contato' },
       { name: 'address_details', label: 'Endereço', type: 'address' },
       { name: 'responsible_name', label: 'Responsável pelo Terminal' },
       { name: 'responsible_contact', label: 'Contato do Responsável', mask: 'tel' },
@@ -265,7 +265,7 @@ function genderWords(type) {
     do: fem ? 'da' : 'do',
     cadastrado: fem ? 'cadastrada' : 'cadastrado',
     atualizado: fem ? 'atualizada' : 'atualizado',
-    deletado: fem ? 'deletada' : 'deletado',
+    deletado: fem ? 'excluída' : 'excluído',
   };
 }
 
@@ -475,7 +475,7 @@ export default function CadastroUnificadoPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm(`Tem certeza que deseja deletar ${g.este} ${activeType.label.toLowerCase()}?`)) {
+    if (await confirm(`Deseja realmente excluir ${g.este} ${activeType.label.toLowerCase()}?`)) {
       try {
         await activeType.api.remove(id);
         toast.success(`${activeType.label} ${g.deletado} com sucesso`);
@@ -487,7 +487,7 @@ export default function CadastroUnificadoPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || `Erro ao deletar ${g.este} ${activeType.label.toLowerCase()}`);
+        toast.error(error.response?.data?.detail || `Erro ao excluir ${g.este} ${activeType.label.toLowerCase()}`);
       }
     }
   };
@@ -517,7 +517,7 @@ export default function CadastroUnificadoPage() {
     if (statusFilter !== 'ALL' && (item.status || 'ATIVO') !== statusFilter) return false;
     const term = search.trim().toLowerCase();
     if (!term) return true;
-    // Só números (CNPJ/CPF/telefone digitado sem pontuação) compara dígito a dígito
+    // Só números (CPF/CNPJ/telefone digitado sem pontuação) compara dígito a dígito
     const termDigits = onlyDigits(term);
     const numericSearch = termDigits.length >= 3 && termDigits.length === term.replace(/[\s./()-]/g, '').length;
     return searchFields.some((field) => (

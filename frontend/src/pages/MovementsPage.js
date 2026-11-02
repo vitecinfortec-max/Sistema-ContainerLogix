@@ -297,12 +297,12 @@ export default function MovementsPage() {
     const idToDelete = deleteId;
     try {
       await api.deleteMovement(idToDelete);
-      toast.success('Registro deletado com sucesso');
+      toast.success('Registro excluído com sucesso');
     } catch (error) {
       if (error.response?.status === 404) {
         toast.info('Registro já foi removido');
       } else {
-        toast.error(error.response?.data?.detail || 'Erro ao deletar registro');
+        toast.error(error.response?.data?.detail || 'Erro ao excluir registro');
       }
     } finally {
       setDeleteId(null);
@@ -535,13 +535,13 @@ export default function MovementsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja deletar este registro? Esta ação não pode ser desfeita.
+              Deseja realmente excluir este registro? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting} data-testid="cancel-delete">Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90" data-testid="confirm-delete">
-              {isDeleting ? 'Deletando...' : 'Deletar'}
+              {isDeleting ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -434,7 +434,7 @@ export default function UnitSegregationPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Tem certeza que deseja excluir esta segregação?'))) return;
+    if (!(await confirm('Deseja realmente excluir esta segregação?'))) return;
     try {
       await api.deleteUnitSegregation(id);
       toast.success('Segregação excluída!');
@@ -451,7 +451,7 @@ export default function UnitSegregationPage() {
   };
 
   const handleRelease = async (id) => {
-    if (!(await confirm('Tem certeza que deseja liberar esta segregação?'))) return;
+    if (!(await confirm('Deseja realmente liberar esta segregação?'))) return;
     try {
       await api.releaseUnitSegregation(id);
       toast.success('Segregação liberada com sucesso!');
@@ -847,17 +847,17 @@ export default function UnitSegregationPage() {
             <div className="space-y-4 py-4 min-w-0">
               <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Cliente Reservado</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Cliente Reservado</span>
                   <span className="text-sm font-semibold text-primary">{selectedItem.client_name}</span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Status</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Status</span>
                   <StatusPill tone={getStatusTone(selectedItem.status)}>
                     {selectedItem.status}
                   </StatusPill>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Retirada</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Retirada</span>
                   {(() => {
                     const rb = getRetrievalBadge(selectedItem.retrieval_status);
                     const RIcon = rb.icon;
@@ -870,11 +870,11 @@ export default function UnitSegregationPage() {
                   })()}
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Criado em</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Criado em</span>
                   <span className="text-sm">{selectedItem.created_at ? format(new Date(selectedItem.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '-'}</span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block">Total de Containers</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block">Total de Containers</span>
                   <span className="text-sm font-semibold">{(selectedItem.items || []).length}</span>
                 </div>
               </div>
@@ -883,7 +883,7 @@ export default function UnitSegregationPage() {
               {selectedItem.items && selectedItem.items.length > 0 && (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 border-b">
-                    <span className="text-[11px] text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">Containers Segregados</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Containers Segregados</span>
                   </div>
                   <div className="overflow-x-auto">
                   <table className="data-table">
@@ -928,7 +928,7 @@ export default function UnitSegregationPage() {
               {selectedItem.items && selectedItem.items.length > 0 && (
                 <div className="border rounded-lg overflow-hidden">
                   <div className="bg-slate-100 dark:bg-slate-700 px-4 py-2 border-b">
-                    <span className="text-[11px] text-slate-600 dark:text-slate-400 uppercase tracking-wider font-semibold">Fotos</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Fotos</span>
                   </div>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {selectedItem.items.map((container, idx) => (
@@ -964,7 +964,7 @@ export default function UnitSegregationPage() {
 
               {selectedItem.observations && (
                 <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block mb-1">Observações</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block mb-1">Observações</span>
                   <span className="text-sm">{selectedItem.observations}</span>
                 </div>
               )}

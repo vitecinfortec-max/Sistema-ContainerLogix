@@ -71,7 +71,7 @@ export default function OfflineBackupPage() {
             computador (ou para o Google Drive) para levar os dados para o sistema Windows.
           </p>
           <Button onClick={handleExport} disabled={exporting} className="w-full">
-            {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <DatabaseBackup className="w-4 h-4 mr-2" />}
+            {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin motion-reduce:animate-none" /> : <DatabaseBackup className="w-4 h-4 mr-2" />}
             Gerar Backup Agora
           </Button>
         </CardContent>
@@ -119,7 +119,7 @@ export default function OfflineBackupPage() {
             variant="destructive"
             className="w-full"
           >
-            {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+            {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin motion-reduce:animate-none" /> : <Upload className="w-4 h-4 mr-2" />}
             Importar Backup Selecionado
           </Button>
         </CardContent>

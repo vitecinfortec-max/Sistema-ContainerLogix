@@ -135,7 +135,7 @@ export default function FlexTankPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Tem certeza que deseja excluir esta movimentação?'))) return;
+    if (!(await confirm('Deseja realmente excluir esta movimentação?'))) return;
 
     try {
       await api.deleteFlexTankMovement(id);

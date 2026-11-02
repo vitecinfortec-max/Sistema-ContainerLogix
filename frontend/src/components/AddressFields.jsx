@@ -154,7 +154,7 @@ export function AddressFields({ value, onChange, international = false }) {
                 disabled={cepLoading}
                 title="Buscar endereço pelo CEP"
               >
-                {cepLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                {cepLoading ? <Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" /> : <Search className="w-4 h-4" />}
               </Button>
             )}
           </div>

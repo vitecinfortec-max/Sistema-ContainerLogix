@@ -120,10 +120,10 @@ export default function ServiceCatalogPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm('Tem certeza que deseja deletar este serviço?')) {
+    if (await confirm('Deseja realmente excluir este serviço?')) {
       try {
         await api.deleteServiceCatalogItem(id);
-        toast.success('Serviço deletado com sucesso');
+        toast.success('Serviço excluído com sucesso');
         setSelectedIds(prev => {
           const next = new Set(prev);
           next.delete(id);
@@ -131,7 +131,7 @@ export default function ServiceCatalogPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Erro ao deletar serviço');
+        toast.error(error.response?.data?.detail || 'Erro ao excluir serviço');
       }
     }
   };

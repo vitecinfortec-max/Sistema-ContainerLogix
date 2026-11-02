@@ -62,7 +62,7 @@ export default function ComercialProposalsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Tem certeza que deseja excluir esta proposta?'))) return;
+    if (!(await confirm('Deseja realmente excluir esta proposta?'))) return;
     try {
       await api.deleteCommercialProposal(id);
       toast.success('Proposta excluída com sucesso!');

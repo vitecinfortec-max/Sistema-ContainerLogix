@@ -170,7 +170,7 @@ export default function ContainerInspectionDetailPage() {
         <PrintHeader
           company={company}
           logoUrl={getCompanyLogoUrl(company)}
-          title="Registro Fotográfico de Contêiner"
+          title="Registro Fotográfico de Container"
           subtitle={`Registro Nº ${inspection.inspection_number}`}
         />
 

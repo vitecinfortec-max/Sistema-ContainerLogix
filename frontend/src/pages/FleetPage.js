@@ -1671,7 +1671,7 @@ export default function FleetPage() {
               </div>
               <div>
                 <Label className="mb-1.5 block">Meta de Consumo (km/L)</Label>
-                <Input inputMode="decimal" placeholder="Ex.: 2,5" value={vehicleForm.fuel_target_km_l} onChange={(e) => handleVehicleFormChange('fuel_target_km_l', e.target.value)} />
+                <Input inputMode="decimal" value={vehicleForm.fuel_target_km_l} onChange={(e) => handleVehicleFormChange('fuel_target_km_l', e.target.value)} />
               </div>
               <div>
                 <Label className="mb-1.5 block">Potência do Motor</Label>
@@ -1702,11 +1702,11 @@ export default function FleetPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="mb-1.5 block">CRLV - Número</Label>
+                <Label className="mb-1.5 block">Número do CRLV</Label>
                 <Input className={importedClass('crlv_number')} value={vehicleForm.crlv_number} onChange={(e) => handleVehicleFormChange('crlv_number', e.target.value)} />
               </div>
               <div>
-                <Label className="mb-1.5 block">CRLV - Validade</Label>
+                <Label className="mb-1.5 block">Validade do CRLV</Label>
                 <Input type="date" value={vehicleForm.crlv_expiry} onChange={(e) => handleVehicleFormChange('crlv_expiry', e.target.value)} />
               </div>
             </div>

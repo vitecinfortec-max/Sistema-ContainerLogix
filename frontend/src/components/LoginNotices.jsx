@@ -40,7 +40,7 @@ export default function LoginNotices({ notices, variant = 'hero' }) {
       )}
       data-testid={hero ? 'login-notices' : 'login-notices-mobile'}
     >
-      <p className={cn('flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em]', hero ? 'text-amber-300' : 'text-primary')}>
+      <p className={cn('flex items-center gap-1.5 text-xs font-medium', hero ? 'text-amber-300' : 'text-primary')}>
         <Megaphone className="w-3.5 h-3.5" />
         Aviso{count > 1 ? ` ${index + 1} de ${count}` : ''}
       </p>
@@ -87,7 +87,7 @@ export default function LoginNotices({ notices, variant = 'hero' }) {
               aria-label={`Ver aviso ${i + 1}`}
               aria-current={i === index}
               className={cn(
-                'h-1.5 rounded-full transition-all',
+                'h-1.5 rounded-full transition-[width,background-color]',
                 i === index ? 'w-6' : 'w-1.5',
                 hero ? (i === index ? 'bg-white' : 'bg-white/40 hover:bg-white/70') : (i === index ? 'bg-primary' : 'bg-primary/30'),
               )}

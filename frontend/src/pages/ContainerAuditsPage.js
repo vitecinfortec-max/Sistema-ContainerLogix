@@ -72,7 +72,7 @@ export default function ContainerAuditsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Tem certeza que deseja excluir esta auditoria?'))) return;
+    if (!(await confirm('Deseja realmente excluir esta auditoria?'))) return;
     try {
       await api.deleteContainerAudit(id);
       toast.success('Auditoria excluída com sucesso!');

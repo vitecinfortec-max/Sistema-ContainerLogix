@@ -356,7 +356,7 @@ export default function VehicleChecklistPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Tem certeza que deseja excluir este checklist?'))) return;
+    if (!(await confirm('Deseja realmente excluir este checklist?'))) return;
     try {
       await api.deleteVehicleChecklist(id);
       toast.success('Checklist excluído!');
@@ -1040,7 +1040,7 @@ export default function VehicleChecklistPage() {
 
               {selectedChecklist.observations && (
                 <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 uppercase tracking-wider font-semibold block mb-1">Observações</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium block mb-1">Observações</span>
                   <span className="text-sm">{selectedChecklist.observations}</span>
                 </div>
               )}

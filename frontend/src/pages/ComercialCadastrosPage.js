@@ -31,12 +31,12 @@ const TYPES = [
     icon: UserCog,
     moduleKey: 'comercial.representante',
     api: { list: api.getRepresentatives, create: api.createRepresentative, update: api.updateRepresentative, remove: api.deleteRepresentative },
-    listColumns: [['name', 'Nome'], ['cnpj', 'CNPJ/CPF'], ['phone', 'Telefone'], ['status', 'Status']],
+    listColumns: [['name', 'Nome'], ['cnpj', 'CPF/CNPJ'], ['phone', 'Telefone'], ['status', 'Status']],
     fields: [
       { name: 'name', label: 'Nome', required: true },
       { name: 'cnpj', label: 'CNPJ ou CPF', mask: 'doc' },
       { name: 'phone', label: 'Telefone', mask: 'tel' },
-      { name: 'email', label: 'Email' },
+      { name: 'email', label: 'E-mail' },
       { name: 'status', label: 'Status', type: 'select', options: STATUS_OPTIONS },
       { name: 'observations', label: 'Observações', type: 'textarea' },
     ],
@@ -127,10 +127,10 @@ export default function ComercialCadastrosPage() {
   };
 
   const handleDelete = async (id) => {
-    if (await confirm(`Tem certeza que deseja deletar este registro de ${activeType.label.toLowerCase()}?`)) {
+    if (await confirm(`Deseja realmente excluir este registro de ${activeType.label.toLowerCase()}?`)) {
       try {
         await activeType.api.remove(id);
-        toast.success(`${activeType.label} deletado com sucesso`);
+        toast.success(`${activeType.label} excluído com sucesso`);
         setSelectedIds((prev) => {
           if (!prev.has(id)) return prev;
           const next = new Set(prev);
@@ -139,7 +139,7 @@ export default function ComercialCadastrosPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || `Erro ao deletar ${activeType.label.toLowerCase()}`);
+        toast.error(error.response?.data?.detail || `Erro ao excluir ${activeType.label.toLowerCase()}`);
       }
     }
   };

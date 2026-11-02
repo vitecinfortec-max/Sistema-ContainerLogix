@@ -71,14 +71,10 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center px-4 py-12 bg-cover bg-center"
-      style={{
-        backgroundImage: 'url(https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?q=80&w=2070)',
-      }}
+    <div
+      className="relative min-h-screen flex items-center justify-center px-4 py-12"
+      style={{ background: 'radial-gradient(120% 90% at 18% 8%, #0c9a8a 0%, #06584f 46%, #032a27 100%)' }}
     >
-      <div className="absolute inset-0 bg-black/40" />
-      
       <Card className="w-full max-w-md relative z-10 shadow-2xl">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
@@ -103,7 +99,7 @@ export default function ChangePasswordPage() {
                   value={formData.currentPassword}
                   onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
                   required
-                  className="pl-10 pr-10 h-12"
+                  className="pl-10 pr-10 h-12 md:h-12 border-slate-500 dark:border-slate-500"
                   data-testid="current-password-input"
                 />
                 <button title="Mostrar ou ocultar senha" aria-label="Mostrar ou ocultar senha"
@@ -126,7 +122,7 @@ export default function ChangePasswordPage() {
                   value={formData.newPassword}
                   onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
                   required
-                  className="pl-10 pr-10 h-12"
+                  className="pl-10 pr-10 h-12 md:h-12 border-slate-500 dark:border-slate-500"
                   data-testid="new-password-input"
                 />
                 <button title="Mostrar ou ocultar senha" aria-label="Mostrar ou ocultar senha"
@@ -149,7 +145,7 @@ export default function ChangePasswordPage() {
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   required
-                  className="pl-10 h-12"
+                  className="pl-10 h-12 md:h-12 border-slate-500 dark:border-slate-500"
                   data-testid="confirm-password-input"
                 />
               </div>
@@ -157,7 +153,7 @@ export default function ChangePasswordPage() {
 
             <Button 
               type="submit" 
-              className="w-full h-12 font-bold uppercase tracking-wide"
+              className="w-full h-12 md:h-12 text-base font-semibold"
               disabled={loading}
               data-testid="change-password-button"
             >

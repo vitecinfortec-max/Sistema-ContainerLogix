@@ -1187,7 +1187,7 @@ export default function BillingPage() {
                 <Package className="w-12 h-12 mx-auto mb-3 text-slate-400 dark:text-slate-500 opacity-50" />
                 <p className="text-slate-600 dark:text-slate-400 font-medium">Nenhuma movimentação adicionada</p>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                  Use o campo "Buscar por ID" para adicionar movimentações pelo código de barras,<br/>
+                  Use o campo “Buscar por ID” para adicionar movimentações pelo código de barras,<br/>
                   ou busque por cliente para ver todas as movimentações pendentes.
                 </p>
               </div>
@@ -1735,7 +1735,7 @@ export default function BillingPage() {
           <DialogHeader>
             <DialogTitle className="text-red-600">Excluir Fatura</DialogTitle>
             <DialogDescription>
-              Tem certeza que deseja excluir a fatura #{invoiceToDelete?.invoice_number}?
+              Deseja realmente excluir a fatura #{invoiceToDelete?.invoice_number}?
               <br />
               <br />
               As movimentações associadas serão desmarcadas como faturadas e poderão ser incluídas em uma nova fatura.

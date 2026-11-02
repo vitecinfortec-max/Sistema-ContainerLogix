@@ -22,7 +22,7 @@ export default function ForgotPasswordPage() {
     try {
       await axios.post(`${API_URL}/api/auth/forgot-password`, { email });
       setSent(true);
-      toast.success('Verifique seu email para a senha provisória');
+      toast.success('Verifique seu e-mail para a senha provisória');
     } catch (error) {
       toast.error('Erro ao processar solicitação');
     } finally {
@@ -31,14 +31,10 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center px-4 py-12 bg-cover bg-center"
-      style={{
-        backgroundImage: 'url(https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?q=80&w=2070)',
-      }}
+    <div
+      className="relative min-h-screen flex items-center justify-center px-4 py-12"
+      style={{ background: 'radial-gradient(120% 90% at 18% 8%, #0c9a8a 0%, #06584f 46%, #032a27 100%)' }}
     >
-      <div className="absolute inset-0 bg-black/40" />
-      
       <Card className="w-full max-w-md relative z-10 shadow-2xl">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
@@ -53,8 +49,8 @@ export default function ForgotPasswordPage() {
           <CardTitle className="text-2xl font-bold">Recuperar Senha</CardTitle>
           <CardDescription>
             {sent 
-              ? 'Verifique seu email para instruções' 
-              : 'Digite seu email para receber uma senha provisória'
+              ? 'Verifique seu e-mail para instruções' 
+              : 'Digite seu e-mail para receber uma senha provisória'
             }
           </CardDescription>
         </CardHeader>
@@ -64,7 +60,7 @@ export default function ForgotPasswordPage() {
               <div className="flex flex-col items-center text-center p-4 bg-emerald-50 rounded-lg">
                 <CheckCircle className="w-12 h-12 text-emerald-500 mb-3" />
                 <p className="text-sm text-emerald-800 font-medium">
-                  Se o email estiver cadastrado, você receberá uma senha provisória.
+                  Se o e-mail estiver cadastrado, você receberá uma senha provisória.
                 </p>
                 <p className="text-xs text-emerald-600 mt-2">
                   Verifique também a pasta de spam.
@@ -76,14 +72,14 @@ export default function ForgotPasswordPage() {
                   <strong>Próximos passos:</strong>
                 </p>
                 <ol className="text-xs text-amber-700 mt-2 list-decimal list-inside space-y-1">
-                  <li>Acesse seu email e copie a senha provisória</li>
+                  <li>Acesse seu e-mail e copie a senha provisória</li>
                   <li>Faça login com a senha provisória</li>
                   <li>Crie uma nova senha segura</li>
                 </ol>
               </div>
 
               <Link to="/login">
-                <Button className="w-full h-12" variant="outline">
+                <Button className="w-full h-12 md:h-12" variant="outline">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Voltar para login
                 </Button>
@@ -92,7 +88,7 @@ export default function ForgotPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">E-mail</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
@@ -101,7 +97,7 @@ export default function ForgotPasswordPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="pl-10 h-12"
+                    className="pl-10 h-12 md:h-12 border-slate-500 dark:border-slate-500"
                     data-testid="forgot-email-input"
                   />
                 </div>
@@ -109,7 +105,7 @@ export default function ForgotPasswordPage() {
 
               <Button 
                 type="submit" 
-                className="w-full h-12 font-bold uppercase tracking-wide"
+                className="w-full h-12 md:h-12 text-base font-semibold"
                 disabled={loading}
                 data-testid="forgot-submit-button"
               >

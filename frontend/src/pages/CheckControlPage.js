@@ -625,7 +625,7 @@ export default function CheckControlPage() {
               <Input className="h-9" value={formData.check_number} onChange={(e) => setField('check_number')(e.target.value)} data-testid="check-number-input" />
             </Field>
             <Field label="Banco" required className="col-span-2 md:col-span-1">
-              <Input className="h-9" value={formData.bank} onChange={(e) => setField('bank')(e.target.value)} placeholder="Ex: Banco do Brasil" />
+              <Input className="h-9" value={formData.bank} onChange={(e) => setField('bank')(e.target.value)} />
             </Field>
             <Field label="Agência">
               <Input className="h-9" value={formData.agency} onChange={(e) => setField('agency')(e.target.value)} />
@@ -664,7 +664,7 @@ export default function CheckControlPage() {
               <Input className="h-9" type="date" min={formData.issue_date} value={formData.due_date} onChange={(e) => setField('due_date')(e.target.value)} />
             </Field>
             <Field label="Finalidade / referência" className="col-span-2">
-              <Input className="h-9" value={formData.description} onChange={(e) => setField('description')(e.target.value)} placeholder="Ex: NF 1234, aluguel de outubro" />
+              <Input className="h-9" value={formData.description} onChange={(e) => setField('description')(e.target.value)} />
             </Field>
 
             <Field label="Observações" className="col-span-2 md:col-span-4">
@@ -720,7 +720,7 @@ export default function CheckControlPage() {
               ) : (
                 <Field label="Motivo da devolução" required>
                   <Input
-                    className="h-9" value={statusDialog.return_reason} placeholder="Ex: Alínea 11 - sem fundos"
+                    className="h-9" value={statusDialog.return_reason}
                     onChange={(e) => setStatusDialog((prev) => ({ ...prev, return_reason: e.target.value }))}
                     data-testid="check-return-reason"
                   />
