@@ -183,6 +183,16 @@ def test_work_contract_pdf(api):
     assert r.status_code == 400 and "PJ" in r.json()["detail"]
 
 
+def test_position_cbo_reaches_existing_contracts(api):
+    pos = api.post("/api/hr/positions", json={"name": "Motorista Carreteiro"}).json()
+    c = _contract(api, _employee(api), position_id=pos["id"])
+    assert c.get("cbo") is None
+    # CBO preenchido no cargo depois da admissão chega ao contrato
+    r = api.put(f"/api/hr/positions/{pos['id']}", json={"name": "Motorista Carreteiro", "cbo": "7825-10"})
+    assert r.status_code == 200, r.text
+    assert api.get(f"/api/hr/contracts/{c['id']}").json()["cbo"] == "7825-10"
+
+
 def test_validation_of_contract(api):
     emp = _employee(api)
     base = {"person_type": "FUNCIONARIO", "person_id": emp["id"], "admission_date": "2024-01-15", "base_salary": 3000}

@@ -236,8 +236,9 @@ async def update_position(position_id: str, data: HRPositionCreate, current_user
     await _refuse_duplicate_position(fields["name"], position_id)
     fields["updated_at"] = _now_iso()
     await db.hr_positions.update_one({"id": position_id}, {"$set": fields})
-    if fields["name"] != current["name"]:
-        await db.hr_contracts.update_many({"position_id": position_id}, {"$set": {"position_name": fields["name"]}})
+    # nome e CBO valem para todos os contratos do cargo (o contracheque copia do contrato).
+    # Sempre, e não só quando mudam: salvar o cargo também conserta contratos que ficaram com o CBO antigo
+    await db.hr_contracts.update_many({"position_id": position_id}, {"$set": {"position_name": fields["name"], "cbo": fields["cbo"]}})
     return await db.hr_positions.find_one({"id": position_id}, {"_id": 0})
 
 
