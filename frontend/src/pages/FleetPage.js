@@ -21,7 +21,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { cn, sanitizeKmInput } from '../lib/utils';
+import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { Truck, Wrench, Plus, Eye, Trash2, FileText, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2, CheckCircle2, Clock, AlertTriangle, FileBarChart } from 'lucide-react';
@@ -31,8 +31,8 @@ import { compressImage } from '../lib/imageCompression';
 import {
   DocumentImportButton, DocumentImportNotice, DocumentAttachments, applyDocumentFields, addAttachment, IMPORTED_FIELD_CLASS,
 } from '../components/DocumentImport';
-import { calendarDate, dateInputToISO, toDateInput, todayISO } from '../lib/dates';
-import { formatPlate, plateKey } from '../lib/masks';
+import { calendarDate, toDateInput, todayISO } from '../lib/dates';
+import { formatPlate } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
 const VEHICLE_STATUS_LABELS = { ATIVO: 'Ativo', INATIVO: 'Inativo', MANUTENCAO: 'Manutenção' };
@@ -115,42 +115,8 @@ export default function FleetPage() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 });
   const [selectedRevisionIds, setSelectedRevisionIds] = useState(() => new Set());
   
-  // Modal de nova revisão
-  const [newModalOpen, setNewModalOpen] = useState(false);
-  // Revisão em edição (null = nova)
-  const [editingRevisionId, setEditingRevisionId] = useState(null);
   // Situação de manutenção por placa (mesma conta do Lançamento de Hodômetro)
   const [maintenanceByPlate, setMaintenanceByPlate] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [formData, setFormData] = useState({
-    vehicle_type_revision: 'CAVALO', // CAVALO ou CARRETA
-    vehicle_plate: '',
-    vehicle_model: '',
-    revision_date: todayISO(),
-    oil_used: '',
-    current_km: '',
-    next_oil_motor_km: '',
-    next_oil_filter_km: '',
-    next_air_filter_km: '',
-    next_ac_filter_km: '',
-    next_fuel_filter_km: '',
-    next_racor_filter_km: '',
-    next_apu_filter_km: '',
-    next_hydraulic_filter_km: '',
-    next_gearbox_oil_km: '',
-    next_differential_oil_km: '',
-    next_lubrication_km: '',
-    next_washing_km: '',
-    mechanic_name: '',
-    performed_by: '',
-    observations: '',
-    // Campos específicos para Carreta
-    carreta_revision_type: ''
-  });
-
-  // Foto do Km (hodômetro) - anexada no momento da criação da revisão (CAVALO)
-  const [kmPhoto, setKmPhoto] = useState(null); // { file, previewUrl }
-
   // Lista completa de veículos, usada pelo autocomplete de Placa (independente
   // da paginação de 15/página da aba "Veículos")
   const [allVehicles, setAllVehicles] = useState([]);
@@ -567,140 +533,6 @@ export default function FleetPage() {
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  // Campos de KM (Controle de Revisão) digitados como texto em vez de
-  // <input type="number" min="0"> - ver sanitizeKmInput em lib/utils.js pro motivo.
-  const handleKmChange = (field) => (e) => {
-    const v = sanitizeKmInput(e.target.value);
-    if (v !== null) handleInputChange(field, v);
-  };
-
-  const resetForm = () => {
-    setFormData({
-      vehicle_type_revision: 'CAVALO',
-      vehicle_plate: '',
-      vehicle_model: '',
-      revision_date: todayISO(),
-      oil_used: '',
-      current_km: '',
-      next_oil_motor_km: '',
-      next_oil_filter_km: '',
-      next_air_filter_km: '',
-      next_ac_filter_km: '',
-      next_fuel_filter_km: '',
-      next_racor_filter_km: '',
-      next_apu_filter_km: '',
-      next_hydraulic_filter_km: '',
-      next_gearbox_oil_km: '',
-      next_differential_oil_km: '',
-      next_lubrication_km: '',
-      next_washing_km: '',
-      mechanic_name: '',
-      performed_by: '',
-      observations: '',
-      carreta_revision_type: ''
-    });
-    if (kmPhoto?.previewUrl) URL.revokeObjectURL(kmPhoto.previewUrl);
-    setKmPhoto(null);
-  };
-
-  const handleAddKmPhoto = async (file) => {
-    if (!file) return;
-    const compressed = await compressImage(file);
-    if (kmPhoto?.previewUrl) URL.revokeObjectURL(kmPhoto.previewUrl);
-    setKmPhoto({ file: compressed, previewUrl: URL.createObjectURL(compressed) });
-  };
-
-  const handleRemoveKmPhoto = () => {
-    if (kmPhoto?.previewUrl) URL.revokeObjectURL(kmPhoto.previewUrl);
-    setKmPhoto(null);
-  };
-
-  const handleSubmit = async () => {
-    // Validação diferenciada por tipo
-    if (formData.vehicle_type_revision === 'CAVALO') {
-      if (!formData.vehicle_plate || !formData.oil_used || !formData.current_km || !formData.mechanic_name) {
-        toast.error('Preencha os campos obrigatórios');
-        return;
-      }
-    } else {
-      // Carreta
-      if (!formData.vehicle_plate || !formData.carreta_revision_type || !formData.mechanic_name) {
-        toast.error('Preencha os campos obrigatórios (Placa, Tipo de Revisão, Mecânico)');
-        return;
-      }
-    }
-
-    setSaving(true);
-    try {
-      let data;
-      
-      if (formData.vehicle_type_revision === 'CAVALO') {
-        data = {
-          vehicle_type_revision: 'CAVALO',
-          vehicle_plate: formatPlate(formData.vehicle_plate),
-          vehicle_model: formData.vehicle_model || null,
-          revision_date: dateInputToISO(formData.revision_date),
-          oil_used: formData.oil_used,
-          current_km: parseInt(formData.current_km),
-          next_oil_motor_km: formData.next_oil_motor_km ? parseInt(formData.next_oil_motor_km) : null,
-          next_oil_filter_km: formData.next_oil_filter_km ? parseInt(formData.next_oil_filter_km) : null,
-          next_air_filter_km: formData.next_air_filter_km ? parseInt(formData.next_air_filter_km) : null,
-          next_ac_filter_km: formData.next_ac_filter_km ? parseInt(formData.next_ac_filter_km) : null,
-          next_fuel_filter_km: formData.next_fuel_filter_km ? parseInt(formData.next_fuel_filter_km) : null,
-          next_racor_filter_km: formData.next_racor_filter_km ? parseInt(formData.next_racor_filter_km) : null,
-          next_apu_filter_km: formData.next_apu_filter_km ? parseInt(formData.next_apu_filter_km) : null,
-          next_hydraulic_filter_km: formData.next_hydraulic_filter_km ? parseInt(formData.next_hydraulic_filter_km) : null,
-          next_gearbox_oil_km: formData.next_gearbox_oil_km ? parseInt(formData.next_gearbox_oil_km) : null,
-          next_differential_oil_km: formData.next_differential_oil_km ? parseInt(formData.next_differential_oil_km) : null,
-          next_lubrication_km: formData.next_lubrication_km ? parseInt(formData.next_lubrication_km) : null,
-          next_washing_km: formData.next_washing_km ? parseInt(formData.next_washing_km) : null,
-          mechanic_name: formData.mechanic_name,
-          performed_by: formData.performed_by || null,
-          observations: formData.observations || null
-        };
-      } else {
-        // CARRETA - formulário simplificado
-        data = {
-          vehicle_type_revision: 'CARRETA',
-          vehicle_plate: formatPlate(formData.vehicle_plate),
-          vehicle_model: formData.vehicle_model || null,
-          revision_date: dateInputToISO(formData.revision_date),
-          oil_used: formData.carreta_revision_type, // Usar tipo de revisão como "oil_used" para manter compatibilidade
-          current_km: 0, // Carreta não tem KM
-          mechanic_name: formData.mechanic_name,
-          performed_by: formData.performed_by || null,
-          observations: formData.observations || null,
-          carreta_revision_type: formData.carreta_revision_type
-        };
-      }
-
-      const response = editingRevisionId
-        ? await api.updateVehicleRevision(editingRevisionId, data)
-        : await api.createVehicleRevision(data);
-      if (kmPhoto?.file) {
-        try {
-          await api.uploadVehicleRevisionKmPhoto(response.data.id, kmPhoto.file);
-        } catch (photoError) {
-          toast.error('Revisão registrada, mas houve erro ao enviar a foto do Km');
-        }
-      }
-      toast.success(editingRevisionId ? 'Revisão atualizada!' : 'Revisão registrada com sucesso!');
-      setNewModalOpen(false);
-      setEditingRevisionId(null);
-      resetForm();
-      loadRevisions();
-      loadMaintenanceStatus();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || (editingRevisionId ? 'Erro ao atualizar revisão' : 'Erro ao registrar revisão'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleDelete = async (id) => {
     if (!(await confirm('Deseja realmente excluir esta revisão?'))) return;
 
@@ -717,49 +549,6 @@ export default function FleetPage() {
     } catch (error) {
       toast.error('Erro ao excluir revisão');
     }
-  };
-
-  const openNewRevision = () => {
-    setEditingRevisionId(null);
-    resetForm();
-    setNewModalOpen(true);
-  };
-
-  // Abre o mesmo formulário preenchido com a revisão (carreta não tem KM e
-  // guarda o tipo de revisão no campo do óleo, ver handleSubmit)
-  const openEditRevision = (revision) => {
-    if (!revision) return;
-    const vehicle = allVehicles.find((v) => plateKey(v.plate) === plateKey(revision.vehicle_plate));
-    const isCarreta = vehicle ? vehicle.vehicle_type === 'CARRETA' : !revision.current_km;
-    const km = (v) => (v === null || v === undefined ? '' : String(v));
-    resetForm();
-    setFormData((prev) => ({
-      ...prev,
-      vehicle_type_revision: isCarreta ? 'CARRETA' : 'CAVALO',
-      vehicle_plate: revision.vehicle_plate || '',
-      vehicle_model: revision.vehicle_model || '',
-      revision_date: toDateInput(revision.revision_date) || todayISO(),
-      oil_used: isCarreta ? '' : (revision.oil_used || ''),
-      carreta_revision_type: isCarreta ? (revision.oil_used || '') : '',
-      current_km: isCarreta ? '' : km(revision.current_km),
-      next_oil_motor_km: km(revision.next_oil_motor_km),
-      next_oil_filter_km: km(revision.next_oil_filter_km),
-      next_air_filter_km: km(revision.next_air_filter_km),
-      next_ac_filter_km: km(revision.next_ac_filter_km),
-      next_fuel_filter_km: km(revision.next_fuel_filter_km),
-      next_racor_filter_km: km(revision.next_racor_filter_km),
-      next_apu_filter_km: km(revision.next_apu_filter_km),
-      next_hydraulic_filter_km: km(revision.next_hydraulic_filter_km),
-      next_gearbox_oil_km: km(revision.next_gearbox_oil_km),
-      next_differential_oil_km: km(revision.next_differential_oil_km),
-      next_lubrication_km: km(revision.next_lubrication_km),
-      next_washing_km: km(revision.next_washing_km),
-      mechanic_name: revision.mechanic_name || '',
-      performed_by: revision.performed_by || '',
-      observations: revision.observations || '',
-    }));
-    setEditingRevisionId(revision.id);
-    setNewModalOpen(true);
   };
 
   const handleViewDetails = async (revision) => {
@@ -1022,10 +811,10 @@ export default function FleetPage() {
               toolbar={(
                 <Toolbar
                   selectedCount={selectedRevisionIds.size}
-                  primary={<ToolbarPrimary icon={Plus} label="Nova revisão" onClick={openNewRevision} testId="new-revision-btn" />}
+                  primary={<ToolbarPrimary icon={Plus} label="Nova revisão" onClick={() => navigate('/fleet/revisoes/new')} testId="new-revision-btn" />}
                 >
                   <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedRevision && handleViewDetails(singleSelectedRevision)} disabled={!singleSelectedRevision} />
-                  <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => openEditRevision(singleSelectedRevision)} disabled={!singleSelectedRevision} testId="edit-revision-btn" />
+                  <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedRevision && navigate(`/fleet/revisoes/${singleSelectedRevision.id}/edit`)} disabled={!singleSelectedRevision} testId="edit-revision-btn" />
                   <ToolbarButton icon={Printer} label="Imprimir PDF" tone="emerald" onClick={() => singleSelectedRevision && handlePrintPDF(singleSelectedRevision.id)} disabled={!singleSelectedRevision} />
                   <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRevision && handleDelete(singleSelectedRevision.id)} disabled={!singleSelectedRevision} />
                 </Toolbar>
@@ -1113,299 +902,6 @@ export default function FleetPage() {
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Modal Nova Revisão */}
-      <Dialog open={newModalOpen} onOpenChange={(open) => { setNewModalOpen(open); if (!open) setEditingRevisionId(null); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Wrench className="w-4 h-4 text-primary" />
-              {editingRevisionId ? 'Editar Revisão de Veículo' : 'Nova Revisão de Veículo'}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Tipo de Veículo: cavalo tem KM e próximas trocas; carreta, só o tipo de revisão */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-              <Label className="mb-1.5 block">Tipo de Veículo *</Label>
-              <Select
-                value={formData.vehicle_type_revision}
-                onValueChange={(value) => handleInputChange('vehicle_type_revision', value)}
-                disabled={!!editingRevisionId}
-              >
-                <SelectTrigger data-testid="revision-vehicle-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CAVALO">Cavalo Mecânico</SelectItem>
-                  <SelectItem value="CARRETA">Carreta</SelectItem>
-                </SelectContent>
-              </Select>
-              </div>
-            </div>
-
-            {/* ========== FORMULÁRIO CAVALO MECÂNICO ========== */}
-            {formData.vehicle_type_revision === 'CAVALO' && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label className="mb-1.5 block">Placa do Veículo *</Label>
-                    <Autocomplete
-                      value={formData.vehicle_plate}
-                      onChange={(v) => handleInputChange('vehicle_plate', formatPlate(v))}
-                      onSelect={(v) => { handleInputChange('vehicle_plate', formatPlate(v.plate)); handleInputChange('vehicle_model', v.model || ''); }}
-                      options={allVehicles}
-                      displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                    />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block">Modelo</Label>
-                    <Input
-                      value={formData.vehicle_model}
-                      onChange={(e) => handleInputChange('vehicle_model', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block">Data da Revisão *</Label>
-                    <Input
-                      type="date"
-                      value={formData.revision_date}
-                      onChange={(e) => handleInputChange('revision_date', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="mb-1.5 block">Óleo Utilizado *</Label>
-                    <Input
-                      value={formData.oil_used}
-                      onChange={(e) => handleInputChange('oil_used', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block">KM Atual (Trocado com) *</Label>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={formData.current_km}
-                      onChange={handleKmChange('current_km')}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="mb-1.5 block">Foto do Km (Hodômetro)</Label>
-                  {kmPhoto ? (
-                    <div className="relative inline-block">
-                      <img src={kmPhoto.previewUrl} alt="Foto do Km" className="w-40 h-28 object-cover rounded-lg border" />
-                      <Button title="Remover" aria-label="Remover"
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-1 right-1 h-6 w-6"
-                        onClick={handleRemoveKmPhoto}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Button type="button" variant="outline" onClick={() => document.getElementById('km-photo-camera-input').click()}>
-                        <Camera className="w-4 h-4 mr-2" />
-                        Câmera
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => document.getElementById('km-photo-gallery-input').click()}>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Galeria
-                      </Button>
-                      <input
-                        id="km-photo-camera-input"
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => { handleAddKmPhoto(e.target.files?.[0]); e.target.value = ''; }}
-                      />
-                      <input
-                        id="km-photo-gallery-input"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => { handleAddKmPhoto(e.target.files?.[0]); e.target.value = ''; }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t pt-4">
-                  <FormSectionTitle className="mb-4">Próxima Revisão (KM)</FormSectionTitle>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label className="mb-1.5 block">Óleo Motor</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_oil_motor_km} onChange={handleKmChange('next_oil_motor_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Filtro Óleo</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_oil_filter_km} onChange={handleKmChange('next_oil_filter_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Filtro Ar</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_air_filter_km} onChange={handleKmChange('next_air_filter_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Filtro Ar Condicionado</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_ac_filter_km} onChange={handleKmChange('next_ac_filter_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Filtro Combustível</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_fuel_filter_km} onChange={handleKmChange('next_fuel_filter_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Filtro Racor</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_racor_filter_km} onChange={handleKmChange('next_racor_filter_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Filtro APU</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_apu_filter_km} onChange={handleKmChange('next_apu_filter_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Filtro Hidráulico</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_hydraulic_filter_km} onChange={handleKmChange('next_hydraulic_filter_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Óleo Caixa de Marcha</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_gearbox_oil_km} onChange={handleKmChange('next_gearbox_oil_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Óleo Diferencial</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_differential_oil_km} onChange={handleKmChange('next_differential_oil_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Lubrificação</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_lubrication_km} onChange={handleKmChange('next_lubrication_km')} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Lavagem</Label>
-                      <Input type="text" inputMode="decimal" value={formData.next_washing_km} onChange={handleKmChange('next_washing_km')} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <FormSectionTitle className="mb-4">Responsáveis</FormSectionTitle>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="mb-1.5 block">Nome do Mecânico *</Label>
-                      <Input value={formData.mechanic_name} onChange={(e) => handleInputChange('mechanic_name', e.target.value)} />
-                    </div>
-                    <div>
-                      <Label className="mb-1.5 block">Realizado por</Label>
-                      <Input value={formData.performed_by} onChange={(e) => handleInputChange('performed_by', e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <Label className="mb-1.5 block">Observações</Label>
-                    <Input value={formData.observations} onChange={(e) => handleInputChange('observations', e.target.value)} />
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* ========== FORMULÁRIO CARRETA ========== */}
-            {formData.vehicle_type_revision === 'CARRETA' && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="mb-1.5 block">Placa *</Label>
-                    <Autocomplete
-                      value={formData.vehicle_plate}
-                      onChange={(v) => handleInputChange('vehicle_plate', formatPlate(v))}
-                      onSelect={(v) => { handleInputChange('vehicle_plate', formatPlate(v.plate)); handleInputChange('vehicle_model', v.model || ''); }}
-                      options={allVehicles}
-                      displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
-                    />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block">Modelo</Label>
-                    <Input
-                      value={formData.vehicle_model}
-                      onChange={(e) => handleInputChange('vehicle_model', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="mb-1.5 block">Tipo de Revisão *</Label>
-                    <Select 
-                      value={formData.carreta_revision_type} 
-                      onValueChange={(value) => handleInputChange('carreta_revision_type', value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="FREIOS">Freios</SelectItem>
-                        <SelectItem value="PNEUS">Pneus</SelectItem>
-                        <SelectItem value="SUSPENSAO">Suspensão</SelectItem>
-                        <SelectItem value="ELETRICA">Elétrica</SelectItem>
-                        <SelectItem value="ESTRUTURA">Estrutura</SelectItem>
-                        <SelectItem value="LONA">Lona/Sider</SelectItem>
-                        <SelectItem value="GERAL">Revisão Geral</SelectItem>
-                        <SelectItem value="OUTROS">Outros</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block">Data da Revisão</Label>
-                    <Input
-                      type="date"
-                      value={formData.revision_date}
-                      onChange={(e) => handleInputChange('revision_date', e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="mb-1.5 block">Observação</Label>
-                  <Input
-                    value={formData.observations}
-                    onChange={(e) => handleInputChange('observations', e.target.value)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="mb-1.5 block">Nome do Mecânico *</Label>
-                    <Input
-                      value={formData.mechanic_name}
-                      onChange={(e) => handleInputChange('mechanic_name', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label className="mb-1.5 block">Realizado por</Label>
-                    <Input
-                      value={formData.performed_by}
-                      onChange={(e) => handleInputChange('performed_by', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : editingRevisionId ? 'Salvar alterações' : 'Registrar revisão'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Modal Detalhes */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>

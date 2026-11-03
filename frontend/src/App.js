@@ -86,6 +86,7 @@ const FlexTankMovementDetailPage = lazyPage(() => import('./pages/FlexTankMoveme
 const EditFlexTankMovementPage = lazyPage(() => import('./pages/EditFlexTankMovementPage'));
 const YardControlPage = lazyPage(() => import('./pages/YardControlPage'));
 const FleetPage = lazyPage(() => import('./pages/FleetPage'));
+const VehicleRevisionFormPage = lazyPage(() => import('./pages/VehicleRevisionFormPage'));
 const VehicleChecklistPage = lazyPage(() => import('./pages/VehicleChecklistPage'));
 const LoadingSchedulePage = lazyPage(() => import('./pages/LoadingSchedulePage'));
 const DailyRateRequestPage = lazyPage(() => import('./pages/DailyRateRequestPage'));
@@ -121,6 +122,7 @@ const UnitSegregationPage = lazyPage(() => import('./pages/UnitSegregationPage')
 const UnitSegregationFormPage = lazyPage(() => import('./pages/UnitSegregationFormPage'));
 const RPATerceiroPage = lazyPage(() => import('./pages/RPATerceiroPage'));
 const OrdemServicoPage = lazyPage(() => import('./pages/OrdemServicoPage'));
+const OrdemServicoFormPage = lazyPage(() => import('./pages/OrdemServicoFormPage'));
 const FuelSupplyPage = lazyPage(() => import('./pages/FuelSupplyPage'));
 const OdometerReadingsPage = lazyPage(() => import('./pages/OdometerReadingsPage'));
 const FuelConsumptionPage = lazyPage(() => import('./pages/FuelConsumptionPage'));
@@ -238,6 +240,22 @@ function App() {
             }
           />
           <Route
+            path="/fleet/revisoes/new"
+            element={
+              <ProtectedRoute moduleKey="frota.revisao">
+                <VehicleRevisionFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/revisoes/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="frota.revisao">
+                <VehicleRevisionFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/fleet/rpa-terceiro"
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.rpa_terceiro">
@@ -266,6 +284,22 @@ function App() {
             element={
               <ProtectedRoute moduleKey="frota.ordem_servico">
                 <OrdemServicoPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/ordem-servico/new"
+            element={
+              <ProtectedRoute moduleKey="frota.ordem_servico">
+                <OrdemServicoFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/ordem-servico/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="frota.ordem_servico">
+                <OrdemServicoFormPage />
               </ProtectedRoute>
             }
           />
