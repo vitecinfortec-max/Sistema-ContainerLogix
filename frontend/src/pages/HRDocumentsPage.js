@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { FileBadge, Plus, Pencil, Trash2, Save, Paperclip, X, AlertTriangle, Clock, CheckCircle2, ExternalLink } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const STATUS_LABELS = { VENCIDO: 'Vencido', A_VENCER: 'Vence em até 30 dias', VALIDO: 'Válido', SEM_VALIDADE: 'Sem validade' };
 const STATUS_TONES = { VENCIDO: 'red', A_VENCER: 'amber', VALIDO: 'emerald', SEM_VALIDADE: 'slate' };
 const EMPTY = { contract_id: '', doc_type: 'ASO_PERIODICO', description: '', issue_date: todayISO(), expiry_date: '', file_url: '', observations: '' };
@@ -57,7 +58,7 @@ export default function HRDocumentsPage() {
       if (statusFilter) params.status = statusFilter;
       setList((await api.getHRDocuments(params)).data || []);
     } catch (e) {
-      toast.error('Erro ao carregar os documentos');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar os documentos'));
     } finally {
       setLoading(false);
     }

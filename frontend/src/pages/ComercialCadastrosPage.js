@@ -18,6 +18,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { useModuleConfig } from '../context/ModuleConfigContext';
 import { Plus, Trash2, Edit, UserCog } from 'lucide-react';
 import { formatCNPJ, formatCPF, formatCnpjCpf, formatPhone } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 
@@ -81,7 +82,7 @@ export default function ComercialCadastrosPage() {
       const response = await activeType.api.list();
       setItems(response.data);
     } catch (error) {
-      toast.error(`Erro ao carregar ${activeType.plural.toLowerCase()}`);
+      toast.error(apiErrorMessage(error, `Erro ao carregar ${activeType.plural.toLowerCase()}`));
     } finally {
       setLoading(false);
     }
@@ -120,7 +121,7 @@ export default function ComercialCadastrosPage() {
       setOpen(false);
       loadItems();
     } catch (error) {
-      toast.error(error.response?.data?.detail || `Erro ao salvar ${activeType.label.toLowerCase()}`);
+      toast.error(apiErrorMessage(error, `Erro ao salvar ${activeType.label.toLowerCase()}`));
     } finally {
       setSubmitting(false);
     }
@@ -139,7 +140,7 @@ export default function ComercialCadastrosPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || `Erro ao excluir ${activeType.label.toLowerCase()}`);
+        toast.error(apiErrorMessage(error, `Erro ao excluir ${activeType.label.toLowerCase()}`));
       }
     }
   };

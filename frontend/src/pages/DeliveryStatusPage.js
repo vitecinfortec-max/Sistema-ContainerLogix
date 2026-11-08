@@ -27,6 +27,7 @@ import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 // Status do registro (ATIVO/CONCLUIDO/CANCELADO) é derivado automaticamente
 // pelo backend a partir de items[].delivery_completed - ver
 // _compute_delivery_status em routers/delivery_status.py.
@@ -99,7 +100,7 @@ export default function DeliveryStatusPage() {
       if (response.data.stats) setStats(response.data.stats);
       setPagination(prev => ({ ...prev, pages: response.data.pages, total: response.data.total }));
     } catch (error) {
-      toast.error('Erro ao carregar status de entrega');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar status de entrega'));
     } finally {
       setLoading(false);
     }
@@ -156,7 +157,7 @@ export default function DeliveryStatusPage() {
       
       toast.success(`Programação Nº ${schedule.schedule_number} carregada com ${items.length} motorista(s)`);
     } catch (error) {
-      toast.error('Programação não encontrada');
+      toast.error(apiErrorMessage(error, 'Programação não encontrada'));
       setScheduleData(null);
     } finally {
       setSearchingSchedule(false);
@@ -187,7 +188,7 @@ export default function DeliveryStatusPage() {
       resetForm();
       loadStatuses();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar'));
     } finally {
       setSaving(false);
     }
@@ -235,7 +236,7 @@ export default function DeliveryStatusPage() {
       });
       loadStatuses();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir'));
     }
   };
 
@@ -277,7 +278,7 @@ export default function DeliveryStatusPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 
@@ -294,7 +295,7 @@ export default function DeliveryStatusPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar Excel');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar Excel'));
     }
   };
 

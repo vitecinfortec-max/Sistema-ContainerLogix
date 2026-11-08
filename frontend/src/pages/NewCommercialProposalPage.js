@@ -12,6 +12,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Plus, Trash2, Loader2, FileText } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const DEFAULT_FREE_TIME_TEXT = '30 (trinta) dias de free time de armazenagem, contados a partir da entrada do container no pátio. Após esse período, incidem as diárias de armazenagem informadas na tabela acima.';
 const DEFAULT_PAYMENT_TERMS_TEXT = 'Pagamento de forma quinzenal, com faturamento gerado a cada 15 dias, sempre às segundas-feiras. Pagamento via Pix.';
@@ -72,7 +73,7 @@ export default function NewCommercialProposalPage() {
       toast.success('Proposta comercial criada com sucesso!');
       navigate('/comercial/proposta');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao criar proposta comercial');
+      toast.error(apiErrorMessage(error, 'Erro ao criar proposta comercial'));
     } finally {
       setSaving(false);
     }

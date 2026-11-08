@@ -26,6 +26,7 @@ import { useUrlState } from '../hooks/useUrlState';
 import {
   HardHat, Plus, Pencil, Trash2, Save, FileSignature, FileText, PenLine, Users, PackageCheck, AlertTriangle,
 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const TYPE_LABELS = { MOTORISTA: 'Motorista', FUNCIONARIO: 'Funcionário' };
 const SIGNATURE_KIND = { MOTORISTA: 'motorista', FUNCIONARIO: 'funcionario' };
@@ -105,7 +106,7 @@ export default function EpiDeliveriesPage() {
       setDeliveries(r.data || []);
       setSelectedIds(new Set());
     } catch (e) {
-      toast.error("Erro ao carregar as entregas de EPI's");
+      toast.error(apiErrorMessage(e, "Erro ao carregar as entregas de EPI's"));
     } finally {
       setLoading(false);
     }
@@ -167,7 +168,7 @@ export default function EpiDeliveriesPage() {
       setNextNumber(d.delivery_number);
       setDialogOpen(true);
     } catch (e) {
-      toast.error('Erro ao carregar a entrega');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar a entrega'));
     }
   };
 
@@ -258,7 +259,7 @@ export default function EpiDeliveriesPage() {
       loadDeliveries();
       loadProducts();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar a entrega');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar a entrega'));
     } finally {
       setSaving(false);
     }
@@ -275,7 +276,7 @@ export default function EpiDeliveriesPage() {
       toast.success('Assinatura salva no cadastro');
       setSignOpen(false);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar a assinatura');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar a assinatura'));
     } finally {
       setSignSaving(false);
     }
@@ -306,7 +307,7 @@ export default function EpiDeliveriesPage() {
       loadDeliveries();
       loadProducts();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao excluir a entrega');
+      toast.error(apiErrorMessage(e, 'Erro ao excluir a entrega'));
     }
   };
 
@@ -317,7 +318,7 @@ export default function EpiDeliveriesPage() {
       const r = await api.getEpiDeliveryPDF(single.id);
       downloadBlob(r.data, `Termo_Entrega_EPI_${single.delivery_number}.pdf`);
     } catch (e) {
-      toast.error('Erro ao gerar o Termo de Entrega');
+      toast.error(apiErrorMessage(e, 'Erro ao gerar o Termo de Entrega'));
     } finally {
       setDownloading(false);
     }
@@ -335,7 +336,7 @@ export default function EpiDeliveriesPage() {
       const r = await api.getEpiFichaPDF(params);
       downloadBlob(r.data, `Ficha_EPI_${(single.recipient_name || 'pessoa').replace(/[^A-Za-z0-9]+/g, '_')}.pdf`);
     } catch (e) {
-      toast.error('Erro ao gerar a Ficha de EPI');
+      toast.error(apiErrorMessage(e, 'Erro ao gerar a Ficha de EPI'));
     } finally {
       setDownloading(false);
     }

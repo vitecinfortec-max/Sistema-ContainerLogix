@@ -30,6 +30,7 @@ import {
   Building2, ChevronDown, Loader2, AlertTriangle,
 } from 'lucide-react';
 import { formatCEP, formatCNPJ, formatCPF, formatCnpjCpf, formatPhone, formatPlate } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const MASKS = { cpf: formatCPF, cnpj: formatCNPJ, doc: formatCnpjCpf, tel: formatPhone, plate: formatPlate };
 
@@ -329,7 +330,7 @@ export default function CadastroUnificadoPage() {
       const response = await activeType.api.list();
       if (seq === loadSeq.current) setItems(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      if (seq === loadSeq.current) toast.error(`Erro ao carregar ${activeType.plural.toLowerCase()}`);
+      if (seq === loadSeq.current) toast.error(apiErrorMessage(error, `Erro ao carregar ${activeType.plural.toLowerCase()}`));
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
@@ -441,7 +442,7 @@ export default function CadastroUnificadoPage() {
       });
       toast.success('Dados preenchidos a partir do CNPJ');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'CNPJ não encontrado');
+      toast.error(apiErrorMessage(error, 'CNPJ não encontrado'));
     } finally {
       setCnpjLoading(false);
     }
@@ -468,7 +469,7 @@ export default function CadastroUnificadoPage() {
       setOpen(false);
       loadItems();
     } catch (error) {
-      toast.error(error.response?.data?.detail || `Erro ao salvar ${g.este} ${activeType.label.toLowerCase()}`);
+      toast.error(apiErrorMessage(error, `Erro ao salvar ${g.este} ${activeType.label.toLowerCase()}`));
     } finally {
       setSubmitting(false);
     }
@@ -487,7 +488,7 @@ export default function CadastroUnificadoPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || `Erro ao excluir ${g.este} ${activeType.label.toLowerCase()}`);
+        toast.error(apiErrorMessage(error, `Erro ao excluir ${g.este} ${activeType.label.toLowerCase()}`));
       }
     }
   };

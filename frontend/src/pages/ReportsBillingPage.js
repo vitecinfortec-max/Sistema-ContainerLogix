@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtValue = (v, currency) => (v == null ? '-' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: currency === 'USD' ? 'USD' : 'BRL' }));
 const PREVIEW_PAGE_SIZE = 15;
@@ -74,7 +75,7 @@ export default function ReportsBillingPage() {
       setClients(response.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      toast.error('Erro ao carregar clientes');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar clientes'));
     }
   };
 
@@ -154,7 +155,7 @@ export default function ReportsBillingPage() {
         const response = await api.previewBillingReport({ ...buildParams(), page: previewPage, per_page: PREVIEW_PAGE_SIZE });
         if (!cancelled) setPreview(response.data);
       } catch (error) {
-        if (!cancelled) toast.error(error.response?.data?.detail || 'Erro ao carregar a prévia do relatório');
+        if (!cancelled) toast.error(apiErrorMessage(error, 'Erro ao carregar a prévia do relatório'));
       } finally {
         if (!cancelled) setPreviewLoading(false);
       }
@@ -180,7 +181,7 @@ export default function ReportsBillingPage() {
       link.remove();
       toast.success('Relatório de Faturamento PDF gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de faturamento PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de faturamento PDF'));
     } finally {
       setLoading(false);
     }
@@ -202,7 +203,7 @@ export default function ReportsBillingPage() {
       link.remove();
       toast.success('Relatório de Faturamento Excel gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de faturamento Excel');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de faturamento Excel'));
     } finally {
       setLoading(false);
     }
@@ -233,7 +234,7 @@ export default function ReportsBillingPage() {
       link.remove();
       toast.success('Relatório de Diárias de Armazenagem PDF gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de diárias de armazenagem PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de diárias de armazenagem PDF'));
     } finally {
       setLoading(false);
     }
@@ -255,7 +256,7 @@ export default function ReportsBillingPage() {
       link.remove();
       toast.success('Relatório de Diárias de Armazenagem Excel gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de diárias de armazenagem Excel');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de diárias de armazenagem Excel'));
     } finally {
       setLoading(false);
     }

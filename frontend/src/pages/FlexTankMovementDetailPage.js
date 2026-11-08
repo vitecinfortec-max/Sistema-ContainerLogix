@@ -12,6 +12,7 @@ import { Edit, Trash2, Loader2, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calendarDate } from '../lib/dates';
+import { apiErrorMessage } from '../lib/errors';
 
 export default function FlexTankMovementDetailPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -29,7 +30,7 @@ export default function FlexTankMovementDetailPage() {
       const response = await api.getFlexTankMovement(id);
       setMovement(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar movimentação');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar movimentação'));
       navigate('/flex-tank');
     } finally {
       setLoading(false);
@@ -44,7 +45,7 @@ export default function FlexTankMovementDetailPage() {
       toast.success('Movimentação excluída com sucesso!');
       navigate('/flex-tank');
     } catch (error) {
-      toast.error('Erro ao excluir movimentação');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir movimentação'));
     }
   };
 

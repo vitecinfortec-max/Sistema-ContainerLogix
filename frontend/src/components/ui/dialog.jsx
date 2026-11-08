@@ -3,6 +3,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { Maximize2, Minimize2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { confirmCloseDialog, isDialogDirty } from "@/components/UnsavedChanges"
 
 const Dialog = DialogPrimitive.Root
 
@@ -32,9 +33,32 @@ const readMaximized = () => {
   try { return localStorage.getItem(MAXIMIZED_KEY) === "1" } catch { return false }
 }
 
-const DialogContent = React.forwardRef(({ className, children, expandable, ...props }, ref) => {
+const DialogContent = React.forwardRef(({ className, children, expandable, onEscapeKeyDown, onPointerDownOutside, onFocusOutside, ...props }, ref) => {
   const canExpand = expandable ?? WIDE_DIALOG.test(className || "")
   const [maximized, setMaximized] = React.useState(() => canExpand && readMaximized())
+  const contentRef = React.useRef(null)
+  const closeRef = React.useRef(null)
+  const closingRef = React.useRef(false)
+
+  const setRefs = (node) => {
+    contentRef.current = node
+    if (typeof ref === "function") ref(node)
+    else if (ref) ref.current = node
+  }
+
+  // Com alteração não salva, Esc / clique fora / X perguntam antes de fechar
+  // (components/UnsavedChanges). Confirmado, fecha pelo próprio X.
+  const guardDismiss = (event, handler) => {
+    handler?.(event)
+    if (event.defaultPrevented || closingRef.current || !isDialogDirty(contentRef.current)) return
+    event.preventDefault()
+    confirmCloseDialog(contentRef.current).then((ok) => {
+      if (!ok) return
+      closingRef.current = true
+      closeRef.current?.click()
+      closingRef.current = false
+    })
+  }
 
   const toggleMaximized = () => {
     setMaximized((prev) => {
@@ -47,7 +71,13 @@ const DialogContent = React.forwardRef(({ className, children, expandable, ...pr
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
-      ref={ref}
+      ref={setRefs}
+      onEscapeKeyDown={(event) => guardDismiss(event, onEscapeKeyDown)}
+      onPointerDownOutside={(event) => guardDismiss(event, onPointerDownOutside)}
+      onFocusOutside={(event) => {
+        onFocusOutside?.(event)
+        if (isDialogDirty(contentRef.current)) event.preventDefault()
+      }}
       data-maximized={maximized || undefined}
       className={cn(
         "form-dense fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
@@ -68,6 +98,8 @@ const DialogContent = React.forwardRef(({ className, children, expandable, ...pr
         </button>
       )}
       <DialogPrimitive.Close
+        ref={closeRef}
+        onClick={(event) => guardDismiss(event)}
         className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
         <X className="h-4 w-4" />
         <span className="sr-only">Fechar</span>

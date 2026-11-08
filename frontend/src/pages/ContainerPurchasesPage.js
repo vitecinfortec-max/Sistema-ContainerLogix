@@ -20,6 +20,7 @@ import { Plus, Pencil, Trash2, ShoppingCart, Package, CheckCircle2, Wallet } fro
 import { calendarDate, dateInputToISO, toDateInput } from '../lib/dates';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const STATUS_LABELS = { DISPONIVEL: 'Disponível', VENDIDO: 'Vendido' };
 const STATUS_TONES = {
   DISPONIVEL: 'emerald',
@@ -67,7 +68,7 @@ export default function ContainerPurchasesPage() {
       const r = await api.getContainerPurchases(params);
       setList(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar compras de container');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar compras de container'));
     } finally {
       setLoading(false);
     }
@@ -148,7 +149,7 @@ export default function ContainerPurchasesPage() {
       setDialogOpen(false);
       loadList();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar compra de container');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar compra de container'));
     } finally { setSaving(false); }
   };
 
@@ -165,7 +166,7 @@ export default function ContainerPurchasesPage() {
         });
         loadList();
       } catch (e) {
-        toast.error(e?.response?.data?.detail || 'Erro ao excluir compra de container');
+        toast.error(apiErrorMessage(e, 'Erro ao excluir compra de container'));
       }
     }
   };

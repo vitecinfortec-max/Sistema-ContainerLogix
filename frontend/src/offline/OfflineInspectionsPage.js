@@ -13,6 +13,7 @@ import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS } from '../pages/NewContainerInspectionPage';
 import { capturePhoto, savePhotoBase64, deletePhoto, getPhotoDisplayUri } from '../lib/offlinePhotos';
+import { apiErrorMessage } from '../lib/errors';
 
 const PHOTO_LABELS = CONTAINER_INSPECTION_PHOTO_TYPES.reduce((acc, { value, label }) => {
   acc[value] = label;
@@ -133,7 +134,7 @@ export default function OfflineInspectionsPage() {
       load();
       toast.success('Registro salvo!');
     } catch (e) {
-      toast.error('Erro ao salvar registro');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar registro'));
     }
   };
 
@@ -144,7 +145,7 @@ export default function OfflineInspectionsPage() {
       load();
       toast.success('Removida!');
     } catch (e) {
-      toast.error('Erro ao remover');
+      toast.error(apiErrorMessage(e, 'Erro ao remover'));
     }
   };
 

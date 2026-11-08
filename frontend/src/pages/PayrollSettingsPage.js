@@ -11,6 +11,7 @@ import { api } from '../lib/api';
 import { errorDetail, fmtDate } from '../components/HRKit';
 import { toast } from 'sonner';
 import { Percent, Save, RotateCcw, Plus, Trash2 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const SIMPLE_FIELDS = [
   ['Geral', [
@@ -57,7 +58,7 @@ export default function PayrollSettingsPage() {
       setData(r.data);
       setForm(JSON.parse(JSON.stringify(r.data.settings)));
     } catch (e) {
-      toast.error('Erro ao carregar as tabelas');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar as tabelas'));
     }
   };
 
@@ -146,34 +147,36 @@ export default function PayrollSettingsPage() {
 function BracketTable({ rows, onChange, onRemove, onAdd, withDeduction = false, hint }) {
   return (
     <div className="space-y-2">
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Faixa</th>
-            <th>Até (R$)</th>
-            <th>Alíquota (%)</th>
-            {withDeduction && <th>Parcela a deduzir (R$)</th>}
-            <th className="w-10" />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((b, i) => (
-            <tr key={i}>
-              <td className="tabular-nums">{i + 1}ª</td>
-              <td><Input type="number" step="0.01" value={b.up_to ?? ''} onChange={(e) => onChange(i, 'up_to', e.target.value)} className="h-8 text-sm" /></td>
-              <td><Input type="number" step="0.01" value={b.rate ?? ''} onChange={(e) => onChange(i, 'rate', e.target.value)} className="h-8 text-sm" /></td>
-              {withDeduction && <td><Input type="number" step="0.01" value={b.deduction ?? ''} onChange={(e) => onChange(i, 'deduction', e.target.value)} className="h-8 text-sm" /></td>}
-              <td>
-                {rows.length > 1 && (
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" aria-label="Remover faixa" title="Remover" onClick={() => onRemove(i)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
-              </td>
+      <div className="overflow-x-auto">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Faixa</th>
+              <th>Até (R$)</th>
+              <th>Alíquota (%)</th>
+              {withDeduction && <th>Parcela a deduzir (R$)</th>}
+              <th className="w-10" />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((b, i) => (
+              <tr key={i}>
+                <td className="tabular-nums">{i + 1}ª</td>
+                <td><Input type="number" step="0.01" value={b.up_to ?? ''} onChange={(e) => onChange(i, 'up_to', e.target.value)} className="h-8 text-sm" /></td>
+                <td><Input type="number" step="0.01" value={b.rate ?? ''} onChange={(e) => onChange(i, 'rate', e.target.value)} className="h-8 text-sm" /></td>
+                {withDeduction && <td><Input type="number" step="0.01" value={b.deduction ?? ''} onChange={(e) => onChange(i, 'deduction', e.target.value)} className="h-8 text-sm" /></td>}
+                <td>
+                  {rows.length > 1 && (
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" aria-label="Remover faixa" title="Remover" onClick={() => onRemove(i)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <div className="flex items-center justify-between">
         <span className="text-[11px] text-slate-500">{hint}</span>
         <Button variant="outline" size="sm" onClick={onAdd}><Plus className="w-4 h-4 mr-1" />Adicionar faixa</Button>

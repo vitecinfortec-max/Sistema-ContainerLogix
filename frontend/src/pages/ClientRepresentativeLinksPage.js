@@ -14,6 +14,7 @@ const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 const fmtBRL = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtUSD = (v) => Number(v || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 import { Plus, Trash2, Edit, Link2, FileDown } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 function CommissionPreview({ data, loading }) {
   const reps = data.representatives || [];
@@ -114,7 +115,7 @@ export default function ClientRepresentativeLinksPage() {
       setRepresentatives(Array.isArray(repsRes.data) ? repsRes.data : []);
       setLinks(linksRes.data);
     } catch (error) {
-      toast.error('Erro ao carregar vínculos');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar vínculos'));
     } finally {
       setLoading(false);
     }
@@ -165,7 +166,7 @@ export default function ClientRepresentativeLinksPage() {
       loadAll();
       loadCommission();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar vínculo');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar vínculo'));
     } finally {
       setSubmitting(false);
     }
@@ -178,7 +179,7 @@ export default function ClientRepresentativeLinksPage() {
       toast.success('Vínculo removido com sucesso');
       loadAll();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao remover vínculo');
+      toast.error(apiErrorMessage(error, 'Erro ao remover vínculo'));
     }
   };
 
@@ -201,7 +202,7 @@ export default function ClientRepresentativeLinksPage() {
       const response = await api.getCommissionReport(reportParams());
       setCommission(response.data);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao calcular a comissão');
+      toast.error(apiErrorMessage(error, 'Erro ao calcular a comissão'));
     } finally {
       setLoadingCommission(false);
     }
@@ -229,7 +230,7 @@ export default function ClientRepresentativeLinksPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao gerar relatório de comissão');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de comissão'));
     } finally {
       setGeneratingReport(false);
     }

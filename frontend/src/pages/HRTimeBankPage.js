@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { Hourglass, Plus, Trash2, Save, TrendingUp, TrendingDown, Users } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const EMPTY = { contract_id: '', date: todayISO(), kind: 'CREDITO', hours: '', description: '' };
 
 export default function HRTimeBankPage() {
@@ -53,7 +54,7 @@ export default function HRTimeBankPage() {
       setEntries(e.data || []);
       setBalances(b.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar o banco de horas');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar o banco de horas'));
     } finally {
       setLoading(false);
     }

@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { Lock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
+import { apiErrorMessage } from '../lib/errors';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -64,7 +65,7 @@ export default function ChangePasswordPage() {
       
       navigate('/dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao alterar senha');
+      toast.error(apiErrorMessage(error, 'Erro ao alterar senha'));
     } finally {
       setLoading(false);
     }

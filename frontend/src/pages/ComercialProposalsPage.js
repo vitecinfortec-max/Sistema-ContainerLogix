@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 // Situação: antigas foram gravadas como "ATIVO" = em aberto
 const PROPOSAL_STATUS = {
   EM_ABERTO: { label: 'Em aberto', tone: 'blue' },
@@ -56,7 +57,7 @@ export default function ComercialProposalsPage() {
       const response = await api.getCommercialProposals();
       setProposals(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar propostas comerciais');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar propostas comerciais'));
     } finally {
       setLoading(false);
     }
@@ -75,7 +76,7 @@ export default function ComercialProposalsPage() {
       });
       loadProposals();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir proposta');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir proposta'));
     }
   };
 
@@ -86,7 +87,7 @@ export default function ComercialProposalsPage() {
       toast.success(`Proposta ${proposal.proposal_number}: ${PROPOSAL_STATUS[status].label.toLowerCase()}`);
       loadProposals();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar a situação');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar a situação'));
     } finally {
       setUpdatingStatus(false);
     }
@@ -105,7 +106,7 @@ export default function ComercialProposalsPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     } finally {
       setDownloadingId(null);
     }

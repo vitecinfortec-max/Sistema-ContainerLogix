@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -18,8 +18,11 @@ import { Plus, Eye, Pencil, Trash2, Package, TrendingUp, TrendingDown, FileSprea
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { calendarDate } from '../lib/dates';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
+import { OptionAutocomplete } from '../components/Autocomplete';
 export default function FlexTankPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const navigate = useNavigate();
@@ -27,6 +30,7 @@ export default function FlexTankPage() {
   const [movements, setMovements] = useState([]);
   const [stock, setStock] = useState({ total_bags: 0, total_entries: 0, total_exits: 0, by_client: [], by_size: [] });
   const [clients, setClients] = useState([]);
+  const clientOptions = useMemo(() => clients.map((client) => [client.id, client.name]), [clients]);
   const [loading, setLoading] = useState(true);
   
   // Ler tab da URL
@@ -93,7 +97,7 @@ export default function FlexTankPage() {
       setClients(response.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      toast.error('Erro ao carregar clientes');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar clientes'));
     }
   };
 
@@ -118,7 +122,7 @@ export default function FlexTankPage() {
         totalPages: response.data.total_pages
       }));
     } catch (error) {
-      toast.error('Erro ao carregar movimentações');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar movimentações'));
     } finally {
       setLoading(false);
     }
@@ -131,7 +135,7 @@ export default function FlexTankPage() {
       setStock(response.data);
     } catch (error) {
       console.error('Erro ao carregar estoque:', error);
-      toast.error('Erro ao carregar estoque');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar estoque'));
     }
   };
 
@@ -150,7 +154,7 @@ export default function FlexTankPage() {
       loadMovements();
       loadStock();
     } catch (error) {
-      toast.error('Erro ao excluir movimentação');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir movimentação'));
     }
   };
 
@@ -210,7 +214,7 @@ export default function FlexTankPage() {
       link.remove();
       toast.success('Relatório baixado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao baixar relatório');
+      toast.error(apiErrorMessage(error, 'Erro ao baixar relatório'));
     }
   };
 
@@ -273,20 +277,13 @@ export default function FlexTankPage() {
                   />
                 </FilterField>
                 <FilterField label="Cliente">
-                  <Select
-                    value={filters.client_id || 'all'}
-                    onValueChange={(value) => updateFilter('client_id', value === 'all' ? '' : value)}
-                  >
-                    <SelectTrigger className="h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {clients.map(client => (
-                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <OptionAutocomplete
+                    value={filters.client_id}
+                    onChange={(value) => updateFilter('client_id', value)}
+                    options={clientOptions}
+                    className="text-sm"
+                    testId="flex-filter-client"
+                  />
                 </FilterField>
                 <FilterField label="Nº registro">
                   <Input
@@ -432,22 +429,13 @@ export default function FlexTankPage() {
                   />
                 </FilterField>
                 <FilterField label="Cliente">
-                  <Select
-                    value={reportFilters.client_id || 'all'}
-                    onValueChange={(value) => setReportFilters(prev => ({ ...prev, client_id: value === 'all' ? '' : value }))}
-                  >
-                    <SelectTrigger className="h-9 text-sm" data-testid="report-filter-client">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os clientes</SelectItem>
-                      {clients.map(client => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <OptionAutocomplete
+                    value={reportFilters.client_id}
+                    onChange={(value) => setReportFilters(prev => ({ ...prev, client_id: value }))}
+                    options={clientOptions}
+                    className="text-sm"
+                    testId="report-filter-client"
+                  />
                 </FilterField>
                 <FilterField label="Tipo">
                   <Select

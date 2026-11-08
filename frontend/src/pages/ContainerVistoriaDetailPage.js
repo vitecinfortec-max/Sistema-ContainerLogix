@@ -17,6 +17,7 @@ import { PrintHeader, PrintSection, PrintFieldGrid, PrintText, PrintPhotoGrid, P
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Label } from '../components/ui/label';
 import { useModuleConfig } from '../context/ModuleConfigContext';
+import { apiErrorMessage } from '../lib/errors';
 
 const PHOTO_LABELS = VISTORIA_PHOTO_TYPES.reduce((acc, { value, label }) => {
   acc[value] = label;
@@ -74,7 +75,7 @@ export default function ContainerVistoriaDetailPage() {
       const response = await api.getContainerVistoria(id);
       setVistoria(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar vistoria');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar vistoria'));
       navigate('/container-vistorias');
     } finally {
       setLoading(false);
@@ -96,7 +97,7 @@ export default function ContainerVistoriaDetailPage() {
       toast.success('Foto enviada com sucesso!');
       loadVistoria();
     } catch (error) {
-      toast.error('Erro ao enviar foto');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar foto'));
     } finally {
       setUploading(false);
     }
@@ -108,7 +109,7 @@ export default function ContainerVistoriaDetailPage() {
       toast.success('Foto removida com sucesso!');
       loadVistoria();
     } catch (error) {
-      toast.error('Erro ao remover foto');
+      toast.error(apiErrorMessage(error, 'Erro ao remover foto'));
     }
   };
 
@@ -128,7 +129,7 @@ export default function ContainerVistoriaDetailPage() {
       await api.downloadFile(photoUrl, `${vistoria.container_number}_${label.replace(/\s+/g, '_')}`);
       toast.success('Download iniciado!');
     } catch (error) {
-      toast.error('Erro ao baixar foto');
+      toast.error(apiErrorMessage(error, 'Erro ao baixar foto'));
     }
   };
 

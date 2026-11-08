@@ -20,6 +20,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatPlate } from '../lib/masks';
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
+import { OptionAutocomplete } from '../components/Autocomplete';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -95,7 +97,7 @@ export default function YardControlPage() {
       setCompanies(companiesRes.data);
     } catch (error) {
       console.error('Erro ao carregar filtros:', error);
-      toast.error('Erro ao carregar filtros');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar filtros'));
     }
   };
 
@@ -135,7 +137,7 @@ export default function YardControlPage() {
       setByClient(response.data.by_client || []);
       setByShipping(response.data.by_shipping || []);
     } catch (error) {
-      toast.error('Erro ao carregar dados do pátio');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados do pátio'));
     } finally {
       setLoading(false);
     }
@@ -209,7 +211,7 @@ export default function YardControlPage() {
       link.remove();
       toast.success('Relatório baixado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao baixar relatório');
+      toast.error(apiErrorMessage(error, 'Erro ao baixar relatório'));
     }
   };
 
@@ -230,7 +232,7 @@ export default function YardControlPage() {
       link.remove();
       toast.success('Relatório baixado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao baixar relatório');
+      toast.error(apiErrorMessage(error, 'Erro ao baixar relatório'));
     }
   };
 
@@ -290,7 +292,7 @@ export default function YardControlPage() {
       });
       loadData(filters);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao registrar saída');
+      toast.error(apiErrorMessage(error, 'Erro ao registrar saída'));
     } finally {
       setSavingExit(false);
     }
@@ -620,18 +622,12 @@ export default function YardControlPage() {
 
               <div>
                 <Label className="mb-1.5 block">Motorista</Label>
-                <Select value={exitData.driver_id} onValueChange={handleDriverChange}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {drivers.map(driver => (
-                      <SelectItem key={driver.id} value={driver.id}>
-                        {driver.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionAutocomplete
+                  value={exitData.driver_id}
+                  onChange={handleDriverChange}
+                  options={drivers.map((driver) => [driver.id, driver.name])}
+                  testId="yard-exit-driver"
+                />
               </div>
 
               <div>

@@ -26,7 +26,6 @@ export function useNotifications() {
 
   const showNotification = useCallback(async (title, body, url = '/movements') => {
     if (!isSupported || permission !== 'granted') {
-      console.log('Notificações não permitidas');
       return false;
     }
 

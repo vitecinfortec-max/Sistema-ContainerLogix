@@ -26,6 +26,7 @@ import {
   checklistTypeForVehicle, countAnswers, photoSlotsFor, resultFromCounts,
 } from './checklistShared';
 import { formatPlate } from '../../lib/masks';
+import { apiErrorMessage } from '../../lib/errors';
 
 // Formulário do Checklist de Veículo (modelo atual), em quatro etapas: veículo,
 // itens de verificação, fotos guiadas pelo modelo 3D e conclusão. O resultado
@@ -166,7 +167,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
       setOpenSections(new Set([0]));
     } catch (error) {
       setSections([]);
-      toast.error('Erro ao carregar itens do checklist');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar itens do checklist'));
     } finally {
       setLoadingTemplate(false);
     }
@@ -389,7 +390,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
       serverChanged.current = true;
       setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
     } catch (error) {
-      toast.error('Erro ao remover foto');
+      toast.error(apiErrorMessage(error, 'Erro ao remover foto'));
     }
   };
 
@@ -474,7 +475,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
       serverChanged.current = false;
       onOpenChange(false);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar checklist');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar checklist'));
     } finally {
       setSaving('');
     }

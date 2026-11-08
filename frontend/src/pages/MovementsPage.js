@@ -31,6 +31,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { scrollBehavior } from '../lib/reducedMotion';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const ITEMS_PER_PAGE = 15;
 const STATUS_LABELS = { CHEIO: 'Cheio', VAZIO: 'Vazio' };
 const formatCount = (n) => n.toLocaleString('pt-BR');
@@ -118,7 +119,7 @@ export default function MovementsPage() {
       setStats(data.stats || EMPTY_STATS);
     } catch (error) {
       if (seq !== requestSeq.current) return;
-      toast.error(error.response?.data?.detail || 'Erro ao carregar registros');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar registros'));
     } finally {
       if (seq === requestSeq.current) {
         setFetching(false);
@@ -282,9 +283,9 @@ export default function MovementsPage() {
       loadMovements();
     } catch (error) {
       if (error.response?.status === 404) {
-        toast.error('Registro não encontrado');
+        toast.error(apiErrorMessage(error, 'Registro não encontrado'));
       } else {
-        toast.error(error.response?.data?.detail || 'Erro ao clonar registro');
+        toast.error(apiErrorMessage(error, 'Erro ao clonar registro'));
       }
     } finally {
       setCloneId(null);
@@ -303,7 +304,7 @@ export default function MovementsPage() {
       if (error.response?.status === 404) {
         toast.info('Registro já foi removido');
       } else {
-        toast.error(error.response?.data?.detail || 'Erro ao excluir registro');
+        toast.error(apiErrorMessage(error, 'Erro ao excluir registro'));
       }
     } finally {
       setDeleteId(null);
@@ -341,7 +342,7 @@ export default function MovementsPage() {
       toast.success('PDF gerado com sucesso!');
       setShowViaDialog(false);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     } finally {
       setIsDownloadingPdf(false);
     }

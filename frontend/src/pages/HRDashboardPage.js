@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import { StatCard, StatGrid, DataCard, EmptyState, StatusPill } from '../components/DataPage';
-import { BarsChart, CHART_COLORS, DonutChart } from '../components/Charts';
+import { BarsChart, CHART_COLORS, CHART_SERIES, DonutChart } from '../components/Charts';
 import { Button } from '../components/ui/button';
 import { api } from '../lib/api';
 import { competenceLabel, fmtDate, fmtMinutes, formatMoney } from '../components/HRKit';
@@ -11,8 +11,9 @@ import { toast } from 'sonner';
 import {
   Contact, Users, PauseCircle, Plane, Wallet, UserPlus, UserMinus, Hourglass, TreePalm, FileBadge, Cake, WalletCards,
 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
-const DONUT_COLORS = [CHART_COLORS.primary, CHART_COLORS.amber, CHART_COLORS.emerald, '#6366f1', '#ef4444', CHART_COLORS.slate];
+const DONUT_COLORS = [...CHART_SERIES.slice(0, 5), CHART_COLORS.slate];
 
 function AlertList({ title, icon: Icon, items, empty, render, onMore, testId }) {
   return (
@@ -32,7 +33,7 @@ export default function HRDashboardPage() {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    api.getHRDashboard().then((r) => setData(r.data)).catch(() => toast.error('Erro ao carregar o painel do RH'));
+    api.getHRDashboard().then((r) => setData(r.data)).catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar o painel do RH')));
   }, []);
 
   if (!data) {

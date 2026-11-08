@@ -3,6 +3,7 @@
 // próprio documento, todos dentro de uma pasta compactada (.zip).
 import { toast } from 'sonner';
 import { Zip, ZipPassThrough } from 'fflate';
+import { apiErrorMessage } from './errors';
 
 /** "Vistoria-TCLU7834740-4.pdf" - tipo do documento, container e número.
  *  Mesma regra de photo_document_filename em backend/reports.py. */
@@ -48,7 +49,7 @@ export async function downloadDocumentsInBatch(items) {
       toast.success(`${items[0].filename} salvo`, { id: toastId });
       return { saved: 1, failed: [] };
     } catch (error) {
-      toast.error('Erro ao gerar o PDF', { id: toastId });
+      toast.error(apiErrorMessage(error, 'Erro ao gerar o PDF'), { id: toastId });
       return { saved: 0, failed: [items[0].filename] };
     }
   }
@@ -92,7 +93,7 @@ export async function downloadDocumentsInBatch(items) {
     if (zipError) throw zipError;
     saveWithLink(new Blob(parts, { type: 'application/zip' }), zipName);
   } catch (error) {
-    toast.error('Erro ao montar o arquivo .zip', { id: toastId });
+    toast.error(apiErrorMessage(error, 'Erro ao montar o arquivo .zip'), { id: toastId });
     return { saved: 0, failed: items.map((item) => item.filename) };
   }
 

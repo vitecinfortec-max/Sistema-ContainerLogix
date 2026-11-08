@@ -13,8 +13,9 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Building2, Plus, Pencil, LayoutGrid, PauseCircle, PlayCircle, Save, Copy, Users, KeyRound, FolderInput } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
-const errorDetail = (e, fallback) => e?.response?.data?.detail || fallback;
+const errorDetail = apiErrorMessage;
 const slugify = (text) => (text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
 const fmtDateTime = (v) => { try { return v ? format(new Date(v), 'dd/MM/yyyy HH:mm') : '-'; } catch (e) { return '-'; } };

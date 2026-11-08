@@ -15,6 +15,7 @@ import { Wrench, Camera, Upload, X, Truck, Gauge, Users } from 'lucide-react';
 import { compressImage } from '../lib/imageCompression';
 import { dateInputToISO, toDateInput, todayISO } from '../lib/dates';
 import { formatPlate, plateKey } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const LIST_PATH = '/fleet?tab=revisions';
 
@@ -107,7 +108,7 @@ export default function VehicleRevisionFormPage() {
           observations: revision.observations || '',
         });
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Não foi possível carregar a revisão');
+        toast.error(apiErrorMessage(error, 'Não foi possível carregar a revisão'));
         backToList();
       } finally {
         setLoading(false);
@@ -182,13 +183,13 @@ export default function VehicleRevisionFormPage() {
         try {
           await api.uploadVehicleRevisionKmPhoto(response.data.id, kmPhoto.file);
         } catch (photoError) {
-          toast.error('Revisão registrada, mas houve erro ao enviar a foto do Km');
+          toast.error(apiErrorMessage(photoError, 'Revisão registrada, mas houve erro ao enviar a foto do Km'));
         }
       }
       toast.success(isEdit ? 'Revisão atualizada' : 'Revisão registrada');
       backToList();
     } catch (error) {
-      toast.error(error.response?.data?.detail || (isEdit ? 'Erro ao atualizar revisão' : 'Erro ao registrar revisão'));
+      toast.error(apiErrorMessage(error, isEdit ? 'Erro ao atualizar revisão' : 'Erro ao registrar revisão'));
     } finally {
       setSaving(false);
     }

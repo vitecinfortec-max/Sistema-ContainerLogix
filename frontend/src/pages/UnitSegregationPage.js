@@ -21,6 +21,7 @@ import { compressImage } from '../lib/imageCompression';
 import PhotoLightbox from '../components/checklist/PhotoLightbox';
 import { ContainerPhotos, photoSrc } from '../components/SegregationPhotos';
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 
 export default function UnitSegregationPage() {
   const { confirm, ConfirmDialog } = useConfirm();
@@ -69,7 +70,7 @@ export default function UnitSegregationPage() {
       setSegregations(response.data.items);
       setPagination(prev => ({ ...prev, pages: response.data.pages, total: response.data.total }));
     } catch (error) {
-      toast.error('Erro ao carregar segregações');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar segregações'));
     } finally {
       setLoading(false);
     }
@@ -89,7 +90,7 @@ export default function UnitSegregationPage() {
       syncSelected(response.data);
       toast.success('Foto anexada');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao enviar foto');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar foto'));
     } finally {
       setPhotoBusy(null);
     }
@@ -103,7 +104,7 @@ export default function UnitSegregationPage() {
       syncSelected(response.data);
       toast.success('Foto removida');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao remover foto');
+      toast.error(apiErrorMessage(error, 'Erro ao remover foto'));
     } finally {
       setPhotoBusy(null);
     }
@@ -126,7 +127,7 @@ export default function UnitSegregationPage() {
       });
       loadSegregations();
     } catch (error) {
-      toast.error('Erro ao excluir');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir'));
     }
   };
 
@@ -137,7 +138,7 @@ export default function UnitSegregationPage() {
       toast.success('Segregação liberada com sucesso!');
       loadSegregations();
     } catch (error) {
-      toast.error('Erro ao liberar');
+      toast.error(apiErrorMessage(error, 'Erro ao liberar'));
     }
   };
 
@@ -154,7 +155,7 @@ export default function UnitSegregationPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 
@@ -171,7 +172,7 @@ export default function UnitSegregationPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar etiqueta');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar etiqueta'));
     }
   };
 

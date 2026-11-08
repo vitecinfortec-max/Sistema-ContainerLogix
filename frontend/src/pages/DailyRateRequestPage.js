@@ -24,6 +24,7 @@ import { todayISO } from '../lib/dates';
 import PeriodReportDialog from '../components/PeriodReportDialog';
 import { FileBarChart } from 'lucide-react';
 import { formatPlate } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const brl = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -130,7 +131,7 @@ export default function DailyRateRequestPage() {
       setVehicles(vehiclesRes.data.items || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados'));
     }
   };
 
@@ -150,7 +151,7 @@ export default function DailyRateRequestPage() {
         total: response.data.total
       }));
     } catch (error) {
-      toast.error('Erro ao carregar solicitações de diária');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar solicitações de diária'));
     } finally {
       setLoading(false);
     }
@@ -279,7 +280,7 @@ export default function DailyRateRequestPage() {
       resetForm();
       loadRequests();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar solicitação');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar solicitação'));
     } finally {
       setSaving(false);
     }
@@ -298,7 +299,7 @@ export default function DailyRateRequestPage() {
       });
       loadRequests();
     } catch (error) {
-      toast.error('Erro ao excluir solicitação');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir solicitação'));
     }
   };
 
@@ -345,7 +346,7 @@ export default function DailyRateRequestPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 
@@ -366,7 +367,7 @@ export default function DailyRateRequestPage() {
       toast.success(paid ? `${name}: marcado como pago` : `${name}: voltou para pendente`);
       loadRequests();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar o pagamento');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar o pagamento'));
     } finally {
       setPayingItem(false);
     }

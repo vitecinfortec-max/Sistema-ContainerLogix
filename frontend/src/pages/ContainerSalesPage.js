@@ -22,6 +22,7 @@ import PeriodReportDialog from '../components/PeriodReportDialog';
 import { calendarDate } from '../lib/dates';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const STATUS_LABELS = { PENDENTE: 'Pendente', RECEBIDO: 'Recebido' };
 const STATUS_TONES = {
   PENDENTE: 'amber',
@@ -79,7 +80,7 @@ export default function ContainerSalesPage() {
       const r = await api.getContainerSales(params);
       setList(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar registros de venda');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar registros de venda'));
     } finally {
       setLoading(false);
     }
@@ -121,7 +122,7 @@ export default function ContainerSalesPage() {
       toast.success(status === 'RECEBIDO' ? 'Marcado como Recebido' : 'Marcado como Pendente');
       loadList();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao atualizar status');
+      toast.error(apiErrorMessage(e, 'Erro ao atualizar status'));
     }
   };
 
@@ -170,7 +171,7 @@ export default function ContainerSalesPage() {
       setDialogOpen(false);
       loadList();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar registro de venda');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar registro de venda'));
     } finally { setSaving(false); }
   };
 
@@ -190,7 +191,7 @@ export default function ContainerSalesPage() {
         });
         loadList();
       } catch (e) {
-        toast.error(e?.response?.data?.detail || 'Erro ao excluir registro de venda');
+        toast.error(apiErrorMessage(e, 'Erro ao excluir registro de venda'));
       }
     }
   };

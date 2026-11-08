@@ -33,8 +33,10 @@ import {
 } from '../components/DocumentImport';
 import { calendarDate, toDateInput, todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const VEHICLE_STATUS_LABELS = { ATIVO: 'Ativo', INATIVO: 'Inativo', MANUTENCAO: 'Manutenção' };
 // Mesma margem do backend (MAINTENANCE_ALERT_MARGIN_KM em routers/frota.py)
 const MAINTENANCE_MARGIN_KM = 1000;
@@ -279,7 +281,7 @@ export default function FleetPage() {
       setDrivers(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Erro ao carregar motoristas:', error);
-      toast.error('Erro ao carregar motoristas');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar motoristas'));
     }
   };
 
@@ -308,7 +310,7 @@ export default function FleetPage() {
         total: response.data.total
       }));
     } catch (error) {
-      toast.error('Erro ao carregar veículos');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar veículos'));
     } finally {
       setVehiclesLoading(false);
     }
@@ -441,7 +443,7 @@ export default function FleetPage() {
       loadVehicles();
       loadAllVehiclesForAutocomplete();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar veículo');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar veículo'));
     } finally {
       setVehicleSaving(false);
     }
@@ -462,7 +464,7 @@ export default function FleetPage() {
       loadVehicles();
       loadAllVehiclesForAutocomplete();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir veículo');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir veículo'));
     }
   };
 
@@ -517,7 +519,7 @@ export default function FleetPage() {
         total: response.data.total
       }));
     } catch (error) {
-      toast.error('Erro ao carregar revisões');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar revisões'));
     } finally {
       setLoading(false);
     }
@@ -547,7 +549,7 @@ export default function FleetPage() {
       });
       loadRevisions();
     } catch (error) {
-      toast.error('Erro ao excluir revisão');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir revisão'));
     }
   };
 
@@ -567,7 +569,7 @@ export default function FleetPage() {
       setRevisions(prev => prev.map(r => r.id === updated.id ? updated : r));
       toast.success('Foto do Km adicionada!');
     } catch (error) {
-      toast.error('Erro ao enviar foto do Km');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar foto do Km'));
     } finally {
       setUploadingDetailKmPhoto(false);
     }
@@ -582,7 +584,7 @@ export default function FleetPage() {
       setRevisions(prev => prev.map(r => r.id === updated.id ? updated : r));
       toast.success('Foto do Km removida!');
     } catch (error) {
-      toast.error('Erro ao remover foto do Km');
+      toast.error(apiErrorMessage(error, 'Erro ao remover foto do Km'));
     }
   };
 
@@ -618,7 +620,7 @@ export default function FleetPage() {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
-      toast.error('Erro ao gerar PDF: ' + (error.response?.data?.detail || error.message));
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 

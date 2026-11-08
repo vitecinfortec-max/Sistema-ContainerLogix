@@ -34,6 +34,7 @@ import {
   AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronUp, Clock, Copy, FileCheck, FileCode, FileCog, FileSearch, FileUp, Loader2, MapPin,
   PackageCheck, Pencil, Plus, Printer, RefreshCw, Save, Send, Trash2, Truck, X, XCircle,
 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const toNumber = (v) => {
@@ -533,7 +534,7 @@ export default function CtePage() {
       const r = await api.getCtes(search ? { search } : {});
       setList(r.data || []);
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao carregar os CT-e');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar os CT-e'));
     } finally {
       setLoading(false);
     }
@@ -596,7 +597,7 @@ export default function CtePage() {
       setOrderText('');
       openForm({ ...f, indicador_ie_tomador: indicadorIe(payerOf(f)) });
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao carregar a Ordem de Carregamento');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar a Ordem de Carregamento'));
     }
   };
 
@@ -659,7 +660,7 @@ export default function CtePage() {
       await loadList();
       return r.data;
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao salvar o CT-e');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar o CT-e'));
       return null;
     } finally {
       setSaving(false);
@@ -672,7 +673,7 @@ export default function CtePage() {
       const r = kind === 'pdf' ? await api.getCtePDF(doc.id) : await api.getCteXML(doc.id);
       downloadBlob(r.data, `CTe_${doc.numero}_${doc.chave || doc.id}.${kind}`);
     } catch (e) {
-      toast.error(kind === 'pdf' ? 'Erro ao baixar o DACTE' : 'Erro ao baixar o XML');
+      toast.error(apiErrorMessage(e, kind === 'pdf' ? 'Erro ao baixar o DACTE' : 'Erro ao baixar o XML'));
     } finally {
       setBusy('');
     }
@@ -687,7 +688,7 @@ export default function CtePage() {
       const r = await api.getCtePreviewPDF(target.id);
       downloadBlob(r.data, `Espelho_CTe_${target.numero || 'rascunho'}_SEM_VALOR_FISCAL.pdf`);
     } catch (e) {
-      toast.error('Erro ao gerar o espelho do CT-e');
+      toast.error(apiErrorMessage(e, 'Erro ao gerar o espelho do CT-e'));
     } finally {
       setBusy('');
     }
@@ -718,7 +719,7 @@ export default function CtePage() {
       notifyResult(result);
       return result;
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao transmitir o CT-e', { duration: 12000 });
+      toast.error(apiErrorMessage(e, 'Erro ao transmitir o CT-e'), { duration: 12000 });
       loadList();
       return null;
     } finally {
@@ -748,7 +749,7 @@ export default function CtePage() {
       setEmitted((prev) => (prev?.id === r.data.id ? r.data : prev));
       toast.success(`Situação: ${CTE_STATUS_LABELS[r.data.status] || r.data.status}`);
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao consultar a situação');
+      toast.error(apiErrorMessage(e, 'Erro ao consultar a situação'));
     } finally {
       setBusy('');
     }
@@ -763,7 +764,7 @@ export default function CtePage() {
       setJustificativa('');
       toast.success(r.data.status === 'CANCELADO' ? 'CT-e cancelado' : 'Cancelamento enviado, aguardando a Sefaz');
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao cancelar o CT-e');
+      toast.error(apiErrorMessage(e, 'Erro ao cancelar o CT-e'));
     } finally {
       setBusy('');
     }
@@ -778,7 +779,7 @@ export default function CtePage() {
       toast.success('CT-e excluído');
       loadList();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao excluir');
+      toast.error(apiErrorMessage(e, 'Erro ao excluir'));
     }
   };
 

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Boxes, PackageCheck, Wallet, AlertTriangle } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // Consulta de saldo (só leitura). O cadastro fica em Almoxarifado > Produto e
@@ -36,7 +37,7 @@ export default function StockPage() {
       const response = await api.getProducts();
       setItems(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar estoque');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar estoque'));
     } finally {
       setLoading(false);
     }

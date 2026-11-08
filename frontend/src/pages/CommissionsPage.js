@@ -23,6 +23,7 @@ import { useUrlState } from '../hooks/useUrlState';
 import {
   AlertTriangle, CheckCircle2, Clock, Edit, FileCheck, FileDown, HandCoins, Loader2, Percent, Plus, RotateCcw, Trash2, Truck, Users, Wallet, X,
 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtPct = (v) => `${Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
@@ -154,7 +155,7 @@ export default function CommissionsPage() {
       setAdvances(a.data || []);
       setSelectedIds((prev) => new Set([...prev].filter((id) => (r.data || []).some((e) => e.id === id))));
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao carregar as comissões');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar as comissões'));
     } finally {
       setLoading(false);
     }
@@ -247,7 +248,7 @@ export default function CommissionsPage() {
         setDialogOpen(false);
       }
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao salvar o lançamento');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar o lançamento'));
     } finally {
       setSaving(false);
     }
@@ -258,7 +259,7 @@ export default function CommissionsPage() {
     if (!deletable.length) { toast.info('Lançamentos pagos não podem ser excluídos (estorne antes)'); return; }
     if (!(await confirm(`Excluir ${deletable.length} lançamento(s) de comissão?`))) return;
     for (const e of deletable) {
-      try { await api.deleteCommissionEntry(e.id); } catch (err) { toast.error(err.response?.data?.detail || 'Erro ao excluir'); }
+      try { await api.deleteCommissionEntry(e.id); } catch (err) { toast.error(apiErrorMessage(err, 'Erro ao excluir')); }
     }
     setSelectedIds(new Set());
     loadList();
@@ -286,7 +287,7 @@ export default function CommissionsPage() {
       setPayAdvances(list);
       setPayAdvIds(new Set(list.map((a) => a.id)));
     } catch (e) {
-      toast.error('Erro ao buscar os adiantamentos do representante');
+      toast.error(apiErrorMessage(e, 'Erro ao buscar os adiantamentos do representante'));
     }
   };
   const pay = async () => {
@@ -300,7 +301,7 @@ export default function CommissionsPage() {
       setSelectedIds(new Set());
       loadList();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao registrar o pagamento');
+      toast.error(apiErrorMessage(e, 'Erro ao registrar o pagamento'));
     } finally {
       setBusy('');
     }
@@ -313,7 +314,7 @@ export default function CommissionsPage() {
         ? ` · ${r.data.advances_reverted} adiantamento(s) voltaram a ficar a descontar` : ''}`);
       loadList();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao estornar');
+      toast.error(apiErrorMessage(e, 'Erro ao estornar'));
     }
   };
 
@@ -326,7 +327,7 @@ export default function CommissionsPage() {
       setCandidates(r.data || []);
       setCteIds(new Set((r.data || []).filter((c) => c.client_id && c.representative_name).map((c) => c.cte_id)));
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao buscar os CT-es');
+      toast.error(apiErrorMessage(e, 'Erro ao buscar os CT-es'));
     } finally {
       setBusy('');
     }
@@ -340,7 +341,7 @@ export default function CommissionsPage() {
       setCteOpen(false);
       loadList();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao lançar as comissões');
+      toast.error(apiErrorMessage(e, 'Erro ao lançar as comissões'));
     } finally {
       setBusy('');
     }
@@ -352,7 +353,7 @@ export default function CommissionsPage() {
       const r = await api.downloadCommissionStatementPdf(params);
       downloadBlob(r.data, `Prestacao_Contas_Comissao_${period[0] || 'inicio'}_${period[1] || 'hoje'}.pdf`);
     } catch (e) {
-      toast.error('Erro ao gerar a prestação de contas');
+      toast.error(apiErrorMessage(e, 'Erro ao gerar a prestação de contas'));
     } finally {
       setBusy('');
     }
@@ -411,7 +412,7 @@ export default function CommissionsPage() {
       setBatchOpen(false);
       loadList();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao salvar o lançamento');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar o lançamento'));
     } finally {
       setBusy('');
     }
@@ -437,7 +438,7 @@ export default function CommissionsPage() {
       setAdvOpen(false);
       loadList();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao salvar o adiantamento');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar o adiantamento'));
     } finally {
       setBusy('');
     }
@@ -449,7 +450,7 @@ export default function CommissionsPage() {
       await api.deleteCommissionAdvance(a.id);
       loadList();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao excluir');
+      toast.error(apiErrorMessage(e, 'Erro ao excluir'));
     }
   };
 

@@ -25,6 +25,7 @@ import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
   ['DIESEL_S500', 'Diesel S500'],
@@ -110,7 +111,7 @@ export default function FuelSupplyOrderPage() {
       const r = await api.getFuelSupplyOrders(params);
       setList(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar ordens de abastecimento');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar ordens de abastecimento'));
     } finally {
       setLoading(false);
     }
@@ -155,7 +156,7 @@ export default function FuelSupplyOrderPage() {
       setNextNumber(d.order_number);
       setForm({ ...buildEmpty(), ...d });
       setDialogOpen(true);
-    } catch (e) { toast.error('Erro ao carregar ordem de abastecimento'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao carregar ordem de abastecimento')); }
   };
 
   const onChange = (field, val) => setForm((p) => ({ ...p, [field]: val }));
@@ -185,7 +186,7 @@ export default function FuelSupplyOrderPage() {
       setDialogOpen(false);
       loadList();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar ordem de abastecimento');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar ordem de abastecimento'));
     } finally { setSaving(false); }
   };
 
@@ -201,7 +202,7 @@ export default function FuelSupplyOrderPage() {
         return next;
       });
       loadList();
-    } catch (e) { toast.error('Erro ao excluir'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao excluir')); }
   };
 
   const toggleSelect = (id) => {
@@ -251,7 +252,7 @@ export default function FuelSupplyOrderPage() {
       link.click();
       link.remove();
       toast.success('PDF gerado!');
-    } catch (e) { toast.error('Erro ao gerar PDF'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao gerar PDF')); }
   };
 
   const singleSelectedOrder = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;
@@ -277,7 +278,7 @@ export default function FuelSupplyOrderPage() {
       link.remove();
       setTimeout(() => window.URL.revokeObjectURL(url), 10000);
       toast.success(selectedIds.size === 1 ? 'PDF gerado!' : `PDF com ${selectedIds.size} ordens gerado!`);
-    } catch (e) { toast.error('Erro ao gerar PDF'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao gerar PDF')); }
   };
   // Imprime direto: o PDF abre num quadro escondido e chama a impressão do
   // navegador; se o navegador não deixar, abre o PDF numa aba para imprimir
@@ -297,7 +298,7 @@ export default function FuelSupplyOrderPage() {
         setTimeout(() => { frame.remove(); window.URL.revokeObjectURL(url); }, 60000);
       };
       document.body.appendChild(frame);
-    } catch (e) { toast.error('Erro ao gerar PDF'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao gerar PDF')); }
   };
 
   return (

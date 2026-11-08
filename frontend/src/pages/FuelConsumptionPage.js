@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { TrendingUp, TrendingDown, Truck, Gauge, AlertTriangle, Target, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { apiErrorMessage } from '../lib/errors';
 
 const fmtKm = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR')} km`;
 const fmtAvg = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km/L`;
@@ -56,7 +57,7 @@ export default function FuelConsumptionPage() {
       const response = await api.getFuelConsumptionSummary();
       setSummary(response.data || []);
     } catch (error) {
-      toast.error('Erro ao carregar médias por veículo');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar médias por veículo'));
     } finally {
       setLoadingSummary(false);
     }
@@ -68,7 +69,7 @@ export default function FuelConsumptionPage() {
       const response = await api.getFuelConsumptionHistory(plate ? { vehicle_plate: plate } : {});
       setHistory(response.data || []);
     } catch (error) {
-      toast.error('Erro ao carregar histórico de cálculos');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar histórico de cálculos'));
     } finally {
       setLoadingHistory(false);
     }

@@ -21,8 +21,10 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { todayISO, calendarDate } from '../lib/dates';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const PAGE_SIZE = 15;
 
 const TYPES = {
@@ -40,7 +42,7 @@ const METHODS = {
 const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatDay = (value) => (value ? format(calendarDate(value), 'dd/MM/yyyy') : '-');
 const toCents = (value) => Math.round((Number(value) || 0) * 100);
-const errorText = (error, fallback) => error.response?.data?.detail || fallback;
+const errorText = apiErrorMessage;
 
 async function saveBlob(request, filename) {
   const response = await request();
@@ -680,10 +682,10 @@ export default function ClientCreditsPage() {
                   <PeriodFilterFields value={statement.period} onChange={(value) => loadStatement(statement.clientId, value)} testIdPrefix="statement" />
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => saveBlob(() => api.downloadClientCreditStatementExcel(statement.clientId, statementParams()), 'extrato_credito.xlsx').catch(() => toast.error('Erro ao gerar o arquivo'))}>
+                  <Button variant="outline" size="sm" onClick={() => saveBlob(() => api.downloadClientCreditStatementExcel(statement.clientId, statementParams()), 'extrato_credito.xlsx').catch((error) => toast.error(apiErrorMessage(error, 'Erro ao gerar o arquivo')))}>
                     <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Excel
                   </Button>
-                  <Button size="sm" onClick={() => saveBlob(() => api.downloadClientCreditStatementPdf(statement.clientId, statementParams()), 'extrato_credito.pdf').catch(() => toast.error('Erro ao gerar o arquivo'))}>
+                  <Button size="sm" onClick={() => saveBlob(() => api.downloadClientCreditStatementPdf(statement.clientId, statementParams()), 'extrato_credito.pdf').catch((error) => toast.error(apiErrorMessage(error, 'Erro ao gerar o arquivo')))}>
                     <Printer className="w-4 h-4 mr-1.5" /> PDF
                   </Button>
                 </div>

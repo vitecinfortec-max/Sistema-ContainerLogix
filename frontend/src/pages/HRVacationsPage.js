@@ -24,6 +24,7 @@ import { useUrlState } from '../hooks/useUrlState';
 import {
   TreePalm, CalendarPlus, Pencil, Trash2, CheckCircle2, RotateCcw, Ban, FileText, Receipt, Save, AlertTriangle, Clock, Users, Plane,
 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const STATUS_LABELS = { PROGRAMADA: 'Programada', PAGA: 'Paga', CANCELADA: 'Cancelada' };
 const STATUS_TONES = { PROGRAMADA: 'amber', PAGA: 'emerald', CANCELADA: 'red' };
@@ -63,7 +64,7 @@ export default function HRVacationsPage() {
   useEffect(() => { loadBalances(); }, []);
   useEffect(() => { setSelectedIds(new Set()); loadList(); }, [listKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadBalances = () => api.getVacationBalances().then((r) => setBalances(r.data || [])).catch(() => toast.error('Erro ao carregar os saldos'));
+  const loadBalances = () => api.getVacationBalances().then((r) => setBalances(r.data || [])).catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar os saldos')));
   const loadList = async () => {
     setLoading(true);
     try {
@@ -74,7 +75,7 @@ export default function HRVacationsPage() {
       if (dateTo) params.date_to = dateTo;
       setList((await api.getVacations(params)).data || []);
     } catch (e) {
-      toast.error('Erro ao carregar as férias');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar as férias'));
     } finally {
       setLoading(false);
     }

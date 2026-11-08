@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -98,7 +99,7 @@ export default function PortServicePage() {
       setVehicles(vehiclesRes.data.items || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados'));
     }
   };
 
@@ -117,7 +118,7 @@ export default function PortServicePage() {
         total: response.data.total
       }));
     } catch (error) {
-      toast.error('Erro ao carregar serviços portuários');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar serviços portuários'));
     } finally {
       setLoading(false);
     }
@@ -189,7 +190,7 @@ export default function PortServicePage() {
       resetForm();
       loadServices();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar Serviço Portuário');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar Serviço Portuário'));
     } finally {
       setSaving(false);
     }
@@ -208,7 +209,7 @@ export default function PortServicePage() {
       });
       loadServices();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir Serviço Portuário');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir Serviço Portuário'));
     }
   };
 
@@ -249,7 +250,7 @@ export default function PortServicePage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 

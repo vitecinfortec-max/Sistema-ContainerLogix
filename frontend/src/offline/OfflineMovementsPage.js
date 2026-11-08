@@ -13,6 +13,7 @@ import {
   offlineMovements, offlineDrivers, offlineTransportCompanies, offlineClients, offlineShippingLines,
 } from '../lib/offlineDb';
 import { formatPlate } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const SIZE_TYPES = ['20DC', '20RF', '20OT', '20FR', '40HC', '40RF', '40OT', '40FR', '40DRY'];
 
@@ -95,7 +96,7 @@ export default function OfflineMovementsPage() {
       load();
       toast.success('Registro salvo!');
     } catch (e) {
-      toast.error('Erro ao salvar registro');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar registro'));
     }
   };
 
@@ -105,7 +106,7 @@ export default function OfflineMovementsPage() {
       load();
       toast.success('Removida!');
     } catch (e) {
-      toast.error('Erro ao remover');
+      toast.error(apiErrorMessage(e, 'Erro ao remover'));
     }
   };
 

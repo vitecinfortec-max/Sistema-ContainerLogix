@@ -5,6 +5,7 @@ import { Button } from './ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { api } from '../lib/api';
 import { compressImage } from '../lib/imageCompression';
+import { apiErrorMessage } from '../lib/errors';
 
 // Importação de documento (CNH, RG/CIN, CRLV) nos cadastros: o servidor lê a
 // foto ou o PDF e devolve os campos, que vão para o formulário destacados
@@ -60,7 +61,7 @@ export function DocumentImportButton({ kinds, onRead, disabled }) {
       }
       onRead(data);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao ler o documento');
+      toast.error(apiErrorMessage(error, 'Erro ao ler o documento'));
     } finally {
       setLoading(false);
     }

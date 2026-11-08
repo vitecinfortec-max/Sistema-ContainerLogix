@@ -8,6 +8,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Edit, ListTree } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 export default function ServicePriceTablePage() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ export default function ServicePriceTablePage() {
       const response = await api.getClients();
       setClients(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      toast.error('Erro ao carregar clientes');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar clientes'));
     }
   };
 
@@ -40,7 +41,7 @@ export default function ServicePriceTablePage() {
       const response = await api.getServicePriceEntries();
       setAllEntries(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar resumo das tabelas cadastradas');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar resumo das tabelas cadastradas'));
     } finally {
       setLoadingSummary(false);
     }

@@ -9,6 +9,7 @@ import { Label } from '../components/ui/label';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Loader2, ListChecks } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 export default function NewContainerAuditPage() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ export default function NewContainerAuditPage() {
       const response = await api.getClients();
       setClients(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      toast.error('Erro ao carregar clientes');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar clientes'));
     }
   };
 
@@ -52,7 +53,7 @@ export default function NewContainerAuditPage() {
       toast.success(`Auditoria ${response.data.audit_code} iniciada`);
       navigate(`/container-audits/${response.data.id}`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao iniciar auditoria');
+      toast.error(apiErrorMessage(error, 'Erro ao iniciar auditoria'));
     } finally {
       setCreating(false);
     }

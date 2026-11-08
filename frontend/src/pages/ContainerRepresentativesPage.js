@@ -20,6 +20,7 @@ import { ptBR } from 'date-fns/locale';
 import { formatCNPJ, formatCPF, formatPhone } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const TIPO_OPTIONS = [
   ['PF', 'Pessoa Física'],
   ['PJ', 'Pessoa Jurídica'],
@@ -70,7 +71,7 @@ export default function ContainerRepresentativesPage() {
       const response = await api.getContainerRepresentatives();
       setRepresentatives(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar representantes');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar representantes'));
     } finally {
       setLoading(false);
     }
@@ -111,7 +112,7 @@ export default function ContainerRepresentativesPage() {
       setOpen(false);
       loadRepresentatives();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar representante');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar representante'));
     } finally {
       setSubmitting(false);
     }
@@ -130,7 +131,7 @@ export default function ContainerRepresentativesPage() {
         });
         loadRepresentatives();
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Erro ao excluir representante');
+        toast.error(apiErrorMessage(error, 'Erro ao excluir representante'));
       }
     }
   };

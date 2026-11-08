@@ -26,6 +26,7 @@ import { todayISO, calendarDate } from '../lib/dates';
 import { compressImage } from '../lib/imageCompression';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const PAGE_SIZE = 15;
 
 const STATUS = {
@@ -174,7 +175,7 @@ export default function CheckControlPage() {
       setPagination((prev) => ({ ...prev, pages: listRes.data.pages, total: listRes.data.total }));
       setSummary(summaryRes.data);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar cheques');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar cheques'));
     } finally {
       setLoading(false);
     }
@@ -327,7 +328,7 @@ export default function CheckControlPage() {
       setModalOpen(false);
       loadChecks();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar cheque');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar cheque'));
     } finally {
       setSaving(false);
     }
@@ -340,7 +341,7 @@ export default function CheckControlPage() {
       toast.success('Cheque excluído');
       loadChecks();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir cheque');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir cheque'));
     }
   };
 
@@ -360,7 +361,7 @@ export default function CheckControlPage() {
       setChecks((prev) => prev.map((c) => (c.id === response.data.id ? response.data : c)));
       toast.success(file ? 'Foto do cheque salva' : 'Foto do cheque removida');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar a foto do cheque');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar a foto do cheque'));
     } finally {
       setDetailPhotoBusy(null);
     }
@@ -431,7 +432,7 @@ export default function CheckControlPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar o relatório');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar o relatório'));
     }
   };
 

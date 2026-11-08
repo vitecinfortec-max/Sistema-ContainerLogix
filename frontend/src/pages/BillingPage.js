@@ -33,6 +33,7 @@ const isOverdue = (invoice) => (invoice.status || 'PENDENTE') === 'PENDENTE' && 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const ITEMS_PER_PAGE = 15;
 
 const INVOICE_STATUS_OPTIONS = [
@@ -159,7 +160,7 @@ export default function BillingPage() {
       setTotalInvoices(countRes.data.count);
       setStats(statsRes.data);
     } catch (error) {
-      toast.error('Erro ao carregar faturas');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar faturas'));
     } finally {
       setLoading(false);
     }
@@ -171,7 +172,7 @@ export default function BillingPage() {
       setClients(res.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      toast.error('Erro ao carregar clientes');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar clientes'));
     }
   };
 
@@ -184,7 +185,7 @@ export default function BillingPage() {
       const res = await api.getUnbilledMovements(params);
       setUnbilledMovements(res.data);
     } catch (error) {
-      toast.error('Erro ao carregar movimentações');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar movimentações'));
     } finally {
       setLoadingMovements(false);
     }
@@ -266,7 +267,7 @@ export default function BillingPage() {
       }
       setSearchQuery('');
     } catch (error) {
-      toast.error('Erro ao buscar movimentação');
+      toast.error(apiErrorMessage(error, 'Erro ao buscar movimentação'));
     }
   };
 
@@ -385,7 +386,7 @@ export default function BillingPage() {
       loadInvoices();
     } catch (error) {
       const message = error.response?.data?.detail || 'Erro ao gerar fatura';
-      toast.error(message);
+      toast.error(apiErrorMessage(error, message));
     } finally {
       setCreating(false);
     }
@@ -415,7 +416,7 @@ export default function BillingPage() {
       setEditMovements(movementsRes.data || []);
       setEditAvailableMovements(unbilledRes.data || []);
     } catch (error) {
-      toast.error('Erro ao carregar movimentações');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar movimentações'));
     } finally {
       setLoadingEditMovements(false);
     }
@@ -477,7 +478,7 @@ export default function BillingPage() {
         toast.warning('Movimentação não encontrada');
       }
     } catch (error) {
-      toast.error('Erro ao buscar movimentação');
+      toast.error(apiErrorMessage(error, 'Erro ao buscar movimentação'));
     }
     setEditSearchId('');
   };
@@ -506,7 +507,7 @@ export default function BillingPage() {
       loadInvoices();
     } catch (error) {
       const message = error.response?.data?.detail || 'Erro ao atualizar fatura';
-      toast.error(message);
+      toast.error(apiErrorMessage(error, message));
     } finally {
       setSaving(false);
     }
@@ -534,7 +535,7 @@ export default function BillingPage() {
       const res = await api.getInvoiceMovements(invoice.id);
       setInvoiceMovements(res.data);
     } catch (error) {
-      toast.error('Erro ao carregar detalhes da fatura');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar detalhes da fatura'));
     } finally {
       setLoadingDetails(false);
     }
@@ -561,7 +562,7 @@ export default function BillingPage() {
       setSelectedInvoice(prev => prev && prev.id === invoiceId ? { ...prev, status: newStatus, paid_date } : prev);
       loadInvoices();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar status');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar status'));
     }
   };
 
@@ -571,7 +572,7 @@ export default function BillingPage() {
       const res = await api.getInvoiceHistory(invoiceId);
       setInvoiceHistory(res.data);
     } catch (error) {
-      toast.error('Erro ao carregar histórico');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar histórico'));
     } finally {
       setLoadingHistory(false);
     }
@@ -659,7 +660,7 @@ export default function BillingPage() {
       document.body.removeChild(a);
       toast.success('PDF da fatura baixado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao baixar PDF da fatura');
+      toast.error(apiErrorMessage(error, 'Erro ao baixar PDF da fatura'));
     } finally {
       setDownloadingPdf(null);
     }
@@ -681,7 +682,7 @@ export default function BillingPage() {
       document.body.removeChild(a);
       toast.success('Recibo baixado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar o recibo da fatura');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar o recibo da fatura'));
     } finally {
       setDownloadingReceipt(null);
     }
@@ -702,7 +703,7 @@ export default function BillingPage() {
       document.body.removeChild(a);
       toast.success('Excel da fatura baixado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao baixar Excel da fatura');
+      toast.error(apiErrorMessage(error, 'Erro ao baixar Excel da fatura'));
     } finally {
       setDownloadingExcel(null);
     }
@@ -729,7 +730,7 @@ export default function BillingPage() {
       setInvoiceToDelete(null);
       loadInvoices();
     } catch (error) {
-      toast.error('Erro ao excluir fatura');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir fatura'));
     } finally {
       setDeleting(false);
     }

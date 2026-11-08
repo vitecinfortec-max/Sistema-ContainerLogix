@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Save, Loader2, Package } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { dateInputToISO, todayISO } from '../lib/dates';
+import { apiErrorMessage } from '../lib/errors';
 
 export default function NewFlexTankMovementPage() {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ export default function NewFlexTankMovementPage() {
       setClients(response.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      toast.error('Erro ao carregar clientes');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar clientes'));
     }
   };
 
@@ -111,7 +112,7 @@ export default function NewFlexTankMovementPage() {
       navigate('/flex-tank');
     } catch (error) {
       console.error('Erro ao criar movimentação:', error);
-      toast.error('Erro ao registrar movimentação');
+      toast.error(apiErrorMessage(error, 'Erro ao registrar movimentação'));
     } finally {
       setSaving(false);
     }

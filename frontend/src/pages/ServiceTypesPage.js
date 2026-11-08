@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 export default function ServiceTypesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [serviceTypes, setServiceTypes] = useState([]);
@@ -64,7 +65,7 @@ export default function ServiceTypesPage() {
         totalPages: response.data.total_pages
       }));
     } catch (error) {
-      toast.error('Erro ao carregar tipos de serviço');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar tipos de serviço'));
     } finally {
       setLoading(false);
     }
@@ -108,7 +109,7 @@ export default function ServiceTypesPage() {
       setOpen(false);
       loadServiceTypes();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar tipo de serviço');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar tipo de serviço'));
     } finally {
       setSubmitting(false);
     }
@@ -127,7 +128,7 @@ export default function ServiceTypesPage() {
         });
         loadServiceTypes();
       } catch (error) {
-        toast.error('Erro ao excluir tipo de serviço');
+        toast.error(apiErrorMessage(error, 'Erro ao excluir tipo de serviço'));
       }
     }
   };

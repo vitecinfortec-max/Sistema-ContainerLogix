@@ -119,6 +119,7 @@ export default function CommandPalette({ open, onOpenChange, items }) {
         className="top-[15%] translate-y-0 max-w-lg p-0 gap-0 overflow-hidden"
         onKeyDown={handleKeyDown}
         data-testid="command-palette"
+        data-unsaved-ignore
       >
         <DialogTitle className="sr-only">Busca global</DialogTitle>
         <div className="flex items-center gap-3 px-4 border-b border-slate-200 dark:border-slate-700">

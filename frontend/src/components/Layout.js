@@ -97,6 +97,7 @@ import { api } from '../lib/api';
 import CommandPalette from './CommandPalette';
 import { PageTransition } from './Motion';
 import { PageGuard } from './PageGuard';
+import { UnsavedChangesGuard } from './UnsavedChanges';
 
 // Intervalo de checagem do alerta de containers parados no pátio
 const YARD_ALERT_POLL_MS = 5 * 60 * 1000;
@@ -1446,6 +1447,7 @@ function LayoutFrame({ children }) {
           <PageTransition key={location.pathname} className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
             <PageGuard>{children}</PageGuard>
           </PageTransition>
+          <UnsavedChangesGuard />
         </main>
       </div>
 

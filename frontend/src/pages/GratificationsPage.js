@@ -27,6 +27,7 @@ import {
   Award, Plus, Pencil, Trash2, Save, CheckCircle2, RotateCcw, Ban, Receipt, Clock, ListChecks, Users,
   FileBarChart, Briefcase,
 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const TYPE_LABELS = { MOTORISTA: 'Motorista', FUNCIONARIO: 'Funcionário' };
 const STATUS_LABELS = { PENDENTE: 'Pendente', PAGO: 'Pago', CANCELADO: 'Cancelado' };
@@ -97,7 +98,7 @@ export default function GratificationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listKey]);
 
-  const loadRoles = () => api.getGratificationRoles().then((r) => setRoles(r.data || [])).catch(() => toast.error('Erro ao carregar as funções'));
+  const loadRoles = () => api.getGratificationRoles().then((r) => setRoles(r.data || [])).catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar as funções')));
 
   // Motoristas + Funcionários numa lista só
   const loadPeople = async () => {
@@ -123,7 +124,7 @@ export default function GratificationsPage() {
       const r = await api.getGratifications(params);
       setList(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar as gratificações');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar as gratificações'));
     } finally {
       setLoading(false);
     }
@@ -227,7 +228,7 @@ export default function GratificationsPage() {
       setDialogOpen(false);
       reload();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar a gratificação');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar a gratificação'));
     } finally {
       setSaving(false);
     }
@@ -241,7 +242,7 @@ export default function GratificationsPage() {
       toast.success('Gratificação excluída');
       reload();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao excluir');
+      toast.error(apiErrorMessage(e, 'Erro ao excluir'));
     }
   };
 
@@ -264,7 +265,7 @@ export default function GratificationsPage() {
       setPayOpen(false);
       reload();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao registrar o pagamento');
+      toast.error(apiErrorMessage(e, 'Erro ao registrar o pagamento'));
     } finally {
       setPaying(false);
     }
@@ -281,7 +282,7 @@ export default function GratificationsPage() {
       toast.success(status === 'PENDENTE' ? 'Pagamento estornado' : 'Gratificação cancelada');
       reload();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao atualizar a situação');
+      toast.error(apiErrorMessage(e, 'Erro ao atualizar a situação'));
     }
   };
 
@@ -312,7 +313,7 @@ export default function GratificationsPage() {
       loadRoles();
       toast.success(`Função ${name} cadastrada`);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao cadastrar a função');
+      toast.error(apiErrorMessage(e, 'Erro ao cadastrar a função'));
     } finally {
       setSavingRole(false);
     }
@@ -324,7 +325,7 @@ export default function GratificationsPage() {
       await api.deleteGratificationRole(role.id);
       loadRoles();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao excluir a função');
+      toast.error(apiErrorMessage(e, 'Erro ao excluir a função'));
     }
   };
 

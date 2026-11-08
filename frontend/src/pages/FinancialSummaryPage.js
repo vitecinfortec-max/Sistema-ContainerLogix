@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Scale, ArrowDownCircle, ArrowUpCircle, Wallet, Hourglass, Printer, FileSpreadsheet, Info } from 'lucide-react';
 import { todayISO } from '../lib/dates';
 import { cn } from '../lib/utils';
+import { apiErrorMessage } from '../lib/errors';
 
 const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -30,7 +31,7 @@ async function download(request, params, filename) {
     link.remove();
     window.URL.revokeObjectURL(url);
   } catch (error) {
-    toast.error('Erro ao gerar o arquivo');
+    toast.error(apiErrorMessage(error, 'Erro ao gerar o arquivo'));
   }
 }
 
@@ -71,7 +72,7 @@ export default function FinancialSummaryPage() {
     setLoading(true);
     api.getFinancialSummary({ date_from: dateFrom, date_to: dateTo })
       .then((res) => setData(res.data))
-      .catch((error) => toast.error(error.response?.data?.detail || 'Erro ao carregar o resumo'))
+      .catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar o resumo')))
       .finally(() => setLoading(false));
   }, [dateFrom, dateTo]);
 

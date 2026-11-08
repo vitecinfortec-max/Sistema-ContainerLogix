@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const STATUS_OPTIONS = [
   ['ATIVO', 'Ativo'],
   ['INATIVO', 'Inativo'],
@@ -56,7 +57,7 @@ export default function FreightRoutesPage() {
       const response = await api.getFreightRoutes();
       setRoutes(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar rotas');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar rotas'));
     } finally {
       setLoading(false);
     }
@@ -104,7 +105,7 @@ export default function FreightRoutesPage() {
       setOpen(false);
       loadRoutes();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar rota');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar rota'));
     } finally {
       setSubmitting(false);
     }
@@ -123,7 +124,7 @@ export default function FreightRoutesPage() {
         });
         loadRoutes();
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Erro ao excluir rota');
+        toast.error(apiErrorMessage(error, 'Erro ao excluir rota'));
       }
     }
   };

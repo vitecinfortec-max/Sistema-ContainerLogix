@@ -24,6 +24,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { scrollBehavior } from '../lib/reducedMotion';
 import { todayISO } from '../lib/dates';
+import { apiErrorMessage } from '../lib/errors';
 
 const fmtLiters = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L`;
 
@@ -165,7 +166,7 @@ export default function FuelTankLevelPage() {
       const response = await api.getTankLevel();
       setLevel(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar nível do tanque');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar nível do tanque'));
     } finally {
       setLoadingLevel(false);
     }
@@ -177,7 +178,7 @@ export default function FuelTankLevelPage() {
       const response = await api.getTankLedger();
       setLedger(response.data || []);
     } catch (error) {
-      toast.error('Erro ao carregar histórico do tanque');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar histórico do tanque'));
     } finally {
       setLoadingLedger(false);
     }
@@ -255,7 +256,7 @@ export default function FuelTankLevelPage() {
       loadLevel();
       loadLedger();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao registrar reabastecimento');
+      toast.error(apiErrorMessage(error, 'Erro ao registrar reabastecimento'));
     } finally {
       setSaving(false);
     }
@@ -271,7 +272,7 @@ export default function FuelTankLevelPage() {
       loadLevel();
       loadLedger();
     } catch (error) {
-      toast.error('Erro ao excluir reabastecimento');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir reabastecimento'));
     }
   };
 

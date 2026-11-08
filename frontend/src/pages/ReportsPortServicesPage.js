@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const TURNO_OPTIONS = [
   ['DIA', 'Dia'],
   ['NOITE', 'Noite'],
@@ -103,7 +104,7 @@ export default function ReportsPortServicesPage() {
       link.remove();
       toast.success('Relatório de Serviço Portuário PDF gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de serviço portuário PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de serviço portuário PDF'));
     } finally {
       setLoading(false);
     }
@@ -123,7 +124,7 @@ export default function ReportsPortServicesPage() {
       link.remove();
       toast.success('Relatório de Serviço Portuário Excel gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de serviço portuário Excel');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de serviço portuário Excel'));
     } finally {
       setLoading(false);
     }

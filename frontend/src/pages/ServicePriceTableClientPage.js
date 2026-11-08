@@ -11,6 +11,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { ArrowLeft, Plus, Trash2, Edit, Tags, FileDown } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const CURRENCY_OPTIONS = [['BRL', 'R$ - Real'], ['USD', '$ - Dólar']];
 const CURRENCY_SYMBOL = { BRL: 'R$', USD: '$' };
@@ -59,7 +60,7 @@ export default function ServicePriceTableClientPage() {
       setServiceTypes(Array.isArray(serviceTypesRes.data?.items) ? serviceTypesRes.data.items : []);
       setEntries(entriesRes.data);
     } catch (error) {
-      toast.error('Erro ao carregar tabela de serviços do cliente');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar tabela de serviços do cliente'));
     } finally {
       setLoading(false);
     }
@@ -70,7 +71,7 @@ export default function ServicePriceTableClientPage() {
       const response = await api.getServicePriceEntries({ client_id: clientId });
       setEntries(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar tabela de serviços do cliente');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar tabela de serviços do cliente'));
     }
   };
 
@@ -134,7 +135,7 @@ export default function ServicePriceTableClientPage() {
       resetEntryForm();
       loadEntries();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar preço de serviço');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar preço de serviço'));
     } finally {
       setSubmitting(false);
     }
@@ -147,7 +148,7 @@ export default function ServicePriceTableClientPage() {
       toast.success('Removido com sucesso');
       loadEntries();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao remover');
+      toast.error(apiErrorMessage(error, 'Erro ao remover'));
     }
   };
 
@@ -164,7 +165,7 @@ export default function ServicePriceTableClientPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     } finally {
       setDownloadingPdf(false);
     }

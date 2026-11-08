@@ -16,6 +16,7 @@ import { todayISO, calendarDate } from '../lib/dates';
 import { cn } from '../lib/utils';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatDay = (value) => (value ? format(calendarDate(value), 'dd/MM/yyyy') : '-');
 
@@ -45,7 +46,7 @@ async function download(request, params, filename) {
     link.remove();
     window.URL.revokeObjectURL(url);
   } catch (error) {
-    toast.error('Erro ao gerar o arquivo');
+    toast.error(apiErrorMessage(error, 'Erro ao gerar o arquivo'));
   }
 }
 
@@ -72,7 +73,7 @@ export default function ReceivablesPage() {
     setLoading(true);
     api.getReceivables(params())
       .then((res) => setData(res.data))
-      .catch((error) => toast.error(error.response?.data?.detail || 'Erro ao carregar Contas a Receber'))
+      .catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar Contas a Receber')))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, debouncedClient, dateField, dateFrom, dateTo]);

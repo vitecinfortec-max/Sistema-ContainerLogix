@@ -23,6 +23,7 @@ import { motion, Stagger, StaggerItem, AnimatedNumber, riseIn, staggerParent, EA
 import { DonutChart, Sparkline, CHART_COLORS, dailyChartData } from '../components/Charts';
 import Stage3D from '../components/three/Stage3D';
 import { yardScene, yardPlan } from '../components/three/yardScene';
+import { apiErrorMessage } from '../lib/errors';
 
 const RANK_STYLES = [
   { icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-500/10' },
@@ -176,7 +177,7 @@ export default function DashboardPage() {
       const response = await api.getDashboardStats();
       setStats(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar estatísticas');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar estatísticas'));
     } finally {
       setLoading(false);
     }
@@ -206,7 +207,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Erro ao carregar atalhos:', error);
-      toast.error('Erro ao carregar atalhos personalizados');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar atalhos personalizados'));
     }
   };
 
@@ -217,7 +218,7 @@ export default function DashboardPage() {
       setShowEditor(false);
       toast.success('Atalhos atualizados!');
     } catch (error) {
-      toast.error('Erro ao salvar atalhos');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar atalhos'));
     }
   };
 

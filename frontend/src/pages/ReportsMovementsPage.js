@@ -16,6 +16,7 @@ import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 import { toLocalDay } from '../lib/dates';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 function yesterdayISO() {
   const d = new Date();
   d.setDate(d.getDate() - 1);
@@ -87,7 +88,7 @@ export default function ReportsMovementsPage() {
       setClients(response.data);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      toast.error('Erro ao carregar clientes');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar clientes'));
     }
   };
 
@@ -152,7 +153,7 @@ export default function ReportsMovementsPage() {
         const response = await api.getMovementsReportPreview({ ...buildParams(), page: previewPage, per_page: PREVIEW_PAGE_SIZE });
         if (!cancelled) setPreview(response.data);
       } catch (error) {
-        if (!cancelled) toast.error(error.response?.data?.detail || 'Erro ao carregar a prévia do relatório');
+        if (!cancelled) toast.error(apiErrorMessage(error, 'Erro ao carregar a prévia do relatório'));
       } finally {
         if (!cancelled) setPreviewLoading(false);
       }
@@ -177,7 +178,7 @@ export default function ReportsMovementsPage() {
       link.remove();
       toast.success('Relatório PDF gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório PDF'));
     } finally {
       setLoading(false);
     }
@@ -198,7 +199,7 @@ export default function ReportsMovementsPage() {
       link.remove();
       toast.success('Relatório Excel gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório Excel');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório Excel'));
     } finally {
       setLoading(false);
     }
@@ -217,7 +218,7 @@ export default function ReportsMovementsPage() {
         toast.success(`Relatório enviado para ${sent.length} cliente(s)`);
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao enviar relatórios por e-mail');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar relatórios por e-mail'));
     } finally {
       setSendingEmails(false);
     }

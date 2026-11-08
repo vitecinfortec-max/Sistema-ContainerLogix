@@ -11,6 +11,7 @@ import { getTenantCode, setTenantCode } from '../lib/tenant';
 import LoginScene3D from '../components/LoginScene3D';
 import LoginNotices from '../components/LoginNotices';
 import { motion, riseIn, staggerParent } from '../components/Motion';
+import { apiErrorMessage } from '../lib/errors';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -91,7 +92,7 @@ export default function LoginPage() {
         navigate('/dashboard');
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao processar solicitação');
+      toast.error(apiErrorMessage(error, 'Erro ao processar solicitação'));
     } finally {
       setLoading(false);
     }

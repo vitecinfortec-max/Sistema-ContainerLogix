@@ -25,6 +25,7 @@ import {
 import { formatPlate } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const buildEmptyForm = () => {
   return Object.freeze({
     // Dados do Contrato
@@ -169,7 +170,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       setClients(r.data || []);
     } catch (e) {
       console.error('Erro ao carregar clientes:', e);
-      toast.error('Erro ao carregar clientes');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar clientes'));
     }
   };
 
@@ -179,7 +180,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       setCompanies(r.data || []);
     } catch (e) {
       console.error('Erro ao carregar transportadoras:', e);
-      toast.error('Erro ao carregar transportadoras');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar transportadoras'));
     }
   };
 
@@ -216,7 +217,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       if (usedIn?.length) toast.warning(`Já usado no(s) contrato(s) Nº ${usedIn.join(', ')}`);
       if (!draft.service_value) toast.info('O Frete não veio da origem: informe o valor do contrato');
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao puxar os dados');
+      toast.error(apiErrorMessage(e, 'Erro ao puxar os dados'));
     } finally {
       setImporting(false);
     }
@@ -312,7 +313,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       setDrivers(r.data || []);
     } catch (e) {
       console.error('Erro ao carregar motoristas:', e);
-      toast.error('Erro ao carregar motoristas');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar motoristas'));
     }
   };
 
@@ -387,7 +388,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       const r = await api.getRPATerceiros(params);
       setRpas(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar contratos');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar contratos'));
     } finally {
       setLoading(false);
     }
@@ -449,7 +450,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       loadSources();
       setDialogOpen(true);
     } catch (e) {
-      toast.error('Erro ao carregar contrato');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar contrato'));
     }
   };
 
@@ -574,7 +575,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       setDialogOpen(false);
       loadRpas();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar contrato');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar contrato'));
     } finally {
       setSaving(false);
     }
@@ -593,7 +594,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       });
       loadRpas();
     } catch (e) {
-      toast.error('Erro ao excluir');
+      toast.error(apiErrorMessage(e, 'Erro ao excluir'));
     }
   };
 
@@ -628,7 +629,7 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
       link.remove();
       toast.success('PDF gerado!');
     } catch (e) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(e, 'Erro ao gerar PDF'));
     }
   };
 

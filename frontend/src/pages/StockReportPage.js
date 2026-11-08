@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const MODELO_OPTIONS = [
   ['INVENTARIO', 'Inventário'],
   ['MOVIMENTACOES', 'Movimentações de Estoque'],
@@ -183,7 +184,7 @@ export default function StockReportPage() {
         if (seq === listSeq.current) setLedgerRows(r.data || []);
       }
     } catch (e) {
-      if (seq === listSeq.current) toast.error('Erro ao carregar a lista do relatório');
+      if (seq === listSeq.current) toast.error(apiErrorMessage(e, 'Erro ao carregar a lista do relatório'));
     } finally {
       if (seq === listSeq.current) setListLoading(false);
     }
@@ -229,7 +230,7 @@ export default function StockReportPage() {
       link.remove();
       toast.success('Relatório PDF gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório PDF'));
     } finally {
       setLoading(false);
     }
@@ -252,7 +253,7 @@ export default function StockReportPage() {
       link.remove();
       toast.success('Relatório Excel gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório Excel');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório Excel'));
     } finally {
       setLoading(false);
     }

@@ -26,6 +26,7 @@ import { todayISO } from '../lib/dates';
 import { activeRecords } from '../lib/cadastroStatus';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const OPERATION_LABELS = { ENTRADA: 'Entrada', SAIDA: 'Saída' };
@@ -81,7 +82,7 @@ export default function StockMovementsPage() {
       const r = await api.getStockMovements(params);
       setMovements(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar movimentações de estoque');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar movimentações de estoque'));
     } finally {
       setLoading(false);
     }
@@ -128,7 +129,7 @@ export default function StockMovementsPage() {
         items: d.items?.length ? d.items : [],
       });
       setDialogOpen(true);
-    } catch (e) { toast.error('Erro ao carregar movimentação'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao carregar movimentação')); }
   };
 
   const downloadPDF = async (id, num) => {
@@ -142,7 +143,7 @@ export default function StockMovementsPage() {
       link.click();
       link.remove();
       toast.success('PDF gerado!');
-    } catch (e) { toast.error('Erro ao gerar PDF'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao gerar PDF')); }
   };
 
   const toggleSelect = (id) => {
@@ -332,7 +333,7 @@ export default function StockMovementsPage() {
       loadMovements();
       loadProducts();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar movimentação');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar movimentação'));
     } finally { setSaving(false); }
   };
 
@@ -372,7 +373,7 @@ export default function StockMovementsPage() {
       loadMovements();
       loadProducts();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir a movimentação');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir a movimentação'));
     } finally {
       setDeleting(false);
     }

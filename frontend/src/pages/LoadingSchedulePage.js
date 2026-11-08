@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
 import { formatCPF, formatPlate } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 // Cliente para o qual exibimos o campo "Nº da Bolsa" (flexitank) na Programação
 // de Carregamento e no Status de Entrega
@@ -109,7 +110,7 @@ export default function LoadingSchedulePage() {
       setVehicles(vehiclesRes.data.items || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados'));
     }
   };
 
@@ -128,7 +129,7 @@ export default function LoadingSchedulePage() {
         total: response.data.total
       }));
     } catch (error) {
-      toast.error('Erro ao carregar programações');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar programações'));
     } finally {
       setLoading(false);
     }
@@ -157,7 +158,7 @@ export default function LoadingSchedulePage() {
       toast.success(cancelling ? 'Programação cancelada' : 'Programação reativada');
       loadSchedules();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao alterar o status');
+      toast.error(apiErrorMessage(error, 'Erro ao alterar o status'));
     }
   };
 
@@ -285,7 +286,7 @@ export default function LoadingSchedulePage() {
       resetForm();
       loadSchedules();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar programação');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar programação'));
     } finally {
       setSaving(false);
     }
@@ -304,7 +305,7 @@ export default function LoadingSchedulePage() {
       });
       loadSchedules();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir programação');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir programação'));
     }
   };
 
@@ -345,7 +346,7 @@ export default function LoadingSchedulePage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 

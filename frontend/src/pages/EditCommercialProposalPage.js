@@ -13,6 +13,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { ArrowLeft, Save, Plus, Trash2, Loader2, Download, FileText } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const CURRENCY_OPTIONS = [['BRL', 'R$ - Real'], ['USD', '$ - Dólar']];
 const CURRENCY_SYMBOL = { BRL: 'R$', USD: '$' };
@@ -54,7 +55,7 @@ export default function EditCommercialProposalPage() {
       setPaymentTermsText(p.payment_terms_text || '');
       setClients(Array.isArray(clientsRes.data) ? clientsRes.data : []);
     } catch (error) {
-      toast.error('Erro ao carregar proposta comercial');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar proposta comercial'));
     } finally {
       setLoading(false);
     }
@@ -95,7 +96,7 @@ export default function EditCommercialProposalPage() {
       toast.success('Proposta comercial atualizada com sucesso!');
       navigate('/comercial/proposta');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar proposta comercial');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar proposta comercial'));
     } finally {
       setSaving(false);
     }
@@ -114,7 +115,7 @@ export default function EditCommercialProposalPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     } finally {
       setDownloading(false);
     }

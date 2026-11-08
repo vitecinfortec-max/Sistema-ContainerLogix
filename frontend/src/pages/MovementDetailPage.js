@@ -17,6 +17,7 @@ import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings
 import {
   PRINT_COLORS, PrintHeader, PrintSection, PrintFieldGrid, PrintField, PrintSignatures, PrintClosing,
 } from '../components/PrintDocument';
+import { apiErrorMessage } from '../lib/errors';
 
 // Função para gerar código de barras como imagem base64
 function generateBarcodeImage(value) {
@@ -98,7 +99,7 @@ export default function MovementDetailPage() {
       const barcodeImg = generateBarcodeImage(barcodeValue);
       setBarcodeImage(barcodeImg);
     } catch (error) {
-      toast.error('Erro ao carregar registro');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar registro'));
       navigate('/movements');
     } finally {
       setLoading(false);

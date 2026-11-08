@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Building2, Upload, X, Save, AlertTriangle, Loader2, Palette } from 'lucide-react';
 import { formatCNPJ, formatPhone } from '../lib/masks';
 import { applyBrandAccent } from '../lib/brandTheme';
+import { apiErrorMessage } from '../lib/errors';
 
 const EMPTY_FORM = {
   name: '',
@@ -56,7 +57,7 @@ export default function CompanySettingsPage() {
         setLogoPreview(api.getFileUrl(`/api/uploads/${data.logo_filename}`));
       }
     } catch (error) {
-      toast.error('Erro ao carregar dados da empresa');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados da empresa'));
     } finally {
       setLoading(false);
     }
@@ -87,7 +88,7 @@ export default function CompanySettingsPage() {
       setFormData(prev => ({ ...prev, logo_filename: response.data.filename }));
       await loadSuggestion(response.data.filename);
     } catch (error) {
-      toast.error('Erro ao enviar logo');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar logo'));
     } finally {
       setUploadingLogo(false);
     }
@@ -120,7 +121,7 @@ export default function CompanySettingsPage() {
       applyBrandAccent(response.data.accent_color || null);
       toast.success('Dados da empresa salvos com sucesso');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar dados da empresa');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar dados da empresa'));
     } finally {
       setSaving(false);
     }

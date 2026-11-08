@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
   ['DIESEL_S500', 'Diesel S500'],
@@ -128,7 +129,7 @@ export default function ReportsFuelSupplyPage() {
       link.remove();
       toast.success('Relatório de Abastecimento PDF gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de abastecimento PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de abastecimento PDF'));
     } finally {
       setLoading(false);
     }
@@ -148,7 +149,7 @@ export default function ReportsFuelSupplyPage() {
       link.remove();
       toast.success('Relatório de Abastecimento Excel gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de abastecimento Excel');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de abastecimento Excel'));
     } finally {
       setLoading(false);
     }

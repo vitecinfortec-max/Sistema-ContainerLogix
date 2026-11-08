@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import axios from 'axios';
+import { apiErrorMessage } from '../lib/errors';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
@@ -24,7 +25,7 @@ export default function ForgotPasswordPage() {
       setSent(true);
       toast.success('Verifique seu e-mail para a senha provisória');
     } catch (error) {
-      toast.error('Erro ao processar solicitação');
+      toast.error(apiErrorMessage(error, 'Erro ao processar solicitação'));
     } finally {
       setLoading(false);
     }

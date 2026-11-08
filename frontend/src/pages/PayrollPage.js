@@ -22,6 +22,7 @@ import {
   WalletCards, Plus, Trash2, FolderOpen, Printer, RefreshCw, Lock, LockOpen, CheckCircle2, RotateCcw, Pencil, Save, Percent,
   Users, Banknote, Landmark, Receipt, ClipboardCheck, FileSpreadsheet, AlertTriangle,
 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const STATUS_LABELS = { ABERTA: 'Aberta', FECHADA: 'Fechada', PAGA: 'Paga' };
 const STATUS_TONES = { ABERTA: 'amber', FECHADA: 'blue', PAGA: 'emerald' };
@@ -58,7 +59,7 @@ function PayrollRunList({ onOpen, onSettings }) {
       setRuns((await api.getPayrollRuns(year ? { year } : {})).data || []);
       setSelectedId(null);
     } catch (e) {
-      toast.error('Erro ao carregar as folhas');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar as folhas'));
     } finally {
       setLoading(false);
     }

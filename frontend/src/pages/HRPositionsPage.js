@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { BriefcaseBusiness, Pencil, Plus, Save, Trash2 } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const EMPTY = { name: '', department: '', cbo: '', salary_min: '', salary_max: '', description: '', status: 'ATIVO' };
 
 export default function HRPositionsPage() {
@@ -48,7 +49,7 @@ export default function HRPositionsPage() {
       if (statusFilter) params.status = statusFilter;
       setList((await api.getHRPositions(params)).data || []);
     } catch (e) {
-      toast.error('Erro ao carregar os cargos');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar os cargos'));
     } finally {
       setLoading(false);
     }

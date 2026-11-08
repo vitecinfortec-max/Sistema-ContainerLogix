@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const STATUS_TONES = {
   EM_ANDAMENTO: 'amber',
   CONCLUIDA: 'emerald',
@@ -66,7 +67,7 @@ export default function ContainerAuditsPage() {
       setAudits(response.data.items);
       setPagination(prev => ({ ...prev, total: response.data.total, totalPages: response.data.total_pages }));
     } catch (error) {
-      toast.error('Erro ao carregar auditorias');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar auditorias'));
     } finally {
       setLoading(false);
     }
@@ -85,7 +86,7 @@ export default function ContainerAuditsPage() {
       });
       loadAudits();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir auditoria');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir auditoria'));
     }
   };
 

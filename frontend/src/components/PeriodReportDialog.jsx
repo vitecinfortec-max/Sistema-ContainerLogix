@@ -9,6 +9,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { todayISO } from '../lib/dates';
 import { toast } from 'sonner';
 import { FileSpreadsheet, Loader2, Printer } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 // Primeiro e último dia do mês corrente, 'YYYY-MM-DD'
 function currentMonth() {
@@ -70,7 +71,7 @@ export default function PeriodReportDialog({
     setSummary(null);
     load(params())
       .then((res) => { if (!cancelled) setSummary(summarize(res.data)); })
-      .catch((error) => { if (!cancelled) toast.error(error.response?.data?.detail || 'Erro ao carregar o relatório'); });
+      .catch((error) => { if (!cancelled) toast.error(apiErrorMessage(error, 'Erro ao carregar o relatório')); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, dateFrom, dateTo, status, debouncedTexts, flags, choices]);
@@ -81,7 +82,7 @@ export default function PeriodReportDialog({
       const ext = kind === 'pdf' ? 'pdf' : 'xlsx';
       await saveBlob(kind === 'pdf' ? downloadPdf : downloadExcel, params(), `${filename}_${dateFrom || 'inicio'}_${dateTo || 'hoje'}.${ext}`);
     } catch (error) {
-      toast.error('Erro ao gerar o arquivo');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar o arquivo'));
     } finally {
       setBusy('');
     }
@@ -89,7 +90,7 @@ export default function PeriodReportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl" data-unsaved-ignore>
         <DialogHeader>
           <DialogTitle className="text-base">{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}

@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { calendarDate } from '../lib/dates';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const PAGE_SIZE = 30;
 
 const ACTIONS = {
@@ -105,7 +106,7 @@ export default function AuditLogPage() {
         setEntries(res.data.items);
         setPagination((prev) => ({ ...prev, pages: res.data.pages, total: res.data.total }));
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Erro ao carregar o log');
+        toast.error(apiErrorMessage(error, 'Erro ao carregar o log'));
       } finally {
         setLoading(false);
       }
@@ -131,7 +132,7 @@ export default function AuditLogPage() {
       const res = await api.getAuditLogEntry(entry.id);
       setDetail(res.data);
     } catch (error) {
-      toast.error('Erro ao abrir o registro do log');
+      toast.error(apiErrorMessage(error, 'Erro ao abrir o registro do log'));
     }
   };
 
@@ -140,7 +141,7 @@ export default function AuditLogPage() {
       const res = await api.getRecordHistory(detail.doc_id);
       setRecordHistory(res.data);
     } catch (error) {
-      toast.error('Erro ao carregar o histórico do registro');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar o histórico do registro'));
     }
   };
 

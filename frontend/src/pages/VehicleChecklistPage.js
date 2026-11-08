@@ -34,6 +34,7 @@ import { ptBR } from 'date-fns/locale';
 import { formatCPF, formatPhone, formatPlate } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 // Toggle SIM/NÃO compacto por item
 function SimNaoToggle({ value, onChange, testId }) {
   return (
@@ -240,7 +241,7 @@ export default function VehicleChecklistPage() {
       setTemplate(templateRes.data.sections || []);
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados'));
     }
   };
 
@@ -264,7 +265,7 @@ export default function VehicleChecklistPage() {
       setPagination(prev => ({ ...prev, pages: response.data.pages, total: response.data.total }));
       setStats(statsResponse && typeof statsResponse.data?.total === 'number' ? statsResponse.data : null);
     } catch (error) {
-      if (seq === requestSeq.current) toast.error('Erro ao carregar checklists');
+      if (seq === requestSeq.current) toast.error(apiErrorMessage(error, 'Erro ao carregar checklists'));
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
@@ -350,7 +351,7 @@ export default function VehicleChecklistPage() {
       resetForm();
       loadChecklists();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar checklist');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar checklist'));
     } finally {
       setSaving(false);
     }
@@ -369,7 +370,7 @@ export default function VehicleChecklistPage() {
       });
       loadChecklists();
     } catch (error) {
-      toast.error('Erro ao excluir');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir'));
     }
   };
 
@@ -404,7 +405,7 @@ export default function VehicleChecklistPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 

@@ -20,6 +20,7 @@ import { WithQuickAdd } from '../components/QuickCreate';
 import ContainerValueFields from '../components/ContainerValueFields';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { formatCPF, formatPlate, plateKey } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 export default function EditMovementPage() {
   const { id } = useParams();
@@ -151,7 +152,7 @@ export default function EditMovementPage() {
       }
     } catch (error) {
       console.error('[EditMovementPage] Erro ao carregar registro:', error);
-      toast.error('Erro ao carregar registro');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar registro'));
       navigate('/movements');
     } finally {
       setLoadingData(false);
@@ -182,7 +183,7 @@ export default function EditMovementPage() {
       setTerminals(terminalsData);
     } catch (error) {
       console.error('[EditMovementPage] Erro ao carregar dados auxiliares:', error);
-      toast.error('Erro ao carregar dados auxiliares');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados auxiliares'));
     } finally {
       setLoadingAux(false);
     }
@@ -221,7 +222,7 @@ export default function EditMovementPage() {
       toast.success('Registro atualizado com sucesso!');
       navigate(`/movements/${id}`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar registro');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar registro'));
     } finally {
       setLoading(false);
     }

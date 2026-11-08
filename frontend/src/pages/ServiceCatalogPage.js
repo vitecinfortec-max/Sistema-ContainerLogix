@@ -18,6 +18,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, Edit, Wrench } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const UNIT_OPTIONS = [['HORAS', 'Horas'], ['QUANTIDADE', 'Quantidade'], ['OUTROS', 'Outros']];
 const STATUS_OPTIONS = [['true', 'Ativo'], ['false', 'Inativo']];
 
@@ -50,7 +51,7 @@ export default function ServiceCatalogPage() {
       const response = await api.getServiceCatalog();
       setItems(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar serviços');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar serviços'));
     } finally {
       setLoading(false);
     }
@@ -114,7 +115,7 @@ export default function ServiceCatalogPage() {
       setOpen(false);
       loadItems();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar serviço');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar serviço'));
     } finally {
       setSubmitting(false);
     }
@@ -132,7 +133,7 @@ export default function ServiceCatalogPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Erro ao excluir serviço');
+        toast.error(apiErrorMessage(error, 'Erro ao excluir serviço'));
       }
     }
   };

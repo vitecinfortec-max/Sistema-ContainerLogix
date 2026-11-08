@@ -13,6 +13,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { FileWarning, Plus, Trash2, X, ShieldCheck, Search, Loader2, Container, Wrench, Calculator } from 'lucide-react';
 import { SIZE_TYPES, formatMoney, estimateCode, vistoriaCode, toNumber } from '../lib/repairEstimates';
+import { apiErrorMessage } from '../lib/errors';
 
 const emptyItem = () => ({ description: '', quantity: 1, unit_price: '' });
 
@@ -120,7 +121,7 @@ export default function RepairEstimateFormPage() {
           setFormData(fillFromVistoria(emptyForm(), vistoria, prices));
         }
       } catch (error) {
-        toast.error(error.response?.data?.detail || (isEdit ? 'Não foi possível carregar o orçamento' : 'Não foi possível carregar a vistoria'));
+        toast.error(apiErrorMessage(error, isEdit ? 'Não foi possível carregar o orçamento' : 'Não foi possível carregar a vistoria'));
         if (isEdit) backToList();
       } finally {
         setLoading(false);
@@ -146,7 +147,7 @@ export default function RepairEstimateFormPage() {
         toast.success(`${vistoriaCode(vistoria.vistoria_number)}: ${vistoria.damage_items.length} serviço(s) incluído(s)`);
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Vistoria não encontrada');
+      toast.error(apiErrorMessage(error, 'Vistoria não encontrada'));
     } finally {
       setLookingUpVistoria(false);
     }
@@ -221,7 +222,7 @@ export default function RepairEstimateFormPage() {
       }
       backToList();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar orçamento');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar orçamento'));
     } finally {
       setSaving(false);
     }

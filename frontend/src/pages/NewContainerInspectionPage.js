@@ -19,6 +19,7 @@ import { Save, Camera, Upload, X, Loader2, Plus, ClipboardCheck } from 'lucide-r
 import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
+import { apiErrorMessage } from '../lib/errors';
 
 export const CONTAINER_INSPECTION_PHOTO_TYPES = [
   { value: 'front', label: 'Frente' },
@@ -79,7 +80,7 @@ export default function NewContainerInspectionPage() {
       setTerminals(activeRecords(terminalsRes.data));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados'));
     }
   };
 
@@ -187,7 +188,7 @@ export default function NewContainerInspectionPage() {
       navigate(`/container-inspections/${inspectionId}`);
     } catch (error) {
       console.error('Erro ao criar registro:', error);
-      toast.error('Erro ao criar registro');
+      toast.error(apiErrorMessage(error, 'Erro ao criar registro'));
     } finally {
       setSaving(false);
     }

@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { useModuleConfig } from '../context/ModuleConfigContext';
 import { Plus, Trash2, Edit, Warehouse, Package, Wrench } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 
@@ -107,7 +108,7 @@ export default function EstoqueCadastrosPage() {
       const response = await activeType.api.list();
       setItems(response.data);
     } catch (error) {
-      toast.error(`Erro ao carregar ${activeType.plural.toLowerCase()}`);
+      toast.error(apiErrorMessage(error, `Erro ao carregar ${activeType.plural.toLowerCase()}`));
     } finally {
       setLoading(false);
     }
@@ -146,7 +147,7 @@ export default function EstoqueCadastrosPage() {
       setOpen(false);
       loadItems();
     } catch (error) {
-      toast.error(error.response?.data?.detail || `Erro ao salvar ${activeType.label.toLowerCase()}`);
+      toast.error(apiErrorMessage(error, `Erro ao salvar ${activeType.label.toLowerCase()}`));
     } finally {
       setSubmitting(false);
     }
@@ -164,7 +165,7 @@ export default function EstoqueCadastrosPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || `Erro ao excluir ${activeType.label.toLowerCase()}`);
+        toast.error(apiErrorMessage(error, `Erro ao excluir ${activeType.label.toLowerCase()}`));
       }
     }
   };

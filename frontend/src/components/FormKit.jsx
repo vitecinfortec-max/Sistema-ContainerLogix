@@ -9,7 +9,7 @@ import { cn } from '../lib/utils';
 /** Seção do formulário: card com faixa de título e os campos dentro. */
 export function FormSection({ title, icon: Icon, actions, children, className, contentClassName, testId }) {
   return (
-    <Card className={cn('border border-slate-200 dark:border-slate-700 shadow-none', className)} data-testid={testId}>
+    <Card className={cn('border border-slate-200 dark:border-slate-700 shadow-none', className)} data-testid={testId} data-unsaved-guard>
       <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800 flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
           {Icon && <Icon className="w-4 h-4 text-primary" />}

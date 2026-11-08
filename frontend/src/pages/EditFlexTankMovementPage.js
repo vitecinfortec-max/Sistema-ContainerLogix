@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Save, Loader2, Package } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { dateInputToISO, toDateInput } from '../lib/dates';
+import { apiErrorMessage } from '../lib/errors';
 
 export default function EditFlexTankMovementPage() {
   const { id } = useParams();
@@ -75,7 +76,7 @@ export default function EditFlexTankMovementPage() {
       
       setClients(clientsRes.data);
     } catch (error) {
-      toast.error('Erro ao carregar movimentação');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar movimentação'));
       navigate('/flex-tank');
     } finally {
       setLoading(false);
@@ -137,7 +138,7 @@ export default function EditFlexTankMovementPage() {
       navigate(`/flex-tank/movements/${id}`);
     } catch (error) {
       console.error('Erro ao atualizar movimentação:', error);
-      toast.error('Erro ao atualizar movimentação');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar movimentação'));
     } finally {
       setSaving(false);
     }

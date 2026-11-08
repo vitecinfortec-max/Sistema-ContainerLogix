@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { Autocomplete } from './Autocomplete';
 import { api } from '../lib/api';
+import { apiErrorMessage } from '../lib/errors';
 
 // Peças comuns das telas do RH (Folha, Férias, Ocorrências, Banco de Horas,
 // Documentos...): formatação, rótulos e o seletor de contrato.
@@ -59,11 +60,7 @@ export async function saveBlob(request, filename) {
   }
 }
 
-export const errorDetail = (e, fallback) => {
-  const detail = e?.response?.data?.detail;
-  if (Array.isArray(detail)) return detail.map((d) => d.msg).join('; ');
-  return detail || fallback;
-};
+export const errorDetail = apiErrorMessage;
 
 /** Listas do RH (tipos de contrato, ocorrência, documento, eventos da folha...). */
 export function useHRMeta() {
@@ -71,7 +68,7 @@ export function useHRMeta() {
     contract_types: [], termination_types: [], notice_types: [], occurrence_types: [], document_types: [], run_types: [], events: [],
   });
   useEffect(() => {
-    api.getHRMeta().then((r) => setMeta(r.data)).catch(() => toast.error('Erro ao carregar as listas do RH'));
+    api.getHRMeta().then((r) => setMeta(r.data)).catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar as listas do RH')));
   }, []);
   const label = (list, value) => (meta[list] || []).find((o) => o.value === value)?.label || value || '-';
   return { meta, label };
@@ -82,7 +79,7 @@ export function useContracts(includeTerminated = false) {
   const [contracts, setContracts] = useState([]);
   const load = () => api.getHRContracts(includeTerminated ? {} : { status: 'VIGENTE' })
     .then((r) => setContracts(r.data || []))
-    .catch(() => toast.error('Erro ao carregar os contratos'));
+    .catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar os contratos')));
   useEffect(() => { load(); }, [includeTerminated]); // eslint-disable-line react-hooks/exhaustive-deps
   return { contracts, reload: load };
 }

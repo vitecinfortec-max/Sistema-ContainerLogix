@@ -29,6 +29,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
+import { apiErrorMessage } from '../lib/errors';
 
 function newItemId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -102,7 +103,7 @@ export default function ExpenseReportsPage() {
 
   useEffect(() => {
     loadSuppliers();
-    api.getExpenseGroups().then((r) => setGroups(r.data)).catch(() => toast.error('Erro ao carregar os grupos de custo'));
+    api.getExpenseGroups().then((r) => setGroups(r.data)).catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar os grupos de custo')));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -121,7 +122,7 @@ export default function ExpenseReportsPage() {
       setSuppliers(response.data);
     } catch (error) {
       console.error('Erro ao carregar fornecedores:', error);
-      toast.error('Erro ao carregar fornecedores');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar fornecedores'));
     }
   };
 
@@ -140,7 +141,7 @@ export default function ExpenseReportsPage() {
         total: response.data.total
       }));
     } catch (error) {
-      toast.error('Erro ao carregar prestações de contas');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar prestações de contas'));
     } finally {
       setLoading(false);
     }
@@ -266,7 +267,7 @@ export default function ExpenseReportsPage() {
       setFormData(prev => ({ ...prev, purchases: newPurchases }));
       toast.success('Recibo removido');
     } catch (error) {
-      toast.error('Erro ao remover recibo');
+      toast.error(apiErrorMessage(error, 'Erro ao remover recibo'));
     }
   };
 
@@ -351,7 +352,7 @@ export default function ExpenseReportsPage() {
       resetForm();
       loadReports();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar prestação de contas');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar prestação de contas'));
     } finally {
       setSaving(false);
     }
@@ -370,7 +371,7 @@ export default function ExpenseReportsPage() {
       });
       loadReports();
     } catch (error) {
-      toast.error('Erro ao excluir prestação de contas');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir prestação de contas'));
     }
   };
 
@@ -406,7 +407,7 @@ export default function ExpenseReportsPage() {
       toast.success('Prestação de contas concluída');
       loadReports();
     } catch (error) {
-      toast.error('Erro ao concluir prestação de contas');
+      toast.error(apiErrorMessage(error, 'Erro ao concluir prestação de contas'));
     }
   };
 
@@ -433,7 +434,7 @@ export default function ExpenseReportsPage() {
       if (selectedReport?.id === data.id) setSelectedReport(data);
       loadReports();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar o acerto');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar o acerto'));
     } finally {
       setSettling(false);
     }
@@ -445,7 +446,7 @@ export default function ExpenseReportsPage() {
       toast.success('Prestação de contas reaberta para edição');
       loadReports();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao reabrir prestação de contas');
+      toast.error(apiErrorMessage(error, 'Erro ao reabrir prestação de contas'));
     }
   };
 
@@ -461,7 +462,7 @@ export default function ExpenseReportsPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 

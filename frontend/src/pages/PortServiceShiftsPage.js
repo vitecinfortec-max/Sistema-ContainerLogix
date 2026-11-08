@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { FileText, FileSpreadsheet, Timer, Anchor, CheckCircle2, TrendingUp, TrendingDown, AlertTriangle, BadgeDollarSign } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const TURNO_OPTIONS = [
   ['DIA', 'Dia'],
   ['NOITE', 'Noite'],
@@ -114,7 +115,7 @@ export default function PortServiceShiftsPage() {
         setItems(r.data.items || []);
         setSummary(r.data.summary || EMPTY_SUMMARY);
       })
-      .catch((e) => { if (!cancelled) toast.error(e.response?.data?.detail || 'Erro ao carregar a conferência de turnos'); })
+      .catch((e) => { if (!cancelled) toast.error(apiErrorMessage(e, 'Erro ao carregar a conferência de turnos')); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,7 +141,7 @@ export default function PortServiceShiftsPage() {
       setTimeout(() => window.URL.revokeObjectURL(url), 10000);
       toast.success(`Conferência de Turnos ${kind === 'pdf' ? 'PDF' : 'Excel'} gerada!`);
     } catch (e) {
-      toast.error(`Erro ao gerar a conferência de turnos em ${kind === 'pdf' ? 'PDF' : 'Excel'}`);
+      toast.error(apiErrorMessage(e, `Erro ao gerar a conferência de turnos em ${kind === 'pdf' ? 'PDF' : 'Excel'}`));
     } finally {
       setDownloading(null);
     }

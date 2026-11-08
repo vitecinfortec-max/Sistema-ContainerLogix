@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const STATUS_OPTIONS = [
   ['ABERTO', 'Aberto'],
   ['ANDAMENTO', 'Em Andamento'],
@@ -125,7 +126,7 @@ export default function ReportsServiceOrdersPage() {
       link.remove();
       toast.success('Relatório de Serviços PDF gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de serviços PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de serviços PDF'));
     } finally {
       setLoading(false);
     }
@@ -145,7 +146,7 @@ export default function ReportsServiceOrdersPage() {
       link.remove();
       toast.success('Relatório de Serviços Excel gerado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao gerar relatório de serviços Excel');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar relatório de serviços Excel'));
     } finally {
       setLoading(false);
     }

@@ -24,6 +24,7 @@ import {
 import { format } from 'date-fns';
 import { useUrlState } from '../hooks/useUrlState';
 import { ESTIMATE_STATUS as STATUS, formatMoney, estimateCode, vistoriaCode, validUntil, isExpired } from '../lib/repairEstimates';
+import { apiErrorMessage } from '../lib/errors';
 
 const PAGE_SIZE = 15;
 
@@ -81,7 +82,7 @@ export default function RepairEstimatesPage() {
       setPagination((prev) => ({ ...prev, pages: listRes.data.pages, total: listRes.data.total }));
       setSummary(summaryRes.data);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar orçamentos');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar orçamentos'));
     } finally {
       setLoading(false);
     }
@@ -131,7 +132,7 @@ export default function RepairEstimatesPage() {
       toast.success('Orçamento excluído');
       loadEstimates();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir orçamento');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir orçamento'));
     }
   };
 
@@ -144,7 +145,7 @@ export default function RepairEstimatesPage() {
       toast.success(`Orçamento ${estimateCode(estimate.estimate_number)} ${successText}`);
       return true;
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar o orçamento');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar o orçamento'));
       return false;
     } finally {
       setUpdatingStatus(false);
@@ -188,7 +189,7 @@ export default function RepairEstimatesPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar o PDF do orçamento');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar o PDF do orçamento'));
     }
   };
 

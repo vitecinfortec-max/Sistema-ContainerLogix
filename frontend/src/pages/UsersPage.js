@@ -16,6 +16,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Users, ShieldCheck, User as UserIcon, UserX, UserPlus, Eye, EyeOff, Pencil, KeyRound } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { apiErrorMessage } from '../lib/errors';
 
 const ROLE_LABELS = {
   admin: 'Administrador',
@@ -51,7 +52,7 @@ export default function UsersPage() {
       const response = await api.getUsers();
       setUsers(response.data);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar usuários');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar usuários'));
     } finally {
       setLoading(false);
     }
@@ -81,7 +82,7 @@ export default function UsersPage() {
       setCreateOpen(false);
       toast.success(`Usuário "${response.data.name}" cadastrado`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao cadastrar usuário');
+      toast.error(apiErrorMessage(error, 'Erro ao cadastrar usuário'));
     } finally {
       setCreating(false);
     }
@@ -102,7 +103,7 @@ export default function UsersPage() {
       setUsers((prev) => prev.map((u) => (u.id === targetUser.id ? response.data : u)));
       toast.success('Nível de acesso atualizado');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar nível de acesso');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar nível de acesso'));
     } finally {
       setSavingId(null);
     }
@@ -122,7 +123,7 @@ export default function UsersPage() {
       setUsers((prev) => prev.map((u) => (u.id === targetUser.id ? response.data : u)));
       toast.success(active ? 'Acesso reativado' : 'Acesso desativado');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar status');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar status'));
     } finally {
       setSavingId(null);
     }
@@ -145,7 +146,7 @@ export default function UsersPage() {
       setEditing(null);
       toast.success('Usuário atualizado');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar usuário');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar usuário'));
     } finally {
       setSavingDialog(false);
     }
@@ -170,7 +171,7 @@ export default function UsersPage() {
       setResetting(null);
       toast.success('Senha redefinida. Passe a nova senha para a pessoa.');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao redefinir a senha');
+      toast.error(apiErrorMessage(error, 'Erro ao redefinir a senha'));
     } finally {
       setSavingDialog(false);
     }

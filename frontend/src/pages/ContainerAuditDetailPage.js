@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { apiErrorMessage } from '../lib/errors';
 
 const STATUS_STYLES = {
   PENDENTE: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
@@ -75,7 +76,7 @@ export default function ContainerAuditDetailPage() {
       const response = await api.getContainerAudit(id);
       applyAudit(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar auditoria');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar auditoria'));
     } finally {
       setLoading(false);
     }
@@ -105,7 +106,7 @@ export default function ContainerAuditDetailPage() {
       mergeAudit(response.data);
       return response.data;
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar container');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar container'));
       return null;
     } finally {
       setSavingContainer(null);
@@ -141,7 +142,7 @@ export default function ContainerAuditDetailPage() {
       mergeAudit(response.data);
       toast.success('Container removido');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao remover container');
+      toast.error(apiErrorMessage(error, 'Erro ao remover container'));
     } finally {
       setSavingContainer(null);
     }
@@ -168,7 +169,7 @@ export default function ContainerAuditDetailPage() {
       await loadAudit();
       toast.success('Foto anexada');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao enviar foto');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar foto'));
     } finally {
       setSavingContainer(null);
     }
@@ -182,7 +183,7 @@ export default function ContainerAuditDetailPage() {
       mergeAudit(response.data);
       toast.success('Foto removida');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao remover foto');
+      toast.error(apiErrorMessage(error, 'Erro ao remover foto'));
     } finally {
       setSavingContainer(null);
     }
@@ -246,7 +247,7 @@ export default function ContainerAuditDetailPage() {
       );
       setScan(null);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar a foto');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar a foto'));
     } finally {
       setScanSaving(false);
     }
@@ -264,7 +265,7 @@ export default function ContainerAuditDetailPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 
@@ -281,7 +282,7 @@ export default function ContainerAuditDetailPage() {
       toast.success('Auditoria concluída');
       await downloadPdf();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao concluir auditoria');
+      toast.error(apiErrorMessage(error, 'Erro ao concluir auditoria'));
     } finally {
       setCompleting(false);
     }

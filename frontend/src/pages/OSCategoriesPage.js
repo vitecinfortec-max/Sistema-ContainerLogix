@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 export default function OSCategoriesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [categories, setCategories] = useState([]);
@@ -39,7 +40,7 @@ export default function OSCategoriesPage() {
       const response = await api.getOSCategories();
       setCategories(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar categorias');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar categorias'));
     } finally {
       setLoading(false);
     }
@@ -80,7 +81,7 @@ export default function OSCategoriesPage() {
       setOpen(false);
       loadCategories();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar categoria');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar categoria'));
     } finally {
       setSubmitting(false);
     }
@@ -99,7 +100,7 @@ export default function OSCategoriesPage() {
         });
         loadCategories();
       } catch (error) {
-        toast.error('Erro ao excluir categoria');
+        toast.error(apiErrorMessage(error, 'Erro ao excluir categoria'));
       }
     }
   };

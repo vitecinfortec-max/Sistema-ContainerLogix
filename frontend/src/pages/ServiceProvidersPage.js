@@ -24,6 +24,8 @@ import {
 import { formatPhone } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
+import { OptionAutocomplete } from '../components/Autocomplete';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (v) => (v ? v.slice(0, 10).split('-').reverse().join('/') : '-');
 const fmtQty = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
@@ -124,7 +126,7 @@ export default function ServiceProvidersPage() {
       setEntries(e.data || []);
       setAdvances(a.data || []);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Erro ao carregar os prestadores de serviço');
+      toast.error(apiErrorMessage(err, 'Erro ao carregar os prestadores de serviço'));
     } finally {
       setLoading(false);
     }
@@ -161,7 +163,7 @@ export default function ServiceProvidersPage() {
       if (success) toast.success(success);
       return true;
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Não foi possível concluir');
+      toast.error(apiErrorMessage(err, 'Não foi possível concluir'));
       return false;
     } finally {
       setBusy('');
@@ -249,7 +251,7 @@ export default function ServiceProvidersPage() {
       setPendingAdvances(a.data || []);
       // Já marca os serviços até o fim do período e todos os vales pendentes
       setClosing((c) => ({ ...c, entry_ids: new Set(list.filter((x) => x.date <= c.period_end).map((x) => x.id)), advance_ids: new Set((a.data || []).map((x) => x.id)) }));
-    }).catch(() => toast.error('Erro ao buscar os serviços do prestador'));
+    }).catch((error) => toast.error(apiErrorMessage(error, 'Erro ao buscar os serviços do prestador')));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closingOpen, closing.provider_id]);
 
@@ -305,7 +307,7 @@ export default function ServiceProvidersPage() {
   };
 
   const showDetail = async (c) => {
-    try { setDetail((await api.getServiceProviderClosing(c.id)).data); } catch (err) { toast.error('Erro ao abrir o fechamento'); }
+    try { setDetail((await api.getServiceProviderClosing(c.id)).data); } catch (err) { toast.error(apiErrorMessage(err, 'Erro ao abrir o fechamento')); }
   };
   const pay = async () => {
     if (await run('pay', () => api.payServiceProviderClosing(selected.id, payForm), `Fechamento nº ${selected.number} pago`)) { setPayOpen(false); loadLists(); }
@@ -350,10 +352,7 @@ export default function ServiceProvidersPage() {
   };
 
   const providerSelect = (value, onChange, testId, list = activeProviders) => (
-    <Select value={value || undefined} onValueChange={onChange}>
-      <SelectTrigger data-testid={testId}><SelectValue placeholder="Escolha o prestador" /></SelectTrigger>
-      <SelectContent>{list.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} · {p.role}</SelectItem>)}</SelectContent>
-    </Select>
+    <OptionAutocomplete value={value} onChange={onChange} options={list.map((p) => [p.id, `${p.name} · ${p.role}`])} testId={testId} />
   );
   const rowProps = (x) => ({
     onClick: () => setSelectedId(x.id === selectedId ? null : x.id), 'data-selected': x.id === selectedId, className: 'cursor-pointer',
@@ -417,13 +416,7 @@ export default function ServiceProvidersPage() {
               <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="sp-search" />
             </FilterField>
             <FilterField label="Prestador">
-              <Select value={providerFilter || '_all'} onValueChange={(v) => setProviderFilter(v === '_all' ? '' : v)}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Todos</SelectItem>
-                  {providers.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <OptionAutocomplete value={providerFilter} onChange={setProviderFilter} options={providers.map((p) => [p.id, p.name])} className="text-sm" testId="sp-filter-provider" />
             </FilterField>
             <FilterField label="Situação do fechamento">
               <Select value={statusFilter || '_all'} onValueChange={(v) => setStatusFilter(v === '_all' ? '' : v)}>
@@ -765,13 +758,12 @@ export default function ServiceProvidersPage() {
               </div>
             </Field>
             <Field label="Prestador">
-              <Select value={confForm.provider_id || '_all'} onValueChange={(v) => setConfForm((f) => ({ ...f, provider_id: v === '_all' ? '' : v }))}>
-                <SelectTrigger data-testid="sp-conf-provider"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Todos os prestadores</SelectItem>
-                  {providers.map((p) => <SelectItem key={p.id} value={p.id}>{p.name} · {p.role}{p.status === 'INATIVO' ? ' (inativo)' : ''}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <OptionAutocomplete
+                value={confForm.provider_id}
+                onChange={(v) => setConfForm((f) => ({ ...f, provider_id: v }))}
+                options={providers.map((p) => [p.id, `${p.name} · ${p.role}${p.status === 'INATIVO' ? ' (inativo)' : ''}`])}
+                testId="sp-conf-provider"
+              />
             </Field>
             {!confForm.provider_id && (
               <Field label="Função">

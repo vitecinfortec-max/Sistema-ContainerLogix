@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, FileText, Printer, Clock, Wrench, Wallet } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const STATUS_TONES = {
   ABERTO: 'blue',
   ANDAMENTO: 'amber',
@@ -60,7 +61,7 @@ export default function OrdemServicoPage() {
       const r = await api.getOrdensServico(params);
       setList(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar Ordens de Serviço');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar Ordens de Serviço'));
     } finally {
       setLoading(false);
     }
@@ -78,7 +79,7 @@ export default function OrdemServicoPage() {
         return next;
       });
       loadList();
-    } catch (e) { toast.error('Erro ao excluir'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao excluir')); }
   };
 
   const toggleSelect = (id) => {
@@ -111,7 +112,7 @@ export default function OrdemServicoPage() {
       link.click();
       link.remove();
       toast.success('PDF gerado!');
-    } catch (e) { toast.error('Erro ao gerar PDF'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao gerar PDF')); }
   };
 
   const singleSelectedOS = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;

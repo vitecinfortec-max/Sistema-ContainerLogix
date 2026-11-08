@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { HandCoins, CheckCircle2, RotateCcw, Pencil, Download, FileText, FileSpreadsheet, Receipt, Clock, ListChecks, FileBarChart } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const STATUS_LABELS = { PENDENTE: 'Pendente', PAGO: 'Pago', CANCELADO: 'Cancelado' };
 const STATUS_TONES = {
   PENDENTE: 'amber',
@@ -84,7 +85,7 @@ export default function FreightPaymentsPage() {
       const r = await api.getFreightPayments(params);
       setList(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar pagamentos de frete');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar pagamentos de frete'));
     } finally {
       setLoading(false);
     }
@@ -96,7 +97,7 @@ export default function FreightPaymentsPage() {
       const r = await api.getFreightPaymentBatches();
       setBatches(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar ordens de pagamento');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar ordens de pagamento'));
     } finally {
       setLoadingBatches(false);
     }
@@ -163,7 +164,7 @@ export default function FreightPaymentsPage() {
       loadList();
       loadBatches(); // o lançamento sai da Ordem de Pagamento (recibo refeito)
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao atualizar status');
+      toast.error(apiErrorMessage(e, 'Erro ao atualizar status'));
     }
   };
 
@@ -177,7 +178,7 @@ export default function FreightPaymentsPage() {
       loadList();
       loadBatches();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao gerar Ordem de Pagamento');
+      toast.error(apiErrorMessage(e, 'Erro ao gerar Ordem de Pagamento'));
     } finally {
       setMarkingPaid(false);
     }
@@ -201,7 +202,7 @@ export default function FreightPaymentsPage() {
       setEditOpen(false);
       loadList();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao atualizar pagamento');
+      toast.error(apiErrorMessage(e, 'Erro ao atualizar pagamento'));
     } finally { setSaving(false); }
   };
 
@@ -222,7 +223,7 @@ export default function FreightPaymentsPage() {
       link.remove();
       toast.success('Relatório gerado!');
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao gerar relatório');
+      toast.error(apiErrorMessage(e, 'Erro ao gerar relatório'));
     } finally { setGenerating(false); }
   };
 
@@ -237,7 +238,7 @@ export default function FreightPaymentsPage() {
       link.click();
       link.remove();
     } catch (e) {
-      toast.error('Erro ao gerar recibo');
+      toast.error(apiErrorMessage(e, 'Erro ao gerar recibo'));
     }
   };
 

@@ -11,6 +11,7 @@ import { api } from '../lib/api';
 import { sanitizeKmInput } from '../lib/utils';
 import { toast } from 'sonner';
 import { Fuel, Settings } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const EMPTY_FORM = { capacity_liters: '', minimum_alert_liters: '', fuel_warehouse_id: '' };
 
@@ -35,7 +36,7 @@ export default function TankSettingsPage() {
       });
       setWarehouses(warehousesResponse.data || []);
     } catch (error) {
-      toast.error('Erro ao carregar configuração do tanque');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar configuração do tanque'));
     } finally {
       setLoading(false);
     }
@@ -62,7 +63,7 @@ export default function TankSettingsPage() {
       });
       toast.success('Configuração do tanque salva com sucesso');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar configuração do tanque');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar configuração do tanque'));
     } finally {
       setSaving(false);
     }

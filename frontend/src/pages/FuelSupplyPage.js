@@ -28,6 +28,7 @@ import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const SOURCE_OPTIONS = [
   ['POSTO_EXTERNO', 'Posto Externo'],
   ['TANQUE_PROPRIO', 'Tanque Próprio'],
@@ -142,7 +143,7 @@ export default function FuelSupplyPage() {
       setList(data.items || []);
       setListMeta({ total: data.total || 0, pages: data.pages || 1, total_liters: data.total_liters || 0, total_value: data.total_value || 0 });
     } catch (e) {
-      if (requestId === requestRef.current) toast.error('Erro ao carregar abastecimentos');
+      if (requestId === requestRef.current) toast.error(apiErrorMessage(e, 'Erro ao carregar abastecimentos'));
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
@@ -252,7 +253,7 @@ export default function FuelSupplyPage() {
       resetReceiptDraft();
       setForm({ ...buildEmpty(), ...d });
       setDialogOpen(true);
-    } catch (e) { toast.error('Erro ao carregar abastecimento'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao carregar abastecimento')); }
   };
 
   const onChange = (field, val) => setForm((p) => ({ ...p, [field]: val }));
@@ -329,7 +330,7 @@ export default function FuelSupplyPage() {
       loadList();
       loadFuelOrders();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar abastecimento');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar abastecimento'));
     } finally { setSaving(false); }
   };
 
@@ -346,7 +347,7 @@ export default function FuelSupplyPage() {
       });
       loadList();
       loadFuelOrders();
-    } catch (e) { toast.error('Erro ao excluir'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao excluir')); }
   };
 
   const toggleSelect = (id) => {

@@ -19,6 +19,7 @@ import { Save, Camera, Upload, X, Loader2, FileText, ShieldCheck } from 'lucide-
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
 import { formatCPF, formatPlate } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 export { formatCPF } from '../lib/masks';
 
 export const VISTORIA_PHOTO_TYPES = [
@@ -88,7 +89,7 @@ export default function NewContainerVistoriaPage() {
       setDrivers(activeRecords(driversRes.data));
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados'));
     }
   };
 
@@ -183,7 +184,7 @@ export default function NewContainerVistoriaPage() {
       navigate(generateEirRef.current ? `/movements/new?vistoria=${vistoriaId}` : `/container-vistorias/${vistoriaId}`);
     } catch (error) {
       console.error('Erro ao criar vistoria:', error);
-      toast.error('Erro ao criar vistoria');
+      toast.error(apiErrorMessage(error, 'Erro ao criar vistoria'));
     } finally {
       setSaving(false);
     }

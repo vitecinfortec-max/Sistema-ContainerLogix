@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { Plus, Trash2, Save, FileText, CalendarClock, Users, Gauge, AlignLeft, Package, Wrench } from 'lucide-react';
 import { nowLocalInput } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const LIST_PATH = '/fleet/ordem-servico';
 
@@ -91,8 +92,8 @@ export default function OrdemServicoFormPage() {
             services: d.services?.length ? d.services : [],
           });
         })
-        .catch(() => {
-          toast.error('Erro ao carregar OS');
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar OS'));
           backToList();
         })
         .finally(() => setLoading(false));
@@ -155,7 +156,7 @@ export default function OrdemServicoFormPage() {
       }
       backToList();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar'));
     } finally { setSaving(false); }
   };
 

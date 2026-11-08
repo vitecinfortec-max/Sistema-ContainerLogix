@@ -16,6 +16,7 @@ import { useCompanySettings, getCompanyLogoUrl } from '../lib/useCompanySettings
 import { PrintHeader, PrintSection, PrintFieldGrid, PrintText, PrintPhotoGrid, PrintClosing } from '../components/PrintDocument';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Label } from '../components/ui/label';
+import { apiErrorMessage } from '../lib/errors';
 
 const PHOTO_LABELS = CONTAINER_INSPECTION_PHOTO_TYPES.reduce((acc, { value, label }) => {
   acc[value] = label;
@@ -75,7 +76,7 @@ export default function ContainerInspectionDetailPage() {
       const response = await api.getContainerInspection(id);
       setInspection(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar registro');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar registro'));
       navigate('/container-inspections');
     } finally {
       setLoading(false);
@@ -97,7 +98,7 @@ export default function ContainerInspectionDetailPage() {
       toast.success('Foto enviada com sucesso!');
       loadInspection();
     } catch (error) {
-      toast.error('Erro ao enviar foto');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar foto'));
     } finally {
       setUploading(false);
     }
@@ -109,7 +110,7 @@ export default function ContainerInspectionDetailPage() {
       toast.success('Foto removida com sucesso!');
       loadInspection();
     } catch (error) {
-      toast.error('Erro ao remover foto');
+      toast.error(apiErrorMessage(error, 'Erro ao remover foto'));
     }
   };
 
@@ -129,7 +130,7 @@ export default function ContainerInspectionDetailPage() {
       await api.downloadFile(photoUrl, `${inspection.container_number}_${label.replace(/\s+/g, '_')}`);
       toast.success('Download iniciado!');
     } catch (error) {
-      toast.error('Erro ao baixar foto');
+      toast.error(apiErrorMessage(error, 'Erro ao baixar foto'));
     }
   };
 

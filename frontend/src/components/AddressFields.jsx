@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Search, Loader2 } from 'lucide-react';
 import { formatCEP } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const UF_OPTIONS = [
   ['AC', 'Acre'], ['AL', 'Alagoas'], ['AP', 'Amapá'], ['AM', 'Amazonas'], ['BA', 'Bahia'],
@@ -131,7 +132,7 @@ export function AddressFields({ value, onChange, international = false }) {
       });
       toast.success('Endereço preenchido a partir do CEP');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'CEP não encontrado');
+      toast.error(apiErrorMessage(error, 'CEP não encontrado'));
     } finally {
       setCepLoading(false);
     }

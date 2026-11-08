@@ -22,6 +22,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Plus, Trash2, Edit, Package, Scale } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const ORIGIN_OPTIONS = [['NACIONAL', 'Nacional'], ['IMPORTADO', 'Importado']];
 const STATUS_OPTIONS = [['ATIVO', 'Ativo'], ['INATIVO', 'Inativo']];
 
@@ -68,7 +69,7 @@ export default function ProductPage() {
       const response = await api.getProducts();
       setItems(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar produtos');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar produtos'));
     } finally {
       setLoading(false);
     }
@@ -164,7 +165,7 @@ export default function ProductPage() {
       setOpen(false);
       loadItems();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar produto');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar produto'));
     } finally {
       setSubmitting(false);
     }
@@ -182,7 +183,7 @@ export default function ProductPage() {
         });
         loadItems();
       } catch (error) {
-        toast.error(error.response?.data?.detail || 'Erro ao excluir produto');
+        toast.error(apiErrorMessage(error, 'Erro ao excluir produto'));
       }
     }
   };
@@ -214,7 +215,7 @@ export default function ProductPage() {
       setAdjusting(null);
       loadItems();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao ajustar o saldo');
+      toast.error(apiErrorMessage(error, 'Erro ao ajustar o saldo'));
     } finally {
       setSavingAdjust(false);
     }

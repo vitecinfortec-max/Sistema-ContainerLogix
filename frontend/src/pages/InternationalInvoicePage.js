@@ -24,6 +24,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const ITEMS_PER_PAGE = 15;
 
 const CURRENCIES = [
@@ -148,7 +149,7 @@ export default function InternationalInvoicePage() {
       setTotalInvoices(res.data.total || 0);
     } catch (error) {
       console.error('Erro ao carregar invoices:', error);
-      toast.error('Erro ao carregar invoices');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar invoices'));
     } finally {
       setLoading(false);
     }
@@ -160,7 +161,7 @@ export default function InternationalInvoicePage() {
       setClients(res.data || []);
     } catch (error) {
       console.error('Erro ao carregar clientes:', error);
-      toast.error('Erro ao carregar clientes');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar clientes'));
     }
   };
 
@@ -170,7 +171,7 @@ export default function InternationalInvoicePage() {
       setReceiverData(res.data);
     } catch (error) {
       console.error('Erro ao carregar dados do recebedor:', error);
-      toast.error('Erro ao carregar dados do recebedor');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados do recebedor'));
     }
   };
 
@@ -223,7 +224,7 @@ export default function InternationalInvoicePage() {
       toast.success(`Movimentação #${movement.transaction_id} adicionada`);
     } catch (error) {
       console.error('Erro ao buscar movimentação:', error);
-      toast.error(error.response?.data?.detail || 'Movimentação não encontrada');
+      toast.error(apiErrorMessage(error, 'Movimentação não encontrada'));
     } finally {
       setSearchingMovement(false);
     }
@@ -324,7 +325,7 @@ export default function InternationalInvoicePage() {
       loadInvoices();
     } catch (error) {
       console.error('Erro ao criar invoice:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao criar invoice');
+      toast.error(apiErrorMessage(error, 'Erro ao criar invoice'));
     } finally {
       setCreating(false);
     }
@@ -429,7 +430,7 @@ export default function InternationalInvoicePage() {
       toast.success(`Movimentação #${movement.transaction_id} adicionada`);
     } catch (error) {
       console.error('Erro ao buscar movimentação:', error);
-      toast.error(error.response?.data?.detail || 'Movimentação não encontrada');
+      toast.error(apiErrorMessage(error, 'Movimentação não encontrada'));
     } finally {
       setEditSearchingMovement(false);
     }
@@ -484,7 +485,7 @@ export default function InternationalInvoicePage() {
       loadInvoices();
     } catch (error) {
       console.error('Erro ao atualizar invoice:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar invoice');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar invoice'));
     } finally {
       setEditing(false);
     }
@@ -499,7 +500,7 @@ export default function InternationalInvoicePage() {
         setSelectedInvoice({ ...selectedInvoice, status: newStatus });
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar status');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar status'));
     }
   };
 
@@ -520,7 +521,7 @@ export default function InternationalInvoicePage() {
       toast.success('PDF baixado com sucesso!');
     } catch (error) {
       console.error('Erro ao baixar PDF:', error);
-      toast.error('Erro ao baixar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao baixar PDF'));
     } finally {
       setDownloadingPdf(null);
     }
@@ -542,7 +543,7 @@ export default function InternationalInvoicePage() {
       setInvoiceToDelete(null);
       loadInvoices();
     } catch (error) {
-      toast.error('Erro ao excluir invoice');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir invoice'));
     } finally {
       setDeleting(false);
     }

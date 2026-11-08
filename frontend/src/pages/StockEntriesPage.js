@@ -17,6 +17,7 @@ import { ptBR } from 'date-fns/locale';
 import { Upload, FileUp, ArrowLeft, Loader2, PackagePlus, Sparkles, Undo2, AlertTriangle } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDate = (v) => {
   if (!v) return '-';
@@ -56,7 +57,7 @@ export default function StockEntriesPage() {
       const r = await api.getStockEntries();
       setEntries(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar entradas de estoque');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar entradas de estoque'));
     } finally {
       setLoading(false);
     }
@@ -104,7 +105,7 @@ export default function StockEntriesPage() {
       });
       setStep('review');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao ler o arquivo XML');
+      toast.error(apiErrorMessage(error, 'Erro ao ler o arquivo XML'));
     } finally {
       setParsing(false);
     }
@@ -161,7 +162,7 @@ export default function StockEntriesPage() {
       loadEntries();
       loadProducts();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao confirmar importação');
+      toast.error(apiErrorMessage(error, 'Erro ao confirmar importação'));
     } finally {
       setConfirming(false);
     }
@@ -186,7 +187,7 @@ export default function StockEntriesPage() {
       loadEntries();
       loadProducts();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao estornar a importação');
+      toast.error(apiErrorMessage(error, 'Erro ao estornar a importação'));
     } finally {
       setReversing(false);
     }

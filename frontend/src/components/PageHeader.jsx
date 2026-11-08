@@ -2,6 +2,7 @@ import { Button } from './ui/button';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, HelpCircle, Plus, Settings, MoreVertical } from 'lucide-react';
 import { Reveal } from './Motion';
+import { confirmLeavePage } from './UnsavedChanges';
 
 function ToolbarIcon({ icon: Icon, onClick, title }) {
   return (
@@ -28,7 +29,11 @@ export default function PageHeader({ title, subtitle, icon: Icon, meta, actions,
             variant="ghost"
             size="icon"
             className="h-8 w-8 shrink-0 -mr-1 text-slate-500 dark:text-slate-400 hover:text-primary"
-            onClick={() => (typeof backTo === 'function' ? backTo() : navigate(backTo))}
+            onClick={() => confirmLeavePage().then((ok) => {
+              if (!ok) return;
+              if (typeof backTo === 'function') backTo();
+              else navigate(backTo);
+            })}
             title="Voltar"
             aria-label="Voltar"
             data-testid={backTestId}

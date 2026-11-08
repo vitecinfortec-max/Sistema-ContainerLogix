@@ -7,6 +7,7 @@ import {
 } from '../components/ui/dialog';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '../lib/errors';
 
 // Lista + formulário genéricos de CRUD local, usados pelas 4 abas de Cadastros
 // Básicos no app Android offline (Motoristas, Transportadoras, Clientes, Armadores).
@@ -60,7 +61,7 @@ export default function SimpleRegistryList({ api, fields, titleField = 'name', e
       load();
       toast.success('Salvo com sucesso!');
     } catch (e) {
-      toast.error('Erro ao salvar');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar'));
     }
   };
 
@@ -70,7 +71,7 @@ export default function SimpleRegistryList({ api, fields, titleField = 'name', e
       load();
       toast.success('Removido!');
     } catch (e) {
-      toast.error('Erro ao remover');
+      toast.error(apiErrorMessage(e, 'Erro ao remover'));
     }
   };
 

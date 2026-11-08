@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { Package, Plus, Trash2, Users, Container } from 'lucide-react';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
+import { apiErrorMessage } from '../lib/errors';
 
 const emptyItem = () => ({ container_number: '', tare: '', shipping_line: '', photos: [], staged: [] });
 
@@ -51,7 +52,7 @@ export default function UnitSegregationFormPage() {
         setClients(clientsRes.data || []);
         setShippingLines(shippingRes.data || []);
       })
-      .catch(() => toast.error('Erro ao carregar clientes e armadores'));
+      .catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar clientes e armadores')));
 
     if (!isEdit) return;
     api.getUnitSegregation(id)
@@ -78,7 +79,7 @@ export default function UnitSegregationFormPage() {
         });
       })
       .catch((error) => {
-        toast.error(error.response?.data?.detail || 'Não foi possível carregar a segregação');
+        toast.error(apiErrorMessage(error, 'Não foi possível carregar a segregação'));
         backToList();
       })
       .finally(() => setLoading(false));
@@ -169,7 +170,7 @@ export default function UnitSegregationFormPage() {
         items: prev.items.map((item, i) => (i === index ? { ...item, photos: item.photos.filter((p) => p.id !== photo.id) } : item)),
       }));
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao remover foto');
+      toast.error(apiErrorMessage(error, 'Erro ao remover foto'));
     }
   };
 
@@ -220,7 +221,7 @@ export default function UnitSegregationFormPage() {
       }
       backToList();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar'));
     } finally {
       setSaving(false);
     }

@@ -16,6 +16,7 @@ import { useUrlState } from '../hooks/useUrlState';
 import {
   FileText, FileSpreadsheet, Truck, TrendingUp, TrendingDown, Wallet, Percent, BarChart3, ArrowLeft,
 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 // Custo e Faturamento por Veículo: tudo vem de lançamentos já feitos em
 // outras telas (Serviço Portuário, Ordem de Carregamento, Abastecimento, OS,
@@ -118,7 +119,7 @@ export default function VehicleResultsPage() {
         const r = await api.getVehicleResults(buildParams());
         if (!cancelled) setData({ ...EMPTY, ...r.data });
       } catch (e) {
-        if (!cancelled) toast.error('Erro ao carregar custo e faturamento');
+        if (!cancelled) toast.error(apiErrorMessage(e, 'Erro ao carregar custo e faturamento'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -173,7 +174,7 @@ export default function VehicleResultsPage() {
       link.click();
       link.remove();
     } catch (e) {
-      toast.error(`Erro ao gerar o ${kind === 'pdf' ? 'PDF' : 'Excel'}`);
+      toast.error(apiErrorMessage(e, `Erro ao gerar o ${kind === 'pdf' ? 'PDF' : 'Excel'}`));
     } finally {
       setDownloading(false);
     }

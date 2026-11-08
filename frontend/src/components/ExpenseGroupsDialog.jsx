@@ -7,8 +7,9 @@ import { useConfirm } from '../hooks/useConfirm';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Save, X, Power } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
-const errorDetail = (e, fallback) => e?.response?.data?.detail || fallback;
+const errorDetail = apiErrorMessage;
 
 // Cadastro dos grupos de custo da Prestação de Contas (Combustível,
 // Alimentação...). Grupo usado em compras não é excluído: fica Inativo e
@@ -26,7 +27,7 @@ export default function ExpenseGroupsDialog({ open, onOpenChange, onChanged }) {
       setGroups(r.data);
       onChanged?.(r.data);
     } catch (e) {
-      toast.error('Erro ao carregar os grupos');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar os grupos'));
     }
   };
   useEffect(() => { if (open) load(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps

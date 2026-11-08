@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { MessageSquareWarning, Plus, Pencil, Trash2, Save, FileSignature, Paperclip, X, Stethoscope, Ban, ShieldAlert } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const TONES = {
   ADVERTENCIA: 'amber', SUSPENSAO: 'red', ATESTADO: 'blue', FALTA_JUSTIFICADA: 'slate', FALTA_INJUSTIFICADA: 'red',
   AFASTAMENTO_INSS: 'amber', ACIDENTE_TRABALHO: 'red', LICENCA_MATERNIDADE: 'blue', LICENCA_PATERNIDADE: 'blue', ELOGIO: 'emerald', OUTRO: 'slate',
@@ -61,7 +62,7 @@ export default function HROccurrencesPage() {
       if (dateTo) params.date_to = dateTo;
       setList((await api.getHROccurrences(params)).data || []);
     } catch (e) {
-      toast.error('Erro ao carregar as ocorrências');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar as ocorrências'));
     } finally {
       setLoading(false);
     }

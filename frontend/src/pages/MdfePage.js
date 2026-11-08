@@ -30,6 +30,7 @@ import {
   AlertTriangle, Ban, CheckCircle2, Clock, FileCheck, FileCode, FileCog, Flag, Loader2, Pencil, Plus, Printer, RefreshCw, Save,
   Send, Trash2, Truck, UserPlus, X, XCircle,
 } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const toNumber = (v) => {
@@ -428,7 +429,7 @@ export default function MdfePage() {
     setSearchParams({}, { replace: true });
     api.getMdfeDraftFromCtes(ids)
       .then((r) => openForm(fromDraft(r.data)))
-      .catch((e) => toast.error(e.response?.data?.detail || 'Erro ao montar o MDF-e a partir dos CT-es'));
+      .catch((e) => toast.error(apiErrorMessage(e, 'Erro ao montar o MDF-e a partir dos CT-es')));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings, registryReady]);
 
@@ -445,7 +446,7 @@ export default function MdfePage() {
       const r = await api.getMdfes(search ? { search } : {});
       setList(r.data || []);
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao carregar os MDF-e');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar os MDF-e'));
     } finally {
       setLoading(false);
     }
@@ -567,7 +568,7 @@ export default function MdfePage() {
         };
       });
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao montar o MDF-e a partir dos CT-es');
+      toast.error(apiErrorMessage(e, 'Erro ao montar o MDF-e a partir dos CT-es'));
     } finally {
       setBusy('');
     }
@@ -584,7 +585,7 @@ export default function MdfePage() {
       await loadList();
       return r.data;
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao salvar o MDF-e');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar o MDF-e'));
       return null;
     } finally {
       setSaving(false);
@@ -597,7 +598,7 @@ export default function MdfePage() {
       const r = kind === 'pdf' ? await api.getMdfePDF(doc.id) : await api.getMdfeXML(doc.id);
       downloadBlob(r.data, `MDFe_${doc.numero}_${doc.chave || doc.id}.${kind}`);
     } catch (e) {
-      toast.error(kind === 'pdf' ? 'Erro ao baixar o DAMDFE' : 'Erro ao baixar o XML');
+      toast.error(apiErrorMessage(e, kind === 'pdf' ? 'Erro ao baixar o DAMDFE' : 'Erro ao baixar o XML'));
     } finally {
       setBusy('');
     }
@@ -624,7 +625,7 @@ export default function MdfePage() {
       }
       return result;
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao transmitir o MDF-e', { duration: 12000 });
+      toast.error(apiErrorMessage(e, 'Erro ao transmitir o MDF-e'), { duration: 12000 });
       loadList();
       return null;
     } finally {
@@ -654,7 +655,7 @@ export default function MdfePage() {
       toast.success(typeof success === 'function' ? success(r.data) : success);
       return true;
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao falar com o emissor fiscal', { duration: 10000 });
+      toast.error(apiErrorMessage(e, 'Erro ao falar com o emissor fiscal'), { duration: 10000 });
       return false;
     } finally {
       setBusy('');
@@ -669,7 +670,7 @@ export default function MdfePage() {
       toast.success('MDF-e excluído');
       loadList();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao excluir');
+      toast.error(apiErrorMessage(e, 'Erro ao excluir'));
     }
   };
 

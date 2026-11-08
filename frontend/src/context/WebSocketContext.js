@@ -75,7 +75,6 @@ export function WebSocketProvider({ children }) {
   const startPolling = useCallback(() => {
     if (pollingInterval.current) return;
 
-    console.log('Iniciando polling como fallback...');
     usePolling.current = true;
     setIsConnected(true);
 
@@ -138,7 +137,6 @@ export function WebSocketProvider({ children }) {
       const connectionTimeout = setTimeout(() => {
         if (stopped.current || ws.current !== socket) return;
         if (socket.readyState !== WebSocket.OPEN) {
-          console.log('WebSocket timeout - usando polling');
           socket.close();
           startPolling();
         }
@@ -147,7 +145,6 @@ export function WebSocketProvider({ children }) {
       socket.onopen = () => {
         clearTimeout(connectionTimeout);
         if (stopped.current || ws.current !== socket) return;
-        console.log('WebSocket conectado');
         setIsConnected(true);
         usePolling.current = false;
 
@@ -179,7 +176,6 @@ export function WebSocketProvider({ children }) {
         clearTimeout(connectionTimeout);
         // Conexão antiga (já substituída) ou encerrada pelo próprio app.
         if (stopped.current || ws.current !== socket) return;
-        console.log('WebSocket desconectado');
         clearInterval(pingInterval.current);
 
         // 1008: o servidor recusou a sessão (token expirado, conta desativada
@@ -196,7 +192,6 @@ export function WebSocketProvider({ children }) {
 
         if (!usePolling.current) {
           reconnectTimeout.current = setTimeout(() => {
-            console.log('Tentando reconectar WebSocket...');
             connect();
           }, 3000);
         }

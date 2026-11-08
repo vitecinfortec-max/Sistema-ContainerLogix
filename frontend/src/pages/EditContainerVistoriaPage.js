@@ -20,6 +20,7 @@ import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
 import { VISTORIA_PHOTO_TYPES, MAX_VISTORIA_PHOTOS, formatCPF } from './NewContainerVistoriaPage';
 import { formatPlate } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const PHOTO_LABELS = VISTORIA_PHOTO_TYPES.reduce((acc, { value, label }) => {
   acc[value] = label;
@@ -104,7 +105,7 @@ export default function EditContainerVistoriaPage() {
       setRepairServices(serviceTypesRes.data?.items || []);
       setDrivers(Array.isArray(driversRes.data) ? driversRes.data : []);
     } catch (error) {
-      toast.error('Erro ao carregar vistoria');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar vistoria'));
       navigate('/container-vistorias');
     } finally {
       setLoading(false);
@@ -149,7 +150,7 @@ export default function EditContainerVistoriaPage() {
       setPhotos(prev => [...prev, response.data]);
       toast.success('Foto adicionada!');
     } catch (error) {
-      toast.error('Erro ao enviar foto');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar foto'));
     } finally {
       setUploadingPhoto(false);
     }
@@ -161,7 +162,7 @@ export default function EditContainerVistoriaPage() {
       setPhotos(prev => prev.filter(p => p.id !== photoId));
       toast.success('Foto removida!');
     } catch (error) {
-      toast.error('Erro ao remover foto');
+      toast.error(apiErrorMessage(error, 'Erro ao remover foto'));
     }
   };
 
@@ -210,7 +211,7 @@ export default function EditContainerVistoriaPage() {
       navigate(`/container-vistorias/${id}`);
     } catch (error) {
       console.error('Erro ao atualizar vistoria:', error);
-      toast.error('Erro ao atualizar vistoria');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar vistoria'));
     } finally {
       setSaving(false);
     }

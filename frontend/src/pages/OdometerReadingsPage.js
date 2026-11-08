@@ -24,6 +24,7 @@ import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const fmtKm = (v) => v === null || v === undefined ? '-' : `${Number(v).toLocaleString('pt-BR')} km`;
 
 const fmtDate = (d) => {
@@ -111,7 +112,7 @@ export default function OdometerReadingsPage() {
         (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3) || (a.km_remaining ?? 0) - (b.km_remaining ?? 0));
       setMaintenanceStatus(list);
     } catch (error) {
-      toast.error('Erro ao carregar situação de manutenção');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar situação de manutenção'));
     } finally {
       setLoadingStatus(false);
     }
@@ -126,7 +127,7 @@ export default function OdometerReadingsPage() {
       setReadings(response.data.items);
       setPagination(prev => ({ ...prev, pages: response.data.pages, total: response.data.total }));
     } catch (error) {
-      toast.error('Erro ao carregar lançamentos de hodômetro');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar lançamentos de hodômetro'));
     } finally {
       setLoading(false);
     }
@@ -185,7 +186,7 @@ export default function OdometerReadingsPage() {
       loadReadings();
       loadMaintenanceStatus();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar lançamento');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar lançamento'));
     } finally {
       setSaving(false);
     }
@@ -202,7 +203,7 @@ export default function OdometerReadingsPage() {
       loadReadings();
       loadMaintenanceStatus();
     } catch (error) {
-      toast.error('Erro ao excluir lançamento');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir lançamento'));
     }
   };
 

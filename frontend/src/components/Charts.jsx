@@ -21,6 +21,12 @@ export const CHART_COLORS = {
   slate: '#94a3b8',
 };
 
+/** Cores das fatias/séries por categoria (rosca, barras empilhadas), na ordem. */
+export const CHART_SERIES = [
+  CHART_COLORS.primary, CHART_COLORS.amber, CHART_COLORS.emerald,
+  '#0891b2', '#e11d48', '#ea580c', '#65a30d', '#0d9488', CHART_COLORS.slate,
+];
+
 export const fmtChartInt = (v) => Number(v || 0).toLocaleString('pt-BR');
 
 const compactFormat = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });

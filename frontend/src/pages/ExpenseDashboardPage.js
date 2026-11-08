@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import { StatCard, StatGrid, DataCard, EmptyState, FilterCard, FilterField, PeriodFilterFields, StatusPill } from '../components/DataPage';
-import { BarsChart, CHART_COLORS, DonutChart } from '../components/Charts';
+import { BarsChart, CHART_COLORS, CHART_SERIES, DonutChart } from '../components/Charts';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import ExpenseGroupsDialog from '../components/ExpenseGroupsDialog';
@@ -10,9 +10,11 @@ import { api } from '../lib/api';
 import { todayISO } from '../lib/dates';
 import { toast } from 'sonner';
 import { PieChart, Wallet, Receipt, Layers, AlertTriangle, FileText, FileSpreadsheet, Tags, TrendingUp, TrendingDown } from 'lucide-react';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
-const COLORS = [CHART_COLORS.primary, CHART_COLORS.amber, CHART_COLORS.emerald, '#6366f1', '#ef4444', '#06b6d4', '#a855f7', '#84cc16', CHART_COLORS.slate];
+import { apiErrorMessage } from '../lib/errors';
+const COLORS = CHART_SERIES;
 const brl = (v) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtDay = (v) => (v ? v.slice(0, 10).split('-').reverse().join('/') : '-');
 const fmtMonth = (v) => `${v.slice(5, 7)}/${v.slice(0, 4)}`;
@@ -36,7 +38,7 @@ async function saveFile(request, filename) {
     a.remove();
     window.URL.revokeObjectURL(url);
   } catch (e) {
-    toast.error('Erro ao gerar o relatório');
+    toast.error(apiErrorMessage(e, 'Erro ao gerar o relatório'));
   }
 }
 
@@ -63,7 +65,7 @@ export default function ExpenseDashboardPage() {
       const r = await api.getExpenseDashboard(params);
       setData(r.data);
     } catch (e) {
-      toast.error('Erro ao carregar o dashboard');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar o dashboard'));
     } finally {
       setLoading(false);
     }

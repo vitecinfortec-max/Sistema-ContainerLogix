@@ -16,6 +16,7 @@ import { Autocomplete } from '../components/Autocomplete';
 import { Anchor, Search, Eye, FileText, FileSpreadsheet, Pencil, Printer, X, Check, Receipt } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { apiErrorMessage } from '../lib/errors';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -98,7 +99,7 @@ export default function PortServiceBillingPage() {
       setBatches(response.data.items);
       setPagination(prev => ({ ...prev, pages: response.data.pages, total: response.data.total }));
     } catch (error) {
-      toast.error('Erro ao carregar faturas de Serviço Portuário');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar faturas de Serviço Portuário'));
     } finally {
       setLoadingBatches(false);
     }
@@ -118,7 +119,7 @@ export default function PortServiceBillingPage() {
       setCandidates(response.data || []);
       setSelectedIds(new Set());
     } catch (error) {
-      toast.error('Erro ao buscar Serviços Portuários');
+      toast.error(apiErrorMessage(error, 'Erro ao buscar Serviços Portuários'));
     } finally {
       setSearching(false);
     }
@@ -171,7 +172,7 @@ export default function PortServiceBillingPage() {
       setPagination(prev => ({ ...prev, page: 1 }));
       loadBatches();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao gerar fatura');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar fatura'));
     } finally {
       setGenerating(false);
     }
@@ -213,7 +214,7 @@ export default function PortServiceBillingPage() {
       const response = await api.getPortServiceBillingBatchServices(batch.id);
       setBatchServices(response.data || []);
     } catch (error) {
-      toast.error('Erro ao carregar serviços da fatura');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar serviços da fatura'));
     } finally {
       setLoadingBatchServices(false);
     }
@@ -237,7 +238,7 @@ export default function PortServiceBillingPage() {
       setBatches(prev => prev.map(b => b.id === selectedBatch.id ? response.data : b));
       setEditMode(false);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar fatura');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar fatura'));
     } finally {
       setSavingEdit(false);
     }
@@ -254,7 +255,7 @@ export default function PortServiceBillingPage() {
       setSelectedBatch(prev => ({ ...prev, status: newStatus }));
       setBatches(prev => prev.map(b => b.id === selectedBatch.id ? { ...b, status: newStatus } : b));
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar status');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar status'));
     } finally {
       setUpdatingStatus(false);
     }
@@ -272,7 +273,7 @@ export default function PortServiceBillingPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar PDF');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar PDF'));
     }
   };
 
@@ -288,7 +289,7 @@ export default function PortServiceBillingPage() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      toast.error('Erro ao gerar Excel');
+      toast.error(apiErrorMessage(error, 'Erro ao gerar Excel'));
     }
   };
 

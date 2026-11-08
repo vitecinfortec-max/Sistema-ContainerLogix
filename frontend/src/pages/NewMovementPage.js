@@ -24,6 +24,7 @@ import { formatContainerNumber } from '../lib/containerNumber';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatCPF, formatPlate, plateKey } from '../lib/masks';
+import { apiErrorMessage } from '../lib/errors';
 
 const AUTO_SAVE_KEY = 'containerlogix_movement_draft';
 
@@ -177,7 +178,7 @@ export default function NewMovementPage() {
     } catch (error) {
       console.error('[NewMovementPage] ERRO ao carregar dados:', error);
       console.error('[NewMovementPage] Detalhes:', error.response?.data || error.message);
-      toast.error('Erro ao carregar dados. Por favor, recarregue a página.');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar dados. Por favor, recarregue a página.'));
     } finally {
       setLoadingData(false);
     }
@@ -218,7 +219,7 @@ export default function NewMovementPage() {
       checkContainerDuplicate(vistoria.container_number, 'ENTRADA');
       toast.success(`Dados da vistoria ${code} preenchidos. Confira e informe o Status.`);
     } catch (error) {
-      toast.error('Não foi possível carregar os dados da vistoria');
+      toast.error(apiErrorMessage(error, 'Não foi possível carregar os dados da vistoria'));
     }
   };
 
@@ -280,7 +281,7 @@ export default function NewMovementPage() {
       // Redireciona para a página de detalhes com parâmetro para abrir impressão automaticamente
       navigate(`/movements/${response.data.id}?autoprint=true`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao cadastrar registro');
+      toast.error(apiErrorMessage(error, 'Erro ao cadastrar registro'));
     } finally {
       setLoading(false);
     }

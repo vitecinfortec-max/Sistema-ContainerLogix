@@ -20,6 +20,7 @@ import { SUGGESTED_INSPECTION_ITEMS } from '../lib/inspectionItems';
 import { formatContainerNumber } from '../lib/containerNumber';
 import { compressImage } from '../lib/imageCompression';
 import { CONTAINER_INSPECTION_PHOTO_TYPES, MAX_CONTAINER_INSPECTION_PHOTOS } from './NewContainerInspectionPage';
+import { apiErrorMessage } from '../lib/errors';
 
 const PHOTO_LABELS = CONTAINER_INSPECTION_PHOTO_TYPES.reduce((acc, { value, label }) => {
   acc[value] = label;
@@ -101,7 +102,7 @@ export default function EditContainerInspectionPage() {
       setShippingLines(shippingLinesRes.data);
       setTerminals(Array.isArray(terminalsRes.data) ? terminalsRes.data : []);
     } catch (error) {
-      toast.error('Erro ao carregar registro');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar registro'));
       navigate('/container-inspections');
     } finally {
       setLoading(false);
@@ -122,7 +123,7 @@ export default function EditContainerInspectionPage() {
       setPhotos(prev => [...prev, response.data]);
       toast.success('Foto adicionada!');
     } catch (error) {
-      toast.error('Erro ao enviar foto');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar foto'));
     } finally {
       setUploadingPhoto(false);
     }
@@ -134,7 +135,7 @@ export default function EditContainerInspectionPage() {
       setPhotos(prev => prev.filter(p => p.id !== photoId));
       toast.success('Foto removida!');
     } catch (error) {
-      toast.error('Erro ao remover foto');
+      toast.error(apiErrorMessage(error, 'Erro ao remover foto'));
     }
   };
 
@@ -219,7 +220,7 @@ export default function EditContainerInspectionPage() {
       navigate(`/container-inspections/${id}`);
     } catch (error) {
       console.error('Erro ao atualizar registro:', error);
-      toast.error('Erro ao atualizar registro');
+      toast.error(apiErrorMessage(error, 'Erro ao atualizar registro'));
     } finally {
       setSaving(false);
     }

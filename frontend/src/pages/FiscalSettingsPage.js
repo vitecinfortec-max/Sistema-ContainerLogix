@@ -15,6 +15,7 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Building2, FileCog, KeyRound, Landmark, Loader2, Save, Send, ShieldCheck, ShieldPlus, Truck } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 const EMPTY_FORM = {
   ambiente: 'homologacao', cnpj: '', ie: '', razao_social: '', nome_fantasia: '', email: '', fone: '',
@@ -91,7 +92,7 @@ export default function FiscalSettingsPage() {
       }
       applySettings(data);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar a Configuração Fiscal');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar a Configuração Fiscal'));
     } finally {
       setLoading(false);
     }
@@ -145,7 +146,7 @@ export default function FiscalSettingsPage() {
       toast.success('Configuração Fiscal salva');
       return true;
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar a Configuração Fiscal');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar a Configuração Fiscal'));
       return false;
     } finally {
       setSaving(false);
@@ -160,7 +161,7 @@ export default function FiscalSettingsPage() {
       applySettings(r.data);
       toast.success('Cadastro da empresa enviado ao emissor');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao enviar o cadastro ao emissor');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar o cadastro ao emissor'));
     } finally {
       setSyncing(false);
     }
@@ -179,7 +180,7 @@ export default function FiscalSettingsPage() {
       setCertPassword('');
       toast.success('Certificado enviado ao emissor');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao enviar o certificado');
+      toast.error(apiErrorMessage(error, 'Erro ao enviar o certificado'));
     } finally {
       setUploading(false);
     }

@@ -27,6 +27,7 @@ import { toLocalDay } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const ORDER_TYPE_OPTIONS = [
   ['COLETA', 'Coleta de Container'],
   ['ENTREGA', 'Entrega de Container'],
@@ -137,7 +138,7 @@ export default function LoadingOrderPage() {
       const r = await api.getLoadingOrders(params);
       setList(r.data || []);
     } catch (e) {
-      toast.error('Erro ao carregar ordens de carregamento');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar ordens de carregamento'));
     } finally {
       setLoading(false);
     }
@@ -218,7 +219,7 @@ export default function LoadingOrderPage() {
       setNextNumber(d.order_number);
       setForm({ ...buildEmpty(), ...d, items: (d.items && d.items.length) ? d.items : [emptyItem()] });
       setDialogOpen(true);
-    } catch (e) { toast.error('Erro ao carregar ordem de carregamento'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao carregar ordem de carregamento')); }
   };
 
   const onChange = (field, val) => setForm((p) => ({ ...p, [field]: val }));
@@ -341,7 +342,7 @@ export default function LoadingOrderPage() {
       loadList();
       loadNextBookingPreview();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar ordem de carregamento');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar ordem de carregamento'));
     } finally { setSaving(false); }
   };
 
@@ -359,7 +360,7 @@ export default function LoadingOrderPage() {
         return next;
       });
       loadList();
-    } catch (e) { toast.error('Erro ao excluir'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao excluir')); }
   };
 
   const toggleSelect = (id) => {
@@ -392,7 +393,7 @@ export default function LoadingOrderPage() {
       link.click();
       link.remove();
       toast.success('PDF gerado!');
-    } catch (e) { toast.error('Erro ao gerar PDF'); }
+    } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao gerar PDF')); }
   };
 
   const singleSelectedOrder = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;

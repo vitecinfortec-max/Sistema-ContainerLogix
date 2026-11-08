@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 export default function ShippingLinesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
   const [lines, setLines] = useState([]);
@@ -38,7 +39,7 @@ export default function ShippingLinesPage() {
       const response = await api.getShippingLines();
       setLines(response.data);
     } catch (error) {
-      toast.error('Erro ao carregar armadores');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar armadores'));
     } finally {
       setLoading(false);
     }
@@ -82,7 +83,7 @@ export default function ShippingLinesPage() {
       setOpen(false);
       loadShippingLines();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar armador');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar armador'));
     } finally {
       setSubmitting(false);
     }
@@ -101,7 +102,7 @@ export default function ShippingLinesPage() {
         });
         loadShippingLines();
       } catch (error) {
-        toast.error('Erro ao excluir armador');
+        toast.error(apiErrorMessage(error, 'Erro ao excluir armador'));
       }
     }
   };

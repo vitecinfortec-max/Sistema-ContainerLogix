@@ -14,7 +14,7 @@ import { Switch } from '../components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Autocomplete } from '../components/Autocomplete';
+import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import { useConfirm } from '../hooks/useConfirm';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { api } from '../lib/api';
@@ -31,6 +31,7 @@ import {
 import { formatCPF, formatPhone } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 function emptyForm() {
   return {
     person_type: '', person_id: '', person_label: '',
@@ -97,7 +98,7 @@ export default function HRContractsPage() {
       if (typeFilter) params.contract_type = typeFilter;
       setList((await api.getHRContracts(params)).data || []);
     } catch (e) {
-      toast.error('Erro ao carregar os contratos');
+      toast.error(apiErrorMessage(e, 'Erro ao carregar os contratos'));
     } finally {
       setLoading(false);
     }
@@ -519,15 +520,13 @@ export default function HRContractsPage() {
                 )}
                 <div>
                   <Label className="mb-1.5 block">Cargo</Label>
-                  <Select value={form.position_id || '_none'} onValueChange={(v) => onPositionChange(v === '_none' ? '' : v)}>
-                    <SelectTrigger className="h-9 text-sm" data-testid="hr-contract-position"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none">Sem cargo cadastrado</SelectItem>
-                      {positions.filter((p) => p.status === 'ATIVO' || p.id === form.position_id).map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <OptionAutocomplete
+                    value={form.position_id}
+                    onChange={onPositionChange}
+                    options={positions.filter((p) => p.status === 'ATIVO' || p.id === form.position_id).map((p) => [p.id, p.name])}
+                    className="text-sm"
+                    testId="hr-contract-position"
+                  />
                 </div>
                 <div>
                   <Label className="mb-1.5 block">Setor</Label>

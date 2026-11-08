@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { useUrlState } from '../hooks/useUrlState';
+import { apiErrorMessage } from '../lib/errors';
 const DAMAGE_OPTIONS = [
   { value: '', label: 'Todos' },
   { value: 'COM_AVARIA', label: 'Com avaria' },
@@ -82,7 +83,7 @@ export default function ContainerInspectionsPage() {
         totalPages: response.data.total_pages
       }));
     } catch (error) {
-      toast.error('Erro ao carregar registros');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar registros'));
     } finally {
       setLoading(false);
     }
@@ -102,7 +103,7 @@ export default function ContainerInspectionsPage() {
       });
       loadInspections();
     } catch (error) {
-      toast.error('Erro ao excluir registro');
+      toast.error(apiErrorMessage(error, 'Erro ao excluir registro'));
     }
   };
 

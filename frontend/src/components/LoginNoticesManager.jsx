@@ -12,6 +12,7 @@ import { StatusPill } from './DataPage';
 import { useConfirm } from '../hooks/useConfirm';
 import { api } from '../lib/api';
 import { toLocalDay } from '../lib/dates';
+import { apiErrorMessage } from '../lib/errors';
 
 // Cadastro dos avisos que aparecem no painel da tela de login (Dados da
 // Empresa, só administrador). A tela de login mostra os ativos dentro do
@@ -36,7 +37,7 @@ export default function LoginNoticesManager() {
   const [saving, setSaving] = useState(false);
   const today = toLocalDay(new Date());
 
-  const load = () => api.listLoginNotices().then((r) => setList(r.data || [])).catch(() => toast.error('Erro ao carregar os avisos'));
+  const load = () => api.listLoginNotices().then((r) => setList(r.data || [])).catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar os avisos')));
   useEffect(() => { load(); }, []);
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
@@ -62,7 +63,7 @@ export default function LoginNoticesManager() {
       setOpen(false);
       load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || 'Erro ao salvar o aviso');
+      toast.error(apiErrorMessage(e, 'Erro ao salvar o aviso'));
     } finally {
       setSaving(false);
     }
@@ -75,7 +76,7 @@ export default function LoginNoticesManager() {
       toast.success('Aviso excluído');
       load();
     } catch (e) {
-      toast.error('Erro ao excluir o aviso');
+      toast.error(apiErrorMessage(e, 'Erro ao excluir o aviso'));
     }
   };
 

@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useModuleConfig } from '../context/ModuleConfigContext';
 import { LayoutGrid, Save } from 'lucide-react';
+import { apiErrorMessage } from '../lib/errors';
 
 export default function ModulesPage() {
   const { reload: reloadModuleConfig } = useModuleConfig();
@@ -29,7 +30,7 @@ export default function ModulesPage() {
       setCatalog(catalogRes.data.catalog);
       setDisabled(configRes.data.disabled_modules || []);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar módulos');
+      toast.error(apiErrorMessage(error, 'Erro ao carregar módulos'));
     } finally {
       setLoading(false);
     }
@@ -66,7 +67,7 @@ export default function ModulesPage() {
       await reloadModuleConfig();
       toast.success('Módulos atualizados');
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar módulos');
+      toast.error(apiErrorMessage(error, 'Erro ao salvar módulos'));
     } finally {
       setSaving(false);
     }
@@ -115,26 +116,28 @@ export default function ModulesPage() {
                   />
                 )}
               >
-                <table className="data-table">
-                  <tbody>
-                    {group.items.map((item) => {
-                      const itemBlocked = groupBlocked || isDisabled(item.key);
-                      return (
-                        <tr key={item.key}>
-                          <td className={itemBlocked ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}>{item.label}</td>
-                          <td className="w-24 text-right !py-1.5">
-                            <Switch
-                              checked={!itemBlocked}
-                              onCheckedChange={() => toggleItem(group.key, item.key)}
-                              disabled={groupBlocked}
-                              data-testid={`module-item-switch-${item.key}`}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <tbody>
+                      {group.items.map((item) => {
+                        const itemBlocked = groupBlocked || isDisabled(item.key);
+                        return (
+                          <tr key={item.key}>
+                            <td className={itemBlocked ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}>{item.label}</td>
+                            <td className="w-24 text-right !py-1.5">
+                              <Switch
+                                checked={!itemBlocked}
+                                onCheckedChange={() => toggleItem(group.key, item.key)}
+                                disabled={groupBlocked}
+                                data-testid={`module-item-switch-${item.key}`}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </DataCard>
             );
           })}
