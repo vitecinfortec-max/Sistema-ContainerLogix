@@ -86,6 +86,7 @@ const FlexTankMovementDetailPage = lazyPage(() => import('./pages/FlexTankMoveme
 const EditFlexTankMovementPage = lazyPage(() => import('./pages/EditFlexTankMovementPage'));
 const YardControlPage = lazyPage(() => import('./pages/YardControlPage'));
 const FleetPage = lazyPage(() => import('./pages/FleetPage'));
+const VehicleFormPage = lazyPage(() => import('./pages/VehicleFormPage'));
 const VehicleRevisionFormPage = lazyPage(() => import('./pages/VehicleRevisionFormPage'));
 const VehicleChecklistPage = lazyPage(() => import('./pages/VehicleChecklistPage'));
 const LoadingSchedulePage = lazyPage(() => import('./pages/LoadingSchedulePage'));
@@ -121,6 +122,7 @@ const InternationalInvoicePage = lazyPage(() => import('./pages/InternationalInv
 const UnitSegregationPage = lazyPage(() => import('./pages/UnitSegregationPage'));
 const UnitSegregationFormPage = lazyPage(() => import('./pages/UnitSegregationFormPage'));
 const RPATerceiroPage = lazyPage(() => import('./pages/RPATerceiroPage'));
+const RPATerceiroFormPage = lazyPage(() => import('./pages/RPATerceiroFormPage'));
 const OrdemServicoPage = lazyPage(() => import('./pages/OrdemServicoPage'));
 const OrdemServicoFormPage = lazyPage(() => import('./pages/OrdemServicoFormPage'));
 const FuelSupplyPage = lazyPage(() => import('./pages/FuelSupplyPage'));
@@ -132,6 +134,7 @@ const ReportsFuelSupplyPage = lazyPage(() => import('./pages/ReportsFuelSupplyPa
 const ReportsServiceOrdersPage = lazyPage(() => import('./pages/ReportsServiceOrdersPage'));
 const FuelSupplyOrderPage = lazyPage(() => import('./pages/FuelSupplyOrderPage'));
 const LoadingOrderPage = lazyPage(() => import('./pages/LoadingOrderPage'));
+const LoadingOrderFormPage = lazyPage(() => import('./pages/LoadingOrderFormPage'));
 const CtePage = lazyPage(() => import('./pages/CtePage'));
 const FiscalSettingsPage = lazyPage(() => import('./pages/FiscalSettingsPage'));
 const MdfePage = lazyPage(() => import('./pages/MdfePage'));
@@ -240,6 +243,22 @@ function App() {
             }
           />
           <Route
+            path="/fleet/veiculos/new"
+            element={
+              <ProtectedRoute moduleKey="frota.veiculos">
+                <VehicleFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/veiculos/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="frota.veiculos">
+                <VehicleFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/fleet/revisoes/new"
             element={
               <ProtectedRoute moduleKey="frota.revisao">
@@ -260,6 +279,22 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.rpa_terceiro">
                 <RPATerceiroPage rpaType="terceiro" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/rpa-terceiro/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.rpa_terceiro">
+                <RPATerceiroFormPage rpaType="terceiro" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/rpa-terceiro/:id/edit"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.rpa_terceiro">
+                <RPATerceiroFormPage rpaType="terceiro" />
               </ProtectedRoute>
             }
           />
@@ -364,6 +399,22 @@ function App() {
             element={
               <ProtectedRoute moduleKey="operacional.ordem_carregamento">
                 <LoadingOrderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/loading-orders/new"
+            element={
+              <ProtectedRoute moduleKey="operacional.ordem_carregamento">
+                <LoadingOrderFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/loading-orders/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="operacional.ordem_carregamento">
+                <LoadingOrderFormPage />
               </ProtectedRoute>
             }
           />

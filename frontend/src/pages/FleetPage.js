@@ -1,4 +1,3 @@
-import { FormSectionTitle } from '../components/FormKit';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
@@ -10,31 +9,19 @@ import {
 } from '../components/DataPage';
 import { Button } from '../components/ui/button';
 import PeriodReportDialog from '../components/PeriodReportDialog';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { Tabs, TabsContent } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../components/ui/command';
-import { Autocomplete } from '../components/Autocomplete';
 import { api } from '../lib/api';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
-import { Truck, Wrench, Plus, Eye, Trash2, FileText, Printer, Pencil, Car, Check, ChevronsUpDown, Camera, Upload, X, Loader2, CheckCircle2, Clock, AlertTriangle, FileBarChart } from 'lucide-react';
+import { Wrench, Plus, Eye, Trash2, Printer, Pencil, Car, Camera, Upload, X, Loader2, CheckCircle2, Clock, AlertTriangle, FileBarChart } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { compressImage } from '../lib/imageCompression';
-import {
-  DocumentImportButton, DocumentImportNotice, DocumentAttachments, applyDocumentFields, addAttachment, IMPORTED_FIELD_CLASS,
-} from '../components/DocumentImport';
 import { calendarDate, toDateInput, todayISO } from '../lib/dates';
-import { formatPlate } from '../lib/masks';
-
-
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
 const VEHICLE_STATUS_LABELS = { ATIVO: 'Ativo', INATIVO: 'Inativo', MANUTENCAO: 'Manutenção' };
@@ -137,52 +124,6 @@ export default function FleetPage() {
   const [vehiclePagination, setVehiclePagination] = useState({ page: 1, pages: 1, total: 0 });
   const [selectedVehicleIds, setSelectedVehicleIds] = useState(() => new Set());
   
-  // Modal de veículo
-  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState(null);
-  const [vehicleSaving, setVehicleSaving] = useState(false);
-  const buildEmptyVehicleForm = () => ({
-    plate: '',
-    renavam: '',
-    chassis: '',
-    model: '',
-    brand: '',
-    year: '',
-    model_year: '',
-    color: '',
-    asset_code: '',
-    vehicle_type: '',
-    category: '',
-    load_capacity: '',
-    axle_count: '',
-    body_type: '',
-    fuel_type: '',
-    tank_capacity: '',
-    fuel_target_km_l: '',
-    engine_power: '',
-    tare_weight: '',
-    gross_weight: '',
-    crlv_number: '',
-    crlv_expiry: '',
-    licensing_expiry: '',
-    tachograph_expiry: '',
-    inspection_date: '',
-    inspection_expiry: '',
-    owner_type: '',
-    ownership_status: '',
-    transport_company: '',
-    status: 'ATIVO',
-    observations: '',
-    driver_id: '',
-    document_attachments: []
-  });
-  const [vehicleForm, setVehicleForm] = useState(buildEmptyVehicleForm());
-  const [vehicleImportedFields, setVehicleImportedFields] = useState(() => new Set());
-  const [vehicleImportNotice, setVehicleImportNotice] = useState(null);
-  const [drivers, setDrivers] = useState([]);
-  const [driverPopoverOpen, setDriverPopoverOpen] = useState(false);
-  const [transportCompanies, setTransportCompanies] = useState([]);
-
   const vehicleTypes = [
     { value: 'CAMINHÃO', label: 'Caminhão' },
     { value: 'CARRETA', label: 'Carreta' },
@@ -194,48 +135,10 @@ export default function FleetPage() {
     { value: 'EQUIPAMENTO', label: 'Outro Equipamento' },
   ];
 
-  const statusOptions = [
-    { value: 'ATIVO', label: 'Ativo' },
-    { value: 'INATIVO', label: 'Inativo' },
-    { value: 'MANUTENCAO', label: 'Em Manutenção' },
-  ];
-
-  const categoryOptions = [
-    { value: 'CARGA', label: 'Carga' },
-    { value: 'TRACAO', label: 'Tração' },
-    { value: 'EQUIPAMENTO_PATIO', label: 'Equipamento de Pátio' },
-  ];
-
-  const fuelOptions = [
-    { value: 'DIESEL', label: 'Diesel' },
-    { value: 'GASOLINA', label: 'Gasolina' },
-    { value: 'ELETRICO', label: 'Elétrico' },
-    { value: 'GLP', label: 'GLP' },
-  ];
-
-  const ownerTypeOptions = [
-    { value: 'PROPRIA', label: 'Empresa Própria' },
-    { value: 'TERCEIRIZADO', label: 'Terceirizado' },
-    { value: 'AUTONOMO', label: 'Motorista Autônomo' },
-  ];
-
-  const ownershipStatusOptions = [
-    { value: 'PROPRIO', label: 'Próprio' },
-    { value: 'ALUGADO', label: 'Alugado' },
-    { value: 'AGREGADO', label: 'Agregado' },
-  ];
-
   // As duas buscas filtram enquanto se digita (sem botão "Filtrar") e valem
   // também ao trocar de página e ao recarregar depois de salvar.
   const debouncedVehicleSearch = useDebouncedValue(vehicleSearch.trim());
   const debouncedPlate = useDebouncedValue(searchPlate.trim());
-
-  useEffect(() => {
-    if (activeTab === 'vehicles') {
-      loadDrivers();
-      loadTransportCompanies();
-    }
-  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'vehicles') loadVehicles();
@@ -275,25 +178,6 @@ export default function FleetPage() {
     }
   };
 
-  const loadDrivers = async () => {
-    try {
-      const response = await api.getDrivers();
-      setDrivers(Array.isArray(response.data) ? response.data : []);
-    } catch (error) {
-      console.error('Erro ao carregar motoristas:', error);
-      toast.error(apiErrorMessage(error, 'Erro ao carregar motoristas'));
-    }
-  };
-
-  const loadTransportCompanies = async () => {
-    try {
-      const response = await api.getCompanies();
-      setTransportCompanies(response.data?.items || response.data || []);
-    } catch (error) {
-      console.error('Erro ao carregar transportadoras:', error);
-    }
-  };
-
   // ========== FUNÇÕES DE VEÍCULOS ==========
   const loadVehicles = async (search = debouncedVehicleSearch) => {
     try {
@@ -319,134 +203,6 @@ export default function FleetPage() {
   const handleVehicleSearchChange = (value) => {
     setVehicleSearch(value);
     setVehiclePagination(prev => ({ ...prev, page: 1 }));
-  };
-
-  const handleVehicleFormChange = (field, value) => {
-    setVehicleForm(prev => ({ ...prev, [field]: value }));
-    setVehicleImportedFields(prev => {
-      if (!prev.has(field)) return prev;
-      const next = new Set(prev);
-      next.delete(field);
-      return next;
-    });
-  };
-
-  const clearVehicleImport = () => {
-    setVehicleImportedFields(new Set());
-    setVehicleImportNotice(null);
-  };
-
-  const resetVehicleForm = () => {
-    setVehicleForm(buildEmptyVehicleForm());
-    setEditingVehicle(null);
-    clearVehicleImport();
-  };
-
-  // Campos lidos do CRLV vão para o formulário, destacados para conferência.
-  // Tipo e Categoria são deduzidos da Espécie/Tipo do documento, então só
-  // entram se ainda estiverem vazios.
-  const handleCrlvRead = (reading) => {
-    const warnings = [...reading.warnings];
-    const readPlate = reading.fields.plate;
-    if (editingVehicle && readPlate && vehicleForm.plate && readPlate !== vehicleForm.plate.replace(/[^A-Z0-9]/gi, '').toUpperCase()) {
-      warnings.unshift(`A placa do documento (${readPlate}) é diferente da placa deste cadastro: confira se é o veículo certo`);
-    }
-    const { next, applied } = applyDocumentFields(vehicleForm, reading.fields, { onlyIfEmpty: ['vehicle_type', 'category'] });
-    next.document_attachments = addAttachment(next.document_attachments, reading.file_url);
-    const info = [];
-    if (reading.info.licensing_year) info.push(['Exercício do licenciamento', reading.info.licensing_year]);
-    if (reading.info.owner_name) {
-      info.push(['Proprietário', [reading.info.owner_name, reading.info.owner_document].filter(Boolean).join(' - ')]);
-    }
-    setVehicleForm(next);
-    setVehicleImportedFields(new Set(applied));
-    setVehicleImportNotice({ label: 'CRLV', count: applied.length, warnings, info });
-  };
-  const importedClass = (field) => (vehicleImportedFields.has(field) ? IMPORTED_FIELD_CLASS : '');
-
-  const openNewVehicleModal = () => {
-    resetVehicleForm();
-    setVehicleModalOpen(true);
-  };
-
-  const openEditVehicleModal = (vehicle) => {
-    setEditingVehicle(vehicle);
-    const empty = buildEmptyVehicleForm();
-    const form = { ...empty };
-    for (const key of Object.keys(empty)) {
-      if (vehicle[key] !== undefined && vehicle[key] !== null) {
-        form[key] = typeof empty[key] === 'string' && typeof vehicle[key] !== 'string'
-          ? String(vehicle[key])
-          : vehicle[key];
-      }
-    }
-    setVehicleForm(form);
-    clearVehicleImport();
-    setVehicleModalOpen(true);
-  };
-
-  const handleVehicleSubmit = async () => {
-    if (!vehicleForm.plate || !vehicleForm.vehicle_type) {
-      toast.error('Preencha os campos obrigatórios (Placa e Tipo)');
-      return;
-    }
-
-    setVehicleSaving(true);
-    try {
-      const data = {
-        plate: vehicleForm.plate.toUpperCase(),
-        renavam: vehicleForm.renavam || null,
-        chassis: vehicleForm.chassis || null,
-        model: vehicleForm.model || null,
-        brand: vehicleForm.brand || null,
-        year: vehicleForm.year ? parseInt(vehicleForm.year) : null,
-        model_year: vehicleForm.model_year ? parseInt(vehicleForm.model_year) : null,
-        color: vehicleForm.color || null,
-        asset_code: vehicleForm.asset_code || null,
-        vehicle_type: vehicleForm.vehicle_type,
-        category: vehicleForm.category || null,
-        load_capacity: vehicleForm.load_capacity || null,
-        axle_count: vehicleForm.axle_count ? parseInt(vehicleForm.axle_count) : null,
-        body_type: vehicleForm.body_type || null,
-        fuel_type: vehicleForm.fuel_type || null,
-        tank_capacity: vehicleForm.tank_capacity || null,
-        fuel_target_km_l: Number(String(vehicleForm.fuel_target_km_l).replace(',', '.')) > 0 ? Number(String(vehicleForm.fuel_target_km_l).replace(',', '.')) : null,
-        engine_power: vehicleForm.engine_power || null,
-        tare_weight: vehicleForm.tare_weight || null,
-        gross_weight: vehicleForm.gross_weight || null,
-        crlv_number: vehicleForm.crlv_number || null,
-        crlv_expiry: vehicleForm.crlv_expiry || null,
-        licensing_expiry: vehicleForm.licensing_expiry || null,
-        tachograph_expiry: vehicleForm.tachograph_expiry || null,
-        inspection_date: vehicleForm.inspection_date || null,
-        inspection_expiry: vehicleForm.inspection_expiry || null,
-        owner_type: vehicleForm.owner_type || null,
-        ownership_status: vehicleForm.ownership_status || null,
-        transport_company: vehicleForm.transport_company || null,
-        status: vehicleForm.status,
-        observations: vehicleForm.observations || null,
-        driver_id: vehicleForm.driver_id || null,
-        document_attachments: vehicleForm.document_attachments || []
-      };
-
-      if (editingVehicle) {
-        if (!vehicleForm.driver_id) data.clear_driver = true;
-        await api.updateVehicle(editingVehicle.id, data);
-        toast.success('Veículo atualizado com sucesso!');
-      } else {
-        await api.createVehicle(data);
-        toast.success('Veículo cadastrado com sucesso!');
-      }
-
-      setVehicleModalOpen(false);
-      resetVehicleForm();
-      loadVehicles();
-      loadAllVehiclesForAutocomplete();
-    } catch (error) {
-      toast.error(apiErrorMessage(error, 'Erro ao salvar veículo'));
-    } finally {
-      setVehicleSaving(false);
-    }
   };
 
   const handleDeleteVehicle = async (id) => {
@@ -695,9 +451,9 @@ export default function FleetPage() {
               toolbar={(
                 <Toolbar
                   selectedCount={selectedVehicleIds.size}
-                  primary={<ToolbarPrimary icon={Plus} label="Novo veículo" onClick={openNewVehicleModal} testId="new-vehicle-btn" />}
+                  primary={<ToolbarPrimary icon={Plus} label="Novo veículo" onClick={() => navigate('/fleet/veiculos/new')} testId="new-vehicle-btn" />}
                 >
-                  <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedVehicle && openEditVehicleModal(singleSelectedVehicle)} disabled={!singleSelectedVehicle} />
+                  <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedVehicle && navigate(`/fleet/veiculos/${singleSelectedVehicle.id}/edit`)} disabled={!singleSelectedVehicle} />
                   <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedVehicle && handleDeleteVehicle(singleSelectedVehicle.id)} disabled={!singleSelectedVehicle} />
                 </Toolbar>
               )}
@@ -746,6 +502,7 @@ export default function FleetPage() {
                         <tr
                           key={vehicle.id}
                           onClick={() => toggleSelectVehicle(vehicle.id)}
+                          onDoubleClick={() => navigate(`/fleet/veiculos/${vehicle.id}/edit`)}
                           data-selected={selectedVehicleIds.has(vehicle.id)}
                           data-row-tone={rowTone(vehicleRowSituation(vehicle, today))}
                           className="cursor-pointer"
@@ -1029,343 +786,6 @@ export default function FleetPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal Cadastro/Edição de Veículo */}
-      <Dialog open={vehicleModalOpen} onOpenChange={setVehicleModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Car className="w-5 h-5" />
-              {editingVehicle ? 'Editar Veículo' : 'Novo Veículo'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <div className="flex flex-col items-start gap-1">
-              <DocumentImportButton kinds={['crlv']} onRead={handleCrlvRead} disabled={vehicleSaving} />
-            </div>
-            <DocumentImportNotice notice={vehicleImportNotice} onClose={() => setVehicleImportNotice(null)} />
-          </div>
-
-          <div className="space-y-5">
-            <FormSectionTitle>Identificação</FormSectionTitle>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Placa *</Label>
-                <Input
-                  className={importedClass('plate')} value={vehicleForm.plate}
-                  onChange={(e) => handleVehicleFormChange('plate', formatPlate(e.target.value))}
-                  data-testid="input-vehicle-plate-form"
-                />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Tipo *</Label>
-                <Select
-                  value={vehicleForm.vehicle_type}
-                  onValueChange={(value) => handleVehicleFormChange('vehicle_type', value)}
-                >
-                  <SelectTrigger className={importedClass('vehicle_type')}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vehicleTypes.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Categoria</Label>
-                <Select value={vehicleForm.category} onValueChange={(value) => handleVehicleFormChange('category', value)}>
-                  <SelectTrigger className={importedClass('category')}><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {categoryOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Cor</Label>
-                <Input className={importedClass('color')} value={vehicleForm.color} onChange={(e) => handleVehicleFormChange('color', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Nº Patrimônio/Cód. Interno</Label>
-                <Input value={vehicleForm.asset_code} onChange={(e) => handleVehicleFormChange('asset_code', e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Marca</Label>
-                <Input
-                  className={importedClass('brand')} value={vehicleForm.brand}
-                  onChange={(e) => handleVehicleFormChange('brand', e.target.value)}
-                />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Modelo</Label>
-                <Input
-                  className={importedClass('model')} value={vehicleForm.model}
-                  onChange={(e) => handleVehicleFormChange('model', e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Ano de Fabricação</Label>
-                <Input
-                  type="number" min="0"
-                  className={importedClass('year')} value={vehicleForm.year}
-                  onChange={(e) => handleVehicleFormChange('year', e.target.value)}
-                  min="1900"
-                  max="2100"
-                />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Ano Modelo</Label>
-                <Input
-                  type="number" min="0"
-                  className={importedClass('model_year')} value={vehicleForm.model_year}
-                  onChange={(e) => handleVehicleFormChange('model_year', e.target.value)}
-                  min="1900"
-                  max="2100"
-                />
-              </div>
-            </div>
-
-            <FormSectionTitle>Especificações</FormSectionTitle>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Capacidade de Carga</Label>
-                <Input className={importedClass('load_capacity')} value={vehicleForm.load_capacity} onChange={(e) => handleVehicleFormChange('load_capacity', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Nº de Eixos</Label>
-                <Input type="number" min="0" className={importedClass('axle_count')} value={vehicleForm.axle_count} onChange={(e) => handleVehicleFormChange('axle_count', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Tipo de Carroceria/Implemento</Label>
-                <Input className={importedClass('body_type')} value={vehicleForm.body_type} onChange={(e) => handleVehicleFormChange('body_type', e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Combustível</Label>
-                <Select value={vehicleForm.fuel_type} onValueChange={(value) => handleVehicleFormChange('fuel_type', value)}>
-                  <SelectTrigger className={importedClass('fuel_type')}><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {fuelOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Capacidade do Tanque</Label>
-                <Input value={vehicleForm.tank_capacity} onChange={(e) => handleVehicleFormChange('tank_capacity', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Meta de Consumo (km/L)</Label>
-                <Input inputMode="decimal" value={vehicleForm.fuel_target_km_l} onChange={(e) => handleVehicleFormChange('fuel_target_km_l', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Potência do Motor</Label>
-                <Input className={importedClass('engine_power')} value={vehicleForm.engine_power} onChange={(e) => handleVehicleFormChange('engine_power', e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Tara (peso vazio)</Label>
-                <Input value={vehicleForm.tare_weight} onChange={(e) => handleVehicleFormChange('tare_weight', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">PBT (Peso Bruto Total)</Label>
-                <Input className={importedClass('gross_weight')} value={vehicleForm.gross_weight} onChange={(e) => handleVehicleFormChange('gross_weight', e.target.value)} />
-              </div>
-            </div>
-
-            <FormSectionTitle>Documentação</FormSectionTitle>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-1.5 block">RENAVAM</Label>
-                <Input className={importedClass('renavam')} value={vehicleForm.renavam} onChange={(e) => handleVehicleFormChange('renavam', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Chassi</Label>
-                <Input className={importedClass('chassis')} value={vehicleForm.chassis} onChange={(e) => handleVehicleFormChange('chassis', e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Número do CRLV</Label>
-                <Input className={importedClass('crlv_number')} value={vehicleForm.crlv_number} onChange={(e) => handleVehicleFormChange('crlv_number', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Validade do CRLV</Label>
-                <Input type="date" value={vehicleForm.crlv_expiry} onChange={(e) => handleVehicleFormChange('crlv_expiry', e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Vencimento do Licenciamento</Label>
-                <Input type="date" value={vehicleForm.licensing_expiry} onChange={(e) => handleVehicleFormChange('licensing_expiry', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Vencimento do Tacógrafo</Label>
-                <Input type="date" value={vehicleForm.tachograph_expiry} onChange={(e) => handleVehicleFormChange('tachograph_expiry', e.target.value)} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Data da Vistoria</Label>
-                <Input type="date" value={vehicleForm.inspection_date} onChange={(e) => handleVehicleFormChange('inspection_date', e.target.value)} />
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Validade da Vistoria</Label>
-                <Input type="date" value={vehicleForm.inspection_expiry} onChange={(e) => handleVehicleFormChange('inspection_expiry', e.target.value)} />
-              </div>
-            </div>
-            <div>
-              <Label className="mb-1.5 block">Documentos anexados (CRLV...)</Label>
-              <DocumentAttachments
-                value={vehicleForm.document_attachments}
-                onChange={(v) => handleVehicleFormChange('document_attachments', v)}
-              />
-            </div>
-
-            <FormSectionTitle>Vínculo</FormSectionTitle>
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label className="mb-1.5 block">Proprietário</Label>
-                <Select value={vehicleForm.owner_type} onValueChange={(value) => handleVehicleFormChange('owner_type', value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ownerTypeOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Status de Propriedade</Label>
-                <Select value={vehicleForm.ownership_status} onValueChange={(value) => handleVehicleFormChange('ownership_status', value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ownershipStatusOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Transportadora Vinculada</Label>
-                <Autocomplete
-                  value={vehicleForm.transport_company}
-                  onChange={(v) => handleVehicleFormChange('transport_company', v)}
-                  onSelect={(c) => handleVehicleFormChange('transport_company', c.name)}
-                  options={transportCompanies}
-                  displayField="name"
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="mb-1.5 block">Status</Label>
-              <Select
-                value={vehicleForm.status}
-                onValueChange={(value) => handleVehicleFormChange('status', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="mb-1.5 block">Motorista Responsável</Label>
-              <Popover open={driverPopoverOpen} onOpenChange={setDriverPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={driverPopoverOpen}
-                    className="w-full justify-between font-normal"
-                  >
-                    {vehicleForm.driver_id
-                      ? drivers.find(driver => driver.id === vehicleForm.driver_id)?.name
-                      : 'Selecione o motorista (opcional)'}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command>
-                    <CommandInput />
-                    <CommandList>
-                      <CommandEmpty>Nenhum motorista encontrado</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="Nenhum"
-                          onSelect={() => {
-                            handleVehicleFormChange('driver_id', '');
-                            setDriverPopoverOpen(false);
-                          }}
-                        >
-                          <Check className={cn('mr-2 h-4 w-4', !vehicleForm.driver_id ? 'opacity-100' : 'opacity-0')} />
-                          Nenhum
-                        </CommandItem>
-                        {drivers.map(driver => (
-                          <CommandItem
-                            key={driver.id}
-                            value={driver.name}
-                            onSelect={() => {
-                              handleVehicleFormChange('driver_id', driver.id);
-                              setDriverPopoverOpen(false);
-                            }}
-                          >
-                            <Check className={cn('mr-2 h-4 w-4', vehicleForm.driver_id === driver.id ? 'opacity-100' : 'opacity-0')} />
-                            {driver.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              <p className="text-xs text-muted-foreground mt-1">
-                Ao vincular, a placa deste veículo é preenchida automaticamente ao selecionar esse motorista em uma Movimentação ou Contrato de Frete.
-              </p>
-            </div>
-
-            <div>
-              <Label className="mb-1.5 block">Observações</Label>
-              <Input
-                value={vehicleForm.observations}
-                onChange={(e) => handleVehicleFormChange('observations', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setVehicleModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleVehicleSubmit} disabled={vehicleSaving}>
-              {vehicleSaving ? 'Salvando...' : (editingVehicle ? 'Salvar alterações' : 'Cadastrar veículo')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       <PeriodReportDialog
         open={revisionReportOpen}
         onOpenChange={setRevisionReportOpen}

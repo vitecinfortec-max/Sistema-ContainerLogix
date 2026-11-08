@@ -413,7 +413,7 @@ function LayoutFrame({ children }) {
   const isRhActive = location.pathname === '/rh' || location.pathname.startsWith('/rh/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/revisoes') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
-  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname === '/loading-orders' || location.pathname === '/freight-routes' || location.pathname === '/freight-payments' || location.pathname.startsWith('/fiscal/');
+  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/veiculos') || location.pathname.startsWith('/loading-orders') || location.pathname === '/freight-routes' || location.pathname === '/freight-payments' || location.pathname.startsWith('/fiscal/');
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/audit-log' || location.pathname === '/modules' || location.pathname === '/plataforma' || location.pathname === '/tank-settings';
   const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status' || location.pathname === '/port-services' || location.pathname === '/reports/port-services' || location.pathname === '/reports/port-service-shifts' || location.pathname === '/reports/vehicle-results';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
@@ -788,6 +788,11 @@ function LayoutFrame({ children }) {
     if (location.pathname.startsWith('/fleet/ordem-servico/')) return 'Editar Ordem de Serviço';
     if (location.pathname === '/fleet/revisoes/new') return 'Nova Revisão de Veículo';
     if (location.pathname.startsWith('/fleet/revisoes/')) return 'Editar Revisão de Veículo';
+    if (location.pathname.startsWith('/fleet/rpa-terceiro/') && location.pathname.endsWith('/edit')) return 'Editar Contrato de Frete';
+    if (location.pathname === '/fleet/veiculos/new') return 'Novo Veículo';
+    if (location.pathname.startsWith('/fleet/veiculos/')) return 'Editar Veículo';
+    if (location.pathname === '/loading-orders/new') return 'Nova Ordem de Carregamento';
+    if (location.pathname.startsWith('/loading-orders/')) return 'Editar Ordem de Carregamento';
     if (location.pathname === '/unit-segregation/new') return 'Nova Segregação de Unidade';
     if (location.pathname.startsWith('/unit-segregation/')) return 'Editar Segregação de Unidade';
     if (location.pathname === '/repair-estimates/new') return 'Novo Orçamento de Reparo';
