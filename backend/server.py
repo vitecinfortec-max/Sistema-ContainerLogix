@@ -97,6 +97,19 @@ async def lifespan(app: FastAPI):
     client.close()
 
 
+# Monitoramento de erros (Sentry): só liga com SENTRY_DSN no ambiente. Cada
+# erro leva a empresa (tag "empresa", posta no tenant_middleware); e-mail e
+# IP dos usuários não são enviados.
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
+if SENTRY_DSN:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "producao"),
+        traces_sample_rate=0.0,
+        send_default_pii=False,
+    )
+
 app = FastAPI(lifespan=lifespan)
 
 
@@ -133,9 +146,9 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# Rotas que respondem sem empresa: verificação de saúde do Render e a
-# documentação da API (não tocam em banco de empresa nenhuma).
-_TENANTLESS_PATHS = {"/api/", "/api", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect"}
+# Rotas que respondem sem empresa: verificação de saúde (Render e monitor
+# externo) e a documentação da API (não tocam em banco de empresa nenhuma).
+_TENANTLESS_PATHS = {"/api/", "/api", "/api/health", "/openapi.json", "/docs", "/redoc", "/docs/oauth2-redirect"}
 
 
 async def resolve_request_tenant(request: Request):
@@ -197,6 +210,8 @@ async def tenant_middleware(request: Request, call_next):
     if error is not None:
         return error
     context_token = set_current_tenant(tenant)
+    if SENTRY_DSN:
+        sentry_sdk.set_tag("empresa", tenant["slug"])
     try:
         return await call_next(request)
     except NoTenantError:
@@ -258,6 +273,19 @@ async def serve_upload(file_path: str, request: Request, token: Optional[str] = 
 @api_router.get("/")
 async def root():
     return {"message": "ContainerLogix API"}
+
+
+@api_router.get("/health")
+async def health():
+    """Monitor externo (UptimeRobot): o servidor está de pé e o banco responde.
+    Não depende de empresa nem de login e não devolve dado nenhum; 503 quando
+    o banco não responde em 5 s."""
+    try:
+        await asyncio.wait_for(client.admin.command("ping"), timeout=5)
+    except Exception:
+        logger.exception("Verificação de saúde: o banco não respondeu")
+        return JSONResponse(status_code=503, content={"status": "erro", "database": False})
+    return {"status": "ok", "database": True}
 
 
 @api_router.get("/tenant-info")

@@ -2,6 +2,7 @@ import { Component, createContext, useContext, useEffect, useState, useSyncExter
 import axios from 'axios';
 import { AlertTriangle, RotateCw } from 'lucide-react';
 import { Button } from './ui/button';
+import { reportError } from '../lib/monitoring';
 
 // Proteção do miolo de cada tela (envolve o conteúdo em components/Layout.js).
 //
@@ -84,6 +85,7 @@ class CrashBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error('Erro na tela:', error, info?.componentStack);
+    reportError(error, { componentStack: info?.componentStack });
   }
 
   render() {

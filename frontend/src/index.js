@@ -6,6 +6,7 @@ import "@/index.css";
 import App from "@/App";
 import OfflineApp from "@/offline/OfflineApp";
 import { MotionProvider } from "@/components/Motion";
+import { startMonitoring } from "@/lib/monitoring";
 
 const isOfflineMode = process.env.REACT_APP_OFFLINE_MODE === 'true';
 const isElectron = navigator.userAgent.toLowerCase().includes('electron');
@@ -29,6 +30,9 @@ if (isCapacitorNative) {
 if (isElectron) {
   sessionStorage.removeItem('token');
 }
+
+// Erros da versão nuvem vão pro monitor (sem chave configurada, não faz nada)
+if (!isOfflineMode && !isElectron) startMonitoring();
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
