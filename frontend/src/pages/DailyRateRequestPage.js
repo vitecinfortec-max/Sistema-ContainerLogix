@@ -1,4 +1,4 @@
-import { FormSectionTitle } from '../components/FormKit';
+import { FormSectionTitle, FormPage } from '../components/FormKit';
 import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -25,6 +25,7 @@ import PeriodReportDialog from '../components/PeriodReportDialog';
 import { FileBarChart } from 'lucide-react';
 import { formatPlate } from '../lib/masks';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
 
 const brl = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -57,6 +58,7 @@ function calculateItemTotal(item) {
 }
 
 export default function DailyRateRequestPage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/daily-rate-requests');
   const { confirm, ConfirmDialog } = useConfirm();
   const [reportOpen, setReportOpen] = useState(false);
   const [requests, setRequests] = useState([]);
@@ -276,7 +278,7 @@ export default function DailyRateRequestPage() {
         await api.createDailyRateRequest(payload);
         toast.success('Solicitação criada com sucesso!');
       }
-      setModalOpen(false);
+      backToList();
       resetForm();
       loadRequests();
     } catch (error) {
@@ -386,142 +388,40 @@ export default function DailyRateRequestPage() {
 
   const formatMoney = (value) => (Number(value) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+  // Cadastro e edição em página própria (/daily-rate-requests/new e /daily-rate-requests/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openNewModal();
+    if (mode === 'edit') {
+      api.getDailyRateRequest(routeId)
+        .then((r) => openEditModal(r.data))
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar solicitação'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4">
-        <PageHeader
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editingRequest}
+          title={editingRequest ? 'Editar solicitação de diária' : 'Nova solicitação de diária'}
           icon={Wallet}
-          title="Solicitação de Diária"
-          subtitle="Gerencie as solicitações de diária, comissão e almoço dos motoristas"
+          backTo={backToList}
+          subtitle="Diárias de container pedidas ao cliente"
+          testId="daily-rate-form-page"
           actions={(
-            <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="daily-rate-period-report">
-              <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
+            <>
+            <Button variant="outline" onClick={() => backToList()}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : (editingRequest ? 'Salvar alterações' : 'Criar solicitação')}
             </Button>
-          )}
-        />
-
-        <FilterCard hasFilters={!!(searchQuery || statusFilter || period[0] || period[1])} onClear={clearSearch}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Motorista, placa ou cliente">
-              <SearchInput
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                data-testid="search-daily-rate-input"
-              />
-            </FilterField>
-            <FilterField label="Status">
-              <Select value={statusFilter || 'ALL'} onValueChange={handleStatusFilterChange}>
-                <SelectTrigger className="h-9 text-sm" data-testid="filter-daily-rate-status"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos</SelectItem>
-                  <SelectItem value="PENDENTE">Pendente</SelectItem>
-                  <SelectItem value="PAGO">Pago</SelectItem>
-                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="daily-rate" />
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque uma solicitação pra habilitar as ações da barra */}
-        <DataCard
-          title="Solicitações"
-          count={pagination.total}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Nova solicitação" onClick={openNewModal} testId="new-daily-rate-btn" />}
-            >
-              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedRequest && openDetails(singleSelectedRequest)} disabled={!singleSelectedRequest} />
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedRequest && openEditModal(singleSelectedRequest)} disabled={!canEdit} />
-              <ToolbarDivider />
-              <ToolbarButton icon={CheckCircle2} label="Marcar como pago" tone="emerald" onClick={() => markSelectedAs('PAGO')} disabled={!canMarkPaid || updatingStatus} testId="daily-rate-mark-paid" />
-              <ToolbarButton icon={RotateCcw} label="Marcar como pendente" tone="amber" onClick={() => markSelectedAs('PENDENTE')} disabled={!canMarkPending || updatingStatus} testId="daily-rate-mark-pending" />
-              <ToolbarDivider />
-              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedRequest && handlePrintPDF(singleSelectedRequest.id)} disabled={!singleSelectedRequest} />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRequest && handleDelete(singleSelectedRequest.id)} disabled={!singleSelectedRequest} />
-            </Toolbar>
-          )}
-          footer={(
-            <TablePagination
-              currentPage={pagination.page}
-              totalPages={pagination.pages}
-              totalItems={pagination.total}
-              pageSize={15}
-              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
-            />
+            </>
           )}
         >
-          {loading ? (
-            <EmptyState loading />
-          ) : requests.length === 0 ? (
-            <EmptyState
-              icon={Wallet}
-              title="Nenhuma solicitação encontrada"
-              hint={searchQuery ? 'Ajuste a busca' : 'Registre a primeira pelo botão "Nova solicitação"'}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={requests.length > 0 && requests.every(r => selectedIds.has(r.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                      />
-                    </th>
-                    <th>Nº</th>
-                    <th className="!text-right">Itens</th>
-                    <th className="!text-right">Total</th>
-                    <th className="!text-right">A pagar</th>
-                    <th>Status</th>
-                    <th>Criado em</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map(request => (
-                    <tr
-                      key={request.id}
-                      data-selected={selectedIds.has(request.id)}
-                      className="cursor-pointer"
-                      onClick={() => toggleSelect(request.id)}
-                    >
-                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(request.id)}
-                          onCheckedChange={() => toggleSelect(request.id)}
-                        />
-                      </td>
-                      <td className="cell-strong whitespace-nowrap tabular-nums">#{request.request_number}</td>
-                      <td className="text-right tabular-nums">{request.items?.length || 0}</td>
-                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{formatMoney(request.total_value)}</td>
-                      <td className="text-right whitespace-nowrap tabular-nums">
-                        {request.status === 'CANCELADO' ? '-' : formatMoney(paidSummary(request).openValue)}
-                      </td>
-                      <td>{getStatusBadge(request)}</td>
-                      <td className="whitespace-nowrap tabular-nums">
-                        {request.created_at && format(new Date(request.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </DataCard>
-      </div>
 
-      {/* Modal Nova/Editar Solicitação */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Wallet className="w-4 h-4 text-primary" />
-              {editingRequest ? 'Editar Solicitação' : 'Nova Solicitação de Diária'}
-            </DialogTitle>
-          </DialogHeader>
 
           <div className="space-y-6">
             <div>
@@ -623,14 +523,134 @@ export default function DailyRateRequestPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : (editingRequest ? 'Salvar alterações' : 'Criar solicitação')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+        </FormPage>
+      ) : (
+        <div className="space-y-4">
+          <PageHeader
+            icon={Wallet}
+            title="Solicitação de Diária"
+            subtitle="Gerencie as solicitações de diária, comissão e almoço dos motoristas"
+            actions={(
+              <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="daily-rate-period-report">
+                <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
+              </Button>
+            )}
+          />
+  
+          <FilterCard hasFilters={!!(searchQuery || statusFilter || period[0] || period[1])} onClear={clearSearch}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <FilterField label="Motorista, placa ou cliente">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  data-testid="search-daily-rate-input"
+                />
+              </FilterField>
+              <FilterField label="Status">
+                <Select value={statusFilter || 'ALL'} onValueChange={handleStatusFilterChange}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="filter-daily-rate-status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos</SelectItem>
+                    <SelectItem value="PENDENTE">Pendente</SelectItem>
+                    <SelectItem value="PAGO">Pago</SelectItem>
+                    <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="daily-rate" />
+            </div>
+          </FilterCard>
+  
+          {/* Lista - marque uma solicitação pra habilitar as ações da barra */}
+          <DataCard
+            title="Solicitações"
+            count={pagination.total}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Nova solicitação" onClick={() => goNew()} testId="new-daily-rate-btn" />}
+              >
+                <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedRequest && openDetails(singleSelectedRequest)} disabled={!singleSelectedRequest} />
+                <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedRequest && goEdit(singleSelectedRequest.id)} disabled={!canEdit} />
+                <ToolbarDivider />
+                <ToolbarButton icon={CheckCircle2} label="Marcar como pago" tone="emerald" onClick={() => markSelectedAs('PAGO')} disabled={!canMarkPaid || updatingStatus} testId="daily-rate-mark-paid" />
+                <ToolbarButton icon={RotateCcw} label="Marcar como pendente" tone="amber" onClick={() => markSelectedAs('PENDENTE')} disabled={!canMarkPending || updatingStatus} testId="daily-rate-mark-pending" />
+                <ToolbarDivider />
+                <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedRequest && handlePrintPDF(singleSelectedRequest.id)} disabled={!singleSelectedRequest} />
+                <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRequest && handleDelete(singleSelectedRequest.id)} disabled={!singleSelectedRequest} />
+              </Toolbar>
+            )}
+            footer={(
+              <TablePagination
+                currentPage={pagination.page}
+                totalPages={pagination.pages}
+                totalItems={pagination.total}
+                pageSize={15}
+                onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+              />
+            )}
+          >
+            {loading ? (
+              <EmptyState loading />
+            ) : requests.length === 0 ? (
+              <EmptyState
+                icon={Wallet}
+                title="Nenhuma solicitação encontrada"
+                hint={searchQuery ? 'Ajuste a busca' : 'Registre a primeira pelo botão "Nova solicitação"'}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={requests.length > 0 && requests.every(r => selectedIds.has(r.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
+                      <th>Nº</th>
+                      <th className="!text-right">Itens</th>
+                      <th className="!text-right">Total</th>
+                      <th className="!text-right">A pagar</th>
+                      <th>Status</th>
+                      <th>Criado em</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {requests.map(request => (
+                      <tr
+                        key={request.id}
+                        data-selected={selectedIds.has(request.id)}
+                        className="cursor-pointer"
+                        onClick={() => toggleSelect(request.id)}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(request.id)}
+                            onCheckedChange={() => toggleSelect(request.id)}
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{request.request_number}</td>
+                        <td className="text-right tabular-nums">{request.items?.length || 0}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{formatMoney(request.total_value)}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums">
+                          {request.status === 'CANCELADO' ? '-' : formatMoney(paidSummary(request).openValue)}
+                        </td>
+                        <td>{getStatusBadge(request)}</td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {request.created_at && format(new Date(request.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataCard>
+        </div>
+      )}
 
       {/* Modal Detalhes */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>

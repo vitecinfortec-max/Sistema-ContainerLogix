@@ -31,9 +31,12 @@ const formatDay = (value) => (value ? format(calendarDate(value), 'dd/MM/yyyy') 
 // Em aberto e com vencimento já passado
 const isOverdue = (invoice) => (invoice.status || 'PENDENTE') === 'PENDENTE' && !!invoice.due_date && invoice.due_date < todayISO();
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
+import { FormPage, FormActions } from '../components/FormKit';
 const ITEMS_PER_PAGE = 15;
 
 const INVOICE_STATUS_OPTIONS = [
@@ -64,6 +67,7 @@ const shortenName = (fullName) => {
 };
 
 export default function BillingPage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/billing');
   // Estado principal - Faturas
   const [invoices, setInvoices] = useState([]);
   const [totalInvoices, setTotalInvoices] = useState(0);
@@ -382,7 +386,7 @@ export default function BillingPage() {
       });
       
       toast.success('Fatura gerada com sucesso!');
-      setShowNewInvoice(false);
+      backToList();
       loadInvoices();
     } catch (error) {
       const message = error.response?.data?.detail || 'Erro ao gerar fatura';
@@ -502,8 +506,7 @@ export default function BillingPage() {
         movement_ids_to_remove: Array.from(movementsToRemove)
       });
       toast.success('Fatura atualizada com sucesso!');
-      setShowEditModal(false);
-      setEditingInvoice(null);
+      backToList();
       loadInvoices();
     } catch (error) {
       const message = error.response?.data?.detail || 'Erro ao atualizar fatura';
@@ -784,7 +787,21 @@ export default function BillingPage() {
     }
   };
 
-  if (loading) {
+  // Gerar e editar fatura em página própria (/billing/new e /billing/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openNewInvoiceModal();
+    if (mode === 'edit') {
+      api.getInvoice(routeId)
+        .then((r) => openEditModal(r.data))
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar fatura'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading && !isForm) {
     return (
       <Layout>
         <PageSkeleton testId="billing-loading" />
@@ -794,205 +811,41 @@ export default function BillingPage() {
 
   return (
     <Layout>
-      <div className="space-y-4" data-testid="billing-page">
-        <PageHeader icon={Receipt} title="Faturamento" subtitle="Gerencie as faturas do sistema" />
-
-        {stats && (
-          <StatGrid>
-            <StatCard label="Em aberto" value={formatCurrency(stats.PENDENTE.total)} icon={Clock} tone="amber" hint={`${stats.PENDENTE.count} fatura(s) pendente(s)`} testId="invoice-kpi-pending" />
-            <StatCard label="Recebido" value={formatCurrency(stats.PAGO.total)} icon={Check} tone="emerald" hint={`${stats.PAGO.count} fatura(s) paga(s)`} testId="invoice-kpi-paid" />
-            <StatCard label="Cancelado" value={formatCurrency(stats.CANCELADO.total)} icon={X} tone="red" hint={`${stats.CANCELADO.count} fatura(s)`} />
-            <StatCard label="Faturas" value={stats.PENDENTE.count + stats.PAGO.count + stats.CANCELADO.count} icon={Receipt} tone="blue" hint={appliedClient ? 'do cliente filtrado' : 'no total'} />
-          </StatGrid>
-        )}
-
-        <FilterCard hasFilters={!!appliedClient || !!clientFilter || !!statusFilter || !!period[0] || !!period[1]} onClear={clearClientFilter}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Cliente">
-              <SearchInput
-                value={clientFilter}
-                onChange={(e) => { setClientFilter(e.target.value); setCurrentPage(1); }}
-                data-testid="invoice-client-filter"
-              />
-            </FilterField>
-            <FilterField label="Status">
-              <Select
-                value={statusFilter || 'ALL'}
-                onValueChange={(v) => { setStatusFilter(v === 'ALL' ? '' : v); setCurrentPage(1); }}
-              >
-                <SelectTrigger className="h-9 text-[13px]" data-testid="invoice-status-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos</SelectItem>
-                  {INVOICE_STATUS_OPTIONS.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="invoice" />
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque uma fatura pra habilitar as ações da barra */}
-        <DataCard
-          title="Faturas geradas"
-          count={totalInvoices}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Gerar faturamento" onClick={openNewInvoiceModal} testId="new-invoice-button" />}
+      {isForm ? (
+        mode === 'new' ? (
+        <FormPage
+          title="Gerar nova fatura"
+          icon={Receipt}
+          backTo={backToList}
+          subtitle="Selecione as movimentações para incluir na fatura"
+          testId="invoice-form-page"
+          actions={(
+            <>
+            <Button variant="outline" onClick={() => backToList()}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={createInvoice} 
+              disabled={selectedMovements.size === 0 || creating}
+              className="bg-primary hover:bg-primary/90"
+              data-testid="confirm-create-invoice"
             >
-              <ToolbarButton
-                icon={Eye}
-                label="Ver detalhes"
-                tone="primary"
-                onClick={() => singleSelectedInvoice && viewInvoiceDetails(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice}
-                testId={singleSelectedInvoice ? `view-invoice-${singleSelectedInvoice.id}` : undefined}
-              />
-              <ToolbarButton
-                icon={Edit}
-                label="Editar"
-                tone="blue"
-                onClick={() => singleSelectedInvoice && openEditModal(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice || singleSelectedInvoice.status === 'CANCELADO'}
-                testId={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
-              />
-              <ToolbarDivider />
-              <ToolbarButton
-                icon={FileText}
-                label={singleSelectedInvoice && downloadingPdf === singleSelectedInvoice.id ? 'Gerando PDF...' : 'Baixar PDF'}
-                tone="red"
-                onClick={() => singleSelectedInvoice && downloadPdf(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice || downloadingPdf === singleSelectedInvoice?.id}
-              />
-              <ToolbarButton
-                icon={FileSpreadsheet}
-                label={singleSelectedInvoice && downloadingExcel === singleSelectedInvoice.id ? 'Gerando Excel...' : 'Baixar Excel'}
-                tone="emerald"
-                onClick={() => singleSelectedInvoice && downloadExcel(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice || downloadingExcel === singleSelectedInvoice?.id}
-                testId={singleSelectedInvoice ? `download-invoice-${singleSelectedInvoice.id}` : undefined}
-              />
-              <ToolbarButton
-                icon={Receipt}
-                label={singleSelectedInvoice && downloadingReceipt === singleSelectedInvoice.id ? 'Gerando recibo...' : 'Recibo'}
-                tone="primary"
-                onClick={() => singleSelectedInvoice && downloadReceipt(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice || singleSelectedInvoice.status !== 'PAGO' || downloadingReceipt === singleSelectedInvoice?.id}
-                testId="invoice-receipt-button"
-              />
-              <ToolbarDivider />
-              <ToolbarButton
-                icon={Trash2}
-                label="Excluir"
-                tone="red"
-                onClick={() => singleSelectedInvoice && confirmDelete(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice}
-                testId={singleSelectedInvoice ? `delete-invoice-${singleSelectedInvoice.id}` : undefined}
-              />
-            </Toolbar>
-          )}
-          footer={(
-            <TablePagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={totalInvoices}
-              pageSize={ITEMS_PER_PAGE}
-              onPageChange={goToPage}
-            />
+              {creating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 mr-2" />
+                  Gerar fatura ({selectedMovements.size})
+                </>
+              )}
+            </Button>
+            </>
           )}
         >
-          {invoices.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={invoices.length > 0 && invoices.every(i => selectedIds.has(i.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                      />
-                    </th>
-                    <th>Nº fatura</th>
-                    <th>Data</th>
-                    <th>Vencimento</th>
-                    <th>Cliente</th>
-                    <th>CNPJ</th>
-                    <th className="!text-right">Qtd. movim.</th>
-                    <th className="!text-right">Valor total</th>
-                    <th>Status</th>
-                    <th>Usuário</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((invoice) => {
-                    const badge = getInvoiceStatusBadge(invoice.status);
-                    return (
-                      <tr
-                        key={invoice.id}
-                        data-selected={selectedIds.has(invoice.id)}
-                        data-row-tone={rowTone(isOverdue(invoice) ? 'alert' : invoice.status === 'CANCELADO' ? 'off' : null)}
-                        className="cursor-pointer"
-                        onClick={() => toggleSelect(invoice.id)}
-                        data-testid="invoice-row"
-                      >
-                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(invoice.id)}
-                            onCheckedChange={() => toggleSelect(invoice.id)}
-                          />
-                        </td>
-                        <td className="cell-strong whitespace-nowrap tabular-nums">#{invoice.invoice_number}</td>
-                        <td className="whitespace-nowrap tabular-nums">
-                          {format(new Date(invoice.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                        </td>
-                        <td className={`whitespace-nowrap tabular-nums ${isOverdue(invoice) ? 'text-destructive font-semibold' : ''}`} title={isOverdue(invoice) ? 'Vencida' : undefined}>
-                          {formatDay(invoice.due_date)}
-                        </td>
-                        <td><div className="max-w-[260px] truncate font-medium text-slate-700 dark:text-slate-200" title={invoice.client_name || ''}>{invoice.client_name}</div></td>
-                        <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{invoice.client_cnpj || '-'}</td>
-                        <td className="text-right tabular-nums">{invoice.movement_ids.length}</td>
-                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">
-                          {formatCurrency(invoice.total_value)}
-                          {invoice.credit_applied > 0 && invoice.status === 'PENDENTE' && (
-                            <div className="text-[11px] font-normal text-muted-foreground" title={`Crédito do cliente usado: ${formatCurrency(invoice.credit_applied)}`}>
-                              falta {formatCurrency(invoice.open_value)}
-                            </div>
-                          )}
-                        </td>
-                        <td><StatusPill tone={badge.tone}>{badge.label}</StatusPill></td>
-                        <td><UserTag name={invoice.user_name ? shortenName(invoice.user_name) : null} /></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState
-              icon={FileText}
-              title={appliedClient ? 'Nenhuma fatura encontrada para esse cliente' : 'Nenhuma fatura gerada'}
-              hint={appliedClient ? 'Ajuste o filtro' : 'Clique em "Gerar faturamento" para criar uma nova fatura'}
-            />
-          )}
-        </DataCard>
-      </div>
 
-      {/* Modal - Nova Fatura */}
-      <Dialog open={showNewInvoice} onOpenChange={setShowNewInvoice}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Receipt className="w-4 h-4 text-primary" />
-              Gerar Nova Fatura
-            </DialogTitle>
-            <DialogDescription className="text-[13px]">
-              Selecione as movimentações para incluir na fatura
-            </DialogDescription>
-          </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-4 py-4">
             {/* Campos de Busca */}
@@ -1236,31 +1089,410 @@ export default function BillingPage() {
             )}
           </div>
 
-          <DialogFooter className="border-t pt-4">
-            <Button variant="outline" onClick={() => setShowNewInvoice(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={createInvoice} 
-              disabled={selectedMovements.size === 0 || creating}
-              className="bg-primary hover:bg-primary/90"
-              data-testid="confirm-create-invoice"
-            >
-              {creating ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Gerar fatura ({selectedMovements.size})
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+        </FormPage>
+        ) : (
+        <FormPage
+          loading={!editingInvoice}
+          title={`Editar fatura #${editingInvoice?.invoice_number || ''}`}
+          icon={Edit}
+          backTo={backToList}
+          subtitle="Atualize as informações e gerencie as movimentações da fatura"
+          testId="edit-invoice-dialog"
+        >
+
+          
+          <div className="overflow-y-auto flex-1 pr-2">
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              {/* Dados do Cliente */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-client-name" className="block">Nome do Cliente *</Label>
+                  <Input
+                    id="edit-client-name"
+                    data-testid="edit-client-name-input"
+                    value={editFormData.client_name}
+                    onChange={(e) => setEditFormData({ ...editFormData, client_name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-client-cnpj" className="block">CNPJ</Label>
+                  <Input
+                    id="edit-client-cnpj"
+                    data-testid="edit-client-cnpj-input"
+                    value={editFormData.client_cnpj}
+                    onChange={handleCNPJChange}
+                    className="font-mono"
+                    maxLength={18}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-1.5 max-w-[220px]">
+                <Label htmlFor="edit-due-date" className="block">Vencimento</Label>
+                <Input
+                  id="edit-due-date"
+                  type="date"
+                  className="h-9"
+                  data-testid="edit-due-date-input"
+                  value={editFormData.due_date}
+                  onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-notes" className="block">Observações</Label>
+                <Textarea
+                  id="edit-notes"
+                  data-testid="edit-notes-input"
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                  className="min-h-[60px] text-[13px]"
+                />
+              </div>
+
+              {/* Movimentações Atuais */}
+              <div className="border rounded-lg">
+                <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 border-b flex items-center justify-between">
+                  <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                    Movimentações na Fatura ({editMovements.length - movementsToRemove.size})
+                  </span>
+                  {movementsToRemove.size > 0 && (
+                    <span className="text-[11px] text-red-600">
+                      {movementsToRemove.size} marcada(s) para remover
+                    </span>
+                  )}
+                </div>
+                <div className="max-h-40 overflow-y-auto">
+                  {loadingEditMovements ? (
+                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Carregando...</div>
+                  ) : editMovements.length > 0 ? (
+                    <table className="data-table">
+                      <thead className="sticky top-0">
+                        <tr>
+                          <th>ID</th>
+                          <th>Container</th>
+                          <th>Tipo</th>
+                          <th className="!text-right">Valor</th>
+                          <th className="!text-center">Remover</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editMovements.map((mov) => (
+                          <tr 
+                            key={mov.id} 
+                            className={`${movementsToRemove.has(mov.id) ? 'bg-red-50 line-through opacity-60' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                          >
+                            <td className="text-[12px] font-mono">{mov.transaction_id}</td>
+                            <td className="text-[12px]">{mov.container_number}</td>
+                            <td className="text-[12px]">{mov.operation_type}</td>
+                            <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
+                            <td className="text-center">
+                              <button aria-label={movementsToRemove.has(mov.id) ? 'Desfazer remoção' : 'Remover da fatura'}
+                                type="button"
+                                onClick={() => toggleRemoveMovement(mov.id)}
+                                className={`p-1 rounded ${movementsToRemove.has(mov.id) ? 'text-emerald-600 hover:bg-emerald-100' : 'text-red-600 hover:bg-red-100'}`}
+                                title={movementsToRemove.has(mov.id) ? 'Desfazer remoção' : 'Remover da fatura'}
+                              >
+                                {movementsToRemove.has(mov.id) ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Nenhuma movimentação</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Adicionar Movimentações */}
+              <div className="border rounded-lg">
+                <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 border-b flex items-center justify-between">
+                  <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                    Adicionar Movimentações
+                  </span>
+                  {movementsToAdd.size > 0 && (
+                    <span className="text-[11px] text-emerald-600">
+                      {movementsToAdd.size} selecionada(s) para adicionar
+                    </span>
+                  )}
+                </div>
+                
+                {/* Busca por ID */}
+                <div className="p-3 border-b bg-slate-50 dark:bg-slate-800/50">
+                  <div className="flex gap-2">
+                    <Input
+                      value={editSearchId}
+                      onChange={(e) => setEditSearchId(e.target.value)}
+                      className="h-9 text-[13px] flex-1"
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchMovementById())}
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={searchMovementById} className="h-9 text-[12px]">
+                      <Search className="w-3.5 h-3.5 mr-1" />
+                      Buscar
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="max-h-40 overflow-y-auto">
+                  {editAvailableMovements.length > 0 ? (
+                    <table className="data-table">
+                      <thead className="sticky top-0">
+                        <tr>
+                          <th>ID</th>
+                          <th>Container</th>
+                          <th>Tipo</th>
+                          <th className="!text-right">Valor</th>
+                          <th className="!text-center">Adicionar</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {editAvailableMovements.map((mov) => (
+                          <tr 
+                            key={mov.id} 
+                            className={`${movementsToAdd.has(mov.id) ? 'bg-emerald-50' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                          >
+                            <td className="text-[12px] font-mono">{mov.transaction_id}</td>
+                            <td className="text-[12px]">{mov.container_number}</td>
+                            <td className="text-[12px]">{mov.operation_type}</td>
+                            <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
+                            <td className="text-center">
+                              <button aria-label={movementsToAdd.has(mov.id) ? 'Remover seleção' : 'Adicionar à fatura'}
+                                type="button"
+                                onClick={() => toggleAddMovement(mov.id)}
+                                className={`p-1 rounded ${movementsToAdd.has(mov.id) ? 'text-red-600 hover:bg-red-100' : 'text-emerald-600 hover:bg-emerald-100'}`}
+                                title={movementsToAdd.has(mov.id) ? 'Remover seleção' : 'Adicionar à fatura'}
+                              >
+                                {movementsToAdd.has(mov.id) ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">
+                      Nenhuma movimentação disponível para adicionar
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <FormActions sticky>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => backToList()}
+                  disabled={saving}
+                  className="text-[13px]"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  type="submit"
+                  className="text-[13px] font-semibold"
+                  disabled={saving}
+                  data-testid="save-invoice-button"
+                >
+                  {saving ? 'Salvando...' : 'Salvar alterações'}
+                </Button>
+              </FormActions>
+            </form>
+          </div>
+        
+        </FormPage>
+        )
+      ) : (
+        <div className="space-y-4" data-testid="billing-page">
+          <PageHeader icon={Receipt} title="Faturamento" subtitle="Gerencie as faturas do sistema" />
+  
+          {stats && (
+            <StatGrid>
+              <StatCard label="Em aberto" value={formatCurrency(stats.PENDENTE.total)} icon={Clock} tone="amber" hint={`${stats.PENDENTE.count} fatura(s) pendente(s)`} testId="invoice-kpi-pending" />
+              <StatCard label="Recebido" value={formatCurrency(stats.PAGO.total)} icon={Check} tone="emerald" hint={`${stats.PAGO.count} fatura(s) paga(s)`} testId="invoice-kpi-paid" />
+              <StatCard label="Cancelado" value={formatCurrency(stats.CANCELADO.total)} icon={X} tone="red" hint={`${stats.CANCELADO.count} fatura(s)`} />
+              <StatCard label="Faturas" value={stats.PENDENTE.count + stats.PAGO.count + stats.CANCELADO.count} icon={Receipt} tone="blue" hint={appliedClient ? 'do cliente filtrado' : 'no total'} />
+            </StatGrid>
+          )}
+  
+          <FilterCard hasFilters={!!appliedClient || !!clientFilter || !!statusFilter || !!period[0] || !!period[1]} onClear={clearClientFilter}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <FilterField label="Cliente">
+                <SearchInput
+                  value={clientFilter}
+                  onChange={(e) => { setClientFilter(e.target.value); setCurrentPage(1); }}
+                  data-testid="invoice-client-filter"
+                />
+              </FilterField>
+              <FilterField label="Status">
+                <Select
+                  value={statusFilter || 'ALL'}
+                  onValueChange={(v) => { setStatusFilter(v === 'ALL' ? '' : v); setCurrentPage(1); }}
+                >
+                  <SelectTrigger className="h-9 text-[13px]" data-testid="invoice-status-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos</SelectItem>
+                    {INVOICE_STATUS_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="invoice" />
+            </div>
+          </FilterCard>
+  
+          {/* Lista - marque uma fatura pra habilitar as ações da barra */}
+          <DataCard
+            title="Faturas geradas"
+            count={totalInvoices}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Gerar faturamento" onClick={() => goNew()} testId="new-invoice-button" />}
+              >
+                <ToolbarButton
+                  icon={Eye}
+                  label="Ver detalhes"
+                  tone="primary"
+                  onClick={() => singleSelectedInvoice && viewInvoiceDetails(singleSelectedInvoice)}
+                  disabled={!singleSelectedInvoice}
+                  testId={singleSelectedInvoice ? `view-invoice-${singleSelectedInvoice.id}` : undefined}
+                />
+                <ToolbarButton
+                  icon={Edit}
+                  label="Editar"
+                  tone="blue"
+                  onClick={() => singleSelectedInvoice && goEdit(singleSelectedInvoice.id)}
+                  disabled={!singleSelectedInvoice || singleSelectedInvoice.status === 'CANCELADO'}
+                  testId={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
+                />
+                <ToolbarDivider />
+                <ToolbarButton
+                  icon={FileText}
+                  label={singleSelectedInvoice && downloadingPdf === singleSelectedInvoice.id ? 'Gerando PDF...' : 'Baixar PDF'}
+                  tone="red"
+                  onClick={() => singleSelectedInvoice && downloadPdf(singleSelectedInvoice)}
+                  disabled={!singleSelectedInvoice || downloadingPdf === singleSelectedInvoice?.id}
+                />
+                <ToolbarButton
+                  icon={FileSpreadsheet}
+                  label={singleSelectedInvoice && downloadingExcel === singleSelectedInvoice.id ? 'Gerando Excel...' : 'Baixar Excel'}
+                  tone="emerald"
+                  onClick={() => singleSelectedInvoice && downloadExcel(singleSelectedInvoice)}
+                  disabled={!singleSelectedInvoice || downloadingExcel === singleSelectedInvoice?.id}
+                  testId={singleSelectedInvoice ? `download-invoice-${singleSelectedInvoice.id}` : undefined}
+                />
+                <ToolbarButton
+                  icon={Receipt}
+                  label={singleSelectedInvoice && downloadingReceipt === singleSelectedInvoice.id ? 'Gerando recibo...' : 'Recibo'}
+                  tone="primary"
+                  onClick={() => singleSelectedInvoice && downloadReceipt(singleSelectedInvoice)}
+                  disabled={!singleSelectedInvoice || singleSelectedInvoice.status !== 'PAGO' || downloadingReceipt === singleSelectedInvoice?.id}
+                  testId="invoice-receipt-button"
+                />
+                <ToolbarDivider />
+                <ToolbarButton
+                  icon={Trash2}
+                  label="Excluir"
+                  tone="red"
+                  onClick={() => singleSelectedInvoice && confirmDelete(singleSelectedInvoice)}
+                  disabled={!singleSelectedInvoice}
+                  testId={singleSelectedInvoice ? `delete-invoice-${singleSelectedInvoice.id}` : undefined}
+                />
+              </Toolbar>
+            )}
+            footer={(
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalInvoices}
+                pageSize={ITEMS_PER_PAGE}
+                onPageChange={goToPage}
+              />
+            )}
+          >
+            {invoices.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={invoices.length > 0 && invoices.every(i => selectedIds.has(i.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
+                      <th>Nº fatura</th>
+                      <th>Data</th>
+                      <th>Vencimento</th>
+                      <th>Cliente</th>
+                      <th>CNPJ</th>
+                      <th className="!text-right">Qtd. movim.</th>
+                      <th className="!text-right">Valor total</th>
+                      <th>Status</th>
+                      <th>Usuário</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map((invoice) => {
+                      const badge = getInvoiceStatusBadge(invoice.status);
+                      return (
+                        <tr
+                          key={invoice.id}
+                          data-selected={selectedIds.has(invoice.id)}
+                          data-row-tone={rowTone(isOverdue(invoice) ? 'alert' : invoice.status === 'CANCELADO' ? 'off' : null)}
+                          className="cursor-pointer"
+                          onClick={() => toggleSelect(invoice.id)}
+                          data-testid="invoice-row"
+                        >
+                          <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedIds.has(invoice.id)}
+                              onCheckedChange={() => toggleSelect(invoice.id)}
+                            />
+                          </td>
+                          <td className="cell-strong whitespace-nowrap tabular-nums">#{invoice.invoice_number}</td>
+                          <td className="whitespace-nowrap tabular-nums">
+                            {format(new Date(invoice.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                          </td>
+                          <td className={`whitespace-nowrap tabular-nums ${isOverdue(invoice) ? 'text-destructive font-semibold' : ''}`} title={isOverdue(invoice) ? 'Vencida' : undefined}>
+                            {formatDay(invoice.due_date)}
+                          </td>
+                          <td><div className="max-w-[260px] truncate font-medium text-slate-700 dark:text-slate-200" title={invoice.client_name || ''}>{invoice.client_name}</div></td>
+                          <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{invoice.client_cnpj || '-'}</td>
+                          <td className="text-right tabular-nums">{invoice.movement_ids.length}</td>
+                          <td className="text-right whitespace-nowrap tabular-nums cell-strong">
+                            {formatCurrency(invoice.total_value)}
+                            {invoice.credit_applied > 0 && invoice.status === 'PENDENTE' && (
+                              <div className="text-[11px] font-normal text-muted-foreground" title={`Crédito do cliente usado: ${formatCurrency(invoice.credit_applied)}`}>
+                                falta {formatCurrency(invoice.open_value)}
+                              </div>
+                            )}
+                          </td>
+                          <td><StatusPill tone={badge.tone}>{badge.label}</StatusPill></td>
+                          <td><UserTag name={invoice.user_name ? shortenName(invoice.user_name) : null} /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                icon={FileText}
+                title={appliedClient ? 'Nenhuma fatura encontrada para esse cliente' : 'Nenhuma fatura gerada'}
+                hint={appliedClient ? 'Ajuste o filtro' : 'Clique em "Gerar faturamento" para criar uma nova fatura'}
+              />
+            )}
+          </DataCard>
+        </div>
+      )}
 
       {/* Modal - Detalhes da Fatura */}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
@@ -1512,222 +1744,6 @@ export default function BillingPage() {
               </Button>
             </div>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal - Edição de Fatura */}
-      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" data-testid="edit-invoice-dialog">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Edit className="w-4 h-4 text-primary" />
-              Editar Fatura #{editingInvoice?.invoice_number}
-            </DialogTitle>
-            <DialogDescription className="text-[13px]">
-              Atualize as informações e gerencie as movimentações da fatura
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="overflow-y-auto flex-1 pr-2">
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              {/* Dados do Cliente */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="edit-client-name" className="block">Nome do Cliente *</Label>
-                  <Input
-                    id="edit-client-name"
-                    data-testid="edit-client-name-input"
-                    value={editFormData.client_name}
-                    onChange={(e) => setEditFormData({ ...editFormData, client_name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="edit-client-cnpj" className="block">CNPJ</Label>
-                  <Input
-                    id="edit-client-cnpj"
-                    data-testid="edit-client-cnpj-input"
-                    value={editFormData.client_cnpj}
-                    onChange={handleCNPJChange}
-                    className="font-mono"
-                    maxLength={18}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-1.5 max-w-[220px]">
-                <Label htmlFor="edit-due-date" className="block">Vencimento</Label>
-                <Input
-                  id="edit-due-date"
-                  type="date"
-                  className="h-9"
-                  data-testid="edit-due-date-input"
-                  value={editFormData.due_date}
-                  onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-notes" className="block">Observações</Label>
-                <Textarea
-                  id="edit-notes"
-                  data-testid="edit-notes-input"
-                  value={editFormData.notes}
-                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                  className="min-h-[60px] text-[13px]"
-                />
-              </div>
-
-              {/* Movimentações Atuais */}
-              <div className="border rounded-lg">
-                <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 border-b flex items-center justify-between">
-                  <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                    Movimentações na Fatura ({editMovements.length - movementsToRemove.size})
-                  </span>
-                  {movementsToRemove.size > 0 && (
-                    <span className="text-[11px] text-red-600">
-                      {movementsToRemove.size} marcada(s) para remover
-                    </span>
-                  )}
-                </div>
-                <div className="max-h-40 overflow-y-auto">
-                  {loadingEditMovements ? (
-                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Carregando...</div>
-                  ) : editMovements.length > 0 ? (
-                    <table className="data-table">
-                      <thead className="sticky top-0">
-                        <tr>
-                          <th>ID</th>
-                          <th>Container</th>
-                          <th>Tipo</th>
-                          <th className="!text-right">Valor</th>
-                          <th className="!text-center">Remover</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {editMovements.map((mov) => (
-                          <tr 
-                            key={mov.id} 
-                            className={`${movementsToRemove.has(mov.id) ? 'bg-red-50 line-through opacity-60' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                          >
-                            <td className="text-[12px] font-mono">{mov.transaction_id}</td>
-                            <td className="text-[12px]">{mov.container_number}</td>
-                            <td className="text-[12px]">{mov.operation_type}</td>
-                            <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
-                            <td className="text-center">
-                              <button aria-label={movementsToRemove.has(mov.id) ? 'Desfazer remoção' : 'Remover da fatura'}
-                                type="button"
-                                onClick={() => toggleRemoveMovement(mov.id)}
-                                className={`p-1 rounded ${movementsToRemove.has(mov.id) ? 'text-emerald-600 hover:bg-emerald-100' : 'text-red-600 hover:bg-red-100'}`}
-                                title={movementsToRemove.has(mov.id) ? 'Desfazer remoção' : 'Remover da fatura'}
-                              >
-                                {movementsToRemove.has(mov.id) ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Nenhuma movimentação</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Adicionar Movimentações */}
-              <div className="border rounded-lg">
-                <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 border-b flex items-center justify-between">
-                  <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
-                    Adicionar Movimentações
-                  </span>
-                  {movementsToAdd.size > 0 && (
-                    <span className="text-[11px] text-emerald-600">
-                      {movementsToAdd.size} selecionada(s) para adicionar
-                    </span>
-                  )}
-                </div>
-                
-                {/* Busca por ID */}
-                <div className="p-3 border-b bg-slate-50 dark:bg-slate-800/50">
-                  <div className="flex gap-2">
-                    <Input
-                      value={editSearchId}
-                      onChange={(e) => setEditSearchId(e.target.value)}
-                      className="h-9 text-[13px] flex-1"
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchMovementById())}
-                    />
-                    <Button type="button" variant="outline" size="sm" onClick={searchMovementById} className="h-9 text-[12px]">
-                      <Search className="w-3.5 h-3.5 mr-1" />
-                      Buscar
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="max-h-40 overflow-y-auto">
-                  {editAvailableMovements.length > 0 ? (
-                    <table className="data-table">
-                      <thead className="sticky top-0">
-                        <tr>
-                          <th>ID</th>
-                          <th>Container</th>
-                          <th>Tipo</th>
-                          <th className="!text-right">Valor</th>
-                          <th className="!text-center">Adicionar</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {editAvailableMovements.map((mov) => (
-                          <tr 
-                            key={mov.id} 
-                            className={`${movementsToAdd.has(mov.id) ? 'bg-emerald-50' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                          >
-                            <td className="text-[12px] font-mono">{mov.transaction_id}</td>
-                            <td className="text-[12px]">{mov.container_number}</td>
-                            <td className="text-[12px]">{mov.operation_type}</td>
-                            <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
-                            <td className="text-center">
-                              <button aria-label={movementsToAdd.has(mov.id) ? 'Remover seleção' : 'Adicionar à fatura'}
-                                type="button"
-                                onClick={() => toggleAddMovement(mov.id)}
-                                className={`p-1 rounded ${movementsToAdd.has(mov.id) ? 'text-red-600 hover:bg-red-100' : 'text-emerald-600 hover:bg-emerald-100'}`}
-                                title={movementsToAdd.has(mov.id) ? 'Remover seleção' : 'Adicionar à fatura'}
-                              >
-                                {movementsToAdd.has(mov.id) ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">
-                      Nenhuma movimentação disponível para adicionar
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <DialogFooter className="pt-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setShowEditModal(false)}
-                  disabled={saving}
-                  className="text-[13px]"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  type="submit"
-                  className="text-[13px] font-semibold"
-                  disabled={saving}
-                  data-testid="save-invoice-button"
-                >
-                  {saving ? 'Salvando...' : 'Salvar alterações'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </div>
         </DialogContent>
       </Dialog>
 

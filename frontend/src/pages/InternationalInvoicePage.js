@@ -1,4 +1,4 @@
-import { FormSectionTitle } from '../components/FormKit';
+import { FormSectionTitle, FormPage } from '../components/FormKit';
 import { useEffect, useState, useRef } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -22,9 +22,11 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
 const ITEMS_PER_PAGE = 15;
 
 const CURRENCIES = [
@@ -40,6 +42,7 @@ const STATUS_OPTIONS = [
 ];
 
 export default function InternationalInvoicePage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/international-invoices');
   // Estado principal
   const [invoices, setInvoices] = useState([]);
   const [totalInvoices, setTotalInvoices] = useState(0);
@@ -321,7 +324,7 @@ export default function InternationalInvoicePage() {
 
       await api.createIntlInvoice(payload);
       toast.success('Invoice criada com sucesso!');
-      setShowNewInvoice(false);
+      backToList();
       loadInvoices();
     } catch (error) {
       console.error('Erro ao criar invoice:', error);
@@ -480,8 +483,7 @@ export default function InternationalInvoicePage() {
 
       await api.updateIntlInvoice(editingInvoice.id, payload);
       toast.success('Invoice atualizada com sucesso!');
-      setShowEditModal(false);
-      setEditingInvoice(null);
+      backToList();
       loadInvoices();
     } catch (error) {
       console.error('Erro ao atualizar invoice:', error);
@@ -586,181 +588,52 @@ export default function InternationalInvoicePage() {
 
   const totalPages = Math.ceil(totalInvoices / ITEMS_PER_PAGE);
 
+  // Cadastro e edição em página própria (/international-invoices/new e /:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openNewInvoiceModal();
+    if (mode === 'edit') {
+      api.getIntlInvoice(routeId)
+        .then((r) => handleOpenEdit(r.data))
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar invoice'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4" data-testid="international-invoice-page">
-        <PageHeader icon={Globe} title="Invoices Internacionais" subtitle="Gerencie suas faturas para clientes internacionais" />
-
-        <FilterCard
-          hasFilters={!!(filterStatus || filterCurrency || period[0] || period[1])}
-          onClear={() => { setFilterStatus(''); setFilterCurrency(''); setPeriod(['', '']); }}
-        >
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <FilterField label="Status">
-              <Select value={filterStatus || 'ALL'} onValueChange={(val) => setFilterStatus(val === "ALL" ? "" : val)}>
-                <SelectTrigger className="h-9 text-sm" data-testid="filter-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos</SelectItem>
-                  {STATUS_OPTIONS.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Moeda">
-              <Select value={filterCurrency || 'ALL'} onValueChange={(val) => setFilterCurrency(val === "ALL" ? "" : val)}>
-                <SelectTrigger className="h-9 text-sm" data-testid="filter-currency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todas</SelectItem>
-                  {CURRENCIES.map(opt => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.value}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="intl-invoice" />
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque uma invoice pra habilitar as ações da barra */}
-        <DataCard
-          title="Invoices"
-          count={totalInvoices}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Nova invoice" onClick={openNewInvoiceModal} testId="new-invoice-btn" />}
-            >
-              <ToolbarButton
-                icon={Eye}
-                label="Ver detalhes"
-                tone="primary"
-                onClick={() => singleSelectedInvoice && handleViewDetails(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice}
-                testId={singleSelectedInvoice ? `view-invoice-${singleSelectedInvoice.id}` : undefined}
-              />
-              <ToolbarButton
-                icon={Pencil}
-                label="Editar"
-                tone="blue"
-                onClick={() => singleSelectedInvoice && handleOpenEdit(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice || singleSelectedInvoice.status === 'CANCELADA'}
-                testId={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
-              />
-              <ToolbarButton
-                icon={FileDown}
-                label={singleSelectedInvoice && downloadingPdf === singleSelectedInvoice.id ? 'Gerando PDF...' : 'Baixar PDF'}
-                tone="emerald"
-                onClick={() => singleSelectedInvoice && handleDownloadPdf(singleSelectedInvoice)}
-                disabled={!singleSelectedInvoice || downloadingPdf === singleSelectedInvoice?.id}
-                testId={singleSelectedInvoice ? `download-pdf-${singleSelectedInvoice.id}` : undefined}
-              />
-              <ToolbarButton
-                icon={Trash2}
-                label="Excluir"
-                tone="red"
-                onClick={() => {
-                  if (!singleSelectedInvoice) return;
-                  setInvoiceToDelete(singleSelectedInvoice);
-                  setShowDeleteConfirm(true);
-                }}
-                disabled={!singleSelectedInvoice}
-                testId={singleSelectedInvoice ? `delete-invoice-${singleSelectedInvoice.id}` : undefined}
-              />
-            </Toolbar>
-          )}
-          footer={(
-            <TablePagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalItems={totalInvoices}
-              pageSize={ITEMS_PER_PAGE}
-              onPageChange={setCurrentPage}
-            />
+      {isForm ? (
+        mode === 'new' ? (
+        <FormPage
+          title="Nova invoice internacional"
+          icon={Globe}
+          backTo={backToList}
+          subtitle="Fatura para cliente no exterior"
+          testId="intl-invoice-form-page"
+          actions={(
+            <>
+              <Button variant="outline" onClick={() => backToList()}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateInvoice} disabled={creating} data-testid="create-invoice-btn">
+                {creating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Criando...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Criar invoice
+                  </>
+                )}
+              </Button>
+            </>
           )}
         >
-          {loading ? (
-            <EmptyState loading />
-          ) : invoices.length === 0 ? (
-            <EmptyState
-              icon={Globe}
-              title="Nenhuma invoice encontrada"
-              hint={filterStatus || filterCurrency ? 'Ajuste os filtros' : 'Crie a primeira pelo botão "Nova invoice"'}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={invoices.length > 0 && invoices.every(i => selectedIds.has(i.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                      />
-                    </th>
-                    <th>Nº</th>
-                    <th>Pagador</th>
-                    <th>Emissão</th>
-                    <th>Vencimento</th>
-                    <th>Moeda</th>
-                    <th className="!text-right">Total</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {invoices.map((invoice) => {
-                    const statusBadge = getStatusBadge(invoice.status);
-                    return (
-                      <tr
-                        key={invoice.id}
-                        data-selected={selectedIds.has(invoice.id)}
-                        className="cursor-pointer"
-                        onClick={() => toggleSelect(invoice.id)}
-                      >
-                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.has(invoice.id)}
-                            onCheckedChange={() => toggleSelect(invoice.id)}
-                          />
-                        </td>
-                        <td className="cell-strong whitespace-nowrap tabular-nums">#{invoice.invoice_number}</td>
-                        <td><div className="max-w-[260px] truncate" title={invoice.payer_company || ''}>{invoice.payer_company}</div></td>
-                        <td className="whitespace-nowrap tabular-nums">
-                          {invoice.issue_date ? format(parseISO(invoice.issue_date), 'dd/MM/yyyy') : '-'}
-                        </td>
-                        <td className="whitespace-nowrap tabular-nums">
-                          {invoice.due_date ? format(parseISO(invoice.due_date), 'dd/MM/yyyy') : '-'}
-                        </td>
-                        <td><StatusPill tone="slate" dot={false}>{invoice.currency}</StatusPill></td>
-                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">
-                          {getCurrencySymbol(invoice.currency)} {invoice.total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td><StatusPill tone={statusBadge.tone}>{statusBadge.label}</StatusPill></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </DataCard>
 
-        {/* Modal Nova Invoice */}
-        <Dialog open={showNewInvoice} onOpenChange={setShowNewInvoice}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-              <DialogTitle className="flex items-center gap-2 text-base">
-                <Globe className="h-4 w-4 text-primary" />
-                Nova Invoice Internacional
-              </DialogTitle>
-              <DialogDescription className="text-[13px]">
-                Preencha os dados para criar uma nova invoice
-              </DialogDescription>
-            </DialogHeader>
 
             <div className="space-y-6 py-4">
               {/* Dados do Recebedor (fixo) */}
@@ -1016,201 +889,37 @@ export default function InternationalInvoicePage() {
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowNewInvoice(false)}>
+        </FormPage>
+        ) : (
+        <FormPage
+          loading={!editingInvoice}
+          title={`Editar invoice #${editingInvoice?.invoice_number || ''}`}
+          icon={Pencil}
+          backTo={backToList}
+          subtitle="Altere os dados da invoice internacional"
+          testId="intl-invoice-form-page"
+          actions={(
+            <>
+              <Button variant="outline" onClick={() => backToList()}>
                 Cancelar
               </Button>
-              <Button onClick={handleCreateInvoice} disabled={creating} data-testid="create-invoice-btn">
-                {creating ? (
+              <Button onClick={handleUpdateInvoice} disabled={editing} data-testid="save-edit-btn">
+                {editing ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Criando...
+                    Salvando...
                   </>
                 ) : (
                   <>
                     <Check className="h-4 w-4 mr-2" />
-                    Criar invoice
+                    Salvar alterações
                   </>
                 )}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </>
+          )}
+        >
 
-        {/* Modal Detalhes */}
-        <Dialog open={showDetails} onOpenChange={setShowDetails}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Invoice #{selectedInvoice?.invoice_number}
-              </DialogTitle>
-            </DialogHeader>
-
-            {selectedInvoice && (
-              <div className="space-y-6 py-4">
-                {/* Status */}
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-sm text-slate-500 dark:text-slate-400">Status:</span>
-                    <StatusPill tone={getStatusBadge(selectedInvoice.status).tone} className="ml-2 text-xs px-3 py-1">{getStatusBadge(selectedInvoice.status).label}</StatusPill>
-                  </div>
-                  <Select 
-                    value={selectedInvoice.status} 
-                    onValueChange={(val) => handleUpdateStatus(selectedInvoice.id, val)}
-                  >
-                    <SelectTrigger className="w-40" data-testid="status-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map(opt => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Dados */}
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
-                    <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Recebedor</h4>
-                    <p className="font-medium">{selectedInvoice.receiver_company}</p>
-                    <p className="text-slate-500 dark:text-slate-400">{selectedInvoice.receiver_address}</p>
-                    <p className="text-slate-500 dark:text-slate-400">{selectedInvoice.receiver_city_state}</p>
-                  </div>
-                  <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
-                    <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Pagador</h4>
-                    <p className="font-medium">{selectedInvoice.payer_company}</p>
-                    <p className="text-slate-500 dark:text-slate-400">{selectedInvoice.payer_address}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Emissão:</span>
-                    <p className="font-medium">
-                      {selectedInvoice.issue_date ? format(parseISO(selectedInvoice.issue_date), 'dd/MM/yyyy') : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Vencimento:</span>
-                    <p className="font-medium">
-                      {selectedInvoice.due_date ? format(parseISO(selectedInvoice.due_date), 'dd/MM/yyyy') : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Moeda:</span>
-                    <p className="font-medium">{selectedInvoice.currency}</p>
-                  </div>
-                </div>
-
-                {/* Itens */}
-                <div>
-                  <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Itens</h4>
-                  <div className="border rounded overflow-hidden">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Descrição</th>
-                          <th className="!text-right">Qtd</th>
-                          <th className="!text-right">Valor Unit.</th>
-                          <th className="!text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedInvoice.items?.map((item, idx) => (
-                          <tr key={idx} className="border-t">
-                            <td>{item.description}</td>
-                            <td className="text-right">{item.quantity}</td>
-                            <td className="text-right">
-                              {getCurrencySymbol(selectedInvoice.currency)} {item.unit_price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </td>
-                            <td className="text-right font-medium">
-                              {getCurrencySymbol(selectedInvoice.currency)} {item.total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t">
-                          <td colSpan={3} className="text-right">TOTAL:</td>
-                          <td className="text-right font-bold text-lg">
-                            {getCurrencySymbol(selectedInvoice.currency)} {selectedInvoice.total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-
-                {selectedInvoice.notes && (
-                  <div>
-                    <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Observações</h4>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-3 rounded">{selectedInvoice.notes}</p>
-                  </div>
-                )}
-
-                <div className="text-xs text-slate-400 dark:text-slate-500 pt-4 border-t">
-                  Criada por {selectedInvoice.created_by_name} em{' '}
-                  {selectedInvoice.created_at ? format(parseISO(selectedInvoice.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}
-                </div>
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDetails(false)}>
-                Fechar
-              </Button>
-              <Button onClick={() => handleDownloadPdf(selectedInvoice)} disabled={downloadingPdf === selectedInvoice?.id}>
-                {downloadingPdf === selectedInvoice?.id ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Baixar PDF
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Modal Confirmação de Exclusão */}
-        <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="text-red-600">Confirmar Exclusão</DialogTitle>
-              <DialogDescription>
-                Deseja realmente excluir a Invoice #{invoiceToDelete?.invoice_number}?
-                Esta ação não pode ser desfeita.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
-                Cancelar
-              </Button>
-              <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-                {deleting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
-                )}
-                Excluir
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Modal Editar Invoice */}
-        <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Pencil className="h-5 w-5 text-primary" />
-                Editar Invoice #{editingInvoice?.invoice_number}
-              </DialogTitle>
-              <DialogDescription>
-                Altere os dados da invoice internacional
-              </DialogDescription>
-            </DialogHeader>
 
             <div className="space-y-6 py-4">
               {/* Dados do Recebedor (fixo) */}
@@ -1470,27 +1179,334 @@ export default function InternationalInvoicePage() {
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditModal(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleUpdateInvoice} disabled={editing} data-testid="save-edit-btn">
-                {editing ? (
-                  <>
+        </FormPage>
+        )
+      ) : (
+        <div className="space-y-4" data-testid="international-invoice-page">
+          <PageHeader icon={Globe} title="Invoices Internacionais" subtitle="Gerencie suas faturas para clientes internacionais" />
+  
+          <FilterCard
+            hasFilters={!!(filterStatus || filterCurrency || period[0] || period[1])}
+            onClear={() => { setFilterStatus(''); setFilterCurrency(''); setPeriod(['', '']); }}
+          >
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <FilterField label="Status">
+                <Select value={filterStatus || 'ALL'} onValueChange={(val) => setFilterStatus(val === "ALL" ? "" : val)}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="filter-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos</SelectItem>
+                    {STATUS_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Moeda">
+                <Select value={filterCurrency || 'ALL'} onValueChange={(val) => setFilterCurrency(val === "ALL" ? "" : val)}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="filter-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todas</SelectItem>
+                    {CURRENCIES.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.value}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="intl-invoice" />
+            </div>
+          </FilterCard>
+  
+          {/* Lista - marque uma invoice pra habilitar as ações da barra */}
+          <DataCard
+            title="Invoices"
+            count={totalInvoices}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Nova invoice" onClick={() => goNew()} testId="new-invoice-btn" />}
+              >
+                <ToolbarButton
+                  icon={Eye}
+                  label="Ver detalhes"
+                  tone="primary"
+                  onClick={() => singleSelectedInvoice && handleViewDetails(singleSelectedInvoice)}
+                  disabled={!singleSelectedInvoice}
+                  testId={singleSelectedInvoice ? `view-invoice-${singleSelectedInvoice.id}` : undefined}
+                />
+                <ToolbarButton
+                  icon={Pencil}
+                  label="Editar"
+                  tone="blue"
+                  onClick={() => singleSelectedInvoice && goEdit(singleSelectedInvoice.id)}
+                  disabled={!singleSelectedInvoice || singleSelectedInvoice.status === 'CANCELADA'}
+                  testId={singleSelectedInvoice ? `edit-invoice-${singleSelectedInvoice.id}` : undefined}
+                />
+                <ToolbarButton
+                  icon={FileDown}
+                  label={singleSelectedInvoice && downloadingPdf === singleSelectedInvoice.id ? 'Gerando PDF...' : 'Baixar PDF'}
+                  tone="emerald"
+                  onClick={() => singleSelectedInvoice && handleDownloadPdf(singleSelectedInvoice)}
+                  disabled={!singleSelectedInvoice || downloadingPdf === singleSelectedInvoice?.id}
+                  testId={singleSelectedInvoice ? `download-pdf-${singleSelectedInvoice.id}` : undefined}
+                />
+                <ToolbarButton
+                  icon={Trash2}
+                  label="Excluir"
+                  tone="red"
+                  onClick={() => {
+                    if (!singleSelectedInvoice) return;
+                    setInvoiceToDelete(singleSelectedInvoice);
+                    setShowDeleteConfirm(true);
+                  }}
+                  disabled={!singleSelectedInvoice}
+                  testId={singleSelectedInvoice ? `delete-invoice-${singleSelectedInvoice.id}` : undefined}
+                />
+              </Toolbar>
+            )}
+            footer={(
+              <TablePagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={totalInvoices}
+                pageSize={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+              />
+            )}
+          >
+            {loading ? (
+              <EmptyState loading />
+            ) : invoices.length === 0 ? (
+              <EmptyState
+                icon={Globe}
+                title="Nenhuma invoice encontrada"
+                hint={filterStatus || filterCurrency ? 'Ajuste os filtros' : 'Crie a primeira pelo botão "Nova invoice"'}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={invoices.length > 0 && invoices.every(i => selectedIds.has(i.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
+                      <th>Nº</th>
+                      <th>Pagador</th>
+                      <th>Emissão</th>
+                      <th>Vencimento</th>
+                      <th>Moeda</th>
+                      <th className="!text-right">Total</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map((invoice) => {
+                      const statusBadge = getStatusBadge(invoice.status);
+                      return (
+                        <tr
+                          key={invoice.id}
+                          data-selected={selectedIds.has(invoice.id)}
+                          className="cursor-pointer"
+                          onClick={() => toggleSelect(invoice.id)}
+                        >
+                          <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedIds.has(invoice.id)}
+                              onCheckedChange={() => toggleSelect(invoice.id)}
+                            />
+                          </td>
+                          <td className="cell-strong whitespace-nowrap tabular-nums">#{invoice.invoice_number}</td>
+                          <td><div className="max-w-[260px] truncate" title={invoice.payer_company || ''}>{invoice.payer_company}</div></td>
+                          <td className="whitespace-nowrap tabular-nums">
+                            {invoice.issue_date ? format(parseISO(invoice.issue_date), 'dd/MM/yyyy') : '-'}
+                          </td>
+                          <td className="whitespace-nowrap tabular-nums">
+                            {invoice.due_date ? format(parseISO(invoice.due_date), 'dd/MM/yyyy') : '-'}
+                          </td>
+                          <td><StatusPill tone="slate" dot={false}>{invoice.currency}</StatusPill></td>
+                          <td className="text-right whitespace-nowrap tabular-nums cell-strong">
+                            {getCurrencySymbol(invoice.currency)} {invoice.total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td><StatusPill tone={statusBadge.tone}>{statusBadge.label}</StatusPill></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataCard>
+  
+          {/* Modal Detalhes */}
+          <Dialog open={showDetails} onOpenChange={setShowDetails}>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Invoice #{selectedInvoice?.invoice_number}
+                </DialogTitle>
+              </DialogHeader>
+  
+              {selectedInvoice && (
+                <div className="space-y-6 py-4">
+                  {/* Status */}
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-sm text-slate-500 dark:text-slate-400">Status:</span>
+                      <StatusPill tone={getStatusBadge(selectedInvoice.status).tone} className="ml-2 text-xs px-3 py-1">{getStatusBadge(selectedInvoice.status).label}</StatusPill>
+                    </div>
+                    <Select 
+                      value={selectedInvoice.status} 
+                      onValueChange={(val) => handleUpdateStatus(selectedInvoice.id, val)}
+                    >
+                      <SelectTrigger className="w-40" data-testid="status-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+  
+                  {/* Dados */}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
+                      <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Recebedor</h4>
+                      <p className="font-medium">{selectedInvoice.receiver_company}</p>
+                      <p className="text-slate-500 dark:text-slate-400">{selectedInvoice.receiver_address}</p>
+                      <p className="text-slate-500 dark:text-slate-400">{selectedInvoice.receiver_city_state}</p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded">
+                      <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Pagador</h4>
+                      <p className="font-medium">{selectedInvoice.payer_company}</p>
+                      <p className="text-slate-500 dark:text-slate-400">{selectedInvoice.payer_address}</p>
+                    </div>
+                  </div>
+  
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Emissão:</span>
+                      <p className="font-medium">
+                        {selectedInvoice.issue_date ? format(parseISO(selectedInvoice.issue_date), 'dd/MM/yyyy') : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Vencimento:</span>
+                      <p className="font-medium">
+                        {selectedInvoice.due_date ? format(parseISO(selectedInvoice.due_date), 'dd/MM/yyyy') : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Moeda:</span>
+                      <p className="font-medium">{selectedInvoice.currency}</p>
+                    </div>
+                  </div>
+  
+                  {/* Itens */}
+                  <div>
+                    <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Itens</h4>
+                    <div className="border rounded overflow-hidden">
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Descrição</th>
+                            <th className="!text-right">Qtd</th>
+                            <th className="!text-right">Valor Unit.</th>
+                            <th className="!text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedInvoice.items?.map((item, idx) => (
+                            <tr key={idx} className="border-t">
+                              <td>{item.description}</td>
+                              <td className="text-right">{item.quantity}</td>
+                              <td className="text-right">
+                                {getCurrencySymbol(selectedInvoice.currency)} {item.unit_price?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </td>
+                              <td className="text-right font-medium">
+                                {getCurrencySymbol(selectedInvoice.currency)} {item.total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t">
+                            <td colSpan={3} className="text-right">TOTAL:</td>
+                            <td className="text-right font-bold text-lg">
+                              {getCurrencySymbol(selectedInvoice.currency)} {selectedInvoice.total?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+  
+                  {selectedInvoice.notes && (
+                    <div>
+                      <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-2">Observações</h4>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 p-3 rounded">{selectedInvoice.notes}</p>
+                    </div>
+                  )}
+  
+                  <div className="text-xs text-slate-400 dark:text-slate-500 pt-4 border-t">
+                    Criada por {selectedInvoice.created_by_name} em{' '}
+                    {selectedInvoice.created_at ? format(parseISO(selectedInvoice.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}
+                  </div>
+                </div>
+              )}
+  
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDetails(false)}>
+                  Fechar
+                </Button>
+                <Button onClick={() => handleDownloadPdf(selectedInvoice)} disabled={downloadingPdf === selectedInvoice?.id}>
+                  {downloadingPdf === selectedInvoice?.id ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4 mr-2" />
-                    Salvar alterações
-                  </>
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Baixar PDF
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+  
+          {/* Modal Confirmação de Exclusão */}
+          <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="text-red-600">Confirmar Exclusão</DialogTitle>
+                <DialogDescription>
+                  Deseja realmente excluir a Invoice #{invoiceToDelete?.invoice_number}?
+                  Esta ação não pode ser desfeita.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+                  Cancelar
+                </Button>
+                <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Excluir
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+  
+        </div>
+      )}
     </Layout>
   );
 }

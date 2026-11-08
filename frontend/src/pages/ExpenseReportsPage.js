@@ -1,4 +1,4 @@
-import { FormSectionTitle } from '../components/FormKit';
+import { FormSectionTitle, FormPage } from '../components/FormKit';
 import PeriodReportDialog from '../components/PeriodReportDialog';
 import { FileBarChart, PieChart, Tags } from 'lucide-react';
 import { useEffect, useState, useRef } from 'react';
@@ -30,6 +30,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
 
 function newItemId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -66,6 +67,7 @@ const brl = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency',
 const hasBalance = (report) => Math.abs(report?.balance || 0) > 0.004;
 
 export default function ExpenseReportsPage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/expense-reports');
   const { confirm, ConfirmDialog } = useConfirm();
   const [reportOpen, setReportOpen] = useState(false);
   const [settlementReportOpen, setSettlementReportOpen] = useState(false);
@@ -348,7 +350,7 @@ export default function ExpenseReportsPage() {
         toast.error(`${failed} comprovante(s) não foram enviados. Abra a prestação em Editar e bata de novo.`);
       }
 
-      setModalOpen(false);
+      backToList();
       resetForm();
       loadReports();
     } catch (error) {
@@ -487,162 +489,43 @@ export default function ExpenseReportsPage() {
     }
   };
 
+  // Cadastro e edição em página própria (/expense-reports/new e /expense-reports/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openNewModal();
+    if (mode === 'edit') {
+      api.getExpenseReport(routeId)
+        .then((r) => {
+          openEditModal(r.data);
+          if (r.data.status === 'CONCLUIDA') backToList(); // concluída: reabrir antes de editar
+        })
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar prestação de contas'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4" data-testid="expense-reports-page">
-        <PageHeader
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editingReport}
+          title={editingReport ? `Editar prestação de contas #${editingReport.report_number_formatted}` : 'Nova prestação de contas'}
           icon={Calculator}
-          title="Prestação de Contas"
-          subtitle="Controle de depósitos recebidos e compras realizadas por período"
+          backTo={backToList}
+          subtitle="Despesas da viagem e acerto com o motorista"
+          testId="expense-report-form-page"
           actions={(
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => navigate('/expense-reports/dashboard')} data-testid="expense-dashboard-link">
-                <PieChart className="w-4 h-4 mr-1.5" /> Custos por grupo
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setGroupsOpen(true)} data-testid="expense-groups-link">
-                <Tags className="w-4 h-4 mr-1.5" /> Grupos de custo
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setSettlementReportOpen(true)} data-testid="expense-settlement-report">
-                <Banknote className="w-4 h-4 mr-1.5" /> Ressarcimentos
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="expense-period-report">
-                <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
-              </Button>
-            </div>
-          )}
-        />
-
-        <FilterCard hasFilters={!!(searchQuery || period[0] || period[1])} onClear={clearSearch}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <FilterField label="Número ou fornecedor">
-              <SearchInput
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                data-testid="search-expense-report-input"
-              />
-            </FilterField>
-            <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="expense" />
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque uma prestação pra habilitar as ações da barra. Concluir
-            vira Reabrir quando a prestação selecionada já está concluída. */}
-        <DataCard
-          title="Prestações de contas"
-          count={pagination.total}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Nova prestação" onClick={openNewModal} testId="new-expense-report-btn" />}
-            >
-              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedReport && openDetails(singleSelectedReport)} disabled={!singleSelectedReport} />
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedReport && openEditModal(singleSelectedReport)} disabled={!singleSelectedReport || singleSelectedReport.status !== 'EM_ANDAMENTO'} />
-              {singleSelectedReport?.status === 'CONCLUIDA' ? (
-                <ToolbarButton icon={RotateCcw} label="Reabrir" tone="amber" onClick={() => handleReopen(singleSelectedReport.id)} disabled={!!singleSelectedReport.settled_at} />
-              ) : (
-                <ToolbarButton icon={CheckCircle2} label="Concluir" tone="emerald" onClick={() => singleSelectedReport && handleComplete(singleSelectedReport.id)} disabled={!singleSelectedReport} />
-              )}
-              {singleSelectedReport?.settled_at ? (
-                <ToolbarButton icon={RotateCcw} label="Desfazer acerto" tone="amber" onClick={() => saveSettlement(false)} disabled={settling} testId="expense-undo-settlement" />
-              ) : (
-                <ToolbarButton
-                  icon={Banknote}
-                  label="Acertar saldo"
-                  tone="emerald"
-                  onClick={() => singleSelectedReport && openSettlement(singleSelectedReport)}
-                  disabled={!singleSelectedReport || singleSelectedReport.status !== 'CONCLUIDA' || !hasBalance(singleSelectedReport)}
-                  testId="expense-settle"
-                />
-              )}
-              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedReport && handlePrintPDF(singleSelectedReport.id)} disabled={!singleSelectedReport || singleSelectedReport.status !== 'CONCLUIDA'} />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedReport && handleDelete(singleSelectedReport.id)} disabled={!singleSelectedReport} />
-            </Toolbar>
-          )}
-          footer={(
-            <TablePagination
-              currentPage={pagination.page}
-              totalPages={pagination.pages}
-              totalItems={pagination.total}
-              pageSize={15}
-              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
-            />
+            <>
+            <Button variant="outline" onClick={() => backToList()}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : (editingReport ? 'Salvar alterações' : 'Criar prestação de contas')}
+            </Button>
+            </>
           )}
         >
-          {loading ? (
-            <EmptyState loading />
-          ) : reports.length === 0 ? (
-            <EmptyState
-              icon={Calculator}
-              title="Nenhuma prestação de contas encontrada"
-              hint={searchQuery ? 'Ajuste a busca' : 'Registre a primeira pelo botão "Nova prestação"'}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={reports.length > 0 && reports.every(r => selectedIds.has(r.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                      />
-                    </th>
-                    <th>Nº</th>
-                    <th>Período</th>
-                    <th className="!text-right">Total compras</th>
-                    <th className="!text-right">Saldo</th>
-                    <th>Acerto</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reports.map((report) => {
-                    const bi = balanceInfo(report.balance || 0);
-                    const isSelected = selectedIds.has(report.id);
-                    return (
-                      <tr
-                        key={report.id}
-                        data-selected={isSelected}
-                        className="cursor-pointer"
-                        onClick={() => toggleSelect(report.id)}
-                      >
-                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSelect(report.id)}
-                          />
-                        </td>
-                        <td className="cell-strong whitespace-nowrap tabular-nums">#{report.report_number_formatted}</td>
-                        <td className="whitespace-nowrap tabular-nums">{formatPeriodDate(report.period_start)} a {formatPeriodDate(report.period_end)}</td>
-                        <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(report.total_purchases)}</td>
-                        <td className={`text-right whitespace-nowrap tabular-nums font-semibold ${bi.className}`}>{formatMoney(bi.value)}</td>
-                        <td className="whitespace-nowrap">
-                          {!hasBalance(report) ? '-' : report.settled_at ? (
-                            <StatusPill tone="emerald">Acertado {formatPeriodDate(report.settled_at)}</StatusPill>
-                          ) : (
-                            <StatusPill tone="amber">Pendente</StatusPill>
-                          )}
-                        </td>
-                        <td>{getStatusBadge(report.status)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </DataCard>
-      </div>
 
-      {/* Modal Nova/Editar Prestação de Contas */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Calculator className="w-4 h-4 text-primary" />
-              {editingReport ? `Editar Prestação de Contas #${editingReport.report_number_formatted}` : 'Nova Prestação de Contas'}
-            </DialogTitle>
-          </DialogHeader>
 
           <div className="space-y-6">
             {/* Período */}
@@ -840,14 +723,154 @@ export default function ExpenseReportsPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : (editingReport ? 'Salvar alterações' : 'Criar prestação de contas')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+        </FormPage>
+      ) : (
+        <div className="space-y-4" data-testid="expense-reports-page">
+          <PageHeader
+            icon={Calculator}
+            title="Prestação de Contas"
+            subtitle="Controle de depósitos recebidos e compras realizadas por período"
+            actions={(
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => navigate('/expense-reports/dashboard')} data-testid="expense-dashboard-link">
+                  <PieChart className="w-4 h-4 mr-1.5" /> Custos por grupo
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setGroupsOpen(true)} data-testid="expense-groups-link">
+                  <Tags className="w-4 h-4 mr-1.5" /> Grupos de custo
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setSettlementReportOpen(true)} data-testid="expense-settlement-report">
+                  <Banknote className="w-4 h-4 mr-1.5" /> Ressarcimentos
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setReportOpen(true)} data-testid="expense-period-report">
+                  <FileBarChart className="w-4 h-4 mr-1.5" /> Relatório do período
+                </Button>
+              </div>
+            )}
+          />
+  
+          <FilterCard hasFilters={!!(searchQuery || period[0] || period[1])} onClear={clearSearch}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <FilterField label="Número ou fornecedor">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  data-testid="search-expense-report-input"
+                />
+              </FilterField>
+              <PeriodFilterFields value={period} onChange={changePeriod} testIdPrefix="expense" />
+            </div>
+          </FilterCard>
+  
+          {/* Lista - marque uma prestação pra habilitar as ações da barra. Concluir
+              vira Reabrir quando a prestação selecionada já está concluída. */}
+          <DataCard
+            title="Prestações de contas"
+            count={pagination.total}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Nova prestação" onClick={() => goNew()} testId="new-expense-report-btn" />}
+              >
+                <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedReport && openDetails(singleSelectedReport)} disabled={!singleSelectedReport} />
+                <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedReport && goEdit(singleSelectedReport.id)} disabled={!singleSelectedReport || singleSelectedReport.status !== 'EM_ANDAMENTO'} />
+                {singleSelectedReport?.status === 'CONCLUIDA' ? (
+                  <ToolbarButton icon={RotateCcw} label="Reabrir" tone="amber" onClick={() => handleReopen(singleSelectedReport.id)} disabled={!!singleSelectedReport.settled_at} />
+                ) : (
+                  <ToolbarButton icon={CheckCircle2} label="Concluir" tone="emerald" onClick={() => singleSelectedReport && handleComplete(singleSelectedReport.id)} disabled={!singleSelectedReport} />
+                )}
+                {singleSelectedReport?.settled_at ? (
+                  <ToolbarButton icon={RotateCcw} label="Desfazer acerto" tone="amber" onClick={() => saveSettlement(false)} disabled={settling} testId="expense-undo-settlement" />
+                ) : (
+                  <ToolbarButton
+                    icon={Banknote}
+                    label="Acertar saldo"
+                    tone="emerald"
+                    onClick={() => singleSelectedReport && openSettlement(singleSelectedReport)}
+                    disabled={!singleSelectedReport || singleSelectedReport.status !== 'CONCLUIDA' || !hasBalance(singleSelectedReport)}
+                    testId="expense-settle"
+                  />
+                )}
+                <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedReport && handlePrintPDF(singleSelectedReport.id)} disabled={!singleSelectedReport || singleSelectedReport.status !== 'CONCLUIDA'} />
+                <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedReport && handleDelete(singleSelectedReport.id)} disabled={!singleSelectedReport} />
+              </Toolbar>
+            )}
+            footer={(
+              <TablePagination
+                currentPage={pagination.page}
+                totalPages={pagination.pages}
+                totalItems={pagination.total}
+                pageSize={15}
+                onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+              />
+            )}
+          >
+            {loading ? (
+              <EmptyState loading />
+            ) : reports.length === 0 ? (
+              <EmptyState
+                icon={Calculator}
+                title="Nenhuma prestação de contas encontrada"
+                hint={searchQuery ? 'Ajuste a busca' : 'Registre a primeira pelo botão "Nova prestação"'}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={reports.length > 0 && reports.every(r => selectedIds.has(r.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
+                      <th>Nº</th>
+                      <th>Período</th>
+                      <th className="!text-right">Total compras</th>
+                      <th className="!text-right">Saldo</th>
+                      <th>Acerto</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reports.map((report) => {
+                      const bi = balanceInfo(report.balance || 0);
+                      const isSelected = selectedIds.has(report.id);
+                      return (
+                        <tr
+                          key={report.id}
+                          data-selected={isSelected}
+                          className="cursor-pointer"
+                          onClick={() => toggleSelect(report.id)}
+                        >
+                          <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelect(report.id)}
+                            />
+                          </td>
+                          <td className="cell-strong whitespace-nowrap tabular-nums">#{report.report_number_formatted}</td>
+                          <td className="whitespace-nowrap tabular-nums">{formatPeriodDate(report.period_start)} a {formatPeriodDate(report.period_end)}</td>
+                          <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(report.total_purchases)}</td>
+                          <td className={`text-right whitespace-nowrap tabular-nums font-semibold ${bi.className}`}>{formatMoney(bi.value)}</td>
+                          <td className="whitespace-nowrap">
+                            {!hasBalance(report) ? '-' : report.settled_at ? (
+                              <StatusPill tone="emerald">Acertado {formatPeriodDate(report.settled_at)}</StatusPill>
+                            ) : (
+                              <StatusPill tone="amber">Pendente</StatusPill>
+                            )}
+                          </td>
+                          <td>{getStatusBadge(report.status)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataCard>
+        </div>
+      )}
 
       {/* Modal Detalhes */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>

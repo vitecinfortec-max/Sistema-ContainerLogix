@@ -653,6 +653,22 @@ function App() {
             }
           />
           <Route
+            path="/billing/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.faturas">
+                <BillingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing/:id/edit"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.faturas">
+                <BillingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/container-inspections"
             element={
               <ProtectedRoute moduleKey="terminal.vistoria">
@@ -877,6 +893,22 @@ function App() {
             }
           />
           <Route
+            path="/daily-rate-requests/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.diaria">
+                <DailyRateRequestPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/daily-rate-requests/:id/edit"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.diaria">
+                <DailyRateRequestPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/client-credits"
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.credito_cliente">
@@ -1013,6 +1045,22 @@ function App() {
             }
           />
           <Route
+            path="/expense-reports/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.prestacao_contas">
+                <ExpenseReportsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/expense-reports/:id/edit"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.prestacao_contas">
+                <ExpenseReportsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/expense-reports/dashboard"
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.prestacao_contas">
@@ -1094,6 +1142,22 @@ function App() {
           />
           <Route
             path="/international-invoices"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.invoice_internacional">
+                <InternationalInvoicePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/international-invoices/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.invoice_internacional">
+                <InternationalInvoicePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/international-invoices/:id/edit"
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.invoice_internacional">
                 <InternationalInvoicePage />

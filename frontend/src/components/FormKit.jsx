@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
 import { cn } from '../lib/utils';
+import PageHeader from './PageHeader';
+import { PageSkeleton } from './DataPage';
 
 // Blocos compartilhados das telas de formulário (seção, título de seção,
 // campo e rodapé de ações), no mesmo espírito de components/DataPage.jsx pras
@@ -90,6 +92,29 @@ export function FormActions({ children, className, sticky = false }) {
       className,
     )}>
       {children}
+    </div>
+  );
+}
+
+/**
+ * Formulário em página própria pras telas que mantêm lista e formulário no
+ * mesmo componente (hooks/useFormRoute): cabeçalho com Voltar, os campos num
+ * cartão e as ações embaixo (fixas no celular). `loading` mostra o esqueleto.
+ */
+export function FormPage({ title, subtitle, icon, backTo, headerActions, actions, loading, children, className, testId }) {
+  return (
+    <div className={cn('max-w-5xl mx-auto space-y-4', className)} data-testid={testId}>
+      <PageHeader backTo={backTo} icon={icon} title={title} subtitle={subtitle} actions={headerActions} />
+      {loading ? (
+        <PageSkeleton />
+      ) : (
+        <>
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none" data-unsaved-guard>
+            <CardContent className="form-dense p-4 sm:p-5 space-y-5">{children}</CardContent>
+          </Card>
+          {actions && <FormActions sticky>{actions}</FormActions>}
+        </>
+      )}
     </div>
   );
 }

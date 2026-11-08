@@ -102,6 +102,15 @@ import { UnsavedChangesGuard } from './UnsavedChanges';
 // Intervalo de checagem do alerta de containers parados no pátio
 const YARD_ALERT_POLL_MS = 5 * 60 * 1000;
 
+// Telas com o formulário em página própria (lista em `base`, cadastro em
+// `base/new`, edição em `base/:id/edit`): [título do novo, título da edição]
+const FORM_PAGE_TITLES = {
+  '/expense-reports': ['Nova Prestação de Contas', 'Editar Prestação de Contas'],
+  '/daily-rate-requests': ['Nova Solicitação de Diária', 'Editar Solicitação de Diária'],
+  '/billing': ['Gerar Nova Fatura', 'Editar Fatura'],
+  '/international-invoices': ['Nova Invoice Internacional', 'Editar Invoice Internacional'],
+};
+
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
   '/movements': 'Gate',
@@ -399,7 +408,7 @@ function LayoutFrame({ children }) {
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname.startsWith('/repair-estimates') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname.startsWith('/unit-segregation');
   const isCadastroActive = location.pathname === '/cadastro' || location.pathname === '/company-settings';
-  const isFinanceiroActive = location.pathname === '/billing' || location.pathname === '/reports/billing' || location.pathname === '/international-invoices' || location.pathname === '/daily-rate-requests' || location.pathname === '/expense-reports' || location.pathname === '/checks' || location.pathname === '/gratifications' || location.pathname === '/service-providers' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/client-credits' || location.pathname === '/port-services-billing';
+  const isFinanceiroActive = location.pathname.startsWith('/billing') || location.pathname === '/reports/billing' || location.pathname.startsWith('/international-invoices') || location.pathname.startsWith('/daily-rate-requests') || location.pathname.startsWith('/expense-reports') || location.pathname === '/checks' || location.pathname === '/gratifications' || location.pathname === '/service-providers' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/client-credits' || location.pathname === '/port-services-billing';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
   // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
@@ -798,6 +807,8 @@ function LayoutFrame({ children }) {
     if (location.pathname === '/repair-estimates/new') return 'Novo Orçamento de Reparo';
     if (location.pathname.startsWith('/repair-estimates/')) return 'Editar Orçamento de Reparo';
     if (location.pathname.startsWith('/comercial/tabela-servicos/')) return 'Tabela de Serviços';
+    const formBase = Object.keys(FORM_PAGE_TITLES).find((base) => location.pathname.startsWith(`${base}/`));
+    if (formBase) return FORM_PAGE_TITLES[formBase][location.pathname.endsWith('/new') ? 0 : 1];
     return 'ContainerLogix';
   }, [location.pathname, location.search]);
 
