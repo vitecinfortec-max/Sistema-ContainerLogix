@@ -26,9 +26,12 @@ import { compressImage } from '../lib/imageCompression';
 import { scrollBehavior } from '../lib/reducedMotion';
 import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
+import { FormPage } from '../components/FormKit';
 const SOURCE_OPTIONS = [
   ['POSTO_EXTERNO', 'Posto Externo'],
   ['TANQUE_PROPRIO', 'Tanque Próprio'],
@@ -88,6 +91,7 @@ function buildEmpty() {
 const ITEMS_PER_PAGE = 15;
 
 export default function FuelSupplyPage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/fleet/abastecimento');
   const { confirm, ConfirmDialog } = useConfirm();
   // Só a página atual: filtro e paginação são feitos no servidor
   const [list, setList] = useState([]);
@@ -326,7 +330,7 @@ export default function FuelSupplyPage() {
       toast.success(editingId ? 'Abastecimento atualizado!' : 'Abastecimento criado!');
       if (!receiptSaved) toast.error('Não foi possível salvar o comprovante. Edite o abastecimento e tente de novo.');
       resetReceiptDraft();
-      setDialogOpen(false);
+      backToList();
       loadList();
       loadFuelOrders();
     } catch (e) {
@@ -388,156 +392,40 @@ export default function FuelSupplyPage() {
   const listLiters = listMeta.total_liters;
   const listValue = listMeta.total_value;
 
+  // Cadastro e edição em página própria (/fleet/abastecimento/new e /fleet/abastecimento/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openCreate();
+    if (mode === 'edit') {
+      api.getFuelSupply(routeId)
+        .then(() => openEdit(routeId))
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar abastecimento'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4" data-testid="fuel-supply-page">
-        <PageHeader
-          title="Abastecimento"
-          subtitle="Controle de abastecimento de combustível e ARLA da frota"
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editingId}
+          title={editingId ? 'Editar abastecimento' : 'Novo abastecimento'}
           icon={Fuel}
-        />
-
-        <StatGrid>
-          <StatCard label="Abastecimentos" value={listMeta.total} icon={Fuel} tone="blue" hint={hasFilters ? 'no filtro atual' : 'registrados'} />
-          <StatCard label="Litros" value={fmtLitersTotal(listLiters)} icon={Droplet} tone="primary" />
-          <StatCard label="Valor total" value={fmtMoney(listValue)} icon={Wallet} tone="emerald" />
-          <StatCard label="Preço médio/litro" value={fmtMoney(listLiters ? listValue / listLiters : 0)} icon={Gauge} tone="amber" />
-        </StatGrid>
-
-        <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <FilterField label="Equipamento, motorista ou fornecedor" className="col-span-2">
-              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="fuel-search" />
-            </FilterField>
-            <FilterField label="Data inicial">
-              <Input type="date" value={dateFrom} onChange={(e) => onFilter(setDateFrom)(e.target.value)} className="h-9 text-sm" data-testid="fuel-date-from" />
-            </FilterField>
-            <FilterField label="Data final">
-              <Input type="date" value={dateTo} onChange={(e) => onFilter(setDateTo)(e.target.value)} className="h-9 text-sm" data-testid="fuel-date-to" />
-            </FilterField>
-            <FilterField label="Fonte">
-              <Select value={sourceFilter} onValueChange={onFilter(setSourceFilter)}>
-                <SelectTrigger className="h-9 text-sm" data-testid="fuel-source-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {SOURCE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FilterField>
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque um abastecimento pra habilitar as ações da barra */}
-        <DataCard
-          title="Abastecimentos"
-          count={loading ? '...' : listMeta.total}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Novo abastecimento" onClick={openCreate} testId="fuel-new-btn" />}
-            >
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedSupply && openEdit(singleSelectedSupply.id)} disabled={!singleSelectedSupply} />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedSupply && handleDelete(singleSelectedSupply.id, singleSelectedSupply.supply_number)} disabled={!singleSelectedSupply} />
-            </Toolbar>
-          )}
-          footer={(
-            <TablePagination
-              currentPage={page}
-              totalPages={totalPages}
-              totalItems={listMeta.total}
-              pageSize={ITEMS_PER_PAGE}
-              onPageChange={goToPage}
-            />
+          backTo={backToList}
+          subtitle={nextNumber !== null ? `Abastecimento Nº ${nextNumber}` : 'Lançamento de abastecimento da frota'}
+          testId="fuel-form-page"
+          actions={(
+            <>
+            <Button variant="outline" onClick={() => backToList()} data-testid="fuel-cancel">Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90" data-testid="fuel-save">
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar abastecimento' : 'Salvar abastecimento'}
+            </Button>
+            </>
           )}
         >
-          {list.length === 0 && !loading ? (
-            <EmptyState
-              icon={Fuel}
-              title={hasFilters ? 'Nenhum abastecimento encontrado' : 'Nenhum abastecimento cadastrado'}
-              hint={hasFilters ? 'Ajuste os filtros' : 'Registre o primeiro pelo botão "Novo abastecimento"'}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={pageItems.length > 0 && pageItems.every((f) => selectedIds.has(f.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                        data-testid="select-all-checkbox"
-                      />
-                    </th>
-                    <th>Nº</th>
-                    <th>Data</th>
-                    <th>Ordem</th>
-                    <th>Equipamento</th>
-                    <th>Motorista</th>
-                    <th>Fornecedor</th>
-                    <th>Fonte</th>
-                    <th>Combustível</th>
-                    <th className="!text-right">Litros</th>
-                    <th className="!text-right">Valor total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageItems.map((f) => (
-                    <tr
-                      key={f.id}
-                      onClick={() => toggleSelect(f.id)}
-                      data-selected={selectedIds.has(f.id)}
-                      className="cursor-pointer"
-                      data-testid={`fuel-row-${f.supply_number}`}
-                    >
-                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(f.id)}
-                          onCheckedChange={() => toggleSelect(f.id)}
-                          data-testid={`fuel-row-checkbox-${f.supply_number}`}
-                        />
-                      </td>
-                      <td className="cell-strong whitespace-nowrap tabular-nums">
-                        #{f.supply_number}
-                        {f.receipt?.url && (
-                          <a
-                            href={api.getFileUrl(f.receipt.url)} target="_blank" rel="noreferrer"
-                            title="Abrir comprovante" onClick={(e) => e.stopPropagation()}
-                          >
-                            <Paperclip className="inline w-3.5 h-3.5 ml-1.5 text-muted-foreground" aria-label="Com comprovante" />
-                          </a>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap tabular-nums">{f.supply_date ? format(new Date(`${f.supply_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
-                      <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{f.supply_order || '-'}</td>
-                      <td><PlateTag>{f.equipment_plate}</PlateTag></td>
-                      <td><div className="max-w-[200px] truncate" title={f.driver_name || ''}>{f.driver_name || '-'}</div></td>
-                      <td><div className="max-w-[200px] truncate" title={f.supplier_name || ''}>{f.supplier_name || '-'}</div></td>
-                      <td>
-                        <StatusPill tone={f.source === 'TANQUE_PROPRIO' ? 'primary' : 'slate'} dot={false}>
-                          {f.source === 'TANQUE_PROPRIO' ? 'Tanque Próprio' : 'Posto Externo'}
-                        </StatusPill>
-                      </td>
-                      <td className="whitespace-nowrap">{FUEL_TYPE_LABELS[f.fuel_type] || f.fuel_type || '-'}</td>
-                      <td className="text-right whitespace-nowrap tabular-nums">{Number(f.liters || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(f.total_value)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </DataCard>
-      </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto" data-testid="fuel-dialog">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Fuel className="w-5 h-5 text-primary" />
-              {editingId ? 'Editar Abastecimento' : 'Novo Abastecimento'}
-              {nextNumber !== null && <Badge variant="outline" className="ml-2 text-primary border-primary/30">Nº {nextNumber}</Badge>}
-            </DialogTitle>
-          </DialogHeader>
 
           <div className="space-y-5">
             <SectionTitle>Dados Gerais</SectionTitle>
@@ -660,14 +548,149 @@ export default function FuelSupplyPage() {
             <TextAreaField label="Observações" value={form.observations} onChange={(v) => onChange('observations', v)} testid="fuel-observations" />
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="fuel-cancel">Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90" data-testid="fuel-save">
-              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar abastecimento' : 'Salvar abastecimento'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+        </FormPage>
+      ) : (
+        <div className="space-y-4" data-testid="fuel-supply-page">
+          <PageHeader
+            title="Abastecimento"
+            subtitle="Controle de abastecimento de combustível e ARLA da frota"
+            icon={Fuel}
+          />
+  
+          <StatGrid>
+            <StatCard label="Abastecimentos" value={listMeta.total} icon={Fuel} tone="blue" hint={hasFilters ? 'no filtro atual' : 'registrados'} />
+            <StatCard label="Litros" value={fmtLitersTotal(listLiters)} icon={Droplet} tone="primary" />
+            <StatCard label="Valor total" value={fmtMoney(listValue)} icon={Wallet} tone="emerald" />
+            <StatCard label="Preço médio/litro" value={fmtMoney(listLiters ? listValue / listLiters : 0)} icon={Gauge} tone="amber" />
+          </StatGrid>
+  
+          <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <FilterField label="Equipamento, motorista ou fornecedor" className="col-span-2">
+                <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="fuel-search" />
+              </FilterField>
+              <FilterField label="Data inicial">
+                <Input type="date" value={dateFrom} onChange={(e) => onFilter(setDateFrom)(e.target.value)} className="h-9 text-sm" data-testid="fuel-date-from" />
+              </FilterField>
+              <FilterField label="Data final">
+                <Input type="date" value={dateTo} onChange={(e) => onFilter(setDateTo)(e.target.value)} className="h-9 text-sm" data-testid="fuel-date-to" />
+              </FilterField>
+              <FilterField label="Fonte">
+                <Select value={sourceFilter} onValueChange={onFilter(setSourceFilter)}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="fuel-source-filter"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {SOURCE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </div>
+          </FilterCard>
+  
+          {/* Lista - marque um abastecimento pra habilitar as ações da barra */}
+          <DataCard
+            title="Abastecimentos"
+            count={loading ? '...' : listMeta.total}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Novo abastecimento" onClick={() => goNew()} testId="fuel-new-btn" />}
+              >
+                <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedSupply && goEdit(singleSelectedSupply.id)} disabled={!singleSelectedSupply} />
+                <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedSupply && handleDelete(singleSelectedSupply.id, singleSelectedSupply.supply_number)} disabled={!singleSelectedSupply} />
+              </Toolbar>
+            )}
+            footer={(
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={listMeta.total}
+                pageSize={ITEMS_PER_PAGE}
+                onPageChange={goToPage}
+              />
+            )}
+          >
+            {list.length === 0 && !loading ? (
+              <EmptyState
+                icon={Fuel}
+                title={hasFilters ? 'Nenhum abastecimento encontrado' : 'Nenhum abastecimento cadastrado'}
+                hint={hasFilters ? 'Ajuste os filtros' : 'Registre o primeiro pelo botão "Novo abastecimento"'}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={pageItems.length > 0 && pageItems.every((f) => selectedIds.has(f.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="select-all-checkbox"
+                        />
+                      </th>
+                      <th>Nº</th>
+                      <th>Data</th>
+                      <th>Ordem</th>
+                      <th>Equipamento</th>
+                      <th>Motorista</th>
+                      <th>Fornecedor</th>
+                      <th>Fonte</th>
+                      <th>Combustível</th>
+                      <th className="!text-right">Litros</th>
+                      <th className="!text-right">Valor total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((f) => (
+                      <tr
+                        key={f.id}
+                        onClick={() => toggleSelect(f.id)}
+                        data-selected={selectedIds.has(f.id)}
+                        className="cursor-pointer"
+                        data-testid={`fuel-row-${f.supply_number}`}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(f.id)}
+                            onCheckedChange={() => toggleSelect(f.id)}
+                            data-testid={`fuel-row-checkbox-${f.supply_number}`}
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">
+                          #{f.supply_number}
+                          {f.receipt?.url && (
+                            <a
+                              href={api.getFileUrl(f.receipt.url)} target="_blank" rel="noreferrer"
+                              title="Abrir comprovante" onClick={(e) => e.stopPropagation()}
+                            >
+                              <Paperclip className="inline w-3.5 h-3.5 ml-1.5 text-muted-foreground" aria-label="Com comprovante" />
+                            </a>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap tabular-nums">{f.supply_date ? format(new Date(`${f.supply_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
+                        <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{f.supply_order || '-'}</td>
+                        <td><PlateTag>{f.equipment_plate}</PlateTag></td>
+                        <td><div className="max-w-[200px] truncate" title={f.driver_name || ''}>{f.driver_name || '-'}</div></td>
+                        <td><div className="max-w-[200px] truncate" title={f.supplier_name || ''}>{f.supplier_name || '-'}</div></td>
+                        <td>
+                          <StatusPill tone={f.source === 'TANQUE_PROPRIO' ? 'primary' : 'slate'} dot={false}>
+                            {f.source === 'TANQUE_PROPRIO' ? 'Tanque Próprio' : 'Posto Externo'}
+                          </StatusPill>
+                        </td>
+                        <td className="whitespace-nowrap">{FUEL_TYPE_LABELS[f.fuel_type] || f.fuel_type || '-'}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums">{Number(f.liters || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(f.total_value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataCard>
+        </div>
+      )}
+
       <ConfirmDialog />
     </Layout>
   );

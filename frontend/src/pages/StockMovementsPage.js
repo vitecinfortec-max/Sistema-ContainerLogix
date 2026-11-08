@@ -24,9 +24,12 @@ import { format } from 'date-fns';
 import { Plus, Trash2, Save, ArrowLeftRight, Car, ClipboardList, Pencil, Printer, HardHat, Droplet } from 'lucide-react';
 import { todayISO } from '../lib/dates';
 import { activeRecords } from '../lib/cadastroStatus';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
+import { FormPage } from '../components/FormKit';
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const OPERATION_LABELS = { ENTRADA: 'Entrada', SAIDA: 'Saída' };
@@ -36,6 +39,7 @@ const OPERATION_TONES = {
 };
 
 export default function StockMovementsPage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/estoque/movimentacao');
   const [movements, setMovements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useUrlState('search', '');
@@ -329,7 +333,7 @@ export default function StockMovementsPage() {
         await api.createStockMovement(payload);
         toast.success('Movimentação de Estoque registrada!');
       }
-      setDialogOpen(false);
+      backToList();
       loadMovements();
       loadProducts();
     } catch (e) {
@@ -379,139 +383,40 @@ export default function StockMovementsPage() {
     }
   };
 
+  // Cadastro e edição em página própria (/estoque/movimentacao/new e /estoque/movimentacao/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openCreate();
+    if (mode === 'edit') {
+      api.getStockMovement(routeId)
+        .then(() => openEdit(routeId))
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar movimentação'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4" data-testid="stock-movements-page">
-        <PageHeader icon={ArrowLeftRight} title="Movimentação de Estoque" subtitle="Lançamentos manuais de Entrada e Saída de estoque" />
-
-        <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <FilterField label="Nº, produto, finalidade, placa, nota fiscal ou fornecedor" className="col-span-2">
-              <SearchInput
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-testid="search-stock-movements-input"
-              />
-            </FilterField>
-            <FilterField label="Operação">
-              <Select value={operationFilter || 'ALL'} onValueChange={(v) => setOperationFilter(v === 'ALL' ? '' : v)}>
-                <SelectTrigger className="h-9 text-sm" data-testid="filter-stock-movement-operation"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todas</SelectItem>
-                  <SelectItem value="ENTRADA">Entrada</SelectItem>
-                  <SelectItem value="SAIDA">Saída</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Data inicial">
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="filter-stock-movement-date-from" />
-            </FilterField>
-            <FilterField label="Data final">
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="filter-stock-movement-date-to" />
-            </FilterField>
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque uma movimentação pra habilitar as ações da barra */}
-        <DataCard
-          title="Movimentações"
-          count={loading ? '...' : movements.length}
-          footer={<TablePagination {...paginationProps} />}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Nova movimentação" onClick={openCreate} testId="stock-movement-new-btn" />}
-            >
-              <ToolbarButton icon={Pencil} label={lockedBy ? `Editar: use ${lockedBy}` : 'Editar'} tone="blue" onClick={() => singleSelectedMovement && openEdit(singleSelectedMovement.id)} disabled={!singleSelectedMovement || lockedByEpi} testId="stock-movement-edit-btn" />
-              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedMovement && downloadPDF(singleSelectedMovement.id, singleSelectedMovement.movement_number)} disabled={!singleSelectedMovement} testId="stock-movement-pdf-btn" />
-              <ToolbarButton icon={Trash2} label={lockedBy ? `Excluir: use ${lockedBy}` : 'Excluir (acerta o saldo do estoque)'} tone="red" onClick={handleDelete} disabled={!singleSelectedMovement || lockedByEpi || deleting} testId="stock-movement-delete-btn" />
-            </Toolbar>
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editingId}
+          title={editingId ? 'Editar movimentação de estoque' : 'Movimentação de estoque - inclusão'}
+          icon={ArrowLeftRight}
+          backTo={backToList}
+          subtitle={nextNumber !== null ? `Movimentação Nº ${nextNumber}` : 'Entrada, saída ou transferência de produtos'}
+          testId="stock-movement-form-page"
+          actions={(
+            <>
+            <Button variant="outline" onClick={() => backToList()} data-testid="stock-movement-cancel">Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} data-testid="stock-movement-save">
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar movimentação' : 'Salvar movimentação'}
+            </Button>
+            </>
           )}
         >
-          {movements.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={pageItems.length > 0 && pageItems.every((m) => selectedIds.has(m.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                        data-testid="stock-movement-select-all"
-                      />
-                    </th>
-                    <th>Nº</th>
-                    <th>Data</th>
-                    <th>Operação</th>
-                    <th>Almoxarifado</th>
-                    <th>Finalidade</th>
-                    <th className="!text-right">Itens</th>
-                    <th className="!text-right">Valor total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageItems.map((m) => (
-                    <tr
-                      key={m.id}
-                      onClick={() => toggleSelect(m.id)}
-                      data-selected={selectedIds.has(m.id)}
-                      className="cursor-pointer"
-                      data-testid="stock-movement-row"
-                    >
-                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(m.id)}
-                          onCheckedChange={() => toggleSelect(m.id)}
-                          data-testid={`stock-movement-row-checkbox-${m.movement_number}`}
-                        />
-                      </td>
-                      <td className="cell-strong whitespace-nowrap tabular-nums">#{m.movement_number}</td>
-                      <td className="whitespace-nowrap tabular-nums">{m.movement_date ? format(new Date(m.movement_date + 'T00:00:00'), 'dd/MM/yyyy') : '-'}</td>
-                      <td>
-                        <StatusPill tone={OPERATION_TONES[m.operation_type] || 'slate'}>
-                          {OPERATION_LABELS[m.operation_type] || m.operation_type}
-                        </StatusPill>
-                      </td>
-                      <td><div className="max-w-[180px] truncate" title={m.warehouse_name || ''}>{m.warehouse_name || '-'}</div></td>
-                      <td>
-                        <div className="max-w-[240px] truncate" title={m.purpose_text || ''}>
-                          {m.purpose_type === 'VEICULO' && <span className="inline-flex items-center gap-1"><Car className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
-                          {m.purpose_type === 'OS' && <span className="inline-flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
-                          {(!m.purpose_type || m.purpose_type === 'OUTRO') && (
-                            m.origin === 'EPI'
-                              ? <span className="inline-flex items-center gap-1" title="Gerada pela Entrega de EPI's: só muda por lá"><HardHat className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>
-                              : m.origin === 'TANQUE'
-                                ? <span className="inline-flex items-center gap-1" title="Gerada pelo Reabastecer Tanque: só muda pela tela Nível do Tanque"><Droplet className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>
-                                : (m.purpose_text || '-')
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-right tabular-nums">{(m.items || []).length}</td>
-                      <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(m.total_value)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState
-              icon={ArrowLeftRight}
-              loading={loading} title={(hasFilters ? 'Nenhuma movimentação encontrada' : 'Nenhuma movimentação de estoque registrada')}
-              hint={loading ? undefined : (hasFilters ? 'Ajuste os filtros' : 'Registre a primeira pelo botão "Nova movimentação"')}
-            />
-          )}
-        </DataCard>
-      </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto" data-testid="stock-movement-dialog">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <ArrowLeftRight className="w-5 h-5 text-primary" />
-              {editingId ? 'Editar Movimentação de Estoque' : 'Movimentação de Estoque - Inclusão'}
-              {nextNumber !== null && <Badge variant="outline" className="ml-2 text-primary border-primary/30">Nº {nextNumber}</Badge>}
-            </DialogTitle>
-          </DialogHeader>
 
           <Tabs defaultValue="basicos" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -641,14 +546,132 @@ export default function StockMovementsPage() {
             </TabsContent>
           </Tabs>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="stock-movement-cancel">Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} data-testid="stock-movement-save">
-              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar movimentação' : 'Salvar movimentação'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+        </FormPage>
+      ) : (
+        <div className="space-y-4" data-testid="stock-movements-page">
+          <PageHeader icon={ArrowLeftRight} title="Movimentação de Estoque" subtitle="Lançamentos manuais de Entrada e Saída de estoque" />
+  
+          <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <FilterField label="Nº, produto, finalidade, placa, nota fiscal ou fornecedor" className="col-span-2">
+                <SearchInput
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  data-testid="search-stock-movements-input"
+                />
+              </FilterField>
+              <FilterField label="Operação">
+                <Select value={operationFilter || 'ALL'} onValueChange={(v) => setOperationFilter(v === 'ALL' ? '' : v)}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="filter-stock-movement-operation"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todas</SelectItem>
+                    <SelectItem value="ENTRADA">Entrada</SelectItem>
+                    <SelectItem value="SAIDA">Saída</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Data inicial">
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="filter-stock-movement-date-from" />
+              </FilterField>
+              <FilterField label="Data final">
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="filter-stock-movement-date-to" />
+              </FilterField>
+            </div>
+          </FilterCard>
+  
+          {/* Lista - marque uma movimentação pra habilitar as ações da barra */}
+          <DataCard
+            title="Movimentações"
+            count={loading ? '...' : movements.length}
+            footer={<TablePagination {...paginationProps} />}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Nova movimentação" onClick={() => goNew()} testId="stock-movement-new-btn" />}
+              >
+                <ToolbarButton icon={Pencil} label={lockedBy ? `Editar: use ${lockedBy}` : 'Editar'} tone="blue" onClick={() => singleSelectedMovement && goEdit(singleSelectedMovement.id)} disabled={!singleSelectedMovement || lockedByEpi} testId="stock-movement-edit-btn" />
+                <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedMovement && downloadPDF(singleSelectedMovement.id, singleSelectedMovement.movement_number)} disabled={!singleSelectedMovement} testId="stock-movement-pdf-btn" />
+                <ToolbarButton icon={Trash2} label={lockedBy ? `Excluir: use ${lockedBy}` : 'Excluir (acerta o saldo do estoque)'} tone="red" onClick={handleDelete} disabled={!singleSelectedMovement || lockedByEpi || deleting} testId="stock-movement-delete-btn" />
+              </Toolbar>
+            )}
+          >
+            {movements.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={pageItems.length > 0 && pageItems.every((m) => selectedIds.has(m.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="stock-movement-select-all"
+                        />
+                      </th>
+                      <th>Nº</th>
+                      <th>Data</th>
+                      <th>Operação</th>
+                      <th>Almoxarifado</th>
+                      <th>Finalidade</th>
+                      <th className="!text-right">Itens</th>
+                      <th className="!text-right">Valor total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((m) => (
+                      <tr
+                        key={m.id}
+                        onClick={() => toggleSelect(m.id)}
+                        data-selected={selectedIds.has(m.id)}
+                        className="cursor-pointer"
+                        data-testid="stock-movement-row"
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(m.id)}
+                            onCheckedChange={() => toggleSelect(m.id)}
+                            data-testid={`stock-movement-row-checkbox-${m.movement_number}`}
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{m.movement_number}</td>
+                        <td className="whitespace-nowrap tabular-nums">{m.movement_date ? format(new Date(m.movement_date + 'T00:00:00'), 'dd/MM/yyyy') : '-'}</td>
+                        <td>
+                          <StatusPill tone={OPERATION_TONES[m.operation_type] || 'slate'}>
+                            {OPERATION_LABELS[m.operation_type] || m.operation_type}
+                          </StatusPill>
+                        </td>
+                        <td><div className="max-w-[180px] truncate" title={m.warehouse_name || ''}>{m.warehouse_name || '-'}</div></td>
+                        <td>
+                          <div className="max-w-[240px] truncate" title={m.purpose_text || ''}>
+                            {m.purpose_type === 'VEICULO' && <span className="inline-flex items-center gap-1"><Car className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
+                            {m.purpose_type === 'OS' && <span className="inline-flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
+                            {(!m.purpose_type || m.purpose_type === 'OUTRO') && (
+                              m.origin === 'EPI'
+                                ? <span className="inline-flex items-center gap-1" title="Gerada pela Entrega de EPI's: só muda por lá"><HardHat className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>
+                                : m.origin === 'TANQUE'
+                                  ? <span className="inline-flex items-center gap-1" title="Gerada pelo Reabastecer Tanque: só muda pela tela Nível do Tanque"><Droplet className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>
+                                  : (m.purpose_text || '-')
+                            )}
+                          </div>
+                        </td>
+                        <td className="text-right tabular-nums">{(m.items || []).length}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(m.total_value)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                icon={ArrowLeftRight}
+                loading={loading} title={(hasFilters ? 'Nenhuma movimentação encontrada' : 'Nenhuma movimentação de estoque registrada')}
+                hint={loading ? undefined : (hasFilters ? 'Ajuste os filtros' : 'Registre a primeira pelo botão "Nova movimentação"')}
+              />
+            )}
+          </DataCard>
+        </div>
+      )}
+
       <ConfirmDialog />
     </Layout>
   );

@@ -105,6 +105,15 @@ const YARD_ALERT_POLL_MS = 5 * 60 * 1000;
 // Telas com o formulário em página própria (lista em `base`, cadastro em
 // `base/new`, edição em `base/:id/edit`): [título do novo, título da edição]
 const FORM_PAGE_TITLES = {
+  '/container-representatives': ['Novo Representante', 'Editar Representante'],
+  '/estoque/movimentacao': ['Nova Movimentação de Estoque', 'Editar Movimentação de Estoque'],
+  '/estoque/entrega-epi': ['Nova Entrega de EPI', 'Editar Entrega de EPI'],
+  '/rh/contratos': ['Nova Admissão', 'Editar Contrato'],
+  '/fleet/abastecimento': ['Novo Abastecimento', 'Editar Abastecimento'],
+  '/fleet/ordem-abastecimento': ['Nova Ordem de Abastecimento', 'Editar Ordem de Abastecimento'],
+  '/delivery-status': ['Novo Status de Entrega', 'Editar Status de Entrega'],
+  '/loading-schedules': ['Nova Programação de Carregamento', 'Editar Programação de Carregamento'],
+  '/port-services': ['Novo Serviço Portuário', 'Editar Serviço Portuário'],
   '/expense-reports': ['Nova Prestação de Contas', 'Editar Prestação de Contas'],
   '/daily-rate-requests': ['Nova Solicitação de Diária', 'Editar Solicitação de Diária'],
   '/billing': ['Gerar Nova Fatura', 'Editar Fatura'],
@@ -416,15 +425,15 @@ function LayoutFrame({ children }) {
   const isManutencaoCadastroActive = location.pathname === '/fleet/os-categories';
   const isManutencaoRelatorioActive = location.pathname === '/reports/service-orders';
   const isEstoqueCadastroActive = location.pathname === '/estoque/cadastros';
-  const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio', '/estoque/entrega-epi'].includes(location.pathname);
+  const isEstoqueActive = isEstoqueCadastroActive || ['/estoque', '/estoque/servicos', '/estoque/produtos', '/estoque/entradas', '/estoque/movimentacao', '/estoque/relatorio', '/estoque/entrega-epi'].includes(location.pathname) || location.pathname.startsWith('/estoque/movimentacao/') || location.pathname.startsWith('/estoque/entrega-epi/');
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/') || location.pathname === '/comercial/comissao';
-  const isGestaoContainerActive = location.pathname === '/container-representatives' || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
+  const isGestaoContainerActive = location.pathname.startsWith('/container-representatives') || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
   const isRhActive = location.pathname === '/rh' || location.pathname.startsWith('/rh/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/revisoes') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
-  const isAbastecimentoActive = location.pathname === '/fleet/abastecimento' || location.pathname === '/fleet/ordem-abastecimento' || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
+  const isAbastecimentoActive = location.pathname.startsWith('/fleet/abastecimento') || location.pathname.startsWith('/fleet/ordem-abastecimento') || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/veiculos') || location.pathname.startsWith('/loading-orders') || location.pathname === '/freight-routes' || location.pathname === '/freight-payments' || location.pathname.startsWith('/fiscal/');
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/audit-log' || location.pathname === '/modules' || location.pathname === '/plataforma' || location.pathname === '/tank-settings';
-  const isOperacionalActive = location.pathname === '/loading-schedules' || location.pathname === '/delivery-status' || location.pathname === '/port-services' || location.pathname === '/reports/port-services' || location.pathname === '/reports/port-service-shifts' || location.pathname === '/reports/vehicle-results';
+  const isOperacionalActive = location.pathname.startsWith('/loading-schedules') || location.pathname.startsWith('/delivery-status') || location.pathname.startsWith('/port-services') || location.pathname === '/reports/port-services' || location.pathname === '/reports/port-service-shifts' || location.pathname === '/reports/vehicle-results';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
   const isContainerInspectionsActive = location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/');
   const isTerminalCadastroActive = location.pathname === '/shipping-lines' || location.pathname === '/service-types';

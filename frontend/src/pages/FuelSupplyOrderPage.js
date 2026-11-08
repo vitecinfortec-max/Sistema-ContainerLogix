@@ -23,9 +23,12 @@ import { Plus, Pencil, Trash2, Save, ClipboardCheck, Download, Printer, Clock, C
 import { scrollBehavior } from '../lib/reducedMotion';
 import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
+import { FormPage } from '../components/FormKit';
 const FUEL_TYPE_OPTIONS = [
   ['DIESEL_S10', 'Diesel S10'],
   ['DIESEL_S500', 'Diesel S500'],
@@ -77,6 +80,7 @@ const authorizedLabel = (o) => {
 const ITEMS_PER_PAGE = 15;
 
 export default function FuelSupplyOrderPage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/fleet/ordem-abastecimento');
   const { confirm, ConfirmDialog } = useConfirm();
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -183,7 +187,7 @@ export default function FuelSupplyOrderPage() {
         await api.createFuelSupplyOrder(payload);
         toast.success('Ordem de Abastecimento criada!');
       }
-      setDialogOpen(false);
+      backToList();
       loadList();
     } catch (e) {
       toast.error(apiErrorMessage(e, 'Erro ao salvar ordem de abastecimento'));
@@ -301,140 +305,45 @@ export default function FuelSupplyOrderPage() {
     } catch (e) { toast.error(apiErrorMessage(e, 'Erro ao gerar PDF')); }
   };
 
+  // Cadastro e edição em página própria (/fleet/ordem-abastecimento/new e /fleet/ordem-abastecimento/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openCreate();
+    if (mode === 'edit') {
+      api.getFuelSupplyOrder(routeId)
+        .then(() => openEdit(routeId))
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar ordem de abastecimento'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4" data-testid="fuel-order-page">
-        <PageHeader icon={ClipboardCheck} title="Ordem de Abastecimento" subtitle="Autorização de abastecimento anterior ao registro do abastecimento em si" />
-
-        <StatGrid className="lg:grid-cols-3">
-          <StatCard label="Ordens" value={list.length} icon={ClipboardCheck} tone="blue" hint={search ? 'que batem com a busca' : 'cadastradas'} />
-          <StatCard label="Pendentes" value={list.filter((o) => !o.is_launched).length} icon={Clock} tone="amber" hint="ainda sem abastecimento lançado" />
-          <StatCard label="Lançadas" value={list.filter((o) => o.is_launched).length} icon={CheckCircle2} tone="primary" hint="já viraram abastecimento" />
-        </StatGrid>
-
-        <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setStatusFilter('all'); setCurrentPage(1); }}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Equipamento, fornecedor, solicitante ou empresa">
-              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="fuel-order-search" />
-            </FilterField>
-            <FilterField label="Situação">
-              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
-                <SelectTrigger className="h-9 text-sm" data-testid="fuel-order-status-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="PENDENTE">Pendentes</SelectItem>
-                  <SelectItem value="LANCADA">Lançadas</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque uma ordem pra habilitar as ações da barra */}
-        <DataCard
-          title="Ordens de abastecimento"
-          count={loading ? '...' : filtered.length}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Nova ordem" onClick={openCreate} testId="fuel-order-new-btn" />}
-            >
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedOrder && openEdit(singleSelectedOrder.id)} disabled={!singleSelectedOrder} />
-              <ToolbarButton icon={Download} label={selectedIds.size > 1 ? `Baixar PDF (${selectedIds.size} ordens)` : 'Baixar PDF'} tone="emerald"
-                onClick={downloadSelected} disabled={!selectedIds.size} testId="fuel-orders-download" />
-              <ToolbarButton icon={Printer} label={selectedIds.size > 1 ? `Imprimir (${selectedIds.size} ordens)` : 'Imprimir'} tone="primary"
-                onClick={printSelected} disabled={!selectedIds.size} testId="fuel-orders-print" />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
-            </Toolbar>
-          )}
-          footer={(
-            <TablePagination
-              currentPage={page}
-              totalPages={totalPages}
-              totalItems={filtered.length}
-              pageSize={ITEMS_PER_PAGE}
-              onPageChange={goToPage}
-            />
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editingId}
+          title={editingId ? 'Editar ordem de abastecimento' : 'Nova ordem de abastecimento'}
+          icon={ClipboardCheck}
+          backTo={backToList}
+          subtitle={nextNumber !== null ? `Ordem Nº ${nextNumber}` : 'Autorização de abastecimento no posto'}
+          testId="fuel-order-form-page"
+          actions={(
+            <>
+            {editingId && (
+              <Button variant="outline" onClick={() => downloadPDF(editingId, nextNumber)} data-testid="fuel-order-print" title="Baixar PDF">
+                <Download className="w-4 h-4 mr-2" />Imprimir
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => backToList()} data-testid="fuel-order-cancel">Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90" data-testid="fuel-order-save">
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar ordem' : 'Salvar ordem'}
+            </Button>
+            </>
           )}
         >
-          {filtered.length === 0 && !loading ? (
-            <EmptyState
-              icon={ClipboardCheck}
-              title={hasFilters ? 'Nenhuma ordem encontrada' : 'Nenhuma ordem de abastecimento cadastrada'}
-              hint={hasFilters ? 'Ajuste os filtros' : 'Cadastre a primeira pelo botão "Nova ordem"'}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={pageItems.length > 0 && pageItems.every((o) => selectedIds.has(o.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                        data-testid="select-all-checkbox"
-                      />
-                    </th>
-                    <th>Nº</th>
-                    <th>Data</th>
-                    <th>Equipamento</th>
-                    <th className="!text-right">KM</th>
-                    <th>Fornecedor</th>
-                    <th>Produto</th>
-                    <th>Tipo</th>
-                    <th className="!text-right">Autorizado</th>
-                    <th>Solicitante</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageItems.map((o) => (
-                    <tr
-                      key={o.id}
-                      onClick={() => toggleSelect(o.id)}
-                      data-selected={selectedIds.has(o.id)}
-                      className="cursor-pointer"
-                      data-testid={`fuel-order-row-${o.order_number}`}
-                    >
-                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(o.id)}
-                          onCheckedChange={() => toggleSelect(o.id)}
-                          data-testid={`fuel-order-row-checkbox-${o.order_number}`}
-                        />
-                      </td>
-                      <td className="cell-strong whitespace-nowrap tabular-nums">#{o.order_number}</td>
-                      <td className="whitespace-nowrap tabular-nums">{o.order_date ? format(new Date(`${o.order_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
-                      <td><PlateTag>{o.equipment_plate}</PlateTag></td>
-                      <td className="text-right whitespace-nowrap tabular-nums">{o.reading != null ? Number(o.reading).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '-'}</td>
-                      <td><div className="max-w-[220px] truncate" title={o.supplier_name || ''}>{o.supplier_name || '-'}</div></td>
-                      <td className="whitespace-nowrap">{FUEL_TYPE_LABELS[o.fuel_type] || o.fuel_type || '-'}</td>
-                      <td className="whitespace-nowrap">{SUPPLY_MODE_LABELS[o.supply_mode] || o.supply_mode || '-'}</td>
-                      <td className="text-right whitespace-nowrap tabular-nums">{authorizedLabel(o)}</td>
-                      <td><div className="max-w-[180px] truncate" title={o.requester || ''}>{o.requester || '-'}</div></td>
-                      <td>
-                        <StatusPill tone={o.is_launched ? 'emerald' : 'amber'}>
-                          {o.is_launched ? 'Lançado' : 'Pendente'}
-                        </StatusPill>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </DataCard>
-      </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="fuel-order-dialog">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <ClipboardCheck className="w-5 h-5 text-primary" />
-              {editingId ? 'Editar Ordem de Abastecimento' : 'Nova Ordem de Abastecimento'}
-              {nextNumber !== null && <Badge variant="outline" className="ml-2 text-primary border-primary/30">Nº {nextNumber}</Badge>}
-            </DialogTitle>
-          </DialogHeader>
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -531,19 +440,133 @@ export default function FuelSupplyOrderPage() {
             <TextAreaField label="Observação" value={form.observations} onChange={(v) => onChange('observations', v)} testid="fuel-order-observations" />
           </div>
 
-          <DialogFooter>
-            {editingId && (
-              <Button variant="outline" onClick={() => downloadPDF(editingId, nextNumber)} data-testid="fuel-order-print" title="Baixar PDF">
-                <Download className="w-4 h-4 mr-2" />Imprimir
-              </Button>
+          
+        </FormPage>
+      ) : (
+        <div className="space-y-4" data-testid="fuel-order-page">
+          <PageHeader icon={ClipboardCheck} title="Ordem de Abastecimento" subtitle="Autorização de abastecimento anterior ao registro do abastecimento em si" />
+  
+          <StatGrid className="lg:grid-cols-3">
+            <StatCard label="Ordens" value={list.length} icon={ClipboardCheck} tone="blue" hint={search ? 'que batem com a busca' : 'cadastradas'} />
+            <StatCard label="Pendentes" value={list.filter((o) => !o.is_launched).length} icon={Clock} tone="amber" hint="ainda sem abastecimento lançado" />
+            <StatCard label="Lançadas" value={list.filter((o) => o.is_launched).length} icon={CheckCircle2} tone="primary" hint="já viraram abastecimento" />
+          </StatGrid>
+  
+          <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setStatusFilter('all'); setCurrentPage(1); }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <FilterField label="Equipamento, fornecedor, solicitante ou empresa">
+                <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="fuel-order-search" />
+              </FilterField>
+              <FilterField label="Situação">
+                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="fuel-order-status-filter"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="PENDENTE">Pendentes</SelectItem>
+                    <SelectItem value="LANCADA">Lançadas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </div>
+          </FilterCard>
+  
+          {/* Lista - marque uma ordem pra habilitar as ações da barra */}
+          <DataCard
+            title="Ordens de abastecimento"
+            count={loading ? '...' : filtered.length}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Nova ordem" onClick={() => goNew()} testId="fuel-order-new-btn" />}
+              >
+                <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedOrder && goEdit(singleSelectedOrder.id)} disabled={!singleSelectedOrder} />
+                <ToolbarButton icon={Download} label={selectedIds.size > 1 ? `Baixar PDF (${selectedIds.size} ordens)` : 'Baixar PDF'} tone="emerald"
+                  onClick={downloadSelected} disabled={!selectedIds.size} testId="fuel-orders-download" />
+                <ToolbarButton icon={Printer} label={selectedIds.size > 1 ? `Imprimir (${selectedIds.size} ordens)` : 'Imprimir'} tone="primary"
+                  onClick={printSelected} disabled={!selectedIds.size} testId="fuel-orders-print" />
+                <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOrder && handleDelete(singleSelectedOrder.id, singleSelectedOrder.order_number)} disabled={!singleSelectedOrder} />
+              </Toolbar>
             )}
-            <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="fuel-order-cancel">Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90" data-testid="fuel-order-save">
-              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar ordem' : 'Salvar ordem'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            footer={(
+              <TablePagination
+                currentPage={page}
+                totalPages={totalPages}
+                totalItems={filtered.length}
+                pageSize={ITEMS_PER_PAGE}
+                onPageChange={goToPage}
+              />
+            )}
+          >
+            {filtered.length === 0 && !loading ? (
+              <EmptyState
+                icon={ClipboardCheck}
+                title={hasFilters ? 'Nenhuma ordem encontrada' : 'Nenhuma ordem de abastecimento cadastrada'}
+                hint={hasFilters ? 'Ajuste os filtros' : 'Cadastre a primeira pelo botão "Nova ordem"'}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={pageItems.length > 0 && pageItems.every((o) => selectedIds.has(o.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="select-all-checkbox"
+                        />
+                      </th>
+                      <th>Nº</th>
+                      <th>Data</th>
+                      <th>Equipamento</th>
+                      <th className="!text-right">KM</th>
+                      <th>Fornecedor</th>
+                      <th>Produto</th>
+                      <th>Tipo</th>
+                      <th className="!text-right">Autorizado</th>
+                      <th>Solicitante</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((o) => (
+                      <tr
+                        key={o.id}
+                        onClick={() => toggleSelect(o.id)}
+                        data-selected={selectedIds.has(o.id)}
+                        className="cursor-pointer"
+                        data-testid={`fuel-order-row-${o.order_number}`}
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(o.id)}
+                            onCheckedChange={() => toggleSelect(o.id)}
+                            data-testid={`fuel-order-row-checkbox-${o.order_number}`}
+                          />
+                        </td>
+                        <td className="cell-strong whitespace-nowrap tabular-nums">#{o.order_number}</td>
+                        <td className="whitespace-nowrap tabular-nums">{o.order_date ? format(new Date(`${o.order_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
+                        <td><PlateTag>{o.equipment_plate}</PlateTag></td>
+                        <td className="text-right whitespace-nowrap tabular-nums">{o.reading != null ? Number(o.reading).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '-'}</td>
+                        <td><div className="max-w-[220px] truncate" title={o.supplier_name || ''}>{o.supplier_name || '-'}</div></td>
+                        <td className="whitespace-nowrap">{FUEL_TYPE_LABELS[o.fuel_type] || o.fuel_type || '-'}</td>
+                        <td className="whitespace-nowrap">{SUPPLY_MODE_LABELS[o.supply_mode] || o.supply_mode || '-'}</td>
+                        <td className="text-right whitespace-nowrap tabular-nums">{authorizedLabel(o)}</td>
+                        <td><div className="max-w-[180px] truncate" title={o.requester || ''}>{o.requester || '-'}</div></td>
+                        <td>
+                          <StatusPill tone={o.is_launched ? 'emerald' : 'amber'}>
+                            {o.is_launched ? 'Lançado' : 'Pendente'}
+                          </StatusPill>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataCard>
+        </div>
+      )}
+
       <ConfirmDialog />
     </Layout>
   );

@@ -1,4 +1,4 @@
-import { FormSectionTitle } from '../components/FormKit';
+import { FormSectionTitle, FormPage } from '../components/FormKit';
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
@@ -24,12 +24,14 @@ import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
 import { formatCPF, formatPlate } from '../lib/masks';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
 
 // Cliente para o qual exibimos o campo "Nº da Bolsa" (flexitank) na Programação
 // de Carregamento e no Status de Entrega
 const BAG_NUMBER_CLIENT_NAME = 'MANUPORT LIQUIDS DO BRASIL LTDA';
 
 export default function LoadingSchedulePage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/loading-schedules');
   const { confirm, ConfirmDialog } = useConfirm();
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -282,7 +284,7 @@ export default function LoadingSchedulePage() {
         await api.createLoadingSchedule(formData);
         toast.success('Programação criada com sucesso!');
       }
-      setModalOpen(false);
+      backToList();
       resetForm();
       loadSchedules();
     } catch (error) {
@@ -364,145 +366,42 @@ export default function LoadingSchedulePage() {
   const cavalos = vehicles.filter(v => v.vehicle_type === 'CAVALO' || v.vehicle_type === 'CAMINHÃO');
   const carretas = vehicles.filter(v => v.vehicle_type === 'CARRETA');
 
+  // Cadastro e edição em página própria (/loading-schedules/new e /loading-schedules/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openNewModal();
+    if (mode === 'edit') {
+      api.getLoadingSchedule(routeId)
+        .then((r) => {
+          openEditModal(r.data);
+        })
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar programação'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4" data-testid="loading-schedule-page">
-        <PageHeader icon={Calendar} title="Programação de Carregamento" subtitle="Gerencie as programações de carregamento" />
-
-        <StatGrid>
-          <StatCard label="Programações" value={stats.ATIVO + stats.CONCLUIDO + stats.CANCELADO} icon={Calendar} tone="blue" hint={searchQuery ? 'que batem com a busca' : 'cadastradas'} />
-          <StatCard label="Ativas" value={stats.ATIVO} icon={Clock} tone="amber" hint="aguardando a entrega" testId="schedule-kpi-active" />
-          <StatCard label="Concluídas" value={stats.CONCLUIDO} icon={CheckCircle2} tone="emerald" hint="pelo Status de Entrega" />
-          <StatCard label="Canceladas" value={stats.CANCELADO} icon={XCircle} tone="red" />
-        </StatGrid>
-
-        <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearSearch}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Cliente, motorista ou container">
-              <SearchInput
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                data-testid="search-schedule-input"
-              />
-            </FilterField>
-            <FilterField label="Status">
-              <Select value={statusFilter || '_all'} onValueChange={changeStatusFilter}>
-                <SelectTrigger className="h-9 text-sm" data-testid="schedule-status-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Todos</SelectItem>
-                  <SelectItem value="ATIVO">Ativo</SelectItem>
-                  <SelectItem value="CONCLUIDO">Concluído</SelectItem>
-                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque uma programação pra habilitar as ações da barra */}
-        <DataCard
-          title="Programações"
-          count={pagination.total}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Nova programação" onClick={openNewModal} testId="new-schedule-btn" />}
-            >
-              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedSchedule && openDetails(singleSelectedSchedule)} disabled={!singleSelectedSchedule} />
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedSchedule && openEditModal(singleSelectedSchedule)} disabled={!singleSelectedSchedule} />
-              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedSchedule && handlePrintPDF(singleSelectedSchedule.id)} disabled={!singleSelectedSchedule} />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedSchedule && handleDelete(singleSelectedSchedule.id)} disabled={!singleSelectedSchedule} />
-              <ToolbarDivider />
-              <ToolbarButton
-                icon={singleSelectedSchedule?.status === 'CANCELADO' ? RotateCcw : Ban}
-                label={singleSelectedSchedule?.status === 'CANCELADO' ? 'Reativar' : 'Cancelar programação'}
-                tone="amber"
-                onClick={() => singleSelectedSchedule && handleToggleCancel(singleSelectedSchedule)}
-                disabled={!singleSelectedSchedule}
-                testId="schedule-toggle-cancel"
-              />
-            </Toolbar>
-          )}
-          footer={(
-            <TablePagination
-              currentPage={pagination.page}
-              totalPages={pagination.pages}
-              totalItems={pagination.total}
-              pageSize={15}
-              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
-            />
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editingSchedule}
+          title={editingSchedule ? 'Editar programação' : 'Nova programação de carregamento'}
+          icon={Calendar}
+          backTo={backToList}
+          subtitle="Containers, cliente e motorista de cada programação"
+          testId="loading-schedule-form-page"
+          actions={(
+            <>
+            <Button variant="outline" onClick={() => backToList()}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : (editingSchedule ? 'Salvar alterações' : 'Criar programação')}
+            </Button>
+            </>
           )}
         >
-          {loading ? (
-            <EmptyState loading />
-          ) : schedules.length === 0 ? (
-            <EmptyState
-              icon={Calendar}
-              title="Nenhuma programação encontrada"
-              hint={searchQuery ? 'Ajuste a busca' : 'Cadastre a primeira pelo botão "Nova programação"'}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={schedules.length > 0 && schedules.every(s => selectedIds.has(s.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                      />
-                    </th>
-                    <th>Nº</th>
-                    <th>Cliente contratante</th>
-                    <th>Cliente destino</th>
-                    <th className="!text-right">Itens</th>
-                    <th>Status</th>
-                    <th>Criado em</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schedules.map((schedule) => {
-                    const isSelected = selectedIds.has(schedule.id);
-                    return (
-                      <tr
-                        key={schedule.id}
-                        data-selected={isSelected}
-                        className="cursor-pointer"
-                        onClick={() => toggleSelect(schedule.id)}
-                      >
-                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSelect(schedule.id)}
-                          />
-                        </td>
-                        <td className="cell-strong whitespace-nowrap tabular-nums">#{schedule.schedule_number}</td>
-                        <td><div className="max-w-[260px] truncate" title={schedule.contracting_client_name || ''}>{schedule.contracting_client_name}</div></td>
-                        <td><div className="max-w-[260px] truncate" title={schedule.destination_client_name || ''}>{schedule.destination_client_name}</div></td>
-                        <td className="text-right tabular-nums">{schedule.items?.length || 0}</td>
-                        <td>{getStatusBadge(schedule.status)}</td>
-                        <td className="whitespace-nowrap tabular-nums">
-                          {schedule.created_at && format(new Date(schedule.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </DataCard>
-      </div>
 
-      {/* Modal Nova/Editar Programação */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Calendar className="w-4 h-4 text-primary" />
-              {editingSchedule ? 'Editar Programação' : 'Nova Programação de Carregamento'}
-            </DialogTitle>
-          </DialogHeader>
 
           <div className="space-y-6">
             {/* Cabeçalho - Clientes */}
@@ -671,14 +570,137 @@ export default function LoadingSchedulePage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : (editingSchedule ? 'Salvar alterações' : 'Criar programação')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+        </FormPage>
+      ) : (
+        <div className="space-y-4" data-testid="loading-schedule-page">
+          <PageHeader icon={Calendar} title="Programação de Carregamento" subtitle="Gerencie as programações de carregamento" />
+  
+          <StatGrid>
+            <StatCard label="Programações" value={stats.ATIVO + stats.CONCLUIDO + stats.CANCELADO} icon={Calendar} tone="blue" hint={searchQuery ? 'que batem com a busca' : 'cadastradas'} />
+            <StatCard label="Ativas" value={stats.ATIVO} icon={Clock} tone="amber" hint="aguardando a entrega" testId="schedule-kpi-active" />
+            <StatCard label="Concluídas" value={stats.CONCLUIDO} icon={CheckCircle2} tone="emerald" hint="pelo Status de Entrega" />
+            <StatCard label="Canceladas" value={stats.CANCELADO} icon={XCircle} tone="red" />
+          </StatGrid>
+  
+          <FilterCard hasFilters={!!(searchQuery || statusFilter)} onClear={clearSearch}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <FilterField label="Cliente, motorista ou container">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  data-testid="search-schedule-input"
+                />
+              </FilterField>
+              <FilterField label="Status">
+                <Select value={statusFilter || '_all'} onValueChange={changeStatusFilter}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="schedule-status-filter"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">Todos</SelectItem>
+                    <SelectItem value="ATIVO">Ativo</SelectItem>
+                    <SelectItem value="CONCLUIDO">Concluído</SelectItem>
+                    <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </div>
+          </FilterCard>
+  
+          {/* Lista - marque uma programação pra habilitar as ações da barra */}
+          <DataCard
+            title="Programações"
+            count={pagination.total}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Nova programação" onClick={() => goNew()} testId="new-schedule-btn" />}
+              >
+                <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedSchedule && openDetails(singleSelectedSchedule)} disabled={!singleSelectedSchedule} />
+                <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedSchedule && goEdit(singleSelectedSchedule.id)} disabled={!singleSelectedSchedule} />
+                <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedSchedule && handlePrintPDF(singleSelectedSchedule.id)} disabled={!singleSelectedSchedule} />
+                <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedSchedule && handleDelete(singleSelectedSchedule.id)} disabled={!singleSelectedSchedule} />
+                <ToolbarDivider />
+                <ToolbarButton
+                  icon={singleSelectedSchedule?.status === 'CANCELADO' ? RotateCcw : Ban}
+                  label={singleSelectedSchedule?.status === 'CANCELADO' ? 'Reativar' : 'Cancelar programação'}
+                  tone="amber"
+                  onClick={() => singleSelectedSchedule && handleToggleCancel(singleSelectedSchedule)}
+                  disabled={!singleSelectedSchedule}
+                  testId="schedule-toggle-cancel"
+                />
+              </Toolbar>
+            )}
+            footer={(
+              <TablePagination
+                currentPage={pagination.page}
+                totalPages={pagination.pages}
+                totalItems={pagination.total}
+                pageSize={15}
+                onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+              />
+            )}
+          >
+            {loading ? (
+              <EmptyState loading />
+            ) : schedules.length === 0 ? (
+              <EmptyState
+                icon={Calendar}
+                title="Nenhuma programação encontrada"
+                hint={searchQuery ? 'Ajuste a busca' : 'Cadastre a primeira pelo botão "Nova programação"'}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={schedules.length > 0 && schedules.every(s => selectedIds.has(s.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
+                      <th>Nº</th>
+                      <th>Cliente contratante</th>
+                      <th>Cliente destino</th>
+                      <th className="!text-right">Itens</th>
+                      <th>Status</th>
+                      <th>Criado em</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {schedules.map((schedule) => {
+                      const isSelected = selectedIds.has(schedule.id);
+                      return (
+                        <tr
+                          key={schedule.id}
+                          data-selected={isSelected}
+                          className="cursor-pointer"
+                          onClick={() => toggleSelect(schedule.id)}
+                        >
+                          <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelect(schedule.id)}
+                            />
+                          </td>
+                          <td className="cell-strong whitespace-nowrap tabular-nums">#{schedule.schedule_number}</td>
+                          <td><div className="max-w-[260px] truncate" title={schedule.contracting_client_name || ''}>{schedule.contracting_client_name}</div></td>
+                          <td><div className="max-w-[260px] truncate" title={schedule.destination_client_name || ''}>{schedule.destination_client_name}</div></td>
+                          <td className="text-right tabular-nums">{schedule.items?.length || 0}</td>
+                          <td>{getStatusBadge(schedule.status)}</td>
+                          <td className="whitespace-nowrap tabular-nums">
+                            {schedule.created_at && format(new Date(schedule.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataCard>
+        </div>
+      )}
 
       {/* Modal Detalhes */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>

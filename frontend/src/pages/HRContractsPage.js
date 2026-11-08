@@ -32,6 +32,8 @@ import { formatCPF, formatPhone } from '../lib/masks';
 
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
+import { FormPage } from '../components/FormKit';
 function emptyForm() {
   return {
     person_type: '', person_id: '', person_label: '',
@@ -47,6 +49,7 @@ function emptyForm() {
 const EMPTY_TERMINATION = { termination_date: todayISO(), termination_type: 'SEM_JUSTA_CAUSA', notice_type: 'INDENIZADO', fgts_balance: '', reason: '' };
 
 export default function HRContractsPage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/rh/contratos');
   const { confirm, ConfirmDialog } = useConfirm();
   const { meta, label } = useHRMeta();
   const [list, setList] = useState([]);
@@ -204,7 +207,7 @@ export default function HRContractsPage() {
       if (editingId) await api.updateHRContract(editingId, payload);
       else await api.createHRContract(payload);
       toast.success(editingId ? 'Contrato atualizado' : 'Admissão registrada');
-      setDialogOpen(false);
+      backToList();
       if (form.new_person) loadPeople();
       reload();
     } catch (e) {
@@ -331,139 +334,42 @@ export default function HRContractsPage() {
     }
   }, [termForm.termination_type, meta.notice_types]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Cadastro e edição em página própria (/rh/contratos/new e /rh/contratos/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openCreate();
+    if (mode === 'edit') {
+      api.getHRContract(routeId)
+        .then((r) => {
+          openEdit(r.data);
+        })
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar contrato'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4" data-testid="hr-contracts-page">
-        <PageHeader icon={UserPlus} title="Admissão e Contratos"
-          subtitle="Contrato de trabalho de cada funcionário: cargo, salário, adicionais, dependentes e desligamento" />
-
-        <StatGrid>
-          <StatCard label="Ativos" value={vigentes.filter((c) => c.status === 'ATIVO').length} icon={Users} tone="emerald" hint="com os filtros atuais" />
-          <StatCard label="Afastados" value={vigentes.filter((c) => c.status === 'AFASTADO').length} icon={PauseCircle} tone="amber" />
-          <StatCard label="Experiência vencendo" value={experienceSoon} icon={Hourglass} tone="blue" hint="nos próximos 15 dias" />
-          <StatCard label="Salários base" value={formatMoney(vigentes.reduce((a, c) => a + (c.base_salary || 0), 0))} icon={Wallet} tone="slate" hint="contratos vigentes" />
-        </StatGrid>
-
-        <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setStatusFilter('VIGENTE'); setTypeFilter(''); }}>
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-            <FilterField label="Nome, CPF ou cargo" className="col-span-2">
-              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="hr-contracts-search" />
-            </FilterField>
-            <FilterField label="Situação">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9 text-sm" data-testid="hr-contracts-status-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="VIGENTE">Vigentes</SelectItem>
-                  <SelectItem value="ATIVO">Ativos</SelectItem>
-                  <SelectItem value="AFASTADO">Afastados</SelectItem>
-                  <SelectItem value="DESLIGADO">Desligados</SelectItem>
-                  <SelectItem value="TODOS">Todos</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Tipo de contrato">
-              <Select value={typeFilter || '_all'} onValueChange={(v) => setTypeFilter(v === '_all' ? '' : v)}>
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Todos</SelectItem>
-                  {meta.contract_types.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </FilterField>
-          </div>
-        </FilterCard>
-
-        <DataCard
-          title="Contratos"
-          count={loading ? '...' : list.length}
-          footer={<TablePagination {...paginationProps} />}
-          toolbar={(
-            <Toolbar selectedCount={selectedIds.size} primary={<ToolbarPrimary icon={UserPlus} label="Nova admissão" onClick={openCreate} testId="hr-contract-new-btn" />}>
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => single && openEdit(single)} disabled={!isVigente} testId="hr-contract-edit-btn" />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={handleDelete} disabled={!single} testId="hr-contract-delete-btn" />
-              <ToolbarDivider />
-              <ToolbarButton icon={single?.status === 'AFASTADO' ? PlayCircle : PauseCircle} label={single?.status === 'AFASTADO' ? 'Retorno ao trabalho' : 'Afastar'}
-                tone="amber" onClick={toggleLeave} disabled={!isVigente} testId="hr-contract-leave-btn" />
-              <ToolbarButton icon={UserX} label="Desligar (simular rescisão)" tone="red" onClick={openTermination} disabled={!isVigente} testId="hr-contract-terminate-btn" />
-              <ToolbarButton icon={Undo2} label="Desfazer desligamento" tone="amber" onClick={reinstate} disabled={!single || single.status !== 'DESLIGADO'} testId="hr-contract-reinstate-btn" />
-              <ToolbarButton icon={Hourglass} label="Prorrogar experiência" tone="amber" onClick={() => setExtendDays(90)} disabled={!canExtend} testId="hr-contract-extend-btn" />
-              <ToolbarButton icon={Wallet} label={allAdvance ? 'Tirar adiantamento quinzenal' : 'Adiantamento quinzenal'} tone="blue"
-                onClick={toggleAdvance} disabled={!selectedIds.size} testId="hr-contract-advance-btn" />
-              <ToolbarDivider />
-              <ToolbarButton icon={FileSignature} label="Contrato de trabalho (PDF)" tone="primary"
-                disabled={!single || !['CLT', 'EXPERIENCIA'].includes(single.contract_type)}
-                onClick={() => saveBlob(() => api.getHRWorkContractPDF(single.id), `Contrato_${single.person_name}.pdf`)} testId="hr-work-contract-btn" />
-              <ToolbarButton icon={FileText} label="Ficha do funcionário (PDF)" tone="primary" disabled={!single}
-                onClick={() => saveBlob(() => api.getHRContractSheetPDF(single.id), `Ficha_${single.person_name}.pdf`)} testId="hr-contract-sheet-btn" />
-              <ToolbarButton icon={FileSignature} label="Demonstrativo de rescisão (PDF)" tone="emerald" disabled={!single || single.status !== 'DESLIGADO'}
-                onClick={() => saveBlob(() => api.getHRTerminationPDF(single.id), `Rescisao_${single.person_name}.pdf`)} testId="hr-contract-termination-pdf-btn" />
-            </Toolbar>
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editingId}
+          title={editingId ? 'Editar contrato' : 'Nova admissão'}
+          icon={UserPlus}
+          backTo={backToList}
+          subtitle="Dados do funcionário, remuneração, documentos e dependentes"
+          testId="hr-contract-form-page"
+          actions={(
+            <>
+            <Button variant="outline" onClick={() => backToList()} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} data-testid="hr-contract-save-btn">
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Registrar admissão'}
+            </Button>
+            </>
           )}
         >
-          {list.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0" />
-                    <th>Mat.</th>
-                    <th>Nome</th>
-                    <th>Cargo</th>
-                    <th>Setor</th>
-                    <th>Tipo</th>
-                    <th>Admissão</th>
-                    <th className="!text-right">Salário</th>
-                    <th>Situação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageItems.map((c) => (
-                    <tr key={c.id} onClick={() => toggle(c.id)} data-selected={selectedIds.has(c.id)} className="cursor-pointer" data-testid={`hr-contract-row-${c.contract_number}`}>
-                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggle(c.id)} />
-                      </td>
-                      <td className="tabular-nums cell-strong">{c.contract_number}</td>
-                      <td>
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="cell-strong max-w-[220px] truncate" title={c.person_name}>{c.person_name}</span>
-                          {c.person_type === 'MOTORISTA' && <StatusPill tone="slate" dot={false} className="text-[11px] px-1.5">Motorista</StatusPill>}
-                          {c.salary_advance && <StatusPill tone="blue" dot={false} className="text-[11px] px-1.5" title="Recebe adiantamento quinzenal">Vale</StatusPill>}
-                        </div>
-                      </td>
-                      <td>{c.position_name || '-'}</td>
-                      <td>{c.department || '-'}</td>
-                      <td className="whitespace-nowrap">{label('contract_types', c.contract_type)}</td>
-                      <td className="tabular-nums whitespace-nowrap">
-                        {fmtDate(c.admission_date)}
-                        {c.experience_end && c.status !== 'DESLIGADO' && c.experience_end >= today && (
-                          <span className="block text-[11px] text-amber-600 dark:text-amber-400">experiência até {fmtDate(c.experience_end)}</span>
-                        )}
-                      </td>
-                      <td className="text-right tabular-nums cell-strong whitespace-nowrap">{formatMoney(c.base_salary)}</td>
-                      <td>
-                        <StatusPill tone={CONTRACT_STATUS_TONES[c.status]}>{CONTRACT_STATUS[c.status]}</StatusPill>
-                        {c.termination && <span className="block text-[11px] text-slate-500">{fmtDate(c.termination.termination_date)}</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState icon={UserPlus} loading={loading} title={hasFilters ? 'Nenhum contrato encontrado' : 'Nenhuma admissão registrada'}
-              hint={loading ? undefined : 'Registre a primeira pelo botão "Nova admissão"'} testId="hr-contracts-empty" />
-          )}
-        </DataCard>
-      </div>
 
-      {/* Admissão / edição */}
-      <Dialog open={dialogOpen} onOpenChange={(v) => !saving && setDialogOpen(v)}>
-        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="hr-contract-dialog">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <UserPlus className="w-5 h-5 text-primary" />{editingId ? 'Editar Contrato' : 'Nova Admissão'}
-            </DialogTitle>
-          </DialogHeader>
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="flex flex-wrap h-auto">
               <TabsTrigger value="pessoa">Pessoa e cargo</TabsTrigger>
@@ -723,14 +629,132 @@ export default function HRContractsPage() {
             </TabsContent>
           </Tabs>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} data-testid="hr-contract-save-btn">
-              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Registrar admissão'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+        </FormPage>
+      ) : (
+        <div className="space-y-4" data-testid="hr-contracts-page">
+          <PageHeader icon={UserPlus} title="Admissão e Contratos"
+            subtitle="Contrato de trabalho de cada funcionário: cargo, salário, adicionais, dependentes e desligamento" />
+  
+          <StatGrid>
+            <StatCard label="Ativos" value={vigentes.filter((c) => c.status === 'ATIVO').length} icon={Users} tone="emerald" hint="com os filtros atuais" />
+            <StatCard label="Afastados" value={vigentes.filter((c) => c.status === 'AFASTADO').length} icon={PauseCircle} tone="amber" />
+            <StatCard label="Experiência vencendo" value={experienceSoon} icon={Hourglass} tone="blue" hint="nos próximos 15 dias" />
+            <StatCard label="Salários base" value={formatMoney(vigentes.reduce((a, c) => a + (c.base_salary || 0), 0))} icon={Wallet} tone="slate" hint="contratos vigentes" />
+          </StatGrid>
+  
+          <FilterCard hasFilters={hasFilters} onClear={() => { setSearch(''); setStatusFilter('VIGENTE'); setTypeFilter(''); }}>
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+              <FilterField label="Nome, CPF ou cargo" className="col-span-2">
+                <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="hr-contracts-search" />
+              </FilterField>
+              <FilterField label="Situação">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="hr-contracts-status-filter"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="VIGENTE">Vigentes</SelectItem>
+                    <SelectItem value="ATIVO">Ativos</SelectItem>
+                    <SelectItem value="AFASTADO">Afastados</SelectItem>
+                    <SelectItem value="DESLIGADO">Desligados</SelectItem>
+                    <SelectItem value="TODOS">Todos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Tipo de contrato">
+                <Select value={typeFilter || '_all'} onValueChange={(v) => setTypeFilter(v === '_all' ? '' : v)}>
+                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">Todos</SelectItem>
+                    {meta.contract_types.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </div>
+          </FilterCard>
+  
+          <DataCard
+            title="Contratos"
+            count={loading ? '...' : list.length}
+            footer={<TablePagination {...paginationProps} />}
+            toolbar={(
+              <Toolbar selectedCount={selectedIds.size} primary={<ToolbarPrimary icon={UserPlus} label="Nova admissão" onClick={() => goNew()} testId="hr-contract-new-btn" />}>
+                <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => single && goEdit(single.id)} disabled={!isVigente} testId="hr-contract-edit-btn" />
+                <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={handleDelete} disabled={!single} testId="hr-contract-delete-btn" />
+                <ToolbarDivider />
+                <ToolbarButton icon={single?.status === 'AFASTADO' ? PlayCircle : PauseCircle} label={single?.status === 'AFASTADO' ? 'Retorno ao trabalho' : 'Afastar'}
+                  tone="amber" onClick={toggleLeave} disabled={!isVigente} testId="hr-contract-leave-btn" />
+                <ToolbarButton icon={UserX} label="Desligar (simular rescisão)" tone="red" onClick={openTermination} disabled={!isVigente} testId="hr-contract-terminate-btn" />
+                <ToolbarButton icon={Undo2} label="Desfazer desligamento" tone="amber" onClick={reinstate} disabled={!single || single.status !== 'DESLIGADO'} testId="hr-contract-reinstate-btn" />
+                <ToolbarButton icon={Hourglass} label="Prorrogar experiência" tone="amber" onClick={() => setExtendDays(90)} disabled={!canExtend} testId="hr-contract-extend-btn" />
+                <ToolbarButton icon={Wallet} label={allAdvance ? 'Tirar adiantamento quinzenal' : 'Adiantamento quinzenal'} tone="blue"
+                  onClick={toggleAdvance} disabled={!selectedIds.size} testId="hr-contract-advance-btn" />
+                <ToolbarDivider />
+                <ToolbarButton icon={FileSignature} label="Contrato de trabalho (PDF)" tone="primary"
+                  disabled={!single || !['CLT', 'EXPERIENCIA'].includes(single.contract_type)}
+                  onClick={() => saveBlob(() => api.getHRWorkContractPDF(single.id), `Contrato_${single.person_name}.pdf`)} testId="hr-work-contract-btn" />
+                <ToolbarButton icon={FileText} label="Ficha do funcionário (PDF)" tone="primary" disabled={!single}
+                  onClick={() => saveBlob(() => api.getHRContractSheetPDF(single.id), `Ficha_${single.person_name}.pdf`)} testId="hr-contract-sheet-btn" />
+                <ToolbarButton icon={FileSignature} label="Demonstrativo de rescisão (PDF)" tone="emerald" disabled={!single || single.status !== 'DESLIGADO'}
+                  onClick={() => saveBlob(() => api.getHRTerminationPDF(single.id), `Rescisao_${single.person_name}.pdf`)} testId="hr-contract-termination-pdf-btn" />
+              </Toolbar>
+            )}
+          >
+            {list.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0" />
+                      <th>Mat.</th>
+                      <th>Nome</th>
+                      <th>Cargo</th>
+                      <th>Setor</th>
+                      <th>Tipo</th>
+                      <th>Admissão</th>
+                      <th className="!text-right">Salário</th>
+                      <th>Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((c) => (
+                      <tr key={c.id} onClick={() => toggle(c.id)} data-selected={selectedIds.has(c.id)} className="cursor-pointer" data-testid={`hr-contract-row-${c.contract_number}`}>
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={selectedIds.has(c.id)} onCheckedChange={() => toggle(c.id)} />
+                        </td>
+                        <td className="tabular-nums cell-strong">{c.contract_number}</td>
+                        <td>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="cell-strong max-w-[220px] truncate" title={c.person_name}>{c.person_name}</span>
+                            {c.person_type === 'MOTORISTA' && <StatusPill tone="slate" dot={false} className="text-[11px] px-1.5">Motorista</StatusPill>}
+                            {c.salary_advance && <StatusPill tone="blue" dot={false} className="text-[11px] px-1.5" title="Recebe adiantamento quinzenal">Vale</StatusPill>}
+                          </div>
+                        </td>
+                        <td>{c.position_name || '-'}</td>
+                        <td>{c.department || '-'}</td>
+                        <td className="whitespace-nowrap">{label('contract_types', c.contract_type)}</td>
+                        <td className="tabular-nums whitespace-nowrap">
+                          {fmtDate(c.admission_date)}
+                          {c.experience_end && c.status !== 'DESLIGADO' && c.experience_end >= today && (
+                            <span className="block text-[11px] text-amber-600 dark:text-amber-400">experiência até {fmtDate(c.experience_end)}</span>
+                          )}
+                        </td>
+                        <td className="text-right tabular-nums cell-strong whitespace-nowrap">{formatMoney(c.base_salary)}</td>
+                        <td>
+                          <StatusPill tone={CONTRACT_STATUS_TONES[c.status]}>{CONTRACT_STATUS[c.status]}</StatusPill>
+                          {c.termination && <span className="block text-[11px] text-slate-500">{fmtDate(c.termination.termination_date)}</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState icon={UserPlus} loading={loading} title={hasFilters ? 'Nenhum contrato encontrado' : 'Nenhuma admissão registrada'}
+                hint={loading ? undefined : 'Registre a primeira pelo botão "Nova admissão"'} testId="hr-contracts-empty" />
+            )}
+          </DataCard>
+        </div>
+      )}
 
       {/* Desligamento */}
       <Dialog open={extendDays !== null} onOpenChange={(v) => !v && setExtendDays(null)}>

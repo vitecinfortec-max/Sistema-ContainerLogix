@@ -355,7 +355,39 @@ function App() {
             }
           />
           <Route
+            path="/fleet/ordem-abastecimento/new"
+            element={
+              <ProtectedRoute moduleKey="frota.ordem_abastecimento">
+                <FuelSupplyOrderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/ordem-abastecimento/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="frota.ordem_abastecimento">
+                <FuelSupplyOrderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/fleet/abastecimento"
+            element={
+              <ProtectedRoute moduleKey="frota.abastecimento">
+                <FuelSupplyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/abastecimento/new"
+            element={
+              <ProtectedRoute moduleKey="frota.abastecimento">
+                <FuelSupplyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/abastecimento/:id/edit"
             element={
               <ProtectedRoute moduleKey="frota.abastecimento">
                 <FuelSupplyPage />
@@ -436,6 +468,22 @@ function App() {
           />
           <Route
             path="/container-representatives"
+            element={
+              <ProtectedRoute adminOnly moduleKey="gestao_container.representante">
+                <ContainerRepresentativesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-representatives/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="gestao_container.representante">
+                <ContainerRepresentativesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/container-representatives/:id/edit"
             element={
               <ProtectedRoute adminOnly moduleKey="gestao_container.representante">
                 <ContainerRepresentativesPage />
@@ -609,7 +657,39 @@ function App() {
             }
           />
           <Route
+            path="/estoque/movimentacao/new"
+            element={
+              <ProtectedRoute moduleKey="estoque.movimentacao">
+                <StockMovementsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/movimentacao/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="estoque.movimentacao">
+                <StockMovementsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/estoque/entrega-epi"
+            element={
+              <ProtectedRoute moduleKey="estoque.entrega_epi">
+                <EpiDeliveriesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/entrega-epi/new"
+            element={
+              <ProtectedRoute moduleKey="estoque.entrega_epi">
+                <EpiDeliveriesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/estoque/entrega-epi/:id/edit"
             element={
               <ProtectedRoute moduleKey="estoque.entrega_epi">
                 <EpiDeliveriesPage />
@@ -885,6 +965,22 @@ function App() {
             }
           />
           <Route
+            path="/loading-schedules/new"
+            element={
+              <ProtectedRoute moduleKey="operacional.programacao_carregamento">
+                <LoadingSchedulePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/loading-schedules/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="operacional.programacao_carregamento">
+                <LoadingSchedulePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/daily-rate-requests"
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.diaria">
@@ -950,6 +1046,22 @@ function App() {
           />
           <Route
             path="/rh/contratos"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.contratos">
+                <HRContractsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/contratos/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="rh.contratos">
+                <HRContractsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rh/contratos/:id/edit"
             element={
               <ProtectedRoute adminOnly moduleKey="rh.contratos">
                 <HRContractsPage />
@@ -1077,7 +1189,39 @@ function App() {
             }
           />
           <Route
+            path="/delivery-status/new"
+            element={
+              <ProtectedRoute moduleKey="operacional.status_entrega">
+                <DeliveryStatusPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/delivery-status/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="operacional.status_entrega">
+                <DeliveryStatusPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/port-services"
+            element={
+              <ProtectedRoute moduleKey="operacional.servico_portuario">
+                <PortServicePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/port-services/new"
+            element={
+              <ProtectedRoute moduleKey="operacional.servico_portuario">
+                <PortServicePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/port-services/:id/edit"
             element={
               <ProtectedRoute moduleKey="operacional.servico_portuario">
                 <PortServicePage />

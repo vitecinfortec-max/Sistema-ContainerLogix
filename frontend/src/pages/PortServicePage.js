@@ -22,6 +22,8 @@ import { ptBR } from 'date-fns/locale';
 import { todayISO } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
+import { FormPage } from '../components/FormKit';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -42,6 +44,7 @@ function createEmptyForm() {
 }
 
 export default function PortServicePage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/port-services');
   const { confirm, ConfirmDialog } = useConfirm();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -186,7 +189,7 @@ export default function PortServicePage() {
         await api.createPortService(payload);
         toast.success('Serviço Portuário criado com sucesso!');
       }
-      setModalOpen(false);
+      backToList();
       resetForm();
       loadServices();
     } catch (error) {
@@ -270,175 +273,42 @@ export default function PortServicePage() {
 
   const cavalos = vehicles.filter(v => v.vehicle_type === 'CAVALO' || v.vehicle_type === 'CAMINHÃO');
 
+  // Cadastro e edição em página própria (/port-services/new e /port-services/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openNewModal();
+    if (mode === 'edit') {
+      api.getPortService(routeId)
+        .then((r) => {
+          openEditModal(r.data);
+        })
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar serviço portuário'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4" data-testid="port-service-page">
-        <PageHeader icon={Anchor} title="Serviço Portuário" subtitle="Registre os serviços internos realizados dentro do porto" />
-
-        <StatGrid>
-          <StatCard label="Serviços" value={stats.count} icon={Anchor} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'registrados'} testId="port-service-kpi-count" />
-          <StatCard label="Valor total" value={fmtMoney(stats.total_value)} icon={Wallet} tone="emerald" />
-          <StatCard label="No pátio" value={stats.in_progress} icon={Clock} tone="amber" hint="sem horário de saída" />
-          <StatCard label="A faturar" value={stats.unbilled} icon={Receipt} tone="primary" hint="ainda fora de fatura" />
-        </StatGrid>
-
-        <FilterCard hasFilters={hasFilters} onClear={clearSearch}>
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-            <FilterField label="Cliente, motorista ou placa" className="col-span-2 lg:col-span-1">
-              <SearchInput
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                data-testid="search-port-service-input"
-              />
-            </FilterField>
-            <FilterField label="Data inicial">
-              <Input type="date" className="h-9 text-sm" value={filters.date_from} onChange={(e) => setFilter('date_from')(e.target.value)} data-testid="port-service-date-from" />
-            </FilterField>
-            <FilterField label="Data final">
-              <Input type="date" className="h-9 text-sm" value={filters.date_to} onChange={(e) => setFilter('date_to')(e.target.value)} data-testid="port-service-date-to" />
-            </FilterField>
-            <FilterField label="Turno">
-              <Select value={filters.turno || '_all'} onValueChange={setFilter('turno')}>
-                <SelectTrigger className="h-9 text-sm" data-testid="port-service-turno-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Todos</SelectItem>
-                  <SelectItem value="DIA">Dia</SelectItem>
-                  <SelectItem value="NOITE">Noite</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Situação">
-              <Select value={filters.situacao || '_all'} onValueChange={setFilter('situacao')}>
-                <SelectTrigger className="h-9 text-sm" data-testid="port-service-situacao-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Todas</SelectItem>
-                  <SelectItem value="EM_ANDAMENTO">No pátio</SelectItem>
-                  <SelectItem value="CONCLUIDO">Concluído</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterField label="Faturado">
-              <Select value={filters.billed || '_all'} onValueChange={setFilter('billed')}>
-                <SelectTrigger className="h-9 text-sm" data-testid="port-service-billed-filter"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_all">Todos</SelectItem>
-                  <SelectItem value="true">Faturados</SelectItem>
-                  <SelectItem value="false">A faturar</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque um serviço pra habilitar as ações da barra */}
-        <DataCard
-          title="Serviços portuários"
-          count={pagination.total}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Novo serviço" onClick={openNewModal} testId="new-port-service-btn" />}
-            >
-              <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedService && openDetails(singleSelectedService)} disabled={!singleSelectedService} />
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedService && openEditModal(singleSelectedService)} disabled={!singleSelectedService} />
-              <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedService && handlePrintPDF(singleSelectedService.id)} disabled={!singleSelectedService} />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedService && handleDelete(singleSelectedService.id)} disabled={!singleSelectedService} />
-            </Toolbar>
-          )}
-          footer={(
-            <TablePagination
-              currentPage={pagination.page}
-              totalPages={pagination.pages}
-              totalItems={pagination.total}
-              pageSize={15}
-              onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
-            />
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editingService}
+          title={editingService ? 'Editar serviço portuário' : 'Novo serviço portuário'}
+          icon={Anchor}
+          backTo={backToList}
+          subtitle="Serviço prestado no porto para o cliente"
+          testId="port-service-form-page"
+          actions={(
+            <>
+            <Button variant="outline" onClick={() => backToList()}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : (editingService ? 'Salvar alterações' : 'Criar registro')}
+            </Button>
+            </>
           )}
         >
-          {loading ? (
-            <EmptyState loading />
-          ) : services.length === 0 ? (
-            <EmptyState
-              icon={Anchor}
-              title="Nenhum Serviço Portuário encontrado"
-              hint={hasFilters ? 'Ajuste os filtros' : 'Registre o primeiro pelo botão "Novo serviço"'}
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={services.length > 0 && services.every(s => selectedIds.has(s.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                      />
-                    </th>
-                    <th>Nº</th>
-                    <th>Cliente</th>
-                    <th>Motorista</th>
-                    <th>Placa</th>
-                    <th>Data</th>
-                    <th>Turno</th>
-                    <th>Situação</th>
-                    <th>Fatura</th>
-                    <th className="!text-right">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {services.map((service) => {
-                    const isSelected = selectedIds.has(service.id);
-                    return (
-                      <tr
-                        key={service.id}
-                        data-selected={isSelected}
-                        className="cursor-pointer"
-                        onClick={() => toggleSelect(service.id)}
-                      >
-                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSelect(service.id)}
-                          />
-                        </td>
-                        <td className="cell-strong whitespace-nowrap tabular-nums">#{service.service_number}</td>
-                        <td><div className="max-w-[220px] truncate" title={service.client_name || ''}>{service.client_name}</div></td>
-                        <td><div className="max-w-[200px] truncate" title={service.driver_name || ''}>{service.driver_name}</div></td>
-                        <td><PlateTag>{service.cavalo_plate}</PlateTag></td>
-                        <td className="whitespace-nowrap tabular-nums">
-                          {service.service_date && format(new Date(service.service_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
-                        </td>
-                        <td>
-                          <StatusPill tone={service.turno === 'NOITE' ? 'violet' : 'amber'} dot={false}>
-                            {service.turno === 'NOITE' ? 'Noite' : 'Dia'}
-                          </StatusPill>
-                        </td>
-                        <td>{getSituacaoBadge(service.situacao)}</td>
-                        <td className="whitespace-nowrap tabular-nums">
-                          {service.billed
-                            ? <StatusPill tone="emerald" dot={false}>{service.billing_batch_number ? `Nº ${service.billing_batch_number}` : 'Faturado'}</StatusPill>
-                            : <span className="text-slate-400 dark:text-slate-500">A faturar</span>}
-                        </td>
-                        <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(service.operation_value)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </DataCard>
-      </div>
 
-      {/* Modal Novo/Editar Serviço Portuário */}
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Anchor className="w-4 h-4 text-primary" />
-              {editingService ? 'Editar Serviço Portuário' : 'Novo Serviço Portuário'}
-            </DialogTitle>
-          </DialogHeader>
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -534,14 +404,167 @@ export default function PortServicePage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : (editingService ? 'Salvar alterações' : 'Criar registro')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+        </FormPage>
+      ) : (
+        <div className="space-y-4" data-testid="port-service-page">
+          <PageHeader icon={Anchor} title="Serviço Portuário" subtitle="Registre os serviços internos realizados dentro do porto" />
+  
+          <StatGrid>
+            <StatCard label="Serviços" value={stats.count} icon={Anchor} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'registrados'} testId="port-service-kpi-count" />
+            <StatCard label="Valor total" value={fmtMoney(stats.total_value)} icon={Wallet} tone="emerald" />
+            <StatCard label="No pátio" value={stats.in_progress} icon={Clock} tone="amber" hint="sem horário de saída" />
+            <StatCard label="A faturar" value={stats.unbilled} icon={Receipt} tone="primary" hint="ainda fora de fatura" />
+          </StatGrid>
+  
+          <FilterCard hasFilters={hasFilters} onClear={clearSearch}>
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+              <FilterField label="Cliente, motorista ou placa" className="col-span-2 lg:col-span-1">
+                <SearchInput
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  data-testid="search-port-service-input"
+                />
+              </FilterField>
+              <FilterField label="Data inicial">
+                <Input type="date" className="h-9 text-sm" value={filters.date_from} onChange={(e) => setFilter('date_from')(e.target.value)} data-testid="port-service-date-from" />
+              </FilterField>
+              <FilterField label="Data final">
+                <Input type="date" className="h-9 text-sm" value={filters.date_to} onChange={(e) => setFilter('date_to')(e.target.value)} data-testid="port-service-date-to" />
+              </FilterField>
+              <FilterField label="Turno">
+                <Select value={filters.turno || '_all'} onValueChange={setFilter('turno')}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="port-service-turno-filter"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">Todos</SelectItem>
+                    <SelectItem value="DIA">Dia</SelectItem>
+                    <SelectItem value="NOITE">Noite</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Situação">
+                <Select value={filters.situacao || '_all'} onValueChange={setFilter('situacao')}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="port-service-situacao-filter"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">Todas</SelectItem>
+                    <SelectItem value="EM_ANDAMENTO">No pátio</SelectItem>
+                    <SelectItem value="CONCLUIDO">Concluído</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterField label="Faturado">
+                <Select value={filters.billed || '_all'} onValueChange={setFilter('billed')}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="port-service-billed-filter"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">Todos</SelectItem>
+                    <SelectItem value="true">Faturados</SelectItem>
+                    <SelectItem value="false">A faturar</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+            </div>
+          </FilterCard>
+  
+          {/* Lista - marque um serviço pra habilitar as ações da barra */}
+          <DataCard
+            title="Serviços portuários"
+            count={pagination.total}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Novo serviço" onClick={() => goNew()} testId="new-port-service-btn" />}
+              >
+                <ToolbarButton icon={Eye} label="Ver detalhes" tone="primary" onClick={() => singleSelectedService && openDetails(singleSelectedService)} disabled={!singleSelectedService} />
+                <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedService && goEdit(singleSelectedService.id)} disabled={!singleSelectedService} />
+                <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedService && handlePrintPDF(singleSelectedService.id)} disabled={!singleSelectedService} />
+                <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedService && handleDelete(singleSelectedService.id)} disabled={!singleSelectedService} />
+              </Toolbar>
+            )}
+            footer={(
+              <TablePagination
+                currentPage={pagination.page}
+                totalPages={pagination.pages}
+                totalItems={pagination.total}
+                pageSize={15}
+                onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+              />
+            )}
+          >
+            {loading ? (
+              <EmptyState loading />
+            ) : services.length === 0 ? (
+              <EmptyState
+                icon={Anchor}
+                title="Nenhum Serviço Portuário encontrado"
+                hint={hasFilters ? 'Ajuste os filtros' : 'Registre o primeiro pelo botão "Novo serviço"'}
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={services.length > 0 && services.every(s => selectedIds.has(s.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                        />
+                      </th>
+                      <th>Nº</th>
+                      <th>Cliente</th>
+                      <th>Motorista</th>
+                      <th>Placa</th>
+                      <th>Data</th>
+                      <th>Turno</th>
+                      <th>Situação</th>
+                      <th>Fatura</th>
+                      <th className="!text-right">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {services.map((service) => {
+                      const isSelected = selectedIds.has(service.id);
+                      return (
+                        <tr
+                          key={service.id}
+                          data-selected={isSelected}
+                          className="cursor-pointer"
+                          onClick={() => toggleSelect(service.id)}
+                        >
+                          <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleSelect(service.id)}
+                            />
+                          </td>
+                          <td className="cell-strong whitespace-nowrap tabular-nums">#{service.service_number}</td>
+                          <td><div className="max-w-[220px] truncate" title={service.client_name || ''}>{service.client_name}</div></td>
+                          <td><div className="max-w-[200px] truncate" title={service.driver_name || ''}>{service.driver_name}</div></td>
+                          <td><PlateTag>{service.cavalo_plate}</PlateTag></td>
+                          <td className="whitespace-nowrap tabular-nums">
+                            {service.service_date && format(new Date(service.service_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}
+                          </td>
+                          <td>
+                            <StatusPill tone={service.turno === 'NOITE' ? 'violet' : 'amber'} dot={false}>
+                              {service.turno === 'NOITE' ? 'Noite' : 'Dia'}
+                            </StatusPill>
+                          </td>
+                          <td>{getSituacaoBadge(service.situacao)}</td>
+                          <td className="whitespace-nowrap tabular-nums">
+                            {service.billed
+                              ? <StatusPill tone="emerald" dot={false}>{service.billing_batch_number ? `Nº ${service.billing_batch_number}` : 'Faturado'}</StatusPill>
+                              : <span className="text-slate-400 dark:text-slate-500">A faturar</span>}
+                          </td>
+                          <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(service.operation_value)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </DataCard>
+        </div>
+      )}
 
       {/* Modal Detalhes */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>

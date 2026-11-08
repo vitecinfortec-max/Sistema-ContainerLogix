@@ -27,6 +27,8 @@ import {
   HardHat, Plus, Pencil, Trash2, Save, FileSignature, FileText, PenLine, Users, PackageCheck, AlertTriangle,
 } from 'lucide-react';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
+import { FormPage } from '../components/FormKit';
 
 const TYPE_LABELS = { MOTORISTA: 'Motorista', FUNCIONARIO: 'Funcionário' };
 const SIGNATURE_KIND = { MOTORISTA: 'motorista', FUNCIONARIO: 'funcionario' };
@@ -59,6 +61,7 @@ function downloadBlob(data, filename) {
 }
 
 export default function EpiDeliveriesPage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/estoque/entrega-epi');
   const { confirm, ConfirmDialog } = useConfirm();
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -255,7 +258,7 @@ export default function EpiDeliveriesPage() {
         const r = await api.createEpiDelivery(payload);
         toast.success(`Entrega Nº ${r.data.delivery_number} registrada e baixada do estoque`);
       }
-      setDialogOpen(false);
+      backToList();
       loadDeliveries();
       loadProducts();
     } catch (e) {
@@ -353,134 +356,40 @@ export default function EpiDeliveriesPage() {
   const hasFilters = !!(search || dateFrom || dateTo);
   const warehouseOptions = (editingId ? warehouses : activeRecords(warehouses)).map((w) => [w.id, w.name]);
 
+  // Cadastro e edição em página própria (/estoque/entrega-epi/new e /estoque/entrega-epi/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openCreate();
+    if (mode === 'edit') {
+      api.getEpiDelivery(routeId)
+        .then(() => openEdit(routeId))
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Erro ao carregar a entrega'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <Layout>
-      <div className="space-y-4" data-testid="epi-deliveries-page">
-        <PageHeader
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editingId}
+          title={editingId ? 'Editar entrega de EPI' : 'Nova entrega de EPI'}
           icon={HardHat}
-          title="Entrega de EPI's"
-          subtitle="Registre os EPIs entregues a cada motorista ou funcionário, com baixa no estoque e assinatura no termo"
-        />
-
-        <StatGrid>
-          <StatCard label="Entregas" value={deliveries.length} icon={PackageCheck} tone="primary" testId="epi-kpi-deliveries" />
-          <StatCard label="EPIs entregues" value={fmtQty(totalItems)} icon={HardHat} tone="blue" testId="epi-kpi-items" />
-          <StatCard label="Pessoas atendidas" value={peopleServed} icon={Users} tone="slate" testId="epi-kpi-people" />
-          <StatCard label="Sem assinatura" value={pendingSignatures} icon={AlertTriangle} tone={pendingSignatures ? 'amber' : 'slate'} hint={pendingSignatures ? 'cadastre a assinatura da pessoa' : undefined} testId="epi-kpi-unsigned" />
-        </StatGrid>
-
-        <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <FilterField label="Nome, CPF, EPI ou C.A." className="col-span-2">
-              <SearchInput
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                data-testid="epi-search-input"
-              />
-            </FilterField>
-            <FilterField label="Data inicial">
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="epi-date-from" />
-            </FilterField>
-            <FilterField label="Data final">
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="epi-date-to" />
-            </FilterField>
-          </div>
-        </FilterCard>
-
-        <DataCard
-          title="Entregas"
-          count={loading ? '...' : deliveries.length}
-          footer={<TablePagination {...paginationProps} />}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Nova entrega" onClick={openCreate} testId="epi-new-btn" />}
-            >
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => single && openEdit(single.id)} disabled={!single} testId="epi-edit-btn" />
-              <ToolbarButton icon={Trash2} label="Excluir (devolve ao estoque)" tone="red" onClick={handleDelete} disabled={!single} testId="epi-delete-btn" />
-              <ToolbarDivider />
-              <ToolbarButton icon={FileSignature} label="Termo de Entrega (PDF)" tone="emerald" onClick={downloadTermo} disabled={!single || downloading} testId="epi-termo-btn" />
-              <ToolbarButton icon={FileText} label="Ficha de EPI da pessoa (PDF)" tone="primary" onClick={downloadFicha} disabled={!single || downloading} testId="epi-ficha-btn" />
-            </Toolbar>
+          backTo={backToList}
+          subtitle={nextNumber !== null ? `Entrega Nº ${nextNumber}` : 'Saída de EPI do estoque para o funcionário'}
+          testId="epi-form-page"
+          actions={(
+            <>
+            <Button variant="outline" onClick={() => backToList()} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleSave} disabled={saving} data-testid="epi-save-btn">
+              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar entrega' : 'Registrar entrega'}
+            </Button>
+            </>
           )}
         >
-          {deliveries.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={pageItems.length > 0 && pageItems.every((d) => selectedIds.has(d.id))}
-                        onCheckedChange={toggleSelectAll}
-                        data-testid="epi-select-all"
-                      />
-                    </th>
-                    <th>Nº</th>
-                    <th>Data</th>
-                    <th>Recebido por</th>
-                    <th>EPIs</th>
-                    <th className="!text-right">Qtd</th>
-                    <th>Assinatura</th>
-                    <th>Lançado por</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageItems.map((d) => {
-                    const itemsText = (d.items || []).map((it) => `${it.product_description} (${fmtQty(it.quantity)})`).join(', ');
-                    return (
-                      <tr
-                        key={d.id}
-                        onClick={() => toggleSelect(d.id)}
-                        data-selected={selectedIds.has(d.id)}
-                        className="cursor-pointer"
-                        data-testid="epi-row"
-                      >
-                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox checked={selectedIds.has(d.id)} onCheckedChange={() => toggleSelect(d.id)} data-testid={`epi-row-checkbox-${d.delivery_number}`} />
-                        </td>
-                        <td className="cell-strong whitespace-nowrap tabular-nums">#{d.delivery_number}</td>
-                        <td className="whitespace-nowrap tabular-nums">{fmtDate(d.delivery_date)}</td>
-                        <td>
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="cell-strong max-w-[220px] truncate" title={d.recipient_name}>{d.recipient_name}</span>
-                            <StatusPill tone={d.recipient_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[11px] px-1.5">
-                              {TYPE_LABELS[d.recipient_type]}
-                            </StatusPill>
-                          </div>
-                        </td>
-                        <td><div className="max-w-[300px] truncate" title={itemsText}>{itemsText || '-'}</div></td>
-                        <td className="text-right tabular-nums">{fmtQty(d.total_quantity)}</td>
-                        <td>
-                          <StatusPill tone={d.has_signature ? 'emerald' : 'amber'}>{d.has_signature ? 'Assinada' : 'Pendente'}</StatusPill>
-                        </td>
-                        <td className="whitespace-nowrap text-slate-500 dark:text-slate-400">{d.created_by_name || '-'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState
-              icon={HardHat}
-              loading={loading} title={(hasFilters ? 'Nenhuma entrega encontrada' : 'Nenhuma entrega de EPI registrada')}
-              hint={loading ? undefined : (hasFilters ? 'Ajuste os filtros' : 'Registre a primeira pelo botão "Nova entrega"')}
-              testId="epi-empty"
-            />
-          )}
-        </DataCard>
-      </div>
 
-      <Dialog open={dialogOpen} onOpenChange={(v) => !saving && setDialogOpen(v)}>
-        <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto" data-testid="epi-dialog">
-          <DialogHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <HardHat className="w-5 h-5 text-primary" />
-              {editingId ? 'Editar Entrega de EPI' : 'Nova Entrega de EPI'}
-              {nextNumber !== null && <Badge variant="outline" className="ml-2 text-primary border-primary/30">Nº {nextNumber}</Badge>}
-            </DialogTitle>
-          </DialogHeader>
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -611,14 +520,126 @@ export default function EpiDeliveriesPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleSave} disabled={saving} data-testid="epi-save-btn">
-              <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : editingId ? 'Atualizar entrega' : 'Registrar entrega'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          
+        </FormPage>
+      ) : (
+        <div className="space-y-4" data-testid="epi-deliveries-page">
+          <PageHeader
+            icon={HardHat}
+            title="Entrega de EPI's"
+            subtitle="Registre os EPIs entregues a cada motorista ou funcionário, com baixa no estoque e assinatura no termo"
+          />
+  
+          <StatGrid>
+            <StatCard label="Entregas" value={deliveries.length} icon={PackageCheck} tone="primary" testId="epi-kpi-deliveries" />
+            <StatCard label="EPIs entregues" value={fmtQty(totalItems)} icon={HardHat} tone="blue" testId="epi-kpi-items" />
+            <StatCard label="Pessoas atendidas" value={peopleServed} icon={Users} tone="slate" testId="epi-kpi-people" />
+            <StatCard label="Sem assinatura" value={pendingSignatures} icon={AlertTriangle} tone={pendingSignatures ? 'amber' : 'slate'} hint={pendingSignatures ? 'cadastre a assinatura da pessoa' : undefined} testId="epi-kpi-unsigned" />
+          </StatGrid>
+  
+          <FilterCard hasFilters={hasFilters} onClear={clearFilters}>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <FilterField label="Nome, CPF, EPI ou C.A." className="col-span-2">
+                <SearchInput
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  data-testid="epi-search-input"
+                />
+              </FilterField>
+              <FilterField label="Data inicial">
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 text-sm" data-testid="epi-date-from" />
+              </FilterField>
+              <FilterField label="Data final">
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 text-sm" data-testid="epi-date-to" />
+              </FilterField>
+            </div>
+          </FilterCard>
+  
+          <DataCard
+            title="Entregas"
+            count={loading ? '...' : deliveries.length}
+            footer={<TablePagination {...paginationProps} />}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Nova entrega" onClick={() => goNew()} testId="epi-new-btn" />}
+              >
+                <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => single && goEdit(single.id)} disabled={!single} testId="epi-edit-btn" />
+                <ToolbarButton icon={Trash2} label="Excluir (devolve ao estoque)" tone="red" onClick={handleDelete} disabled={!single} testId="epi-delete-btn" />
+                <ToolbarDivider />
+                <ToolbarButton icon={FileSignature} label="Termo de Entrega (PDF)" tone="emerald" onClick={downloadTermo} disabled={!single || downloading} testId="epi-termo-btn" />
+                <ToolbarButton icon={FileText} label="Ficha de EPI da pessoa (PDF)" tone="primary" onClick={downloadFicha} disabled={!single || downloading} testId="epi-ficha-btn" />
+              </Toolbar>
+            )}
+          >
+            {deliveries.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={pageItems.length > 0 && pageItems.every((d) => selectedIds.has(d.id))}
+                          onCheckedChange={toggleSelectAll}
+                          data-testid="epi-select-all"
+                        />
+                      </th>
+                      <th>Nº</th>
+                      <th>Data</th>
+                      <th>Recebido por</th>
+                      <th>EPIs</th>
+                      <th className="!text-right">Qtd</th>
+                      <th>Assinatura</th>
+                      <th>Lançado por</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((d) => {
+                      const itemsText = (d.items || []).map((it) => `${it.product_description} (${fmtQty(it.quantity)})`).join(', ');
+                      return (
+                        <tr
+                          key={d.id}
+                          onClick={() => toggleSelect(d.id)}
+                          data-selected={selectedIds.has(d.id)}
+                          className="cursor-pointer"
+                          data-testid="epi-row"
+                        >
+                          <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox checked={selectedIds.has(d.id)} onCheckedChange={() => toggleSelect(d.id)} data-testid={`epi-row-checkbox-${d.delivery_number}`} />
+                          </td>
+                          <td className="cell-strong whitespace-nowrap tabular-nums">#{d.delivery_number}</td>
+                          <td className="whitespace-nowrap tabular-nums">{fmtDate(d.delivery_date)}</td>
+                          <td>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="cell-strong max-w-[220px] truncate" title={d.recipient_name}>{d.recipient_name}</span>
+                              <StatusPill tone={d.recipient_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[11px] px-1.5">
+                                {TYPE_LABELS[d.recipient_type]}
+                              </StatusPill>
+                            </div>
+                          </td>
+                          <td><div className="max-w-[300px] truncate" title={itemsText}>{itemsText || '-'}</div></td>
+                          <td className="text-right tabular-nums">{fmtQty(d.total_quantity)}</td>
+                          <td>
+                            <StatusPill tone={d.has_signature ? 'emerald' : 'amber'}>{d.has_signature ? 'Assinada' : 'Pendente'}</StatusPill>
+                          </td>
+                          <td className="whitespace-nowrap text-slate-500 dark:text-slate-400">{d.created_by_name || '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                icon={HardHat}
+                loading={loading} title={(hasFilters ? 'Nenhuma entrega encontrada' : 'Nenhuma entrega de EPI registrada')}
+                hint={loading ? undefined : (hasFilters ? 'Ajuste os filtros' : 'Registre a primeira pelo botão "Nova entrega"')}
+                testId="epi-empty"
+              />
+            )}
+          </DataCard>
+        </div>
+      )}
 
       <SignatureCaptureDialog
         open={signOpen}

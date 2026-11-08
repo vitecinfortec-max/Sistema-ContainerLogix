@@ -18,9 +18,12 @@ import { Plus, Trash2, Users, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { formatCNPJ, formatCPF, formatPhone } from '../lib/masks';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
+import { useFormRoute } from '../hooks/useFormRoute';
+import { FormPage, FormActions } from '../components/FormKit';
 const TIPO_OPTIONS = [
   ['PF', 'Pessoa Física'],
   ['PJ', 'Pessoa Jurídica'],
@@ -51,6 +54,7 @@ function buildEmpty() {
 }
 
 export default function ContainerRepresentativesPage() {
+  const { mode, id: routeId, isForm, goNew, goEdit, backToList } = useFormRoute('/container-representatives');
   const { confirm, ConfirmDialog } = useConfirm();
   const [representatives, setRepresentatives] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +113,7 @@ export default function ContainerRepresentativesPage() {
         toast.success('Representante cadastrado com sucesso');
       }
       resetForm();
-      setOpen(false);
+      backToList();
       loadRepresentatives();
     } catch (error) {
       toast.error(apiErrorMessage(error, 'Erro ao salvar representante'));
@@ -169,7 +173,26 @@ export default function ContainerRepresentativesPage() {
 
   const singleSelectedRepresentative = selectedIds.size === 1 ? filteredRepresentatives.find(r => r.id === [...selectedIds][0]) : null;
 
-  if (loading) {
+
+  // Cadastro e edição em página própria (/container-representatives/new e /container-representatives/:id/edit)
+  useEffect(() => {
+    if (mode === 'new') openCreateDialog();
+    if (mode === 'edit') {
+      api.getContainerRepresentatives()
+        .then((r) => {
+          const representative = (r.data || []).find((x) => x.id === routeId);
+          if (!representative) throw new Error('não encontrado');
+          openEditDialog(representative);
+        })
+        .catch((error) => {
+          toast.error(apiErrorMessage(error, 'Representante não encontrado'));
+          backToList();
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading && !isForm) {
     return (
       <Layout>
         <PageSkeleton testId="container-representatives-loading" />
@@ -179,20 +202,17 @@ export default function ContainerRepresentativesPage() {
 
   return (
     <Layout>
-      <div className="space-y-4" data-testid="container-representatives-page">
-        <PageHeader icon={Users} title="Cadastro de Representantes" subtitle="Vendedores (PF ou PJ) usados no Registro de Venda de Container" />
+      {isForm ? (
+        <FormPage
+          loading={mode === 'edit' && !editMode}
+          title={editMode ? 'Editar representante' : 'Cadastrar representante'}
+          icon={Users}
+          backTo={backToList}
+          subtitle={editMode ? 'Atualize os dados do representante' : 'Adicione um novo representante ao sistema'}
+          testId="representative-form-page"
+          className="max-w-3xl"
+        >
 
-        <Dialog open={open} onOpenChange={(isOpen) => {
-            setOpen(isOpen);
-            if (!isOpen) resetForm();
-          }}>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-testid="representative-dialog">
-              <DialogHeader>
-                <DialogTitle className="text-base">{editMode ? 'Editar Representante' : 'Cadastrar Representante'}</DialogTitle>
-                <DialogDescription className="text-[13px]">
-                  {editMode ? 'Atualize os dados do representante' : 'Adicione um novo representante ao sistema'}
-                </DialogDescription>
-              </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="block">Tipo *</Label>
@@ -358,108 +378,114 @@ export default function ContainerRepresentativesPage() {
                   />
                 </div>
 
-                <Button
-                  type="submit"
-                  className="w-full font-semibold"
-                  data-testid="submit-representative-button"
-                  disabled={submitting}
-                >
-                  {submitting ? 'Salvando...' : (editMode ? 'Atualizar' : 'Cadastrar')}
-                </Button>
+                <FormActions sticky>
+                  <Button type="button" variant="outline" onClick={backToList}>Cancelar</Button>
+                  <Button
+                    type="submit"
+                    className="font-semibold"
+                    data-testid="submit-representative-button"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Salvando...' : (editMode ? 'Salvar alterações' : 'Cadastrar')}
+                  </Button>
+                </FormActions>
               </form>
-            </DialogContent>
-          </Dialog>
-
-        <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <FilterField label="Nome, nome fantasia, CPF ou CNPJ">
-              <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-representative-input" />
-            </FilterField>
-          </div>
-        </FilterCard>
-
-        {/* Lista - marque um representante pra habilitar as ações da barra */}
-        <DataCard
-          title="Representantes"
-          count={filteredRepresentatives.length}
-          toolbar={(
-            <Toolbar
-              selectedCount={selectedIds.size}
-              primary={<ToolbarPrimary icon={Plus} label="Novo representante" onClick={openCreateDialog} testId="add-representative-button" />}
-            >
-              <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedRepresentative && openEditDialog(singleSelectedRepresentative)} disabled={!singleSelectedRepresentative} testId="edit-representative-button" />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRepresentative && handleDelete(singleSelectedRepresentative.id)} disabled={!singleSelectedRepresentative} testId="delete-representative-button" />
-            </Toolbar>
-          )}
-          footer={<TablePagination {...paginationProps} />}
-        >
-          {filteredRepresentatives.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="w-10 pr-0">
-                      <Checkbox
-                        checked={pageItems.length > 0 && pageItems.every(r => selectedIds.has(r.id))}
-                        onCheckedChange={toggleSelectAllOnPage}
-                        data-testid="select-all-checkbox"
-                      />
-                    </th>
-                    <th>Tipo</th>
-                    <th>Nome</th>
-                    <th>CPF/CNPJ</th>
-                    <th>Telefone</th>
-                    <th>Status</th>
-                    <th>Cadastrado em</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageItems.map((r) => (
-                    <tr
-                      key={r.id}
-                      onClick={() => toggleSelect(r.id)}
-                      data-selected={selectedIds.has(r.id)}
-                      className="cursor-pointer"
-                      data-testid="representative-row"
-                    >
-                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedIds.has(r.id)}
-                          onCheckedChange={() => toggleSelect(r.id)}
-                          data-testid="representative-row-checkbox"
-                        />
-                      </td>
-                      <td>
-                        <StatusPill tone={r.tipo === 'PJ' ? 'violet' : 'blue'} dot={false}>
-                          {r.tipo === 'PJ' ? 'PJ' : 'PF'}
-                        </StatusPill>
-                      </td>
-                      <td><div className="max-w-[260px] truncate cell-strong" title={r.name || ''}>{r.name}</div></td>
-                      <td className="whitespace-nowrap tabular-nums">{r.tipo === 'PJ' ? (r.cnpj || '-') : (r.cpf || '-')}</td>
-                      <td className="whitespace-nowrap tabular-nums">{r.phone || '-'}</td>
-                      <td>
-                        <StatusPill tone={STATUS_TONES[r.status] || 'emerald'}>
-                          {r.status === 'INATIVO' ? 'Inativo' : 'Ativo'}
-                        </StatusPill>
-                      </td>
-                      <td className="whitespace-nowrap tabular-nums">
-                        {format(new Date(r.created_at), 'dd/MM/yyyy', { locale: ptBR })}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        </FormPage>
+      ) : (
+        <div className="space-y-4" data-testid="container-representatives-page">
+          <PageHeader icon={Users} title="Cadastro de Representantes" subtitle="Vendedores (PF ou PJ) usados no Registro de Venda de Container" />
+  
+          <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <FilterField label="Nome, nome fantasia, CPF ou CNPJ">
+                <SearchInput value={search} onChange={(e) => setSearch(e.target.value)} data-testid="search-representative-input" />
+              </FilterField>
             </div>
-          ) : (
-            <EmptyState
-              icon={Users}
-              title={search ? 'Nenhum representante encontrado' : 'Nenhum representante cadastrado'}
-              hint={search ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo representante"'}
-              testId="no-representatives"
-            />
-          )}
-        </DataCard>
-      </div>
+          </FilterCard>
+  
+          {/* Lista - marque um representante pra habilitar as ações da barra */}
+          <DataCard
+            title="Representantes"
+            count={filteredRepresentatives.length}
+            toolbar={(
+              <Toolbar
+                selectedCount={selectedIds.size}
+                primary={<ToolbarPrimary icon={Plus} label="Novo representante" onClick={() => goNew()} testId="add-representative-button" />}
+              >
+                <ToolbarButton icon={Edit} label="Editar" tone="blue" onClick={() => singleSelectedRepresentative && goEdit(singleSelectedRepresentative.id)} disabled={!singleSelectedRepresentative} testId="edit-representative-button" />
+                <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedRepresentative && handleDelete(singleSelectedRepresentative.id)} disabled={!singleSelectedRepresentative} testId="delete-representative-button" />
+              </Toolbar>
+            )}
+            footer={<TablePagination {...paginationProps} />}
+          >
+            {filteredRepresentatives.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="w-10 pr-0">
+                        <Checkbox
+                          checked={pageItems.length > 0 && pageItems.every(r => selectedIds.has(r.id))}
+                          onCheckedChange={toggleSelectAllOnPage}
+                          data-testid="select-all-checkbox"
+                        />
+                      </th>
+                      <th>Tipo</th>
+                      <th>Nome</th>
+                      <th>CPF/CNPJ</th>
+                      <th>Telefone</th>
+                      <th>Status</th>
+                      <th>Cadastrado em</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((r) => (
+                      <tr
+                        key={r.id}
+                        onClick={() => toggleSelect(r.id)}
+                        data-selected={selectedIds.has(r.id)}
+                        className="cursor-pointer"
+                        data-testid="representative-row"
+                      >
+                        <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(r.id)}
+                            onCheckedChange={() => toggleSelect(r.id)}
+                            data-testid="representative-row-checkbox"
+                          />
+                        </td>
+                        <td>
+                          <StatusPill tone={r.tipo === 'PJ' ? 'violet' : 'blue'} dot={false}>
+                            {r.tipo === 'PJ' ? 'PJ' : 'PF'}
+                          </StatusPill>
+                        </td>
+                        <td><div className="max-w-[260px] truncate cell-strong" title={r.name || ''}>{r.name}</div></td>
+                        <td className="whitespace-nowrap tabular-nums">{r.tipo === 'PJ' ? (r.cnpj || '-') : (r.cpf || '-')}</td>
+                        <td className="whitespace-nowrap tabular-nums">{r.phone || '-'}</td>
+                        <td>
+                          <StatusPill tone={STATUS_TONES[r.status] || 'emerald'}>
+                            {r.status === 'INATIVO' ? 'Inativo' : 'Ativo'}
+                          </StatusPill>
+                        </td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          {format(new Date(r.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptyState
+                icon={Users}
+                title={search ? 'Nenhum representante encontrado' : 'Nenhum representante cadastrado'}
+                hint={search ? 'Ajuste a busca' : 'Cadastre o primeiro pelo botão "Novo representante"'}
+                testId="no-representatives"
+              />
+            )}
+          </DataCard>
+        </div>
+      )}
       <ConfirmDialog />
     </Layout>
   );
