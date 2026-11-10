@@ -29,6 +29,55 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 const WIDE_DIALOG = /(^|\s)(sm:|md:|lg:)?max-w-(4xl|5xl|6xl|7xl)(\s|$)/
 const MAXIMIZED_KEY = "dialog-maximized"
 
+// Altura máxima com rolagem interna (10/11/2026): só quando o conteúdo não
+// cabe em 90% da altura da tela. Ligar sempre cortaria as listas de busca
+// (Autocomplete), que abrem dentro da própria janela, nas janelas pequenas.
+// Mede a soma dos blocos da janela (sem os posicionados por cima), não o
+// scrollHeight, que contaria a lista aberta. Janelas que já definem altura
+// ou rolagem própria (max-h-*, overflow-*) ficam como estão.
+const OWN_SCROLL = /(^|\s)(max-h-|overflow-|h-\[)/
+const TALL_RATIO = 0.9
+
+// `el` é o elemento da janela (estado, não ref): o DialogContent fica montado
+// com a janela fechada, e a medição precisa recomeçar quando ela abre.
+function useTooTall(el, enabled) {
+  const [tooTall, setTooTall] = React.useState(false)
+  React.useEffect(() => {
+    if (!enabled || !el || typeof ResizeObserver === "undefined") return undefined
+    const measure = () => {
+      const style = getComputedStyle(el)
+      const gap = parseFloat(style.rowGap) || 0
+      let height = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0)
+      let blocks = 0
+      for (const child of el.children) {
+        const position = getComputedStyle(child).position
+        if (position === "absolute" || position === "fixed") continue
+        height += child.offsetHeight
+        blocks += 1
+      }
+      height += gap * Math.max(0, blocks - 1)
+      setTooTall(height > window.innerHeight * TALL_RATIO)
+    }
+    const resize = new ResizeObserver(measure)
+    const observeAll = () => {
+      resize.disconnect()
+      resize.observe(el)
+      for (const child of el.children) resize.observe(child)
+    }
+    const mutation = new MutationObserver(() => { observeAll(); measure() })
+    observeAll()
+    mutation.observe(el, { childList: true })
+    window.addEventListener("resize", measure)
+    measure()
+    return () => {
+      resize.disconnect()
+      mutation.disconnect()
+      window.removeEventListener("resize", measure)
+    }
+  }, [el, enabled])
+  return enabled && tooTall
+}
+
 const readMaximized = () => {
   try { return localStorage.getItem(MAXIMIZED_KEY) === "1" } catch { return false }
 }
@@ -39,12 +88,16 @@ const DialogContent = React.forwardRef(({ className, children, expandable, onEsc
   const contentRef = React.useRef(null)
   const closeRef = React.useRef(null)
   const closingRef = React.useRef(false)
+  const [contentEl, setContentEl] = React.useState(null)
+  const tooTall = useTooTall(contentEl, !maximized && !OWN_SCROLL.test(className || ""))
 
-  const setRefs = (node) => {
+  // Estável entre renders: grava estado, então não pode ser recriada a cada vez
+  const setRefs = React.useCallback((node) => {
     contentRef.current = node
+    setContentEl(node)
     if (typeof ref === "function") ref(node)
     else if (ref) ref.current = node
-  }
+  }, [ref])
 
   // Com alteração não salva, Esc / clique fora / X perguntam antes de fechar
   // (components/UnsavedChanges). Confirmado, fecha pelo próprio X.
@@ -81,8 +134,12 @@ const DialogContent = React.forwardRef(({ className, children, expandable, onEsc
       data-maximized={maximized || undefined}
       className={cn(
         "form-dense fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        // Nunca mais larga que 95% da tela (a largura máxima de cada janela
+        // continua valendo abaixo disso)
+        "sm:w-[95vw]",
         className,
-        maximized && "w-screen max-w-none sm:max-w-none h-[100dvh] max-h-[100dvh] sm:h-[100dvh] sm:max-h-[100dvh] rounded-none sm:rounded-none"
+        tooTall && "max-h-[90dvh] overflow-y-auto",
+        maximized && "w-screen sm:w-screen max-w-none sm:max-w-none h-[100dvh] max-h-[100dvh] sm:h-[100dvh] sm:max-h-[100dvh] rounded-none sm:rounded-none"
       )}
       {...props}>
       {children}
