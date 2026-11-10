@@ -601,6 +601,11 @@ async def prepare_database():
     await db.clients.create_index("cnpj")
     await db.transport_companies.create_index("cnpj")
     try:
+        # Número do Registro de Manutenção (MAN-000001): nunca repete
+        await db.maintenance_records.create_index("record_number", unique=True)
+    except Exception as e:
+        logger.warning(f"Não foi possível criar índice único em maintenance_records.record_number: {e}")
+    try:
         await db.container_repair_services.create_index("name", unique=True)
     except Exception as e:
         logger.warning(f"Não foi possível criar índice único em container_repair_services.name: {e}")

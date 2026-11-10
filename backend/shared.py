@@ -637,6 +637,7 @@ PATH_MODULE_MAP = [
     ("/api/odometer-readings", "frota.hodometro"),
     ("/api/maintenance-plans", "frota.plano_manutencao"),
     ("/api/maintenance-executions", "frota.plano_manutencao"),
+    ("/api/maintenance-records", "frota.plano_manutencao"),
     ("/api/vehicle-checklists", "frota.checklist"),
     ("/api/vehicles", "frota.veiculos"),
     ("/api/drivers", "cadastro.pessoas"),

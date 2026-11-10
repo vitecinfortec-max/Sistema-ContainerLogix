@@ -9,7 +9,6 @@ import {
 import { Field } from '../components/FormKit';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
@@ -19,10 +18,12 @@ import { useConfirm } from '../hooks/useConfirm';
 import { useUrlState } from '../hooks/useUrlState';
 import { api } from '../lib/api';
 import { apiErrorMessage } from '../lib/errors';
-import { todayISO } from '../lib/dates';
+import { downloadBlob } from '../lib/fiscal';
+import { formatMoney } from '../lib/payables';
 import { toast } from 'sonner';
 import {
   CalendarClock, Plus, Pencil, Trash2, CheckCircle2, Clock, AlertTriangle, CircleDashed, History, Mail, ClipboardCheck,
+  Printer, FileDown, ScanBarcode,
 } from 'lucide-react';
 
 const STATUS = {
@@ -52,69 +53,6 @@ function remainingText(row) {
     parts.push(row.days_remaining < 0 ? `${-row.days_remaining} dia(s) de atraso` : `${row.days_remaining} dia(s)`);
   }
   return parts.join(' · ') || '-';
-}
-
-// Registrar que o item foi feito no veículo: recomeça a contagem
-function ExecutionDialog({ row, onOpenChange, onSaved }) {
-  const [form, setForm] = useState({ executed_date: todayISO(), km: '', service_order_number: '', notes: '' });
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (row) setForm({ executed_date: todayISO(), km: row.current_km ? String(row.current_km) : '', service_order_number: '', notes: '' });
-  }, [row]);
-
-  const save = async () => {
-    const km = form.km === '' ? null : Number(form.km);
-    if (row.interval_km && km === null) {
-      toast.error('Informe o KM do veículo: este item vence por quilometragem');
-      return;
-    }
-    setSaving(true);
-    try {
-      await api.createMaintenanceExecution({
-        plan_id: row.plan_id, item_id: row.item_id, vehicle_id: row.vehicle_id,
-        executed_date: form.executed_date, km, service_order_number: form.service_order_number, notes: form.notes,
-      });
-      toast.success('Execução registrada');
-      onOpenChange(false);
-      onSaved();
-    } catch (error) {
-      toast.error(apiErrorMessage(error, 'Erro ao registrar a execução'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={!!row} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Registrar execução</DialogTitle>
-          <DialogDescription>
-            {row && `${row.item_name} no veículo ${row.vehicle_plate}. A contagem até o próximo vencimento recomeça desta data e KM.`}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="form-dense grid grid-cols-2 gap-3">
-          <Field label="Data" required>
-            <Input type="date" value={form.executed_date} max={todayISO()} onChange={(e) => setForm({ ...form, executed_date: e.target.value })} data-testid="execution-date" />
-          </Field>
-          <Field label="KM do veículo" required={!!row?.interval_km}>
-            <Input inputMode="numeric" value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value.replace(/\D/g, '') })} data-testid="execution-km" />
-          </Field>
-          <Field label="Nº da Ordem de Serviço" className="col-span-2">
-            <Input value={form.service_order_number} onChange={(e) => setForm({ ...form, service_order_number: e.target.value })} data-testid="execution-os" />
-          </Field>
-          <Field label="Observações" className="col-span-2">
-            <Textarea rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          </Field>
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button type="button" onClick={save} disabled={saving} data-testid="execution-save-btn">{saving ? 'Salvando...' : 'Registrar execução'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 // Histórico das execuções de um item num veículo
@@ -255,7 +193,23 @@ function EmailSettingsDialog({ open, onOpenChange }) {
   );
 }
 
+// Novo Registro de Manutenção; vindo de uma linha, já com o veículo e o item marcados
+const newRecordPath = (row) => (row
+  ? `/fleet/plano-manutencao/registro/new?vehicle=${row.vehicle_id}&plan=${row.plan_id}&item=${row.item_id}`
+  : '/fleet/plano-manutencao/registro/new');
+
+async function downloadPdf(request, filename) {
+  try {
+    const { data } = await request();
+    downloadBlob(data, filename);
+  } catch (error) {
+    toast.error(apiErrorMessage(error, 'Erro ao gerar o PDF'));
+  }
+}
+
 function StatusTab({ plans, isAdmin }) {
+  const navigate = useNavigate();
+  const [notInPlan, setNotInPlan] = useState(0);
   const [rows, setRows] = useState([]);
   const [summary, setSummary] = useState({});
   const [loading, setLoading] = useState(true);
@@ -263,12 +217,11 @@ function StatusTab({ plans, isAdmin }) {
   const [planFilter, setPlanFilter] = useUrlState('plan', '');
   const [searchTerm, setSearchTerm] = useUrlState('term', '');
   const [selected, setSelected] = useState(null);
-  const [executing, setExecuting] = useState(null);
   const [history, setHistory] = useState(null);
   const [emailsOpen, setEmailsOpen] = useState(false);
 
   const load = () => api.getMaintenancePlanStatus(planFilter ? { plan_id: planFilter } : {})
-    .then((r) => { setRows(r.data.items || []); setSummary(r.data.summary || {}); })
+    .then((r) => { setRows(r.data.items || []); setSummary(r.data.summary || {}); setNotInPlan(r.data.vehicles_not_in_plan || 0); })
     .catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar a situação do plano')))
     .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -290,6 +243,17 @@ function StatusTab({ plans, isAdmin }) {
         <StatCard label="Sem execução registrada" value={summary.NO_HISTORY ?? 0} icon={CircleDashed} tone="blue" hint="registre a última feita" />
         <StatCard label="Em dia" value={summary.OK ?? 0} icon={CheckCircle2} tone="emerald" />
       </StatGrid>
+
+      {notInPlan > 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200" data-testid="vehicles-not-in-plan">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            {notInPlan} veículo(s) ativo(s) do tipo de um plano não {notInPlan === 1 ? 'participa' : 'participam'} do Plano de Manutenção.
+            Se {notInPlan === 1 ? 'for' : 'forem'} da frota própria, marque "Participa do Plano de Manutenção" no{' '}
+            <button type="button" className="underline font-medium" onClick={() => navigate('/fleet')}>Cadastro de Veículos</button>.
+          </span>
+        </div>
+      )}
 
       <FilterCard
         hasFilters={!!(searchTerm || statusFilter || planFilter)}
@@ -326,9 +290,11 @@ function StatusTab({ plans, isAdmin }) {
         toolbar={(
           <Toolbar
             selectedCount={single ? 1 : 0}
-            primary={<ToolbarPrimary icon={ClipboardCheck} label="Registrar execução" onClick={() => (single ? setExecuting(single) : toast.info('Selecione o item na lista'))} testId="register-execution-btn" />}
+            primary={<ToolbarPrimary icon={ClipboardCheck} label="Registrar execução" onClick={() => navigate(newRecordPath(single))} testId="register-execution-btn" />}
           >
             <ToolbarButton icon={History} label="Histórico" onClick={() => single && setHistory(single)} disabled={!single} testId="execution-history-btn" />
+            <ToolbarButton icon={Printer} label="Imprimir plano do veículo" disabled={!single} testId="print-vehicle-plan-btn"
+              onClick={() => single && downloadPdf(() => api.getMaintenancePlanVehiclePdf(single.vehicle_id), `plano_manutencao_${single.vehicle_plate}.pdf`)} />
             {isAdmin && (
               <>
                 <ToolbarDivider />
@@ -343,8 +309,8 @@ function StatusTab({ plans, isAdmin }) {
         ) : visible.length === 0 ? (
           <EmptyState
             icon={CalendarClock}
-            title={rows.length === 0 ? 'Nenhum veículo coberto por um plano ativo' : 'Nenhum item encontrado'}
-            hint={rows.length === 0 ? 'Cadastre um plano na aba Planos e escolha os tipos de veículo dele' : 'Ajuste os filtros'}
+            title={rows.length === 0 ? 'Nenhum veículo da frota coberto por um plano ativo' : 'Nenhum item encontrado'}
+            hint={rows.length === 0 ? 'Cadastre um plano na aba Planos e marque "Participa do Plano de Manutenção" no cadastro dos veículos da frota' : 'Ajuste os filtros'}
           />
         ) : (
           <div className="overflow-x-auto">
@@ -366,7 +332,7 @@ function StatusTab({ plans, isAdmin }) {
                   const key = rowKey(r);
                   const isSelected = selected === key;
                   return (
-                    <tr key={key} onClick={() => toggle(key)} onDoubleClick={() => setExecuting(r)} data-selected={isSelected} className="cursor-pointer">
+                    <tr key={key} onClick={() => toggle(key)} onDoubleClick={() => navigate(newRecordPath(r))} data-selected={isSelected} className="cursor-pointer">
                       <td className="pr-0" onClick={(e) => e.stopPropagation()}>
                         <Checkbox checked={isSelected} onCheckedChange={() => toggle(key)} aria-label={`Selecionar ${r.item_name} de ${r.vehicle_plate}`} />
                       </td>
@@ -397,9 +363,134 @@ function StatusTab({ plans, isAdmin }) {
         )}
       </DataCard>
 
-      <ExecutionDialog row={executing} onOpenChange={(open) => !open && setExecuting(null)} onSaved={load} />
       <HistoryDialog row={history} onOpenChange={(open) => !open && setHistory(null)} onChanged={load} />
       {isAdmin && <EmailSettingsDialog open={emailsOpen} onOpenChange={setEmailsOpen} />}
+    </div>
+  );
+}
+
+const RECORD_TYPES = { PREVENTIVA: 'Preventiva', CORRETIVA: 'Corretiva' };
+
+// Registros de Manutenção (MAN-000001): busca pelo número digitado ou lido
+// pelo leitor de código de barras, reimpressão do PDF e exclusão
+function RecordsTab() {
+  const navigate = useNavigate();
+  const { confirm, ConfirmDialog } = useConfirm();
+  const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useUrlState('rec', '');
+  const [query, setQuery] = useState(search);
+  const [selectedId, setSelectedId] = useState(null);
+
+  const load = (term = query) => api.getMaintenanceRecords({ search: term.trim() || undefined, per_page: 100 })
+    .then((r) => { setItems(r.data.items || []); setTotal(r.data.total || 0); })
+    .catch((error) => toast.error(apiErrorMessage(error, 'Erro ao carregar os registros')))
+    .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(query); }, [query]);
+  // Digitando: busca depois de uma pausa; o leitor termina com Enter e busca na hora
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(search), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const single = items.find((r) => r.id === selectedId) || null;
+  const toggle = (id) => setSelectedId((prev) => (prev === id ? null : id));
+  const printRecord = (rec) => downloadPdf(() => api.getMaintenanceRecordPdf(rec.id), `${rec.record_code}.pdf`);
+
+  const handleDelete = async () => {
+    if (!single || !(await confirm(`Excluir o registro ${single.record_code}? Os itens do plano marcados nele voltam à situação anterior.`))) return;
+    try {
+      await api.deleteMaintenanceRecord(single.id);
+      toast.success(`Registro ${single.record_code} excluído`);
+      setSelectedId(null);
+      load();
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Erro ao excluir o registro'));
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <FilterCard hasFilters={!!search} onClear={() => setSearch('')}>
+        <FilterField label="Nº do registro (digite ou leia o código de barras), placa, oficina ou serviço">
+          <div className="relative">
+            <ScanBarcode className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setQuery(search); load(search); } }}
+              className="h-9 text-sm pl-8"
+              data-testid="search-maintenance-record"
+            />
+          </div>
+        </FilterField>
+      </FilterCard>
+
+      <DataCard
+        title="Registros de manutenção"
+        count={total.toLocaleString('pt-BR')}
+        toolbar={(
+          <Toolbar
+            selectedCount={single ? 1 : 0}
+            primary={<ToolbarPrimary icon={Plus} label="Novo registro" onClick={() => navigate(newRecordPath(null))} testId="new-record-btn" />}
+          >
+            <ToolbarButton icon={FileDown} label="PDF do registro" onClick={() => single && printRecord(single)} disabled={!single} testId="record-pdf-btn" />
+            <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={handleDelete} disabled={!single} testId="delete-record-btn" />
+          </Toolbar>
+        )}
+      >
+        {loading ? (
+          <EmptyState loading />
+        ) : items.length === 0 ? (
+          <EmptyState icon={ClipboardCheck} title={search ? 'Nenhum registro encontrado' : 'Nenhum registro de manutenção'} hint={search ? 'Confira o número ou a placa' : 'Use Novo registro quando um veículo passar pela oficina'} />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th className="w-10 pr-0" aria-label="Selecionar" />
+                  <th>Nº</th>
+                  <th>Data</th>
+                  <th>Placa</th>
+                  <th className="hidden md:table-cell">Tipo</th>
+                  <th className="hidden lg:table-cell">Itens e serviços</th>
+                  <th className="hidden xl:table-cell">Oficina / responsável</th>
+                  <th className="hidden sm:table-cell !text-right">KM</th>
+                  <th className="!text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((r) => {
+                  const services = [...r.items.map((i) => i.item_name), ...(r.other_services ? r.other_services.split('\n').filter(Boolean) : [])];
+                  return (
+                    <tr key={r.id} onClick={() => toggle(r.id)} onDoubleClick={() => printRecord(r)} data-selected={selectedId === r.id} className="cursor-pointer">
+                      <td className="pr-0" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox checked={selectedId === r.id} onCheckedChange={() => toggle(r.id)} aria-label={`Selecionar o registro ${r.record_code}`} />
+                      </td>
+                      <td className="cell-strong tabular-nums whitespace-nowrap">{r.record_code}</td>
+                      <td className="tabular-nums whitespace-nowrap">{formatDay(r.executed_date)}</td>
+                      <td>
+                        <PlateTag>{r.vehicle_plate}</PlateTag>
+                        {r.vehicle_name && <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{r.vehicle_name}</div>}
+                      </td>
+                      <td className="hidden md:table-cell">
+                        <StatusPill tone={r.maintenance_type === 'CORRETIVA' ? 'amber' : 'blue'}>{RECORD_TYPES[r.maintenance_type] || r.maintenance_type}</StatusPill>
+                      </td>
+                      <td className="hidden lg:table-cell"><div className="max-w-[320px] truncate" title={services.join(', ')}>{services.join(', ') || '-'}</div></td>
+                      <td className="hidden xl:table-cell"><div className="max-w-[200px] truncate">{r.workshop || '-'}</div></td>
+                      <td className="hidden sm:table-cell text-right tabular-nums whitespace-nowrap">{r.km !== null && r.km !== undefined ? formatKm(r.km) : '-'}</td>
+                      <td className="text-right tabular-nums whitespace-nowrap">{formatMoney(r.total_value)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </DataCard>
+      <ConfirmDialog />
     </div>
   );
 }
@@ -514,10 +605,14 @@ export default function MaintenancePlansPage() {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
             <TabsTrigger value="situacao" data-testid="tab-plan-status">Situação</TabsTrigger>
+            <TabsTrigger value="registros" data-testid="tab-records">Registros</TabsTrigger>
             <TabsTrigger value="planos" data-testid="tab-plans">Planos ({plans.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="situacao" className="mt-4">
             <StatusTab plans={plans} isAdmin={isAdmin} />
+          </TabsContent>
+          <TabsContent value="registros" className="mt-4">
+            <RecordsTab />
           </TabsContent>
           <TabsContent value="planos" className="mt-4">
             <PlansTab plans={plans} vehicleTypes={vehicleTypes} loading={loading} onChanged={loadPlans} />

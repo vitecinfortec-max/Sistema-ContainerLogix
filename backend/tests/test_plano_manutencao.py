@@ -13,10 +13,13 @@ def _days_ago(n: int) -> str:
 def _seed(api):
     db = api.db
     api.run(db.vehicles.insert_many([
-        {"id": "vh-1", "plate": "ABC1D23", "model": "FH 540", "vehicle_type": "CAVALO", "status": "ATIVO"},
-        {"id": "vh-2", "plate": "XYZ9K87", "model": "Actros", "vehicle_type": "CAVALO", "status": "ATIVO"},
-        {"id": "vh-3", "plate": "CAR0A00", "vehicle_type": "CARRETA", "status": "ATIVO"},
-        {"id": "vh-4", "plate": "OLD0A00", "vehicle_type": "CAVALO", "status": "INATIVO"},
+        {"id": "vh-1", "plate": "ABC1D23", "brand": "VOLVO", "model": "FH 540", "vehicle_type": "CAVALO", "status": "ATIVO", "in_maintenance_plan": True},
+        {"id": "vh-2", "plate": "XYZ9K87", "model": "Actros", "vehicle_type": "CAVALO", "status": "ATIVO", "in_maintenance_plan": True},
+        {"id": "vh-3", "plate": "CAR0A00", "vehicle_type": "CARRETA", "status": "ATIVO", "in_maintenance_plan": True},
+        {"id": "vh-4", "plate": "OLD0A00", "vehicle_type": "CAVALO", "status": "INATIVO", "in_maintenance_plan": True},
+        # agregado/terceiro: do tipo do plano, mas fora da frota acompanhada
+        {"id": "vh-5", "plate": "AGR0A00", "vehicle_type": "CAVALO", "status": "ATIVO",
+         "created_by": "admin-1", "created_by_name": "Admin", "created_at": "2026-01-01T00:00:00+00:00"},
     ]))
     api.run(db.odometer_readings.insert_one({"id": "od-1", "vehicle_id": "vh-1", "km": 119_500}))
 
@@ -172,3 +175,91 @@ def test_module_disabled_hides_alerts(api):
     keys = [a["key"] for a in api.get("/api/alerts/summary").json()["fleet"]]
     assert "maintenance_plan_overdue" not in keys
     assert api.get("/api/maintenance-plans").status_code == 403
+
+
+def test_only_fleet_vehicles(api):
+    _seed(api)
+    plan = api.post("/api/maintenance-plans", json=_plan_body()).json()
+    data = api.get("/api/maintenance-plans-status").json()
+    plates = {r["vehicle_plate"] for r in data["items"]}
+    assert plates == {"ABC1D23", "XYZ9K87"}  # sem o agregado (não marcado) e sem o inativo
+    assert data["vehicles_not_in_plan"] == 1
+    fleet = api.get("/api/maintenance-plans-fleet").json()
+    assert {v["plate"] for v in fleet} == {"ABC1D23", "XYZ9K87", "CAR0A00"}
+    assert [i["item_name"] for i in next(v for v in fleet if v["plate"] == "ABC1D23")["items"]] == ["Troca de óleo do motor", "Lubrificação"]
+    assert next(v for v in fleet if v["plate"] == "CAR0A00")["items"] == []  # carreta sem plano
+    r = _execute(api, plan, 1, "vh-5", _days_ago(1))
+    assert r.status_code == 400 and "não participa" in r.json()["detail"]
+    # marcar no cadastro coloca o veículo no plano
+    assert api.put("/api/vehicles/vh-5", json={"in_maintenance_plan": True}).json()["in_maintenance_plan"] is True
+    assert "AGR0A00" in {r["vehicle_plate"] for r in api.get("/api/maintenance-plans-status").json()["items"]}
+
+
+def _record_body(plan, **over):
+    body = {
+        "vehicle_id": "vh-1", "executed_date": _days_ago(0), "km": 119_900, "maintenance_type": "PREVENTIVA",
+        "items": [{"plan_id": plan["id"], "item_id": plan["items"][0]["id"]}, {"plan_id": plan["id"], "item_id": plan["items"][1]["id"]}],
+        "other_services": "Revisão do freio", "workshop": "Oficina Central",
+        "parts": [{"description": "Filtro de óleo", "quantity": 2, "unit_value": 45.5}, {"description": "", "quantity": 1}],
+        "labor_value": 150, "notes": "Cliente & motorista acompanharam",
+    }
+    body.update(over)
+    return body
+
+
+def test_record_numbering_and_status(api):
+    import asyncio
+    import routers.maintenance_plans as mp
+    _seed(api)
+    plan = api.post("/api/maintenance-plans", json=_plan_body()).json()
+    rec = api.post("/api/maintenance-records", json=_record_body(plan)).json()
+    assert rec["record_code"] == "MAN-000001" and rec["record_number"] == 1
+    assert rec["parts"] == [{"description": "Filtro de óleo", "quantity": 2, "unit_value": 45.5, "total": 91.0}]
+    assert rec["total_value"] == 241 and rec["vehicle_name"] == "VOLVO FH 540"
+    rows = {r["item_name"]: r for r in api.get("/api/maintenance-plans-status", params={"vehicle_id": "vh-1"}).json()["items"]}
+    assert rows["Troca de óleo do motor"]["status"] == "OK" and rows["Troca de óleo do motor"]["due_km"] == 139_900
+    assert rows["Lubrificação"]["last_date"] == _days_ago(0)
+
+    # sem KM com item por km, sem nada executado, veículo fora da frota
+    assert api.post("/api/maintenance-records", json=_record_body(plan, km=None)).status_code == 400
+    assert api.post("/api/maintenance-records", json=_record_body(plan, items=[], other_services="", parts=[])).status_code == 400
+    assert api.post("/api/maintenance-records", json=_record_body(plan, vehicle_id="vh-5")).status_code == 400
+    corrective = api.post("/api/maintenance-records", json=_record_body(plan, items=[], km=None, maintenance_type="CORRETIVA")).json()
+    assert corrective["record_code"] == "MAN-000002" and corrective["items"] == []
+
+    # dois salvando ao mesmo tempo: números diferentes
+    async def two_at_once():
+        return await asyncio.gather(mp._next_record_number(), mp._next_record_number(), mp._next_record_number())
+    assert len(set(api.run(two_at_once()))) == 3
+
+    # busca pelo número digitado ou lido pelo leitor
+    for term in ("MAN-000001", "man-1", "000001", "1"):
+        found = api.get("/api/maintenance-records", params={"search": term}).json()["items"]
+        assert [f["record_code"] for f in found] == ["MAN-000001"], term
+    assert api.get("/api/maintenance-records", params={"search": "abc-1d23"}).json()["total"] == 2
+
+    # excluir o registro desfaz as execuções dele
+    removed = api.delete(f"/api/maintenance-records/{rec['id']}").json()
+    assert removed["executions_removed"] == 2
+    rows = {r["item_name"]: r for r in api.get("/api/maintenance-plans-status", params={"vehicle_id": "vh-1"}).json()["items"]}
+    assert rows["Lubrificação"]["status"] == "NO_HISTORY"
+
+
+def test_record_and_plan_pdfs(api):
+    import fitz
+    _seed(api)
+    plan = api.post("/api/maintenance-plans", json=_plan_body()).json()
+    rec = api.post("/api/maintenance-records", json=_record_body(plan)).json()
+    r = api.get(f"/api/maintenance-records/{rec['id']}/pdf")
+    assert r.status_code == 200 and r.content[:4] == b"%PDF"
+    text = fitz.open(stream=r.content, filetype="pdf")[0].get_text()
+    for expected in ("Registro de Manutenção", "MAN-000001", "VOLVO FH 540", "Oficina Central", "Itens do plano executados",
+                     "139.900 km", "Peças e valores", "R$ 241,00", "Cliente & motorista", "ASSINATURA DO RESPONSÁVEL"):
+        assert expected in text, expected
+
+    plan_pdf = api.get("/api/maintenance-plans-status/vehicle/vh-1/pdf")
+    assert plan_pdf.status_code == 200
+    text = fitz.open(stream=plan_pdf.content, filetype="pdf")[0].get_text()
+    for expected in ("Plano de Manutenção Preventiva", "Hodômetro atual (KM):", "Itens de troca obrigatória", "139.900", "Troca de óleo do motor"):
+        assert expected in text, expected
+    assert api.get("/api/maintenance-plans-status/vehicle/vh-5/pdf").status_code == 400  # fora da frota

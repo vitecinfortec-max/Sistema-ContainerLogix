@@ -1404,6 +1404,7 @@ class Vehicle(BaseModel):
     inspection_expiry: Optional[str] = None
     insurance_expiry: Optional[str] = None  # Vencimento do seguro do veículo
     document_attachments: Optional[List[str]] = None
+    in_maintenance_plan: bool = False  # Participa do Plano de Manutenção (frota própria acompanhada)
     owner_type: Optional[str] = None  # PROPRIA, TERCEIRIZADO, AUTONOMO
     ownership_status: Optional[str] = None  # PROPRIO, ALUGADO, AGREGADO
     transport_company: Optional[str] = None
@@ -1447,6 +1448,7 @@ class VehicleCreate(BaseModel):
     inspection_expiry: Optional[str] = None
     insurance_expiry: Optional[str] = None  # Vencimento do seguro do veículo
     document_attachments: Optional[List[str]] = None
+    in_maintenance_plan: bool = False
     owner_type: Optional[str] = None
     ownership_status: Optional[str] = None
     transport_company: Optional[str] = None
@@ -1483,6 +1485,7 @@ class VehicleUpdate(BaseModel):
     inspection_expiry: Optional[str] = None
     insurance_expiry: Optional[str] = None  # Vencimento do seguro do veículo
     document_attachments: Optional[List[str]] = None
+    in_maintenance_plan: Optional[bool] = None
     owner_type: Optional[str] = None
     ownership_status: Optional[str] = None
     transport_company: Optional[str] = None
@@ -1521,6 +1524,7 @@ class VehicleResponse(BaseModel):
     inspection_expiry: Optional[str] = None
     insurance_expiry: Optional[str] = None  # Vencimento do seguro do veículo
     document_attachments: Optional[List[str]] = None
+    in_maintenance_plan: bool = False
     owner_type: Optional[str] = None
     ownership_status: Optional[str] = None
     transport_company: Optional[str] = None
@@ -4990,3 +4994,28 @@ class PayablePay(BaseModel):
 
 class PayableCancel(BaseModel):
     cancelled: bool
+
+
+class MaintenanceRecordItem(BaseModel):
+    plan_id: str
+    item_id: str
+
+
+class MaintenanceRecordPart(BaseModel):
+    description: str
+    quantity: float = Field(default=1, gt=0)
+    unit_value: float = Field(default=0, ge=0)
+
+
+class MaintenanceRecordCreate(BaseModel):
+    """Registro de Manutenção (MAN-000001): o que foi feito num veículo da frota."""
+    vehicle_id: str
+    executed_date: str  # YYYY-MM-DD
+    km: Optional[int] = Field(default=None, ge=0)
+    maintenance_type: Literal["PREVENTIVA", "CORRETIVA"] = "PREVENTIVA"
+    items: List[MaintenanceRecordItem] = []  # itens do plano executados (recomeçam a contagem)
+    other_services: Optional[str] = None  # serviços fora do plano
+    workshop: Optional[str] = None  # oficina ou responsável
+    parts: List[MaintenanceRecordPart] = []
+    labor_value: float = Field(default=0, ge=0)  # mão de obra
+    notes: Optional[str] = None

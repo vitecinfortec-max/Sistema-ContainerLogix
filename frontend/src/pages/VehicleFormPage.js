@@ -7,6 +7,7 @@ import { Field, FormSection, FormActions } from '../components/FormKit';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
 import { Autocomplete, OptionAutocomplete } from '../components/Autocomplete';
 import {
   DocumentImportButton, DocumentImportNotice, DocumentAttachments, applyDocumentFields, addAttachment, IMPORTED_FIELD_CLASS,
@@ -39,6 +40,7 @@ const buildEmptyVehicleForm = () => ({
   fuel_target_km_l: '', engine_power: '', tare_weight: '', gross_weight: '',
   crlv_number: '', crlv_expiry: '', licensing_expiry: '', tachograph_expiry: '', inspection_date: '', inspection_expiry: '', insurance_expiry: '',
   owner_type: '', ownership_status: '', transport_company: '', status: 'ATIVO', observations: '', driver_id: '',
+  in_maintenance_plan: false,
   document_attachments: [],
 });
 
@@ -155,6 +157,7 @@ export default function VehicleFormPage() {
         inspection_expiry: form.inspection_expiry || null,
         insurance_expiry: form.insurance_expiry || null,
         owner_type: form.owner_type || null,
+        in_maintenance_plan: !!form.in_maintenance_plan,
         ownership_status: form.ownership_status || null,
         transport_company: form.transport_company || null,
         status: form.status,
@@ -293,6 +296,13 @@ export default function VehicleFormPage() {
                 />
               </Field>
               {T({ name: 'observations', label: 'Observações' })}
+              <label className="flex items-start gap-2 text-sm cursor-pointer" data-testid="vehicle-in-maintenance-plan">
+                <Checkbox className="mt-0.5" checked={!!form.in_maintenance_plan} onCheckedChange={(v) => onChange('in_maintenance_plan', !!v)} />
+                <span>
+                  <span className="font-medium">Participa do Plano de Manutenção</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">Marque nos veículos da frota própria: só eles aparecem na Situação do Plano de Manutenção, nos avisos e no Registro de Manutenção.</span>
+                </span>
+              </label>
             </FormSection>
 
             <FormActions sticky>

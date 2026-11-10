@@ -927,6 +927,7 @@ function LayoutFrame({ children }) {
     if (location.pathname.startsWith('/fleet/veiculos/')) return 'Editar Veículo';
     if (location.pathname === '/loading-orders/new') return 'Nova Ordem de Carregamento';
     if (location.pathname.startsWith('/loading-orders/')) return 'Editar Ordem de Carregamento';
+    if (location.pathname === '/fleet/plano-manutencao/registro/new') return 'Novo Registro de Manutenção';
     if (location.pathname === '/transport-occurrences/new') return 'Nova Ocorrência';
     if (location.pathname.startsWith('/transport-occurrences/')) return 'Editar Ocorrência';
     if (location.pathname === '/unit-segregation/new') return 'Nova Segregação de Unidade';
