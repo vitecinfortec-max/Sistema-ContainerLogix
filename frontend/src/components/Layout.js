@@ -88,8 +88,14 @@ import {
   AlertOctagon,
   Star,
   Handshake,
-  FileBarChart
+  FileBarChart,
+  Monitor as MonitorIcon,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem,
+  DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuItem,
+} from './ui/dropdown-menu';
+import { DENSITIES, applyDensity, normalizeDensity } from '../lib/density';
 import { toast } from 'sonner';
 import { Suspense, createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageSkeleton } from './DataPage';
@@ -291,7 +297,22 @@ const saveSidebarOpen = (open) => {
 };
 
 function LayoutFrame({ children }) {
-  const { user, logout } = useAuth();
+  const { user, setUser, logout } = useAuth();
+
+  // Densidade da tela: aplica na hora e grava no perfil (vale em qualquer computador)
+  const changeDensity = async (value) => {
+    const previous = normalizeDensity(user?.density);
+    if (value === previous) return;
+    applyDensity(value);
+    setUser((u) => (u ? { ...u, density: value } : u));
+    try {
+      await api.updateMyPreferences({ density: value });
+    } catch {
+      applyDensity(previous);
+      setUser((u) => (u ? { ...u, density: previous } : u));
+      toast.error('Não foi possível salvar a densidade da tela');
+    }
+  };
   const isAdmin = user?.role === 'admin';
   const isSuperadmin = !!user?.is_superadmin;
   const { isModuleEnabled } = useModuleConfig();
@@ -1205,12 +1226,43 @@ function LayoutFrame({ children }) {
             {theme === 'dark' ? <Sun className="w-[1.125rem] h-[1.125rem]" /> : <Moon className="w-[1.125rem] h-[1.125rem]" />}
           </button>
           <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-2"></div>
-          <div className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-default" data-testid="header-user-info">
-            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
-              <User className="w-3.5 h-3.5 text-primary" />
-            </div>
-            <span className="text-sm text-slate-700 dark:text-slate-300">{user?.name?.split(' ').slice(0, 2).join(' ')}</span>
-          </div>
+          {/* Menu da pessoa: densidade da tela (Compacto / Normal / Confortável), salva no perfil */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button"
+                className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                data-testid="header-user-info"
+                title="Preferências da tela"
+              >
+                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="w-3.5 h-3.5 text-primary" />
+                </div>
+                <span className="text-sm text-slate-700 dark:text-slate-300">{user?.name?.split(' ').slice(0, 2).join(' ')}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuLabel className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                <MonitorIcon className="w-3.5 h-3.5" />
+                Densidade da tela
+              </DropdownMenuLabel>
+              <DropdownMenuRadioGroup value={normalizeDensity(user?.density)} onValueChange={changeDensity}>
+                {DENSITIES.map((d) => (
+                  <DropdownMenuRadioItem key={d.value} value={d.value} data-testid={`density-${d.value}`}>
+                    <div>
+                      <p className="text-sm">{d.label}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{d.hint}</p>
+                    </div>
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={logout} className="text-red-600 focus:text-red-700" data-testid="user-menu-logout">
+                <LogOut className="w-4 h-4 mr-2" />
+                Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

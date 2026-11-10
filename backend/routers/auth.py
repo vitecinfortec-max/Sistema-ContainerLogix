@@ -4,6 +4,7 @@ import os
 import re
 from datetime import date, datetime, timedelta, timezone
 import logging
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel as PydanticBaseModel
@@ -210,7 +211,8 @@ async def login(credentials: UserLogin, http_request: Request):
         must_change_password=user_doc.get('must_change_password', False),
         active=user_doc.get('active', True),
         is_superadmin=user_doc.get('is_superadmin', False),
-        created_at=datetime.fromisoformat(user_doc['created_at'])
+        created_at=datetime.fromisoformat(user_doc['created_at']),
+        density=_density(user_doc),
     )
 
     return Token(access_token=access_token, token_type="bearer", user=user_response)
@@ -240,8 +242,32 @@ async def get_me(current_user: dict = Depends(get_current_active_user)):
         must_change_password=user_doc.get('must_change_password', False),
         active=user_doc.get('active', True),
         is_superadmin=user_doc.get('is_superadmin', False),
-        created_at=datetime.fromisoformat(user_doc['created_at'])
+        created_at=datetime.fromisoformat(user_doc['created_at']),
+        density=_density(user_doc),
     )
+
+DENSITIES = ("compact", "normal", "comfortable")
+
+
+def _density(user_doc: dict) -> str:
+    """Densidade da tela salva no perfil (preferences.density); sem escolha, Normal."""
+    value = ((user_doc or {}).get('preferences') or {}).get('density')
+    return value if value in DENSITIES else "normal"
+
+
+class UserPreferencesUpdate(PydanticBaseModel):
+    density: Literal["compact", "normal", "comfortable"]
+
+
+@api_router.put("/auth/me/preferences")
+async def update_my_preferences(data: UserPreferencesUpdate, current_user: dict = Depends(get_current_active_user)):
+    """Preferências de tela da própria pessoa (hoje só a densidade). Vale em
+    qualquer computador em que ela entrar."""
+    result = await db.users.update_one({"id": current_user['sub']}, {"$set": {"preferences.density": data.density}})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return {"density": data.density}
+
 
 @api_router.get("/company-settings")
 async def get_company_settings_endpoint(current_user: dict = Depends(get_current_active_user)):

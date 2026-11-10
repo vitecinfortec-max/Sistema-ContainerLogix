@@ -7,6 +7,10 @@ import App from "@/App";
 import OfflineApp from "@/offline/OfflineApp";
 import { MotionProvider } from "@/components/Motion";
 import { startMonitoring } from "@/lib/monitoring";
+import { applyDensity, readSavedDensity } from "@/lib/density";
+
+// Densidade da tela salva neste navegador, antes do primeiro desenho
+applyDensity(readSavedDensity());
 
 const isOfflineMode = process.env.REACT_APP_OFFLINE_MODE === 'true';
 const isElectron = navigator.userAgent.toLowerCase().includes('electron');

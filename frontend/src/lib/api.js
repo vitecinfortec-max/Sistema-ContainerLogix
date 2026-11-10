@@ -246,6 +246,8 @@ export const api = {
   updateUserShortcuts: (shortcuts) => axios.put(`${API}/user/shortcuts`, { shortcuts }),
   getMenuFavorites: () => axios.get(`${API}/user/menu-favorites`),
   updateMenuFavorites: (favorites) => axios.put(`${API}/user/menu-favorites`, { favorites }),
+  // Densidade da tela (Compacto / Normal / Confortável) - lib/density.js
+  updateMyPreferences: (preferences) => axios.put(`${API}/auth/me/preferences`, preferences),
   
   // Company Settings (Dados da Empresa)
   getCompanySettings: () => axios.get(`${API}/company-settings`),

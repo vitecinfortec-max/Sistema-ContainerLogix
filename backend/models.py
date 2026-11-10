@@ -31,6 +31,8 @@ class UserResponse(BaseModel):
     active: bool = True
     is_superadmin: bool = False
     created_at: datetime
+    # Densidade da tela escolhida pela pessoa (Compacto / Normal / Confortável)
+    density: Literal["compact", "normal", "comfortable"] = "normal"
 
 class UserCreate(BaseModel):
     name: str

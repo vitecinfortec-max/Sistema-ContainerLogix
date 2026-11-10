@@ -1,5 +1,6 @@
 import { createContext, useState, useContext, useEffect } from 'react';
 import { applyBrandAccent } from '../lib/brandTheme';
+import { applyDensity } from '../lib/density';
 import axios from 'axios';
 import '../lib/tenant'; // empresa em toda chamada (multi-cliente)
 
@@ -60,6 +61,11 @@ export const AuthProvider = ({ children }) => {
       .then((response) => applyBrandAccent(response.data?.accent_color || null))
       .catch(() => {});
   }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Densidade da tela salva no perfil da pessoa (vale em qualquer computador)
+  useEffect(() => {
+    if (user?.density) applyDensity(user.density);
+  }, [user?.density]);
 
   const fetchUser = async () => {
     try {
