@@ -605,40 +605,41 @@ async def get_settlement_pdf(settlement_id: str, current_user: dict = Depends(ge
     sections = [
         Section(
             "Saldo com o motorista",
-            [Column("Item", width=40), Column("Valor", MONEY, 12)],
+            [Column("Item", width=30), Column("Valor", MONEY, 12)],
             [["Abastecimentos pagos pelo motorista", s.get("fuel_driver_total") or 0],
              ["Despesas pagas pelo motorista", s.get("expenses_driver_total") or 0],
              ["(-) Adiantamentos entregues ao motorista", -(s.get("advances_total") or 0)],
              ["(+) Devoluções do motorista", s.get("returns_total") or 0]],
             total=["= " + ("A pagar ao motorista" if balance > 0 else "A devolver pelo motorista" if balance < 0 else "Zerado"), abs(balance)],
+            side_by_side=True,  # ao lado do "Resultado da viagem"
         ),
         Section(
             "Resultado da viagem",
-            [Column("Item", width=40), Column("Valor", MONEY, 12)],
+            [Column("Item", width=30), Column("Valor", MONEY, 12)],
             [["Receita (frete das viagens)", s.get("revenue") or 0],
              ["(-) Abastecimento interno (tanque próprio)", -(s.get("fuel_internal_total") or 0)],
              ["(-) Abastecimento externo (posto)", -(s.get("fuel_external_total") or 0)],
-             ["(-) Despesas (pedágio, diária, comissão e outras)", -(s.get("expenses_total") or 0)]],
+             ["(-) Despesas (pedágio, diária, comissão...)", -(s.get("expenses_total") or 0)]],
             total=["= " + res_text, result],
         ),
         Section(
             "Abastecimento",
-            [Column("Nº", INT, 5), Column("Data", DAY, 8), Column("Local/Posto", width=20), Column("Origem", width=7, align="center"),
-             Column("Pagamento", width=8, align="center"), Column("Placa", width=8, align="center"),
-             Column("Litros", width=7, align="right"), Column("R$/Litro", MONEY, 7), Column("Km hodômetro", INT, 8),
-             Column("Total", MONEY, 10)],
+            [Column("Nº", INT, 4), Column("Data", DAY, 8.5), Column("Local/Posto", width=15), Column("Origem", width=7, align="center"),
+             Column("Pagamento", width=8, align="center"), Column("Placa", width=8.5, align="center"),
+             Column("Litros", width=6.5, align="right"), Column("R$/Litro", MONEY, 7.5), Column("Km hodôm.", INT, 7),
+             Column("Total", MONEY, 9.5)],
             [[f.get("supply_number"), f.get("supply_date"), _fuel_location(f), FUEL_ORIGIN_LABELS[_fuel_origin(f)],
               PAID_BY_LABELS[_fuel_paid_by(f)], f.get("plate"), _br_number(f.get("liters")),
               round(f.get("unit_price") or (f["total"] / f["liters"] if f.get("liters") else 0), 2) or None,
               f.get("reading"), f.get("total")] for f in fuel],
-            total=["TOTAL", None, None, None, None, None, _br_number(s.get("fuel_liters")), None, None, s.get("fuel_total")],
+            total=[None, None, "TOTAL", None, None, None, _br_number(s.get("fuel_liters")), None, None, s.get("fuel_total")],
             empty_text="Nenhum abastecimento.",
         ),
         Section(
             "Despesas",
-            [Column("Descrição", width=24), Column("Categoria", width=12), Column("Pago por", width=8, align="center"),
-             Column("Data", DAY, 8), Column("Fornecedor", width=16),
-             Column("Quant.", width=6, align="right"), Column("Unitário", MONEY, 9), Column("Total", MONEY, 10)],
+            [Column("Descrição", width=18), Column("Categoria", width=11), Column("Pago por", width=8, align="center"),
+             Column("Data", DAY, 8.5), Column("Fornecedor", width=12),
+             Column("Qtd.", width=5, align="right"), Column("Unitário", MONEY, 9), Column("Total", MONEY, 9.5)],
             [[e.get("description"), EXPENSE_CATEGORY_LABELS.get(e.get("category") or "OUTRAS"),
               PAID_BY_LABELS.get(e.get("paid_by") or "MOTORISTA"), e.get("expense_date"), e.get("supplier_name"),
               _br_number(e.get("quantity")), e.get("unit_value"), e.get("total")] for e in expenses],
@@ -647,9 +648,9 @@ async def get_settlement_pdf(settlement_id: str, current_user: dict = Depends(ge
         ),
         Section(
             "Viagens",
-            [Column("Ordem", width=7, align="center"), Column("Data", DAY, 8), Column("Booking", width=10), Column("Rota", width=24),
-             Column("Placa", width=8, align="center"), Column("Km inicial", INT, 8), Column("Km final", INT, 8), Column("Km", INT, 7),
-             Column("Frete", MONEY, 10)],
+            [Column("Ordem", width=7, align="center"), Column("Data", DAY, 8.5), Column("Booking", width=9), Column("Rota", width=20),
+             Column("Placa", width=8.5, align="center"), Column("Km inicial", INT, 7), Column("Km final", INT, 7), Column("Km", INT, 6),
+             Column("Frete", MONEY, 9.5)],
             [[trip_order_label(t), t.get("order_date"), t.get("booking"), t.get("route_name"), t.get("truck_plate"),
               t.get("km_start"), t.get("km_end"), t.get("km"), t.get("freight_value")] for t in trips],
             total=["TOTAL", None, None, None, None, None, None, s.get("km_total"), s.get("revenue")],
@@ -657,7 +658,7 @@ async def get_settlement_pdf(settlement_id: str, current_user: dict = Depends(ge
         ),
         Section(
             "Adiantamentos e devoluções",
-            [Column("Tipo", width=14), Column("Número", width=12), Column("Data", DAY, 9), Column("Valor", MONEY, 11)],
+            [Column("Tipo", width=14), Column("Número", width=14), Column("Data", DAY, 10), Column("Valor", MONEY, 12)],
             [[ADVANCE_LABELS.get(a.get("kind"), a.get("kind")), a.get("number"), a.get("advance_date"),
               a.get("amount") if a.get("kind") == "DEVOLUCAO" else -(a.get("amount") or 0)] for a in advances],
             # sem linha de total: o saldo já está no quadro "Saldo com o motorista"
@@ -666,4 +667,5 @@ async def get_settlement_pdf(settlement_id: str, current_user: dict = Depends(ge
     ]
     subtitle = f"Acerto nº {s['settlement_number']}" + (f" · {s['observations']}" if s.get("observations") else "")
     return await pdf_response("Acerto da Viagem", subtitle, info, sections,
-                              f"acerto_viagem_{s['settlement_number']}", current_user.get("name", "Sistema"))
+                              f"acerto_viagem_{s['settlement_number']}", current_user.get("name", "Sistema"),
+                              portrait=True, info_cols=3)

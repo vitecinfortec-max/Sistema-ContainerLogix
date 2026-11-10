@@ -56,6 +56,7 @@ class Section:
     blocks: Optional[List[Block]] = None  # só no PDF: troca `rows` por uma tabela por bloco, com `block_columns`
     block_columns: Optional[List[Column]] = None
     strong_rows: list = field(default_factory=list)  # só no Excel: índices das linhas em destaque
+    side_by_side: bool = False  # só no PDF: esta seção e a seguinte lado a lado (quadros curtos)
 
 
 def fmt_day(value) -> str:
@@ -113,8 +114,9 @@ def _pdf_block(block: Block, columns: List[Column], width: float, cell, light: b
 
 
 async def pdf_response(title: str, subtitle: Optional[str], info: list, sections: List[Section], filename: str, user_name: str,
-                       dashboard=None):
-    """`dashboard(width)`: flowables extras (gráficos) entre os indicadores e as tabelas."""
+                       dashboard=None, portrait: bool = False, info_cols: int = 4):
+    """`dashboard(width)`: flowables extras (gráficos) entre os indicadores e as tabelas.
+    `portrait`: folha em pé (documento de um registro, ex.: Acerto da Viagem); o padrão é deitada."""
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.units import mm
     from reportlab.platypus import KeepTogether, SimpleDocTemplate, Table, TableStyle, Spacer
@@ -126,34 +128,64 @@ async def pdf_response(title: str, subtitle: Optional[str], info: list, sections
 
     company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=12*mm, leftMargin=12*mm, topMargin=10*mm, bottomMargin=14*mm)
+    doc = SimpleDocTemplate(buffer, pagesize=A4 if portrait else landscape(A4), rightMargin=12*mm, leftMargin=12*mm, topMargin=10*mm, bottomMargin=14*mm)
     width = doc.width
     styles = getSampleStyleSheet()
     elements = list(_build_pdf_header(styles, load_logo_buffer(company), title, generation_info=subtitle, company=company, content_width=width))
     info = list(info) + [("Gerado em", datetime.now(BRT_TZ).strftime("%d/%m/%Y %H:%M")), ("Gerado por", user_name)]
-    elements.append(_pdf_info_grid(info, width, cols=4))
+    elements.append(_pdf_info_grid(info, width, cols=info_cols))
     if dashboard:
         elements.extend(dashboard(width))
 
     cell = _pdf_cell_factory(styles, font_size=7.5)
-    for section in sections:
-        elements.extend(_pdf_section_title(section.title, width))
-        if not section.rows:
-            elements.append(_pdf_empty_state(section.empty_text, width))
-            continue
-        if section.blocks:
-            elements.extend(KeepTogether([_pdf_block(b, section.block_columns, width, cell), Spacer(1, 8)]) for b in section.blocks)
-            continue
+
+    def section_table(section, w):
         data = [_pdf_header_cells([c.label for c in section.columns], font_size=7.5)]
         for row in section.rows:
             data.append([cell(_pdf_text(v, c.kind), c.pdf_align) for v, c in zip(row, section.columns)])
         if section.total:
             data.append([cell(_pdf_text(v, c.kind), c.pdf_align, bold=True) if v is not None else cell("", markup="")
                          for v, c in zip(section.total, section.columns)])
-        scale = width / sum(c.width for c in section.columns)
+        scale = w / sum(c.width for c in section.columns)
         table = Table(data, colWidths=[c.width * scale for c in section.columns], repeatRows=1)
         table.setStyle(TableStyle(_pdf_table_style(total_row=bool(section.total))))
-        elements.append(table)
+        return table
+
+    index = 0
+    while index < len(sections):
+        section = sections[index]
+        pair = sections[index + 1] if section.side_by_side and index + 1 < len(sections) else None
+        if pair and not section.blocks and not pair.blocks:
+            gap = 14
+            half = (width - gap) / 2
+            columns = []
+            for sec in (section, pair):
+                parts = _pdf_section_title(sec.title, half)[1:]  # sem o espaço de cima: vai no Spacer abaixo
+                parts.append(section_table(sec, half) if sec.rows else _pdf_empty_state(sec.empty_text, half))
+                columns.append(parts)
+            outer = Table([[columns[0], "", columns[1]]], colWidths=[half, gap, half])
+            outer.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                       ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                       ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
+            elements.extend([Spacer(1, 14), outer, Spacer(1, 4)])
+            index += 2
+            continue
+        index += 1
+        title = _pdf_section_title(section.title, width)
+        if not section.rows:
+            elements.append(KeepTogether(title + [_pdf_empty_state(section.empty_text, width)]))
+            continue
+        if section.blocks:
+            elements.extend(title)
+            elements.extend(KeepTogether([_pdf_block(b, section.block_columns, width, cell), Spacer(1, 8)]) for b in section.blocks)
+            continue
+        table = section_table(section, width)
+        # tabela curta não se separa do título (título sozinho no pé da página)
+        if len(section.rows) <= 25:
+            elements.append(KeepTogether(title + [table]))
+        else:
+            elements.extend(title)
+            elements.append(table)
         elements.append(Spacer(1, 4))
 
     footer = _make_pdf_footer(company["name"])
