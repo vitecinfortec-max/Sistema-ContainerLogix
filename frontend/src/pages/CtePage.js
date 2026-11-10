@@ -49,10 +49,38 @@ const toMoneyInput = (v) => (v === null || v === undefined || v === '' ? '' : Nu
 // Seções da página de emissão (as pendências da conferência levam até elas)
 const SECTION_LABELS = {
   basicos: 'Dados básicos', envolvidos: 'Envolvidos', viagem: 'Motorista e veículo', seguro: 'Seguro', documentos: 'Documentos',
-  carga: 'Totais da carga', frete: 'Composição do frete', pedagio: 'Vale-pedágio',
+  carga: 'Totais da carga', frete: 'Composição do frete', piso: 'Frete mínimo ANTT', pedagio: 'Vale-pedágio',
 };
-// Componentes mais usados na composição do frete (o nome vai no CT-e, até 15 caracteres)
-const COMPONENT_PRESETS = [['FRETE VALOR', 'Frete'], ['PEDAGIO', 'Pedágio'], ['SEGURO', 'Seguro'], ['OUTROS', 'Outros']];
+// Composição do frete (referência: Bsoft), na ordem da tela. Cada valor maior
+// que zero vira um componente vPrest/Comp com este nome (até 15 caracteres);
+// o total da prestação e o valor a receber são a soma.
+const COMPONENTS = [['FRETE VALOR', 'Frete Valor'], ['OUTROS', 'Outros'], ['PEDAGIO', 'Pedágio'], ['DIARIA', 'Diária'], ['SEGURO', 'Seguro']];
+const COMPONENT_ALIASES = { FRETE: 'FRETE VALOR', 'FRETE PESO': 'FRETE VALOR', 'PEDÁGIO': 'PEDAGIO', 'DIÁRIA': 'DIARIA' };
+const emptyComposition = () => Object.fromEntries(COMPONENTS.map(([k]) => [k, '']));
+// Componentes salvos -> campos fixos. Nome fora da lista (CT-e antigo) soma em Outros.
+function toComposition(componentes) {
+  const out = emptyComposition();
+  const sums = Object.fromEntries(COMPONENTS.map(([k]) => [k, null]));
+  const legacy = [];
+  (componentes || []).forEach((c) => {
+    const raw = (c.nome || '').trim().toUpperCase();
+    const key = sums[raw] !== undefined ? raw : COMPONENT_ALIASES[raw];
+    const target = key || 'OUTROS';
+    if (!key) legacy.push(raw);
+    sums[target] = (sums[target] || 0) + Number(c.valor || 0);
+  });
+  Object.entries(sums).forEach(([k, v]) => { if (v !== null) out[k] = toMoneyInput(v); });
+  return { composicao: out, componentes_legado: legacy };
+}
+const compositionTotal = (comp) => COMPONENTS.reduce((sum, [k]) => sum + (toNumber(comp?.[k]) || 0), 0);
+
+// Containers: número e lacre vão no XML (unidade de carga); o resto fica no sistema e no espelho
+const CONTAINER_TYPES = ['DRY', 'HC', 'REEFER', 'OPEN TOP', 'FLAT RACK', 'TANK'];
+const CONTAINER_SIZES = [['20', "20'"], ['40', "40'"], ['45', "45'"]];
+const emptyContainer = () => ({ numero: '', lacre: '', tara: '', tipo: '', tamanho: '', valor: '' });
+
+// Piso mínimo da ANTT (Cálculo do Frete Mínimo)
+const emptyMinFreight = () => ({ tabela: 'A', tipo_carga: '4', eixos: '', distancia_km: '', retorno_vazio: false, distancia_retorno_km: '' });
 
 const emptyParty = () => ({ client_id: null, nome: '', nome_fantasia: '', cnpj_cpf: '', ie: '', fone: '', email: '', endereco: {} });
 const partyFilled = (p) => !!((p?.nome || '').trim() || onlyDigits(p?.cnpj_cpf));
@@ -117,7 +145,9 @@ function buildEmpty(settings) {
     destino: { cidade: '', uf: '' },
     valor_total: '',
     valor_receber: '',
-    componentes: [],
+    composicao: emptyComposition(),
+    componentes_legado: [],
+    frete_minimo: emptyMinFreight(),
     icms_cst: settings?.icms_cst || '00',
     icms_aliquota: toInput(settings?.icms_aliquota),
     valor_carga: '',
@@ -173,10 +203,20 @@ function toForm(doc, settings) {
     icms_cst: doc.icms_cst || base.icms_cst,
     icms_aliquota: toInput(doc.icms_aliquota ?? settings?.icms_aliquota),
     valor_carga: toMoneyInput(doc.valor_carga),
-    componentes: (doc.componentes || []).map((c) => ({ ...c, valor: toMoneyInput(c.valor) })),
+    ...toComposition(doc.componentes),
+    frete_minimo: {
+      ...emptyMinFreight(), ...(doc.frete_minimo || {}),
+      tipo_carga: String(doc.frete_minimo?.tipo_carga ?? 4),
+      eixos: doc.frete_minimo?.eixos ? String(doc.frete_minimo.eixos) : '',
+      distancia_km: toInput(doc.frete_minimo?.distancia_km),
+      distancia_retorno_km: toInput(doc.frete_minimo?.distancia_retorno_km),
+    },
     quantidades: (doc.quantidades?.length ? doc.quantidades : base.quantidades).map((q) => ({ ...q, quantidade: toInput(q.quantidade) })),
     documentos: (doc.documentos || []).map(docToForm),
-    containers: doc.containers || [],
+    containers: (doc.containers || []).map((c) => ({
+      ...emptyContainer(), ...c, lacre: c.lacre || '', tipo: c.tipo || '', tamanho: c.tamanho || '',
+      tara: toInput(c.tara), valor: toMoneyInput(c.valor),
+    })),
     observacoes: doc.observacoes || '',
     motorista: { ...emptyDriver(), ...(doc.motorista || {}), cpf: doc.motorista?.cpf ? formatCnpjCpf(doc.motorista.cpf) : '' },
     veiculo_placa: doc.veiculo_placa || '',
@@ -209,9 +249,10 @@ function derive(prev, next) {
   const cfop = cfopForRoute(f.cfop, f.origem.uf, f.destino.uf);
   if (cfop !== f.cfop) f = { ...f, cfop };
   if (payerOf(f) !== payerOf(prev)) f = { ...f, indicador_ie_tomador: indicadorIe(payerOf(f)) };
-  if (f.componentes !== prev.componentes) {
-    const values = f.componentes.map((c) => toNumber(c.valor)).filter((v) => v !== null);
-    if (values.length) f = { ...f, valor_total: values.reduce((a, b) => a + b, 0).toFixed(2).replace('.', ',') };
+  // Total da prestação e valor a receber: sempre a soma da composição
+  if (f.composicao !== prev.composicao || f.valor_total === '' || f.valor_receber !== f.valor_total) {
+    const total = compositionTotal(f.composicao).toFixed(2).replace('.', ',');
+    if (total !== f.valor_total || total !== f.valor_receber) f = { ...f, valor_total: total, valor_receber: total };
   }
   return f;
 }
@@ -368,10 +409,9 @@ function validateCte(f, settings) {
   if (new Set(keys).size !== keys.length) add('documentos', 'A mesma chave de NF-e aparece mais de uma vez');
 
   const total = toNumber(f.valor_total) || 0;
-  if (total <= 0) add('frete', 'Informe o valor total da prestação (ou a composição do frete)');
+  if (total <= 0) add('frete', 'Informe a composição do frete (o total da prestação é a soma)');
   const receber = toNumber(f.valor_receber);
   if (receber !== null && receber > total) add('frete', 'Valor a receber maior que o valor total');
-  if (f.componentes.some((c) => toNumber(c.valor) && !(c.nome || '').trim())) add('frete', 'Componente do frete sem nome');
   if (ICMS_WITH_RATE.includes(f.icms_cst)) {
     const rate = toNumber(f.icms_aliquota);
     if (!rate || rate <= 0 || rate > 100) add('frete', 'Informe a alíquota do ICMS');
@@ -407,9 +447,19 @@ function toPayload(form) {
     recebedor: papel === 2 || partyFilled(form.recebedor) ? party(form.recebedor) : null,
     origem: form.origem,
     destino: form.destino,
-    valor_total: toNumber(form.valor_total),
-    valor_receber: toNumber(form.valor_receber),
-    componentes: form.componentes.filter((c) => (c.nome || '').trim()).map((c) => ({ nome: c.nome.trim(), valor: toNumber(c.valor) || 0 })),
+    // Total e valor a receber = soma da composição; cada valor > 0 vira um vPrest/Comp
+    valor_total: Math.round(compositionTotal(form.composicao) * 100) / 100,
+    valor_receber: Math.round(compositionTotal(form.composicao) * 100) / 100,
+    componentes: COMPONENTS.map(([nome]) => ({ nome, valor: Math.round((toNumber(form.composicao?.[nome]) || 0) * 100) / 100 }))
+      .filter((c) => c.valor > 0),
+    frete_minimo: form.frete_minimo && (form.frete_minimo.eixos || toNumber(form.frete_minimo.distancia_km)) ? {
+      tabela: form.frete_minimo.tabela || 'A',
+      tipo_carga: Number(form.frete_minimo.tipo_carga) || 4,
+      eixos: Number(form.frete_minimo.eixos) || null,
+      distancia_km: toNumber(form.frete_minimo.distancia_km),
+      retorno_vazio: !!form.frete_minimo.retorno_vazio,
+      distancia_retorno_km: form.frete_minimo.retorno_vazio ? toNumber(form.frete_minimo.distancia_retorno_km) : null,
+    } : null,
     icms_cst: form.icms_cst,
     icms_aliquota: ICMS_WITH_RATE.includes(form.icms_cst) ? toNumber(form.icms_aliquota) : null,
     valor_carga: toNumber(form.valor_carga),
@@ -433,7 +483,10 @@ function toPayload(form) {
       DOC_MONEY_FIELDS.forEach((k) => { const n = toNumber(d[k]); out[k] = n === null ? null : Math.round(n * 100) / 100; });
       return out;
     }),
-    containers: form.containers.filter((c) => (c.numero || '').trim()).map((c) => ({ numero: c.numero.trim().toUpperCase(), lacre: (c.lacre || '').trim() || null })),
+    containers: form.containers.filter((c) => (c.numero || '').trim()).map((c) => ({
+      numero: c.numero.trim().toUpperCase(), lacre: (c.lacre || '').trim() || null,
+      tara: toNumber(c.tara), tipo: c.tipo || null, tamanho: c.tamanho || null, valor: toNumber(c.valor),
+    })),
     observacoes: (form.observacoes || '').trim() || null,
     motorista: (form.motorista?.nome || '').trim()
       ? { driver_id: form.motorista.driver_id || null, nome: form.motorista.nome.trim(), cpf: onlyDigits(form.motorista.cpf) || null }
@@ -731,7 +784,27 @@ export default function CtePage() {
 
   const filtered = statusFilter ? list.filter((c) => c.status === statusFilter) : list;
   const { pageItems, paginationProps } = usePagination(filtered, { resetKey: `${search}|${statusFilter}` });
-  const issues = useMemo(() => validateCte(form, settings), [form, settings]);
+  // Piso mínimo da ANTT: opções (tabelas, tipos de carga, eixos) e o cálculo
+  // da tabela vigente hoje; CT-e já transmitido mostra o cálculo congelado nele
+  const [pisoOptions, setPisoOptions] = useState(null);
+  const [pisoCalc, setPisoCalc] = useState(null);
+  const pisoRef = useRef(null);
+  const editable = !editingId || CTE_EDITABLE.includes(form.status || 'RASCUNHO');
+  const pisoFrete = Math.round((compositionTotal(form.composicao) - (toNumber(form.composicao?.PEDAGIO) || 0)) * 100) / 100;
+  const pisoResult = editable ? pisoCalc : (form.frete_minimo_calc || null);
+  const pisoAbaixo = pisoResult?.valor_piso != null && pisoFrete < pisoResult.valor_piso;
+  const pisoModo = settings?.piso_antt_modo || 'avisar';
+  const issues = useMemo(() => {
+    const list = validateCte(form, settings);
+    if (pisoModo === 'bloquear') {
+      if (!pisoResult || pisoResult.valor_piso == null) {
+        list.push({ section: 'piso', msg: `Piso mínimo ANTT: ${pisoResult?.motivo || 'preencha o Cálculo do Frete Mínimo'}` });
+      } else if (pisoAbaixo) {
+        list.push({ section: 'piso', msg: `Frete (sem pedágio) ${fmtMoney(pisoFrete)} abaixo do piso mínimo ANTT de ${fmtMoney(pisoResult.valor_piso)}` });
+      }
+    }
+    return list;
+  }, [form, settings, pisoModo, pisoResult, pisoAbaixo, pisoFrete]);
   const issuesIn = (section) => issues.filter((i) => i.section === section).length;
   // Rola a página do formulário até a seção (depois do diálogo abrir/renderizar)
   const scrollToSection = (id) => setTimeout(() => {
@@ -744,8 +817,53 @@ export default function CtePage() {
     api.getLoadingOrders().then((r) => setOrders(r.data || [])).catch(() => {});
     api.getDrivers().then((r) => setDrivers((r.data || []).filter((d) => d.status !== 'INATIVO'))).catch(() => {});
     api.getVehicles({ per_page: 1000 }).then((r) => setVehicles(r.data?.items || r.data || [])).catch(() => {});
+    api.getAnttFloorOptions().then((r) => setPisoOptions(r.data)).catch(() => {});
     return () => { activeRef.current = false; };
   }, []);
+
+  // Recalcula o piso (tabela vigente hoje) quando os parâmetros mudam
+  const fm = form.frete_minimo || emptyMinFreight();
+  useEffect(() => {
+    if (!dialogOpen || !editable) return undefined;
+    if (pisoRef.current) clearTimeout(pisoRef.current);
+    pisoRef.current = setTimeout(() => {
+      api.calcAnttFloor({
+        tabela: fm.tabela, tipo_carga: Number(fm.tipo_carga) || 4, eixos: Number(fm.eixos) || 0,
+        distancia_km: toNumber(fm.distancia_km) || 0, retorno_vazio: !!fm.retorno_vazio,
+        ...(fm.retorno_vazio && toNumber(fm.distancia_retorno_km) ? { distancia_retorno_km: toNumber(fm.distancia_retorno_km) } : {}),
+      }).then((r) => setPisoCalc(r.data)).catch(() => setPisoCalc(null));
+    }, 400);
+    return () => pisoRef.current && clearTimeout(pisoRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialogOpen, editable, fm.tabela, fm.tipo_carga, fm.eixos, fm.distancia_km, fm.retorno_vazio, fm.distancia_retorno_km]);
+
+  // Eixos da composição pelos veículos do CT-e (cavalo + carretas), se cadastrados
+  const suggestedAxles = useMemo(() => {
+    const plates = [form.veiculo_placa, ...(form.reboque_placas || [])].map(normPlate).filter(Boolean);
+    const found = plates.map((p) => vehicles.find((v) => normPlate(v.plate) === p)).filter((v) => v && Number(v.axle_count) > 0);
+    if (!found.length || found.length !== plates.length) return null;
+    return found.reduce((sum, v) => sum + Number(v.axle_count), 0);
+  }, [form.veiculo_placa, form.reboque_placas, vehicles]);
+  const setMinFreight = (patch) => update((prev) => ({ ...prev, frete_minimo: { ...(prev.frete_minimo || emptyMinFreight()), ...patch } }));
+
+  // Container: ao sair do número, sugere tamanho, tipo e tara do último registro no Gate
+  const suggestContainer = (index) => {
+    const c = form.containers[index];
+    const numero = (c?.numero || '').trim();
+    if (numero.length < 4 || (c.tipo && c.tamanho && c.tara)) return;
+    api.getCteContainerInfo(numero).then((r) => {
+      const info = r.data || {};
+      if (!info.tipo && !info.tamanho && !info.tara) return;
+      update((prev) => ({
+        ...prev,
+        containers: prev.containers.map((row, i) => (i !== index ? row : {
+          ...row,
+          tipo: row.tipo || info.tipo || '', tamanho: row.tamanho || info.tamanho || '',
+          tara: row.tara || (info.tara ? toInput(info.tara) : ''),
+        })),
+      }));
+    }).catch(() => {});
+  };
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -1036,7 +1154,6 @@ export default function CtePage() {
   const emittedDoc = emitted ? (list.find((c) => c.id === emitted.id) || emitted) : null;
   const notReady = settings && (!settings.provider_configured || !settings.provider_synced_at || !settings.certificate);
 
-  const hasComponents = form.componentes.some((c) => toNumber(c.valor) !== null);
   const total = toNumber(form.valor_total) || 0;
   const icmsRate = ICMS_WITH_RATE.includes(form.icms_cst) ? (toNumber(form.icms_aliquota) || 0) : 0;
   const icmsValue = Math.round(total * icmsRate) / 100;
@@ -1577,58 +1694,95 @@ export default function CtePage() {
                   </div>
                 </Section>
 
-                <Section id="containers" title="Containers"
-                  actions={<Button type="button" variant="outline" size="sm" onClick={() => addRow('containers', { numero: '', lacre: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Container</Button>}>
+                <Section id="containers" title={`Containers${form.containers.length ? ` (${form.containers.length})` : ''}`}
+                  actions={<Button type="button" variant="outline" size="sm" onClick={() => addRow('containers', emptyContainer())} data-testid="cte-add-container"><Plus className="w-3.5 h-3.5 mr-1" /> Container</Button>}>
                   {form.containers.length === 0 ? (
-                    <p className="text-xs text-slate-500">Nenhum container. Os informados vão no CT-e como unidades de carga.</p>
+                    <p className="text-xs text-slate-500">Nenhum container. Os informados vão no CT-e como unidades de carga (número e lacre).</p>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                      {form.containers.map((c, i) => (
-                        <div key={i} className="flex gap-2 items-end">
-                          <Field label={i === 0 ? 'Número' : undefined} className="flex-1">
-                            <Input value={c.numero} onChange={(e) => setRow('containers', i, { numero: e.target.value.toUpperCase() })} className="font-mono" maxLength={20} aria-label="Container" />
-                          </Field>
-                          <Field label={i === 0 ? 'Lacre' : undefined} className="w-44">
-                            <Input value={c.lacre || ''} onChange={(e) => setRow('containers', i, { lacre: e.target.value.toUpperCase() })} className="font-mono" maxLength={20} aria-label="Lacre" />
-                          </Field>
-                          <RowRemove onClick={() => removeRow('containers', i)} />
-                        </div>
-                      ))}
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                      <table className="w-full text-[0.8125rem]" data-testid="cte-containers-grid">
+                        <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+                          <tr>
+                            <th className="px-2 py-2 text-left font-semibold">Número <span className="rounded bg-primary/10 px-1 text-[0.625rem] text-primary">XML</span></th>
+                            <th className="px-2 py-2 text-left font-semibold">Lacre <span className="rounded bg-primary/10 px-1 text-[0.625rem] text-primary">XML</span></th>
+                            <th className="px-2 py-2 text-left font-semibold">Tamanho</th>
+                            <th className="px-2 py-2 text-left font-semibold">Tipo</th>
+                            <th className="px-2 py-2 text-right font-semibold">Tara (kg)</th>
+                            <th className="px-2 py-2 text-right font-semibold">Valor (R$)</th>
+                            <th className="px-1 py-2" aria-label="Remover" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {form.containers.map((c, i) => (
+                            <tr key={i} className="border-t border-slate-100 dark:border-slate-800" data-testid={`cte-container-${i}`}>
+                              <td className="px-2 py-1.5 min-w-[9rem]">
+                                <Input value={c.numero} onChange={(e) => setRow('containers', i, { numero: e.target.value.toUpperCase() })} onBlur={() => suggestContainer(i)}
+                                  className="font-mono" maxLength={20} aria-label="Número do container" data-testid={`cte-container-numero-${i}`} />
+                              </td>
+                              <td className="px-2 py-1.5 min-w-[7rem]">
+                                <Input value={c.lacre || ''} onChange={(e) => setRow('containers', i, { lacre: e.target.value.toUpperCase() })} className="font-mono" maxLength={20} aria-label="Lacre" />
+                              </td>
+                              <td className="px-2 py-1.5 w-24">
+                                <Select value={c.tamanho || ''} onValueChange={(v) => setRow('containers', i, { tamanho: v })}>
+                                  <SelectTrigger aria-label="Tamanho" data-testid={`cte-container-tamanho-${i}`}><SelectValue placeholder="-" /></SelectTrigger>
+                                  <SelectContent>{CONTAINER_SIZES.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </td>
+                              <td className="px-2 py-1.5 w-36">
+                                <Select value={c.tipo || ''} onValueChange={(v) => setRow('containers', i, { tipo: v })}>
+                                  <SelectTrigger aria-label="Tipo" data-testid={`cte-container-tipo-${i}`}><SelectValue placeholder="-" /></SelectTrigger>
+                                  <SelectContent>{CONTAINER_TYPES.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </td>
+                              <td className="px-2 py-1.5 w-28">
+                                <Input inputMode="decimal" value={c.tara || ''} onChange={(e) => setRow('containers', i, { tara: decimalInput(e.target.value, 2) })}
+                                  className="text-right tabular-nums" aria-label="Tara (kg)" data-testid={`cte-container-tara-${i}`} />
+                              </td>
+                              <td className="px-2 py-1.5 w-32">
+                                <Input inputMode="decimal" value={c.valor || ''} onChange={(e) => setRow('containers', i, { valor: decimalInput(e.target.value, 2) })}
+                                  className="text-right tabular-nums" aria-label="Valor do container" data-testid={`cte-container-valor-${i}`} />
+                              </td>
+                              <td className="px-1 py-1.5"><RowRemove onClick={() => removeRow('containers', i)} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
+                  )}
+                  {form.containers.length > 0 && (
+                    <p className="text-xs text-slate-500">Tamanho, tipo, tara e valor ficam no sistema e saem no espelho (o leiaute do CT-e não tem campo para eles). Ao sair do número, o sistema sugere tamanho, tipo e tara do último registro do container no Gate.</p>
                   )}
                 </Section>
 
-                <Section id="frete" title="Composição do frete" count={issuesIn('frete')}
-                  actions={(
-                    <>
-                      {COMPONENT_PRESETS.filter(([nome]) => !form.componentes.some((c) => c.nome === nome)).map(([nome, label]) => (
-                        <Button key={nome} type="button" variant="outline" size="sm" onClick={() => addRow('componentes', { nome, valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> {label}</Button>
-                      ))}
-                      <Button type="button" variant="ghost" size="sm" onClick={() => addRow('componentes', { nome: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Nome livre</Button>
-                    </>
-                  )}>
-                  {form.componentes.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                      {form.componentes.map((c, i) => (
-                        <div key={i} className="flex gap-1 items-end">
-                          <div className="flex-1 space-y-1.5 min-w-0">
-                            <Input value={c.nome} maxLength={15} onChange={(e) => setRow('componentes', i, { nome: e.target.value.toUpperCase() })} className="h-7 text-xs font-semibold" aria-label="Nome do componente" />
-                            <Input inputMode="decimal" value={c.valor} placeholder="0,00" onChange={(e) => setRow('componentes', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} className="text-right" aria-label="Valor do componente" data-testid={`cte-comp-${i}`} />
-                          </div>
-                          <RowRemove onClick={() => removeRow('componentes', i)} />
-                        </div>
-                      ))}
-                    </div>
+                <Section id="frete" title="Composição do frete" count={issuesIn('frete')}>
+                  {form.componentes_legado?.length > 0 && (
+                    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300" data-testid="cte-comp-legado">
+                      Componentes antigos somados em Outros: {form.componentes_legado.join(', ')}. Confira antes de transmitir.
+                    </p>
                   )}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-3" data-testid="cte-composicao">
+                    {COMPONENTS.map(([key, label]) => (
+                      <Field key={key} label={label}>
+                        <Input inputMode="decimal" value={form.composicao?.[key] || ''} placeholder="0,00" className="text-right tabular-nums"
+                          onChange={(e) => set('composicao', { ...form.composicao, [key]: decimalInput(e.target.value, 2) })}
+                          data-testid={`cte-comp-${key.replace(' ', '-').toLowerCase()}`} />
+                      </Field>
+                    ))}
+                    <Field label="Base de Cálculo">
+                      <Input value={icmsRate ? (Math.round(total * 100) / 100).toFixed(2).replace('.', ',') : '0,00'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" />
+                    </Field>
+                    <Field label="Alíquota (%)" required={ICMS_WITH_RATE.includes(form.icms_cst)}>
+                      <Input inputMode="decimal" value={form.icms_aliquota} disabled={!ICMS_WITH_RATE.includes(form.icms_cst)} className="text-right"
+                        onChange={(e) => set('icms_aliquota', decimalInput(e.target.value, 4))} data-testid="cte-icms-aliquota" />
+                    </Field>
+                    <Field label="Valor do ICMS">
+                      <Input value={icmsRate ? icmsValue.toFixed(2).replace('.', ',') : '0,00'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-icms-valor" />
+                    </Field>
+                    <Field label="Total Prestação" required className="col-span-2">
+                      <Input value={form.valor_total || '0,00'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right font-semibold tabular-nums" data-testid="cte-valor-total" />
+                    </Field>
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-                    <Field label="Total da prestação (R$)" required hint={hasComponents ? 'Soma da composição' : 'Ou use a composição'}>
-                      <Input inputMode="decimal" value={form.valor_total} readOnly={hasComponents}
-                        className={`text-right font-semibold ${hasComponents ? 'bg-slate-50 dark:bg-slate-800' : ''}`}
-                        onChange={(e) => set('valor_total', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-valor-total" />
-                    </Field>
-                    <Field label="Valor a receber (R$)" hint="Vazio = igual ao total">
-                      <Input inputMode="decimal" value={form.valor_receber} className="text-right" onChange={(e) => set('valor_receber', e.target.value.replace(/[^\d,.]/g, ''))} />
-                    </Field>
                     <Field label="CST do ICMS" required className="col-span-2">
                       <Select value={form.icms_cst} onValueChange={(v) => set('icms_cst', v)}>
                         <SelectTrigger data-testid="cte-icms-cst"><SelectValue /></SelectTrigger>
@@ -1637,14 +1791,82 @@ export default function CtePage() {
                         </SelectContent>
                       </Select>
                     </Field>
-                    <Field label="Alíquota (%)" required={ICMS_WITH_RATE.includes(form.icms_cst)}>
-                      <Input inputMode="decimal" value={form.icms_aliquota} disabled={!ICMS_WITH_RATE.includes(form.icms_cst)} className="text-right"
-                        onChange={(e) => set('icms_aliquota', e.target.value.replace(/[^\d,.]/g, ''))} data-testid="cte-icms-aliquota" />
-                    </Field>
-                    <Field label="Valor do ICMS" hint={icmsRate ? `Base ${fmtMoney(total)}` : undefined}>
-                      <Input value={icmsRate ? fmtMoney(icmsValue) : '-'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-icms-valor" />
+                    <Field label="Valor a receber (R$)" hint="Igual ao total da prestação">
+                      <Input value={form.valor_receber || '0,00'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-valor-receber" />
                     </Field>
                   </div>
+                  <p className="text-xs text-slate-500">Cada valor preenchido vai no CT-e como componente do valor da prestação; o total e o valor a receber são a soma. Base, alíquota e ICMS são informativos (não somam).</p>
+                </Section>
+
+                <Section id="piso" title="Cálculo do Frete Mínimo (piso ANTT)" count={issuesIn('piso')}>
+                  <div className="grid grid-cols-2 md:grid-cols-12 gap-3 items-end" data-testid="cte-piso">
+                    <Field label="Tabela" className="col-span-2 md:col-span-4">
+                      <Select value={fm.tabela} onValueChange={(v) => setMinFreight({ tabela: v })} disabled={!editable}>
+                        <SelectTrigger data-testid="cte-piso-tabela"><SelectValue /></SelectTrigger>
+                        <SelectContent>{(pisoOptions?.tabelas || [{ value: 'A', label: 'A' }]).map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Retorno vazio" className="md:col-span-2">
+                      <Select value={fm.retorno_vazio ? 'S' : 'N'} onValueChange={(v) => setMinFreight({ retorno_vazio: v === 'S' })} disabled={!editable}>
+                        <SelectTrigger data-testid="cte-piso-retorno"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="N">Não</SelectItem><SelectItem value="S">Sim</SelectItem></SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Tipo de carga" className="col-span-2 md:col-span-4">
+                      <Select value={String(fm.tipo_carga || '4')} onValueChange={(v) => setMinFreight({ tipo_carga: v })} disabled={!editable}>
+                        <SelectTrigger data-testid="cte-piso-tipo-carga"><SelectValue /></SelectTrigger>
+                        <SelectContent>{(pisoOptions?.tipos_carga || [{ value: 4, label: '4 - Conteinerizada' }]).map((t) => <SelectItem key={t.value} value={String(t.value)}>{t.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Nº eixos" className="md:col-span-2"
+                      hint={suggestedAxles && String(suggestedAxles) !== String(fm.eixos) && editable
+                        ? <button type="button" className="text-primary hover:underline" onClick={() => setMinFreight({ eixos: String(suggestedAxles) })} data-testid="cte-piso-eixos-sugerido">Veículos: {suggestedAxles} eixos (usar)</button>
+                        : undefined}>
+                      <Select value={fm.eixos ? String(fm.eixos) : ''} onValueChange={(v) => setMinFreight({ eixos: v })} disabled={!editable}>
+                        <SelectTrigger data-testid="cte-piso-eixos"><SelectValue placeholder="-" /></SelectTrigger>
+                        <SelectContent>{(pisoOptions?.eixos || [2, 3, 4, 5, 6, 7, 9]).map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Distância (km)" className="md:col-span-2">
+                      <Input inputMode="decimal" value={fm.distancia_km || ''} onChange={(e) => setMinFreight({ distancia_km: decimalInput(e.target.value, 2) })}
+                        className="text-right tabular-nums" disabled={!editable} data-testid="cte-piso-distancia" />
+                    </Field>
+                    {fm.retorno_vazio && (
+                      <Field label="Km do retorno" className="md:col-span-2" hint="Vazio = igual à ida">
+                        <Input inputMode="decimal" value={fm.distancia_retorno_km || ''} onChange={(e) => setMinFreight({ distancia_retorno_km: decimalInput(e.target.value, 2) })}
+                          className="text-right tabular-nums" disabled={!editable} />
+                      </Field>
+                    )}
+                    <Field label="CCD (R$/km)" className="md:col-span-2">
+                      <Input value={pisoResult?.ccd != null ? pisoResult.ccd.toLocaleString('pt-BR', { minimumFractionDigits: 4 }) : '-'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-piso-ccd" />
+                    </Field>
+                    <Field label="CC (R$)" className="md:col-span-2">
+                      <Input value={pisoResult?.cc != null ? fmtMoney(pisoResult.cc) : '-'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-piso-cc" />
+                    </Field>
+                    <Field label="Frete Mínimo" className="md:col-span-2">
+                      <Input value={pisoResult?.valor_piso != null ? fmtMoney(pisoResult.valor_piso) : '-'} readOnly
+                        className={`text-right font-semibold tabular-nums ${pisoAbaixo ? 'bg-red-50 text-red-700 border-red-300 dark:bg-red-500/10 dark:text-red-300' : 'bg-slate-50 dark:bg-slate-800'}`} data-testid="cte-piso-valor" />
+                    </Field>
+                    <Field label="Frete do CT-e (sem pedágio)" className="md:col-span-2">
+                      <Input value={fmtMoney(pisoFrete)} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-piso-frete" />
+                    </Field>
+                  </div>
+                  {pisoResult?.valor_piso != null ? (
+                    <div className={`rounded-md border px-3 py-2 text-xs ${pisoAbaixo
+                      ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300'
+                      : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'}`} data-testid="cte-piso-resultado">
+                      {pisoAbaixo
+                        ? <><AlertTriangle className="inline w-3.5 h-3.5 mr-1" />Frete {fmtMoney(pisoFrete)} abaixo do piso mínimo de {fmtMoney(pisoResult.valor_piso)} (faltam {fmtMoney(pisoResult.valor_piso - pisoFrete)}).{pisoModo === 'bloquear' ? ' A emissão está bloqueada.' : ''}</>
+                        : <><CheckCircle2 className="inline w-3.5 h-3.5 mr-1" />Frete acima do piso mínimo.</>}
+                      {' '}Cálculo: {toNumber(fm.distancia_km) ? Number(pisoResult.distancia_km).toLocaleString('pt-BR') : 0} km × {pisoResult.ccd?.toLocaleString('pt-BR', { minimumFractionDigits: 4 })} + {fmtMoney(pisoResult.cc)}
+                      {pisoResult.valor_retorno ? ` + retorno ${fmtMoney(pisoResult.valor_retorno)}` : ''} · {pisoResult.resolucao}
+                      {pisoResult.vigencia_inicio ? ` (vigência ${fmtDate(pisoResult.vigencia_inicio)})` : ''}
+                      {pisoResult.teste && <strong> · TABELA DE TESTE, não oficial</strong>}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500" data-testid="cte-piso-motivo">{pisoResult?.motivo || 'Informe a tabela, o tipo de carga, os eixos e a distância.'}{' '}
+                      <a href="/fiscal/pisos-antt" target="_blank" rel="noreferrer" className="text-primary hover:underline">Tabelas ANTT</a></p>
+                  )}
                 </Section>
 
                 <Section id="pedagio" title="Vale-pedágio" count={issuesIn('pedagio')}

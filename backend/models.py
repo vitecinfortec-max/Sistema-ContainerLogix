@@ -4432,6 +4432,8 @@ class FiscalSettingsUpdate(BaseModel):
     seguradora_cnpj: Optional[str] = None
     seguro_apolice: Optional[str] = None
     mdfe_tipo_carga: Optional[str] = None  # 04 Conteinerizada, 05 Carga Geral...
+    # CT-e com frete abaixo do piso mínimo da ANTT: só avisa ou bloqueia a emissão
+    piso_antt_modo: Optional[Literal["desligado", "avisar", "bloquear"]] = None
 
 
 class CteParty(BaseModel):
@@ -4494,8 +4496,25 @@ class CteDocument(BaseModel):
 
 
 class CteContainer(BaseModel):
+    """Vai no XML como unidade de carga (infUnidCarga: tipo 1, identificação
+    e lacre). Tara, tipo, tamanho e valor não têm tag no leiaute 4.00: ficam
+    no sistema e no espelho."""
     numero: str
     lacre: Optional[str] = None
+    tara: Optional[float] = Field(default=None, ge=0)  # kg
+    tipo: Optional[Literal["DRY", "HC", "REEFER", "OPEN TOP", "FLAT RACK", "TANK"]] = None
+    tamanho: Optional[Literal["20", "40", "45"]] = None  # pés
+    valor: Optional[float] = Field(default=None, ge=0)
+
+
+class CteMinFreight(BaseModel):
+    """Parâmetros do piso mínimo de frete da ANTT (antt_piso.py)."""
+    tabela: Literal["A", "B", "C", "D"] = "A"
+    tipo_carga: int = Field(default=4, ge=1, le=12)  # 4 = conteinerizada
+    eixos: Optional[int] = None
+    distancia_km: Optional[float] = Field(default=None, ge=0)
+    retorno_vazio: bool = False
+    distancia_retorno_km: Optional[float] = Field(default=None, ge=0)  # vazio = a mesma da ida
 
 
 class CteDriver(BaseModel):
@@ -4542,6 +4561,9 @@ class CteCreate(BaseModel):
     documentos: List[CteDocument] = []
     containers: List[CteContainer] = []
     observacoes: Optional[str] = None
+    # Piso mínimo de frete da ANTT: o cálculo (frete_minimo_calc) é refeito
+    # ao salvar e congelado na emissão, com a tabela vigente na data
+    frete_minimo: Optional[CteMinFreight] = None
     # Viagem: motorista, veículos, seguro e vale-pedágio não têm grupo no CT-e
     # 4.00 (ficaram no MDF-e). Saem nas observações e preenchem o MDF-e.
     motorista: Optional[CteDriver] = None

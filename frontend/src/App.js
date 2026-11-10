@@ -143,6 +143,7 @@ const PortClientOrderPage = lazyPage(() => import('./pages/PortClientOrderPage')
 const PortClientReportsPage = lazyPage(() => import('./pages/PortClientReportsPage'));
 const CtePage = lazyPage(() => import('./pages/CtePage'));
 const FiscalSettingsPage = lazyPage(() => import('./pages/FiscalSettingsPage'));
+const AnttFloorPage = lazyPage(() => import('./pages/AnttFloorPage'));
 const MdfePage = lazyPage(() => import('./pages/MdfePage'));
 const FreightRoutesPage = lazyPage(() => import('./pages/FreightRoutesPage'));
 const FreightPaymentsPage = lazyPage(() => import('./pages/FreightPaymentsPage'));
@@ -627,6 +628,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="fiscal.mdfe">
                 <MdfePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fiscal/pisos-antt"
+            element={
+              <ProtectedRoute adminOnly moduleKey="fiscal.cte">
+                <AnttFloorPage />
               </ProtectedRoute>
             }
           />

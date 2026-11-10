@@ -884,6 +884,22 @@ export const api = {
   downloadPortClientReport: (kind, format, params) => axios.get(`${API}/reports/port-client-orders/${kind}/${format}`, { params, responseType: 'blob' }),
 
   // Fiscal (CT-e pela Focus NFe)
+  // Piso mínimo de frete da ANTT (tabelas, importação, cálculo e aviso do DOU)
+  getAnttFloorOptions: () => axios.get(`${API}/fiscal/pisos-antt/opcoes`),
+  getAnttFloorTables: () => axios.get(`${API}/fiscal/pisos-antt`),
+  getAnttFloorTable: (id) => axios.get(`${API}/fiscal/pisos-antt/${id}`),
+  createAnttFloorTable: (data) => axios.post(`${API}/fiscal/pisos-antt`, data),
+  updateAnttFloorTable: (id, data) => axios.put(`${API}/fiscal/pisos-antt/${id}`, data),
+  deleteAnttFloorTable: (id) => axios.delete(`${API}/fiscal/pisos-antt/${id}`),
+  importAnttFloorTable: (id, file) => {
+    const body = new FormData();
+    body.append('file', file);
+    return axios.post(`${API}/fiscal/pisos-antt/${id}/importar`, body);
+  },
+  calcAnttFloor: (params) => axios.get(`${API}/fiscal/pisos-antt/calcular`, { params }),
+  getCteContainerInfo: (numero) => axios.get(`${API}/ctes/container-info/${encodeURIComponent(numero)}`),
+  checkAnttPublications: () => axios.post(`${API}/fiscal/pisos-antt/verificar`),
+  markAnttPublicationChecked: (id) => axios.post(`${API}/fiscal/pisos-antt/publicacoes/${encodeURIComponent(id)}/conferida`),
   getFiscalSettings: () => axios.get(`${API}/fiscal/settings`),
   updateFiscalSettings: (data) => axios.put(`${API}/fiscal/settings`, data),
   syncFiscalCompany: () => axios.post(`${API}/fiscal/settings/sync`),

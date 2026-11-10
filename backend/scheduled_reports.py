@@ -186,6 +186,14 @@ def start_scheduler():
         id="daily_client_movement_reports",
         replace_existing=True,
     )
+    # Aviso de nova tabela de piso mínimo da ANTT publicada no DOU (só aviso)
+    import antt_piso
+    _scheduler.add_job(
+        antt_piso.run_daily_check,
+        CronTrigger(hour=8, minute=30),
+        id="antt_piso_dou_check",
+        replace_existing=True,
+    )
     _scheduler.start()
     logger.info("Agendador de relatórios diários iniciado (07:00 América/Fortaleza)")
 

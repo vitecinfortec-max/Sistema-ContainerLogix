@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
+import antt_piso
 import fiscal_cte
 import fiscal_cte_preview
 import fiscal_focus
@@ -360,6 +361,24 @@ async def _party_from_client(name: Optional[str]) -> dict:
     }
 
 
+async def _container_info(numero: str) -> dict:
+    """Tamanho, tipo e tara do container pelo último registro dele no Gate."""
+    numero = re.sub(r"[^A-Z0-9]", "", (numero or "").upper())
+    if len(numero) < 4:
+        return {}
+    mov = await db.movements.find_one({"container_number": numero}, {"_id": 0, "size_type": 1, "tare": 1},
+                                      sort=[("created_at", -1)])
+    if not mov:
+        return {}
+    return {**fiscal_cte.container_from_size_type(mov.get("size_type")), "tara": fiscal_cte.tare_kg(mov.get("tare"))}
+
+
+@api_router.get("/ctes/container-info/{numero}")
+async def container_info(numero: str, current_user: dict = Depends(get_current_admin_user)):
+    """Sugestão para a grade de containers do CT-e (tamanho, tipo e tara)."""
+    return await _container_info(numero)
+
+
 @api_router.get("/ctes/from-loading-order/{order_id}")
 async def cte_draft_from_loading_order(order_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Rascunho (não salvo) de CT-e com os dados da Ordem de Carregamento: o
@@ -373,7 +392,9 @@ async def cte_draft_from_loading_order(order_id: str, current_user: dict = Depen
     containers, peso = [], 0.0
     for item in order.get("items") or []:
         if item.get("container_number"):
-            containers.append({"numero": item["container_number"], "lacre": item.get("seal")})
+            info = await _container_info(item["container_number"])
+            info.update({k: v for k, v in fiscal_cte.container_from_size_type(item.get("size_type")).items() if v})
+            containers.append({"numero": item["container_number"], "lacre": item.get("seal"), **info})
         try:
             peso += float(str(item.get("gross_weight") or "0").replace(".", "").replace(",", "."))
         except ValueError:
@@ -396,7 +417,7 @@ async def cte_draft_from_loading_order(order_id: str, current_user: dict = Depen
         tomador_papel=0,
         remetente=client or None,
         valor_total=freight,
-        componentes=[{"nome": "FRETE", "valor": freight}] if freight else [],
+        componentes=[{"nome": "FRETE VALOR", "valor": freight}] if freight else [],
         icms_cst=settings.get("icms_cst"),
         icms_aliquota=settings.get("icms_aliquota"),
         produto_predominante=settings.get("produto_predominante"),
@@ -418,11 +439,23 @@ async def get_cte(cte_id: str, current_user: dict = Depends(get_current_admin_us
     return await _get_cte_or_404(cte_id)
 
 
+def _today_brt():
+    return datetime.now(fiscal_cte.BRT).date()
+
+
+async def _floor_calc(doc: dict, day=None) -> dict:
+    """Piso mínimo da ANTT com a tabela vigente na data (hoje no rascunho, a
+    data de emissão na transmissão - aí fica congelado no CT-e)."""
+    return {"frete_minimo_calc": await antt_piso.calculate_for_cte(doc, day or _today_brt())}
+
+
 @api_router.post("/ctes")
 async def create_cte(data: CteCreate, current_user: dict = Depends(get_current_admin_user)):
+    body = data.model_dump()
     doc = {
         "id": str(uuid.uuid4()),
-        **data.model_dump(),
+        **body,
+        **(await _floor_calc(body)),
         "status": "RASCUNHO",
         "numero": None,
         "serie": None,
@@ -439,7 +472,8 @@ async def create_cte(data: CteCreate, current_user: dict = Depends(get_current_a
 
 @api_router.put("/ctes/{cte_id}")
 async def update_cte(cte_id: str, data: CteCreate, current_user: dict = Depends(get_current_admin_user)):
-    update = {**data.model_dump(), "updated_at": _now_iso()}
+    body = data.model_dump()
+    update = {**body, **(await _floor_calc(body)), "updated_at": _now_iso()}
     result = await db.ctes.update_one({"id": cte_id, "status": {"$in": list(EDITABLE_STATUSES)}}, {"$set": update})
     if result.matched_count == 0:
         await _get_cte_or_404(cte_id)
@@ -475,6 +509,8 @@ async def emit_cte(cte_id: str, current_user: dict = Depends(get_current_admin_u
     if not settings.get("provider_synced_at") or not token:
         raise HTTPException(status_code=400, detail="Envie o cadastro da empresa ao emissor (Configuração Fiscal)")
     await resolve_municipalities(cte, settings)
+    # Piso da ANTT pela tabela vigente na data de emissão (congelado no CT-e)
+    cte.update(await _floor_calc(cte))
     errors = fiscal_cte.validate(cte, settings)
     if errors:
         raise HTTPException(status_code=400, detail="Corrija antes de emitir: " + " | ".join(errors))
@@ -496,6 +532,7 @@ async def emit_cte(cte_id: str, current_user: dict = Depends(get_current_admin_u
         "origem": cte.get("origem"), "destino": cte.get("destino"),
         "remetente": cte.get("remetente"), "destinatario": cte.get("destinatario"), "tomador": cte.get("tomador"),
         "expedidor": cte.get("expedidor"), "recebedor": cte.get("recebedor"),
+        "frete_minimo_calc": cte.get("frete_minimo_calc"),
         "emitido_por": current_user.get("name"), "emitido_em": _now_iso(),
     }
     try:

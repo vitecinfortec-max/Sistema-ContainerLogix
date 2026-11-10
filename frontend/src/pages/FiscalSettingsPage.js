@@ -22,7 +22,7 @@ const EMPTY_FORM = {
   endereco: {}, crt: '3', rntrc: '', cte_serie: '1', cte_proximo_numero: '', cfop_padrao: '5353',
   natureza_operacao: '', icms_cst: '00', icms_aliquota: '', produto_predominante: '',
   ibs_cbs_cst: '', ibs_cbs_classificacao: '', ibs_uf_aliquota: '', ibs_mun_aliquota: '', cbs_aliquota: '',
-  seguro_responsavel: '1', seguradora_nome: '', seguradora_cnpj: '', seguro_apolice: '', mdfe_tipo_carga: '04',
+  seguro_responsavel: '1', seguradora_nome: '', seguradora_cnpj: '', seguro_apolice: '', mdfe_tipo_carga: '04', piso_antt_modo: 'avisar',
 };
 
 const fmtDate = (value) => (value ? format(new Date(value), 'dd/MM/yyyy') : '-');
@@ -73,6 +73,7 @@ export default function FiscalSettingsPage() {
       seguradora_cnpj: data.seguradora_cnpj ? formatCnpjCpf(data.seguradora_cnpj) : '',
       seguro_apolice: data.seguro_apolice || '',
       mdfe_tipo_carga: data.mdfe_tipo_carga || '04',
+      piso_antt_modo: data.piso_antt_modo || 'avisar',
     });
   };
 
@@ -128,6 +129,7 @@ export default function FiscalSettingsPage() {
       seguradora_cnpj: form.seguradora_cnpj || null,
       seguro_apolice: form.seguro_apolice.trim() || null,
       mdfe_tipo_carga: form.mdfe_tipo_carga,
+      piso_antt_modo: form.piso_antt_modo,
     };
     // Só manda o próximo número quando ele foi alterado na tela
     if (form.cte_proximo_numero && Number(form.cte_proximo_numero) !== Number(nextNumber)) {
@@ -321,6 +323,16 @@ export default function FiscalSettingsPage() {
             </Field>
             <Field label="Produto predominante">
               <Input value={form.produto_predominante} onChange={(e) => set('produto_predominante', e.target.value.toUpperCase())} maxLength={60} />
+            </Field>
+            <Field label="Frete abaixo do piso ANTT" className="md:col-span-2" hint={<>Piso mínimo pelas <a href="/fiscal/pisos-antt" className="text-primary hover:underline">tabelas ANTT</a> cadastradas</>}>
+              <Select value={form.piso_antt_modo} onValueChange={(v) => set('piso_antt_modo', v)}>
+                <SelectTrigger data-testid="fiscal-piso-modo"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="avisar">Avisar (alerta em vermelho no CT-e)</SelectItem>
+                  <SelectItem value="bloquear">Bloquear a emissão</SelectItem>
+                  <SelectItem value="desligado">Não conferir</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">

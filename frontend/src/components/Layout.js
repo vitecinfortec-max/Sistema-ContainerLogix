@@ -166,6 +166,7 @@ const PAGE_TITLES = {
   '/fiscal/cte': 'CT-e',
   '/fiscal/mdfe': 'MDF-e',
   '/fiscal/configuracao': 'Configuração Fiscal',
+  '/fiscal/pisos-antt': 'Pisos ANTT',
   '/freight-routes': 'Rota',
   '/freight-payments': 'Pagamento Frete',
   '/fleet/checklist': 'Checklist de Veículo',
@@ -804,6 +805,7 @@ function LayoutFrame({ children }) {
     ...(isAdmin ? [
       { path: '/fiscal/cte', label: 'CT-e', icon: FileCheck, moduleKey: 'fiscal.cte' },
       { path: '/fiscal/mdfe', label: 'MDF-e', icon: Truck, moduleKey: 'fiscal.mdfe' },
+      { path: '/fiscal/pisos-antt', label: 'Pisos ANTT (frete mínimo)', icon: Scale, moduleKey: 'fiscal.cte' },
       { path: '/fiscal/configuracao', label: 'Configuração Fiscal', icon: FileCog, moduleKey: 'fiscal.configuracao' },
     ] : []),
   ].filter((item) => isModuleEnabled(item.moduleKey));

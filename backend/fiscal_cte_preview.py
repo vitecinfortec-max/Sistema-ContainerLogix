@@ -92,6 +92,18 @@ def _chave_fmt(chave: str) -> str:
     return " ".join(chave[i:i + 4] for i in range(0, len(chave), 4))
 
 
+def _container_label(c: dict) -> str:
+    """MSCU1234565 40' HC tara 3.800 kg (lacre L1) - tamanho, tipo e tara só
+    no espelho (o leiaute do CT-e não tem tag para eles)."""
+    parts = [c.get("numero") or ""]
+    if c.get("tamanho") or c.get("tipo"):
+        parts.append(" ".join(x for x in [f"{c['tamanho']}'" if c.get("tamanho") else "", c.get("tipo") or ""] if x))
+    if c.get("tara"):
+        parts.append(f"tara {_num(c['tara'], 0)} kg")
+    text = " ".join(parts)
+    return text + (f" (lacre {c['lacre']})" if c.get("lacre") else "")
+
+
 def _local(value) -> str:
     dt = local_datetime(value) if value else None
     return dt.strftime("%d/%m/%Y %H:%M") if dt else ""
@@ -458,8 +470,7 @@ def generate_cte_preview_pdf(cte: dict, settings: dict, company: dict = None) ->
     oh = 86
     d.rect(X0, y, W, oh)
     obs = " | ".join(n for n in [fiscal_cte._text(cte.get("observacoes")), *fiscal_cte.trip_notes(cte)] if n)
-    containers = ", ".join(x.get("numero") + (f" (lacre {x['lacre']})" if x.get("lacre") else "")
-                           for x in cte.get("containers") or [] if x.get("numero"))
+    containers = ", ".join(_container_label(x) for x in cte.get("containers") or [] if x.get("numero"))
     d.para(X0, y + 2, W, oh - 4, obs.replace(" | ", "\n") or "-", size=6.8)
     y += oh
 

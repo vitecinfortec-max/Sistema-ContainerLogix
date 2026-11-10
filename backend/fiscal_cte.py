@@ -192,6 +192,18 @@ def validate(cte: dict, settings: dict) -> list:
     if componentes and abs(sum(_money(c.get("valor")) for c in componentes) - total) > 0.009:
         errors.append("A soma dos componentes do valor deve ser igual ao Valor Total da Prestação")
 
+    # Piso mínimo da ANTT (antt_piso.py): com "bloquear", não emite abaixo do
+    # piso nem sem o cálculo feito; com "avisar" só a tela alerta
+    if (settings.get("piso_antt_modo") or "avisar") == "bloquear":
+        calc = cte.get("frete_minimo_calc") or {}
+        if not cte.get("frete_minimo"):
+            errors.append("Piso mínimo ANTT: preencha o Cálculo do Frete Mínimo (tabela, tipo de carga, eixos e distância)")
+        elif calc.get("valor_piso") is None:
+            errors.append(f"Piso mínimo ANTT não calculado: {calc.get('motivo') or 'confira os dados'}")
+        elif calc.get("abaixo_do_piso"):
+            errors.append(f"Frete de {_brl(calc.get('valor_frete'))} (sem pedágio) abaixo do piso mínimo da ANTT de "
+                          f"{_brl(calc['valor_piso'])} ({calc.get('resolucao')})")
+
     cst = cte.get("icms_cst") or settings.get("icms_cst")
     if cst not in ("00", "40", "41", "51", "60", "90", "SN"):
         errors.append("Informe a situação tributária do ICMS (CST)")
@@ -375,6 +387,28 @@ def _ibs_cbs(settings: dict, total: float) -> dict:
         out["cbs_aliquota"] = _dec(settings["cbs_aliquota"])
         out["cbs_valor"] = _dec(_money(total * float(settings["cbs_aliquota"]) / 100))
     return out
+
+
+CONTAINER_TYPE_CODES = {"DC": "DRY", "DV": "DRY", "GP": "DRY", "DRY": "DRY", "HC": "HC", "HQ": "HC",
+                        "RF": "REEFER", "RH": "REEFER", "RE": "REEFER", "OT": "OPEN TOP", "FR": "FLAT RACK",
+                        "PL": "FLAT RACK", "TK": "TANK", "TN": "TANK"}
+
+
+def container_from_size_type(size_type) -> dict:
+    """Código do Gate (20DC, 40HC, 40RF...) -> tamanho e tipo do CT-e."""
+    m = re.fullmatch(r"(20|40|45)\s*([A-Z ]+)", _text(size_type).upper())
+    if not m:
+        return {}
+    return {"tamanho": m.group(1), "tipo": CONTAINER_TYPE_CODES.get(m.group(2).strip())}
+
+
+def tare_kg(value):
+    """Tara gravada como texto no Gate ("3.800", "3800 kg") -> número em kg."""
+    digits = re.sub(r"[^\d,]", "", str(value or "")).replace(",", ".")
+    try:
+        return float(digits) if digits else None
+    except ValueError:
+        return None
 
 
 def _cargo_units(containers: list) -> list:
