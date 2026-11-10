@@ -244,6 +244,8 @@ export const api = {
   // User Shortcuts
   getUserShortcuts: () => axios.get(`${API}/user/shortcuts`),
   updateUserShortcuts: (shortcuts) => axios.put(`${API}/user/shortcuts`, { shortcuts }),
+  getMenuFavorites: () => axios.get(`${API}/user/menu-favorites`),
+  updateMenuFavorites: (favorites) => axios.put(`${API}/user/menu-favorites`, { favorites }),
   
   // Company Settings (Dados da Empresa)
   getCompanySettings: () => axios.get(`${API}/company-settings`),

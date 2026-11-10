@@ -7,7 +7,7 @@ import re
 import logging
 from urllib.parse import quote as url_quote
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from models import DailyMovementPoint, DailyBillingPoint, DriverRankingEntry, DashboardStats
 
@@ -40,6 +40,32 @@ async def update_user_shortcuts(data: dict, current_user: dict = Depends(get_cur
         {"$set": {"shortcuts": shortcuts}}
     )
     return {"message": "Atalhos atualizados", "shortcuts": shortcuts}
+
+
+# Favoritos do menu lateral: caminhos das telas fixadas no topo da sidebar,
+# na ordem em que o usuário marcou. Ficam no usuário (não no navegador) pra
+# acompanharem a pessoa em qualquer computador.
+MAX_MENU_FAVORITES = 20
+
+
+@api_router.get("/user/menu-favorites")
+async def get_menu_favorites(current_user: dict = Depends(get_current_active_user)):
+    user = await db.users.find_one({"email": current_user["email"]}, {"_id": 0, "menu_favorites": 1})
+    return {"favorites": (user or {}).get("menu_favorites") or []}
+
+
+@api_router.put("/user/menu-favorites")
+async def update_menu_favorites(data: dict, current_user: dict = Depends(get_current_active_user)):
+    raw = data.get("favorites") or []
+    if not isinstance(raw, list):
+        raise HTTPException(status_code=400, detail="Lista de favoritos inválida")
+    favorites = []
+    for path in raw:
+        if isinstance(path, str) and path.startswith("/") and len(path) <= 200 and path not in favorites:
+            favorites.append(path)
+    favorites = favorites[:MAX_MENU_FAVORITES]
+    await db.users.update_one({"email": current_user["email"]}, {"$set": {"menu_favorites": favorites}})
+    return {"favorites": favorites}
 
 
 def _created_at_gte(dt: datetime) -> dict:

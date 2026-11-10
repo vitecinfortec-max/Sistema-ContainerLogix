@@ -248,6 +248,16 @@ class TestDashboard:
         assert api.put("/api/user/shortcuts", json={"shortcuts": ["movements", "billing"]}).status_code == 200
         assert "movements" in str(api.get("/api/user/shortcuts").json())
 
+    def test_menu_favorites_roundtrip(self, api):
+        assert api.get("/api/user/menu-favorites").json() == {"favorites": []}
+        # duplicados, não-caminhos e tipos errados são descartados, a ordem fica
+        r = api.put("/api/user/menu-favorites", json={"favorites": ["/billing", "/movements", "/billing", "x", 3, "/fleet?tab=revisions"]})
+        assert r.status_code == 200
+        assert api.get("/api/user/menu-favorites").json() == {"favorites": ["/billing", "/movements", "/fleet?tab=revisions"]}
+        many = [f"/p{i}" for i in range(30)]
+        assert len(api.put("/api/user/menu-favorites", json={"favorites": many}).json()["favorites"]) == 20
+        assert api.put("/api/user/menu-favorites", json={"favorites": "/billing"}).status_code == 400
+
 
 # ---------- Controle de Pátio ----------
 

@@ -85,8 +85,10 @@ import {
   FileBadge,
   Percent,
   Building2,
-  AlertOctagon
+  AlertOctagon,
+  Star
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Suspense, createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageSkeleton } from './DataPage';
 import { format } from 'date-fns';
@@ -301,6 +303,26 @@ function LayoutFrame({ children }) {
   const [yardAlert, setYardAlert] = useState({ over_60: 0, over_90: 0 });
   const [financialAlerts, setFinancialAlerts] = useState([]);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  // Favoritos: caminhos das telas fixadas no topo do menu (salvos no usuário)
+  const [favoritePaths, setFavoritePaths] = useState([]);
+
+  useEffect(() => {
+    api.getMenuFavorites()
+      .then((res) => setFavoritePaths(res.data?.favorites || []))
+      .catch(() => {});
+  }, []);
+
+  const toggleFavorite = (path) => {
+    const previous = favoritePaths;
+    const next = previous.includes(path) ? previous.filter((p) => p !== path) : [...previous, path];
+    setFavoritePaths(next);
+    api.updateMenuFavorites(next)
+      .then((res) => setFavoritePaths(res.data?.favorites || next))
+      .catch(() => {
+        setFavoritePaths(previous);
+        toast.error('Não foi possível salvar o favorito');
+      });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -783,6 +805,17 @@ function LayoutFrame({ children }) {
     ...gestaoContainerItems, ...rhItems,
   ], [isAdmin]);
 
+  // Montado a cada render (sem memo) pra respeitar módulos/permissões já
+  // carregados: favorito de tela que a pessoa não acessa mais simplesmente
+  // não aparece. A ordem é a em que foram marcados.
+  const menuItemsByPath = new Map([
+    ...terminalItems, ...flexTankItems, ...movimentacoesItems, ...terminalCadastroItems, ...manutencaoItems, ...abastecimentoItems,
+    ...manutencaoCadastroItems, ...manutencaoRelatorioItems, ...transporteItems, ...cadastroItems,
+    ...(isAdmin ? financeiroItems : []), ...operacionalItems, ...opcoesSistemaItems, ...estoqueItems, ...estoqueCadastroItems,
+    ...comercialItems, ...gestaoContainerItems, ...rhItems,
+  ].map((item) => [item.path, item]));
+  const favoriteItems = favoritePaths.map((path) => menuItemsByPath.get(path)).filter(Boolean);
+
   const filteredItems = searchQuery
     ? allSearchableItems.filter(item => item.label.toLowerCase().includes(searchQuery.toLowerCase()))
     : null;
@@ -871,35 +904,60 @@ function LayoutFrame({ children }) {
       );
     }
 
+    // Estrela de favorito: irmã do link (botão dentro de <a> é HTML inválido),
+    // aparece no hover/foco e fica sempre visível quando a tela já é favorita.
+    // Só o item favoritado reserva espaço à direita (rótulos longos já ficam
+    // no limite); nos demais a estrela cobre o fim da linha com o fundo do hover.
+    const isFavorite = favoritePaths.includes(item.path);
+    const favoriteButton = (
+      <button
+        type="button"
+        onClick={() => toggleFavorite(item.path)}
+        title={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+        aria-label={isFavorite ? `Remover ${item.label} dos favoritos` : `Adicionar ${item.label} aos favoritos`}
+        aria-pressed={isFavorite}
+        data-testid={`fav-${item.path.replace(/\//g, '-').slice(1)}`}
+        className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded transition-opacity hover:bg-slate-200 dark:hover:bg-slate-700 focus-visible:opacity-100 ${
+          isFavorite ? 'opacity-100' : 'opacity-0 group-hover/nav:opacity-100 bg-slate-100 dark:bg-slate-800'
+        }`}
+      >
+        <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-amber-400 text-amber-500' : 'text-slate-400 dark:text-slate-500'}`} />
+      </button>
+    );
+
     // Sub-items: chevron on the left
     if (isSubItem) {
       return (
-        <Link
-          key={item.path}
-          to={item.path}
-          data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-          className={`group flex items-center mx-2 my-px rounded-md py-2 transition-colors ${
-            isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          } ${deepIndent ? 'pl-[58px]' : 'pl-[42px]'} pr-3 text-[13px]`}
-        >
-          <span>{item.label}</span>
-        </Link>
+        <div key={item.path} className="group/nav relative">
+          <Link
+            to={item.path}
+            data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
+            className={`group flex items-center mx-2 my-px rounded-md py-2 transition-colors ${
+              isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            } ${deepIndent ? 'pl-[58px]' : 'pl-[42px]'} ${isFavorite ? 'pr-9' : 'pr-3'} text-[13px]`}
+          >
+            <span>{item.label}</span>
+          </Link>
+          {favoriteButton}
+        </div>
       );
     }
 
     // Main items (like Dashboard): icon on left, no chevron (not expandable)
     return (
-      <Link
-        key={item.path}
-        to={item.path}
-        data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
-        className={`group flex items-center mx-2 my-px rounded-md py-2.5 transition-colors ${
-          isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-        } px-3 gap-3 text-[13px]`}
-      >
-        <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
-        <span>{item.label}</span>
-      </Link>
+      <div key={item.path} className="group/nav relative">
+        <Link
+          to={item.path}
+          data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
+          className={`group flex items-center mx-2 my-px rounded-md py-2.5 transition-colors ${
+            isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+          } pl-3 ${isFavorite ? 'pr-9' : 'pr-3'} gap-3 text-[13px]`}
+        >
+          <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+          <span>{item.label}</span>
+        </Link>
+        {favoriteButton}
+      </div>
     );
   };
 
@@ -1176,6 +1234,19 @@ function LayoutFrame({ children }) {
               <div>
                 {mainNavItems.map((item) => renderNavItem(item))}
 
+                {/* Favoritos: telas fixadas pela estrela, sempre no topo */}
+                {favoriteItems.length > 0 && (
+                  <div className="pb-1 mb-1 border-b border-slate-200 dark:border-slate-700" data-testid="nav-favorites">
+                    {sidebarOpen && (
+                      <p className="flex items-center gap-1.5 px-5 pt-2.5 pb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                        Favoritos
+                      </p>
+                    )}
+                    {favoriteItems.map((item) => renderNavItem(item))}
+                  </div>
+                )}
+
                 {/* Terminal */}
                 {isTerminalGroupVisible && renderGroupHeader('Terminal', Anchor, terminalOpen, toggleTerminal, isTerminalActive, 'nav-terminal-toggle')}
                 {isTerminalGroupVisible && terminalOpen && sidebarOpen && (
@@ -1337,6 +1408,16 @@ function LayoutFrame({ children }) {
                     </Link>
                   );
                 })}
+
+                {favoriteItems.length > 0 && (
+                  <div className="pb-1 mb-1 border-b border-slate-200 dark:border-slate-700">
+                    <p className="flex items-center gap-1.5 px-4 pt-2.5 pb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                      Favoritos
+                    </p>
+                    {favoriteItems.map((item) => renderMobileNavItem(item))}
+                  </div>
+                )}
 
                 {/* Terminal Mobile */}
                 {isTerminalGroupVisible && renderMobileGroupToggle('Terminal', Anchor, terminalOpen, toggleTerminal, isTerminalActive)}
