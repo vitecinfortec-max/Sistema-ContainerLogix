@@ -573,7 +573,7 @@ async def prepare_database():
         "hr_contracts", "hr_payslips", "hr_payroll_runs", "hr_vacations", "hr_occurrences", "hr_documents", "hr_time_bank",
     ):
         await db[collection_name].create_index("id")
-    # Ordem de Serviço - Porto x Cliente: listagem e relatórios filtram pela data prevista
+    # Ordem de Serviço - Cliente: listagem e relatórios filtram pela data prevista
     await db.port_client_orders.create_index("id")
     await db.port_client_orders.create_index("order_number")
     await db.port_client_orders.create_index([("scheduled_at", 1), ("status", 1)])

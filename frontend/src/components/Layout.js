@@ -155,8 +155,8 @@ const PAGE_TITLES = {
   '/loading-orders': 'Ordem de Carregamento',
   '/transport-occurrences': 'Ocorrências de Transporte',
   '/driver-settlements': 'Acerto de Motorista',
-  '/port-client-orders': 'Ordem de Serviço – Porto x Cliente',
-  '/port-client-orders/reports': 'Relatórios Porto x Cliente',
+  '/port-client-orders': 'Ordem de Serviço - Cliente',
+  '/port-client-orders/reports': 'Relatórios OS - Cliente',
   '/fiscal/cte': 'CT-e',
   '/fiscal/mdfe': 'MDF-e',
   '/fiscal/configuracao': 'Configuração Fiscal',
@@ -739,8 +739,8 @@ function LayoutFrame({ children }) {
     { path: '/transport-occurrences', label: 'Ocorrências', icon: AlertOctagon, moduleKey: 'operacional.ocorrencias_transporte' },
     // Acerto de Motorista: mexe com o dinheiro do motorista - só administrador (a rota também é adminOnly)
     ...(isAdmin ? [{ path: '/driver-settlements', label: 'Acerto de Motorista', icon: Handshake, moduleKey: 'operacional.acerto_motorista' }] : []),
-    { path: '/port-client-orders', label: 'OS – Porto x Cliente', icon: Container, moduleKey: 'operacional.os_porto_cliente' },
-    { path: '/port-client-orders/reports', label: 'Relatórios Porto x Cliente', icon: FileBarChart, moduleKey: 'operacional.relatorio_os_porto_cliente' },
+    { path: '/port-client-orders', label: 'Ordem de Serviço - Cliente', icon: Container, moduleKey: 'operacional.os_porto_cliente' },
+    { path: '/port-client-orders/reports', label: 'Relatórios OS - Cliente', icon: FileBarChart, moduleKey: 'operacional.relatorio_os_porto_cliente' },
     { path: '/freight-routes', label: 'Rota', icon: Route, moduleKey: 'cadastro.rota' },
     { path: '/freight-payments', label: 'Pagamento Frete', icon: HandCoins, moduleKey: 'financeiro.pagamento_frete' },
     // CT-e: módulo "sob contratação" (nasce desligado; o dono liga por empresa em

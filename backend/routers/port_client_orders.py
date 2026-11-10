@@ -1,4 +1,4 @@
-"""Ordem de Serviço - Porto x Cliente.
+"""Ordem de Serviço - Cliente (antes "Porto x Cliente").
 
 Entrega e coleta de container CHEIO feitas direto entre o porto e o cliente,
 sem passar pelo terminal. Fica numa coleção própria (port_client_orders) e,
@@ -89,8 +89,15 @@ def _validate(doc: dict):
         raise HTTPException(status_code=400, detail='Informe o Cliente')
     if not _clean_text(doc.get('port_terminal_name')):
         raise HTTPException(status_code=400, detail='Informe o Porto/Terminal portuário')
-    if not _clean_text(doc.get('container_number')):
-        raise HTTPException(status_code=400, detail='Informe o número do container')
+    containers = order_containers(doc)
+    if not containers:
+        raise HTTPException(status_code=400, detail='Informe ao menos 1 container')
+    seen = set()
+    for c in containers:
+        key = re.sub(r'[^A-Z0-9]', '', c['container_number'].upper())
+        if key in seen:
+            raise HTTPException(status_code=400, detail=f"Container {c['container_number']} repetido na ordem")
+        seen.add(key)
     if not _clean_text(doc.get('scheduled_at')):
         raise HTTPException(status_code=400, detail='Informe a data/hora prevista')
     value = doc.get('freight_value')
@@ -102,9 +109,19 @@ def _normalize(data: dict) -> dict:
     out = {}
     for key, value in data.items():
         out[key] = _clean_text(value) if isinstance(value, str) else value
-    if out.get('container_number'):
-        out['container_number'] = normalize_container_number(out['container_number'])
-    for key in ('truck_plate', 'trailer_plate'):
+    if out.get('containers') is not None:
+        containers = []
+        for c in out['containers']:
+            number = _clean_text(c.get('container_number'))
+            if not number:
+                continue  # linha deixada em branco no formulário
+            containers.append({
+                'container_number': normalize_container_number(number),
+                'container_size': _clean_text(c.get('container_size')),
+                'container_type': _clean_text(c.get('container_type')),
+            })
+        out['containers'] = containers
+    for key in ('truck_plate', 'trailer_plate', 'trailer_plate_2'):
         if out.get(key):
             out[key] = format_plate(out[key])
     for key in ('booking', 'bl'):
@@ -125,10 +142,31 @@ def _check_status_change(old: str, new: str):
         )
 
 
+def order_containers(doc: dict) -> list:
+    """Containers da ordem. As primeiras ordens (antes de aceitar vários
+    containers) guardavam um só, nos campos soltos container_number/size/type."""
+    if doc.get('containers'):
+        return doc['containers']
+    if _clean_text(doc.get('container_number')):
+        return [{'container_number': doc['container_number'], 'container_size': doc.get('container_size'),
+                 'container_type': doc.get('container_type')}]
+    return []
+
+
 def _serialize(doc: dict) -> dict:
     doc = dict(doc)
     doc.pop('_id', None)
-    doc['container_warning'] = container_number_warning(doc.get('container_number'))
+    containers = []
+    warnings = []
+    for c in order_containers(doc):
+        warning = container_number_warning(c['container_number'])
+        containers.append({**c, 'warning': warning})
+        if warning:
+            warnings.append(f"{c['container_number']}: {warning}")
+    doc['containers'] = containers
+    for legacy in ('container_number', 'container_size', 'container_type'):
+        doc.pop(legacy, None)
+    doc['container_warnings'] = warnings
     return doc
 
 
@@ -161,10 +199,13 @@ def build_query(date_from=None, date_to=None, client_id=None, client_name=None, 
     if search:
         s = re.escape(search.strip())
         ors = [
+            {'containers.container_number': {'$regex': s, '$options': 'i'}},
             {'container_number': {'$regex': s, '$options': 'i'}},
             {'client_name': {'$regex': s, '$options': 'i'}},
             {'driver_name': {'$regex': s, '$options': 'i'}},
             {'truck_plate': {'$regex': plate_regex(search) or s, '$options': 'i'}},
+            {'trailer_plate': {'$regex': plate_regex(search) or s, '$options': 'i'}},
+            {'trailer_plate_2': {'$regex': plate_regex(search) or s, '$options': 'i'}},
             {'booking': {'$regex': s, '$options': 'i'}},
             {'bl': {'$regex': s, '$options': 'i'}},
             {'port_terminal_name': {'$regex': s, '$options': 'i'}},
@@ -273,7 +314,10 @@ async def update_port_client_order(order_id: str, data: PortClientOrderUpdate, c
     changes['container_condition'] = 'CHEIO'
     changes['updated_at'] = datetime.now(timezone.utc).isoformat()
     changes['updated_by_name'] = current_user.get('name')
-    await db.port_client_orders.update_one({'id': order_id}, {'$set': changes})
+    update = {'$set': changes}
+    if 'containers' in changes:
+        update['$unset'] = {'container_number': '', 'container_size': '', 'container_type': ''}
+    await db.port_client_orders.update_one({'id': order_id}, update)
     updated = await db.port_client_orders.find_one({'id': order_id}, {'_id': 0})
     return _serialize(updated)
 
@@ -302,7 +346,7 @@ async def download_port_client_order_pdf(order_id: str, current_user: dict = Dep
     from reportlab.graphics.barcode import code128
     from reports import (
         download_logo, _build_pdf_header, _voucher_field_row, _voucher_boxed_section,
-        _pdf_signatures, _hex, BRAND_LINE, BRAND_DARK, BRAND_MUTED,
+        _pdf_signatures, _hex, _pdf_header_cells, _pdf_table_style, BRAND_LINE, BRAND_DARK, BRAND_MUTED,
     )
 
     order = await db.port_client_orders.find_one({'id': order_id}, {'_id': 0})
@@ -332,7 +376,7 @@ async def download_port_client_order_pdf(order_id: str, current_user: dict = Dep
     op = order.get('operation_type')
     elements = list(_build_pdf_header(
         styles, download_logo(company),
-        f"Ordem de Serviço – Porto x Cliente - Nº {order['order_number']}  ·  {OPERATION_LABELS.get(op, op)}",
+        f"Ordem de Serviço – Cliente - Nº {order['order_number']}  ·  {OPERATION_LABELS.get(op, op)}",
         company=company, content_width=width,
     ))
 
@@ -358,16 +402,33 @@ async def download_port_client_order_pdf(order_id: str, current_user: dict = Dep
     elements.append(boxed_section('Origem e Destino', origin_rows))
     elements.append(Spacer(1, 2))
 
-    size = order.get('container_size')
-    elements.append(boxed_section('Container e Carga', [
+    containers = order_containers(order)
+    elements.append(boxed_section('Container(s) e Carga', [
         field_row([
-            ('Nº do Container', order.get('container_number')),
-            ('Tamanho', f"{size}'" if size else None),
-            ('Tipo', order.get('container_type')),
+            ('Booking', order.get('booking')),
+            ('BL', order.get('bl')),
+            ('Quantidade de Containers', len(containers) or None),
             ('Condição', 'Cheio'),
         ]),
-        field_row([('Booking', order.get('booking')), ('BL', order.get('bl'))], n_cols=2),
     ]))
+    elements.append(Spacer(1, 2))
+    item_rows = [_pdf_header_cells(["#", "Nº do Container", "Tamanho", "Tipo", "Condição"], font_size=7.5)]
+    for idx, c in enumerate(containers, 1):
+        size = c.get('container_size')
+        item_rows.append([str(idx), c.get('container_number') or '-', f"{size}'" if size else '-',
+                          c.get('container_type') or '-', 'Cheio'])
+    base_widths = [20, 150, 70, 90, 70]
+    scale = width / sum(base_widths)
+    items_table = Table(item_rows, colWidths=[w * scale for w in base_widths], repeatRows=1)
+    items_table.setStyle(TableStyle(_pdf_table_style() + [
+        ('FONTSIZE', (0, 0), (-1, -1), 7.5),
+        ('FONTNAME', (1, 1), (1, -1), 'Helvetica-Bold'),
+        ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+        ('ALIGN', (2, 1), (-1, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 2.5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2.5),
+    ]))
+    elements.append(items_table)
     elements.append(Spacer(1, 2))
 
     elements.append(boxed_section('Dados do Transporte (Motorista/Veículo)', [
@@ -375,8 +436,9 @@ async def download_port_client_order_pdf(order_id: str, current_user: dict = Dep
         field_row([
             ('CPF', order.get('driver_cpf')),
             ('Placa Cavalo', order.get('truck_plate')),
-            ('Placa Carreta', order.get('trailer_plate')),
-        ], n_cols=3),
+            ('Placa Carreta' if not order.get('trailer_plate_2') else 'Placa 1ª Carreta', order.get('trailer_plate')),
+        ] + ([('Placa 2ª Carreta (rodotrem)', order.get('trailer_plate_2'))] if order.get('trailer_plate_2') else []),
+            n_cols=4 if order.get('trailer_plate_2') else 3),
     ]))
     elements.append(Spacer(1, 2))
 
@@ -389,11 +451,11 @@ async def download_port_client_order_pdf(order_id: str, current_user: dict = Dep
 
     instr_style = ParagraphStyle('PCInstr', parent=styles['Normal'], fontSize=7, leading=8.5)
     if op == 'COLETA':
-        steps = ("• Retirar o container cheio no endereço do cliente e entregá-lo no porto/terminal indicado acima.<br/>"
-                 "• Conferir o número do container e o lacre com esta ordem antes de sair do cliente.<br/>")
+        steps = ("• Retirar o(s) container(s) cheio(s) no endereço do cliente e entregá-lo(s) no porto/terminal indicado acima.<br/>"
+                 "• Conferir o número de cada container e o lacre com esta ordem antes de sair do cliente.<br/>")
     else:
-        steps = ("• Retirar o container cheio no porto/terminal indicado acima e entregá-lo no endereço do cliente.<br/>"
-                 "• Conferir o número do container e o lacre com esta ordem antes de sair do porto.<br/>")
+        steps = ("• Retirar o(s) container(s) cheio(s) no porto/terminal indicado acima e entregá-lo(s) no endereço do cliente.<br/>"
+                 "• Conferir o número de cada container e o lacre com esta ordem antes de sair do porto.<br/>")
     elements.append(boxed_section('Instruções ao Motorista', [], extra=[Paragraph(
         "<b>OBSERVAÇÕES IMPORTANTES</b><br/>" + steps +
         "• Obrigatório o uso completo de EPI (Capacete, colete refletivo, bota de biqueira de aço e óculos de proteção).<br/>"
@@ -406,7 +468,7 @@ async def download_port_client_order_pdf(order_id: str, current_user: dict = Dep
     checklist_items = [
         "Portas, trincos e borrachas de vedação",
         "Teto e painéis laterais (furos/amassados)",
-        "Número do container batendo com a ordem",
+        "Números dos containers batendo com a ordem",
         "Lacre intacto",
     ]
     check_header_style = ParagraphStyle('PCCheckHeader', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold')
@@ -457,10 +519,10 @@ async def download_port_client_order_pdf(order_id: str, current_user: dict = Dep
     ]))
     elements.append(info_tbl)
     elements.append(Spacer(1, 2))
-    elements.append(Paragraph(f"{xml_escape(company['name'])}  ·  Este documento é válido como Ordem de Serviço – Porto x Cliente", footer_style))
+    elements.append(Paragraph(f"{xml_escape(company['name'])}  ·  Este documento é válido como Ordem de Serviço – Cliente", footer_style))
 
     doc.build(elements)
-    filename = f"OrdemServicoPortoCliente_{order['order_number']}.pdf"
+    filename = f"OrdemServicoCliente_{order['order_number']}.pdf"
     return StreamingResponse(io.BytesIO(buffer.getvalue()), media_type="application/pdf",
                              headers={"Content-Disposition": f"attachment; filename={filename}"})
 
@@ -517,10 +579,28 @@ def _sum(orders):
     return round(sum(o.get('freight_value') or 0 for o in orders), 2)
 
 
-def _size_type(o):
-    size = o.get('container_size')
-    parts = [f"{size}'" if size else None, o.get('container_type')]
+def _size_type_of(c):
+    size = c.get('container_size')
+    parts = [f"{size}'" if size else None, c.get('container_type')]
     return ' '.join(p for p in parts if p) or None
+
+
+def _size_type(o):
+    """Tamanho/tipo dos containers da ordem, sem repetir (ex.: "40' HC, 20' DRY")."""
+    seen = []
+    for c in order_containers(o):
+        st = _size_type_of(c)
+        if st and st not in seen:
+            seen.append(st)
+    return ', '.join(seen) or None
+
+
+def _container_numbers(o):
+    return ', '.join(c['container_number'] for c in order_containers(o)) or None
+
+
+def _container_count(orders):
+    return sum(len(order_containers(o)) for o in orders)
 
 
 def _report_periodo(orders, status_filter):
@@ -528,18 +608,19 @@ def _report_periodo(orders, status_filter):
     cancelled_out = len(orders) - len(billable)
     columns = [
         _col('Nº', 'int', 0.45, 7), _col('Prevista', 'datetime', 1.2, 16), _col('Realizada', 'datetime', 1.2, 16),
-        _col('Operação', 'text', 0.7, 10), _col('Cliente', 'text', 1.8, 30), _col('Porto/Terminal', 'text', 1.3, 22),
-        _col('Container', 'text', 1.1, 15), _col('Tam./Tipo', 'text', 0.7, 10), _col('Motorista', 'text', 1.4, 24),
-        _col('Placa', 'text', 0.8, 10), _col('Status', 'text', 1.0, 12), _col('Frete', 'money', 0.95, 14),
+        _col('Operação', 'text', 0.85, 10), _col('Cliente', 'text', 1.6, 30), _col('Porto/Terminal', 'text', 1.1, 22),
+        _col('Containers', 'text', 1.3, 18), _col('Qtd.', 'int', 0.4, 6), _col('Tam./Tipo', 'text', 0.85, 10),
+        _col('Motorista', 'text', 1.3, 24), _col('Placa', 'text', 0.8, 10), _col('Status', 'text', 1.0, 12),
+        _col('Frete', 'money', 0.95, 14),
     ]
     rows = [[
         o.get('order_number'), o.get('scheduled_at'), o.get('completed_at'),
         OPERATION_SHORT.get(o.get('operation_type'), o.get('operation_type')), o.get('client_name'),
-        o.get('port_terminal_name'), o.get('container_number'), _size_type(o), o.get('driver_name'),
+        o.get('port_terminal_name'), _container_numbers(o), len(order_containers(o)), _size_type(o), o.get('driver_name'),
         o.get('truck_plate'), STATUS_LABELS.get(o.get('status'), o.get('status')), o.get('freight_value') or 0,
     ] for o in orders]
     total = _sum(billable)
-    totals = [('Quantidade de ordens', len(orders), 'int')]
+    totals = [('Quantidade de ordens', len(orders), 'int'), ('Quantidade de containers', _container_count(orders), 'int')]
     if cancelled_out:
         totals.append(('Canceladas (fora do frete)', cancelled_out, 'int'))
     totals.append(('Valor total do frete', total, 'money'))
@@ -552,8 +633,8 @@ def _report_periodo(orders, status_filter):
         ],
         'sections': [{
             'sheet': 'Ordens', 'columns': columns, 'rows': rows,
-            'row_tones': [STATUS_TONES.get(o.get('status')) for o in orders], 'tone_col': 10,
-            'total': [None] * 11 + [total],
+            'row_tones': [STATUS_TONES.get(o.get('status')) for o in orders], 'tone_col': 11,
+            'total': [None] * 12 + [total],
             'total_label': 'TOTAL (sem canceladas)' if cancelled_out else 'TOTAL',
         }],
         'totals': totals,
@@ -569,14 +650,14 @@ def _report_faturamento(orders, status_filter):
     for client, items in groups.items():
         ent = [o for o in items if o.get('operation_type') == 'ENTREGA']
         col = [o for o in items if o.get('operation_type') == 'COLETA']
-        rows.append([client, len(ent), _sum(ent), len(col), _sum(col), len(items), _sum(items)])
-    rows.sort(key=lambda r: (-r[6], r[0]))
-    tot = [None] + [sum(r[i] for r in rows) for i in range(1, 7)]
+        rows.append([client, len(ent), _sum(ent), len(col), _sum(col), len(items), _container_count(items), _sum(items)])
+    rows.sort(key=lambda r: (-r[7], r[0]))
+    tot = [None] + [sum(r[i] for r in rows) for i in range(1, 8)]
     tot = [round(v, 2) if isinstance(v, float) else v for v in tot]
     columns = [
         _col('Cliente', 'text', 2.6, 34), _col('Entregas', 'int', 0.7, 10), _col('Frete Entregas', 'money', 1.1, 16),
         _col('Coletas', 'int', 0.7, 10), _col('Frete Coletas', 'money', 1.1, 16), _col('Total de Ordens', 'int', 0.8, 12),
-        _col('Frete Total', 'money', 1.1, 16),
+        _col('Containers', 'int', 0.8, 12), _col('Frete Total', 'money', 1.1, 16),
     ]
     return {
         'summary': [
@@ -609,7 +690,7 @@ def _report_producao(orders, status_filter):
     driver_rows.sort(key=lambda r: (-r[4], r[0]))
     vehicle_rows = []
     for plate, items in by_vehicle.items():
-        trailers = sorted({o.get('trailer_plate') for o in items if o.get('trailer_plate')})
+        trailers = sorted({p for o in items for p in (o.get('trailer_plate'), o.get('trailer_plate_2')) if p})
         drivers = {o.get('driver_name') for o in items if o.get('driver_name')}
         vehicle_rows.append([plate, ', '.join(trailers) or None, len(items), len(drivers), _sum(items)])
     vehicle_rows.sort(key=lambda r: (-r[4], r[0]))
@@ -663,7 +744,7 @@ def _report_em_aberto(orders, status_filter):
         rows.append([
             o.get('order_number'), o.get('scheduled_at'), label,
             OPERATION_SHORT.get(o.get('operation_type'), o.get('operation_type')), o.get('client_name'),
-            o.get('port_terminal_name'), o.get('client_address'), o.get('container_number'), o.get('driver_name'),
+            o.get('port_terminal_name'), o.get('client_address'), _container_numbers(o), o.get('driver_name'),
             o.get('truck_plate'), STATUS_LABELS.get(o.get('status'), o.get('status')), o.get('freight_value') or 0,
         ])
     total = _sum(pending)
@@ -681,7 +762,7 @@ def _report_em_aberto(orders, status_filter):
             'columns': [
                 _col('Nº', 'int', 0.45, 7), _col('Prevista', 'datetime', 1.2, 16), _col('Prazo', 'text', 1.0, 18),
                 _col('Operação', 'text', 0.7, 10), _col('Cliente', 'text', 1.5, 28), _col('Porto/Terminal', 'text', 1.2, 20),
-                _col('Endereço do Cliente', 'text', 1.8, 34), _col('Container', 'text', 1.0, 15), _col('Motorista', 'text', 1.2, 22),
+                _col('Endereço do Cliente', 'text', 1.8, 34), _col('Containers', 'text', 1.2, 18), _col('Motorista', 'text', 1.2, 22),
                 _col('Placa', 'text', 0.7, 10), _col('Status', 'text', 0.8, 12), _col('Frete', 'money', 0.9, 14),
             ],
             'rows': rows, 'row_tones': tones, 'tone_col': 2,
@@ -756,7 +837,7 @@ async def build_report(kind: str, filters: dict) -> dict:
     )
     orders = await db.port_client_orders.find(query, {'_id': 0}).sort([('scheduled_at', 1), ('order_number', 1)]).to_list(None)
     report = _REPORT_BUILDERS[kind](orders, filters.get('status'))
-    report['title'] = f"{REPORT_KINDS[kind]} – Porto x Cliente"
+    report['title'] = f"{REPORT_KINDS[kind]} – Ordem de Serviço – Cliente"
     report['filters_text'] = await _filters_text(filters)
     report['kind'] = kind
     return report
@@ -784,7 +865,7 @@ async def port_client_orders_report_pdf(
 ):
     report = await build_report(kind, _filters(date_from, date_to, client_id, client_name, operation_type, status))
     pdf = generate_tabular_report_pdf(report, company=await get_company_settings())
-    filename = f"os_porto_cliente_{kind}_{now_brt().strftime('%d-%m-%Y_%H-%M')}.pdf"
+    filename = f"os_cliente_{kind}_{now_brt().strftime('%d-%m-%Y_%H-%M')}.pdf"
     return StreamingResponse(io.BytesIO(pdf), media_type="application/pdf",
                              headers={"Content-Disposition": f"attachment; filename={filename}"})
 
@@ -797,6 +878,6 @@ async def port_client_orders_report_excel(
 ):
     report = await build_report(kind, _filters(date_from, date_to, client_id, client_name, operation_type, status))
     xlsx = generate_tabular_report_excel(report, company=await get_company_settings())
-    filename = f"os_porto_cliente_{kind}_{now_brt().strftime('%d-%m-%Y_%H-%M')}.xlsx"
+    filename = f"os_cliente_{kind}_{now_brt().strftime('%d-%m-%Y_%H-%M')}.xlsx"
     return StreamingResponse(io.BytesIO(xlsx), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                              headers={"Content-Disposition": f"attachment; filename={filename}"})

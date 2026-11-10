@@ -4786,6 +4786,13 @@ PORT_CLIENT_OPERATION_TYPES = ("ENTREGA", "COLETA")
 PORT_CLIENT_STATUSES = ("ABERTA", "EM_TRANSITO", "CONCLUIDA", "CANCELADA")
 
 
+class PortClientOrderContainer(BaseModel):
+    """Um container da Ordem de Serviço - Cliente (a ordem pode levar vários)."""
+    container_number: str
+    container_size: Optional[str] = None  # 20 | 40 | 45
+    container_type: Optional[str] = None  # DRY | HC | REEFER | OPEN TOP | FLAT RACK | TANK
+
+
 class PortClientOrderCreate(BaseModel):
     operation_type: Literal["ENTREGA", "COLETA"]
     status: Literal["ABERTA", "EM_TRANSITO", "CONCLUIDA", "CANCELADA"] = "ABERTA"
@@ -4794,9 +4801,7 @@ class PortClientOrderCreate(BaseModel):
     port_terminal_id: Optional[str] = None
     port_terminal_name: str
     client_address: Optional[str] = None
-    container_number: str
-    container_size: Optional[str] = None  # 20 | 40 | 45
-    container_type: Optional[str] = None  # DRY | HC | REEFER | OPEN TOP | FLAT RACK | TANK
+    containers: List[PortClientOrderContainer] = []
     booking: Optional[str] = None
     bl: Optional[str] = None
     freight_value: float
@@ -4805,6 +4810,7 @@ class PortClientOrderCreate(BaseModel):
     driver_cpf: Optional[str] = None
     truck_plate: Optional[str] = None
     trailer_plate: Optional[str] = None
+    trailer_plate_2: Optional[str] = None  # 2ª carreta (rodotrem)
     scheduled_at: Optional[str] = None  # 'AAAA-MM-DDTHH:MM', horário de Brasília (digitado)
     completed_at: Optional[str] = None  # idem
     observations: Optional[str] = None
@@ -4818,9 +4824,7 @@ class PortClientOrderUpdate(BaseModel):
     port_terminal_id: Optional[str] = None
     port_terminal_name: Optional[str] = None
     client_address: Optional[str] = None
-    container_number: Optional[str] = None
-    container_size: Optional[str] = None
-    container_type: Optional[str] = None
+    containers: Optional[List[PortClientOrderContainer]] = None
     booking: Optional[str] = None
     bl: Optional[str] = None
     freight_value: Optional[float] = None
@@ -4829,6 +4833,7 @@ class PortClientOrderUpdate(BaseModel):
     driver_cpf: Optional[str] = None
     truck_plate: Optional[str] = None
     trailer_plate: Optional[str] = None
+    trailer_plate_2: Optional[str] = None
     scheduled_at: Optional[str] = None
     completed_at: Optional[str] = None
     observations: Optional[str] = None

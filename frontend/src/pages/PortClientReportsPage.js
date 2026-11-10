@@ -130,7 +130,7 @@ export default function PortClientReportsPage() {
       const url = window.URL.createObjectURL(new Blob([r.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `os_porto_cliente_${kind}_${format(new Date(), 'dd-MM-yyyy_HH-mm')}.${fmt === 'pdf' ? 'pdf' : 'xlsx'}`);
+      link.setAttribute('download', `os_cliente_${kind}_${format(new Date(), 'dd-MM-yyyy_HH-mm')}.${fmt === 'pdf' ? 'pdf' : 'xlsx'}`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -147,7 +147,7 @@ export default function PortClientReportsPage() {
   return (
     <Layout>
       <div className="space-y-4" data-testid="port-client-reports-page">
-        <PageHeader icon={FileBarChart} title="Relatórios – Porto x Cliente" subtitle="Ordens de Serviço Porto x Cliente: faturamento de frete separado das operações do terminal" />
+        <PageHeader icon={FileBarChart} title="Relatórios – Ordem de Serviço - Cliente" subtitle="Faturamento de frete das ordens de serviço feitas direto entre porto e cliente, separado das operações do terminal" />
 
         <div className="flex flex-wrap gap-2" role="tablist">
           {REPORTS.map((r) => (

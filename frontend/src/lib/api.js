@@ -870,7 +870,7 @@ export const api = {
   closeDriverSettlement: (id, closed, date) => axios.put(`${API}/driver-settlements/${id}/close`, { closed, date: date || null }),
   getDriverSettlementPdf: (id) => axios.get(`${API}/driver-settlements/${id}/pdf`, { responseType: 'blob' }),
 
-  // Ordem de Serviço - Porto x Cliente (sem EIR / sem movimentação de pátio)
+  // Ordem de Serviço - Cliente (sem EIR / sem movimentação de pátio)
   getPortClientOrders: (params) => axios.get(`${API}/port-client-orders`, { params }),
   getPortClientOrderNextNumber: () => axios.get(`${API}/port-client-orders/next-number`),
   createPortClientOrder: (data) => axios.post(`${API}/port-client-orders`, data),

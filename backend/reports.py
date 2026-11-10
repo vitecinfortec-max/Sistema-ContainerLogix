@@ -6187,7 +6187,7 @@ def generate_vehicle_results_report_excel(data: dict, date_from=None, date_to=No
 
 
 # ==================== RELATÓRIO TABULAR GENÉRICO (PDF + EXCEL) ====================
-# Os relatórios da Ordem de Serviço - Porto x Cliente montam UM modelo de dados
+# Os relatórios da Ordem de Serviço - Cliente montam UM modelo de dados
 # (colunas tipadas, linhas com valores crus, linha de total e quadro de totais)
 # e os dois geradores abaixo só formatam esse modelo. Assim o total que a tela
 # mostra, o do PDF e o do Excel saem do mesmo cálculo e não têm como divergir.

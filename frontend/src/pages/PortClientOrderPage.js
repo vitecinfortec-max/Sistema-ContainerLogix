@@ -18,7 +18,7 @@ import { useConfirm } from '../hooks/useConfirm';
 import { Autocomplete } from '../components/Autocomplete';
 import { toast } from 'sonner';
 import {
-  Container, Plus, Trash2, Printer, Pencil, Wallet, Clock, Truck, CheckCircle2, XCircle, AlertTriangle,
+  Container, Plus, Trash2, Printer, Pencil, Wallet, Clock, Truck, CheckCircle2, XCircle, AlertTriangle, X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatPlate } from '../lib/masks';
@@ -67,12 +67,16 @@ function nowLocal() {
   return format(new Date(), "yyyy-MM-dd'T'HH:mm");
 }
 
+function emptyContainer() {
+  return { container_number: '', container_size: '', container_type: '' };
+}
+
 function emptyForm() {
   return {
     operation_type: 'ENTREGA', status: 'ABERTA',
     client_id: '', client_name: '', port_terminal_id: '', port_terminal_name: '', client_address: '',
-    container_number: '', container_size: '', container_type: '', booking: '', bl: '', freight_value: '',
-    driver_id: '', driver_name: '', driver_cpf: '', truck_plate: '', trailer_plate: '',
+    containers: [emptyContainer()], booking: '', bl: '', freight_value: '',
+    driver_id: '', driver_name: '', driver_cpf: '', truck_plate: '', trailer_plate: '', trailer_plate_2: '', rodotrem: false,
     scheduled_at: '', completed_at: '', observations: '',
   };
 }
@@ -167,6 +171,10 @@ export default function PortClientOrderPage() {
     const base = emptyForm();
     Object.keys(base).forEach((k) => { if (order[k] !== null && order[k] !== undefined) base[k] = order[k]; });
     base.freight_value = order.freight_value ?? '';
+    base.containers = (order.containers || []).length
+      ? order.containers.map((c) => ({ container_number: c.container_number || '', container_size: c.container_size || '', container_type: c.container_type || '' }))
+      : [emptyContainer()];
+    base.rodotrem = !!order.trailer_plate_2;
     setForm(base);
     setModalOpen(true);
   };
@@ -191,14 +199,27 @@ export default function PortClientOrderPage() {
     const missing = [];
     if (!form.client_name.trim()) missing.push('Cliente');
     if (!form.port_terminal_name.trim()) missing.push('Porto/Terminal');
-    if (!form.container_number.trim()) missing.push('Nº do Container');
+    const filledContainers = form.containers.filter((c) => c.container_number.trim());
+    if (!filledContainers.length) missing.push('ao menos 1 Container');
     if (!form.scheduled_at) missing.push('Data/hora prevista');
     if (!(Number(form.freight_value) > 0)) missing.push('Valor do Frete');
     if (missing.length) {
       toast.error(`Preencha: ${missing.join(', ')}`);
       return;
     }
-    const payload = { ...form, freight_value: Number(form.freight_value) };
+    const keys = filledContainers.map((c) => c.container_number.toUpperCase().replace(/[^A-Z0-9]/g, ''));
+    const repeated = keys.find((k, i) => keys.indexOf(k) !== i);
+    if (repeated) {
+      toast.error(`Container ${repeated} repetido na ordem`);
+      return;
+    }
+    const { rodotrem, ...rest } = form;
+    const payload = {
+      ...rest,
+      containers: filledContainers.map((c) => ({ ...c, container_size: c.container_size || null, container_type: c.container_type || null })),
+      trailer_plate_2: rodotrem ? form.trailer_plate_2 : '',
+      freight_value: Number(form.freight_value),
+    };
     Object.keys(payload).forEach((k) => { if (payload[k] === '') payload[k] = null; });
     setSaving(true);
     try {
@@ -206,7 +227,7 @@ export default function PortClientOrderPage() {
         ? await api.updatePortClientOrder(editing.id, payload)
         : await api.createPortClientOrder(payload);
       toast.success(editing ? 'Ordem atualizada' : `Ordem Nº ${r.data.order_number} criada`);
-      if (r.data.container_warning) toast.warning(r.data.container_warning);
+      (r.data.container_warnings || []).forEach((w) => toast.warning(w));
       setModalOpen(false);
       loadOrders();
     } catch (e) {
@@ -266,7 +287,17 @@ export default function PortClientOrderPage() {
   const single = selectedIds.size === 1 ? orders.find((o) => o.id === [...selectedIds][0]) : null;
   const singleOpen = single && !FINAL_STATUSES.includes(single.status);
 
-  const formWarning = containerWarning(form.container_number);
+  const setContainer = (idx, key, value) => setForm((p) => ({
+    ...p, containers: p.containers.map((c, i) => (i === idx ? { ...c, [key]: value } : c)),
+  }));
+  // novo container herda tamanho/tipo do anterior (o normal é a ordem levar containers iguais)
+  const addContainer = () => setForm((p) => {
+    const last = p.containers[p.containers.length - 1] || emptyContainer();
+    return { ...p, containers: [...p.containers, { ...emptyContainer(), container_size: last.container_size, container_type: last.container_type }] };
+  });
+  const removeContainer = (idx) => setForm((p) => ({
+    ...p, containers: p.containers.length > 1 ? p.containers.filter((_, i) => i !== idx) : [emptyContainer()],
+  }));
   const isFinal = editing && FINAL_STATUSES.includes(editing.status);
   const cavalos = vehicles.filter((v) => v.vehicle_type !== 'CARRETA');
   const carretas = vehicles.filter((v) => v.vehicle_type === 'CARRETA');
@@ -276,7 +307,7 @@ export default function PortClientOrderPage() {
       <div className="space-y-4" data-testid="port-client-order-page">
         <PageHeader
           icon={Container}
-          title="Ordem de Serviço – Porto x Cliente"
+          title="Ordem de Serviço - Cliente"
           subtitle="Entrega e coleta de container cheio direto entre porto e cliente, sem passar pelo terminal (não gera EIR nem movimentação de pátio)"
         />
 
@@ -332,7 +363,7 @@ export default function PortClientOrderPage() {
         </FilterCard>
 
         <DataCard
-          title="Ordens Porto x Cliente"
+          title="Ordens de Serviço - Cliente"
           count={pagination.total}
           toolbar={(
             <Toolbar
@@ -372,7 +403,7 @@ export default function PortClientOrderPage() {
                     <th>Operação</th>
                     <th>Cliente</th>
                     <th>Porto/Terminal</th>
-                    <th>Container</th>
+                    <th>Containers</th>
                     <th>Motorista / Placa</th>
                     <th>Status</th>
                     <th className="!text-right">Frete</th>
@@ -391,11 +422,18 @@ export default function PortClientOrderPage() {
                         </td>
                         <td><div className="max-w-[170px] truncate" title={o.client_name || ''}>{o.client_name}</div></td>
                         <td><div className="max-w-[130px] truncate" title={o.port_terminal_name || ''}>{o.port_terminal_name}</div></td>
-                        <td className="whitespace-nowrap font-mono">
-                          <span className="inline-flex items-center gap-1" title={o.container_warning || ''}>
-                            {o.container_number}
-                            {o.container_warning && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
-                          </span>
+                        <td className="whitespace-nowrap font-mono" data-testid="pco-row-containers">
+                          {(o.containers || []).slice(0, 2).map((c) => (
+                            <div key={c.container_number} className="flex items-center gap-1" title={c.warning || ''}>
+                              {c.container_number}
+                              {c.warning && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />}
+                            </div>
+                          ))}
+                          {(o.containers || []).length > 2 && (
+                            <span className="text-xs text-slate-500 font-sans" title={o.containers.slice(2).map((c) => c.container_number).join(', ')}>
+                              + {o.containers.length - 2} container(s)
+                            </span>
+                          )}
                         </td>
                         <td>
                           <div className="max-w-[170px] truncate" title={o.driver_name || ''}>{o.driver_name || '-'}</div>
@@ -419,7 +457,7 @@ export default function PortClientOrderPage() {
             <DialogTitle className="flex items-center gap-2 text-base">
               <Container className="w-4 h-4 text-primary" />
               {editing ? `Editar Ordem Nº ${editing.order_number}` : `Nova Ordem${nextNumber ? ` Nº ${nextNumber}` : ''}`}
-              <span className="text-xs font-normal text-slate-500">· Porto x Cliente (sem EIR)</span>
+              <span className="text-xs font-normal text-slate-500">· direto porto x cliente (sem EIR)</span>
             </DialogTitle>
           </DialogHeader>
 
@@ -480,46 +518,58 @@ export default function PortClientOrderPage() {
               <Input className="h-9" value={form.client_address} onChange={(e) => set('client_address', e.target.value)} data-testid="pco-address" />
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="col-span-2">
-                <Label className="mb-1.5 block">Nº do Container *</Label>
-                <Input className="h-9 font-mono uppercase" value={form.container_number} placeholder="ABCU1234567"
-                  onChange={(e) => set('container_number', e.target.value.toUpperCase())} data-testid="pco-container" />
-                {formWarning && (
-                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1" data-testid="pco-container-warning">
-                    <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" /> {formWarning}
-                  </p>
-                )}
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2" data-testid="pco-containers">
+              <div className="flex items-center justify-between">
+                <div className="flex items-baseline gap-2"><Label>Containers *</Label><span className="text-xs text-slate-500">condição: Cheio</span></div>
+                <span className="text-xs text-slate-500">{form.containers.filter((c) => c.container_number.trim()).length} container(s)</span>
               </div>
-              <div>
-                <Label className="mb-1.5 block">Tamanho</Label>
-                <Select value={form.container_size || '_empty'} onValueChange={(v) => set('container_size', v === '_empty' ? '' : v)}>
-                  <SelectTrigger className="h-9" data-testid="pco-size"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_empty">-</SelectItem>
-                    {SIZE_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}'</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Tipo</Label>
-                <Select value={form.container_type || '_empty'} onValueChange={(v) => set('container_type', v === '_empty' ? '' : v)}>
-                  <SelectTrigger className="h-9" data-testid="pco-type"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_empty">-</SelectItem>
-                    {TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="mb-1.5 block">Condição</Label>
-                <Input className="h-9" value="Cheio" disabled />
-              </div>
+              {form.containers.map((c, idx) => {
+                const warning = containerWarning(c.container_number);
+                return (
+                  <div key={idx} data-testid={`pco-container-row-${idx}`}>
+                    <div className="grid grid-cols-[1.5rem_1fr_6rem_8rem_2rem] gap-2 items-center">
+                      <span className="text-xs text-slate-400 tabular-nums text-right">{idx + 1}.</span>
+                      <Input className="h-9 font-mono uppercase" value={c.container_number} placeholder="ABCU1234567"
+                        onChange={(e) => setContainer(idx, 'container_number', e.target.value.toUpperCase())}
+                        data-testid={`pco-container-${idx}`} aria-label={`Nº do container ${idx + 1}`} />
+                      <Select value={c.container_size || '_empty'} onValueChange={(v) => setContainer(idx, 'container_size', v === '_empty' ? '' : v)}>
+                        <SelectTrigger className="h-9" aria-label="Tamanho"><SelectValue placeholder="Tam." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_empty">Tam.</SelectItem>
+                          {SIZE_OPTIONS.map((sz) => <SelectItem key={sz} value={sz}>{sz}'</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={c.container_type || '_empty'} onValueChange={(v) => setContainer(idx, 'container_type', v === '_empty' ? '' : v)}>
+                        <SelectTrigger className="h-9" aria-label="Tipo"><SelectValue placeholder="Tipo" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_empty">Tipo</SelectItem>
+                          {TYPE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600"
+                        onClick={() => removeContainer(idx)} title="Remover container" data-testid={`pco-container-remove-${idx}`}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {warning && (
+                      <p className="mt-1 ml-8 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1" data-testid={`pco-container-warning-${idx}`}>
+                        <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" /> {warning}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+              <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={addContainer} data-testid="pco-add-container">
+                <Plus className="w-4 h-4" /> Adicionar container
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label className="mb-1.5 block">Booking</Label>
                 <Input className="h-9 uppercase" value={form.booking} onChange={(e) => set('booking', e.target.value)} />
               </div>
-              <div className="col-span-2">
+              <div>
                 <Label className="mb-1.5 block">BL</Label>
                 <Input className="h-9 uppercase" value={form.bl} onChange={(e) => set('bl', e.target.value)} />
               </div>
@@ -560,7 +610,25 @@ export default function PortClientOrderPage() {
                   className="font-mono"
                   testId="pco-trailer"
                 />
+                <label className="mt-1.5 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer">
+                  <Checkbox checked={form.rodotrem} onCheckedChange={(v) => set('rodotrem', !!v)} data-testid="pco-rodotrem" />
+                  Rodotrem (2ª carreta)
+                </label>
               </div>
+              {form.rodotrem && (
+                <div className="md:col-start-3">
+                  <Label className="mb-1.5 block">Placa da 2ª Carreta</Label>
+                  <Autocomplete
+                    value={form.trailer_plate_2}
+                    onChange={(v) => set('trailer_plate_2', formatPlate(v))}
+                    onSelect={(v) => set('trailer_plate_2', formatPlate(v.plate))}
+                    options={carretas}
+                    displayField={(v) => `${v.plate}${v.model ? ' - ' + v.model : ''}`}
+                    className="font-mono"
+                    testId="pco-trailer-2"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
