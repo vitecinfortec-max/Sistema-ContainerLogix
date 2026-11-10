@@ -1,7 +1,8 @@
 """Transporte - Acerto de Motorista (modelo do Bsoft): fecha as contas de um
 motorista juntando os abastecimentos que ele pagou do bolso, as despesas da
-viagem, as viagens acertadas (Ordens de Carregamento aprovadas, com km
-inicial/final) e os adiantamentos/devoluções.
+viagem, as viagens acertadas (Ordens de Carregamento aprovadas e Ordens de
+Serviço - Cliente em trânsito ou concluídas, com km inicial/final) e os
+adiantamentos/devoluções.
 
 Saldo = abastecimentos + despesas - adiantamentos + devoluções
   positivo: a empresa paga ao motorista; negativo: o motorista devolve.
@@ -24,7 +25,7 @@ from period_reports import Column, Section, DAY, INT, MONEY, pdf_response
 from reports import today_brt
 from routers.fuel_supply import _fuel_calc
 from settlement_links import settlement_holding
-from shared import db, get_current_admin_user
+from shared import db, get_current_admin_user, plate_regex
 
 api_router = APIRouter(prefix="/api")
 
@@ -65,14 +66,44 @@ def _fuel_snapshot(supply: dict) -> dict:
     }
 
 
+# Situações da Ordem de Serviço - Cliente que já podem entrar no acerto (a viagem saiu)
+CLIENT_OS_TRIP_STATUSES = ("EM_TRANSITO", "CONCLUIDA")
+CLIENT_OS_STATUS_LABELS = {"ABERTA": "aberta", "EM_TRANSITO": "em trânsito", "CONCLUIDA": "concluída", "CANCELADA": "cancelada"}
+TRIP_SOURCE_PREFIX = {"ORDEM_CARREGAMENTO": "OC", "OS_CLIENTE": "OS-C"}
+
+
+def _km(km_start, km_end):
+    return round(km_end - km_start, 1) if km_start is not None and km_end is not None else None
+
+
 def _trip_snapshot(order: dict, km_start, km_end) -> dict:
     return {
+        "source": "ORDEM_CARREGAMENTO",
         "loading_order_id": order["id"], "order_number": order.get("order_number"),
         "order_date": as_local_date(order.get("created_at")), "order_type": order.get("order_type"),
         "booking": order.get("booking"), "route_name": order.get("route_name"), "client_name": order.get("client_name"),
         "truck_plate": order.get("truck_plate"), "km_start": km_start, "km_end": km_end,
-        "km": round(km_end - km_start, 1) if km_start is not None and km_end is not None else None,
+        "km": _km(km_start, km_end),
     }
+
+
+def _client_os_trip_snapshot(order: dict, km_start, km_end) -> dict:
+    """Viagem de uma Ordem de Serviço - Cliente (routers/port_client_orders.py)."""
+    port, client = order.get("port_terminal_name"), order.get("client_name")
+    route = f"{client} → {port}" if order.get("operation_type") == "COLETA" else f"{port} → {client}"
+    return {
+        "source": "OS_CLIENTE",
+        "port_client_order_id": order["id"], "order_number": order.get("order_number"),
+        "order_date": (order.get("scheduled_at") or "")[:10] or as_local_date(order.get("created_at")),
+        "order_type": order.get("operation_type"), "booking": order.get("booking"), "route_name": route,
+        "client_name": client, "truck_plate": order.get("truck_plate"), "km_start": km_start, "km_end": km_end,
+        "km": _km(km_start, km_end),
+    }
+
+
+def trip_order_label(trip: dict) -> str:
+    """'OC 12' / 'OS-C 5': as duas numerações são independentes."""
+    return f"{TRIP_SOURCE_PREFIX.get(trip.get('source') or 'ORDEM_CARREGAMENTO', '')} {trip.get('order_number') or ''}".strip()
 
 
 def _totals(fuel: list, trips: list, expenses: list, advances: list) -> dict:
@@ -121,9 +152,32 @@ async def _build(data: DriverSettlementCreate, settlement_id: Optional[str] = No
 
     trips, seen = [], set()
     for trip in data.trips:
-        if trip.loading_order_id in seen:
+        if bool(trip.loading_order_id) == bool(trip.port_client_order_id):
+            raise HTTPException(status_code=400, detail="Cada viagem deve indicar uma Ordem de Carregamento ou uma Ordem de Serviço - Cliente")
+        if trip.port_client_order_id:
+            if ("os", trip.port_client_order_id) in seen:
+                continue
+            seen.add(("os", trip.port_client_order_id))
+            order = await db.port_client_orders.find_one({"id": trip.port_client_order_id}, {"_id": 0})
+            if not order:
+                raise HTTPException(status_code=400, detail="Ordem de Serviço - Cliente não encontrada")
+            label = f"Ordem de Serviço - Cliente nº {order.get('order_number')}"
+            if order.get("status") not in CLIENT_OS_TRIP_STATUSES:
+                raise HTTPException(status_code=400, detail=(
+                    f"{label} está {CLIENT_OS_STATUS_LABELS.get(order.get('status'), order.get('status'))}: "
+                    "só entra no acerto em trânsito ou concluída"))
+            if order.get("driver_id") != driver["id"]:
+                raise HTTPException(status_code=400, detail=f"{label} é de outro motorista")
+            if trip.km_start is not None and trip.km_end is not None and trip.km_end < trip.km_start:
+                raise HTTPException(status_code=400, detail=f"{label}: km final menor que o inicial")
+            other = await settlement_holding("client_os", trip.port_client_order_id, exclude_id=settlement_id)
+            if other:
+                raise HTTPException(status_code=400, detail=f"{label} já está no Acerto nº {other['settlement_number']}")
+            trips.append(_client_os_trip_snapshot(order, trip.km_start, trip.km_end))
             continue
-        seen.add(trip.loading_order_id)
+        if ("oc", trip.loading_order_id) in seen:
+            continue
+        seen.add(("oc", trip.loading_order_id))
         order = await db.loading_orders.find_one({"id": trip.loading_order_id}, {"_id": 0})
         if not order:
             raise HTTPException(status_code=400, detail="Ordem de Carregamento não encontrada")
@@ -211,27 +265,38 @@ async def list_candidates(
     driver_id: str, vehicle_id: Optional[str] = None, settlement_id: Optional[str] = None,
     current_user: dict = Depends(get_current_admin_user),
 ):
-    """Abastecimentos pagos pelo motorista e viagens aprovadas dele que ainda
-    não estão em outro acerto (os do próprio acerto em edição continuam)."""
+    """Abastecimentos pagos pelo motorista e viagens dele (Ordens de
+    Carregamento aprovadas e Ordens de Serviço - Cliente em trânsito ou
+    concluídas) que ainda não estão em outro acerto (os do próprio acerto em
+    edição continuam)."""
     fuel_query = {"driver_id": driver_id, "payment_type": "PAGO_MOTORISTA"}
     trip_query = {"driver_id": driver_id, "status": "APROVADA"}
+    os_query = {"driver_id": driver_id, "status": {"$in": list(CLIENT_OS_TRIP_STATUSES)}}
     if vehicle_id:
         vehicle = await db.vehicles.find_one({"id": vehicle_id}, {"_id": 0, "plate": 1})
         fuel_query["equipment_id"] = vehicle_id
         if vehicle and vehicle.get("plate"):
             trip_query["truck_plate"] = vehicle["plate"]
+            os_query["truck_plate"] = {"$regex": plate_regex(vehicle["plate"], exact=True), "$options": "i"}
 
-    used_fuel, used_trips = set(), set()
+    used_fuel, used_trips, used_os = set(), set(), set()
     others = {"id": {"$ne": settlement_id}} if settlement_id else {}
-    async for s in db.driver_settlements.find(others, {"_id": 0, "fuel_supplies.id": 1, "trips.loading_order_id": 1}):
+    projection = {"_id": 0, "fuel_supplies.id": 1, "trips.loading_order_id": 1, "trips.port_client_order_id": 1}
+    async for s in db.driver_settlements.find(others, projection):
         used_fuel.update(f["id"] for f in s.get("fuel_supplies") or [])
-        used_trips.update(t["loading_order_id"] for t in s.get("trips") or [])
+        for t in s.get("trips") or []:
+            if t.get("port_client_order_id"):
+                used_os.add(t["port_client_order_id"])
+            elif t.get("loading_order_id"):
+                used_trips.add(t["loading_order_id"])
 
     supplies = await db.fuel_supplies.find(fuel_query, {"_id": 0}).sort("supply_date", -1).to_list(300)
     orders = await db.loading_orders.find(trip_query, {"_id": 0}).sort("order_number", -1).to_list(300)
+    client_orders = await db.port_client_orders.find(os_query, {"_id": 0}).sort("order_number", -1).to_list(300)
     return {
         "fuel_supplies": [_fuel_snapshot(s) for s in supplies if s["id"] not in used_fuel],
-        "trips": [_trip_snapshot(o, None, None) for o in orders if o["id"] not in used_trips],
+        "trips": [_trip_snapshot(o, None, None) for o in orders if o["id"] not in used_trips]
+        + [_client_os_trip_snapshot(o, None, None) for o in client_orders if o["id"] not in used_os],
     }
 
 
@@ -342,9 +407,9 @@ async def get_settlement_pdf(settlement_id: str, current_user: dict = Depends(ge
         ),
         Section(
             "Viagens acertadas",
-            [Column("Ordem", INT, 7), Column("Data", DAY, 9), Column("Booking", width=12), Column("Rota", width=26),
+            [Column("Ordem", width=8, align="center"), Column("Data", DAY, 9), Column("Booking", width=12), Column("Rota", width=26),
              Column("Placa", width=9, align="center"), Column("Km inicial", INT, 10), Column("Km final", INT, 10), Column("Km", INT, 8)],
-            [[t.get("order_number"), t.get("order_date"), t.get("booking"), t.get("route_name"), t.get("truck_plate"),
+            [[trip_order_label(t), t.get("order_date"), t.get("booking"), t.get("route_name"), t.get("truck_plate"),
               t.get("km_start"), t.get("km_end"), t.get("km")] for t in trips],
             total=["TOTAL", None, None, None, None, None, None, s.get("km_total")],
             empty_text="Nenhuma viagem.",

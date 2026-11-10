@@ -36,6 +36,12 @@ const emptyAdvance = () => ({ id: newRowId(), kind: 'ADIANTAMENTO', number: '', 
 
 // Novo acerto (/driver-settlements/new) e edição (/driver-settlements/:id/edit).
 // Fechado abre só para consulta.
+// Viagem acertada: vem de uma Ordem de Carregamento (OC) ou de uma Ordem de
+// Serviço - Cliente (OS-C). As numerações são independentes, então a chave
+// e o rótulo levam a origem.
+const tripKey = (t) => (t.port_client_order_id ? `os:${t.port_client_order_id}` : `oc:${t.loading_order_id}`);
+const tripLabel = (t) => `${t.port_client_order_id ? 'OS-C' : 'OC'} ${t.order_number ?? ''}`.trim();
+
 export default function DriverSettlementFormPage() {
   const { id } = useParams();
   const isEdit = !!id;
@@ -51,7 +57,7 @@ export default function DriverSettlementFormPage() {
   const [candidates, setCandidates] = useState({ fuel_supplies: [], trips: [] });
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [selectedFuel, setSelectedFuel] = useState(() => new Set());
-  const [tripKm, setTripKm] = useState({}); // loading_order_id -> { km_start, km_end } (texto digitado)
+  const [tripKm, setTripKm] = useState({}); // tripKey -> { km_start, km_end } (texto digitado)
   const [selectedTrips, setSelectedTrips] = useState(() => new Set());
   const [expenses, setExpenses] = useState([]);
   const [advances, setAdvances] = useState([]);
@@ -72,8 +78,8 @@ export default function DriverSettlementFormPage() {
           settlement_date: data.settlement_date, observations: data.observations || '',
         });
         setSelectedFuel(new Set((data.fuel_supplies || []).map((f) => f.id)));
-        setSelectedTrips(new Set((data.trips || []).map((t) => t.loading_order_id)));
-        setTripKm(Object.fromEntries((data.trips || []).map((t) => [t.loading_order_id, {
+        setSelectedTrips(new Set((data.trips || []).map(tripKey)));
+        setTripKm(Object.fromEntries((data.trips || []).map((t) => [tripKey(t), {
           km_start: t.km_start ?? '', km_end: t.km_end ?? '',
         }])));
         setExpenses((data.expenses || []).map((e) => ({
@@ -114,9 +120,9 @@ export default function DriverSettlementFormPage() {
     return [...byId.values()].sort((a, b) => (b.supply_date || '').localeCompare(a.supply_date || ''));
   }, [stored, candidates, selectedFuel]);
   const tripRows = useMemo(() => {
-    const byId = new Map((stored?.trips || []).filter((t) => selectedTrips.has(t.loading_order_id)).map((t) => [t.loading_order_id, t]));
-    candidates.trips.forEach((t) => byId.set(t.loading_order_id, t));
-    return [...byId.values()].sort((a, b) => (b.order_number || 0) - (a.order_number || 0));
+    const byId = new Map((stored?.trips || []).filter((t) => selectedTrips.has(tripKey(t))).map((t) => [tripKey(t), t]));
+    candidates.trips.forEach((t) => byId.set(tripKey(t), t));
+    return [...byId.values()].sort((a, b) => (b.order_date || '').localeCompare(a.order_date || '') || (b.order_number || 0) - (a.order_number || 0));
   }, [stored, candidates, selectedTrips]);
 
   const tripKmValue = (orderId) => {
@@ -168,16 +174,19 @@ export default function DriverSettlementFormPage() {
       return;
     }
     const trips = [];
-    for (const orderId of selectedTrips) {
-      const row = tripRows.find((t) => t.loading_order_id === orderId);
-      const km = tripKm[orderId] || {};
+    for (const key of selectedTrips) {
+      const row = tripRows.find((t) => tripKey(t) === key);
+      if (!row) continue;
+      const km = tripKm[key] || {};
       const kmStart = parseNumber(km.km_start);
       const kmEnd = parseNumber(km.km_end);
       if (Number.isNaN(kmStart) || Number.isNaN(kmEnd) || (kmStart !== null && kmEnd !== null && kmEnd < kmStart)) {
-        toast.error(`Ordem nº ${row?.order_number}: confira o km inicial e o final`);
+        toast.error(`Ordem ${tripLabel(row)}: confira o km inicial e o final`);
         return;
       }
-      trips.push({ loading_order_id: orderId, km_start: kmStart, km_end: kmEnd });
+      trips.push(row.port_client_order_id
+        ? { port_client_order_id: row.port_client_order_id, km_start: kmStart, km_end: kmEnd }
+        : { loading_order_id: row.loading_order_id, km_start: kmStart, km_end: kmEnd });
     }
     const expensePayload = [];
     for (const e of expenses) {
@@ -356,11 +365,11 @@ export default function DriverSettlementFormPage() {
             <FormSection title={`Viagens acertadas (${selectedTrips.size})`} icon={Route} contentClassName="p-0">
               {!form.driver_id ? <div className="p-4">{noDriverHint}</div> : tripRows.length === 0 ? (
                 <p className="p-4 text-sm text-slate-500 dark:text-slate-400">
-                  {loadingCandidates ? 'Carregando...' : 'Nenhuma Ordem de Carregamento aprovada em aberto para este motorista.'}
+                  {loadingCandidates ? 'Carregando...' : 'Nenhuma viagem em aberto para este motorista (Ordem de Carregamento aprovada ou Ordem de Serviço - Cliente em trânsito/concluída).'}
                 </p>
               ) : (
                 <div className="overflow-x-auto">
-                  <p className="px-4 pt-3 text-xs text-slate-500 dark:text-slate-400">Marque as viagens que serão acertadas e informe o km do hodômetro na saída e na chegada.</p>
+                  <p className="px-4 pt-3 text-xs text-slate-500 dark:text-slate-400">Marque as viagens que serão acertadas e informe o km do hodômetro na saída e na chegada. OC = Ordem de Carregamento · OS-C = Ordem de Serviço - Cliente.</p>
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -371,21 +380,23 @@ export default function DriverSettlementFormPage() {
                     </thead>
                     <tbody>
                       {tripRows.map((t) => {
-                        const checked = selectedTrips.has(t.loading_order_id);
-                        const km = tripKm[t.loading_order_id] || {};
-                        const distance = tripKmValue(t.loading_order_id);
+                        const key = tripKey(t);
+                        const checked = selectedTrips.has(key);
+                        const km = tripKm[key] || {};
+                        const distance = tripKmValue(key);
+                        const testSuffix = t.port_client_order_id ? `os-${t.order_number}` : t.order_number;
                         return (
-                          <tr key={t.loading_order_id} data-selected={checked}>
+                          <tr key={key} data-selected={checked}>
                             <td className="pr-0">
-                              <Checkbox checked={checked} onCheckedChange={() => toggleTrip(t.loading_order_id)} disabled={readOnly} aria-label={`Acertar viagem da ordem ${t.order_number}`} data-testid={`trip-check-${t.order_number}`} />
+                              <Checkbox checked={checked} onCheckedChange={() => toggleTrip(key)} disabled={readOnly} aria-label={`Acertar viagem da ordem ${tripLabel(t)}`} data-testid={`trip-check-${testSuffix}`} />
                             </td>
-                            <td className="cell-strong tabular-nums">{t.order_number}</td>
+                            <td className="cell-strong tabular-nums whitespace-nowrap" title={t.port_client_order_id ? 'Ordem de Serviço - Cliente' : 'Ordem de Carregamento'}>{tripLabel(t)}</td>
                             <td className="tabular-nums whitespace-nowrap">{formatDay(t.order_date)}</td>
                             <td className="hidden md:table-cell">{t.booking || '-'}</td>
                             <td className="hidden lg:table-cell"><div className="max-w-[220px] truncate">{t.route_name || t.client_name || '-'}</div></td>
                             <td className="hidden md:table-cell">{t.truck_plate ? <PlateTag>{t.truck_plate}</PlateTag> : '-'}</td>
-                            <td><Input inputMode="decimal" className={smallInput} value={km.km_start ?? ''} onChange={(e) => setKm(t.loading_order_id, 'km_start', e.target.value)} disabled={readOnly || !checked} aria-label={`Km inicial da ordem ${t.order_number}`} /></td>
-                            <td><Input inputMode="decimal" className={smallInput} value={km.km_end ?? ''} onChange={(e) => setKm(t.loading_order_id, 'km_end', e.target.value)} disabled={readOnly || !checked} aria-label={`Km final da ordem ${t.order_number}`} /></td>
+                            <td><Input inputMode="decimal" className={smallInput} value={km.km_start ?? ''} onChange={(e) => setKm(key, 'km_start', e.target.value)} disabled={readOnly || !checked} aria-label={`Km inicial da ordem ${tripLabel(t)}`} /></td>
+                            <td><Input inputMode="decimal" className={smallInput} value={km.km_end ?? ''} onChange={(e) => setKm(key, 'km_end', e.target.value)} disabled={readOnly || !checked} aria-label={`Km final da ordem ${tripLabel(t)}`} /></td>
                             <td className="text-right tabular-nums">{checked && distance != null ? formatNumber(distance, 1) : '-'}</td>
                           </tr>
                         );

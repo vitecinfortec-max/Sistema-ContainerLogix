@@ -4747,7 +4747,9 @@ class DriverSettlementExpense(BaseModel):
 
 
 class DriverSettlementTrip(BaseModel):
-    loading_order_id: str
+    # Uma viagem vem de uma Ordem de Carregamento OU de uma Ordem de Serviço - Cliente
+    loading_order_id: Optional[str] = None
+    port_client_order_id: Optional[str] = None
     km_start: Optional[float] = Field(default=None, ge=0)
     km_end: Optional[float] = Field(default=None, ge=0)
 

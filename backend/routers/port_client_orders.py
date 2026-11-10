@@ -23,6 +23,7 @@ from reports import (
     fmt_datetime, merge_company, now_brt, tabular_fmt,
     generate_tabular_report_pdf, generate_tabular_report_excel,
 )
+from settlement_links import ensure_not_in_settlement, settlement_holding
 from shared import db, get_current_active_user, get_company_settings, format_plate, plate_regex
 
 api_router = APIRouter(prefix="/api")
@@ -309,6 +310,12 @@ async def update_port_client_order(order_id: str, data: PortClientOrderUpdate, c
     merged = {**existing, **changes}
     _validate(merged)
     _check_status_change(existing.get('status'), merged.get('status'))
+    if merged.get('status') != existing.get('status') or merged.get('driver_id') != existing.get('driver_id'):
+        settlement = await settlement_holding('client_os', order_id)
+        if settlement:
+            raise HTTPException(status_code=400, detail=(
+                f"Ordem está no Acerto de Motorista nº {settlement['settlement_number']}: tire-a do acerto "
+                "(ou reabra o acerto) antes de mudar o status ou o motorista."))
     if merged.get('status') == 'CONCLUIDA' and not merged.get('completed_at'):
         changes['completed_at'] = _now_local()
     changes['container_condition'] = 'CHEIO'
@@ -324,6 +331,7 @@ async def update_port_client_order(order_id: str, data: PortClientOrderUpdate, c
 
 @api_router.delete("/port-client-orders/{order_id}")
 async def delete_port_client_order(order_id: str, current_user: dict = Depends(get_current_active_user)):
+    await ensure_not_in_settlement('client_os', order_id, 'excluir')
     result = await db.port_client_orders.delete_one({'id': order_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail='Ordem de Serviço não encontrada')
