@@ -1,7 +1,8 @@
 """Alertas financeiros do sino do topo (só para administradores): cheques
 vencidos sem compensar, cheques vencendo nos próximos dias, cheques devolvidos,
 faturas vencidas, divergências entre Ordens de Coleta e Pagamento Frete e
-prestações de contas abertas há muito tempo. Módulo não contratado pelo
+prestações de contas abertas há muito tempo e contas a pagar vencidas ou
+vencendo. Módulo não contratado pelo
 cliente não gera alerta."""
 from datetime import datetime, timedelta
 
@@ -10,6 +11,7 @@ from list_filters import period_query
 from shared import db, get_disabled_modules, is_module_disabled
 from routers.checks import DUE_SOON_DAYS
 from routers.freight_reports import build_freight_reconciliation
+from routers.payables import build_payable_alerts
 
 FREIGHT_CHECK_DAYS = 90  # janela da conferência Ordens x Pagamento Frete
 EXPENSE_OPEN_DAYS = 30   # prestação de contas em andamento há mais que isso
@@ -108,5 +110,8 @@ async def build_financial_alerts() -> list:
                 "path": "/expense-reports",
                 "tone": "amber",
             })
+
+    if not is_module_disabled("financeiro.contas_pagar", disabled):
+        alerts += await build_payable_alerts()
 
     return alerts

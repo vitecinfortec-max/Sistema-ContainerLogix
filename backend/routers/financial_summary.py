@@ -64,6 +64,8 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
     daily_requests = await find("daily_rate_requests", {"status": {"$in": ["PAGO", "PENDENTE"]}}, "financeiro.diaria")
     expense_reports = await find("expense_reports", {}, "financeiro.prestacao_contas")
     purchases = await find("container_purchases", {}, "gestao_container.compra")
+    payables_paid = await find("payables", {"status": "PAGO"}, "financeiro.contas_pagar")
+    payables_open = await find("payables", {"status": "ABERTO"}, "financeiro.contas_pagar")
     credit_entries = await find("client_credit_entries", {}, "financeiro.credito_cliente")
     credit_accounts = await find("client_credit_accounts", {}, "financeiro.credito_cliente")
 
@@ -102,6 +104,7 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
               lambda d: net(d), lambda d: d.get("entry_date"), note="adiantamentos: abatidos depois nas faturas, que contam só o restante"),
     ]
     outflows = [
+        _line("payables", "Contas a pagar pagas", "financeiro.contas_pagar", payables_paid, lambda d: d.get("paid_amount"), lambda d: d.get("paid_date")),
         _line("checks", "Cheques compensados", "financeiro.controle_cheque", checks_comp, lambda d: d.get("amount"), lambda d: d.get("compensation_date"),
               note="o cheque pode ter sido o meio de pagamento de outra saída desta lista"),
         _line("freight", "Pagamento de frete", "financeiro.pagamento_frete", freight_paid, lambda d: d.get("freight_value"), lambda d: _day(d.get("paid_at"))),
@@ -127,6 +130,7 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
               lambda d: (d.get("sale_value") or 0) - (d.get("received_value") or 0)),
     ]
     payable = [
+        _line("payables_open", "Contas a pagar em aberto", "financeiro.contas_pagar", payables_open, lambda d: d.get("amount")),
         _line("checks_open", "Cheques emitidos a compensar", "financeiro.controle_cheque", checks_open, lambda d: d.get("amount")),
         _line("freight_open", "Fretes a pagar", "financeiro.pagamento_frete", freight_open, lambda d: d.get("freight_value")),
         _line("daily_open", "Diárias a pagar", "financeiro.diaria", daily_open, lambda d: d.get("total")),

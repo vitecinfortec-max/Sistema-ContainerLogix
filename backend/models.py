@@ -4930,3 +4930,63 @@ class MaintenanceExecutionCreate(BaseModel):
 
 class MaintenancePlanSettings(BaseModel):
     alert_emails: Optional[str] = None  # separados por ";"
+
+
+# ==================== FINANCEIRO - CONTAS A PAGAR ====================
+# Regras em routers/payables.py
+
+class ChartAccountCreate(BaseModel):
+    code: str  # ex: 2.01 (a ordem do plano de contas segue o código)
+    name: str
+    kind: Literal["DESPESA", "RECEITA"] = "DESPESA"
+    active: bool = True
+
+
+class CostCenterCreate(BaseModel):
+    name: str
+    active: bool = True
+
+
+class PayableInstallmentIn(BaseModel):
+    due_date: str  # YYYY-MM-DD
+    amount: float = Field(gt=0)
+
+
+class PayableCreate(BaseModel):
+    description: str
+    supplier_id: Optional[str] = None  # do cadastro de Fornecedor
+    supplier_name: Optional[str] = None  # ou só o nome, sem cadastro
+    document_number: Optional[str] = None  # NF, boleto, contrato...
+    issue_date: str  # YYYY-MM-DD (data do documento)
+    account_id: Optional[str] = None  # Plano de Contas
+    cost_center_id: Optional[str] = None
+    recurrence: Literal["UNICA", "PARCELADA", "RECORRENTE"] = "UNICA"
+    installments: List[PayableInstallmentIn]
+    notes: Optional[str] = None
+
+
+class PayableUpdate(BaseModel):
+    """Altera uma parcela (só em aberto)."""
+    description: str
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    document_number: Optional[str] = None
+    issue_date: str
+    due_date: str
+    amount: float = Field(gt=0)
+    account_id: Optional[str] = None
+    cost_center_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class PayablePay(BaseModel):
+    ids: List[str]
+    paid_date: str  # YYYY-MM-DD
+    payment_method: str
+    interest: float = Field(default=0, ge=0)  # juros/multa (só pagando uma parcela)
+    discount: float = Field(default=0, ge=0)  # desconto (idem)
+    payment_notes: Optional[str] = None
+
+
+class PayableCancel(BaseModel):
+    cancelled: bool

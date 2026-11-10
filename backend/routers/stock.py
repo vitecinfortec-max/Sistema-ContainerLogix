@@ -20,9 +20,13 @@ from models import (
     StockValueByWarehousePoint, DailyStockLedgerPoint,
     StockEntry, StockEntryResponse,
     StockMovement, StockMovementCreate, StockMovementUpdate, StockMovementResponse, StockMovementItem,
-    Supplier,
+    Supplier, PayableInstallmentIn,
 )
-from shared import db, get_current_active_user, get_company_settings, validate_and_read_upload, refuse_negative
+from shared import (
+    db, get_current_active_user, get_company_settings, validate_and_read_upload, refuse_negative,
+    get_disabled_modules, is_module_disabled,
+)
+from routers.payables import create_nfe_payables, delete_payables, nfe_payables_to_remove, prepare_nfe_payables
 from reports import (
     generate_stock_report_excel, generate_stock_report_pdf,
     generate_stock_ledger_report_excel, generate_stock_ledger_report_pdf,
@@ -735,6 +739,8 @@ async def parse_nfe_import(file: UploadFile = File(...), current_user: dict = De
         "matched_supplier_id": matched_supplier['id'] if matched_supplier else None,
         "matched_supplier_name": matched_supplier['name'] if matched_supplier else None,
         "items": items_out,
+        "installments": parsed['installments'],
+        "total_value": parsed['total_value'],
         # A tela avisa e não deixa confirmar (a confirmação também recusa)
         "already_imported": _already_imported_message(already_imported) if already_imported else None,
     }
@@ -752,6 +758,12 @@ class NfeImportItemConfirm(BaseModel):
     matched_product_id: Optional[str] = None  # None = criar produto novo
 
 
+class NfePayablesConfirm(BaseModel):
+    installments: List[PayableInstallmentIn]
+    account_id: Optional[str] = None
+    cost_center_id: Optional[str] = None
+
+
 class NfeImportConfirm(BaseModel):
     nfe_number: Optional[str] = None
     nfe_key: Optional[str] = None
@@ -760,6 +772,7 @@ class NfeImportConfirm(BaseModel):
     supplier_name: Optional[str] = None
     matched_supplier_id: Optional[str] = None  # None = criar fornecedor novo a partir do emitente
     items: List[NfeImportItemConfirm]
+    payables: Optional[NfePayablesConfirm] = None  # lançar as duplicatas em Contas a Pagar
 
 
 @api_router.post("/stock/nfe-import/confirm")
@@ -784,6 +797,19 @@ async def confirm_nfe_import(data: NfeImportConfirm, current_user: dict = Depend
             if not product_doc:
                 raise HTTPException(status_code=404, detail=f"Produto vinculado não encontrado: {item.description}")
             matched_products[item.matched_product_id] = product_doc
+
+    # Duplicatas em Contas a Pagar: só administrador e com o módulo contratado
+    payables_plan = None
+    if data.payables and data.payables.installments:
+        user = await db.users.find_one({"id": current_user['sub']}, {"_id": 0, "role": 1}) or {}
+        if user.get('role') != 'admin':
+            raise HTTPException(status_code=403, detail="Só o administrador lança as parcelas da nota em Contas a Pagar")
+        if is_module_disabled("financeiro.contas_pagar", await get_disabled_modules()):
+            raise HTTPException(status_code=400, detail="O módulo Contas a Pagar não está disponível no seu plano atual")
+        payables_plan = await prepare_nfe_payables(
+            nfe_issue_date=data.nfe_issue_date, installments=data.payables.installments,
+            account_id=data.payables.account_id, cost_center_id=data.payables.cost_center_id,
+        )
 
     nfe_key = (data.nfe_key or '').strip() or None
     existing = await _existing_nfe_import(nfe_key)
@@ -817,6 +843,7 @@ async def confirm_nfe_import(data: NfeImportConfirm, current_user: dict = Depend
 
     created_supplier_id = None
     created_product_ids = []
+    created_payables = []
     applied = []
     try:
         supplier_id = data.matched_supplier_id
@@ -873,9 +900,16 @@ async def confirm_nfe_import(data: NfeImportConfirm, current_user: dict = Depend
             entry_doc = entry.model_dump()
             entry_doc['created_at'] = entry_doc['created_at'].isoformat()
             await db.stock_entries.insert_one(entry_doc)
+
+        if payables_plan:
+            created_payables = await create_nfe_payables(
+                payables_plan, import_id=import_id, nfe_number=data.nfe_number, nfe_key=nfe_key,
+                supplier_id=supplier_id, supplier_name=supplier_name, current_user=current_user,
+            )
     except Exception:
         # Falhou no meio: desfaz o que já tinha entrado, pra nota poder ser
         # importada de novo sem somar nada em dobro
+        await delete_payables(created_payables)
         await db.stock_entries.delete_many({"import_id": import_id})
         await _revert_stock_deltas(applied)
         if created_product_ids:
@@ -890,6 +924,7 @@ async def confirm_nfe_import(data: NfeImportConfirm, current_user: dict = Depend
         "products_created": products_created,
         "products_updated": products_updated,
         "entries_created": len(data.items),
+        "payables_created": len(created_payables),
     }
 
 
@@ -929,6 +964,9 @@ async def reverse_stock_entry_import(entry_id: str, current_user: dict = Depends
                    "Exclua o reabastecimento na tela Nível do Tanque antes de estornar a importação.",
         )
 
+    # Parcelas em Contas a Pagar geradas pela nota: paga impede o estorno
+    payables = await nfe_payables_to_remove(entry.get('import_id'))
+
     deltas = {}
     for e in entries:
         deltas[e['product_id']] = deltas.get(e['product_id'], 0) - float(e.get('quantity') or 0)
@@ -945,13 +983,15 @@ async def reverse_stock_entry_import(entry_id: str, current_user: dict = Depends
             f"Estorno da {label}: {len(entries)} entrada(s)", {"entries": entries},
         )
         await db.stock_entries.delete_many(query)
+        await delete_payables(payables)
         keys = {(e.get('nfe_key') or '').strip() for e in entries} - {''}
         if keys:
             await db.stock_nfe_imports.delete_many({"_id": {"$in": list(keys)}})
     except Exception:
         await _revert_stock_deltas(applied)
         raise
-    return {"message": "Importação estornada e quantidades retiradas do estoque", "entries_removed": len(entries)}
+    return {"message": "Importação estornada e quantidades retiradas do estoque", "entries_removed": len(entries),
+            "payables_removed": len(payables)}
 
 
 # ==================== MOVIMENTAÇÃO DE ESTOQUE (ENTRADA/SAÍDA MANUAL) ====================

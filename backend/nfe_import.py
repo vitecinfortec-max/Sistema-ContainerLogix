@@ -95,6 +95,19 @@ def parse_nfe_xml(content: bytes) -> dict:
     if not items:
         raise ValueError("Nenhum item de produto encontrado nesta Nota Fiscal")
 
+    # Duplicatas (cobrança): viram as parcelas em Contas a Pagar
+    installments = []
+    cobr = _find(inf_nfe, 'cobr')
+    for dup in (cobr if cobr is not None else []):
+        if _local(dup.tag) != 'dup':
+            continue
+        amount = _to_float(_text(dup, 'vDup'))
+        due = _text(dup, 'dVenc')[:10]
+        if amount > 0 and due:
+            installments.append({'number': _text(dup, 'nDup'), 'due_date': due, 'amount': amount})
+    icms_tot = _find(inf_nfe, 'total/ICMSTot')
+    total_value = _to_float(_text(icms_tot, 'vNF')) if icms_tot is not None else 0.0
+
     return {
         'nfe_number': _text(ide, 'nNF'),
         'nfe_key': nfe_key,
@@ -102,4 +115,6 @@ def parse_nfe_xml(content: bytes) -> dict:
         'supplier_cnpj': _text(emit, 'CNPJ'),
         'supplier_name': _text(emit, 'xNome'),
         'items': items,
+        'installments': installments,
+        'total_value': total_value or round(sum(i['total_value'] for i in items), 2),
     }

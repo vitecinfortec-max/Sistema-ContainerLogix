@@ -841,6 +841,32 @@ export const api = {
   getLoadingOrderPDF: (id) => axios.get(`${API}/loading-orders/${id}/pdf`, { responseType: 'blob' }),
 
   // Ocorrências de Transporte
+  getChartAccounts: () => axios.get(`${API}/chart-accounts`),
+  createChartAccount: (data) => axios.post(`${API}/chart-accounts`, data),
+  updateChartAccount: (id, data) => axios.put(`${API}/chart-accounts/${id}`, data),
+  deleteChartAccount: (id) => axios.delete(`${API}/chart-accounts/${id}`),
+  getCostCenters: () => axios.get(`${API}/cost-centers`),
+  createCostCenter: (data) => axios.post(`${API}/cost-centers`, data),
+  updateCostCenter: (id, data) => axios.put(`${API}/cost-centers/${id}`, data),
+  deleteCostCenter: (id) => axios.delete(`${API}/cost-centers/${id}`),
+  getPayables: (params) => axios.get(`${API}/payables`, { params }),
+  getPayablesSummary: () => axios.get(`${API}/payables/summary`),
+  getPayable: (id) => axios.get(`${API}/payables/${id}`),
+  createPayable: (data) => axios.post(`${API}/payables`, data),
+  updatePayable: (id, data) => axios.put(`${API}/payables/${id}`, data),
+  deletePayable: (id, wholeGroup = false) => axios.delete(`${API}/payables/${id}`, { params: { whole_group: wholeGroup } }),
+  payPayables: (data) => axios.post(`${API}/payables/pay`, data),
+  unpayPayable: (id) => axios.post(`${API}/payables/${id}/unpay`),
+  cancelPayable: (id, cancelled) => axios.post(`${API}/payables/${id}/cancel`, { cancelled }),
+  uploadPayableAttachment: (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/payables/${id}/attachments`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  deletePayableAttachment: (id, attachmentId) => axios.delete(`${API}/payables/${id}/attachments/${attachmentId}`),
+  getPayablesReport: (params) => axios.get(`${API}/reports/payables`, { params }),
+  getPayablesReportPdf: (params) => axios.get(`${API}/reports/payables/pdf`, { params, responseType: 'blob' }),
+  getPayablesReportExcel: (params) => axios.get(`${API}/reports/payables/excel`, { params, responseType: 'blob' }),
   getMaintenancePlans: () => axios.get(`${API}/maintenance-plans`),
   getMaintenancePlan: (id) => axios.get(`${API}/maintenance-plans/${id}`),
   createMaintenancePlan: (data) => axios.post(`${API}/maintenance-plans`, data),

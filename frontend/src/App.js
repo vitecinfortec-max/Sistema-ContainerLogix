@@ -61,6 +61,9 @@ const StockReportPage = lazyPage(() => import('./pages/StockReportPage'));
 const ReportsMovementsPage = lazyPage(() => import('./pages/ReportsMovementsPage'));
 const ReportsBillingPage = lazyPage(() => import('./pages/ReportsBillingPage'));
 const BillingPage = lazyPage(() => import('./pages/BillingPage'));
+const AccountsPayablePage = lazyPage(() => import('./pages/AccountsPayablePage'));
+const AccountsPayableFormPage = lazyPage(() => import('./pages/AccountsPayableFormPage'));
+const ChartOfAccountsPage = lazyPage(() => import('./pages/ChartOfAccountsPage'));
 const ContainerInspectionsPage = lazyPage(() => import('./pages/ContainerInspectionsPage'));
 const NewContainerInspectionPage = lazyPage(() => import('./pages/NewContainerInspectionPage'));
 const ContainerInspectionDetailPage = lazyPage(() => import('./pages/ContainerInspectionDetailPage'));
@@ -826,6 +829,38 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.relatorio_faturamento">
                 <ReportsBillingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/accounts-payable"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.contas_pagar">
+                <AccountsPayablePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/accounts-payable/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.contas_pagar">
+                <AccountsPayableFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/accounts-payable/:id/edit"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.contas_pagar">
+                <AccountsPayableFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chart-of-accounts"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.contas_pagar">
+                <ChartOfAccountsPage />
               </ProtectedRoute>
             }
           />

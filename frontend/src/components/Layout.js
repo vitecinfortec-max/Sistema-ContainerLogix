@@ -91,6 +91,8 @@ import {
   FileBarChart,
   Monitor as MonitorIcon,
   CalendarClock,
+  ReceiptText,
+  ListTree,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem,
@@ -129,6 +131,7 @@ const FORM_PAGE_TITLES = {
   '/expense-reports': ['Nova Prestação de Contas', 'Editar Prestação de Contas'],
   '/driver-settlements': ['Novo Acerto da Viagem', 'Acerto da Viagem'],
   '/fleet/plano-manutencao': ['Novo Plano de Manutenção', 'Editar Plano de Manutenção'],
+  '/accounts-payable': ['Nova Conta a Pagar', 'Conta a Pagar'],
   '/daily-rate-requests': ['Nova Solicitação de Diária', 'Editar Solicitação de Diária'],
   '/billing': ['Gerar Nova Fatura', 'Editar Fatura'],
   '/international-invoices': ['Nova Invoice Internacional', 'Editar Invoice Internacional'],
@@ -145,6 +148,8 @@ const PAGE_TITLES = {
   '/fleet/ordem-servico': 'Ordem de Serviço',
   '/fleet/hodometro': 'Lançamento de Hodômetro',
   '/fleet/plano-manutencao': 'Plano de Manutenção',
+  '/accounts-payable': 'Contas a Pagar',
+  '/chart-of-accounts': 'Plano de Contas e Centros de Custo',
   '/fleet/controle-media': 'Controle de Média',
   '/fleet/ordem-abastecimento': 'Ordem de Abastecimento',
   '/fleet/abastecimento': 'Abastecimento',
@@ -491,7 +496,7 @@ function LayoutFrame({ children }) {
 
   const isMovimentacoesActive = location.pathname === '/movements' || location.pathname === '/movements/new' || location.pathname.startsWith('/movements/') || location.pathname === '/reports/movements' || location.pathname === '/yard-control' || location.pathname === '/container-inspections' || location.pathname.startsWith('/container-inspections/') || location.pathname === '/container-vistorias' || location.pathname.startsWith('/container-vistorias/') || location.pathname.startsWith('/repair-estimates') || location.pathname === '/container-audits' || location.pathname.startsWith('/container-audits/') || location.pathname.startsWith('/unit-segregation');
   const isCadastroActive = location.pathname === '/cadastro' || location.pathname === '/company-settings';
-  const isFinanceiroActive = location.pathname.startsWith('/billing') || location.pathname === '/reports/billing' || location.pathname.startsWith('/international-invoices') || location.pathname.startsWith('/daily-rate-requests') || location.pathname.startsWith('/expense-reports') || location.pathname === '/checks' || location.pathname === '/gratifications' || location.pathname === '/service-providers' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/client-credits' || location.pathname === '/port-services-billing';
+  const isFinanceiroActive = location.pathname.startsWith('/billing') || location.pathname.startsWith('/accounts-payable') || location.pathname === '/chart-of-accounts' || location.pathname === '/reports/billing' || location.pathname.startsWith('/international-invoices') || location.pathname.startsWith('/daily-rate-requests') || location.pathname.startsWith('/expense-reports') || location.pathname === '/checks' || location.pathname === '/gratifications' || location.pathname === '/service-providers' || location.pathname === '/reports/receivables' || location.pathname === '/financial-summary' || location.pathname === '/client-credits' || location.pathname === '/port-services-billing';
   // '/fleet' é compartilhado por Manutenção (aba Controle de Revisão) e Transporte
   // (Cadastro de Veículo, aba padrão) - só o parâmetro `tab` diferencia qual
   // grupo deve acender, senão os dois grupos ficariam ativos ao mesmo tempo.
@@ -838,6 +843,8 @@ function LayoutFrame({ children }) {
     { path: '/international-invoices', label: 'Invoice Internacional', icon: Globe, moduleKey: 'financeiro.invoice_internacional' },
     { path: '/reports/billing', label: 'Relatório de Faturamento', icon: BarChart3, moduleKey: 'financeiro.relatorio_faturamento' },
     { path: '/reports/receivables', label: 'Contas a Receber', icon: PiggyBank, moduleKey: 'financeiro.faturas' },
+    { path: '/accounts-payable', label: 'Contas a Pagar', icon: ReceiptText, moduleKey: 'financeiro.contas_pagar' },
+    { path: '/chart-of-accounts', label: 'Plano de Contas', icon: ListTree, moduleKey: 'financeiro.contas_pagar' },
     { path: '/daily-rate-requests', label: 'Solicitação de Diária', icon: Wallet, moduleKey: 'financeiro.diaria' },
     { path: '/expense-reports', label: 'Prestação de Contas', icon: Calculator, moduleKey: 'financeiro.prestacao_contas' },
     { path: '/checks', label: 'Controle de Cheque', icon: Banknote, moduleKey: 'financeiro.controle_cheque' },

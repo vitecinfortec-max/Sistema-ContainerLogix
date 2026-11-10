@@ -10,7 +10,7 @@ import {
   Receipt, Truck, Users, BarChart3, DollarSign, Ship, Building2,
   ClipboardList, Check, Settings2, Trophy, Medal, Award, AlertTriangle, CheckCircle2,
   Fuel, Wrench, Clock, FileCheck, PackageCheck, FileText, Car, Clipboard, Boxes, ArrowLeftRight,
-  Calculator, HardHat, Scale, Percent, PiggyBank, FileSpreadsheet, Handshake, CalendarClock
+  Calculator, HardHat, Scale, Percent, PiggyBank, FileSpreadsheet, Handshake, CalendarClock, Wallet
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useModuleConfig } from '../context/ModuleConfigContext';
@@ -107,6 +107,7 @@ const ALL_SHORTCUTS = [
   { id: 'mdfe', label: 'Manifesto (MDF-e)', icon: Truck, path: '/fiscal/mdfe', kind: 'tool', moduleKey: 'fiscal.mdfe' },
   { id: 'loading-orders', label: 'Ordem de Carregamento', icon: PackageCheck, path: '/loading-orders', kind: 'tool', moduleKey: 'operacional.ordem_carregamento' },
   { id: 'transport-occurrences', label: 'Ocorrências de Transporte', icon: AlertTriangle, path: '/transport-occurrences', kind: 'tool', moduleKey: 'operacional.ocorrencias_transporte' },
+  { id: 'accounts-payable', label: 'Contas a Pagar', icon: Wallet, path: '/accounts-payable', kind: 'tool', moduleKey: 'financeiro.contas_pagar', adminOnly: true },
   { id: 'maintenance-plans', label: 'Plano de Manutenção', icon: CalendarClock, path: '/fleet/plano-manutencao', kind: 'tool', moduleKey: 'frota.plano_manutencao' },
   { id: 'driver-settlements', label: 'Acerto da Viagem', icon: Handshake, path: '/driver-settlements', kind: 'tool', moduleKey: 'operacional.acerto_motorista', adminOnly: true },
   { id: 'loading-schedules', label: 'Programação de Carregamento', icon: Calendar, path: '/loading-schedules', kind: 'tool', moduleKey: 'operacional.programacao_carregamento' },

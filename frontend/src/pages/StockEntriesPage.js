@@ -9,12 +9,16 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../components/ui/dialog';
 import { Autocomplete } from '../components/Autocomplete';
+import { Checkbox } from '../components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { useAuth } from '../context/AuthContext';
+import { useModuleConfig } from '../context/ModuleConfigContext';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Upload, FileUp, ArrowLeft, Loader2, PackagePlus, Sparkles, Undo2, AlertTriangle } from 'lucide-react';
+import { Upload, FileUp, ArrowLeft, Loader2, PackagePlus, Sparkles, Undo2, AlertTriangle, Plus, Trash2, Wallet } from 'lucide-react';
 
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
@@ -32,8 +36,21 @@ const sameImport = (a, b) => {
   return a.id === b.id;
 };
 
+// Parcelas que a nota gera em Contas a Pagar: as duplicatas dela ou, sem
+// duplicata, uma parcela única com o valor da nota vencendo na emissão
+const nfeInstallments = (data) => (data.installments?.length
+  ? data.installments.map((i) => ({ due_date: i.due_date, amount: String(i.amount) }))
+  : [{ due_date: data.nfe_issue_date || '', amount: data.total_value ? String(data.total_value) : '' }]);
+const toAmount = (value) => Number(String(value).replace(',', '.')) || 0;
+
 export default function StockEntriesPage() {
   const { confirm, ConfirmDialog } = useConfirm();
+  const { user } = useAuth();
+  const { isModuleEnabled } = useModuleConfig();
+  const canLaunchPayables = user?.role === 'admin' && isModuleEnabled('financeiro.contas_pagar');
+  const [payables, setPayables] = useState({ enabled: false, installments: [], account_id: '', cost_center_id: '' });
+  const [accounts, setAccounts] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
   const [entries, setEntries] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [reversing, setReversing] = useState(false);
@@ -50,6 +67,12 @@ export default function StockEntriesPage() {
   const fileInputRef = useRef(null);
 
   useEffect(() => { loadEntries(); loadProducts(); }, []);
+
+  useEffect(() => {
+    if (!canLaunchPayables) return;
+    api.getChartAccounts().then((r) => setAccounts((r.data || []).filter((a) => a.active && a.kind === 'DESPESA'))).catch(() => {});
+    api.getCostCenters().then((r) => setCostCenters((r.data || []).filter((c) => c.active))).catch(() => {});
+  }, [canLaunchPayables]);
 
   const loadEntries = async () => {
     setLoading(true);
@@ -103,6 +126,7 @@ export default function StockEntriesPage() {
           matched_product_name: it.matched_product_name || null,
         })),
       });
+      setPayables({ enabled: canLaunchPayables, installments: nfeInstallments(data), account_id: '', cost_center_id: '' });
       setStep('review');
     } catch (error) {
       toast.error(apiErrorMessage(error, 'Erro ao ler o arquivo XML'));
@@ -131,8 +155,18 @@ export default function StockEntriesPage() {
     });
   };
 
+  const setInstallment = (index, field, value) => setPayables((prev) => ({
+    ...prev, installments: prev.installments.map((inst, i) => (i === index ? { ...inst, [field]: value } : inst)),
+  }));
+
   const handleConfirm = async () => {
     if (!preview) return;
+    const launch = canLaunchPayables && payables.enabled;
+    const installments = payables.installments.map((i) => ({ due_date: i.due_date, amount: toAmount(i.amount) }));
+    if (launch && (installments.length === 0 || installments.some((i) => !i.due_date || !(i.amount > 0)))) {
+      toast.error('Confira as parcelas de Contas a Pagar: cada uma precisa de vencimento e valor');
+      return;
+    }
     setConfirming(true);
     try {
       const payload = {
@@ -153,10 +187,14 @@ export default function StockEntriesPage() {
           total_value: Number(it.quantity || 0) * Number(it.unit_value || 0),
           matched_product_id: it.matched_product_id || null,
         })),
+        payables: launch ? {
+          installments, account_id: payables.account_id || null, cost_center_id: payables.cost_center_id || null,
+        } : null,
       };
       const r = await api.confirmNfeImport(payload);
-      const { products_created, products_updated, entries_created } = r.data;
-      toast.success(`Importação concluída: ${entries_created} entrada(s), ${products_created} produto(s) novo(s), ${products_updated} atualizado(s)`);
+      const { products_created, products_updated, entries_created, payables_created } = r.data;
+      toast.success(`Importação concluída: ${entries_created} entrada(s), ${products_created} produto(s) novo(s), ${products_updated} atualizado(s)`
+        + (payables_created ? `, ${payables_created} parcela(s) em Contas a Pagar` : ''));
       setOpen(false);
       resetImport();
       loadEntries();
@@ -175,7 +213,7 @@ export default function StockEntriesPage() {
     const group = entries.filter((e) => sameImport(e, selectedEntry));
     const label = selectedEntry.nfe_number ? `da NF-e Nº ${selectedEntry.nfe_number}` : 'desta entrada';
     const ok = await confirm(
-      `${group.length > 1 ? `As ${group.length} entradas` : 'A entrada'} ${label} ${group.length > 1 ? 'serão removidas' : 'será removida'} e as quantidades retiradas do estoque. Os produtos continuam cadastrados.`,
+      `${group.length > 1 ? `As ${group.length} entradas` : 'A entrada'} ${label} ${group.length > 1 ? 'serão removidas' : 'será removida'} e as quantidades retiradas do estoque. As parcelas da nota em Contas a Pagar, se houver, são excluídas. Os produtos continuam cadastrados.`,
       'Estornar a importação?',
     );
     if (!ok) return;
@@ -399,6 +437,74 @@ export default function StockEntriesPage() {
                   </div>
                 ))}
               </div>
+
+              {canLaunchPayables && (
+                <div className="border border-slate-200 dark:border-slate-700 rounded-md p-3 space-y-3" data-testid="nfe-payables-section">
+                  <label className="flex flex-wrap items-center gap-2 text-[0.8125rem] font-semibold">
+                    <Checkbox checked={payables.enabled} onCheckedChange={(v) => setPayables((prev) => ({ ...prev, enabled: !!v }))} data-testid="nfe-payables-toggle" />
+                    <Wallet className="w-4 h-4 text-primary" />
+                    Lançar em Contas a Pagar
+                    <span className="font-normal text-slate-500 dark:text-slate-400">
+                      ({preview.installments?.length ? `${preview.installments.length} duplicata(s) da nota` : 'nota sem duplicata: parcela única'})
+                    </span>
+                  </label>
+                  {payables.enabled && (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500 dark:text-slate-400">Plano de contas</Label>
+                          <Select value={payables.account_id || 'NONE'} onValueChange={(v) => setPayables((prev) => ({ ...prev, account_id: v === 'NONE' ? '' : v }))}>
+                            <SelectTrigger className="h-9 text-[0.8125rem]" data-testid="nfe-payables-account"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="NONE">Sem conta</SelectItem>
+                              {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.code} {a.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500 dark:text-slate-400">Centro de custo</Label>
+                          <Select value={payables.cost_center_id || 'NONE'} onValueChange={(v) => setPayables((prev) => ({ ...prev, cost_center_id: v === 'NONE' ? '' : v }))}>
+                            <SelectTrigger className="h-9 text-[0.8125rem]" data-testid="nfe-payables-center"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="NONE">Sem centro de custo</SelectItem>
+                              {costCenters.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      {payables.installments.map((inst, i) => (
+                        <div key={i} className="flex items-end gap-2">
+                          <span className="pb-2 text-xs text-slate-500 dark:text-slate-400 w-10 tabular-nums">{i + 1}/{payables.installments.length}</span>
+                          <div className="space-y-1 flex-1">
+                            <Label className="text-xs text-slate-500 dark:text-slate-400">Vencimento</Label>
+                            <Input type="date" value={inst.due_date} onChange={(e) => setInstallment(i, 'due_date', e.target.value)} className="h-9 text-[0.8125rem]" aria-label={`Vencimento da parcela ${i + 1}`} />
+                          </div>
+                          <div className="space-y-1 flex-1">
+                            <Label className="text-xs text-slate-500 dark:text-slate-400">Valor (R$)</Label>
+                            <Input inputMode="decimal" value={inst.amount} onChange={(e) => setInstallment(i, 'amount', e.target.value)} className="h-9 text-[0.8125rem]" aria-label={`Valor da parcela ${i + 1}`} />
+                          </div>
+                          <Button type="button" variant="ghost" size="icon" disabled={payables.installments.length === 1}
+                            onClick={() => setPayables((prev) => ({ ...prev, installments: prev.installments.filter((_, j) => j !== i) }))}
+                            aria-label={`Remover a parcela ${i + 1}`} title="Remover parcela">
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Button type="button" variant="outline" size="sm"
+                          onClick={() => setPayables((prev) => ({ ...prev, installments: [...prev.installments, { due_date: '', amount: '' }] }))}>
+                          <Plus className="w-4 h-4 mr-1" /> Adicionar parcela
+                        </Button>
+                        <span className="text-[0.75rem] text-slate-500 dark:text-slate-400">
+                          Total das parcelas: <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {fmtMoney(payables.installments.reduce((sum, i) => sum + toAmount(i.amount), 0))}
+                          </span>{preview.total_value ? ` · valor da nota ${fmtMoney(preview.total_value)}` : ''}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setStep('upload')}>
