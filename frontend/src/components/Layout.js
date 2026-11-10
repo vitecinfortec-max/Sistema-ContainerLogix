@@ -90,6 +90,7 @@ import {
   Handshake,
   FileBarChart,
   Monitor as MonitorIcon,
+  CalendarClock,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem,
@@ -127,6 +128,7 @@ const FORM_PAGE_TITLES = {
   '/port-services': ['Novo Serviço Portuário', 'Editar Serviço Portuário'],
   '/expense-reports': ['Nova Prestação de Contas', 'Editar Prestação de Contas'],
   '/driver-settlements': ['Novo Acerto da Viagem', 'Acerto da Viagem'],
+  '/fleet/plano-manutencao': ['Novo Plano de Manutenção', 'Editar Plano de Manutenção'],
   '/daily-rate-requests': ['Nova Solicitação de Diária', 'Editar Solicitação de Diária'],
   '/billing': ['Gerar Nova Fatura', 'Editar Fatura'],
   '/international-invoices': ['Nova Invoice Internacional', 'Editar Invoice Internacional'],
@@ -142,6 +144,7 @@ const PAGE_TITLES = {
   '/fleet/rpa-terceiro/new': 'Novo Contrato de Frete',
   '/fleet/ordem-servico': 'Ordem de Serviço',
   '/fleet/hodometro': 'Lançamento de Hodômetro',
+  '/fleet/plano-manutencao': 'Plano de Manutenção',
   '/fleet/controle-media': 'Controle de Média',
   '/fleet/ordem-abastecimento': 'Ordem de Abastecimento',
   '/fleet/abastecimento': 'Abastecimento',
@@ -500,7 +503,7 @@ function LayoutFrame({ children }) {
   const isComercialActive = location.pathname === '/comercial/cadastros' || location.pathname === '/comercial/tabela-servicos' || location.pathname.startsWith('/comercial/tabela-servicos/') || location.pathname === '/comercial/vinculo-clientes' || location.pathname === '/comercial/proposta' || location.pathname.startsWith('/comercial/proposta/') || location.pathname === '/comercial/comissao';
   const isGestaoContainerActive = location.pathname.startsWith('/container-representatives') || location.pathname === '/container-purchases' || location.pathname === '/container-sales';
   const isRhActive = location.pathname === '/rh' || location.pathname.startsWith('/rh/');
-  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/revisoes') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
+  const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/revisoes') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname.startsWith('/fleet/plano-manutencao') || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isAbastecimentoActive = location.pathname.startsWith('/fleet/abastecimento') || location.pathname.startsWith('/fleet/ordem-abastecimento') || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
   const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/veiculos') || location.pathname.startsWith('/loading-orders') || location.pathname.startsWith('/transport-occurrences') || location.pathname.startsWith('/driver-settlements') || location.pathname === '/freight-routes' || location.pathname === '/freight-payments' || location.pathname.startsWith('/port-client-orders') || location.pathname.startsWith('/fiscal/');
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/audit-log' || location.pathname === '/modules' || location.pathname === '/plataforma' || location.pathname === '/tank-settings';
@@ -725,6 +728,7 @@ function LayoutFrame({ children }) {
   const manutencaoItems = [
     { path: '/fleet?tab=revisions', label: 'Controle de Revisão', icon: Wrench, moduleKey: 'frota.revisao' },
     { path: '/fleet/hodometro', label: 'Lançamento de Hodômetro', icon: Gauge, moduleKey: 'frota.hodometro' },
+    { path: '/fleet/plano-manutencao', label: 'Plano de Manutenção', icon: CalendarClock, moduleKey: 'frota.plano_manutencao' },
     { path: '/fleet/ordem-servico', label: 'Ordem de Serviço', icon: ClipboardList, moduleKey: 'frota.ordem_servico' },
     { path: '/fleet/checklist', label: 'Checklist de Veículo', icon: ClipboardCheck, moduleKey: 'frota.checklist' },
     { path: '/fleet/controle-media', label: 'Controle de Média', icon: TrendingUp, moduleKey: 'frota.controle_media' },

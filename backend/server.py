@@ -61,6 +61,7 @@ from routers.port_client_orders import api_router as port_client_orders_router
 from routers.freight_routes import api_router as freight_routes_router
 from routers.transport_occurrences import api_router as transport_occurrences_router
 from routers.driver_settlements import api_router as driver_settlements_router
+from routers.maintenance_plans import api_router as maintenance_plans_router
 from routers.freight_payments import api_router as freight_payments_router
 from routers.gratifications import api_router as gratifications_router
 from routers.service_providers import api_router as service_providers_router
@@ -349,6 +350,7 @@ app.include_router(port_client_orders_router)
 app.include_router(freight_routes_router)
 app.include_router(transport_occurrences_router)
 app.include_router(driver_settlements_router)
+app.include_router(maintenance_plans_router)
 app.include_router(freight_payments_router)
 app.include_router(gratifications_router)
 app.include_router(service_providers_router)

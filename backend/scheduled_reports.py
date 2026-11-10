@@ -171,11 +171,27 @@ async def _run_daily_reports_for_current_db():
     await send_daily_client_movement_reports(day)
 
 
+async def _run_scheduled_maintenance_plan_email():
+    """E-mail diário do Plano de Manutenção (routers/maintenance_plans.py),
+    uma vez para cada empresa ativa quando o multi-cliente está ligado."""
+    from routers.maintenance_plans import run_maintenance_plan_email_once
+    if not is_multi_tenant():
+        await run_maintenance_plan_email_once()
+        return
+    for tenant in await active_tenants():
+        with tenant_context(tenant):
+            try:
+                await run_maintenance_plan_email_once()
+            except Exception:
+                logger.exception(f"Falha no e-mail do plano de manutenção da empresa {tenant['slug']}")
+
+
 _scheduler: AsyncIOScheduler = None
 
 
 def start_scheduler():
-    """Chamado no startup do app - agenda o envio diário pra 07:00 (Brasília)."""
+    """Chamado no startup do app - agenda os envios diários pra 07:00 (Brasília):
+    relatório de movimentações dos clientes e avisos do Plano de Manutenção."""
     global _scheduler
     if _scheduler is not None:
         return
@@ -184,6 +200,12 @@ def start_scheduler():
         _run_scheduled_daily_reports,
         CronTrigger(hour=7, minute=0),
         id="daily_client_movement_reports",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _run_scheduled_maintenance_plan_email,
+        CronTrigger(hour=7, minute=0),
+        id="daily_maintenance_plan_email",
         replace_existing=True,
     )
     # Aviso de nova tabela de piso mínimo da ANTT publicada no DOU (só aviso)

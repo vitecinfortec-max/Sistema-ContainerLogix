@@ -127,6 +127,8 @@ const OrdemServicoPage = lazyPage(() => import('./pages/OrdemServicoPage'));
 const OrdemServicoFormPage = lazyPage(() => import('./pages/OrdemServicoFormPage'));
 const FuelSupplyPage = lazyPage(() => import('./pages/FuelSupplyPage'));
 const OdometerReadingsPage = lazyPage(() => import('./pages/OdometerReadingsPage'));
+const MaintenancePlansPage = lazyPage(() => import('./pages/MaintenancePlansPage'));
+const MaintenancePlanFormPage = lazyPage(() => import('./pages/MaintenancePlanFormPage'));
 const FuelConsumptionPage = lazyPage(() => import('./pages/FuelConsumptionPage'));
 const FuelTankLevelPage = lazyPage(() => import('./pages/FuelTankLevelPage'));
 const TankSettingsPage = lazyPage(() => import('./pages/TankSettingsPage'));
@@ -310,6 +312,30 @@ function App() {
             element={
               <ProtectedRoute moduleKey="frota.hodometro">
                 <OdometerReadingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/plano-manutencao"
+            element={
+              <ProtectedRoute moduleKey="frota.plano_manutencao">
+                <MaintenancePlansPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/plano-manutencao/new"
+            element={
+              <ProtectedRoute moduleKey="frota.plano_manutencao">
+                <MaintenancePlanFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleet/plano-manutencao/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="frota.plano_manutencao">
+                <MaintenancePlanFormPage />
               </ProtectedRoute>
             }
           />

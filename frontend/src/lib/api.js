@@ -841,6 +841,18 @@ export const api = {
   getLoadingOrderPDF: (id) => axios.get(`${API}/loading-orders/${id}/pdf`, { responseType: 'blob' }),
 
   // Ocorrências de Transporte
+  getMaintenancePlans: () => axios.get(`${API}/maintenance-plans`),
+  getMaintenancePlan: (id) => axios.get(`${API}/maintenance-plans/${id}`),
+  createMaintenancePlan: (data) => axios.post(`${API}/maintenance-plans`, data),
+  updateMaintenancePlan: (id, data) => axios.put(`${API}/maintenance-plans/${id}`, data),
+  deleteMaintenancePlan: (id) => axios.delete(`${API}/maintenance-plans/${id}`),
+  getMaintenancePlanStatus: (params) => axios.get(`${API}/maintenance-plans-status`, { params }),
+  getMaintenancePlanSettings: () => axios.get(`${API}/maintenance-plans/settings`),
+  updateMaintenancePlanSettings: (data) => axios.put(`${API}/maintenance-plans/settings`, data),
+  sendMaintenancePlanEmail: () => axios.post(`${API}/maintenance-plans/send-alert-email`),
+  getMaintenanceExecutions: (params) => axios.get(`${API}/maintenance-executions`, { params }),
+  createMaintenanceExecution: (data) => axios.post(`${API}/maintenance-executions`, data),
+  deleteMaintenanceExecution: (id) => axios.delete(`${API}/maintenance-executions/${id}`),
   getTransportOccurrenceTypes: () => axios.get(`${API}/transport-occurrence-types`),
   createTransportOccurrenceType: (data) => axios.post(`${API}/transport-occurrence-types`, data),
   updateTransportOccurrenceType: (id, data) => axios.put(`${API}/transport-occurrence-types/${id}`, data),

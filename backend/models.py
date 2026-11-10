@@ -4896,3 +4896,37 @@ class PortClientOrderUpdate(BaseModel):
     scheduled_at: Optional[str] = None
     completed_at: Optional[str] = None
     observations: Optional[str] = None
+
+
+# ==================== MANUTENÇÃO - PLANO DE MANUTENÇÃO ====================
+# Regras em routers/maintenance_plans.py
+
+class MaintenancePlanItem(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str  # ex: Troca de óleo do motor
+    interval_km: Optional[int] = Field(default=None, gt=0)  # a cada X km
+    interval_days: Optional[int] = Field(default=None, gt=0)  # ou a cada X dias (o que vencer primeiro)
+    alert_km: int = Field(default=1000, ge=0)  # avisa quando faltar isso de km
+    alert_days: int = Field(default=15, ge=0)  # ou isso de dias
+
+
+class MaintenancePlanCreate(BaseModel):
+    name: str
+    vehicle_types: List[str]  # tipos do Cadastro de Veículos (CAVALO, CAMINHÃO...)
+    items: List[MaintenancePlanItem]
+    active: bool = True
+    notes: Optional[str] = None
+
+
+class MaintenanceExecutionCreate(BaseModel):
+    plan_id: str
+    item_id: str
+    vehicle_id: str
+    executed_date: str  # YYYY-MM-DD
+    km: Optional[int] = Field(default=None, ge=0)
+    service_order_number: Optional[str] = None  # nº da OS, se teve
+    notes: Optional[str] = None
+
+
+class MaintenancePlanSettings(BaseModel):
+    alert_emails: Optional[str] = None  # separados por ";"

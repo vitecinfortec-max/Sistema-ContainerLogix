@@ -831,6 +831,33 @@ NEXT_KM_LABELS = {
 MAINTENANCE_ALERT_MARGIN_KM = 1000
 
 
+async def get_vehicle_current_km(vehicle_id: str, plate: Optional[str] = None) -> int:
+    """Maior KM conhecido do veículo: hodômetro, abastecimento e, com a placa,
+    a última revisão. O maior, não o último lançado: uma leitura antiga lançada
+    depois tem KM menor e esconderia o KM real do veículo."""
+    current_km = 0
+    latest_reading = await db.odometer_readings.find_one(
+        {"vehicle_id": vehicle_id}, {"_id": 0, "km": 1}, sort=[("km", -1)]
+    )
+    if latest_reading and latest_reading.get("km") is not None:
+        current_km = max(current_km, latest_reading["km"])
+
+    latest_fuel_supply = await db.fuel_supplies.find_one(
+        {"equipment_id": vehicle_id, "reading": {"$ne": None}}, {"_id": 0, "reading": 1}, sort=[("reading", -1)]
+    )
+    if latest_fuel_supply and latest_fuel_supply.get("reading") is not None:
+        current_km = max(current_km, latest_fuel_supply["reading"])
+
+    if plate:
+        revision = await db.vehicle_revisions.find_one(
+            {"vehicle_plate": {"$regex": plate_regex(plate, exact=True), "$options": "i"}},
+            {"_id": 0, "current_km": 1}, sort=[("current_km", -1)]
+        )
+        if revision and revision.get("current_km") is not None:
+            current_km = max(current_km, revision["current_km"])
+    return current_km
+
+
 async def _compute_vehicle_maintenance_status(vehicle: dict) -> Optional[dict]:
     """Calcula a situação de manutenção de um veículo a partir da última Revisão
     registrada e do maior KM conhecido (revisão, hodômetro ou abastecimento).
@@ -854,21 +881,7 @@ async def _compute_vehicle_maintenance_status(vehicle: dict) -> Optional[dict]:
     # Todos os itens que vencem nesse mesmo KM (ex: óleo e filtro juntos)
     next_due_items = [NEXT_KM_LABELS.get(f, f) for km, f in due if km == next_due_km]
 
-    current_km = revision.get("current_km") or 0
-
-    # O maior KM lançado (não o último cadastrado: uma leitura antiga lançada
-    # depois tem KM menor e esconderia o KM real do veículo)
-    latest_reading = await db.odometer_readings.find_one(
-        {"vehicle_id": vehicle["id"]}, {"_id": 0, "km": 1}, sort=[("km", -1)]
-    )
-    if latest_reading and latest_reading.get("km") is not None:
-        current_km = max(current_km, latest_reading["km"])
-
-    latest_fuel_supply = await db.fuel_supplies.find_one(
-        {"equipment_id": vehicle["id"], "reading": {"$ne": None}}, {"_id": 0, "reading": 1}, sort=[("reading", -1)]
-    )
-    if latest_fuel_supply and latest_fuel_supply.get("reading") is not None:
-        current_km = max(current_km, latest_fuel_supply["reading"])
+    current_km = max(revision.get("current_km") or 0, await get_vehicle_current_km(vehicle["id"]))
 
     km_remaining = next_due_km - current_km
     if km_remaining <= 0:

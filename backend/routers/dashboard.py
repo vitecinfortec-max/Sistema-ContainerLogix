@@ -17,6 +17,7 @@ import antt_piso
 from routers.financial_alerts import build_financial_alerts
 from routers.fleet_alerts import build_fleet_alerts
 from routers.frota import get_all_vehicle_maintenance_status
+from routers.maintenance_plans import build_maintenance_plan_alerts
 from routers.fuel_supply import _compute_tank_level
 from routers.movements import _movement_response
 from routers.yard_control import get_yard_control
@@ -324,7 +325,8 @@ async def get_alerts_summary(current_user: dict = Depends(get_current_active_use
     """Resumo leve de alertas - usado pelo sino do topo e pelo card 'Alertas do
     Sistema' do dashboard (containers parados no pátio há mais de 30/60/90 dias).
     Administradores recebem também os alertas financeiros (cheques e faturas).
-    'fleet' traz os documentos de veículos e CNHs vencidos ou vencendo."""
+    'fleet' traz os documentos de veículos e CNHs vencidos ou vencendo e os
+    itens do Plano de Manutenção vencidos ou vencendo."""
     yard = await get_yard_control(current_user=current_user)
     user = await db.users.find_one({"id": current_user["sub"]}, {"_id": 0, "role": 1}) or {}
     financial = await build_financial_alerts() if user.get("role") == "admin" else []
@@ -334,7 +336,7 @@ async def get_alerts_summary(current_user: dict = Depends(get_current_active_use
             financial = financial + await antt_piso.floor_alerts()
         except Exception:
             pass
-    fleet = await build_fleet_alerts()
+    fleet = await build_fleet_alerts() + await build_maintenance_plan_alerts()
     maintenance = await get_all_vehicle_maintenance_status()
     tank = await _compute_tank_level()
     return {
