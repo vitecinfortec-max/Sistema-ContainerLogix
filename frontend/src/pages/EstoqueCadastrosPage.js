@@ -220,7 +220,7 @@ export default function EstoqueCadastrosPage() {
                   type="button"
                   onClick={() => setActiveTypeKey(t.key)}
                   data-testid={`estoque-cadastro-type-${t.key}`}
-                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[0.8125rem] font-medium transition-colors ${
                     active
                       ? 'bg-primary text-primary-foreground'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -246,7 +246,7 @@ export default function EstoqueCadastrosPage() {
           <DialogContent data-testid="estoque-cadastro-dialog">
             <DialogHeader>
               <DialogTitle className="text-base">{editId ? `Editar ${activeType.label}` : `Cadastrar ${activeType.label}`}</DialogTitle>
-              <DialogDescription className="text-[13px]">
+              <DialogDescription className="text-[0.8125rem]">
                 {editId ? `Atualize os dados` : `Adicione um novo registro`}
               </DialogDescription>
             </DialogHeader>

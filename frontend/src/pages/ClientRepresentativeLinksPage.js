@@ -48,9 +48,9 @@ function CommissionPreview({ data, loading }) {
             ...(rep.clients || []).map((c) => (
               <tr key={`${rep.representative_name}-${c.client_name}`}>
                 <td className="pl-8">
-                  <div className="max-w-[300px] truncate" title={c.client_name}>{c.client_name}</div>
+                  <div className="max-w-[18.75rem] truncate" title={c.client_name}>{c.client_name}</div>
                   {c.has_price_table === false && (
-                    <span className="text-[11px] text-amber-600 dark:text-amber-400">sem Tabela de Serviços: não gera comissão</span>
+                    <span className="text-[0.6875rem] text-amber-600 dark:text-amber-400">sem Tabela de Serviços: não gera comissão</span>
                   )}
                 </td>
                 <td className="text-right tabular-nums">{String(c.commission_percentage).replace('.', ',')}%</td>
@@ -310,8 +310,8 @@ export default function ClientRepresentativeLinksPage() {
                 <tbody>
                   {pageItems.map((link) => (
                     <tr key={link.id} data-selected={editId === link.id}>
-                      <td className="cell-strong"><div className="max-w-[300px] truncate" title={link.client_name}>{link.client_name}</div></td>
-                      <td><div className="max-w-[240px] truncate" title={link.representative_name}>{link.representative_name}</div></td>
+                      <td className="cell-strong"><div className="max-w-[18.75rem] truncate" title={link.client_name}>{link.client_name}</div></td>
+                      <td><div className="max-w-[15rem] truncate" title={link.representative_name}>{link.representative_name}</div></td>
                       <td className="text-right tabular-nums">{link.commission_percentage}%</td>
                       <td>
                         <StatusPill tone={link.status === 'ATIVO' ? 'emerald' : 'slate'}>
@@ -361,9 +361,9 @@ export default function ClientRepresentativeLinksPage() {
               </Button>
             </div>
             {periodError ? (
-              <p className="text-[12px] text-red-600 dark:text-red-400 mt-3" data-testid="commission-period-error">{periodError}</p>
+              <p className="text-[0.75rem] text-red-600 dark:text-red-400 mt-3" data-testid="commission-period-error">{periodError}</p>
             ) : (
-              <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-3">
+              <p className="text-[0.75rem] text-slate-500 dark:text-slate-400 mt-3">
                 A comissão é calculada apenas sobre movimentações já faturadas dentro do período informado (dias no horário de Brasília), e só dos serviços que o cliente tem na Tabela de Serviços.
               </p>
             )}

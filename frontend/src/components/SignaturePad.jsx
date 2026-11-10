@@ -189,7 +189,7 @@ export function SignatureCaptureDialog({ open, onOpenChange, onSave, personName,
       <DialogContent className="max-w-lg" data-testid="signature-dialog">
         <DialogHeader>
           <DialogTitle className="text-base">Assinatura{personName ? ` - ${personName}` : ''}</DialogTitle>
-          <DialogDescription className="text-[13px]">
+          <DialogDescription className="text-[0.8125rem]">
             Peça para a pessoa assinar na área abaixo (dedo ou mouse), ou importe a foto da assinatura
           </DialogDescription>
         </DialogHeader>
@@ -201,7 +201,7 @@ export function SignatureCaptureDialog({ open, onOpenChange, onSave, personName,
               type="button"
               onClick={() => setMode(key)}
               data-testid={`signature-mode-${key}`}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[0.8125rem] font-medium transition-colors ${
                 mode === key ? 'bg-primary text-primary-foreground' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
@@ -214,7 +214,7 @@ export function SignatureCaptureDialog({ open, onOpenChange, onSave, personName,
           <div className="space-y-2">
             <DrawArea onChange={setDrawn} clearSignal={clearSignal} />
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">Assine dentro do quadro</span>
+              <span className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Assine dentro do quadro</span>
               <Button type="button" variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => setClearSignal((n) => n + 1)} data-testid="signature-clear">
                 <Eraser className="w-3.5 h-3.5" />Limpar
               </Button>
@@ -231,12 +231,12 @@ export function SignatureCaptureDialog({ open, onOpenChange, onSave, personName,
               {imported ? (
                 <img src={imported} alt="Assinatura importada" className="max-h-full max-w-full object-contain" />
               ) : (
-                <span className="flex flex-col items-center gap-1 text-[13px] text-slate-500">
+                <span className="flex flex-col items-center gap-1 text-[0.8125rem] text-slate-500">
                   <Upload className="w-5 h-5" />Clique para escolher a imagem
                 </span>
               )}
             </button>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">Foto ou scan da assinatura em fundo claro (JPG ou PNG)</span>
+            <span className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Foto ou scan da assinatura em fundo claro (JPG ou PNG)</span>
           </div>
         )}
 
@@ -267,7 +267,7 @@ export function SignatureField({ value, onChange, personName }) {
         {src ? (
           <img src={src} alt="Assinatura" className="max-h-full max-w-full object-contain p-2" />
         ) : (
-          <span className="text-[12px] text-slate-400">Nenhuma assinatura cadastrada</span>
+          <span className="text-[0.75rem] text-slate-400">Nenhuma assinatura cadastrada</span>
         )}
       </div>
       <div className="flex gap-2">

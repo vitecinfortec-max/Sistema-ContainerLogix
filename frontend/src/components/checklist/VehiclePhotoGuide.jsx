@@ -47,7 +47,7 @@ function VehicleDiagram({ slots, active, doneTypes }) {
               )}
             />
             {done && <path d={`M ${spot.x - 4} ${spot.y} l 3 3 l 5 -6`} fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />}
-            <text x={spot.lx} y={spot.ly} textAnchor="middle" className={cn('text-[9px]', isActive ? 'fill-primary font-semibold' : 'fill-slate-500 dark:fill-slate-400')}>
+            <text x={spot.lx} y={spot.ly} textAnchor="middle" className={cn('text-[0.5625rem]', isActive ? 'fill-primary font-semibold' : 'fill-slate-500 dark:fill-slate-400')}>
               {spot.label}
             </text>
           </g>
@@ -104,7 +104,7 @@ export default function VehiclePhotoGuide({ vehicleType, slots, active, doneType
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.16 }}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm',
+              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.6875rem] font-semibold text-white shadow-sm',
               done ? 'bg-emerald-600' : 'bg-primary',
             )}
           >
@@ -112,7 +112,7 @@ export default function VehiclePhotoGuide({ vehicleType, slots, active, doneType
             {slot ? slot.label : 'Visão geral'}
           </motion.span>
         </AnimatePresence>
-        <span className="hidden items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[11px] font-medium text-slate-500 shadow-sm backdrop-blur group-has-[[data-stage=ready]]:inline-flex motion-reduce:!hidden dark:bg-slate-900/70 dark:text-slate-300">
+        <span className="hidden items-center gap-1 rounded-full bg-white/80 px-2 py-1 text-[0.6875rem] font-medium text-slate-500 shadow-sm backdrop-blur group-has-[[data-stage=ready]]:inline-flex motion-reduce:!hidden dark:bg-slate-900/70 dark:text-slate-300">
           <Rotate3d className="h-3 w-3" />
           Arraste para girar
         </span>

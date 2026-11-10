@@ -68,7 +68,7 @@ export function StatCard({ label, value, icon: Icon, tone = 'primary', hint, tes
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{label}</p>
         <p className="text-lg xl:text-xl font-semibold leading-tight tabular-nums text-slate-900 dark:text-slate-100 truncate whitespace-nowrap">{failed ? '—' : <AnimatedNumber value={value} />}</p>
-        {hint && !failed && <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{hint}</p>}
+        {hint && !failed && <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500 truncate">{hint}</p>}
       </div>
     </motion.div>
   );
@@ -132,14 +132,14 @@ export function FilterCard({ children, hasFilters, onClear, actions, title = 'Fi
           type="button"
           onClick={toggle}
           aria-expanded={open}
-          className="flex items-center gap-2 rounded-md px-2 py-1 text-[13px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+          className="flex items-center gap-2 rounded-md px-2 py-1 text-[0.8125rem] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
           data-testid="filter-card-toggle"
         >
           <ChevronDown className={cn('w-4 h-4 text-slate-500 transition-transform', !open && '-rotate-90')} />
           <SlidersHorizontal className="w-4 h-4 text-primary" />
           {title}
           {hasFilters && (
-            <span className="rounded-full bg-primary/10 text-primary text-[11px] font-semibold px-1.5 py-px">ativos</span>
+            <span className="rounded-full bg-primary/10 text-primary text-[0.6875rem] font-semibold px-1.5 py-px">ativos</span>
           )}
         </button>
         {hasFilters && onClear && (
@@ -208,7 +208,7 @@ export function DataCard({ title, count, meta, toolbar, children, footer, classN
         <div className="flex items-center gap-2 min-w-0">
           <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</h2>
           {count !== undefined && count !== null && (
-            <span className="rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[11px] font-semibold px-2 py-0.5 tabular-nums">
+            <span className="rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[0.6875rem] font-semibold px-2 py-0.5 tabular-nums">
               {count}
             </span>
           )}
@@ -227,7 +227,7 @@ export function Toolbar({ children, primary, selectedCount = 0 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {selectedCount > 0 && (
-        <span className="text-[11px] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">
+        <span className="text-[0.6875rem] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">
           {selectedCount} selecionado{selectedCount > 1 ? 's' : ''}
         </span>
       )}
@@ -265,7 +265,7 @@ export function ToolbarDivider() {
 
 export function ToolbarPrimary({ icon: Icon, label, onClick, disabled, testId }) {
   return (
-    <Button type="button" size="sm" onClick={onClick} disabled={disabled} data-testid={testId} className="h-9 px-3.5 text-[13px] gap-1.5">
+    <Button type="button" size="sm" onClick={onClick} disabled={disabled} data-testid={testId} className="h-9 px-3.5 text-[0.8125rem] gap-1.5">
       {Icon && <Icon className="w-4 h-4" />}
       {label}
     </Button>
@@ -293,7 +293,7 @@ export function fiscalRowTone(status) {
 export function StatusPill({ tone = 'slate', children, dot = true, className, title }) {
   return (
     <span title={title} className={cn(
-      'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
+      'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[0.6875rem] font-semibold',
       SOFT_TONES[tone] || SOFT_TONES.slate,
       className,
     )}>
@@ -307,7 +307,7 @@ export function StatusPill({ tone = 'slate', children, dot = true, className, ti
 export function PlateTag({ children }) {
   if (!children) return <span className="text-slate-400">-</span>;
   return (
-    <span className="inline-block whitespace-nowrap rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-1.5 py-px font-mono text-[12px] tracking-wide text-slate-700 dark:text-slate-200">
+    <span className="inline-block whitespace-nowrap rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-1.5 py-px font-mono text-[0.75rem] tracking-wide text-slate-700 dark:text-slate-200">
       {children}
     </span>
   );
@@ -321,7 +321,7 @@ export function UserTag({ name }) {
   const initials = (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
   return (
     <span className="inline-flex items-center gap-2 whitespace-nowrap">
-      <span className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-semibold flex items-center justify-center">
+      <span className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-[0.6875rem] font-semibold flex items-center justify-center">
         {initials}
       </span>
       {short}

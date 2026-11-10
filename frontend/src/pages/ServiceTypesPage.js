@@ -174,7 +174,7 @@ export default function ServiceTypesPage() {
             <DialogContent data-testid="service-type-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editMode ? 'Editar Tipo de Serviço' : 'Cadastrar Tipo de Serviço'}</DialogTitle>
-                <DialogDescription className="text-[13px]">
+                <DialogDescription className="text-[0.8125rem]">
                   {editMode ? 'Atualize os dados do tipo de serviço' : 'Adicione um novo tipo de serviço ao sistema'}
                 </DialogDescription>
               </DialogHeader>
@@ -196,7 +196,7 @@ export default function ServiceTypesPage() {
                     data-testid="service-type-description-input"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="min-h-[70px] text-[13px]"
+                    className="min-h-[4.375rem] text-[0.8125rem]"
                   />
                 </div>
                 <Button 
@@ -276,7 +276,7 @@ export default function ServiceTypesPage() {
                         />
                       </td>
                       <td className="cell-strong">{serviceType.name}</td>
-                      <td className="text-slate-500 dark:text-slate-400"><div className="max-w-[420px] truncate" title={serviceType.description || ''}>{serviceType.description || '-'}</div></td>
+                      <td className="text-slate-500 dark:text-slate-400"><div className="max-w-[26.25rem] truncate" title={serviceType.description || ''}>{serviceType.description || '-'}</div></td>
                       <td className="whitespace-nowrap tabular-nums">{format(new Date(serviceType.created_at), 'dd/MM/yyyy', { locale: ptBR })}</td>
                     </tr>
                   ))}

@@ -335,7 +335,7 @@ export default function ClientCreditsPage() {
                         <Checkbox checked={a.client_id === selectedClientId} onCheckedChange={() => selectClient(a.client_id)} />
                       </td>
                       <td>
-                        <div className="cell-strong max-w-[280px] truncate" title={a.client_name}>{a.client_name}</div>
+                        <div className="cell-strong max-w-[17.5rem] truncate" title={a.client_name}>{a.client_name}</div>
                         {a.client_cnpj && <div className="text-xs text-muted-foreground">{a.client_cnpj}</div>}
                       </td>
                       <td className={`text-right tabular-nums font-semibold whitespace-nowrap ${a.balance > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500'}`}>
@@ -436,7 +436,7 @@ export default function ClientCreditsPage() {
                         </td>
                         <td className="cell-strong tabular-nums">#{e.entry_number}</td>
                         <td className="tabular-nums whitespace-nowrap">{formatDay(e.entry_date)}</td>
-                        <td><div className="max-w-[220px] truncate" title={e.client_name}>{e.client_name}</div></td>
+                        <td><div className="max-w-[13.75rem] truncate" title={e.client_name}>{e.client_name}</div></td>
                         <td className="whitespace-nowrap">
                           <StatusPill tone={TYPES[e.entry_type]?.tone}>{TYPES[e.entry_type]?.label}</StatusPill>
                           {reversed && (
@@ -447,7 +447,7 @@ export default function ClientCreditsPage() {
                           )}
                         </td>
                         <td className="hidden md:table-cell">
-                          <div className="max-w-[340px] truncate" title={[describe(e), e.notes].filter(Boolean).join(' · ')}>
+                          <div className="max-w-[21.25rem] truncate" title={[describe(e), e.notes].filter(Boolean).join(' · ')}>
                             {describe(e)}{e.notes && e.entry_type !== 'ESTORNO' ? <span className="text-muted-foreground"> · {e.notes}</span> : null}
                           </div>
                         </td>
@@ -512,7 +512,7 @@ export default function ClientCreditsPage() {
                     onChange={(e) => setCreditForm((f) => ({ ...f, reference: e.target.value }))} />
                 </Field>
                 <Field label="Observação" className="col-span-2">
-                  <Textarea className="min-h-[60px] text-[13px]" value={creditForm.notes}
+                  <Textarea className="min-h-[3.75rem] text-[0.8125rem]" value={creditForm.notes}
                     onChange={(e) => setCreditForm((f) => ({ ...f, notes: e.target.value }))} />
                 </Field>
               </div>
@@ -540,7 +540,7 @@ export default function ClientCreditsPage() {
               {applyState.invoices.length === 0 ? (
                 <EmptyState icon={Receipt} title="Nenhuma fatura em aberto deste cliente" />
               ) : (
-                <div className="max-h-[360px] overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
+                <div className="max-h-[22.5rem] overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -562,7 +562,7 @@ export default function ClientCreditsPage() {
                             <td className="tabular-nums">{formatDay(inv.due_date)}</td>
                             <td className="text-right tabular-nums">
                               {formatMoney(inv.total_value)}
-                              {inv.credit_applied > 0 && <div className="text-[11px] text-muted-foreground">crédito já usado {formatMoney(inv.credit_applied)}</div>}
+                              {inv.credit_applied > 0 && <div className="text-[0.6875rem] text-muted-foreground">crédito já usado {formatMoney(inv.credit_applied)}</div>}
                             </td>
                             <td className="text-right tabular-nums font-semibold">{formatMoney(inv.open_value)}</td>
                             <td className="text-right">
@@ -656,7 +656,7 @@ export default function ClientCreditsPage() {
               </DialogHeader>
               <p className="text-sm">Valor a estornar: <span className="font-semibold">{formatMoney(reverseState.entry.amount - reverseState.entry.reversed_amount)}</span></p>
               <Field label="Motivo" required>
-                <Textarea className="min-h-[70px] text-[13px]" value={reverseState.reason} onChange={(e) => setReverseState((s) => ({ ...s, reason: e.target.value }))}
+                <Textarea className="min-h-[4.375rem] text-[0.8125rem]" value={reverseState.reason} onChange={(e) => setReverseState((s) => ({ ...s, reason: e.target.value }))}
                   data-testid="reverse-reason-input" />
               </Field>
               <DialogFooter>
@@ -690,7 +690,7 @@ export default function ClientCreditsPage() {
                   </Button>
                 </div>
               </div>
-              <div className="max-h-[420px] overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
+              <div className="max-h-[26.25rem] overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
                 <table className="data-table">
                   <thead>
                     <tr><th>Nº</th><th>Data</th><th>Histórico</th><th className="text-right">Entrada</th><th className="text-right">Saída</th><th className="text-right">Saldo</th></tr>

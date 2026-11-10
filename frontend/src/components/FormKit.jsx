@@ -26,7 +26,7 @@ export function FormSection({ title, icon: Icon, actions, children, className, c
 
 function IssueCount({ n }) {
   if (!n) return null;
-  return <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{n}</span>;
+  return <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 text-[0.6875rem] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">{n}</span>;
 }
 
 /**
@@ -54,7 +54,7 @@ export function IssueSection({ idPrefix, id, title, count, actions, children }) 
 export function FormSectionTitle({ children, bare = false, className }) {
   return (
     <h3 className={cn(
-      'text-[13px] font-semibold text-primary',
+      'text-[0.8125rem] font-semibold text-primary',
       !bare && 'border-b-2 border-primary/20 pb-1',
       className,
     )}>
@@ -88,7 +88,7 @@ export function FormActions({ children, className, sticky = false }) {
   return (
     <div className={cn(
       'flex flex-wrap items-center justify-end gap-2',
-      sticky && 'max-md:sticky max-md:bottom-[76px] max-md:z-40 max-md:rounded-lg max-md:border max-md:border-slate-200 max-md:dark:border-slate-700 max-md:bg-card max-md:p-2 max-md:shadow-lg max-md:[&>*]:flex-1',
+      sticky && 'max-md:sticky max-md:bottom-[4.75rem] max-md:z-40 max-md:rounded-lg max-md:border max-md:border-slate-200 max-md:dark:border-slate-700 max-md:bg-card max-md:p-2 max-md:shadow-lg max-md:[&>*]:flex-1',
       className,
     )}>
       {children}

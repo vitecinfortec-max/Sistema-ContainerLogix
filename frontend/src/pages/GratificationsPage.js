@@ -451,14 +451,14 @@ export default function GratificationsPage() {
                       <td className="whitespace-nowrap tabular-nums">{fmtDate(g.reference_date)}</td>
                       <td>
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="cell-strong max-w-[220px] truncate" title={g.person_name}>{g.person_name}</span>
-                          <StatusPill tone={g.person_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[11px] px-1.5">
+                          <span className="cell-strong max-w-[13.75rem] truncate" title={g.person_name}>{g.person_name}</span>
+                          <StatusPill tone={g.person_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[0.6875rem] px-1.5">
                             {TYPE_LABELS[g.person_type]}
                           </StatusPill>
                         </div>
                       </td>
                       <td className="whitespace-nowrap">{g.role}</td>
-                      <td><div className="max-w-[260px] truncate" title={g.description || ''}>{g.description || '-'}</div></td>
+                      <td><div className="max-w-[16.25rem] truncate" title={g.description || ''}>{g.description || '-'}</div></td>
                       <td className="text-right tabular-nums whitespace-nowrap cell-strong">{formatMoney(g.amount)}</td>
                       <td><StatusPill tone={STATUS_TONES[g.status] || 'slate'}>{STATUS_LABELS[g.status] || g.status}</StatusPill></td>
                       <td className="whitespace-nowrap tabular-nums">
@@ -533,7 +533,7 @@ export default function GratificationsPage() {
             </div>
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Observações</Label>
-              <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[60px]" />
+              <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[3.75rem]" />
             </div>
           </div>
 
@@ -605,7 +605,7 @@ export default function GratificationsPage() {
               <li key={r.id} className="flex items-center justify-between px-3 py-2 text-sm">
                 <span className="flex items-center gap-2">
                   {r.name}
-                  {r.is_default && <Badge variant="outline" className="text-[11px] px-1.5 py-0">Padrão</Badge>}
+                  {r.is_default && <Badge variant="outline" className="text-[0.6875rem] px-1.5 py-0">Padrão</Badge>}
                 </span>
                 {!r.is_default && (
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" aria-label={`Excluir ${r.name}`} title="Excluir" onClick={() => handleDeleteRole(r)}>

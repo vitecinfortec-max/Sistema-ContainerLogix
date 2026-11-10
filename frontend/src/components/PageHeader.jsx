@@ -49,7 +49,7 @@ export default function PageHeader({ title, subtitle, icon: Icon, meta, actions,
         <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{title}</h1>
           {(subtitle || meta) && (
-            <div className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+            <div className="text-[0.8125rem] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
               {subtitle && <span>{subtitle}</span>}
               {meta}
             </div>

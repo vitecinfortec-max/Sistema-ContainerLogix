@@ -6,6 +6,20 @@ module.exports = {
     "./public/index.html"
   ],
   theme: {
+  	// Larguras de tela mais comuns (já descontada a escala do Windows):
+  	// 1280 (1920 a 150%), 1366 (notebook), 1440, 1536 (1920 a 125%),
+  	// 1600 e 1920. Em ordem crescente para o CSS gerado sair na ordem certa.
+  	screens: {
+  		sm: '640px',
+  		md: '768px',
+  		lg: '1024px',
+  		xl: '1280px',
+  		laptop: '1366px',
+  		desk: '1440px',
+  		'2xl': '1536px',
+  		wide: '1600px',
+  		full: '1920px'
+  	},
   	extend: {
   		borderRadius: {
   			lg: 'var(--radius)',

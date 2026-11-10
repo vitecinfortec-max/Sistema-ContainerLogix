@@ -537,8 +537,8 @@ export default function PortServicePage() {
                             />
                           </td>
                           <td className="cell-strong whitespace-nowrap tabular-nums">#{service.service_number}</td>
-                          <td><div className="max-w-[220px] truncate" title={service.client_name || ''}>{service.client_name}</div></td>
-                          <td><div className="max-w-[200px] truncate" title={service.driver_name || ''}>{service.driver_name}</div></td>
+                          <td><div className="max-w-[13.75rem] truncate" title={service.client_name || ''}>{service.client_name}</div></td>
+                          <td><div className="max-w-[12.5rem] truncate" title={service.driver_name || ''}>{service.driver_name}</div></td>
                           <td><PlateTag>{service.cavalo_plate}</PlateTag></td>
                           <td className="whitespace-nowrap tabular-nums">
                             {service.service_date && format(new Date(service.service_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR })}

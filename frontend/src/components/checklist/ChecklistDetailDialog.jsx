@@ -106,7 +106,7 @@ export default function ChecklistDetailDialog({ open, onOpenChange, checklist, o
               <p className={cn('text-sm font-semibold', look.text)} data-testid="checklist-detail-result">{look.title}</p>
             </div>
             <ProgressRing value={counts.total ? counts.answered / counts.total : 0} tone={look.ring} size={52} stroke={5}>
-              <span className="text-[11px] font-semibold tabular-nums text-slate-700 dark:text-slate-200">{counts.answered}/{counts.total}</span>
+              <span className="text-[0.6875rem] font-semibold tabular-nums text-slate-700 dark:text-slate-200">{counts.answered}/{counts.total}</span>
             </ProgressRing>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
@@ -139,7 +139,7 @@ export default function ChecklistDetailDialog({ open, onOpenChange, checklist, o
                     <span>
                       <span className="font-medium">{item.text}</span>
                       <span className="text-red-700/70 dark:text-red-200/60"> · {item.section}</span>
-                      {item.note && <span className="block text-[13px] text-red-800/90 dark:text-red-100/80">{item.note}</span>}
+                      {item.note && <span className="block text-[0.8125rem] text-red-800/90 dark:text-red-100/80">{item.note}</span>}
                     </span>
                   </li>
                 ))}
@@ -174,12 +174,12 @@ export default function ChecklistDetailDialog({ open, onOpenChange, checklist, o
                         <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200', isOpen && 'rotate-180')} />
                         <span className="flex-1 truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{section.label}</span>
                         {sectionCounts.failed > 0 && (
-                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[0.6875rem] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
                             {sectionCounts.failed} reprovado{sectionCounts.failed > 1 ? 's' : ''}
                           </span>
                         )}
                         <span className={cn(
-                          'rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
+                          'rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold tabular-nums',
                           sectionCounts.pending === 0 && sectionCounts.failed === 0
                             ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
                             : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
@@ -243,7 +243,7 @@ export default function ChecklistDetailDialog({ open, onOpenChange, checklist, o
                         loading="lazy"
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
-                      <span className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-5 text-[11px] font-medium text-white">
+                      <span className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-5 text-[0.6875rem] font-medium text-white">
                         {CHECKLIST_PHOTO_LABELS[photo.type] || photo.type}
                         <ZoomIn className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
                       </span>

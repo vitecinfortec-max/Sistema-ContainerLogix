@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 // Rótulo padrão dos campos: 13px, peso médio. Quem fica acima do campo usa
 // "mb-1.5 block" (ou um pai com space-y-1.5) - ver components/FormKit.jsx.
 const labelVariants = cva(
-  "text-[13px] font-medium leading-none text-slate-700 dark:text-slate-300 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+  "text-[0.8125rem] font-medium leading-none text-slate-700 dark:text-slate-300 peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
 )
 
 // "Nome *" -> o asterisco de campo obrigatório sai na cor de erro, igual em

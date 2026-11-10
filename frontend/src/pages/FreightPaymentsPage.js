@@ -360,9 +360,9 @@ export default function FreightPaymentsPage() {
                       </td>
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{p.payment_number}</td>
                       <td className="whitespace-nowrap tabular-nums">#{p.order_number}</td>
-                      <td><div className="max-w-[220px] truncate" title={p.route_name || ''}>{p.route_name || '-'}</div></td>
-                      <td><div className="max-w-[200px] truncate" title={p.driver_name || ''}>{p.driver_name || '-'}</div></td>
-                      <td><div className="max-w-[200px] truncate" title={p.transport_company || ''}>{p.transport_company || '-'}</div></td>
+                      <td><div className="max-w-[13.75rem] truncate" title={p.route_name || ''}>{p.route_name || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={p.driver_name || ''}>{p.driver_name || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={p.transport_company || ''}>{p.transport_company || '-'}</div></td>
                       <td className="text-right tabular-nums whitespace-nowrap">{formatMoney(p.freight_value)}</td>
                       <td>
                         <StatusPill tone={STATUS_TONES[p.status] || 'slate'}>
@@ -404,8 +404,8 @@ export default function FreightPaymentsPage() {
                   {batches.map((b) => (
                     <tr key={b.id} data-testid={`freight-payment-batch-row-${b.batch_number}`}>
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{b.batch_number}</td>
-                      <td><div className="max-w-[220px] truncate" title={b.driver_name || ''}>{b.driver_name || '-'}</div></td>
-                      <td><div className="max-w-[220px] truncate" title={b.transport_company || ''}>{b.transport_company || '-'}</div></td>
+                      <td><div className="max-w-[13.75rem] truncate" title={b.driver_name || ''}>{b.driver_name || '-'}</div></td>
+                      <td><div className="max-w-[13.75rem] truncate" title={b.transport_company || ''}>{b.transport_company || '-'}</div></td>
                       <td className="text-right tabular-nums">{b.item_count}</td>
                       <td className="text-right tabular-nums whitespace-nowrap cell-strong">{formatMoney(b.total_value)}</td>
                       <td className="whitespace-nowrap tabular-nums">{b.created_at ? format(new Date(b.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
@@ -449,7 +449,7 @@ export default function FreightPaymentsPage() {
             <div className="space-y-1.5">
               <Label className="block">Observações</Label>
               <Textarea
-                className="text-[13px] min-h-[60px]"
+                className="text-[0.8125rem] min-h-[3.75rem]"
                 value={editForm.observations}
                 onChange={(e) => setEditForm({ ...editForm, observations: e.target.value })}
               />

@@ -84,7 +84,7 @@ export default function StockPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {BALANCE_OPTIONS.map(([value, label]) => (
-                    <SelectItem key={value} value={value} className="text-[13px]">{label}</SelectItem>
+                    <SelectItem key={value} value={value} className="text-[0.8125rem]">{label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -93,9 +93,9 @@ export default function StockPage() {
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="h-9 text-sm" data-testid="stock-status-filter"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
-                  <SelectItem value="ATIVO" className="text-[13px]">Ativo</SelectItem>
-                  <SelectItem value="INATIVO" className="text-[13px]">Inativo</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todos</SelectItem>
+                  <SelectItem value="ATIVO" className="text-[0.8125rem]">Ativo</SelectItem>
+                  <SelectItem value="INATIVO" className="text-[0.8125rem]">Inativo</SelectItem>
                 </SelectContent>
               </Select>
             </FilterField>
@@ -130,11 +130,11 @@ export default function StockPage() {
                         <td className="cell-strong whitespace-nowrap tabular-nums">{item.code}</td>
                         <td>
                           <div className="flex items-center gap-2">
-                            <span className="max-w-[360px] truncate" title={item.description || ''}>{item.description}</span>
-                            {item.status === 'INATIVO' && <StatusPill tone="slate" dot={false} className="text-[11px] px-1.5">Inativo</StatusPill>}
+                            <span className="max-w-[22.5rem] truncate" title={item.description || ''}>{item.description}</span>
+                            {item.status === 'INATIVO' && <StatusPill tone="slate" dot={false} className="text-[0.6875rem] px-1.5">Inativo</StatusPill>}
                           </div>
                         </td>
-                        <td><div className="max-w-[200px] truncate" title={item.warehouse_name || ''}>{item.warehouse_name || '-'}</div></td>
+                        <td><div className="max-w-[12.5rem] truncate" title={item.warehouse_name || ''}>{item.warehouse_name || '-'}</div></td>
                         <td className={`text-right whitespace-nowrap tabular-nums font-medium ${qty <= 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>{qtyWithUnit(qty, item.unit)}</td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(item.reference_value)}</td>
                         <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(qty * (Number(item.reference_value) || 0))}</td>

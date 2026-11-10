@@ -150,7 +150,7 @@ export default function OSCategoriesPage() {
             <DialogContent data-testid="os-category-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editMode ? 'Editar Categoria' : 'Cadastrar Categoria'}</DialogTitle>
-                <DialogDescription className="text-[13px]">
+                <DialogDescription className="text-[0.8125rem]">
                   {editMode ? 'Atualize os dados da categoria' : 'Adicione uma nova categoria de Ordem de Serviço'}
                 </DialogDescription>
               </DialogHeader>

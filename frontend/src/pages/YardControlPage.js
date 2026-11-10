@@ -315,8 +315,8 @@ export default function YardControlPage() {
           <div className="flex items-start gap-3 rounded-lg border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-4 py-3">
             <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-[13px] font-semibold text-red-800 dark:text-red-300">Atenção à permanência</p>
-              <p className="text-[12px] text-red-700 dark:text-red-400">
+              <p className="text-[0.8125rem] font-semibold text-red-800 dark:text-red-300">Atenção à permanência</p>
+              <p className="text-[0.75rem] text-red-700 dark:text-red-400">
                 {stats.over_60_days} container(s) com mais de 60 dias no pátio
                 {stats.over_90_days > 0 && `, sendo ${stats.over_90_days} com mais de 90 dias`}.
               </p>
@@ -378,7 +378,7 @@ export default function YardControlPage() {
                     .map(client => (
                       <div
                         key={client.id}
-                        className="px-3 py-2 cursor-pointer hover:bg-muted text-[13px]"
+                        className="px-3 py-2 cursor-pointer hover:bg-muted text-[0.8125rem]"
                         onClick={() => {
                           updateFilter('client_name', client.name);
                           setClientInputFocused(false);
@@ -389,7 +389,7 @@ export default function YardControlPage() {
                     ))
                   }
                   {clients.filter(c => c.name.toLowerCase().includes(filters.client_name.toLowerCase())).length === 0 && (
-                    <div className="px-3 py-2 text-[13px] text-muted-foreground">
+                    <div className="px-3 py-2 text-[0.8125rem] text-muted-foreground">
                       Nenhum cliente encontrado
                     </div>
                   )}
@@ -528,7 +528,7 @@ export default function YardControlPage() {
                           <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">{container.container_number}</span>
                           {container.is_segregated && (
                             <span title={`Reservado para: ${container.segregation_client}`}>
-                              <StatusPill tone="amber" dot={false} className="!text-[11px] !px-1.5">SEGREGADO</StatusPill>
+                              <StatusPill tone="amber" dot={false} className="!text-[0.6875rem] !px-1.5">SEGREGADO</StatusPill>
                             </span>
                           )}
                         </div>
@@ -544,8 +544,8 @@ export default function YardControlPage() {
                         </StatusPill>
                       </td>
                       <td className="whitespace-nowrap">{container.size_type}</td>
-                      <td><div className="max-w-[150px] truncate" title={container.shipping_line || ''}>{container.shipping_line}</div></td>
-                      <td><div className="max-w-[200px] truncate" title={container.client_name || ''}>{container.client_name || '-'}</div></td>
+                      <td><div className="max-w-[9.375rem] truncate" title={container.shipping_line || ''}>{container.shipping_line}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={container.client_name || ''}>{container.client_name || '-'}</div></td>
                       <td className="whitespace-nowrap tabular-nums">
                         {container.entry_date ? format(new Date(container.entry_date), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                       </td>
@@ -586,11 +586,11 @@ export default function YardControlPage() {
                 <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.map((item, index) => (
                     <div key={index} className="flex items-center justify-between gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                      <span className="text-[13px] font-medium text-slate-700 dark:text-slate-200 truncate flex-1" title={item[nameKey]}>{item[nameKey]}</span>
+                      <span className="text-[0.8125rem] font-medium text-slate-700 dark:text-slate-200 truncate flex-1" title={item[nameKey]}>{item[nameKey]}</span>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <StatusPill tone="slate" dot={false}>{item.empty} V</StatusPill>
                         <StatusPill tone="emerald" dot={false}>{item.full} C</StatusPill>
-                        <span className="min-w-8 text-center rounded-full bg-primary text-primary-foreground text-[11px] font-bold px-2 py-0.5 tabular-nums">{item.total}</span>
+                        <span className="min-w-8 text-center rounded-full bg-primary text-primary-foreground text-[0.6875rem] font-bold px-2 py-0.5 tabular-nums">{item.total}</span>
                       </div>
                     </div>
                   ))}

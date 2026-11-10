@@ -473,7 +473,7 @@ export default function MovementsPage() {
                     <SortableTh field="status" label="Status" />
                     <SortableTh field="created_at" label="Emissão" />
                     {/* Usuário é a coluna menos usada - some em telas menores pra lista caber sem rolagem lateral */}
-                    <SortableTh field="user_name" label="Usuário" className="hidden min-[1400px]:table-cell" />
+                    <SortableTh field="user_name" label="Usuário" className="hidden min-[87.5rem]:table-cell" />
                   </tr>
                 </thead>
                 <tbody>
@@ -500,9 +500,9 @@ export default function MovementsPage() {
                             {movement.operation_type === 'ENTRADA' ? 'Entrada' : 'Saída'}
                           </StatusPill>
                         </td>
-                        <td className="cell-strong whitespace-nowrap font-mono text-[12px]">{movement.container_number || '-'}</td>
-                        <td><div className="max-w-[110px] xl:max-w-[150px] min-[1400px]:max-w-[190px] 2xl:max-w-[300px] truncate" title={movement.client_name || ''}>{movement.client_name || '-'}</div></td>
-                        <td><div className="max-w-[120px] xl:max-w-[170px] min-[1400px]:max-w-[210px] 2xl:max-w-[320px] truncate" title={movement.driver_name || ''}>{movement.driver_name}</div></td>
+                        <td className="cell-strong whitespace-nowrap font-mono text-[0.75rem]">{movement.container_number || '-'}</td>
+                        <td><div className="max-w-[6.875rem] xl:max-w-[9.375rem] min-[87.5rem]:max-w-[11.875rem] 2xl:max-w-[18.75rem] truncate" title={movement.client_name || ''}>{movement.client_name || '-'}</div></td>
+                        <td><div className="max-w-[7.5rem] xl:max-w-[10.625rem] min-[87.5rem]:max-w-[13.125rem] 2xl:max-w-[20rem] truncate" title={movement.driver_name || ''}>{movement.driver_name}</div></td>
                         <td><PlateTag>{movement.truck_plate}</PlateTag></td>
                         <td>
                           <StatusPill tone={movement.status === 'CHEIO' ? 'emerald' : 'slate'}>
@@ -513,7 +513,7 @@ export default function MovementsPage() {
                           {format(createdAt, 'dd/MM/yyyy', { locale: ptBR })}{' '}
                           <span className="text-slate-400 dark:text-slate-500">{format(createdAt, 'HH:mm', { locale: ptBR })}</span>
                         </td>
-                        <td className="hidden min-[1400px]:table-cell"><UserTag name={movement.user_name} /></td>
+                        <td className="hidden min-[87.5rem]:table-cell"><UserTag name={movement.user_name} /></td>
                       </tr>
                     );
                   })}

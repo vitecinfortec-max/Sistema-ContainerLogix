@@ -173,9 +173,9 @@ export default function ReportsPortServicesPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todos</SelectItem>
                   {TURNO_OPTIONS.map(([v, l]) => (
-                    <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                    <SelectItem key={v} value={v} className="text-[0.8125rem]">{l}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

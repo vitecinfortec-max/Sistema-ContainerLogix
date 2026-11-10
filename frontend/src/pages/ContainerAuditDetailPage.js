@@ -329,13 +329,13 @@ export default function ContainerAuditDetailPage() {
       <div className="text-sm font-mono text-slate-800 dark:text-slate-200">{item.container_number}</div>
       <div className="md:hidden space-y-1">
         {(item.size_type || item.booking) && (
-          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="text-[0.6875rem] text-slate-500 dark:text-slate-400">
             {[item.size_type, item.booking && `Booking ${item.booking}`].filter(Boolean).join(' · ')}
           </div>
         )}
         {isLocked
-          ? item.observations && <div className="text-[11px] text-slate-500 dark:text-slate-400">{item.observations}</div>
-          : observationInput(item, 'mt-1 min-w-[160px]')}
+          ? item.observations && <div className="text-[0.6875rem] text-slate-500 dark:text-slate-400">{item.observations}</div>
+          : observationInput(item, 'mt-1 min-w-[10rem]')}
       </div>
     </td>
   );
@@ -574,7 +574,7 @@ export default function ContainerAuditDetailPage() {
             <div className="space-y-3">
               <img src={scan.previewUrl} alt="Foto do container" className="w-full max-h-64 object-contain rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900" />
               {scan.error && (
-                <p className="text-[13px] text-amber-700 dark:text-amber-300">{scan.error}</p>
+                <p className="text-[0.8125rem] text-amber-700 dark:text-amber-300">{scan.error}</p>
               )}
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
@@ -604,16 +604,16 @@ export default function ContainerAuditDetailPage() {
                 </div>
               </div>
               {scan.reading?.size_type_code && (
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">Código ISO lido: <span className="font-mono">{scan.reading.size_type_code}</span></p>
+                <p className="text-[0.75rem] text-slate-500 dark:text-slate-400">Código ISO lido: <span className="font-mono">{scan.reading.size_type_code}</span></p>
               )}
               {scanDigitWarning && (
-                <p className="flex items-start gap-1.5 text-[13px] text-red-700 dark:text-red-300" data-testid="scan-digit-warning">
+                <p className="flex items-start gap-1.5 text-[0.8125rem] text-red-700 dark:text-red-300" data-testid="scan-digit-warning">
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                   O dígito verificador pintado ({scan.reading.read_check_digit}) não bate com o calculado. Confira as letras e números com o container.
                 </p>
               )}
               {scanValid && (
-                <p className="text-[13px] font-medium text-slate-700 dark:text-slate-300" data-testid="scan-match-info">
+                <p className="text-[0.8125rem] font-medium text-slate-700 dark:text-slate-300" data-testid="scan-match-info">
                   {scanMatch?.expected
                     ? (scanMatch.status === 'CONFIRMADO' ? 'Já confirmado na lista de esperados: a foto será atualizada.' : 'Está na lista de esperados: será marcado como Confirmado, com a foto.')
                     : scanMatch ? 'Já lançado como não esperado: a foto será atualizada.'

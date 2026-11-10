@@ -87,7 +87,7 @@ function AnswerToggle({ value, onChange, testId }) {
           data-testid={testId ? `${testId}-${key.toLowerCase()}` : undefined}
           onClick={() => onChange(value === key ? null : key)}
           className={cn(
-            'inline-flex h-9 min-w-[60px] items-center justify-center gap-1 rounded-md border px-2 text-xs font-semibold transition-colors',
+            'inline-flex h-9 min-w-[3.75rem] items-center justify-center gap-1 rounded-md border px-2 text-xs font-semibold transition-colors',
             value === key ? on : cn('border-slate-300 bg-white text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400', off),
           )}
         >
@@ -520,7 +520,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
             </div>
             <StatusPill tone={RESULT_META[result].tone} className="hidden sm:inline-flex">{RESULT_META[result].label}</StatusPill>
             <ProgressRing value={counts.total ? counts.answered / counts.total : 0} tone={tone.ring} size={42}>
-              <span className="text-[11px] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
+              <span className="text-[0.6875rem] font-semibold tabular-nums text-slate-600 dark:text-slate-300">
                 {counts.total ? Math.round((counts.answered / counts.total) * 100) : 0}%
               </span>
             </ProgressRing>
@@ -539,12 +539,12 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                   onClick={() => goTo(index)}
                   data-testid={`checklist-step-${item.key}`}
                   className={cn(
-                    'relative flex flex-col items-center gap-1 rounded-t-md px-1 pb-2.5 pt-1 text-[11px] font-medium outline-none transition-colors focus-visible:bg-primary/5 sm:flex-row sm:justify-center sm:gap-2 sm:text-xs',
+                    'relative flex flex-col items-center gap-1 rounded-t-md px-1 pb-2.5 pt-1 text-[0.6875rem] font-medium outline-none transition-colors focus-visible:bg-primary/5 sm:flex-row sm:justify-center sm:gap-2 sm:text-xs',
                     active ? 'text-primary' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200',
                   )}
                 >
                   <span className={cn(
-                    'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold transition-colors',
+                    'flex h-6 w-6 items-center justify-center rounded-full text-[0.6875rem] font-semibold transition-colors',
                     meta.done ? 'bg-emerald-500 text-white' : active ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
                   )}>
                     {meta.done ? <Check className="h-3.5 w-3.5" /> : index + 1}
@@ -594,7 +594,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                           >
                             <Icon className="h-6 w-6" />
                             <span className="text-sm font-semibold">{label}</span>
-                            <span className="hidden text-[11px] text-slate-400 sm:block">{hint}</span>
+                            <span className="hidden text-[0.6875rem] text-slate-400 sm:block">{hint}</span>
                           </motion.button>
                         );
                       })}
@@ -716,7 +716,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                             <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200', isOpen && 'rotate-180')} />
                             <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{section.label}</span>
                             <span className={cn(
-                              'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums',
+                              'shrink-0 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold tabular-nums',
                               sectionCounts.failed > 0
                                 ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'
                                 : complete
@@ -812,7 +812,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                               </span>
                               <span className="min-w-0">
                                 <span className="block truncate text-sm font-medium text-slate-800 dark:text-slate-100">{slot.label}</span>
-                                <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+                                <span className="block text-[0.6875rem] text-slate-500 dark:text-slate-400">
                                   {done ? `${slotPhotos.length} foto${slotPhotos.length > 1 ? 's' : ''}` : 'Sem foto'}
                                 </span>
                               </span>
@@ -850,7 +850,7 @@ export default function ChecklistFormDialog({ open, onOpenChange, checklist, dri
                                   initial={{ opacity: 0, scale: 0.8 }}
                                   animate={{ opacity: 1, scale: 1 }}
                                   transition={{ type: 'spring', stiffness: 320, damping: 24 }}
-                                  className="relative h-16 w-[88px] overflow-hidden rounded-md border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
+                                  className="relative h-16 w-[5.5rem] overflow-hidden rounded-md border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
                                 >
                                   <img
                                     src={photoSrc(photo)}

@@ -190,7 +190,7 @@ export default function ComercialCadastrosPage() {
                   type="button"
                   onClick={() => setActiveTypeKey(t.key)}
                   data-testid={`comercial-cadastro-type-${t.key}`}
-                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[0.8125rem] font-medium transition-colors ${
                     active
                       ? 'bg-primary text-primary-foreground'
                       : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -208,7 +208,7 @@ export default function ComercialCadastrosPage() {
           <DialogContent data-testid="comercial-cadastro-dialog">
             <DialogHeader>
               <DialogTitle className="text-base">{editId ? `Editar ${activeType.label}` : `Cadastrar ${activeType.label}`}</DialogTitle>
-              <DialogDescription className="text-[13px]">
+              <DialogDescription className="text-[0.8125rem]">
                 {editId ? `Atualize os dados` : `Adicione um novo registro`}
               </DialogDescription>
             </DialogHeader>
@@ -224,7 +224,7 @@ export default function ComercialCadastrosPage() {
                       </SelectContent>
                     </Select>
                   ) : f.type === 'textarea' ? (
-                    <Textarea value={formData[f.name] || ''} onChange={(e) => setField(f.name, e.target.value)} className="text-[13px] min-h-[70px]" />
+                    <Textarea value={formData[f.name] || ''} onChange={(e) => setField(f.name, e.target.value)} className="text-[0.8125rem] min-h-[4.375rem]" />
                   ) : (
                     <Input
                       value={formData[f.name] || ''}

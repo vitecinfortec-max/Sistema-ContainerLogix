@@ -229,11 +229,11 @@ export default function PlatformTenantsPage() {
                       </td>
                       <td className="cell-strong">
                         {t.name}
-                        {t.current && <span className="ml-2 text-[11px] font-normal text-primary">(você está aqui)</span>}
-                        <span className="block text-[11px] font-normal text-slate-400">banco {t.db_name}</span>
+                        {t.current && <span className="ml-2 text-[0.6875rem] font-normal text-primary">(você está aqui)</span>}
+                        <span className="block text-[0.6875rem] font-normal text-slate-400">banco {t.db_name}</span>
                       </td>
                       <td className="tabular-nums">{t.slug}</td>
-                      <td><div className="max-w-[260px] text-[12px] leading-snug">{(t.hosts || []).join(', ') || '-'}</div></td>
+                      <td><div className="max-w-[16.25rem] text-[0.75rem] leading-snug">{(t.hosts || []).join(', ') || '-'}</div></td>
                       <td className="text-center tabular-nums">{t.users}</td>
                       <td className="text-center tabular-nums">{t.movements}</td>
                       <td className="tabular-nums whitespace-nowrap">{fmtDateTime(t.last_movement_at)}</td>
@@ -264,12 +264,12 @@ export default function PlatformTenantsPage() {
             <div>
               <Label className="mb-1.5 block">Código da empresa *</Label>
               <Input value={form.slug} onChange={(e) => setField('slug', slugify(e.target.value))} className="h-9 text-sm" data-testid="platform-slug" />
-              <p className="text-[11px] text-slate-500 mt-1">Não muda depois. Usado no app e no endereço.</p>
+              <p className="text-[0.6875rem] text-slate-500 mt-1">Não muda depois. Usado no app e no endereço.</p>
             </div>
             <div>
               <Label className="mb-1.5 block">Endereços (um por linha)</Label>
-              <Textarea value={form.hosts} onChange={(e) => setField('hosts', e.target.value)} className="text-sm min-h-[60px]" />
-              <p className="text-[11px] text-slate-500 mt-1">Vazio: {form.slug || 'codigo'}.containerlogix.com.br</p>
+              <Textarea value={form.hosts} onChange={(e) => setField('hosts', e.target.value)} className="text-sm min-h-[3.75rem]" />
+              <p className="text-[0.6875rem] text-slate-500 mt-1">Vazio: {form.slug || 'codigo'}.containerlogix.com.br</p>
             </div>
             <div>
               <Label className="mb-1.5 block">Administrador da empresa *</Label>
@@ -282,11 +282,11 @@ export default function PlatformTenantsPage() {
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Remetente dos e-mails</Label>
               <Input type="email" value={form.sender_email} onChange={(e) => setField('sender_email', e.target.value)} className="h-9 text-sm" />
-              <p className="text-[11px] text-slate-500 mt-1">Relatório diário e recuperação de senha. Vazio: o remetente padrão do servidor.</p>
+              <p className="text-[0.6875rem] text-slate-500 mt-1">Relatório diário e recuperação de senha. Vazio: o remetente padrão do servidor.</p>
             </div>
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Observações</Label>
-              <Textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)} className="text-sm min-h-[50px]" />
+              <Textarea value={form.notes} onChange={(e) => setField('notes', e.target.value)} className="text-sm min-h-[3.125rem]" />
             </div>
           </div>
           <DialogFooter>
@@ -333,16 +333,16 @@ export default function PlatformTenantsPage() {
             </div>
             <div>
               <Label className="mb-1.5 block">Endereços (um por linha)</Label>
-              <Textarea value={editForm.hosts} onChange={(e) => setEditForm((f) => ({ ...f, hosts: e.target.value }))} className="text-sm min-h-[80px]" />
+              <Textarea value={editForm.hosts} onChange={(e) => setEditForm((f) => ({ ...f, hosts: e.target.value }))} className="text-sm min-h-[5rem]" />
             </div>
             <div>
               <Label className="mb-1.5 block">Remetente dos e-mails</Label>
               <Input type="email" value={editForm.sender_email} onChange={(e) => setEditForm((f) => ({ ...f, sender_email: e.target.value }))} className="h-9 text-sm" />
-              <p className="text-[11px] text-slate-500 mt-1">Vazio: o remetente padrão do servidor.</p>
+              <p className="text-[0.6875rem] text-slate-500 mt-1">Vazio: o remetente padrão do servidor.</p>
             </div>
             <div>
               <Label className="mb-1.5 block">Observações</Label>
-              <Textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} className="text-sm min-h-[50px]" />
+              <Textarea value={editForm.notes} onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))} className="text-sm min-h-[3.125rem]" />
             </div>
           </div>
           <DialogFooter>
@@ -367,7 +367,7 @@ export default function PlatformTenantsPage() {
                 </label>
                 <div className="space-y-1 pl-6">
                   {group.items.map((item) => (
-                    <label key={item.key} className={`flex items-center gap-2 text-[13px] ${disabled.has(group.key) ? 'opacity-40' : ''}`}>
+                    <label key={item.key} className={`flex items-center gap-2 text-[0.8125rem] ${disabled.has(group.key) ? 'opacity-40' : ''}`}>
                       <Checkbox checked={!disabled.has(item.key)} disabled={disabled.has(group.key)} onCheckedChange={() => toggleKey(item.key)} />{item.label}
                     </label>
                   ))}
@@ -400,7 +400,7 @@ export default function PlatformTenantsPage() {
               <div>Arquivos: {importStatus.total ?? '...'} · copiados {importStatus.copied} · já existiam {importStatus.skipped} · com erro {importStatus.failed}</div>
               <div>Transferido: {fmtBytes(importStatus.bytes)}</div>
               {importStatus.error && <div className="text-destructive">{importStatus.error}</div>}
-              {(importStatus.errors || []).slice(0, 5).map((err) => <div key={err} className="text-[11px] text-destructive">{err}</div>)}
+              {(importStatus.errors || []).slice(0, 5).map((err) => <div key={err} className="text-[0.6875rem] text-destructive">{err}</div>)}
             </div>
           )}
           <DialogFooter>

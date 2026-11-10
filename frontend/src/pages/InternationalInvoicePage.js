@@ -1322,7 +1322,7 @@ export default function InternationalInvoicePage() {
                             />
                           </td>
                           <td className="cell-strong whitespace-nowrap tabular-nums">#{invoice.invoice_number}</td>
-                          <td><div className="max-w-[260px] truncate" title={invoice.payer_company || ''}>{invoice.payer_company}</div></td>
+                          <td><div className="max-w-[16.25rem] truncate" title={invoice.payer_company || ''}>{invoice.payer_company}</div></td>
                           <td className="whitespace-nowrap tabular-nums">
                             {invoice.issue_date ? format(parseISO(invoice.issue_date), 'dd/MM/yyyy') : '-'}
                           </td>

@@ -408,7 +408,7 @@ export default function EpiDeliveriesPage() {
 
               {selectedPerson && (
                 <div className="sm:col-span-3 flex flex-wrap items-center gap-4 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 p-3" data-testid="epi-person-card">
-                  <div className="min-w-0 flex-1 text-[13px]">
+                  <div className="min-w-0 flex-1 text-[0.8125rem]">
                     <div className="font-semibold text-slate-800 dark:text-slate-100">{selectedPerson.name}</div>
                     <div className="text-slate-500 dark:text-slate-400">
                       {TYPE_LABELS[selectedPerson._type]}
@@ -453,13 +453,13 @@ export default function EpiDeliveriesPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-[13px] font-semibold text-primary">EPIs entregues</h3>
+                <h3 className="text-[0.8125rem] font-semibold text-primary">EPIs entregues</h3>
                 <Button variant="outline" size="sm" type="button" onClick={addItem} className="h-7 text-xs" data-testid="epi-add-item">
                   <Plus className="w-3 h-3 mr-1" />Adicionar EPI
                 </Button>
               </div>
               {epiProducts.length > 0 && (
-                <p className="text-[11px] text-slate-500 dark:text-slate-400" data-testid="epi-products-scope">
+                <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400" data-testid="epi-products-scope">
                   {onlyEpis
                     ? `A busca mostra só os ${epiProducts.length} produto(s) com C.A. ou de família EPI.`
                     : 'A busca está mostrando todos os produtos do estoque.'}{' '}
@@ -469,7 +469,7 @@ export default function EpiDeliveriesPage() {
                 </p>
               )}
               {form.items.length === 0 && (
-                <div className="text-center py-4 text-[12px] text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded">
+                <div className="text-center py-4 text-[0.75rem] text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded">
                   Nenhum EPI adicionado
                 </div>
               )}
@@ -490,7 +490,7 @@ export default function EpiDeliveriesPage() {
                         testId={`epi-item-product-${idx}`}
                       />
                       {product && (
-                        <p className={`text-[11px] mt-1 ${overStock ? 'text-red-600' : 'text-slate-500 dark:text-slate-400'}`}>
+                        <p className={`text-[0.6875rem] mt-1 ${overStock ? 'text-red-600' : 'text-slate-500 dark:text-slate-400'}`}>
                           Saldo em estoque: {qtyWithUnit(product.stock_quantity, product.unit)}
                           {overStock ? ' - insuficiente para esta quantidade' : ''}
                         </p>
@@ -516,7 +516,7 @@ export default function EpiDeliveriesPage() {
 
             <div>
               <Label className="mb-1.5 block">Observações</Label>
-              <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[60px]" data-testid="epi-obs-input" />
+              <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[3.75rem]" data-testid="epi-obs-input" />
             </div>
           </div>
 
@@ -611,13 +611,13 @@ export default function EpiDeliveriesPage() {
                           <td className="whitespace-nowrap tabular-nums">{fmtDate(d.delivery_date)}</td>
                           <td>
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="cell-strong max-w-[220px] truncate" title={d.recipient_name}>{d.recipient_name}</span>
-                              <StatusPill tone={d.recipient_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[11px] px-1.5">
+                              <span className="cell-strong max-w-[13.75rem] truncate" title={d.recipient_name}>{d.recipient_name}</span>
+                              <StatusPill tone={d.recipient_type === 'FUNCIONARIO' ? 'blue' : 'slate'} dot={false} className="text-[0.6875rem] px-1.5">
                                 {TYPE_LABELS[d.recipient_type]}
                               </StatusPill>
                             </div>
                           </td>
-                          <td><div className="max-w-[300px] truncate" title={itemsText}>{itemsText || '-'}</div></td>
+                          <td><div className="max-w-[18.75rem] truncate" title={itemsText}>{itemsText || '-'}</div></td>
                           <td className="text-right tabular-nums">{fmtQty(d.total_quantity)}</td>
                           <td>
                             <StatusPill tone={d.has_signature ? 'emerald' : 'amber'}>{d.has_signature ? 'Assinada' : 'Pendente'}</StatusPill>

@@ -57,7 +57,7 @@ const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currenc
 /** Desconto possível do turno (só quando o saldo é negativo). */
 function Discount({ value, className = '' }) {
   if (!value) return null;
-  return <div className={`text-[11px] font-medium text-red-600 dark:text-red-400 tabular-nums ${className}`}>- {fmtMoney(value)}</div>;
+  return <div className={`text-[0.6875rem] font-medium text-red-600 dark:text-red-400 tabular-nums ${className}`}>- {fmtMoney(value)}</div>;
 }
 
 const fmtDay = (iso) => (iso ? format(new Date(`${iso}T00:00:00`), 'dd/MM/yyyy') : '-');
@@ -205,9 +205,9 @@ export default function PortServiceShiftsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todos</SelectItem>
                   {TURNO_OPTIONS.map(([v, l]) => (
-                    <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                    <SelectItem key={v} value={v} className="text-[0.8125rem]">{l}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -288,18 +288,18 @@ export default function PortServiceShiftsPage() {
                         <td>
                           <StatusPill tone={i.turno === 'NOITE' ? 'violet' : 'blue'}>{i.turno === 'NOITE' ? 'Noite' : 'Dia'}</StatusPill>
                         </td>
-                        <td><div className="max-w-[125px] truncate" title={i.client_name || ''}>{i.client_name || '-'}</div></td>
+                        <td><div className="max-w-[7.8125rem] truncate" title={i.client_name || ''}>{i.client_name || '-'}</div></td>
                         <td>
-                          <div className="max-w-[125px] truncate" title={i.driver_name || ''}>{i.driver_name || '-'}</div>
+                          <div className="max-w-[7.8125rem] truncate" title={i.driver_name || ''}>{i.driver_name || '-'}</div>
                           <div className="mt-0.5"><PlateTag>{i.cavalo_plate}</PlateTag></div>
                         </td>
                         <td className="text-center tabular-nums whitespace-nowrap">
                           {i.entry_time || '-'}
-                          <div className="text-[11px] text-slate-400">prev. {i.expected_entry || '-'}</div>
+                          <div className="text-[0.6875rem] text-slate-400">prev. {i.expected_entry || '-'}</div>
                         </td>
                         <td className="text-center tabular-nums whitespace-nowrap">
                           {i.exit_time || '-'}
-                          <div className="text-[11px] text-slate-400">prev. {i.expected_exit || '-'}</div>
+                          <div className="text-[0.6875rem] text-slate-400">prev. {i.expected_exit || '-'}</div>
                         </td>
                         <td className="text-center whitespace-nowrap"><Diff minutes={i.entry_diff} /></td>
                         <td className="text-center whitespace-nowrap"><Diff minutes={i.exit_diff} /></td>
@@ -307,7 +307,7 @@ export default function PortServiceShiftsPage() {
                           <Balance item={i} />
                           <Discount value={i.discount} className="mt-0.5" />
                         </td>
-                        <td className="min-w-[170px] max-w-[300px] whitespace-pre-wrap text-[12px] text-slate-600 dark:text-slate-300">
+                        <td className="min-w-[10.625rem] max-w-[18.75rem] whitespace-pre-wrap text-[0.75rem] text-slate-600 dark:text-slate-300">
                           {i.observations || <span className="text-slate-400">-</span>}
                         </td>
                       </tr>

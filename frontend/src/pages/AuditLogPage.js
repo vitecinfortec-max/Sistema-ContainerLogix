@@ -243,7 +243,7 @@ export default function AuditLogPage() {
                       <td><ActionPill action={entry.action} /></td>
                       <td className="whitespace-nowrap">{entry.area}</td>
                       <td className="cell-strong">{entry.label || '-'}</td>
-                      <td className="text-xs text-muted-foreground max-w-[320px] truncate" title={summaryText(entry)}>{summaryText(entry)}</td>
+                      <td className="text-xs text-muted-foreground max-w-[20rem] truncate" title={summaryText(entry)}>{summaryText(entry)}</td>
                     </tr>
                   ))}
                 </tbody>

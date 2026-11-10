@@ -236,18 +236,18 @@ export default function HRVacationsPage() {
                     <tbody>
                       {balancePage.pageItems.map((b) => (
                         <tr key={b.contract_id} data-testid={`hr-vacation-balance-${b.contract_number}`}>
-                          <td className="cell-strong">{b.person_name}<span className="block text-[11px] font-normal text-slate-500">{b.position_name || ''}</span></td>
+                          <td className="cell-strong">{b.person_name}<span className="block text-[0.6875rem] font-normal text-slate-500">{b.position_name || ''}</span></td>
                           <td className="tabular-nums">{fmtDate(b.admission_date)}</td>
                           <td>
                             <div className="flex flex-wrap gap-1">
                               {b.periods.slice(-3).map((p) => (
-                                <StatusPill key={p.start} tone={PERIOD_TONES[p.status]} dot={false} className="text-[11px]"
+                                <StatusPill key={p.start} tone={PERIOD_TONES[p.status]} dot={false} className="text-[0.6875rem]"
                                   title={`${fmtDate(p.start)} a ${fmtDate(p.end)} · direito ${fmtNumber(p.entitled, 1)} · usado ${p.used}`}>
                                   {fmtDate(p.start).slice(3)}: {PERIOD_LABELS[p.status]}{p.status !== 'QUITADO' ? ` (${fmtNumber(p.balance, 1)}d)` : ''}
                                 </StatusPill>
                               ))}
                               {b.periods.some((p) => p.inss_leave_warning) && (
-                                <StatusPill tone="red" dot={false} className="text-[11px]"
+                                <StatusPill tone="red" dot={false} className="text-[0.6875rem]"
                                   title="Mais de 6 meses de afastamento pelo INSS no período aquisitivo: pelo art. 133, IV, da CLT o empregado perde as férias desse período e o novo período começa na volta. Confira com a contabilidade.">
                                   afastamento &gt; 6 meses (art. 133)
                                 </StatusPill>
@@ -319,7 +319,7 @@ export default function HRVacationsPage() {
                           <td className="tabular-nums whitespace-nowrap">{fmtDate(v.acquisition_start)} a {fmtDate(v.acquisition_end)}</td>
                           <td className="tabular-nums whitespace-nowrap">
                             {fmtDate(v.start_date)} a {fmtDate(v.end_date)}
-                            {v.late && <span className="block text-[11px] text-red-600">fora do prazo (em dobro)</span>}
+                            {v.late && <span className="block text-[0.6875rem] text-red-600">fora do prazo (em dobro)</span>}
                           </td>
                           <td className="text-center tabular-nums">{v.days}{v.sell_days ? ` + ${v.sell_days} abono` : ''}</td>
                           <td className="text-right tabular-nums cell-strong">{formatMoney(v.calc?.net)}</td>
@@ -362,7 +362,7 @@ export default function HRVacationsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {form.contract_id && !contractPeriods.length && <p className="text-[11px] text-amber-600 mt-1">Nenhum período aquisitivo completo com saldo.</p>}
+              {form.contract_id && !contractPeriods.length && <p className="text-[0.6875rem] text-amber-600 mt-1">Nenhum período aquisitivo completo com saldo.</p>}
             </div>
             <div>
               <Label className="mb-1.5 block">Início do gozo *</Label>
@@ -379,7 +379,7 @@ export default function HRVacationsPage() {
             <div>
               <Label className="mb-1.5 block">Data do pagamento</Label>
               <Input type="date" value={form.payment_date} onChange={(e) => setField('payment_date', e.target.value)} className="h-9 text-sm" />
-              <p className="text-[11px] text-slate-500 mt-1">Vazio: 2 dias antes do início (art. 145 da CLT).</p>
+              <p className="text-[0.6875rem] text-slate-500 mt-1">Vazio: 2 dias antes do início (art. 145 da CLT).</p>
             </div>
             <div className="sm:col-span-2 flex items-center gap-2">
               <Switch checked={form.advance_13th} onCheckedChange={(v) => setField('advance_13th', v)} />
@@ -387,14 +387,14 @@ export default function HRVacationsPage() {
             </div>
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Observações</Label>
-              <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[50px]" />
+              <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[3.125rem]" />
             </div>
           </div>
 
           {previewError && <p className="text-sm text-destructive" data-testid="hr-vacation-preview-error">{previewError}</p>}
           {preview && (
             <div className="space-y-2" data-testid="hr-vacation-preview">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[0.75rem]">
                 <div className="rounded-md bg-muted p-2"><div className="text-slate-500">Gozo</div><div className="font-semibold">{fmtDate(preview.start_date)} a {fmtDate(preview.end_date)}</div></div>
                 <div className="rounded-md bg-muted p-2"><div className="text-slate-500">Retorno</div><div className="font-semibold">{fmtDate(preview.return_date)}</div></div>
                 <div className="rounded-md bg-muted p-2"><div className="text-slate-500">Avisar até</div><div className="font-semibold">{fmtDate(preview.notice_date)}</div></div>
@@ -411,7 +411,7 @@ export default function HRVacationsPage() {
                 </tbody>
                 <tfoot><tr><td>Líquido</td><td className="text-right tabular-nums">{formatMoney(preview.calc.net)}</td></tr></tfoot>
               </table>
-              {preview.late && <p className="text-[12px] text-red-600">O prazo de concessão deste período já passou: a lei manda pagar as férias em dobro (art. 137 da CLT). Confira com a contabilidade.</p>}
+              {preview.late && <p className="text-[0.75rem] text-red-600">O prazo de concessão deste período já passou: a lei manda pagar as férias em dobro (art. 137 da CLT). Confira com a contabilidade.</p>}
             </div>
           )}
 

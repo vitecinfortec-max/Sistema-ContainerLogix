@@ -471,7 +471,7 @@ export default function HRContractsPage() {
                 <div>
                   <Label className="mb-1.5 block">Férias quitadas até</Label>
                   <Input type="date" value={form.vacation_settled_until} onChange={(e) => setField('vacation_settled_until', e.target.value)} className="h-9 text-sm" data-testid="hr-contract-vacation-settled" />
-                  <p className="text-[11px] text-slate-500 mt-1">Para quem já trabalhava antes do sistema: períodos aquisitivos que terminam até essa data já tiveram as férias tiradas.</p>
+                  <p className="text-[0.6875rem] text-slate-500 mt-1">Para quem já trabalhava antes do sistema: períodos aquisitivos que terminam até essa data já tiveram as férias tiradas.</p>
                 </div>
               </div>
             </TabsContent>
@@ -482,7 +482,7 @@ export default function HRContractsPage() {
                   <Label className="mb-1.5 block">Salário mensal (R$) *</Label>
                   <Input type="number" min="0" step="0.01" value={form.base_salary} onChange={(e) => setField('base_salary', e.target.value)} className="h-9 text-sm text-right" data-testid="hr-contract-salary" />
                   {selectedPosition && (selectedPosition.salary_min || selectedPosition.salary_max) && (
-                    <p className="text-[11px] text-slate-500 mt-1">Faixa do cargo: {formatMoney(selectedPosition.salary_min)} a {formatMoney(selectedPosition.salary_max)}</p>
+                    <p className="text-[0.6875rem] text-slate-500 mt-1">Faixa do cargo: {formatMoney(selectedPosition.salary_min)} a {formatMoney(selectedPosition.salary_max)}</p>
                   )}
                 </div>
                 <div>
@@ -513,12 +513,12 @@ export default function HRContractsPage() {
                   <div>
                     <Label className="mb-1.5 block">Custo mensal das passagens (R$)</Label>
                     <Input type="number" min="0" step="0.01" value={form.vt_monthly_cost} onChange={(e) => setField('vt_monthly_cost', e.target.value)} className="h-9 text-sm text-right" />
-                    <p className="text-[11px] text-slate-500 mt-1">O desconto não passa desse valor.</p>
+                    <p className="text-[0.6875rem] text-slate-500 mt-1">O desconto não passa desse valor.</p>
                   </div>
                 )}
                 <div className="sm:col-span-2">
                   <Label className="mb-1.5 block">Observações</Label>
-                  <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[60px]" />
+                  <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[3.75rem]" />
                 </div>
               </div>
             </TabsContent>
@@ -587,11 +587,11 @@ export default function HRContractsPage() {
                 data-testid="hr-contract-add-dependent">
                 <Plus className="w-4 h-4 mr-1" />Adicionar dependente
               </Button>
-              <p className="text-[11px] text-slate-500">O salário-família vale para filhos de até 14 anos, enquanto a remuneração estiver dentro do limite da tabela.</p>
+              <p className="text-[0.6875rem] text-slate-500">O salário-família vale para filhos de até 14 anos, enquanto a remuneração estiver dentro do limite da tabela.</p>
             </TabsContent>
 
             <TabsContent value="fixos" className="pt-3 space-y-2">
-              <p className="text-[12px] text-slate-500">Lançamentos que entram em toda folha mensal (plano de saúde, pensão, vale-refeição...). Podem ser ajustados em cada contracheque.</p>
+              <p className="text-[0.75rem] text-slate-500">Lançamentos que entram em toda folha mensal (plano de saúde, pensão, vale-refeição...). Podem ser ajustados em cada contracheque.</p>
               {form.recurring_events.map((ev, i) => {
                 const input = eventInput(ev.code);
                 return (
@@ -724,9 +724,9 @@ export default function HRContractsPage() {
                         <td className="tabular-nums cell-strong">{c.contract_number}</td>
                         <td>
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="cell-strong max-w-[220px] truncate" title={c.person_name}>{c.person_name}</span>
-                            {c.person_type === 'MOTORISTA' && <StatusPill tone="slate" dot={false} className="text-[11px] px-1.5">Motorista</StatusPill>}
-                            {c.salary_advance && <StatusPill tone="blue" dot={false} className="text-[11px] px-1.5" title="Recebe adiantamento quinzenal">Vale</StatusPill>}
+                            <span className="cell-strong max-w-[13.75rem] truncate" title={c.person_name}>{c.person_name}</span>
+                            {c.person_type === 'MOTORISTA' && <StatusPill tone="slate" dot={false} className="text-[0.6875rem] px-1.5">Motorista</StatusPill>}
+                            {c.salary_advance && <StatusPill tone="blue" dot={false} className="text-[0.6875rem] px-1.5" title="Recebe adiantamento quinzenal">Vale</StatusPill>}
                           </div>
                         </td>
                         <td>{c.position_name || '-'}</td>
@@ -735,13 +735,13 @@ export default function HRContractsPage() {
                         <td className="tabular-nums whitespace-nowrap">
                           {fmtDate(c.admission_date)}
                           {c.experience_end && c.status !== 'DESLIGADO' && c.experience_end >= today && (
-                            <span className="block text-[11px] text-amber-600 dark:text-amber-400">experiência até {fmtDate(c.experience_end)}</span>
+                            <span className="block text-[0.6875rem] text-amber-600 dark:text-amber-400">experiência até {fmtDate(c.experience_end)}</span>
                           )}
                         </td>
                         <td className="text-right tabular-nums cell-strong whitespace-nowrap">{formatMoney(c.base_salary)}</td>
                         <td>
                           <StatusPill tone={CONTRACT_STATUS_TONES[c.status]}>{CONTRACT_STATUS[c.status]}</StatusPill>
-                          {c.termination && <span className="block text-[11px] text-slate-500">{fmtDate(c.termination.termination_date)}</span>}
+                          {c.termination && <span className="block text-[0.6875rem] text-slate-500">{fmtDate(c.termination.termination_date)}</span>}
                         </td>
                       </tr>
                     ))}
@@ -810,18 +810,18 @@ export default function HRContractsPage() {
             <div>
               <Label className="mb-1.5 block">Saldo do FGTS (R$)</Label>
               <Input type="number" min="0" step="0.01" value={termForm.fgts_balance} onChange={(e) => setTerm('fgts_balance', e.target.value)} className="h-9 text-sm text-right" />
-              <p className="text-[11px] text-slate-500 mt-1">Vazio: estimado pelas folhas e férias pagas no sistema.</p>
+              <p className="text-[0.6875rem] text-slate-500 mt-1">Vazio: estimado pelas folhas e férias pagas no sistema.</p>
             </div>
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Observações</Label>
-              <Textarea value={termForm.reason} onChange={(e) => setTerm('reason', e.target.value)} className="text-sm min-h-[50px]" />
+              <Textarea value={termForm.reason} onChange={(e) => setTerm('reason', e.target.value)} className="text-sm min-h-[3.125rem]" />
             </div>
           </div>
 
           {termPreview && (
             <div className="space-y-2" data-testid="hr-termination-preview">
               {termPreview.calc.early_experience && (
-                <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[12px] text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[0.75rem] text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                   Experiência encerrada antes do prazo ({termPreview.calc.experience_remaining_days} dias restantes): não há aviso prévio.
                   {termForm.termination_type === 'PEDIDO'
                     ? ' O empregado indeniza metade dos dias restantes (art. 480) só se o aviso estiver como "Não cumprido".'
@@ -848,13 +848,13 @@ export default function HRContractsPage() {
                   </tr>
                 </tfoot>
               </table>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[0.75rem]">
                 <div className="rounded-md bg-muted p-2"><div className="text-slate-500">Dias de aviso</div><div className="font-semibold">{termPreview.calc.notice_days}</div></div>
                 <div className="rounded-md bg-muted p-2"><div className="text-slate-500">FGTS considerado</div><div className="font-semibold">{formatMoney(termPreview.calc.fgts_balance)}</div></div>
                 <div className="rounded-md bg-muted p-2"><div className="text-slate-500">Multa FGTS ({termPreview.calc.fgts_fine_rate}%)</div><div className="font-semibold">{formatMoney(termPreview.calc.fgts_fine)}</div></div>
                 <div className="rounded-md bg-muted p-2"><div className="text-slate-500">Saque FGTS</div><div className="font-semibold">{termPreview.calc.fgts_withdraw}</div></div>
               </div>
-              <p className="text-[11px] text-slate-500">Simulação para conferência: médias de variáveis e multas específicas devem ser conferidas pela contabilidade.</p>
+              <p className="text-[0.6875rem] text-slate-500">Simulação para conferência: médias de variáveis e multas específicas devem ser conferidas pela contabilidade.</p>
             </div>
           )}
 

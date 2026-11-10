@@ -113,7 +113,7 @@ export default function LoginNoticesManager() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{n.title}</p>
                     {n.message && <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">{n.message}</p>}
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                    <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500 mt-1">
                       {period}{n.link_url ? ` · botão "${n.link_label || 'Saiba mais'}"` : ''}
                     </p>
                   </div>
@@ -146,8 +146,8 @@ export default function LoginNoticesManager() {
             </div>
             <div className="col-span-2">
               <Label className="mb-1.5 block">Texto</Label>
-              <Textarea value={form.message} maxLength={400} onChange={(e) => set('message', e.target.value)} className="min-h-[80px] text-sm" data-testid="login-notice-message-input" />
-              <p className="text-[11px] text-slate-400 mt-1 text-right">{(form.message || '').length}/400</p>
+              <Textarea value={form.message} maxLength={400} onChange={(e) => set('message', e.target.value)} className="min-h-[5rem] text-sm" data-testid="login-notice-message-input" />
+              <p className="text-[0.6875rem] text-slate-400 mt-1 text-right">{(form.message || '').length}/400</p>
             </div>
             <div>
               <Label className="mb-1.5 block">Texto do botão</Label>

@@ -136,7 +136,7 @@ export default function PeriodReportDialog({
           ))}
         </div>
 
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3 min-h-[72px]" data-testid="period-report-summary">
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3 min-h-[4.5rem]" data-testid="period-report-summary">
           {summary ? (
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               {summary.map(([label, value]) => (

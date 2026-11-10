@@ -400,7 +400,7 @@ export default function FuelTankLevelPage() {
                     <span className={`block text-2xl font-semibold tabular-nums leading-tight ${statusTone.text}`} data-testid="tank-percentage">
                       <AnimatedNumber value={fmtPercent(level.percentage)} />
                     </span>
-                    <span className="flex items-center justify-end gap-1 text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                    <span className="flex items-center justify-end gap-1 text-[0.6875rem] font-medium text-slate-600 dark:text-slate-300">
                       {isLow || isOver ? <AlertTriangle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
                       {badge.label}
                     </span>
@@ -419,7 +419,7 @@ export default function FuelTankLevelPage() {
                       <span key={p} className="absolute top-0 bottom-0 w-px bg-white/70 dark:bg-slate-900/60" style={{ left: `${p}%` }} />
                     ))}
                   </div>
-                  <div className="relative h-4 mt-1 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+                  <div className="relative h-4 mt-1 text-[0.6875rem] tabular-nums text-slate-400 dark:text-slate-500">
                     <span className="absolute left-0">0</span>
                     {[25, 50, 75].map((p) => (
                       <span key={p} className="absolute -translate-x-1/2" style={{ left: `${p}%` }}>{p}%</span>
@@ -430,10 +430,10 @@ export default function FuelTankLevelPage() {
                     // Marca do alerta mínimo embaixo da régua da barra
                     <div className="relative h-4 mt-0.5" title="Alerta mínimo">
                       <span
-                        className="absolute flex flex-col items-center -translate-x-1/2 text-[11px] font-semibold leading-none text-red-600 dark:text-red-400"
+                        className="absolute flex flex-col items-center -translate-x-1/2 text-[0.6875rem] font-semibold leading-none text-red-600 dark:text-red-400"
                         style={{ left: `${minFraction * 100}%` }}
                       >
-                        <span className="w-0 h-0 border-x-4 border-x-transparent border-b-[5px] border-b-red-500" />
+                        <span className="w-0 h-0 border-x-4 border-x-transparent border-b-[0.3125rem] border-b-red-500" />
                         Mín.
                       </span>
                     </div>
@@ -461,12 +461,12 @@ export default function FuelTankLevelPage() {
                     },
                   ].map((tile) => (
                     <div key={tile.label} className="min-w-0 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 px-3 py-2">
-                      <dt className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">{tile.icon}{tile.label}</dt>
+                      <dt className="flex items-center gap-1.5 text-[0.6875rem] text-slate-500 dark:text-slate-400">{tile.icon}{tile.label}</dt>
                       <dd className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-100 truncate" data-testid={tile.testId}>{tile.value}</dd>
                     </div>
                   ))}
                 </dl>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500">
                   Consumo e autonomia pela média das saídas do tanque nos últimos {CONSUMPTION_DAYS} dias.
                 </p>
                 {isOver && (
@@ -552,7 +552,7 @@ export default function FuelTankLevelPage() {
                             ? (
                               <span className="cell-strong">
                                 #{item.reference_number}
-                                {item.nfe_number && <span className="ml-1.5 text-[11px] font-normal text-slate-500 dark:text-slate-400" title="Puxado da NF-e">NF {item.nfe_number}</span>}
+                                {item.nfe_number && <span className="ml-1.5 text-[0.6875rem] font-normal text-slate-500 dark:text-slate-400" title="Puxado da NF-e">NF {item.nfe_number}</span>}
                               </span>
                             )
                             : <span className="text-slate-500 dark:text-slate-400" title="Número do abastecimento">Abast. #{item.reference_number}</span>}
@@ -564,8 +564,8 @@ export default function FuelTankLevelPage() {
                         <td className={`text-right whitespace-nowrap tabular-nums ${item.balance_after > capacity && capacity > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'}`}>
                           {fmtLiters(item.balance_after)}
                         </td>
-                        <td><div className="max-w-[240px] truncate" title={item.label || ''}>{item.label}</div></td>
-                        <td><div className="max-w-[260px] truncate" title={item.observations || ''}>{item.observations || '-'}</div></td>
+                        <td><div className="max-w-[15rem] truncate" title={item.label || ''}>{item.label}</div></td>
+                        <td><div className="max-w-[16.25rem] truncate" title={item.observations || ''}>{item.observations || '-'}</div></td>
                       </tr>
                     );
                   })}
@@ -645,7 +645,7 @@ export default function FuelTankLevelPage() {
                       <div className="col-span-2 flex gap-1.5"><dt className="text-slate-500 dark:text-slate-400">Produto:</dt><dd className="font-medium text-slate-800 dark:text-slate-100 truncate">{selectedNfe.product_name}</dd></div>
                       <div className="flex gap-1.5"><dt className="text-slate-500 dark:text-slate-400">Na nota:</dt><dd className="font-medium tabular-nums text-slate-800 dark:text-slate-100">{fmtLiters(selectedNfe.quantity)}</dd></div>
                       <div className="flex gap-1.5"><dt className="text-slate-500 dark:text-slate-400">Saldo no almox.:</dt><dd className="font-medium tabular-nums text-slate-800 dark:text-slate-100">{fmtLiters(selectedNfe.available_stock)}</dd></div>
-                      <p className="col-span-2 pt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      <p className="col-span-2 pt-1 text-[0.6875rem] text-slate-500 dark:text-slate-400">
                         Ao salvar, os litros saem do almoxarifado "{nfeOptions.warehouse_name}" (Movimentação de Estoque de Saída). Excluir o reabastecimento devolve.
                       </p>
                     </dl>

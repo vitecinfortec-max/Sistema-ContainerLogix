@@ -132,7 +132,7 @@ export default function HRTimeBankPage() {
                       <td className={`text-right tabular-nums cell-strong ${b.balance < 0 ? 'text-blue-600' : b.balance > 0 ? 'text-amber-600' : ''}`}>{fmtMinutes(b.balance)}</td>
                       <td className="text-right tabular-nums" title={b.next_expiry ? `Próximo vencimento: ${fmtDate(b.next_expiry)} (prazo de ${b.months} meses)` : ''}>
                         {b.expired ? <span className="text-destructive font-semibold">{fmtMinutes(b.expired)}</span> : '-'}
-                        {b.expiring ? <span className="block text-[11px] text-amber-600">{fmtMinutes(b.expiring)} vencem {fmtDate(b.next_expiry)}</span> : null}
+                        {b.expiring ? <span className="block text-[0.6875rem] text-amber-600">{fmtMinutes(b.expiring)} vencem {fmtDate(b.next_expiry)}</span> : null}
                       </td>
                     </tr>
                   ))}
@@ -163,7 +163,7 @@ export default function HRTimeBankPage() {
                         <td className="tabular-nums">{fmtDate(e.date)}</td>
                         <td className="cell-strong">{e.person_name}</td>
                         <td className={`text-right tabular-nums cell-strong ${e.minutes < 0 ? 'text-blue-600' : 'text-amber-600'}`}>{e.minutes > 0 ? '+' : ''}{fmtMinutes(e.minutes)}</td>
-                        <td><div className="max-w-[260px] truncate">{e.description || '-'}</div></td>
+                        <td><div className="max-w-[16.25rem] truncate">{e.description || '-'}</div></td>
                         <td className="text-slate-500">{e.created_by_name}</td>
                       </tr>
                     ))}

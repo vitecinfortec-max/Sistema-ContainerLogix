@@ -281,11 +281,11 @@ export default function MovementDetailPage() {
             <CardContent className="p-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">ID Transação</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">ID Transação</p>
                   <p className="font-semibold text-sm font-mono text-primary">#{movement.transaction_id}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">Tipo de Operação</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400 mb-0.5">Tipo de Operação</p>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                     movement.operation_type === 'ENTRADA'
                       ? 'bg-primary/10 text-primary'
@@ -295,7 +295,7 @@ export default function MovementDetailPage() {
                   </span>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-0.5">Status</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400 mb-0.5">Status</p>
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                     movement.status === 'CHEIO'
                       ? 'bg-emerald-50 text-emerald-700'
@@ -305,7 +305,7 @@ export default function MovementDetailPage() {
                   </span>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Data/Hora</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Data/Hora</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{format(new Date(movement.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</p>
                 </div>
               </div>
@@ -320,25 +320,25 @@ export default function MovementDetailPage() {
             <CardContent className="p-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs mb-2">
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Motorista</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Motorista</p>
                   <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.driver_name}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">CPF</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">CPF</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.driver_cpf}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Transportadora</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Transportadora</p>
                   <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.transport_company}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Placa Cavalo</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Placa Cavalo</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.truck_plate}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Placa Carreta</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Placa Carreta</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.trailer_plate_1}</p>
                 </div>
               </div>
@@ -353,59 +353,59 @@ export default function MovementDetailPage() {
             <CardContent className="p-4">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-2">
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Nº Container</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Nº Container</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.container_number}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Tamanho/Tipo</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Tamanho/Tipo</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.size_type}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Armador</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Armador</p>
                   <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.shipping_line}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Tara</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Tara</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.tare || '-'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-2">
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Lacre</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Lacre</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.seal || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Genset</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Genset</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.genset || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Booking</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Booking</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.booking || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Tipo de Serviço</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Tipo de Serviço</p>
                   <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.service_type || '-'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Nota Fiscal</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Nota Fiscal</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">{movement.invoice_number || '-'}</p>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Cliente</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Cliente</p>
                   <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.client_name || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Terminal de Origem</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Terminal de Origem</p>
                   <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.origin_terminal || '-'}</p>
                 </div>
                 <div className="col-span-2">
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Comprador</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Comprador</p>
                   <p className="font-semibold text-xs text-slate-800 dark:text-slate-200">{movement.buyer_name || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Valor do Container</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Valor do Container</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">
                     {movement.container_value != null
                       ? `${movement.container_value_currency === 'USD' ? 'US$' : 'R$'} ${Number(movement.container_value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -413,7 +413,7 @@ export default function MovementDetailPage() {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Data de Fabricação</p>
+                  <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Data de Fabricação</p>
                   <p className="font-semibold font-mono text-xs text-slate-800 dark:text-slate-200">
                     {movement.manufacture_date ? movement.manufacture_date.split('-').reverse().join('/') : '-'}
                   </p>

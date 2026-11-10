@@ -447,7 +447,7 @@ export default function DeliveryStatusPage() {
                         </>
                       )}
                       {item.delivery_completed && (
-                        <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" data-testid={`delivery-finalized-badge-${index}`}>
+                        <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" data-testid={`delivery-finalized-badge-${index}`}>
                           <CheckCircle2 className="w-3 h-3" />
                           Finalizado
                         </span>
@@ -697,7 +697,7 @@ export default function DeliveryStatusPage() {
                           <td className="whitespace-nowrap tabular-nums">
                             {status.status_date ? format(new Date(status.status_date + 'T00:00:00'), 'dd/MM/yyyy', { locale: ptBR }) : '-'}
                           </td>
-                          <td><div className="max-w-[260px] truncate" title={status.destination_client_name || ''}>{status.destination_client_name}</div></td>
+                          <td><div className="max-w-[16.25rem] truncate" title={status.destination_client_name || ''}>{status.destination_client_name}</div></td>
                           <td className="text-right tabular-nums">{status.items?.length || 0}</td>
                           <td>
                             <StatusPill tone={RECORD_STATUS_TONES[status.status] || 'blue'}>
@@ -788,12 +788,12 @@ export default function DeliveryStatusPage() {
                           <td className="text-center">{item.delivery_completed || '-'}</td>
                           <td className="text-center">
                             {item.delivery_completed ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
                                 <CheckCircle2 className="w-3 h-3" />
                                 Finalizado
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
                                 Pendente
                               </span>
                             )}

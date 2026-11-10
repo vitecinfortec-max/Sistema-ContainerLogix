@@ -233,7 +233,7 @@ export default function UsersPage() {
                         <td>
                           <span className="inline-flex items-center gap-2">
                             <UserTag name={u.name} />
-                            {isSelf && <StatusPill tone="primary" dot={false} className="text-[11px] px-1.5">você</StatusPill>}
+                            {isSelf && <StatusPill tone="primary" dot={false} className="text-[0.6875rem] px-1.5">você</StatusPill>}
                           </span>
                         </td>
                         <td className="text-slate-500 dark:text-slate-400">{u.email}</td>
@@ -243,7 +243,7 @@ export default function UsersPage() {
                             onValueChange={(value) => handleRoleChange(u, value)}
                             disabled={isSelf || isSaving || isLocked}
                           >
-                            <SelectTrigger className="h-8 w-[160px] text-[13px]" data-testid="user-role-select">
+                            <SelectTrigger className="h-8 w-[10rem] text-[0.8125rem]" data-testid="user-role-select">
                               <SelectValue>{ROLE_LABELS[u.role] || u.role}</SelectValue>
                             </SelectTrigger>
                             <SelectContent>
@@ -303,7 +303,7 @@ export default function UsersPage() {
         <DialogContent data-testid="new-user-dialog">
           <DialogHeader>
             <DialogTitle className="text-base">Novo Usuário</DialogTitle>
-            <DialogDescription className="text-[13px]">
+            <DialogDescription className="text-[0.8125rem]">
               Crie o acesso e passe o email e a senha para a pessoa entrar no sistema
             </DialogDescription>
           </DialogHeader>
@@ -355,7 +355,7 @@ export default function UsersPage() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Mínimo de 6 caracteres</p>
+                <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Mínimo de 6 caracteres</p>
               </div>
               <div className="space-y-1.5">
                 <Label className="block">Nível de acesso *</Label>
@@ -377,9 +377,9 @@ export default function UsersPage() {
                 data-testid="new-user-must-change"
                 className="mt-0.5"
               />
-              <span className="text-[13px] leading-snug">
+              <span className="text-[0.8125rem] leading-snug">
                 <span className="font-medium text-slate-800 dark:text-slate-100">Pedir nova senha no primeiro acesso</span>
-                <span className="block text-slate-500 dark:text-slate-400 text-[12px]">Ao entrar pela primeira vez, a pessoa é levada a trocar essa senha por uma só dela</span>
+                <span className="block text-slate-500 dark:text-slate-400 text-[0.75rem]">Ao entrar pela primeira vez, a pessoa é levada a trocar essa senha por uma só dela</span>
               </span>
             </label>
             <Button type="submit" className="w-full font-semibold" disabled={creating} data-testid="new-user-submit">
@@ -393,7 +393,7 @@ export default function UsersPage() {
         <DialogContent data-testid="edit-user-dialog">
           <DialogHeader>
             <DialogTitle className="text-base">Editar Usuário</DialogTitle>
-            <DialogDescription className="text-[13px]">
+            <DialogDescription className="text-[0.8125rem]">
               O email é o que a pessoa usa para entrar no sistema
             </DialogDescription>
           </DialogHeader>
@@ -430,7 +430,7 @@ export default function UsersPage() {
         <DialogContent data-testid="reset-password-dialog">
           <DialogHeader>
             <DialogTitle className="text-base">Redefinir Senha</DialogTitle>
-            <DialogDescription className="text-[13px]">
+            <DialogDescription className="text-[0.8125rem]">
               {resetting ? `Nova senha para "${resetting.name}". As sessões abertas dessa pessoa serão encerradas.` : ''}
             </DialogDescription>
           </DialogHeader>
@@ -458,7 +458,7 @@ export default function UsersPage() {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">Mínimo de 6 caracteres</p>
+              <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">Mínimo de 6 caracteres</p>
             </div>
             <label className="flex items-start gap-2.5 rounded-md border border-slate-200 dark:border-slate-700 p-3 cursor-pointer">
               <Checkbox
@@ -466,7 +466,7 @@ export default function UsersPage() {
                 onCheckedChange={(checked) => setResetForm({ ...resetForm, must_change_password: checked === true })}
                 className="mt-0.5"
               />
-              <span className="text-[13px] leading-snug">
+              <span className="text-[0.8125rem] leading-snug">
                 <span className="font-medium text-slate-800 dark:text-slate-100">Pedir nova senha no próximo acesso</span>
               </span>
             </label>

@@ -517,7 +517,7 @@ export default function FuelSupplyPage() {
 
             <div className="flex items-center gap-2">
               <input type="checkbox" id="has-other-expenses" checked={form.has_other_expenses} onChange={(e) => onChange('has_other_expenses', e.target.checked)} className="h-4 w-4" data-testid="fuel-has-other-expenses" />
-              <Label htmlFor="has-other-expenses" className="text-[12px] text-slate-700 dark:text-slate-300 cursor-pointer">Outras Despesas</Label>
+              <Label htmlFor="has-other-expenses" className="text-[0.75rem] text-slate-700 dark:text-slate-300 cursor-pointer">Outras Despesas</Label>
             </div>
             {form.has_other_expenses && (
               <div className="grid grid-cols-2 gap-3 pl-6">
@@ -533,7 +533,7 @@ export default function FuelSupplyPage() {
               <Label>Tipo de Pagamento <span className="text-destructive">*</span></Label>
               <div className="flex flex-wrap gap-4">
                 {PAYMENT_TYPE_OPTIONS.map(([v, l]) => (
-                  <label key={v} className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <label key={v} className="flex items-center gap-1.5 text-[0.8125rem] text-slate-700 dark:text-slate-300 cursor-pointer">
                     <input type="radio" name="payment_type" checked={form.payment_type === v} onChange={() => onChange('payment_type', v)} className="h-3.5 w-3.5" />
                     {l}
                   </label>
@@ -671,8 +671,8 @@ export default function FuelSupplyPage() {
                         <td className="whitespace-nowrap tabular-nums">{f.supply_date ? format(new Date(`${f.supply_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
                         <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{f.supply_order || '-'}</td>
                         <td><PlateTag>{f.equipment_plate}</PlateTag></td>
-                        <td><div className="max-w-[200px] truncate" title={f.driver_name || ''}>{f.driver_name || '-'}</div></td>
-                        <td><div className="max-w-[200px] truncate" title={f.supplier_name || ''}>{f.supplier_name || '-'}</div></td>
+                        <td><div className="max-w-[12.5rem] truncate" title={f.driver_name || ''}>{f.driver_name || '-'}</div></td>
+                        <td><div className="max-w-[12.5rem] truncate" title={f.supplier_name || ''}>{f.supplier_name || '-'}</div></td>
                         <td>
                           <StatusPill tone={f.source === 'TANQUE_PROPRIO' ? 'primary' : 'slate'} dot={false}>
                             {f.source === 'TANQUE_PROPRIO' ? 'Tanque Próprio' : 'Posto Externo'}
@@ -710,7 +710,7 @@ function ReceiptSlot({ view, busy, onPick, onRemove }) {
             {view.isPdf ? (
               <div className="flex items-center gap-2 h-16 px-4 rounded-lg border text-sm text-slate-700 dark:text-slate-300">
                 <FileText className="w-5 h-5 text-primary" />
-                <span className="max-w-[220px] truncate">{view.name || 'Nota (PDF)'}</span>
+                <span className="max-w-[13.75rem] truncate">{view.name || 'Nota (PDF)'}</span>
               </div>
             ) : (
               <img src={view.src} alt="Comprovante do abastecimento" className="w-40 h-28 object-cover rounded-lg border" />
@@ -741,7 +741,7 @@ function ReceiptSlot({ view, busy, onPick, onRemove }) {
 
 function SectionTitle({ children }) {
   return (
-    <h3 className="text-[13px] font-semibold text-primary border-b-2 border-primary/20 pb-1">
+    <h3 className="text-[0.8125rem] font-semibold text-primary border-b-2 border-primary/20 pb-1">
       {children}
     </h3>
   );
@@ -801,11 +801,11 @@ function RadioField({ label, value, onChange, testid }) {
     <div>
       <Label className="mb-1.5 block"><RequiredLabel label={label} /></Label>
       <div className="flex items-center gap-4 h-9">
-        <label className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
+        <label className="flex items-center gap-1.5 text-[0.8125rem] text-slate-700 dark:text-slate-300 cursor-pointer">
           <input type="radio" checked={value === true} onChange={() => onChange(true)} className="h-3.5 w-3.5" data-testid={testid ? `${testid}-sim` : undefined} />
           Sim
         </label>
-        <label className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
+        <label className="flex items-center gap-1.5 text-[0.8125rem] text-slate-700 dark:text-slate-300 cursor-pointer">
           <input type="radio" checked={value === false} onChange={() => onChange(false)} className="h-3.5 w-3.5" data-testid={testid ? `${testid}-nao` : undefined} />
           Não
         </label>
@@ -818,7 +818,7 @@ function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
       <Label className="mb-1.5 block">{label}</Label>
-      <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
+      <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[3.75rem]" data-testid={testid} />
     </div>
   );
 }

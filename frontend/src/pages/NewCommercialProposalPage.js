@@ -170,7 +170,7 @@ export default function NewCommercialProposalPage() {
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Free Time de Armazenagem</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              <Textarea value={freeTimeText} onChange={(e) => setFreeTimeText(e.target.value)} className="min-h-[80px]" />
+              <Textarea value={freeTimeText} onChange={(e) => setFreeTimeText(e.target.value)} className="min-h-[5rem]" />
             </CardContent>
           </Card>
 
@@ -179,7 +179,7 @@ export default function NewCommercialProposalPage() {
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Forma de Pagamento</CardTitle>
             </CardHeader>
             <CardContent className="p-4">
-              <Textarea value={paymentTermsText} onChange={(e) => setPaymentTermsText(e.target.value)} className="min-h-[80px]" />
+              <Textarea value={paymentTermsText} onChange={(e) => setPaymentTermsText(e.target.value)} className="min-h-[5rem]" />
             </CardContent>
           </Card>
 

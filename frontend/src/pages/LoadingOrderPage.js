@@ -238,9 +238,9 @@ export default function LoadingOrderPage() {
                           ? `${o.items[0].container_number || '-'}${o.items.length > 1 ? ` +${o.items.length - 1}` : ''}`
                           : '-'}
                       </td>
-                      <td><div className="max-w-[200px] truncate" title={o.driver_name || ''}>{o.driver_name || '-'}</div></td>
-                      <td><div className="max-w-[200px] truncate" title={o.transport_company || ''}>{o.transport_company || '-'}</div></td>
-                      <td><div className="max-w-[200px] truncate" title={o.route_name || ''}>{o.route_name || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={o.driver_name || ''}>{o.driver_name || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={o.transport_company || ''}>{o.transport_company || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={o.route_name || ''}>{o.route_name || '-'}</div></td>
                       <td>
                         <StatusPill tone={STATUS_TONES[o.status] || 'slate'}>
                           {STATUS_LABELS[o.status] || o.status}

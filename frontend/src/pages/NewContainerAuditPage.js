@@ -106,7 +106,7 @@ export default function NewContainerAuditPage() {
               )}
             </div>
 
-            <p className="text-[13px] text-slate-500 dark:text-slate-400">
+            <p className="text-[0.8125rem] text-slate-500 dark:text-slate-400">
               O sistema vai trazer automaticamente todos os containers que constam em estoque para este cliente, pra você confrontar com o que encontrar no pátio.
             </p>
 

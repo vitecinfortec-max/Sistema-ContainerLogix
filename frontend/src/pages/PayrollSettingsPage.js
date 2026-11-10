@@ -122,7 +122,7 @@ export default function PayrollSettingsPage() {
 
         {SIMPLE_FIELDS.map(([title, fields, hint]) => (
           <FormSection key={title} title={title}>
-            {hint && <p className="text-[12px] text-slate-500 mb-3">{hint}</p>}
+            {hint && <p className="text-[0.75rem] text-slate-500 mb-3">{hint}</p>}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {fields.map(([k, lbl, type]) => (
                 <div key={k}>
@@ -178,7 +178,7 @@ function BracketTable({ rows, onChange, onRemove, onAdd, withDeduction = false, 
         </table>
       </div>
       <div className="flex items-center justify-between">
-        <span className="text-[11px] text-slate-500">{hint}</span>
+        <span className="text-[0.6875rem] text-slate-500">{hint}</span>
         <Button variant="outline" size="sm" onClick={onAdd}><Plus className="w-4 h-4 mr-1" />Adicionar faixa</Button>
       </div>
     </div>

@@ -909,7 +909,7 @@ function LayoutFrame({ children }) {
             isActive ? 'bg-primary/10 text-primary' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
-          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+          <Icon className={`w-[1.125rem] h-[1.125rem] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
         </Link>
       );
     }
@@ -944,7 +944,7 @@ function LayoutFrame({ children }) {
             data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
             className={`group flex items-center mx-2 my-px rounded-md py-2 transition-colors ${
               isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-            } ${deepIndent ? 'pl-[58px]' : 'pl-[42px]'} ${isFavorite ? 'pr-9' : 'pr-3'} text-[13px]`}
+            } ${deepIndent ? 'pl-[3.625rem]' : 'pl-[2.625rem]'} ${isFavorite ? 'pr-9' : 'pr-3'} text-[0.8125rem]`}
           >
             <span>{item.label}</span>
           </Link>
@@ -961,9 +961,9 @@ function LayoutFrame({ children }) {
           data-testid={`nav-${item.path.replace(/\//g, '-').slice(1)}`}
           className={`group flex items-center mx-2 my-px rounded-md py-2.5 transition-colors ${
             isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          } pl-3 ${isFavorite ? 'pr-9' : 'pr-3'} gap-3 text-[13px]`}
+          } pl-3 ${isFavorite ? 'pr-9' : 'pr-3'} gap-3 text-[0.8125rem]`}
         >
-          <Icon className={`flex-shrink-0 w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+          <Icon className={`flex-shrink-0 w-[1.125rem] h-[1.125rem] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
           <span>{item.label}</span>
         </Link>
         {favoriteButton}
@@ -976,7 +976,7 @@ function LayoutFrame({ children }) {
     const isActive = isNavItemActive(item, location);
     return (
       <Link key={item.path} to={item.path} onClick={() => setMobileMenuOpen(false)}
-        className={`flex items-center mx-2 my-px rounded-md ${nested ? 'pl-[60px]' : 'pl-10'} pr-3 py-2.5 text-[13px] ${
+        className={`flex items-center mx-2 my-px rounded-md ${nested ? 'pl-[3.75rem]' : 'pl-10'} pr-3 py-2.5 text-[0.8125rem] ${
           isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
         }`}
       >
@@ -1017,20 +1017,20 @@ function LayoutFrame({ children }) {
           onClick={() => handleGroupClickCollapsed(toggle)}
           data-testid={testId}
         >
-          <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={1.8} />
+          <Icon className={`w-[1.125rem] h-[1.125rem] ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={1.8} />
         </div>
       );
     }
     return (
       <button
         onClick={toggle}
-        className={`w-[calc(100%-1rem)] mx-2 my-px rounded-md flex items-center justify-between ${nested ? 'pl-7 pr-3' : 'px-3'} py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/60 text-[13px] ${
+        className={`w-[calc(100%-1rem)] mx-2 my-px rounded-md flex items-center justify-between ${nested ? 'pl-7 pr-3' : 'px-3'} py-2.5 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800/60 text-[0.8125rem] ${
           isActive ? 'text-primary font-semibold' : 'text-slate-700 dark:text-slate-300'
         }`}
         data-testid={testId}
       >
         <div className="flex items-center gap-3">
-          <Icon className={`w-[18px] h-[18px] flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
+          <Icon className={`w-[1.125rem] h-[1.125rem] flex-shrink-0 ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`} strokeWidth={isActive ? 2.2 : 1.8} />
           <span>{label}</span>
         </div>
         <ChevronRight className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''} ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`} />
@@ -1042,13 +1042,13 @@ function LayoutFrame({ children }) {
     <div className="min-h-screen bg-canvas flex flex-col">
       {/* Top Header Bar */}
       <header className={`no-print hidden md:flex items-center justify-between h-12 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 fixed top-0 right-0 z-30 ${
-        sidebarOpen ? 'left-[268px]' : 'left-16'
+        sidebarOpen ? 'left-[16.75rem]' : 'left-16'
       }`} data-testid="top-header">
         <div className="flex items-center h-full px-6">
           <Breadcrumb data-testid="page-title">
             <BreadcrumbList className="flex-nowrap">
               <BreadcrumbItem>
-                <BreadcrumbLink asChild className="text-[13px] text-slate-500 dark:text-slate-400">
+                <BreadcrumbLink asChild className="text-[0.8125rem] text-slate-500 dark:text-slate-400">
                   <Link to="/dashboard">ContainerLogix</Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
@@ -1056,13 +1056,13 @@ function LayoutFrame({ children }) {
                 <>
                   <BreadcrumbSeparator className="text-slate-400 dark:text-slate-500" />
                   <BreadcrumbItem>
-                    <span className="text-[13px] text-slate-500 dark:text-slate-400">{breadcrumbGroup}</span>
+                    <span className="text-[0.8125rem] text-slate-500 dark:text-slate-400">{breadcrumbGroup}</span>
                   </BreadcrumbItem>
                 </>
               )}
               <BreadcrumbSeparator className="text-slate-400 dark:text-slate-500" />
               <BreadcrumbItem>
-                <BreadcrumbPage className="text-[15px] font-semibold text-slate-800 dark:text-slate-200">
+                <BreadcrumbPage className="text-[0.9375rem] font-semibold text-slate-800 dark:text-slate-200">
                   {pageTitle}
                 </BreadcrumbPage>
               </BreadcrumbItem>
@@ -1076,9 +1076,9 @@ function LayoutFrame({ children }) {
             title="Busca global"
             data-testid="header-search"
           >
-            <Search className="w-[15px] h-[15px]" />
+            <Search className="w-[0.9375rem] h-[0.9375rem]" />
             <span className="hidden lg:inline">Buscar</span>
-            <kbd className="hidden lg:inline text-[11px] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5">Ctrl+K</kbd>
+            <kbd className="hidden lg:inline text-[0.6875rem] text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 rounded px-1 py-0.5">Ctrl+K</kbd>
           </button>
           <div className="relative" ref={notificationsRef}>
             <button
@@ -1087,9 +1087,9 @@ function LayoutFrame({ children }) {
               title="Notificações"
               data-testid="header-notifications"
             >
-              <Bell className="w-[18px] h-[18px]" />
+              <Bell className="w-[1.125rem] h-[1.125rem]" />
               {unreadNotificationsCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[11px] font-semibold leading-none">
+                <span className="absolute top-0.5 right-0.5 flex items-center justify-center min-w-[1rem] h-4 px-1 rounded-full bg-red-500 text-white text-[0.6875rem] font-semibold leading-none">
                   {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
                 </span>
               )}
@@ -1145,7 +1145,7 @@ function LayoutFrame({ children }) {
                     >
                       <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">{n.title}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{n.description}</p>
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{format(n.timestamp, 'HH:mm', { locale: ptBR })}</p>
+                      <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500 mt-1">{format(n.timestamp, 'HH:mm', { locale: ptBR })}</p>
                     </button>
                   ))
                 )}
@@ -1158,7 +1158,7 @@ function LayoutFrame({ children }) {
             title="Configurações"
             data-testid="header-settings"
           >
-            <Settings className="w-[18px] h-[18px]" />
+            <Settings className="w-[1.125rem] h-[1.125rem]" />
           </button>
           <button aria-label={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
             onClick={toggleTheme}
@@ -1166,7 +1166,7 @@ function LayoutFrame({ children }) {
             title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
             data-testid="header-theme-toggle"
           >
-            {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+            {theme === 'dark' ? <Sun className="w-[1.125rem] h-[1.125rem]" /> : <Moon className="w-[1.125rem] h-[1.125rem]" />}
           </button>
           <div className="w-px h-5 bg-slate-200 dark:bg-slate-700 mx-2"></div>
           <div className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-default" data-testid="header-user-info">
@@ -1182,7 +1182,7 @@ function LayoutFrame({ children }) {
         {/* Sidebar - Desktop */}
         <aside 
           className={`no-print hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 fixed left-0 top-0 h-screen z-40 ${
-            sidebarOpen ? 'w-[268px]' : 'w-16'
+            sidebarOpen ? 'w-[16.75rem]' : 'w-16'
           }`}
           data-testid="sidebar"
         >
@@ -1195,7 +1195,7 @@ function LayoutFrame({ children }) {
                 className="h-9 w-auto"
               />
               {sidebarOpen && (
-                <span className="font-bold text-[15px] text-primary">
+                <span className="font-bold text-[0.9375rem] text-primary">
                   ContainerLogix
                 </span>
               )}
@@ -1368,10 +1368,10 @@ function LayoutFrame({ children }) {
               <button 
                 onClick={handleLogout} 
                 data-testid="logout-button"
-                className={`flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-red-600 transition-colors text-[13px] py-1.5 px-2 rounded ${!sidebarOpen ? 'justify-center w-full' : ''}`}
+                className={`flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-red-600 transition-colors text-[0.8125rem] py-1.5 px-2 rounded ${!sidebarOpen ? 'justify-center w-full' : ''}`}
                 title={!sidebarOpen ? 'Sair' : undefined}
               >
-                <LogOut className="w-[18px] h-[18px]" />
+                <LogOut className="w-[1.125rem] h-[1.125rem]" />
                 {sidebarOpen && <span>Sair</span>}
               </button>
               <button title="Recolher ou expandir menu" aria-label="Recolher ou expandir menu"
@@ -1525,7 +1525,7 @@ function LayoutFrame({ children }) {
             }`}
           >
             <Home className="w-6 h-6" strokeWidth={1.8} />
-            <span className="text-[11px] font-medium">Início</span>
+            <span className="text-[0.6875rem] font-medium">Início</span>
           </Link>
           <Link
             to="/movements"
@@ -1536,7 +1536,7 @@ function LayoutFrame({ children }) {
             }`}
           >
             <Container className="w-6 h-6" strokeWidth={1.8} />
-            <span className="text-[11px] font-medium">Gate</span>
+            <span className="text-[0.6875rem] font-medium">Gate</span>
           </Link>
           <Link
             to="/container-inspections"
@@ -1547,7 +1547,7 @@ function LayoutFrame({ children }) {
             }`}
           >
             <ClipboardCheck className="w-6 h-6" strokeWidth={1.8} />
-            <span className="text-[11px] font-medium">Registro</span>
+            <span className="text-[0.6875rem] font-medium">Registro</span>
           </Link>
           <button
             type="button"
@@ -1558,13 +1558,13 @@ function LayoutFrame({ children }) {
             }`}
           >
             <MoreHorizontal className="w-6 h-6" strokeWidth={1.8} />
-            <span className="text-[11px] font-medium">Mais</span>
+            <span className="text-[0.6875rem] font-medium">Mais</span>
           </button>
         </nav>
 
         {/* Main Content */}
         <main className={`flex-1 min-w-0 ${
-          sidebarOpen ? 'md:ml-[268px]' : 'md:ml-16'
+          sidebarOpen ? 'md:ml-[16.75rem]' : 'md:ml-16'
         } mt-14 md:mt-12 pb-20 md:pb-0`}>
           <PageTransition key={location.pathname} className="max-w-screen-2xl mx-auto px-4 py-5 md:px-6 md:py-6">
             <PageGuard>{children}</PageGuard>

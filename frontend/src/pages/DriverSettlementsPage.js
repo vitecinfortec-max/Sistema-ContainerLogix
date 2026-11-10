@@ -319,7 +319,7 @@ export default function DriverSettlementsPage() {
                       </td>
                       <td className="cell-strong tabular-nums">{s.settlement_number}</td>
                       <td className="whitespace-nowrap tabular-nums">{formatDay(s.settlement_date)}</td>
-                      <td><div className="max-w-[200px] truncate">{s.driver_name}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate">{s.driver_name}</div></td>
                       <td className="hidden md:table-cell">{s.vehicle_plate ? <PlateTag>{s.vehicle_plate}</PlateTag> : '-'}</td>
                       <td className="hidden xl:table-cell text-right tabular-nums">{(s.km_total || 0).toLocaleString('pt-BR')}</td>
                       <td className="hidden lg:table-cell text-right tabular-nums whitespace-nowrap">{formatMoney(s.revenue)}</td>

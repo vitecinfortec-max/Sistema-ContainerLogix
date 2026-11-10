@@ -385,7 +385,7 @@ export default function FlexTankPage() {
                               {movement.movement_type === 'ENTRADA' ? 'Entrada' : 'Saída'}
                             </StatusPill>
                           </td>
-                          <td><div className="max-w-[260px] truncate" title={movement.client_name || ''}>{movement.client_name || '-'}</div></td>
+                          <td><div className="max-w-[16.25rem] truncate" title={movement.client_name || ''}>{movement.client_name || '-'}</div></td>
                           <td className="font-mono whitespace-nowrap text-slate-700 dark:text-slate-200">{movement.container_number || '-'}</td>
                         </tr>
                       ))}
@@ -478,7 +478,7 @@ export default function FlexTankPage() {
                         <tbody>
                           {rows.map((item, idx) => (
                             <tr key={idx}>
-                              <td><div className="max-w-[240px] truncate" title={item[nameKey]}>{item[nameKey]}</div></td>
+                              <td><div className="max-w-[15rem] truncate" title={item[nameKey]}>{item[nameKey]}</div></td>
                               <td className="text-right tabular-nums text-primary">{item.entries}</td>
                               <td className="text-right tabular-nums text-amber-600 dark:text-amber-400">{item.exits}</td>
                               <td className="text-right tabular-nums cell-strong">{item.stock}</td>

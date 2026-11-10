@@ -109,7 +109,7 @@ export function DocumentImportNotice({ notice, onClose }) {
   if (!notice) return null;
   const { label, count, warnings = [], info = [] } = notice;
   return (
-    <div className="relative rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-3.5 py-2.5 pr-9 text-[13px] text-amber-900 dark:text-amber-100 space-y-1">
+    <div className="relative rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-3.5 py-2.5 pr-9 text-[0.8125rem] text-amber-900 dark:text-amber-100 space-y-1">
       <button type="button" aria-label="Fechar aviso" onClick={onClose} className="absolute right-2 top-2 rounded p-0.5 hover:bg-amber-100 dark:hover:bg-amber-900/60">
         <X className="w-4 h-4" />
       </button>
@@ -136,7 +136,7 @@ export function DocumentAttachments({ value, onChange }) {
   return (
     <ul className="space-y-1.5">
       {files.map((url, index) => (
-        <li key={url} className="flex items-center gap-2 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-[13px]">
+        <li key={url} className="flex items-center gap-2 rounded-md border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 text-[0.8125rem]">
           <FileText className="w-4 h-4 shrink-0 text-slate-500" />
           <a href={api.getFileUrl(url)} target="_blank" rel="noopener noreferrer" className="flex-1 truncate text-primary hover:underline">
             Documento {index + 1} ({/\.pdf$/i.test(url) ? 'PDF' : 'imagem'})

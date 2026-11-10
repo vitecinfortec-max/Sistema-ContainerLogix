@@ -89,7 +89,7 @@ export default function ModulesPage() {
           title="Módulos Contratados"
           subtitle="Controle o que este cliente pode usar. Desative um grupo inteiro ou só itens específicos — o resto dos usuários deste sistema deixa de enxergar o que estiver desativado aqui."
           actions={(
-            <Button onClick={handleSave} disabled={saving} className="h-9 gap-1.5 text-[13px]" data-testid="save-modules-button">
+            <Button onClick={handleSave} disabled={saving} className="h-9 gap-1.5 text-[0.8125rem]" data-testid="save-modules-button">
               <Save className="w-4 h-4" />
               {saving ? 'Salvando...' : 'Salvar alterações'}
             </Button>

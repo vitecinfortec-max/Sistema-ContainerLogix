@@ -208,9 +208,9 @@ export default function ReportsFuelSupplyPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todos</SelectItem>
                   {FUEL_TYPE_OPTIONS.map(([v, l]) => (
-                    <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                    <SelectItem key={v} value={v} className="text-[0.8125rem]">{l}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -221,9 +221,9 @@ export default function ReportsFuelSupplyPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todas</SelectItem>
-                  <SelectItem value="POSTO_EXTERNO" className="text-[13px]">Posto Externo</SelectItem>
-                  <SelectItem value="TANQUE_PROPRIO" className="text-[13px]">Tanque Próprio</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todas</SelectItem>
+                  <SelectItem value="POSTO_EXTERNO" className="text-[0.8125rem]">Posto Externo</SelectItem>
+                  <SelectItem value="TANQUE_PROPRIO" className="text-[0.8125rem]">Tanque Próprio</SelectItem>
                 </SelectContent>
               </Select>
             </FilterField>
@@ -291,8 +291,8 @@ export default function ReportsFuelSupplyPage() {
                       <td className="whitespace-nowrap tabular-nums" data-testid={`fuel-supply-order-${f.id}`}>{f.order_number_label || '-'}</td>
                       <td className="whitespace-nowrap tabular-nums">{f.supply_date ? format(new Date(`${f.supply_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
                       <td>{f.equipment_plate ? <PlateTag>{f.equipment_plate}</PlateTag> : '-'}</td>
-                      <td><div className="max-w-[180px] truncate" title={f.driver_name || ''}>{f.driver_name || '-'}</div></td>
-                      <td><div className="max-w-[180px] truncate" title={f.supplier_name || ''}>{f.supplier_name || '-'}</div></td>
+                      <td><div className="max-w-[11.25rem] truncate" title={f.driver_name || ''}>{f.driver_name || '-'}</div></td>
+                      <td><div className="max-w-[11.25rem] truncate" title={f.supplier_name || ''}>{f.supplier_name || '-'}</div></td>
                       <td>
                         <StatusPill tone={f.source === 'TANQUE_PROPRIO' ? 'primary' : 'slate'} dot={false}>
                           {f.source === 'TANQUE_PROPRIO' ? 'Tanque Próprio' : 'Posto Externo'}

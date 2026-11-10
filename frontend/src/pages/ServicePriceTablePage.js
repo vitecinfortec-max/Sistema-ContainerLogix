@@ -79,7 +79,7 @@ export default function ServicePriceTablePage() {
                 className="w-full text-sm"
               />
             </FilterField>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2">Digite o nome e escolha o cliente para ver ou editar os preços dele.</p>
+            <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500 mt-2">Digite o nome e escolha o cliente para ver ou editar os preços dele.</p>
           </div>
         </DataCard>
 
@@ -106,7 +106,7 @@ export default function ServicePriceTablePage() {
                       className="cursor-pointer"
                       data-testid={`service-price-summary-row-${cs.client_id}`}
                     >
-                      <td className="cell-strong"><div className="max-w-[420px] truncate" title={cs.client_name}>{cs.client_name}</div></td>
+                      <td className="cell-strong"><div className="max-w-[26.25rem] truncate" title={cs.client_name}>{cs.client_name}</div></td>
                       <td className="text-right tabular-nums">{cs.count}</td>
                       <td className="text-right !py-1">
                         <Button aria-label="Editar" variant="ghost" size="sm" className="h-8 w-8 p-0" title="Editar">

@@ -270,9 +270,9 @@ export default function ProductPage() {
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="h-9 text-sm" data-testid="product-status-filter"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
-                  <SelectItem value="ATIVO" className="text-[13px]">Ativo</SelectItem>
-                  <SelectItem value="INATIVO" className="text-[13px]">Inativo</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todos</SelectItem>
+                  <SelectItem value="ATIVO" className="text-[0.8125rem]">Ativo</SelectItem>
+                  <SelectItem value="INATIVO" className="text-[0.8125rem]">Inativo</SelectItem>
                 </SelectContent>
               </Select>
             </FilterField>
@@ -333,9 +333,9 @@ export default function ProductPage() {
                           />
                         </td>
                         <td className="cell-strong whitespace-nowrap tabular-nums">{item.code}</td>
-                        <td><div className="max-w-[340px] truncate" title={item.description || ''}>{item.description}</div></td>
-                        <td><div className="max-w-[180px] truncate" title={item.warehouse_name || ''}>{item.warehouse_name || '-'}</div></td>
-                        <td><div className="max-w-[180px] truncate" title={item.family_name || ''}>{item.family_name || '-'}</div></td>
+                        <td><div className="max-w-[21.25rem] truncate" title={item.description || ''}>{item.description}</div></td>
+                        <td><div className="max-w-[11.25rem] truncate" title={item.warehouse_name || ''}>{item.warehouse_name || '-'}</div></td>
+                        <td><div className="max-w-[11.25rem] truncate" title={item.family_name || ''}>{item.family_name || '-'}</div></td>
                         <td className="text-right whitespace-nowrap tabular-nums font-medium">{qtyWithUnit(item.stock_quantity, item.unit)}</td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(item.reference_value)}</td>
                         <td>
@@ -548,11 +548,11 @@ export default function ProductPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="block">Observações</Label>
-              <Textarea value={formData.observations} onChange={(e) => setField('observations', e.target.value)} className="text-[13px] min-h-[60px]" />
+              <Textarea value={formData.observations} onChange={(e) => setField('observations', e.target.value)} className="text-[0.8125rem] min-h-[3.75rem]" />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="text-[13px] font-semibold" data-testid="submit-product-button" disabled={submitting}>
+              <Button type="submit" className="text-[0.8125rem] font-semibold" data-testid="submit-product-button" disabled={submitting}>
                 {submitting ? 'Salvando...' : (editId ? 'Atualizar' : 'Cadastrar')}
               </Button>
             </DialogFooter>

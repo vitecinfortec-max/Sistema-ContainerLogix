@@ -274,7 +274,7 @@ export default function OdometerReadingsPage() {
                         <td><PlateTag>{m.vehicle_plate}</PlateTag></td>
                         <td>{m.vehicle_model || '-'}</td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(m.current_km)}</td>
-                        <td><div className="max-w-[240px] truncate" title={(m.next_due_items || []).join(', ')}>{(m.next_due_items || []).join(', ') || '-'}</div></td>
+                        <td><div className="max-w-[15rem] truncate" title={(m.next_due_items || []).join(', ')}>{(m.next_due_items || []).join(', ') || '-'}</div></td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtKm(m.next_due_km)}</td>
                         <td className={`text-right whitespace-nowrap tabular-nums cell-strong ${REMAINING_TONE[m.status] || ''}`}>{fmtRemaining(m.km_remaining)}</td>
                         <td><StatusPill tone={badge.tone}>{badge.label}</StatusPill></td>
@@ -385,7 +385,7 @@ export default function OdometerReadingsPage() {
                             {isManual ? 'Manual' : 'Abastecimento'}
                           </StatusPill>
                         </td>
-                        <td><div className="max-w-[260px] truncate" title={r.observations || ''}>{r.observations || '-'}</div></td>
+                        <td><div className="max-w-[16.25rem] truncate" title={r.observations || ''}>{r.observations || '-'}</div></td>
                         <td className="whitespace-nowrap tabular-nums">
                           {r.created_at ? format(new Date(r.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '-'}
                         </td>

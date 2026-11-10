@@ -581,7 +581,7 @@ export default function CommissionsPage() {
                       <td className="pr-0" onClick={(ev) => ev.stopPropagation()}><Checkbox checked={selectedIds.has(e.id)} onCheckedChange={() => toggleSelect(e.id)} /></td>
                       <td className="whitespace-nowrap tabular-nums">
                         <div>{fmtDate(e.billing_date)}</div>
-                        {(e.period_start || e.period_end) && <div className="text-[11px] text-slate-500" title="Período referente">{fmtPeriod(e.period_start, e.period_end)}</div>}
+                        {(e.period_start || e.period_end) && <div className="text-[0.6875rem] text-slate-500" title="Período referente">{fmtPeriod(e.period_start, e.period_end)}</div>}
                       </td>
                       <td className="whitespace-nowrap">
                         {e.status === 'PAGO'
@@ -590,10 +590,10 @@ export default function CommissionsPage() {
                       </td>
                       <td className="whitespace-nowrap">{DOC_LABELS[e.document_type] || ''} {e.document_number || ''}</td>
                       <td>
-                        <div className="max-w-[190px] truncate cell-strong" title={e.client_name}>{e.client_name}</div>
-                        {e.observations && <div className="max-w-[190px] truncate text-[11px] text-slate-500" title={e.observations}>{e.observations}</div>}
+                        <div className="max-w-[11.875rem] truncate cell-strong" title={e.client_name}>{e.client_name}</div>
+                        {e.observations && <div className="max-w-[11.875rem] truncate text-[0.6875rem] text-slate-500" title={e.observations}>{e.observations}</div>}
                       </td>
-                      <td><div className="max-w-[140px] truncate" title={e.representative_name}>{e.representative_name}</div></td>
+                      <td><div className="max-w-[8.75rem] truncate" title={e.representative_name}>{e.representative_name}</div></td>
                       <td className="text-right tabular-nums">{fmtMoney(e.freight_value)}</td>
                       <td className="text-right tabular-nums" title={(e.discounts || []).map((d) => `${d.description}: ${fmtMoney(d.value)}`).join('\n')}>
                         {e.discount_total ? fmtMoney(e.discount_total) : '-'}
@@ -614,7 +614,7 @@ export default function CommissionsPage() {
         <DataCard
           title="Adiantamentos"
           count={advances.length}
-          meta={<span className="text-[11px] text-slate-500">descontados da comissão na baixa do pagamento</span>}
+          meta={<span className="text-[0.6875rem] text-slate-500">descontados da comissão na baixa do pagamento</span>}
           testId="commission-advances"
           toolbar={<Toolbar primary={<ToolbarPrimary icon={Plus} label="Novo adiantamento" onClick={() => openAdvance()} testId="commission-advance-new-btn" />} />}
         >
@@ -637,7 +637,7 @@ export default function CommissionsPage() {
                         {isCarried(a) && <StatusPill tone="amber" className="ml-1" title="Lançado sozinho na baixa em que os adiantamentos passaram da comissão">Saldo anterior</StatusPill>}
                       </td>
                       <td className="cell-strong">{a.representative_name}</td>
-                      <td><div className="max-w-[420px] whitespace-normal text-[13px]">{a.description || '-'}</div></td>
+                      <td><div className="max-w-[26.25rem] whitespace-normal text-[0.8125rem]">{a.description || '-'}</div></td>
                       <td className="text-right tabular-nums font-semibold">{fmtMoney(a.value)}</td>
                       <td className="text-right whitespace-nowrap">
                         {a.status === 'PENDENTE' && !isCarried(a) && (
@@ -862,9 +862,9 @@ export default function CommissionsPage() {
                         })} /></td>
                         <td className="cell-strong tabular-nums">{c.numero || '-'}</td>
                         <td className="tabular-nums">{fmtDate(c.billing_date)}</td>
-                        <td><div className="max-w-[220px] truncate" title={c.client_name || c.payer_name}>{c.client_name || c.payer_name || '-'}</div>
-                          {!c.client_id && <div className="text-[11px] text-amber-600">não está no cadastro de clientes</div>}</td>
-                        <td>{c.representative_name || (c.client_id ? <span className="text-[11px] text-amber-600">sem vínculo</span> : '-')}</td>
+                        <td><div className="max-w-[13.75rem] truncate" title={c.client_name || c.payer_name}>{c.client_name || c.payer_name || '-'}</div>
+                          {!c.client_id && <div className="text-[0.6875rem] text-amber-600">não está no cadastro de clientes</div>}</td>
+                        <td>{c.representative_name || (c.client_id ? <span className="text-[0.6875rem] text-amber-600">sem vínculo</span> : '-')}</td>
                         <td className="text-right tabular-nums">{fmtMoney(c.freight_value)}</td>
                         <td className="text-right tabular-nums">{ok ? `${fmtMoney(Math.round((c.freight_value || 0) * c.commission_percentage) / 100)} (${fmtPct(c.commission_percentage)})` : '-'}</td>
                       </tr>
@@ -923,7 +923,7 @@ export default function CommissionsPage() {
                       <tbody>
                         {batchRows.map(({ link: l, commission, freight }) => (
                           <tr key={l.client_id} data-testid={`commission-batch-row-${l.client_id}`}>
-                            <td><div className="max-w-[260px] truncate cell-strong" title={l.client_name}>{l.client_name}</div></td>
+                            <td><div className="max-w-[16.25rem] truncate cell-strong" title={l.client_name}>{l.client_name}</div></td>
                             <td><Input inputMode="decimal" value={batch.rows[l.client_id] || ''} placeholder="0,00" className="h-8 w-36 ml-auto text-right font-semibold" aria-label={`Valor faturado de ${l.client_name}`}
                               onChange={(e) => { const v = moneyMask(e.target.value); setBatch((p) => ({ ...p, rows: { ...p.rows, [l.client_id]: v } })); }}
                               data-testid={`commission-batch-freight-${l.client_id}`} /></td>

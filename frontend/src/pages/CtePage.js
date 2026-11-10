@@ -934,8 +934,8 @@ export default function CtePage() {
                         {c.numero ? `${c.numero}` : '-'}
                         {c.serie !== null && c.serie !== undefined && <span className="text-xs text-slate-400"> / {c.serie}</span>}
                       </td>
-                      <td><div className="max-w-[200px] truncate" title={c.remetente?.nome || ''}>{c.remetente?.nome || '-'}</div></td>
-                      <td><div className="max-w-[200px] truncate" title={c.destinatario?.nome || ''}>{c.destinatario?.nome || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={c.remetente?.nome || ''}>{c.remetente?.nome || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={c.destinatario?.nome || ''}>{c.destinatario?.nome || '-'}</div></td>
                       <td className="whitespace-nowrap">
                         {c.origem?.cidade ? `${c.origem.cidade}/${c.origem.uf}` : '-'} → {c.destino?.cidade ? `${c.destino.cidade}/${c.destino.uf}` : '-'}
                       </td>
@@ -944,8 +944,8 @@ export default function CtePage() {
                         <StatusPill tone={CTE_STATUS_TONES[c.status] || 'slate'} title={c.motivo || c.chave || ''}>
                           {CTE_STATUS_LABELS[c.status] || c.status}
                         </StatusPill>
-                        {c.ambiente === 'homologacao' && <span className="ml-1 text-[11px] text-slate-400">homologação</span>}
-                        {c.mdfe_numero && <div className="text-[11px] text-slate-500">MDF-e nº {c.mdfe_numero}</div>}
+                        {c.ambiente === 'homologacao' && <span className="ml-1 text-[0.6875rem] text-slate-400">homologação</span>}
+                        {c.mdfe_numero && <div className="text-[0.6875rem] text-slate-500">MDF-e nº {c.mdfe_numero}</div>}
                       </td>
                       <td className="tabular-nums">{c.loading_order_number ? `#${c.loading_order_number}` : '-'}</td>
                       <td className="whitespace-nowrap tabular-nums">{c.created_at ? format(new Date(c.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
@@ -1012,7 +1012,7 @@ export default function CtePage() {
               {emittedDoc ? `CT-e nº ${emittedDoc.numero || '-'}` : editingId ? 'Editar CT-e' : 'Novo CT-e'}
               {!emittedDoc && form.loading_order_number && <span className="text-sm font-normal text-slate-500">· Ordem de Carregamento #{form.loading_order_number}</span>}
               {!emittedDoc && settings && settings.ambiente !== 'producao' && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Homologação</span>
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.6875rem] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Homologação</span>
               )}
             </DialogTitle>
           </DialogHeader>

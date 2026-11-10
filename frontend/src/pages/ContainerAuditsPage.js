@@ -201,7 +201,7 @@ export default function ContainerAuditsPage() {
                         <Checkbox checked={selectedIds.has(audit.id)} onCheckedChange={() => toggleSelect(audit.id)} />
                       </td>
                       <td className="cell-strong font-mono whitespace-nowrap">{audit.audit_code}</td>
-                      <td><div className="max-w-[300px] truncate" title={audit.client_name || ''}>{audit.client_name}</div></td>
+                      <td><div className="max-w-[18.75rem] truncate" title={audit.client_name || ''}>{audit.client_name}</div></td>
                       <td className="hidden sm:table-cell whitespace-nowrap tabular-nums">
                         {format(new Date(audit.created_at), 'dd/MM/yyyy', { locale: ptBR })}{' '}
                         <span className="text-slate-400 dark:text-slate-500">{format(new Date(audit.created_at), 'HH:mm', { locale: ptBR })}</span>

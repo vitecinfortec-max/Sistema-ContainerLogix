@@ -96,13 +96,13 @@ export default function HRReportsPage() {
               className={cn('rounded-lg border p-3 text-left transition-colors',
                 r.kind === kind ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-slate-200 dark:border-slate-700 hover:border-primary/50 bg-card')}>
               <r.icon className={cn('w-5 h-5 mb-1.5', r.kind === kind ? 'text-primary' : 'text-slate-400')} />
-              <div className="text-[13px] font-semibold text-slate-800 dark:text-slate-100 leading-tight">{r.title}</div>
+              <div className="text-[0.8125rem] font-semibold text-slate-800 dark:text-slate-100 leading-tight">{r.title}</div>
             </button>
           ))}
         </div>
 
         <FilterCard title={report.title}>
-          <p className="text-[12px] text-slate-500 mb-3">{report.desc}</p>
+          <p className="text-[0.75rem] text-slate-500 mb-3">{report.desc}</p>
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 items-end">
             {has('months') && (
               <>
@@ -180,7 +180,7 @@ export default function HRReportsPage() {
         {data && (
           <div className="flex flex-wrap gap-2" data-testid="hr-report-summary">
             {data.info.map(([k, v]) => (
-              <span key={k} className="rounded-md border border-slate-200 dark:border-slate-700 bg-card px-3 py-1.5 text-[12px]">
+              <span key={k} className="rounded-md border border-slate-200 dark:border-slate-700 bg-card px-3 py-1.5 text-[0.75rem]">
                 <span className="text-slate-500">{k}: </span><b className="text-slate-800 dark:text-slate-100">{v}</b>
               </span>
             ))}
@@ -211,7 +211,7 @@ export default function HRReportsPage() {
                     </tfoot>
                   )}
                 </table>
-                {s.count > s.rows.length && <p className="px-4 py-2 text-[11px] text-slate-500">Mostrando {s.rows.length} de {s.count}. O PDF e o Excel trazem tudo.</p>}
+                {s.count > s.rows.length && <p className="px-4 py-2 text-[0.6875rem] text-slate-500">Mostrando {s.rows.length} de {s.count}. O PDF e o Excel trazem tudo.</p>}
               </div>
             ) : <EmptyState icon={report.icon} title="Nada a mostrar com esses filtros" />}
           </DataCard>

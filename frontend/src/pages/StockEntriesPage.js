@@ -253,8 +253,8 @@ export default function StockEntriesPage() {
                       onClick={() => setSelectedId(e.id === selectedId ? null : e.id)}
                     >
                       <td className="whitespace-nowrap tabular-nums">{fmtDate(e.created_at)}</td>
-                      <td><div className="max-w-[320px] truncate cell-strong" title={e.product_name || ''}>{e.product_name}</div></td>
-                      <td><div className="max-w-[220px] truncate" title={e.supplier_name || ''}>{e.supplier_name || '-'}</div></td>
+                      <td><div className="max-w-[20rem] truncate cell-strong" title={e.product_name || ''}>{e.product_name}</div></td>
+                      <td><div className="max-w-[13.75rem] truncate" title={e.supplier_name || ''}>{e.supplier_name || '-'}</div></td>
                       <td className="whitespace-nowrap tabular-nums">{e.nfe_number || '-'}</td>
                       <td className="text-right tabular-nums">{e.quantity}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(e.unit_value)}</td>
@@ -281,7 +281,7 @@ export default function StockEntriesPage() {
               <FileUp className="w-4 h-4 text-primary" />
               Importar XML de Nota Fiscal
             </DialogTitle>
-            <DialogDescription className="text-[13px]">
+            <DialogDescription className="text-[0.8125rem]">
               {step === 'upload'
                 ? 'Selecione o arquivo XML da NF-e para gerar produtos e entradas de estoque'
                 : 'Confira os itens antes de confirmar - você pode vincular a um produto já cadastrado ou deixar em branco para criar um novo'}
@@ -297,11 +297,11 @@ export default function StockEntriesPage() {
                   type="file"
                   accept=".xml"
                   onChange={handleFileChange}
-                  className="max-w-xs mx-auto text-[13px]"
+                  className="max-w-xs mx-auto text-[0.8125rem]"
                   data-testid="nfe-file-input"
                 />
                 {selectedFile && (
-                  <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-2">{selectedFile.name}</p>
+                  <p className="text-[0.75rem] text-slate-500 dark:text-slate-400 mt-2">{selectedFile.name}</p>
                 )}
               </div>
               <DialogFooter>
@@ -315,7 +315,7 @@ export default function StockEntriesPage() {
 
           {step === 'review' && preview && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 p-3 rounded-md bg-slate-50 dark:bg-slate-800 text-[13px]">
+              <div className="grid grid-cols-2 gap-4 p-3 rounded-md bg-slate-50 dark:bg-slate-800 text-[0.8125rem]">
                 <div>
                   <span className="text-slate-500 dark:text-slate-400">NF-e Nº: </span>
                   <span className="font-semibold">{preview.nfe_number || '-'}</span>
@@ -328,9 +328,9 @@ export default function StockEntriesPage() {
                   <span className="text-slate-500 dark:text-slate-400">Fornecedor: </span>
                   <span className="font-semibold">{preview.supplier_name || '-'}</span>
                   {preview.matched_supplier_id ? (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Já cadastrado</span>
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Já cadastrado</span>
                   ) : (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
                       <Sparkles className="w-3 h-3 mr-1" />Novo fornecedor será criado
                     </span>
                   )}
@@ -338,7 +338,7 @@ export default function StockEntriesPage() {
               </div>
 
               {preview.already_imported && (
-                <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-[13px] text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200" data-testid="nfe-already-imported">
+                <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-[0.8125rem] text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200" data-testid="nfe-already-imported">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{preview.already_imported}</span>
                 </div>
@@ -349,13 +349,13 @@ export default function StockEntriesPage() {
                   <div key={idx} className="border border-slate-200 dark:border-slate-700 rounded-md p-3 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-[13px] font-semibold">{item.description}</p>
-                        <p className="text-[11px] text-slate-400 dark:text-slate-500">NCM: {item.ncm || '-'} · CFOP: {item.cfop || '-'} · Unid.: {item.unit || '-'}</p>
+                        <p className="text-[0.8125rem] font-semibold">{item.description}</p>
+                        <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500">NCM: {item.ncm || '-'} · CFOP: {item.cfop || '-'} · Unid.: {item.unit || '-'}</p>
                       </div>
                       {item.matched_product_id ? (
-                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Produto existente</span>
+                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Produto existente</span>
                       ) : (
-                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Novo produto</span>
+                        <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Novo produto</span>
                       )}
                     </div>
                     <div className="grid grid-cols-4 gap-2">
@@ -371,7 +371,7 @@ export default function StockEntriesPage() {
                           onSelect={(p) => setItemProduct(idx, p)}
                           options={products}
                           displayField="description"
-                          className="h-9 text-[13px]"
+                          className="h-9 text-[0.8125rem]"
                         />
                       </div>
                       <div className="space-y-1">
@@ -380,7 +380,7 @@ export default function StockEntriesPage() {
                           type="number" step="0.01"
                           value={item.quantity}
                           onChange={(e) => setItemField(idx, 'quantity', e.target.value)}
-                          className="h-9 text-[13px]"
+                          className="h-9 text-[0.8125rem]"
                         />
                       </div>
                       <div className="space-y-1">
@@ -389,11 +389,11 @@ export default function StockEntriesPage() {
                           type="number" step="0.01"
                           value={item.unit_value}
                           onChange={(e) => setItemField(idx, 'unit_value', e.target.value)}
-                          className="h-9 text-[13px]"
+                          className="h-9 text-[0.8125rem]"
                         />
                       </div>
                     </div>
-                    <p className="text-right text-[12px] text-slate-500 dark:text-slate-400">
+                    <p className="text-right text-[0.75rem] text-slate-500 dark:text-slate-400">
                       Valor Total: <span className="font-semibold text-slate-700 dark:text-slate-300">{fmtMoney(Number(item.quantity || 0) * Number(item.unit_value || 0))}</span>
                     </p>
                   </div>

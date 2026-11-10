@@ -349,7 +349,7 @@ export default function DriverSettlementFormPage() {
                               <Checkbox checked={selectedFuel.has(f.id)} onCheckedChange={() => toggleFuel(f.id)} disabled={readOnly} aria-label={`Acertar abastecimento ${f.supply_number}`} data-testid={`fuel-check-${f.supply_number}`} />
                             </td>
                             <td className="tabular-nums whitespace-nowrap">{formatDay(f.supply_date)}</td>
-                            <td><div className="max-w-[200px] truncate" title={`Nº ${f.supply_number}`}>{internal ? 'Tanque próprio' : (f.supplier_name || '-')}</div></td>
+                            <td><div className="max-w-[12.5rem] truncate" title={`Nº ${f.supply_number}`}>{internal ? 'Tanque próprio' : (f.supplier_name || '-')}</div></td>
                             <td><StatusPill tone={internal ? 'primary' : 'slate'} dot={false}>{internal ? 'Interno' : 'Externo'}</StatusPill></td>
                             <td><StatusPill tone={fuelPaidBy(f) === 'MOTORISTA' ? 'amber' : 'blue'} dot={false}>{PAID_BY[fuelPaidBy(f)]}</StatusPill></td>
                             <td className="text-right tabular-nums">{formatNumber(f.liters, 2)}</td>
@@ -390,7 +390,7 @@ export default function DriverSettlementFormPage() {
                     <tbody>
                       {expenses.map((e, index) => (
                         <tr key={e.id}>
-                          <td className="min-w-[180px]"><Input className={smallInput} value={e.description} onChange={(ev) => updateExpense(e.id, 'description', ev.target.value)} disabled={readOnly} aria-label={`Descrição da despesa ${index + 1}`} data-testid={`expense-description-${index}`} /></td>
+                          <td className="min-w-[11.25rem]"><Input className={smallInput} value={e.description} onChange={(ev) => updateExpense(e.id, 'description', ev.target.value)} disabled={readOnly} aria-label={`Descrição da despesa ${index + 1}`} data-testid={`expense-description-${index}`} /></td>
                           <td>
                             <Select value={e.category} onValueChange={(v) => updateExpense(e.id, 'category', v)} disabled={readOnly}>
                               <SelectTrigger className={smallInput} aria-label={`Categoria da despesa ${index + 1}`} data-testid={`expense-category-${index}`}><SelectValue /></SelectTrigger>
@@ -408,7 +408,7 @@ export default function DriverSettlementFormPage() {
                             </Select>
                           </td>
                           <td><Input type="date" className={smallInput} value={e.expense_date} onChange={(ev) => updateExpense(e.id, 'expense_date', ev.target.value)} disabled={readOnly} aria-label={`Data da despesa ${index + 1}`} /></td>
-                          <td className="min-w-[140px]"><Input className={smallInput} value={e.supplier_name} onChange={(ev) => updateExpense(e.id, 'supplier_name', ev.target.value)} disabled={readOnly} aria-label={`Fornecedor da despesa ${index + 1}`} /></td>
+                          <td className="min-w-[8.75rem]"><Input className={smallInput} value={e.supplier_name} onChange={(ev) => updateExpense(e.id, 'supplier_name', ev.target.value)} disabled={readOnly} aria-label={`Fornecedor da despesa ${index + 1}`} /></td>
                           <td><Input inputMode="decimal" className={smallInput} value={e.quantity} onChange={(ev) => updateExpense(e.id, 'quantity', ev.target.value)} disabled={readOnly} aria-label={`Quantidade da despesa ${index + 1}`} /></td>
                           <td><Input inputMode="decimal" className={smallInput} value={e.unit_value} onChange={(ev) => updateExpense(e.id, 'unit_value', ev.target.value)} disabled={readOnly} aria-label={`Valor unitário da despesa ${index + 1}`} data-testid={`expense-value-${index}`} /></td>
                           <td className="text-right tabular-nums whitespace-nowrap">{formatMoney((parseNumber(e.quantity) || 0) * (parseNumber(e.unit_value) || 0))}</td>
@@ -458,7 +458,7 @@ export default function DriverSettlementFormPage() {
                             <td className="cell-strong tabular-nums whitespace-nowrap" title={t.port_client_order_id ? 'Ordem de Serviço - Cliente' : 'Ordem de Carregamento'}>{tripLabel(t)}</td>
                             <td className="tabular-nums whitespace-nowrap">{formatDay(t.order_date)}</td>
                             <td className="hidden md:table-cell">{t.booking || '-'}</td>
-                            <td className="hidden lg:table-cell"><div className="max-w-[220px] truncate">{t.route_name || t.client_name || '-'}</div></td>
+                            <td className="hidden lg:table-cell"><div className="max-w-[13.75rem] truncate">{t.route_name || t.client_name || '-'}</div></td>
                             <td className="hidden md:table-cell">{t.truck_plate ? <PlateTag>{t.truck_plate}</PlateTag> : '-'}</td>
                             <td><Input inputMode="decimal" className={smallInput} value={km.km_start ?? ''} onChange={(e) => setKm(key, 'km_start', e.target.value)} disabled={readOnly || !checked} aria-label={`Km inicial da ordem ${tripLabel(t)}`} /></td>
                             <td><Input inputMode="decimal" className={smallInput} value={km.km_end ?? ''} onChange={(e) => setKm(key, 'km_end', e.target.value)} disabled={readOnly || !checked} aria-label={`Km final da ordem ${tripLabel(t)}`} /></td>

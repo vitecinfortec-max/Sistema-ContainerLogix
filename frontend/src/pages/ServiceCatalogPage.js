@@ -236,8 +236,8 @@ export default function ServiceCatalogPage() {
                           />
                         </td>
                         <td className="cell-strong whitespace-nowrap tabular-nums">{item.code}</td>
-                        <td><div className="max-w-[180px] truncate" title={item.family_name || ''}>{item.family_name || '-'}</div></td>
-                        <td><div className="max-w-[360px] truncate" title={item.description || ''}>{item.description}</div></td>
+                        <td><div className="max-w-[11.25rem] truncate" title={item.family_name || ''}>{item.family_name || '-'}</div></td>
+                        <td><div className="max-w-[22.5rem] truncate" title={item.description || ''}>{item.description}</div></td>
                         <td className="whitespace-nowrap">{UNIT_OPTIONS.find(([v]) => v === item.unit)?.[1] || item.unit}</td>
                         <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(item.value)}</td>
                         <td>
@@ -269,7 +269,7 @@ export default function ServiceCatalogPage() {
               {editId ? 'Editar Serviço' : 'Cadastrar Serviço'}
               {nextCode !== null && <Badge variant="outline">Cód. {nextCode}</Badge>}
             </DialogTitle>
-            <DialogDescription className="text-[13px]">
+            <DialogDescription className="text-[0.8125rem]">
               {editId ? 'Atualize os dados do serviço' : 'Adicione um novo serviço ao catálogo'}
             </DialogDescription>
           </DialogHeader>

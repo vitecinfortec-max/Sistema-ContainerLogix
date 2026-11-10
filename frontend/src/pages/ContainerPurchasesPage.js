@@ -267,7 +267,7 @@ export default function ContainerPurchasesPage() {
                       </td>
                       <td className="font-mono whitespace-nowrap cell-strong">{p.container_number}</td>
                       <td className="whitespace-nowrap">{p.booking || '-'}</td>
-                      <td><div className="max-w-[200px] truncate" title={p.origin_terminal || ''}>{p.origin_terminal || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={p.origin_terminal || ''}>{p.origin_terminal || '-'}</div></td>
                       <td className="whitespace-nowrap tabular-nums">{p.entry_date ? format(calendarDate(p.entry_date), 'dd/MM/yyyy') : '-'}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(p.purchase_value)}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(p.sale_value)}</td>
@@ -362,7 +362,7 @@ export default function ContainerPurchasesPage() {
             <div className="space-y-1.5">
               <Label className="block">Observações</Label>
               <Textarea
-                className="text-[13px] min-h-[60px]"
+                className="text-[0.8125rem] min-h-[3.75rem]"
                 value={form.observations}
                 onChange={(e) => setForm({ ...form, observations: e.target.value })}
               />

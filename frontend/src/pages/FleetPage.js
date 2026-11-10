@@ -520,7 +520,7 @@ export default function FleetPage() {
                           <td>{vehicle.brand || '-'}</td>
                           <td>{vehicle.model || '-'}</td>
                           <td className="tabular-nums">{vehicle.year || '-'}</td>
-                          <td><div className="max-w-[220px] truncate" title={vehicle.driver_name || ''}>{vehicle.driver_name || '-'}</div></td>
+                          <td><div className="max-w-[13.75rem] truncate" title={vehicle.driver_name || ''}>{vehicle.driver_name || '-'}</div></td>
                           <td className="whitespace-nowrap">
                             {(() => {
                               const docs = vehicleDocsStatus(vehicle, today);
@@ -641,8 +641,8 @@ export default function FleetPage() {
                             {format(calendarDate(revision.revision_date), 'dd/MM/yyyy', { locale: ptBR })}
                           </td>
                           <td className="text-right whitespace-nowrap tabular-nums">{formatKM(revision.current_km)}</td>
-                          <td><div className="max-w-[200px] truncate" title={revision.oil_used || ''}>{revision.oil_used || '-'}</div></td>
-                          <td><div className="max-w-[200px] truncate" title={revision.mechanic_name || ''}>{revision.mechanic_name || '-'}</div></td>
+                          <td><div className="max-w-[12.5rem] truncate" title={revision.oil_used || ''}>{revision.oil_used || '-'}</div></td>
+                          <td><div className="max-w-[12.5rem] truncate" title={revision.mechanic_name || ''}>{revision.mechanic_name || '-'}</div></td>
                           <td>
                             {(() => {
                               const m = maintenanceByPlate[revision.vehicle_plate];

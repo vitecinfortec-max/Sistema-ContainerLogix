@@ -412,7 +412,7 @@ export default function FuelSupplyOrderPage() {
               <Label className="mb-1.5 block">Tipo <span className="text-destructive">*</span></Label>
               <div className="flex flex-wrap gap-4">
                 {SUPPLY_MODE_OPTIONS.map(([v, l]) => (
-                  <label key={v} className="flex items-center gap-1.5 text-[13px] text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <label key={v} className="flex items-center gap-1.5 text-[0.8125rem] text-slate-700 dark:text-slate-300 cursor-pointer">
                     <input type="radio" name="supply_mode" checked={form.supply_mode === v} onChange={() => onChange('supply_mode', v)} className="h-3.5 w-3.5" data-testid={`fuel-order-mode-${v}`} />
                     {l}
                   </label>
@@ -547,11 +547,11 @@ export default function FuelSupplyOrderPage() {
                         <td className="whitespace-nowrap tabular-nums">{o.order_date ? format(new Date(`${o.order_date}T00:00:00`), 'dd/MM/yyyy') : '-'}</td>
                         <td><PlateTag>{o.equipment_plate}</PlateTag></td>
                         <td className="text-right whitespace-nowrap tabular-nums">{o.reading != null ? Number(o.reading).toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '-'}</td>
-                        <td><div className="max-w-[220px] truncate" title={o.supplier_name || ''}>{o.supplier_name || '-'}</div></td>
+                        <td><div className="max-w-[13.75rem] truncate" title={o.supplier_name || ''}>{o.supplier_name || '-'}</div></td>
                         <td className="whitespace-nowrap">{FUEL_TYPE_LABELS[o.fuel_type] || o.fuel_type || '-'}</td>
                         <td className="whitespace-nowrap">{SUPPLY_MODE_LABELS[o.supply_mode] || o.supply_mode || '-'}</td>
                         <td className="text-right whitespace-nowrap tabular-nums">{authorizedLabel(o)}</td>
-                        <td><div className="max-w-[180px] truncate" title={o.requester || ''}>{o.requester || '-'}</div></td>
+                        <td><div className="max-w-[11.25rem] truncate" title={o.requester || ''}>{o.requester || '-'}</div></td>
                         <td>
                           <StatusPill tone={o.is_launched ? 'emerald' : 'amber'}>
                             {o.is_launched ? 'Lançado' : 'Pendente'}
@@ -593,7 +593,7 @@ function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
       <Label className="mb-1.5 block">{label}</Label>
-      <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
+      <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[3.75rem]" data-testid={testid} />
     </div>
   );
 }

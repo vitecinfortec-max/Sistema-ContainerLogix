@@ -195,9 +195,9 @@ export default function ReportsServiceOrdersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todos</SelectItem>
                   {STATUS_OPTIONS.map(([v, l]) => (
-                    <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                    <SelectItem key={v} value={v} className="text-[0.8125rem]">{l}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -208,9 +208,9 @@ export default function ReportsServiceOrdersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todas</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todas</SelectItem>
                   {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.name} className="text-[13px]">{c.name}</SelectItem>
+                    <SelectItem key={c.id} value={c.name} className="text-[0.8125rem]">{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -276,8 +276,8 @@ export default function ReportsServiceOrdersPage() {
                       <td className="whitespace-nowrap tabular-nums">{fmtDateTime(o.opened_at)}</td>
                       <td className="whitespace-nowrap tabular-nums">{fmtDateTime(o.closed_at)}</td>
                       <td>{o.equipment_plate ? <PlateTag>{o.equipment_plate}</PlateTag> : '-'}</td>
-                      <td><div className="max-w-[180px] truncate" title={o.category || ''}>{o.category || '-'}</div></td>
-                      <td><div className="max-w-[220px] truncate" title={o.person_name || ''}>{o.person_name || '-'}</div></td>
+                      <td><div className="max-w-[11.25rem] truncate" title={o.category || ''}>{o.category || '-'}</div></td>
+                      <td><div className="max-w-[13.75rem] truncate" title={o.person_name || ''}>{o.person_name || '-'}</div></td>
                       <td><StatusPill tone={STATUS_TONES[o.status] || 'slate'}>{STATUS_LABELS[o.status] || o.status}</StatusPill></td>
                       <td className={`text-right whitespace-nowrap tabular-nums cell-strong ${o.status === 'CANCELADO' ? 'line-through text-slate-400 dark:text-slate-500' : ''}`}>{fmtMoney(o.grand_total)}</td>
                     </tr>

@@ -127,11 +127,11 @@ export default function TankSettingsPage() {
                     .map(w => [w.id, w.name])}
                   testId="tank-fuel-warehouse-input"
                 />
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <p className="text-[0.6875rem] text-slate-500 dark:text-slate-400">
                   No “Reabastecer tanque”, o botão “Puxar de NF-e” lista as notas importadas de produtos deste almoxarifado e dá baixa nele.
                 </p>
               </div>
-              <Button type="submit" className="text-[13px] font-semibold" disabled={saving} data-testid="save-tank-settings-button">
+              <Button type="submit" className="text-[0.8125rem] font-semibold" disabled={saving} data-testid="save-tank-settings-button">
                 {saving ? 'Salvando...' : 'Salvar'}
               </Button>
             </form>

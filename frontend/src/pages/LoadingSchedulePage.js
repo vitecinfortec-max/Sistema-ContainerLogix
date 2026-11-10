@@ -684,8 +684,8 @@ export default function LoadingSchedulePage() {
                             />
                           </td>
                           <td className="cell-strong whitespace-nowrap tabular-nums">#{schedule.schedule_number}</td>
-                          <td><div className="max-w-[260px] truncate" title={schedule.contracting_client_name || ''}>{schedule.contracting_client_name}</div></td>
-                          <td><div className="max-w-[260px] truncate" title={schedule.destination_client_name || ''}>{schedule.destination_client_name}</div></td>
+                          <td><div className="max-w-[16.25rem] truncate" title={schedule.contracting_client_name || ''}>{schedule.contracting_client_name}</div></td>
+                          <td><div className="max-w-[16.25rem] truncate" title={schedule.destination_client_name || ''}>{schedule.destination_client_name}</div></td>
                           <td className="text-right tabular-nums">{schedule.items?.length || 0}</td>
                           <td>{getStatusBadge(schedule.status)}</td>
                           <td className="whitespace-nowrap tabular-nums">

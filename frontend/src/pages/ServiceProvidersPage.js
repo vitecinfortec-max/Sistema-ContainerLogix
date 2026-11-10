@@ -458,12 +458,12 @@ export default function ServiceProvidersPage() {
                       {pageItems.map((c) => (
                         <tr key={c.id} {...rowProps(c)} onDoubleClick={() => showDetail(c)} data-testid={`sp-closing-${c.number}`}>
                           <td className="cell-strong tabular-nums">{c.number}</td>
-                          <td><div className="cell-strong">{c.provider_name}</div><div className="text-[11px] text-slate-500">{c.role}</div></td>
+                          <td><div className="cell-strong">{c.provider_name}</div><div className="text-[0.6875rem] text-slate-500">{c.role}</div></td>
                           <td className="whitespace-nowrap tabular-nums">{fmtDate(c.period_start)} a {fmtDate(c.period_end)}</td>
-                          <td className="text-right tabular-nums">{fmtMoney(c.gross_total)} <span className="text-[11px] text-slate-500">({c.entries_count})</span></td>
+                          <td className="text-right tabular-nums">{fmtMoney(c.gross_total)} <span className="text-[0.6875rem] text-slate-500">({c.entries_count})</span></td>
                           <td className="text-right tabular-nums">{fmtMoney(c.advances_total + c.discount_total)}</td>
                           <td className="text-right tabular-nums font-semibold">{fmtMoney(c.net_total)}
-                            {c.carried_over > 0 && <div className="text-[11px] font-normal text-amber-600">saldo −{fmtMoney(c.carried_over)} p/ próximo</div>}</td>
+                            {c.carried_over > 0 && <div className="text-[0.6875rem] font-normal text-amber-600">saldo −{fmtMoney(c.carried_over)} p/ próximo</div>}</td>
                           <td className="whitespace-nowrap">
                             {c.status === 'PAGO'
                               ? <StatusPill tone="emerald" title={[c.payment_method, c.payment_notes].filter(Boolean).join(' · ')}>Pago em {fmtDate(c.payment_date)}</StatusPill>
@@ -482,8 +482,8 @@ export default function ServiceProvidersPage() {
                       {pageItems.map((e) => (
                         <tr key={e.id} {...rowProps(e)} onDoubleClick={() => openEntry(e)}>
                           <td className="whitespace-nowrap tabular-nums">{fmtDate(e.date)}</td>
-                          <td><div className="cell-strong">{e.provider_name}</div><div className="text-[11px] text-slate-500">{e.role}</div></td>
-                          <td><div className="max-w-[280px] truncate" title={e.description || ''}>{e.description || '-'}</div></td>
+                          <td><div className="cell-strong">{e.provider_name}</div><div className="text-[0.6875rem] text-slate-500">{e.role}</div></td>
+                          <td><div className="max-w-[17.5rem] truncate" title={e.description || ''}>{e.description || '-'}</div></td>
                           <td className="text-right tabular-nums whitespace-nowrap">{fmtUnits(e.quantity, e.unit)}</td>
                           <td className="text-right tabular-nums">{fmtMoney(e.unit_value)}</td>
                           <td className="text-right tabular-nums font-semibold">{fmtMoney(e.total)}</td>
@@ -501,7 +501,7 @@ export default function ServiceProvidersPage() {
                         <tr key={a.id} {...rowProps(a)} onDoubleClick={() => openAdvance(a)}>
                           <td className="whitespace-nowrap tabular-nums">{fmtDate(a.date)}</td>
                           <td className="cell-strong">{a.provider_name}</td>
-                          <td><div className="max-w-[420px] whitespace-normal text-[13px]">{a.description || '-'}</div></td>
+                          <td><div className="max-w-[26.25rem] whitespace-normal text-[0.8125rem]">{a.description || '-'}</div></td>
                           <td className="text-right tabular-nums font-semibold">{fmtMoney(a.value)}</td>
                           <td className="whitespace-nowrap">
                             {a.status === 'PENDENTE' ? <StatusPill tone="violet">A descontar</StatusPill> : <StatusPill tone="emerald">Descontado</StatusPill>}
@@ -524,7 +524,7 @@ export default function ServiceProvidersPage() {
                           <td>{UNIT_LABELS[p.payment_unit]}</td>
                           <td className="text-right tabular-nums">{p.default_rate ? fmtMoney(p.default_rate) : '-'}</td>
                           <td className="tabular-nums">{p.phone || '-'}</td>
-                          <td><div className="max-w-[160px] truncate" title={p.pix_key || ''}>{p.pix_key || '-'}</div></td>
+                          <td><div className="max-w-[10rem] truncate" title={p.pix_key || ''}>{p.pix_key || '-'}</div></td>
                           <td>{p.status === 'INATIVO' ? <StatusPill tone="slate">Inativo</StatusPill> : <StatusPill tone="emerald">Ativo</StatusPill>}</td>
                         </tr>
                       ))}
@@ -572,7 +572,7 @@ export default function ServiceProvidersPage() {
                       {openEntries.map((e) => (
                         <tr key={e.id} className={closing.entry_ids.has(e.id) ? '' : 'opacity-60'} data-testid={`sp-closing-entry-${e.id}`}>
                           <td className="pr-0"><Checkbox checked={closing.entry_ids.has(e.id)} onCheckedChange={() => toggleIn('entry_ids', e.id)} /></td>
-                          <td className="tabular-nums whitespace-nowrap">{fmtDate(e.date)}{e.date > closing.period_end && <span className="block text-[11px] text-amber-600">depois do período</span>}</td>
+                          <td className="tabular-nums whitespace-nowrap">{fmtDate(e.date)}{e.date > closing.period_end && <span className="block text-[0.6875rem] text-amber-600">depois do período</span>}</td>
                           <td>{e.description || '-'}</td>
                           <td className="text-right tabular-nums whitespace-nowrap">{fmtUnits(e.quantity, e.unit)}</td>
                           <td className="text-right tabular-nums">{fmtMoney(e.unit_value)}</td>
@@ -584,7 +584,7 @@ export default function ServiceProvidersPage() {
                         <tr key={`n${i}`}>
                           <td />
                           <td><Input type="date" value={l.date} className="h-8 w-36" aria-label="Data do serviço" onChange={(e) => setLine('new_entries', i, { date: e.target.value })} /></td>
-                          <td><Input value={l.description} className="h-8 min-w-[160px]" placeholder="Descrição" maxLength={120} aria-label="Descrição do serviço"
+                          <td><Input value={l.description} className="h-8 min-w-[10rem]" placeholder="Descrição" maxLength={120} aria-label="Descrição do serviço"
                             onChange={(e) => setLine('new_entries', i, { description: e.target.value })} /></td>
                           <td><Input inputMode="decimal" value={l.quantity} className="h-8 w-20 ml-auto text-right" aria-label="Quantidade"
                             onChange={(e) => setLine('new_entries', i, { quantity: moneyMask(e.target.value) })} data-testid={`sp-new-entry-qty-${i}`} /></td>

@@ -363,7 +363,7 @@ export default function PortServiceBillingPage() {
                               </td>
                               <td className="cell-strong whitespace-nowrap tabular-nums">#{c.service_number}</td>
                               <td className="whitespace-nowrap tabular-nums">{fmtDate(c.service_date)}</td>
-                              <td><div className="max-w-[220px] truncate" title={c.driver_name || ''}>{c.driver_name}</div></td>
+                              <td><div className="max-w-[13.75rem] truncate" title={c.driver_name || ''}>{c.driver_name}</div></td>
                               <td><PlateTag>{c.cavalo_plate}</PlateTag></td>
                               <td>
                                 <StatusPill tone={c.turno === 'NOITE' ? 'violet' : 'amber'} dot={false}>
@@ -401,7 +401,7 @@ export default function PortServiceBillingPage() {
                 </div>
 
                 <div className="flex items-center justify-between gap-3 flex-wrap rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 px-4 py-3">
-                  <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-[13px] text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-x-5 gap-y-1 flex-wrap text-[0.8125rem] text-slate-500 dark:text-slate-400">
                     <span><span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{selectedIds.size}</span> selecionado(s)</span>
                     <span>Serviços: <span className="font-medium text-slate-700 dark:text-slate-200 tabular-nums">{fmtMoney(selectedTotal)}</span></span>
                     {discountNumber > 0 && (
@@ -481,7 +481,7 @@ export default function PortServiceBillingPage() {
                           <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectBatch(batch.id)} />
                         </td>
                         <td className="cell-strong whitespace-nowrap tabular-nums">#{batch.batch_number}</td>
-                        <td><div className="max-w-[240px] truncate" title={batch.client_name || ''}>{batch.client_name}</div></td>
+                        <td><div className="max-w-[15rem] truncate" title={batch.client_name || ''}>{batch.client_name}</div></td>
                         <td className="whitespace-nowrap tabular-nums">{fmtPeriod(batch.period_from, batch.period_to)}</td>
                         <td className="text-right tabular-nums">{batch.item_count}</td>
                         <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(batch.net_total ?? batch.total_value)}</td>

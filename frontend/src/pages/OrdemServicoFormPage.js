@@ -268,7 +268,7 @@ export default function OrdemServicoFormPage() {
                   }}
                 />
                 {!form.city && !form.state && form.city_uf && (
-                  <p className="sm:col-span-2 lg:col-span-3 text-[11px] text-slate-400 dark:text-slate-500 -mt-2">
+                  <p className="sm:col-span-2 lg:col-span-3 text-[0.6875rem] text-slate-400 dark:text-slate-500 -mt-2">
                     Cidade/UF cadastrada anteriormente (texto livre): {form.city_uf}
                   </p>
                 )}
@@ -412,7 +412,7 @@ function CheckboxField({ label, value, onChange }) {
   return (
     <div className="flex items-center gap-2 mt-5">
       <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4" />
-      <Label className="text-[12px] text-slate-700 dark:text-slate-300">{label}</Label>
+      <Label className="text-[0.75rem] text-slate-700 dark:text-slate-300">{label}</Label>
     </div>
   );
 }
@@ -421,7 +421,7 @@ function TextAreaField({ label, value, onChange, testid }) {
   return (
     <div>
       <Label className="mb-1.5 block">{label}</Label>
-      <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[60px]" data-testid={testid} />
+      <Textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} className="text-sm min-h-[3.75rem]" data-testid={testid} />
     </div>
   );
 }
@@ -448,7 +448,7 @@ function ItemsSection({ title, icon, items, kind, onAdd, onRemove, onChange, sho
     >
       <div className="space-y-2">
         {items.length === 0 && (
-          <div className="text-center py-4 text-[12px] text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded">
+          <div className="text-center py-4 text-[0.75rem] text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded">
             Nenhum {title === 'Produtos' ? 'produto' : 'serviço'} adicionado
           </div>
         )}

@@ -83,7 +83,7 @@
    cor da marca. Usada junto com os blocos de components/DataPage.jsx. */
 @layer components {
   .data-table {
-    @apply w-full text-[13px];
+    @apply w-full text-[0.8125rem];
   }
   .data-table thead th {
     @apply px-3 py-2.5 text-left text-xs font-semibold whitespace-nowrap
@@ -235,6 +235,34 @@
   }
   .font-mono {
     font-family: var(--font-mono);
+  }
+}
+
+/* Escala fluida da tela (10/11/2026). Quase todo tamanho do sistema é em rem
+   (classes do Tailwind), então a fonte base do <html> é o único ponto de
+   controle: cresce com a largura da janela - 13,5px em 1280, 14px em 1366,
+   ~15px em 1600 e 17px de 1920 pra cima - e um pouco menos em telas baixas
+   (notebook de 768px de altura). --density vem da preferência do usuário
+   (Compacto / Normal / Confortável, lib/density.js). Só na tela e do tablet
+   pra cima: celular/APK e impressão continuam com 16px. Sem zoom nem scale. */
+html {
+  --density: 1;
+  --fit: 1;
+}
+html[data-density="compact"] {
+  --density: 0.92;
+}
+html[data-density="comfortable"] {
+  --density: 1.08;
+}
+@media screen and (min-width: 768px) {
+  html {
+    font-size: calc(clamp(13.5px, 6.5px + 0.546875vw, 17px) * var(--fit) * var(--density));
+  }
+}
+@media screen and (min-width: 768px) and (max-height: 800px) {
+  html {
+    --fit: 0.97;
   }
 }
 
@@ -463,7 +491,7 @@ body > div[style*="position:fixed"][style*="bottom"] {
     width: 2rem;
   }
   :is(.form-dense, main form) label {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   :is(.form-dense, main form) label:is(.mb-1\.5, .mb-2) {
     margin-bottom: 0.25rem;
@@ -484,8 +512,8 @@ body > div[style*="position:fixed"][style*="bottom"] {
   :is(.form-dense, main form) .gap-4 {
     row-gap: 0.625rem;
   }
-  :is(.form-dense, main form) textarea.min-h-\[60px\],
-  :is(.form-dense, main form) textarea.min-h-\[80px\] {
-    min-height: 52px;
+  :is(.form-dense, main form) textarea.min-h-\[3.75rem\],
+  :is(.form-dense, main form) textarea.min-h-\[5rem\] {
+    min-height: 3.25rem;
   }
 }

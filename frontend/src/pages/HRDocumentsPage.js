@@ -192,7 +192,7 @@ export default function HRDocumentsPage() {
                       <td className="pr-0" onClick={(e) => e.stopPropagation()}><Checkbox checked={selectedIds.has(d.id)} onCheckedChange={() => toggle(d.id)} /></td>
                       <td className="cell-strong">{d.person_name}</td>
                       <td>{label('document_types', d.doc_type)}</td>
-                      <td><div className="max-w-[240px] truncate">{d.description || '-'}</div></td>
+                      <td><div className="max-w-[15rem] truncate">{d.description || '-'}</div></td>
                       <td className="tabular-nums">{fmtDate(d.issue_date)}</td>
                       <td className="tabular-nums">{fmtDate(d.expiry_date)}</td>
                       <td><StatusPill tone={STATUS_TONES[d.status]}>{STATUS_LABELS[d.status]}</StatusPill></td>
@@ -258,7 +258,7 @@ export default function HRDocumentsPage() {
             </div>
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Observações</Label>
-              <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[50px]" />
+              <Textarea value={form.observations} onChange={(e) => setField('observations', e.target.value)} className="text-sm min-h-[3.125rem]" />
             </div>
           </div>
           <DialogFooter>

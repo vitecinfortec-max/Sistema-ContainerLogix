@@ -326,7 +326,7 @@ export default function RepairEstimatesPage() {
                         <div>{estimate.client_name || '-'}</div>
                         {estimate.shipping_line && <div className="text-xs text-muted-foreground">{estimate.shipping_line}</div>}
                       </td>
-                      <td className="max-w-[260px]">
+                      <td className="max-w-[16.25rem]">
                         <div className="truncate" title={estimate.items.map((i) => i.description).join(', ')}>
                           {estimate.items.map((i) => i.description).join(', ')}
                         </div>

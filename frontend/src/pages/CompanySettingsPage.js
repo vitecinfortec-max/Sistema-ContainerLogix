@@ -146,7 +146,7 @@ export default function CompanySettingsPage() {
         />
 
         {!isAdmin && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-[13px] text-amber-800 dark:text-amber-300">
+          <div className="flex items-start gap-2 rounded-md border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-[0.8125rem] text-amber-800 dark:text-amber-300">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <span>Apenas administradores podem editar os dados da empresa. Você pode visualizar as informações abaixo.</span>
           </div>
@@ -196,7 +196,7 @@ export default function CompanySettingsPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="mt-2 text-[12px] h-8"
+                          className="mt-2 text-[0.75rem] h-8"
                           onClick={() => fileInputRef.current?.click()}
                           disabled={uploadingLogo}
                           data-testid="upload-logo-button"
@@ -261,7 +261,7 @@ export default function CompanySettingsPage() {
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       disabled={!isAdmin}
-                      className="text-[13px] min-h-[70px]"
+                      className="text-[0.8125rem] min-h-[4.375rem]"
                     />
                   </div>
                 </div>
@@ -366,7 +366,7 @@ export default function CompanySettingsPage() {
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dados Bancários</CardTitle>
-              <CardDescription className="text-[12px]">Exibidos nos relatórios e faturas de faturamento</CardDescription>
+              <CardDescription className="text-[0.75rem]">Exibidos nos relatórios e faturas de faturamento</CardDescription>
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -417,7 +417,7 @@ export default function CompanySettingsPage() {
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Ordem de Carregamento</CardTitle>
-              <CardDescription className="text-[12px]">Controla o preenchimento automático do Booking/Ref. em ordens do tipo Entrega</CardDescription>
+              <CardDescription className="text-[0.75rem]">Controla o preenchimento automático do Booking/Ref. em ordens do tipo Entrega</CardDescription>
             </CardHeader>
             <CardContent className="p-4">
               <div className="max-w-sm space-y-1.5">
@@ -431,7 +431,7 @@ export default function CompanySettingsPage() {
                   className="font-mono"
                   maxLength={10}
                 />
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                <p className="text-[0.75rem] text-slate-500 dark:text-slate-400">
                   Se preenchido (ex: "TLL"), toda Ordem de Carregamento do tipo Entrega passa a gerar o Booking/Ref. sozinha, em sequência (TLL00001, TLL00002...). Deixe em branco para continuar preenchendo manualmente.
                 </p>
               </div>
@@ -441,7 +441,7 @@ export default function CompanySettingsPage() {
           <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
             <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
               <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Fechamento do Financeiro</CardTitle>
-              <CardDescription className="text-[12px]">Trava os lançamentos financeiros de meses já fechados com a contabilidade</CardDescription>
+              <CardDescription className="text-[0.75rem]">Trava os lançamentos financeiros de meses já fechados com a contabilidade</CardDescription>
             </CardHeader>
             <CardContent className="p-4">
               <div className="max-w-sm space-y-1.5">
@@ -454,7 +454,7 @@ export default function CompanySettingsPage() {
                   onChange={(e) => setFormData({ ...formData, financial_lock_date: e.target.value })}
                   disabled={!isAdmin}
                 />
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                <p className="text-[0.75rem] text-slate-500 dark:text-slate-400">
                   Faturas, cheques, prestações de contas, pagamentos de frete, diárias, faturamento portuário, invoices internacionais e créditos de cliente com data até este dia não podem mais ser incluídos, alterados nem excluídos, por ninguém. Recebimentos e baixas feitos depois desta data continuam liberados. Para corrigir algo, volte a data, corrija e feche de novo. Deixe em branco para não travar nada.
                 </p>
               </div>

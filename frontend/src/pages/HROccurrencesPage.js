@@ -202,7 +202,7 @@ export default function HROccurrencesPage() {
                       <td className="cell-strong">{o.person_name}</td>
                       <td><StatusPill tone={TONES[o.occurrence_type] || 'slate'}>{label('occurrence_types', o.occurrence_type)}</StatusPill></td>
                       <td className="text-center tabular-nums">{o.days ?? '-'}</td>
-                      <td><div className="max-w-[300px] truncate" title={o.description || ''}>{o.cid ? `CID ${o.cid} · ` : ''}{o.description || '-'}</div></td>
+                      <td><div className="max-w-[18.75rem] truncate" title={o.description || ''}>{o.cid ? `CID ${o.cid} · ` : ''}{o.description || '-'}</div></td>
                       <td className="text-center" onClick={(e) => e.stopPropagation()}>
                         {(o.attachments || []).map((url, i) => (
                           <a key={url} href={api.getFileUrl(url)} target="_blank" rel="noreferrer" className="text-primary text-xs underline mr-1">{i + 1}</a>
@@ -251,7 +251,7 @@ export default function HROccurrencesPage() {
               <Label className="mb-1.5 block">Dias</Label>
               <Input type="number" min="0" step="0.5" value={form.end_date ? '' : form.days} disabled={!!form.end_date}
                 onChange={(e) => setField('days', e.target.value)} className="h-9 text-sm" />
-              <p className="text-[11px] text-slate-500 mt-1">{form.end_date ? 'Calculado pelas datas.' : 'Sem data final: informe os dias.'}</p>
+              <p className="text-[0.6875rem] text-slate-500 mt-1">{form.end_date ? 'Calculado pelas datas.' : 'Sem data final: informe os dias.'}</p>
             </div>
             {['ATESTADO', 'AFASTAMENTO_INSS', 'ACIDENTE_TRABALHO'].includes(form.occurrence_type) && (
               <div>
@@ -261,7 +261,7 @@ export default function HROccurrencesPage() {
             )}
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Descrição / motivo</Label>
-              <Textarea value={form.description} onChange={(e) => setField('description', e.target.value)} className="text-sm min-h-[70px]" />
+              <Textarea value={form.description} onChange={(e) => setField('description', e.target.value)} className="text-sm min-h-[4.375rem]" />
             </div>
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Anexos (atestado, documento assinado...)</Label>
@@ -281,8 +281,8 @@ export default function HROccurrencesPage() {
               </div>
             </div>
           </div>
-          {affectsPayroll && <p className="text-[12px] text-amber-600">Os dias desta ocorrência serão descontados na folha do mês.</p>}
-          {isLeave && <p className="text-[12px] text-amber-600">A empresa paga os 15 primeiros dias; a partir do 16º o salário sai da folha (benefício do INSS).</p>}
+          {affectsPayroll && <p className="text-[0.75rem] text-amber-600">Os dias desta ocorrência serão descontados na folha do mês.</p>}
+          {isLeave && <p className="text-[0.75rem] text-amber-600">A empresa paga os 15 primeiros dias; a partir do 16º o salário sai da folha (benefício do INSS).</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancelar</Button>
             <Button onClick={save} disabled={saving || uploading} data-testid="hr-occurrence-save-btn"><Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : 'Salvar'}</Button>

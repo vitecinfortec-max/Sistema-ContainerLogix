@@ -318,7 +318,7 @@ export default function OfflineInspectionsPage() {
                       >
                         <X className="w-3 h-3" />
                       </Button>
-                      <p className="text-[11px] text-center mt-0.5">{PHOTO_LABELS[photo.type]}</p>
+                      <p className="text-[0.6875rem] text-center mt-0.5">{PHOTO_LABELS[photo.type]}</p>
                     </div>
                   ))}
                 </div>

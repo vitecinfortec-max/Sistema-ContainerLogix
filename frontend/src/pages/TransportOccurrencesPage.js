@@ -308,9 +308,9 @@ export default function TransportOccurrencesPage() {
                         </div>
                       </td>
                       <td className="hidden md:table-cell">{occ.vehicle_plate ? <PlateTag>{occ.vehicle_plate}</PlateTag> : '-'}</td>
-                      <td className="hidden lg:table-cell"><div className="max-w-[180px] truncate">{occ.driver_name || '-'}</div></td>
+                      <td className="hidden lg:table-cell"><div className="max-w-[11.25rem] truncate">{occ.driver_name || '-'}</div></td>
                       <td className="hidden lg:table-cell tabular-nums">{occ.loading_order_number || '-'}</td>
-                      <td className="hidden xl:table-cell"><div className="max-w-[280px] truncate" title={occ.description}>{occ.description}</div></td>
+                      <td className="hidden xl:table-cell"><div className="max-w-[17.5rem] truncate" title={occ.description}>{occ.description}</div></td>
                       <td className="hidden md:table-cell text-right tabular-nums whitespace-nowrap">{formatMoney(occ.cost)}</td>
                       <td><StatusPill tone={STATUS_TONES[occ.status] || 'slate'}>{OCCURRENCE_STATUS[occ.status] || occ.status}</StatusPill></td>
                     </tr>

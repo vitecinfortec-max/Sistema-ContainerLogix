@@ -467,7 +467,7 @@ export default function StockMovementsPage() {
                     displayField={purposeDisplay}
                     className="h-9 text-sm"
                   />
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                  <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500 mt-1">
                     Busque pela placa do veículo ou Nº da OS de Serviço, ou digite livremente (ex: Uso Interno, Perda)
                   </p>
                 </div>
@@ -475,20 +475,20 @@ export default function StockMovementsPage() {
               </div>
               <div>
                 <Label className="mb-1.5 block">Observações</Label>
-                <Textarea value={form.observations ?? ''} onChange={(e) => onChange('observations', e.target.value)} className="text-sm min-h-[70px]" data-testid="stock-movement-obs" />
+                <Textarea value={form.observations ?? ''} onChange={(e) => onChange('observations', e.target.value)} className="text-sm min-h-[4.375rem]" data-testid="stock-movement-obs" />
               </div>
             </TabsContent>
 
             <TabsContent value="itens" className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-[13px] font-semibold text-primary">Itens</h3>
+                <h3 className="text-[0.8125rem] font-semibold text-primary">Itens</h3>
                 <Button variant="outline" size="sm" type="button" onClick={addItem} className="h-7 text-xs">
                   <Plus className="w-3 h-3 mr-1" />Adicionar item
                 </Button>
               </div>
               <div className="space-y-2">
                 {(form.items || []).length === 0 && (
-                  <div className="text-center py-4 text-[12px] text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded">
+                  <div className="text-center py-4 text-[0.75rem] text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-700 rounded">
                     Nenhum item adicionado
                   </div>
                 )}
@@ -510,7 +510,7 @@ export default function StockMovementsPage() {
                         testId={`stock-movement-item-product-${idx}`}
                       />
                       {product && (
-                        <p className={`text-[11px] mt-1 ${overStock ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`} data-testid={`stock-movement-item-balance-${idx}`}>
+                        <p className={`text-[0.6875rem] mt-1 ${overStock ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`} data-testid={`stock-movement-item-balance-${idx}`}>
                           Saldo em estoque: {qtyWithUnit(product.stock_quantity, product.unit)}
                           {overStock ? ' - insuficiente para esta saída' : ''}
                         </p>
@@ -538,7 +538,7 @@ export default function StockMovementsPage() {
                 })}
               </div>
               <div className="flex justify-end pt-2 border-t border-slate-200 dark:border-slate-700">
-                <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 min-w-[220px] text-right">
+                <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 min-w-[13.75rem] text-right">
                   <div className="text-xs text-primary font-medium">Valor Total</div>
                   <div className="text-xl font-bold text-primary tabular-nums">{fmtMoney(total)}</div>
                 </div>
@@ -640,9 +640,9 @@ export default function StockMovementsPage() {
                             {OPERATION_LABELS[m.operation_type] || m.operation_type}
                           </StatusPill>
                         </td>
-                        <td><div className="max-w-[180px] truncate" title={m.warehouse_name || ''}>{m.warehouse_name || '-'}</div></td>
+                        <td><div className="max-w-[11.25rem] truncate" title={m.warehouse_name || ''}>{m.warehouse_name || '-'}</div></td>
                         <td>
-                          <div className="max-w-[240px] truncate" title={m.purpose_text || ''}>
+                          <div className="max-w-[15rem] truncate" title={m.purpose_text || ''}>
                             {m.purpose_type === 'VEICULO' && <span className="inline-flex items-center gap-1"><Car className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
                             {m.purpose_type === 'OS' && <span className="inline-flex items-center gap-1"><ClipboardList className="w-3.5 h-3.5 text-slate-400" />{m.purpose_text}</span>}
                             {(!m.purpose_type || m.purpose_type === 'OUTRO') && (

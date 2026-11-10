@@ -309,9 +309,9 @@ export default function ContainerSalesPage() {
                       </td>
                       <td className="font-mono whitespace-nowrap cell-strong">{s.container_number}</td>
                       <td className="whitespace-nowrap">{s.booking || '-'}</td>
-                      <td><div className="max-w-[180px] truncate" title={s.origin_terminal || ''}>{s.origin_terminal || '-'}</div></td>
+                      <td><div className="max-w-[11.25rem] truncate" title={s.origin_terminal || ''}>{s.origin_terminal || '-'}</div></td>
                       <td className="whitespace-nowrap tabular-nums">{s.entry_date ? format(calendarDate(s.entry_date), 'dd/MM/yyyy') : '-'}</td>
-                      <td><div className="max-w-[180px] truncate" title={s.representative_name || ''}>{s.representative_name || '-'}</div></td>
+                      <td><div className="max-w-[11.25rem] truncate" title={s.representative_name || ''}>{s.representative_name || '-'}</div></td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(s.sale_value)}</td>
                       <td className="text-right whitespace-nowrap tabular-nums">{formatMoney(s.received_value)}</td>
                       <td>
@@ -389,7 +389,7 @@ export default function ContainerSalesPage() {
             <div className="space-y-1.5">
               <Label className="block">Observações</Label>
               <Textarea
-                className="text-[13px] min-h-[60px]"
+                className="text-[0.8125rem] min-h-[3.75rem]"
                 value={form.observations}
                 onChange={(e) => setForm({ ...form, observations: e.target.value })}
               />

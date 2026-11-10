@@ -157,12 +157,12 @@ function AnswerBar({ counts }) {
   if (!counts.total) return <span className="text-slate-400">-</span>;
   const width = (n) => `${(n / counts.total) * 100}%`;
   return (
-    <div className="flex min-w-[130px] items-center gap-2" title={`${counts.ok} conforme(s), ${counts.failed} reprovado(s), ${counts.pending} sem resposta`}>
+    <div className="flex min-w-[8.125rem] items-center gap-2" title={`${counts.ok} conforme(s), ${counts.failed} reprovado(s), ${counts.pending} sem resposta`}>
       <div className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
         <motion.div className="h-full bg-emerald-500" initial={{ width: 0 }} animate={{ width: width(counts.ok) }} transition={{ duration: 0.5, ease: 'easeOut' }} />
         <motion.div className="h-full bg-red-500" initial={{ width: 0 }} animate={{ width: width(counts.failed) }} transition={{ duration: 0.5, ease: 'easeOut' }} />
       </div>
-      <span className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400">{counts.answered}/{counts.total}</span>
+      <span className="text-[0.6875rem] tabular-nums text-slate-500 dark:text-slate-400">{counts.answered}/{counts.total}</span>
     </div>
   );
 }
@@ -517,7 +517,7 @@ export default function VehicleChecklistPage() {
                       onClick={() => applyResultFilter(value)}
                       data-testid={`checklist-result-${value || 'all'}`}
                       className={cn(
-                        'relative h-9 rounded-md border px-3 text-[13px] font-medium transition-colors',
+                        'relative h-9 rounded-md border px-3 text-[0.8125rem] font-medium transition-colors',
                         active
                           ? 'border-primary text-primary'
                           : 'border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300 dark:hover:border-slate-600',
@@ -623,15 +623,15 @@ export default function VehicleChecklistPage() {
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-2">
-                              <span className="max-w-[200px] truncate" title={c.client_name || ''}>{c.client_name || '-'}</span>
+                              <span className="max-w-[12.5rem] truncate" title={c.client_name || ''}>{c.client_name || '-'}</span>
                               {c.template === 'petrobras_lvt' && (
-                                <StatusPill tone="emerald" dot={false} className="text-[11px] px-1.5">LVT</StatusPill>
+                                <StatusPill tone="emerald" dot={false} className="text-[0.6875rem] px-1.5">LVT</StatusPill>
                               )}
                             </span>
                           )}
                         </td>
-                        <td><div className="max-w-[200px] truncate" title={c.driver_name || ''}>{c.driver_name || '-'}</div></td>
-                        <td><div className="max-w-[160px] truncate" title={c.vistoriador_name || ''}>{c.vistoriador_name || '-'}</div></td>
+                        <td><div className="max-w-[12.5rem] truncate" title={c.driver_name || ''}>{c.driver_name || '-'}</div></td>
+                        <td><div className="max-w-[10rem] truncate" title={c.vistoriador_name || ''}>{c.vistoriador_name || '-'}</div></td>
                         <td><AnswerBar counts={countAnswers(checklistItems(c))} /></td>
                         <td className="whitespace-nowrap">
                           {isSimple ? (
@@ -677,7 +677,7 @@ export default function VehicleChecklistPage() {
               <ClipboardCheck className="w-5 h-5" />
               {editingChecklist ? 'Editar Checklist de Veículo' : 'Novo Checklist de Veículo'}
               {formData.template === 'petrobras_lvt' && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
                   Modelo Petrobras (LVT)
                 </span>
               )}

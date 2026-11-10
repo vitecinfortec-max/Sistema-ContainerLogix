@@ -221,7 +221,7 @@ export default function HRPositionsPage() {
             </div>
             <div className="sm:col-span-2">
               <Label className="mb-1.5 block">Atribuições / descrição</Label>
-              <Textarea value={form.description} onChange={(e) => setField('description', e.target.value)} className="text-sm min-h-[70px]" />
+              <Textarea value={form.description} onChange={(e) => setField('description', e.target.value)} className="text-sm min-h-[4.375rem]" />
             </div>
           </div>
           <DialogFooter>

@@ -288,7 +288,7 @@ export default function StockReportPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {MODELO_OPTIONS.map(([v, l]) => (
-                      <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                      <SelectItem key={v} value={v} className="text-[0.8125rem]">{l}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -306,9 +306,9 @@ export default function StockReportPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                      <SelectItem value="all" className="text-[0.8125rem]">Todos</SelectItem>
                       {warehouses.map((w) => (
-                        <SelectItem key={w.id} value={w.id} className="text-[13px]">{w.name}</SelectItem>
+                        <SelectItem key={w.id} value={w.id} className="text-[0.8125rem]">{w.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -319,9 +319,9 @@ export default function StockReportPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all" className="text-[13px]">Todas</SelectItem>
+                      <SelectItem value="all" className="text-[0.8125rem]">Todas</SelectItem>
                       {families.map((f) => (
-                        <SelectItem key={f.id} value={f.id} className="text-[13px]">{f.name}</SelectItem>
+                        <SelectItem key={f.id} value={f.id} className="text-[0.8125rem]">{f.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -332,9 +332,9 @@ export default function StockReportPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                      <SelectItem value="all" className="text-[0.8125rem]">Todos</SelectItem>
                       {STATUS_OPTIONS.map(([v, l]) => (
-                        <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                        <SelectItem key={v} value={v} className="text-[0.8125rem]">{l}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -357,9 +357,9 @@ export default function StockReportPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all" className="text-[13px]">Todos</SelectItem>
+                      <SelectItem value="all" className="text-[0.8125rem]">Todos</SelectItem>
                       {OPERATION_OPTIONS.map(([v, l]) => (
-                        <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                        <SelectItem key={v} value={v} className="text-[0.8125rem]">{l}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -370,9 +370,9 @@ export default function StockReportPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all" className="text-[13px]">Todas</SelectItem>
+                      <SelectItem value="all" className="text-[0.8125rem]">Todas</SelectItem>
                       {REFERENCE_OPTIONS.map(([v, l]) => (
-                        <SelectItem key={v} value={v} className="text-[13px]">{l}</SelectItem>
+                        <SelectItem key={v} value={v} className="text-[0.8125rem]">{l}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -476,9 +476,9 @@ export default function StockReportPage() {
                       {invPaging.pageItems.map((p) => (
                         <tr key={p.id} data-testid="stock-inventory-row">
                           <td className="cell-strong whitespace-nowrap tabular-nums">{p.code}</td>
-                          <td><div className="max-w-[320px] truncate" title={p.description || ''}>{p.description}</div></td>
-                          <td><div className="max-w-[180px] truncate" title={p.warehouse_name || ''}>{p.warehouse_name || '-'}</div></td>
-                          <td><div className="max-w-[160px] truncate" title={p.family_name || ''}>{p.family_name || '-'}</div></td>
+                          <td><div className="max-w-[20rem] truncate" title={p.description || ''}>{p.description}</div></td>
+                          <td><div className="max-w-[11.25rem] truncate" title={p.warehouse_name || ''}>{p.warehouse_name || '-'}</div></td>
+                          <td><div className="max-w-[10rem] truncate" title={p.family_name || ''}>{p.family_name || '-'}</div></td>
                           <td className={`text-right whitespace-nowrap tabular-nums font-medium ${p.stock_quantity <= 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>{qtyWithUnit(p.stock_quantity, p.unit)}</td>
                           <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(p.reference_value)}</td>
                           <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(p.total_value)}</td>
@@ -520,9 +520,9 @@ export default function StockReportPage() {
                         <tr key={`${ledgerPaging.paginationProps.currentPage}-${index}`} data-testid="stock-ledger-row">
                           <td className="whitespace-nowrap tabular-nums">{fmtDay(r.date)}</td>
                           <td><StatusPill tone={r.operation_type === 'ENTRADA' ? 'emerald' : 'red'}>{r.operation_type === 'ENTRADA' ? 'Entrada' : 'Saída'}</StatusPill></td>
-                          <td><div className="max-w-[300px] truncate" title={r.product_name || ''}>{r.product_name}</div></td>
-                          <td><div className="max-w-[170px] truncate" title={r.warehouse_name || ''}>{r.warehouse_name || '-'}</div></td>
-                          <td><div className="max-w-[220px] truncate" title={r.reference_label || ''}>{r.reference_label || '-'}</div></td>
+                          <td><div className="max-w-[18.75rem] truncate" title={r.product_name || ''}>{r.product_name}</div></td>
+                          <td><div className="max-w-[10.625rem] truncate" title={r.warehouse_name || ''}>{r.warehouse_name || '-'}</div></td>
+                          <td><div className="max-w-[13.75rem] truncate" title={r.reference_label || ''}>{r.reference_label || '-'}</div></td>
                           <td className="text-right whitespace-nowrap tabular-nums font-medium">{fmtQty(r.quantity)}</td>
                           <td className="text-right whitespace-nowrap tabular-nums">{fmtMoney(r.unit_value)}</td>
                           <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(r.total_value)}</td>

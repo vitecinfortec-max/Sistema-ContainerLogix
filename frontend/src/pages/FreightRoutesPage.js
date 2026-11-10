@@ -181,7 +181,7 @@ export default function FreightRoutesPage() {
             <DialogContent data-testid="route-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editMode ? 'Editar Rota' : 'Cadastrar Rota'}</DialogTitle>
-                <DialogDescription className="text-[13px]">
+                <DialogDescription className="text-[0.8125rem]">
                   {editMode ? 'Atualize os dados da rota' : 'Adicione uma nova rota ao sistema'}
                 </DialogDescription>
               </DialogHeader>
@@ -237,7 +237,7 @@ export default function FreightRoutesPage() {
                     data-testid="route-observations-input"
                     value={formData.observations}
                     onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                    className="text-[13px] min-h-[60px]"
+                    className="text-[0.8125rem] min-h-[3.75rem]"
                   />
                 </div>
                 <Button

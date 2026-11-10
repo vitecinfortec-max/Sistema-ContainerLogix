@@ -243,7 +243,7 @@ export default function FuelConsumptionPage() {
                         {fmtLiters(h.liters)}
                         {/* Média de tanque cheio a tanque cheio: os parciais do meio somam nos litros */}
                         {h.partial_count > 0 && (
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                          <div className="text-[0.6875rem] text-slate-500 dark:text-slate-400">
                             {`inclui ${h.partial_count} parcia${h.partial_count > 1 ? 'is' : 'l'}`}
                           </div>
                         )}

@@ -185,7 +185,7 @@ function PayrollRunList({ onOpen, onSettings }) {
                   {meta.run_types.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-slate-500 mt-1" data-testid="payroll-new-type-hint">
+              <p className="text-[0.6875rem] text-slate-500 mt-1" data-testid="payroll-new-type-hint">
                 {newForm.run_type === 'ADIANTAMENTO'
                   ? `Paga ${meta.salary_advance_rate ?? 40}% do salário a quem tem "Recebe adiantamento quinzenal" no contrato, sem nenhum desconto (INSS, IRRF, vale-transporte e lançamentos ficam na folha mensal).`
                   : newForm.run_type === 'MENSAL'
@@ -387,12 +387,12 @@ function PayrollRunDetail({ runId, onBack }) {
                       </td>
                       <td className="cell-strong">
                         {p.person_name}
-                        {(p.inputs || []).length > 0 && <span className="ml-2 text-[11px] text-slate-400">{p.inputs.length} lançamento(s)</span>}
+                        {(p.inputs || []).length > 0 && <span className="ml-2 text-[0.6875rem] text-slate-400">{p.inputs.length} lançamento(s)</span>}
                       </td>
                       <td>{p.position_name || '-'}</td>
                       <td className="text-center tabular-nums">
                         {['MENSAL', 'ADIANTAMENTO'].includes(run.run_type) ? p.days_worked : `${p.months_13th}/12`}
-                        {p.vacation_days > 0 && <span className="block text-[11px] text-blue-600">{p.vacation_days}d férias</span>}
+                        {p.vacation_days > 0 && <span className="block text-[0.6875rem] text-blue-600">{p.vacation_days}d férias</span>}
                       </td>
                       <td className="text-right tabular-nums">{formatMoney(p.base_salary)}</td>
                       <td className="text-right tabular-nums">{formatMoney(p.totals?.gross)}</td>
@@ -488,7 +488,7 @@ function PayslipDialog({ slip, run, events, onClose, onSaved }) {
             {(slip.events || []).map((e, i) => (
               <tr key={i}>
                 <td className="tabular-nums">{e.number}</td>
-                <td>{e.label}{!e.auto && <span className="ml-1 text-[11px] text-blue-600">lançado</span>}</td>
+                <td>{e.label}{!e.auto && <span className="ml-1 text-[0.6875rem] text-blue-600">lançado</span>}</td>
                 <td className="tabular-nums">{e.reference}</td>
                 <td className="text-right tabular-nums">{e.kind === 'P' ? formatMoney(e.value) : ''}</td>
                 <td className="text-right tabular-nums text-destructive">{e.kind === 'D' ? formatMoney(e.value) : ''}</td>
@@ -499,7 +499,7 @@ function PayslipDialog({ slip, run, events, onClose, onSaved }) {
             <tr><td colSpan={3}>Totais · líquido {formatMoney(t.net)}</td><td className="text-right tabular-nums">{formatMoney(t.gross)}</td><td className="text-right tabular-nums">{formatMoney(t.deductions)}</td></tr>
           </tfoot>
         </table>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[12px]">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[0.75rem]">
           <div className="rounded-md bg-muted p-2"><div className="text-slate-500">Base INSS</div><div className="font-semibold">{formatMoney(t.inss_base)}</div></div>
           <div className="rounded-md bg-muted p-2"><div className="text-slate-500">Base IRRF</div><div className="font-semibold">{formatMoney(t.irrf_base)}{t.irrf_simplified ? ' (simpl.)' : ''}</div></div>
           <div className="rounded-md bg-muted p-2"><div className="text-slate-500">Redução IR (Lei 15.270)</div><div className="font-semibold">{formatMoney(t.irrf_reduction)}</div></div>
@@ -552,12 +552,12 @@ function PayslipDialog({ slip, run, events, onClose, onSaved }) {
             <div>
               <Label className="mb-1.5 block">Dias pagos (0 a 30)</Label>
               <Input type="number" min="0" max="30" disabled={!editable} value={daysOverride} onChange={(e) => setDaysOverride(e.target.value)} className="h-9 text-sm" />
-              <p className="text-[11px] text-slate-500 mt-1">Vazio: calculado ({slip.days_override == null ? slip.days_worked : 'admissão, férias e afastamentos'}).</p>
+              <p className="text-[0.6875rem] text-slate-500 mt-1">Vazio: calculado ({slip.days_override == null ? slip.days_worked : 'admissão, férias e afastamentos'}).</p>
             </div>
           )}
           <div className="sm:col-span-2">
             <Label className="mb-1.5 block">Observações (saem no contracheque)</Label>
-            <Textarea disabled={!editable} value={observations} onChange={(e) => setObservations(e.target.value)} className="text-sm min-h-[60px]" />
+            <Textarea disabled={!editable} value={observations} onChange={(e) => setObservations(e.target.value)} className="text-sm min-h-[3.75rem]" />
           </div>
         </div>
 

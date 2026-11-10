@@ -915,7 +915,7 @@ export default function BillingPage() {
                   </span>
                   <span className="text-xs text-slate-500 dark:text-slate-400">Adicionadas via busca por ID/Código de Barras</span>
                 </div>
-                <div className="max-h-[200px] overflow-y-auto">
+                <div className="max-h-[12.5rem] overflow-y-auto">
                   <table className="data-table">
                     <thead className="sticky top-0">
                       <tr>
@@ -988,7 +988,7 @@ export default function BillingPage() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 ) : (
-                  <div className="max-h-[250px] overflow-y-auto">
+                  <div className="max-h-[15.625rem] overflow-y-auto">
                     <table className="data-table">
                       <thead className="sticky top-0">
                         <tr>
@@ -1071,7 +1071,7 @@ export default function BillingPage() {
                   </div>
                 </div>
 
-                <div className="mt-4 max-w-[220px]">
+                <div className="mt-4 max-w-[13.75rem]">
                   <Label className="mb-1.5 block">Vencimento (opcional)</Label>
                   <Input type="date" className="h-9" min={todayISO()} value={invoiceDueDate} onChange={(e) => setInvoiceDueDate(e.target.value)} data-testid="invoice-due-date" />
                 </div>
@@ -1129,7 +1129,7 @@ export default function BillingPage() {
                 </div>
               </div>
               
-              <div className="space-y-1.5 max-w-[220px]">
+              <div className="space-y-1.5 max-w-[13.75rem]">
                 <Label htmlFor="edit-due-date" className="block">Vencimento</Label>
                 <Input
                   id="edit-due-date"
@@ -1148,25 +1148,25 @@ export default function BillingPage() {
                   data-testid="edit-notes-input"
                   value={editFormData.notes}
                   onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                  className="min-h-[60px] text-[13px]"
+                  className="min-h-[3.75rem] text-[0.8125rem]"
                 />
               </div>
 
               {/* Movimentações Atuais */}
               <div className="border rounded-lg">
                 <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 border-b flex items-center justify-between">
-                  <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                  <span className="text-[0.8125rem] font-medium text-slate-700 dark:text-slate-300">
                     Movimentações na Fatura ({editMovements.length - movementsToRemove.size})
                   </span>
                   {movementsToRemove.size > 0 && (
-                    <span className="text-[11px] text-red-600">
+                    <span className="text-[0.6875rem] text-red-600">
                       {movementsToRemove.size} marcada(s) para remover
                     </span>
                   )}
                 </div>
                 <div className="max-h-40 overflow-y-auto">
                   {loadingEditMovements ? (
-                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Carregando...</div>
+                    <div className="p-4 text-center text-[0.8125rem] text-slate-500 dark:text-slate-400">Carregando...</div>
                   ) : editMovements.length > 0 ? (
                     <table className="data-table">
                       <thead className="sticky top-0">
@@ -1184,10 +1184,10 @@ export default function BillingPage() {
                             key={mov.id} 
                             className={`${movementsToRemove.has(mov.id) ? 'bg-red-50 line-through opacity-60' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                           >
-                            <td className="text-[12px] font-mono">{mov.transaction_id}</td>
-                            <td className="text-[12px]">{mov.container_number}</td>
-                            <td className="text-[12px]">{mov.operation_type}</td>
-                            <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
+                            <td className="text-[0.75rem] font-mono">{mov.transaction_id}</td>
+                            <td className="text-[0.75rem]">{mov.container_number}</td>
+                            <td className="text-[0.75rem]">{mov.operation_type}</td>
+                            <td className="text-[0.75rem] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
                             <td className="text-center">
                               <button aria-label={movementsToRemove.has(mov.id) ? 'Desfazer remoção' : 'Remover da fatura'}
                                 type="button"
@@ -1203,7 +1203,7 @@ export default function BillingPage() {
                       </tbody>
                     </table>
                   ) : (
-                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">Nenhuma movimentação</div>
+                    <div className="p-4 text-center text-[0.8125rem] text-slate-500 dark:text-slate-400">Nenhuma movimentação</div>
                   )}
                 </div>
               </div>
@@ -1211,11 +1211,11 @@ export default function BillingPage() {
               {/* Adicionar Movimentações */}
               <div className="border rounded-lg">
                 <div className="bg-slate-50 dark:bg-slate-800 px-3 py-2 border-b flex items-center justify-between">
-                  <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+                  <span className="text-[0.8125rem] font-medium text-slate-700 dark:text-slate-300">
                     Adicionar Movimentações
                   </span>
                   {movementsToAdd.size > 0 && (
-                    <span className="text-[11px] text-emerald-600">
+                    <span className="text-[0.6875rem] text-emerald-600">
                       {movementsToAdd.size} selecionada(s) para adicionar
                     </span>
                   )}
@@ -1227,10 +1227,10 @@ export default function BillingPage() {
                     <Input
                       value={editSearchId}
                       onChange={(e) => setEditSearchId(e.target.value)}
-                      className="h-9 text-[13px] flex-1"
+                      className="h-9 text-[0.8125rem] flex-1"
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), searchMovementById())}
                     />
-                    <Button type="button" variant="outline" size="sm" onClick={searchMovementById} className="h-9 text-[12px]">
+                    <Button type="button" variant="outline" size="sm" onClick={searchMovementById} className="h-9 text-[0.75rem]">
                       <Search className="w-3.5 h-3.5 mr-1" />
                       Buscar
                     </Button>
@@ -1255,10 +1255,10 @@ export default function BillingPage() {
                             key={mov.id} 
                             className={`${movementsToAdd.has(mov.id) ? 'bg-emerald-50' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
                           >
-                            <td className="text-[12px] font-mono">{mov.transaction_id}</td>
-                            <td className="text-[12px]">{mov.container_number}</td>
-                            <td className="text-[12px]">{mov.operation_type}</td>
-                            <td className="text-[12px] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
+                            <td className="text-[0.75rem] font-mono">{mov.transaction_id}</td>
+                            <td className="text-[0.75rem]">{mov.container_number}</td>
+                            <td className="text-[0.75rem]">{mov.operation_type}</td>
+                            <td className="text-[0.75rem] text-right font-mono">{formatCurrency(mov.service_value || 0)}</td>
                             <td className="text-center">
                               <button aria-label={movementsToAdd.has(mov.id) ? 'Remover seleção' : 'Adicionar à fatura'}
                                 type="button"
@@ -1274,7 +1274,7 @@ export default function BillingPage() {
                       </tbody>
                     </table>
                   ) : (
-                    <div className="p-4 text-center text-[13px] text-slate-500 dark:text-slate-400">
+                    <div className="p-4 text-center text-[0.8125rem] text-slate-500 dark:text-slate-400">
                       Nenhuma movimentação disponível para adicionar
                     </div>
                   )}
@@ -1287,13 +1287,13 @@ export default function BillingPage() {
                   variant="outline" 
                   onClick={() => backToList()}
                   disabled={saving}
-                  className="text-[13px]"
+                  className="text-[0.8125rem]"
                 >
                   Cancelar
                 </Button>
                 <Button 
                   type="submit"
-                  className="text-[13px] font-semibold"
+                  className="text-[0.8125rem] font-semibold"
                   disabled={saving}
                   data-testid="save-invoice-button"
                 >
@@ -1332,7 +1332,7 @@ export default function BillingPage() {
                   value={statusFilter || 'ALL'}
                   onValueChange={(v) => { setStatusFilter(v === 'ALL' ? '' : v); setCurrentPage(1); }}
                 >
-                  <SelectTrigger className="h-9 text-[13px]" data-testid="invoice-status-filter">
+                  <SelectTrigger className="h-9 text-[0.8125rem]" data-testid="invoice-status-filter">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1464,13 +1464,13 @@ export default function BillingPage() {
                           <td className={`whitespace-nowrap tabular-nums ${isOverdue(invoice) ? 'text-destructive font-semibold' : ''}`} title={isOverdue(invoice) ? 'Vencida' : undefined}>
                             {formatDay(invoice.due_date)}
                           </td>
-                          <td><div className="max-w-[260px] truncate font-medium text-slate-700 dark:text-slate-200" title={invoice.client_name || ''}>{invoice.client_name}</div></td>
+                          <td><div className="max-w-[16.25rem] truncate font-medium text-slate-700 dark:text-slate-200" title={invoice.client_name || ''}>{invoice.client_name}</div></td>
                           <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{invoice.client_cnpj || '-'}</td>
                           <td className="text-right tabular-nums">{invoice.movement_ids.length}</td>
                           <td className="text-right whitespace-nowrap tabular-nums cell-strong">
                             {formatCurrency(invoice.total_value)}
                             {invoice.credit_applied > 0 && invoice.status === 'PENDENTE' && (
-                              <div className="text-[11px] font-normal text-muted-foreground" title={`Crédito do cliente usado: ${formatCurrency(invoice.credit_applied)}`}>
+                              <div className="text-[0.6875rem] font-normal text-muted-foreground" title={`Crédito do cliente usado: ${formatCurrency(invoice.credit_applied)}`}>
                                 falta {formatCurrency(invoice.open_value)}
                               </div>
                             )}
@@ -1509,7 +1509,7 @@ export default function BillingPage() {
               {/* Status */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] text-slate-500 dark:text-slate-400">Status:</span>
+                  <span className="text-[0.8125rem] text-slate-500 dark:text-slate-400">Status:</span>
                   <StatusPill tone={getInvoiceStatusBadge(selectedInvoice.status).tone} className="text-xs px-3 py-1">
                     {getInvoiceStatusBadge(selectedInvoice.status).label}
                   </StatusPill>
@@ -1519,7 +1519,7 @@ export default function BillingPage() {
                   onValueChange={(val) => handleUpdateInvoiceStatus(selectedInvoice.id, val)}
                   disabled={selectedInvoice.status === 'CANCELADO'}
                 >
-                  <SelectTrigger className="w-40 h-9 text-[13px]" data-testid="invoice-status-select">
+                  <SelectTrigger className="w-40 h-9 text-[0.8125rem]" data-testid="invoice-status-select">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1599,7 +1599,7 @@ export default function BillingPage() {
                 <div className="flex gap-1">
                   <button
                     onClick={() => handleTabChange('movements')}
-                    className={`px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
+                    className={`px-4 py-2.5 text-[0.8125rem] font-medium border-b-2 transition-colors ${
                       detailsTab === 'movements'
                         ? 'border-primary text-primary'
                         : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
@@ -1611,7 +1611,7 @@ export default function BillingPage() {
                   </button>
                   <button
                     onClick={() => handleTabChange('history')}
-                    className={`px-4 py-2.5 text-[13px] font-medium border-b-2 transition-colors ${
+                    className={`px-4 py-2.5 text-[0.8125rem] font-medium border-b-2 transition-colors ${
                       detailsTab === 'history'
                         ? 'border-primary text-primary'
                         : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
@@ -1690,7 +1690,7 @@ export default function BillingPage() {
                                 <StatusPill tone={actionInfo.tone} dot={false}>
                                   {actionInfo.label}
                                 </StatusPill>
-                                <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">{h.user_name}</span>
+                                <span className="text-[0.8125rem] font-medium text-slate-700 dark:text-slate-300">{h.user_name}</span>
                               </div>
                               <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
                                 <Clock className="w-3 h-3" />
@@ -1698,7 +1698,7 @@ export default function BillingPage() {
                               </span>
                             </div>
                             {changesList.length > 0 && (
-                              <ul className="mt-2 text-[12px] text-slate-600 dark:text-slate-400 space-y-0.5">
+                              <ul className="mt-2 text-[0.75rem] text-slate-600 dark:text-slate-400 space-y-0.5">
                                 {changesList.map((change, idx) => (
                                   <li key={idx} className="flex items-center gap-1.5">
                                     <span className="w-1 h-1 rounded-full bg-slate-400 dark:bg-slate-500"></span>
@@ -1714,7 +1714,7 @@ export default function BillingPage() {
                   ) : (
                     <div className="text-center py-8 text-slate-500 dark:text-slate-400">
                       <History className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-[13px]">Nenhum histórico de alterações</p>
+                      <p className="text-[0.8125rem]">Nenhum histórico de alterações</p>
                     </div>
                   )}
                 </div>
@@ -1729,7 +1729,7 @@ export default function BillingPage() {
                 size="sm"
                 onClick={() => selectedInvoice && downloadExcel(selectedInvoice)}
                 disabled={downloadingExcel === selectedInvoice?.id}
-                className="text-[12px]"
+                className="text-[0.75rem]"
                 data-testid="details-download-excel"
               >
                 {downloadingExcel === selectedInvoice?.id ? (
@@ -1739,7 +1739,7 @@ export default function BillingPage() {
                 )}
                 Baixar Excel
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowDetails(false)} className="text-[12px]">
+              <Button variant="outline" size="sm" onClick={() => setShowDetails(false)} className="text-[0.75rem]">
                 Fechar
               </Button>
             </div>

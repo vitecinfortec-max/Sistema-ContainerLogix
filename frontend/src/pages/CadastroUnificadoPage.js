@@ -550,7 +550,7 @@ export default function CadastroUnificadoPage() {
                 type="button"
                 onClick={() => setActiveTypeKey(t.key)}
                 data-testid={`cadastro-type-${t.key}`}
-                className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-[0.8125rem] font-medium transition-colors ${
                   active
                     ? 'bg-primary text-primary-foreground'
                     : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -567,7 +567,7 @@ export default function CadastroUnificadoPage() {
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="cadastro-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editId ? `Editar ${activeType.label}` : `Cadastrar ${activeType.label}`}</DialogTitle>
-                <DialogDescription className="text-[13px]">
+                <DialogDescription className="text-[0.8125rem]">
                   {editId ? `Atualize os dados ${g.do} ${activeType.label.toLowerCase()}` : `Adicione ${g.umNovo} ${activeType.label.toLowerCase()} ao sistema`}
                 </DialogDescription>
               </DialogHeader>
@@ -605,7 +605,7 @@ export default function CadastroUnificadoPage() {
                     ) : f.type === 'signature' ? (
                       <SignatureField value={formData[f.name]} onChange={(v) => setField(f.name, v)} personName={formData.name} />
                     ) : f.type === 'textarea' ? (
-                      <Textarea value={formData[f.name] || ''} onChange={(e) => setField(f.name, e.target.value)} className="text-[13px] min-h-[70px]" />
+                      <Textarea value={formData[f.name] || ''} onChange={(e) => setField(f.name, e.target.value)} className="text-[0.8125rem] min-h-[4.375rem]" />
                     ) : (f.mask === 'cnpj' || f.mask === 'doc') ? (
                       <div className="flex gap-1.5">
                         <Input
@@ -666,7 +666,7 @@ export default function CadastroUnificadoPage() {
 
         {cnhAlerts.length > 0 && (
           <div
-            className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-3.5 py-2.5 text-[13px] text-amber-800 dark:text-amber-200"
+            className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 px-3.5 py-2.5 text-[0.8125rem] text-amber-800 dark:text-amber-200"
             data-testid="cnh-alert"
           >
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -690,7 +690,7 @@ export default function CadastroUnificadoPage() {
               primary={(
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button type="button" size="sm" data-testid="add-cadastro-button" className="h-9 px-3.5 text-[13px] gap-1.5">
+                    <Button type="button" size="sm" data-testid="add-cadastro-button" className="h-9 px-3.5 text-[0.8125rem] gap-1.5">
                       <Plus className="w-4 h-4" />
                       Novo cadastro
                       <ChevronDown className="w-3.5 h-3.5 opacity-80" />
@@ -767,7 +767,7 @@ export default function CadastroUnificadoPage() {
                               )}
                             </span>
                           ) : colIdx === 0 ? (
-                            <div className="max-w-[320px] truncate" title={item[field] || ''}>{item[field] || '-'}</div>
+                            <div className="max-w-[20rem] truncate" title={item[field] || ''}>{item[field] || '-'}</div>
                           ) : (item[field] || '-')}
                         </td>
                       ))}

@@ -158,7 +158,7 @@ export default function ShippingLinesPage() {
             <DialogContent data-testid="line-dialog">
               <DialogHeader>
                 <DialogTitle className="text-base">{editMode ? 'Editar Armador' : 'Cadastrar Armador'}</DialogTitle>
-                <DialogDescription className="text-[13px]">
+                <DialogDescription className="text-[0.8125rem]">
                   {editMode ? 'Atualize os dados do armador' : 'Adicione um novo armador ao sistema'}
                 </DialogDescription>
               </DialogHeader>

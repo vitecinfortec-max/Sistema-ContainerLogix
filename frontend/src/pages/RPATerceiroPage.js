@@ -188,9 +188,9 @@ export default function RPATerceiroPage({ rpaType = 'terceiro' }) {
                         />
                       </td>
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{r.rpa_number}</td>
-                      <td><div className="max-w-[220px] truncate" title={r.driver_name || ''}>{r.driver_name || '-'}</div></td>
+                      <td><div className="max-w-[13.75rem] truncate" title={r.driver_name || ''}>{r.driver_name || '-'}</div></td>
                       <td className="whitespace-nowrap tabular-nums text-slate-500 dark:text-slate-400">{r.driver_cpf || '-'}</td>
-                      <td><div className="max-w-[220px] truncate" title={r.client_name || ''}>{r.client_name || '-'}</div></td>
+                      <td><div className="max-w-[13.75rem] truncate" title={r.client_name || ''}>{r.client_name || '-'}</div></td>
                       <td className="font-mono whitespace-nowrap text-slate-700 dark:text-slate-200">{r.container_number || '-'}</td>
                       <td className="whitespace-nowrap tabular-nums">
                         {toDateInput(r.service_date) ? format(new Date(`${toDateInput(r.service_date)}T00:00:00`), 'dd/MM/yyyy') : '-'}

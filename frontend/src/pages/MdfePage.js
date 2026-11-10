@@ -744,7 +744,7 @@ export default function MdfePage() {
                   <div key={m.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-1.5 text-sm" data-testid={`mdfe-trip-${m.id}`}>
                     <span className="font-semibold tabular-nums">Nº {m.numero}</span>
                     {m.veiculo?.placa && <PlateTag>{m.veiculo.placa}</PlateTag>}
-                    <span className="text-slate-600 dark:text-slate-300 truncate max-w-[260px]">{m.uf_inicio} → {destinos || m.uf_fim}</span>
+                    <span className="text-slate-600 dark:text-slate-300 truncate max-w-[16.25rem]">{m.uf_inicio} → {destinos || m.uf_fim}</span>
                     <span className={`text-xs ${days >= 3 ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-slate-500'}`}>
                       {days === 0 ? 'emitido hoje' : `há ${days} dia(s)`}
                     </span>
@@ -829,13 +829,13 @@ export default function MdfePage() {
                         </td>
                         <td className="cell-strong tabular-nums whitespace-nowrap">{m.numero || '-'}{m.serie != null && <span className="text-xs text-slate-400"> / {m.serie}</span>}</td>
                         <td>{m.veiculo?.placa ? <PlateTag>{m.veiculo.placa}</PlateTag> : '-'}</td>
-                        <td><div className="max-w-[180px] truncate">{(m.condutores || []).map((c) => c.nome).join(', ') || '-'}</div></td>
-                        <td className="whitespace-nowrap">{m.uf_inicio || '-'} → {m.uf_fim || '-'}<div className="text-xs text-slate-400 max-w-[220px] truncate">{destinos}</div></td>
+                        <td><div className="max-w-[11.25rem] truncate">{(m.condutores || []).map((c) => c.nome).join(', ') || '-'}</div></td>
+                        <td className="whitespace-nowrap">{m.uf_inicio || '-'} → {m.uf_fim || '-'}<div className="text-xs text-slate-400 max-w-[13.75rem] truncate">{destinos}</div></td>
                         <td className="text-right tabular-nums">{ctes}</td>
                         <td className="text-right tabular-nums whitespace-nowrap">{fmtMoney(m.valor_total_carga)}</td>
                         <td>
                           <StatusPill tone={MDFE_STATUS_TONES[m.status] || 'slate'} title={m.motivo || m.chave || ''}>{MDFE_STATUS_LABELS[m.status] || m.status}</StatusPill>
-                          {m.ambiente === 'homologacao' && <span className="ml-1 text-[11px] text-slate-400">homologação</span>}
+                          {m.ambiente === 'homologacao' && <span className="ml-1 text-[0.6875rem] text-slate-400">homologação</span>}
                         </td>
                         <td className="whitespace-nowrap tabular-nums">{m.created_at ? format(new Date(m.created_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
                       </tr>
@@ -926,7 +926,7 @@ export default function MdfePage() {
               {emitted ? `MDF-e nº ${emitted.numero || '-'}` : editingId ? 'Editar MDF-e' : 'Novo MDF-e'}
               {!emitted && form.cte_ids?.length > 0 && <span className="text-sm font-normal text-slate-500">· {form.cte_ids.length} CT-e(s) do sistema</span>}
               {!emitted && settings && settings.ambiente !== 'producao' && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Homologação</span>
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.6875rem] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">Homologação</span>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -1001,7 +1001,7 @@ export default function MdfePage() {
                             <span className="flex-1 min-w-0 truncate">{c.remetente?.nome || '-'} → {c.destinatario?.nome || '-'}</span>
                             <span className="hidden md:block w-44 truncate text-slate-500">{c.destino?.cidade ? `${c.destino.cidade}/${c.destino.uf}` : '-'}</span>
                             <span className="w-28 text-right tabular-nums">{fmtMoney(c.valor_carga || c.valor_total)}</span>
-                            {c.ambiente === 'homologacao' && <span className="text-[11px] text-slate-400">homologação</span>}
+                            {c.ambiente === 'homologacao' && <span className="text-[0.6875rem] text-slate-400">homologação</span>}
                           </label>
                         );
                       })}

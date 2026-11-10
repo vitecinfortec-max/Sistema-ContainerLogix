@@ -255,7 +255,7 @@ export default function ContainerVistoriasPage() {
                       </td>
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{vistoria.vistoria_number}</td>
                       <td className="font-mono whitespace-nowrap text-slate-700 dark:text-slate-200">{vistoria.container_number}</td>
-                      <td><div className="max-w-[260px] truncate" title={vistoria.client_name || ''}>{vistoria.client_name || '-'}</div></td>
+                      <td><div className="max-w-[16.25rem] truncate" title={vistoria.client_name || ''}>{vistoria.client_name || '-'}</div></td>
                       <td className="hidden sm:table-cell">
                         {vistoria.no_damage ? (
                           <StatusPill tone="emerald">Sem avarias</StatusPill>

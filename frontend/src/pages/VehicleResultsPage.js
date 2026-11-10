@@ -321,7 +321,7 @@ export default function VehicleResultsPage() {
                             <td><StatusPill tone={revenue ? 'emerald' : 'red'}>{revenue ? 'Faturamento' : 'Custo'}</StatusPill></td>
                             <td className="whitespace-nowrap">{r.category}</td>
                             <td className="whitespace-nowrap cell-strong">{r.document}</td>
-                            <td><div className="max-w-[280px] truncate" title={r.description || ''}>{r.description || '-'}</div></td>
+                            <td><div className="max-w-[17.5rem] truncate" title={r.description || ''}>{r.description || '-'}</div></td>
                             <td className={`text-right whitespace-nowrap tabular-nums font-medium ${revenue ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
                               {revenue ? '+' : '-'}{fmtMoney(r.value)}
                             </td>

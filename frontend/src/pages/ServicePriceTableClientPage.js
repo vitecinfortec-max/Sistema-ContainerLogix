@@ -297,12 +297,12 @@ export default function ServicePriceTableClientPage() {
                 <tbody>
                   {pageItems.map((entry) => (
                     <tr key={entry.id} data-selected={editId === entry.id}>
-                      <td className="cell-strong"><div className="max-w-[360px] truncate" title={entry.service_type_name}>{entry.service_type_name}</div></td>
+                      <td className="cell-strong"><div className="max-w-[22.5rem] truncate" title={entry.service_type_name}>{entry.service_type_name}</div></td>
                       <td>
                         {entry.billing_type === 'DIARIA' ? (
                           <div className="flex flex-col gap-0.5">
                             <StatusPill tone="violet" dot={false} className="w-fit">Diária de armazenagem</StatusPill>
-                            <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                            <span className="text-[0.6875rem] text-slate-400 dark:text-slate-500">
                               Free time {entry.free_time_days} dias · {entry.container_size_group ? `${entry.container_size_group} pés` : 'qualquer tamanho'}
                             </span>
                           </div>

@@ -82,7 +82,7 @@ function StockShare({ label, value, share, barClass, dotClass, testId }) {
         </span>
         <span className="flex items-baseline gap-1.5">
           <span className="text-sm font-semibold tabular-nums text-slate-800 dark:text-slate-200"><AnimatedNumber value={value} /></span>
-          <span className="w-9 text-right text-[11px] tabular-nums text-slate-400 dark:text-slate-500">{share}%</span>
+          <span className="w-9 text-right text-[0.6875rem] tabular-nums text-slate-400 dark:text-slate-500">{share}%</span>
         </span>
       </div>
       <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
@@ -275,7 +275,7 @@ export default function DashboardPage() {
             <CardHeader className="border-b border-slate-100 dark:border-slate-800 py-3 px-4">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100" data-testid="shortcuts-title">Atalhos</CardTitle>
-                <Button variant="outline" size="sm" onClick={openEditor} className="h-8 gap-1.5 text-[13px]" data-testid="edit-shortcuts-button">
+                <Button variant="outline" size="sm" onClick={openEditor} className="h-8 gap-1.5 text-[0.8125rem]" data-testid="edit-shortcuts-button">
                   <Settings2 className="w-4 h-4 text-primary" />
                   Personalizar atalhos
                 </Button>
@@ -293,7 +293,7 @@ export default function DashboardPage() {
                       role="tab"
                       aria-selected={active}
                       onClick={() => setShortcutFilter(f.id)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1 text-[13px] font-medium transition-colors ${
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1 text-[0.8125rem] font-medium transition-colors ${
                         active
                           ? 'border-slate-800 bg-slate-800 text-white dark:border-slate-200 dark:bg-slate-200 dark:text-slate-900'
                           : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
@@ -319,14 +319,14 @@ export default function DashboardPage() {
                       data-testid={`shortcut-${shortcut.id}`}
                     >
                       <span className="relative w-9 h-9 shrink-0 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Icon className="w-[18px] h-[18px] text-primary" />
+                        <Icon className="w-[1.125rem] h-[1.125rem] text-primary" />
                         {shortcut.kind === 'report' && (
                           <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white dark:bg-slate-900 flex items-center justify-center">
                             <BarChart3 className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                           </span>
                         )}
                       </span>
-                      <span className="text-[13px] font-medium leading-tight text-slate-700 dark:text-slate-200">{shortcut.label}</span>
+                      <span className="text-[0.8125rem] font-medium leading-tight text-slate-700 dark:text-slate-200">{shortcut.label}</span>
                     </motion.button>
                   );
                 })}
@@ -339,9 +339,9 @@ export default function DashboardPage() {
                   data-testid="add-shortcut-button"
                 >
                   <span className="w-9 h-9 shrink-0 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center">
-                    <Plus className="w-[18px] h-[18px] text-slate-400 dark:text-slate-500" />
+                    <Plus className="w-[1.125rem] h-[1.125rem] text-slate-400 dark:text-slate-500" />
                   </span>
-                  <span className="text-[13px] font-medium text-slate-400 dark:text-slate-500">Adicionar atalho</span>
+                  <span className="text-[0.8125rem] font-medium text-slate-400 dark:text-slate-500">Adicionar atalho</span>
                 </motion.button>
               </motion.div>
               {activeShortcuts.length === 0 && pinnedShortcuts.length > 0 && (
@@ -356,7 +356,7 @@ export default function DashboardPage() {
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
                 <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Alertas do Sistema</CardTitle>
                 {alertCount > 0 && (
-                  <span className="ml-auto rounded-full bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 text-[11px] font-semibold px-2 py-0.5 tabular-nums">{alertCount}</span>
+                  <span className="ml-auto rounded-full bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 text-[0.6875rem] font-semibold px-2 py-0.5 tabular-nums">{alertCount}</span>
                 )}
               </div>
             </CardHeader>
@@ -441,7 +441,7 @@ export default function DashboardPage() {
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <Icon className="w-4 h-4 text-primary" />
                       </div>
-                      <span className={`text-[13px] font-medium leading-tight flex-1 ${isSelected ? 'text-primary' : 'text-slate-600 dark:text-slate-400'}`}>
+                      <span className={`text-[0.8125rem] font-medium leading-tight flex-1 ${isSelected ? 'text-primary' : 'text-slate-600 dark:text-slate-400'}`}>
                         {shortcut.label}
                       </span>
                       {isSelected && (
@@ -579,7 +579,7 @@ export default function DashboardPage() {
                   {dailyTrend.length > 1 ? (
                     <div className="text-right" data-testid="entries-trend">
                       <Sparkline data={dailyTrend} dataKey="entries" name="Entradas" color={CHART_COLORS.primary} className="h-12 w-32 sm:w-44" />
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
+                      <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
                     </div>
                   ) : (
                     <ArrowDownCircle className="w-10 h-10 text-primary/20" />
@@ -604,7 +604,7 @@ export default function DashboardPage() {
                   {dailyTrend.length > 1 ? (
                     <div className="text-right" data-testid="exits-trend">
                       <Sparkline data={dailyTrend} dataKey="exits" name="Saídas" color={CHART_COLORS.amber} className="h-12 w-32 sm:w-44" />
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
+                      <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500 mt-0.5">últimos 14 dias</p>
                     </div>
                   ) : (
                     <ArrowUpCircle className="w-10 h-10 text-amber-500/20" />
@@ -720,7 +720,7 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     {yardUnit > 1 && (
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      <p className="text-[0.6875rem] text-slate-400 dark:text-slate-500">
                         No modelo, cada container representa {yardUnit} unidades.
                       </p>
                     )}

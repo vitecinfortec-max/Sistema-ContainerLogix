@@ -222,7 +222,7 @@ export default function ComercialProposalsPage() {
                         <Checkbox checked={selectedIds.has(p.id)} onCheckedChange={() => toggleSelect(p.id)} />
                       </td>
                       <td className="cell-strong whitespace-nowrap tabular-nums">{p.proposal_number}</td>
-                      <td><div className="max-w-[320px] truncate" title={p.recipient_name || ''}>{p.recipient_name}</div></td>
+                      <td><div className="max-w-[20rem] truncate" title={p.recipient_name || ''}>{p.recipient_name}</div></td>
                       <td className="hidden sm:table-cell whitespace-nowrap tabular-nums">
                         {format(new Date(p.created_at), "dd/MM/yyyy", { locale: ptBR })}
                       </td>

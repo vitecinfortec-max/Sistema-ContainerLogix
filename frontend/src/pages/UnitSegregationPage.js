@@ -322,11 +322,11 @@ export default function UnitSegregationPage() {
                           />
                         </td>
                         <td className="cell-strong whitespace-nowrap tabular-nums">#{item.segregation_number}</td>
-                        <td><div className="max-w-[260px] truncate" title={item.client_name || ''}>{item.client_name}</div></td>
+                        <td><div className="max-w-[16.25rem] truncate" title={item.client_name || ''}>{item.client_name}</div></td>
                         <td>
                           <div className="flex flex-wrap gap-1">
                             {(item.items || []).slice(0, 3).map((container, i) => (
-                              <span key={i} className="inline-flex px-1.5 py-px rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-[11px] font-mono text-slate-700 dark:text-slate-300">
+                              <span key={i} className="inline-flex px-1.5 py-px rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 text-[0.6875rem] font-mono text-slate-700 dark:text-slate-300">
                                 {container.container_number}
                               </span>
                             ))}
@@ -427,12 +427,12 @@ export default function UnitSegregationPage() {
                           <td>{container.shipping_line_name || container.shipping_line}</td>
                           <td>
                             {container.retrieved ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" title={container.retrieved_at ? format(new Date(container.retrieved_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : ''}>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" title={container.retrieved_at ? format(new Date(container.retrieved_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : ''}>
                                 <CheckCircle2 className="w-3 h-3" />
                                 Retirado{container.retrieved_transaction_id ? ` (#${container.retrieved_transaction_id})` : ''}
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[0.6875rem] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
                                 <Clock className="w-3 h-3" />
                                 Pendente
                               </span>

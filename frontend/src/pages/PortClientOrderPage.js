@@ -420,8 +420,8 @@ export default function PortClientOrderPage() {
                         <td>
                           <StatusPill tone={o.operation_type === 'COLETA' ? 'violet' : 'primary'} dot={false}>{OPERATION_SHORT[o.operation_type]}</StatusPill>
                         </td>
-                        <td><div className="max-w-[170px] truncate" title={o.client_name || ''}>{o.client_name}</div></td>
-                        <td><div className="max-w-[130px] truncate" title={o.port_terminal_name || ''}>{o.port_terminal_name}</div></td>
+                        <td><div className="max-w-[10.625rem] truncate" title={o.client_name || ''}>{o.client_name}</div></td>
+                        <td><div className="max-w-[8.125rem] truncate" title={o.port_terminal_name || ''}>{o.port_terminal_name}</div></td>
                         <td className="whitespace-nowrap font-mono" data-testid="pco-row-containers">
                           {(o.containers || []).slice(0, 2).map((c) => (
                             <div key={c.container_number} className="flex items-center gap-1" title={c.warning || ''}>
@@ -436,7 +436,7 @@ export default function PortClientOrderPage() {
                           )}
                         </td>
                         <td>
-                          <div className="max-w-[170px] truncate" title={o.driver_name || ''}>{o.driver_name || '-'}</div>
+                          <div className="max-w-[10.625rem] truncate" title={o.driver_name || ''}>{o.driver_name || '-'}</div>
                           {o.truck_plate && <div className="mt-0.5"><PlateTag>{o.truck_plate}</PlateTag></div>}
                         </td>
                         <td><StatusPill tone={STATUS_TONES[o.status]}>{STATUS_LABELS[o.status]}</StatusPill></td>

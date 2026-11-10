@@ -270,10 +270,10 @@ export default function ReportsMovementsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todas as Operações</SelectItem>
-                  <SelectItem value="ENTRADA" className="text-[13px]">Apenas Entradas</SelectItem>
-                  <SelectItem value="SAIDA" className="text-[13px]">Apenas Saídas</SelectItem>
-                  <SelectItem value="ESTOQUE" className="text-[13px]">Estoque Atual</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todas as Operações</SelectItem>
+                  <SelectItem value="ENTRADA" className="text-[0.8125rem]">Apenas Entradas</SelectItem>
+                  <SelectItem value="SAIDA" className="text-[0.8125rem]">Apenas Saídas</SelectItem>
+                  <SelectItem value="ESTOQUE" className="text-[0.8125rem]">Estoque Atual</SelectItem>
                 </SelectContent>
               </Select>
             </FilterField>
@@ -284,9 +284,9 @@ export default function ReportsMovementsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all" className="text-[13px]">Todos os Status</SelectItem>
-                  <SelectItem value="CHEIO" className="text-[13px]">Cheio</SelectItem>
-                  <SelectItem value="VAZIO" className="text-[13px]">Vazio</SelectItem>
+                  <SelectItem value="all" className="text-[0.8125rem]">Todos os Status</SelectItem>
+                  <SelectItem value="CHEIO" className="text-[0.8125rem]">Cheio</SelectItem>
+                  <SelectItem value="VAZIO" className="text-[0.8125rem]">Vazio</SelectItem>
                 </SelectContent>
               </Select>
             </FilterField>
@@ -327,7 +327,7 @@ export default function ReportsMovementsPage() {
                           key={client.id}
                           type="button"
                           onClick={() => selectClient(client)}
-                          className="w-full px-3 py-2 text-left text-[13px] hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 focus:outline-none border-b border-slate-100 dark:border-slate-800 last:border-b-0"
+                          className="w-full px-3 py-2 text-left text-[0.8125rem] hover:bg-slate-100 dark:hover:bg-slate-700 focus:bg-slate-100 dark:focus:bg-slate-700 focus:outline-none border-b border-slate-100 dark:border-slate-800 last:border-b-0"
                         >
                           {client.name}
                         </button>
@@ -336,7 +336,7 @@ export default function ReportsMovementsPage() {
                   )}
 
                   {showClientSuggestions && clientSearch.length >= 1 && clientSuggestions.length === 0 && (
-                    <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg px-3 py-2 text-[12px] text-slate-500 dark:text-slate-400">
+                    <div className="absolute z-[100] w-full mt-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md shadow-lg px-3 py-2 text-[0.75rem] text-slate-500 dark:text-slate-400">
                       Nenhum cliente encontrado
                     </div>
                   )}
@@ -400,16 +400,16 @@ export default function ReportsMovementsPage() {
                           {m.operation_type === 'ENTRADA' ? 'Entrada' : 'Saída'}
                         </StatusPill>
                       </td>
-                      <td className="cell-strong whitespace-nowrap font-mono text-[12px]">{m.container_number || '-'}</td>
+                      <td className="cell-strong whitespace-nowrap font-mono text-[0.75rem]">{m.container_number || '-'}</td>
                       <td>
                         <StatusPill tone={m.status === 'CHEIO' ? 'emerald' : 'slate'}>
                           {m.status === 'CHEIO' ? 'Cheio' : 'Vazio'}
                         </StatusPill>
                       </td>
                       <td className="whitespace-nowrap">{m.size_type || '-'}</td>
-                      <td><div className="max-w-[200px] truncate" title={m.client_name || ''}>{m.client_name || '-'}</div></td>
-                      <td><div className="max-w-[140px] truncate" title={m.shipping_line || ''}>{m.shipping_line || '-'}</div></td>
-                      <td><div className="max-w-[180px] truncate" title={m.driver_name || ''}>{m.driver_name || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={m.client_name || ''}>{m.client_name || '-'}</div></td>
+                      <td><div className="max-w-[8.75rem] truncate" title={m.shipping_line || ''}>{m.shipping_line || '-'}</div></td>
+                      <td><div className="max-w-[11.25rem] truncate" title={m.driver_name || ''}>{m.driver_name || '-'}</div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -443,7 +443,7 @@ export default function ReportsMovementsPage() {
             testId="daily-email-report-card"
           >
             <div className="p-4 space-y-3">
-              <p className="text-[13px] text-slate-500 dark:text-slate-400">
+              <p className="text-[0.8125rem] text-slate-500 dark:text-slate-400">
                 Todo dia às 07:00 o sistema envia automaticamente, por e-mail, o relatório de movimentações do dia anterior pra cada Cliente ativo com e-mail cadastrado.
                 Use os campos abaixo pra disparar o envio manualmente (útil pra testar ou reenviar um dia específico).
               </p>
@@ -468,7 +468,7 @@ export default function ReportsMovementsPage() {
                 </Button>
               </div>
               {emailResult && (
-                <div className="text-[12px] space-y-1 pt-1">
+                <div className="text-[0.75rem] space-y-1 pt-1">
                   <p className="text-emerald-700 dark:text-emerald-400">
                     Enviado para {emailResult.sent.length} cliente(s){emailResult.sent.length > 0 ? `: ${emailResult.sent.join(', ')}` : ''}
                   </p>

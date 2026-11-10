@@ -374,7 +374,7 @@ export default function ContainerRepresentativesPage() {
                     data-testid="representative-observations-input"
                     value={formData.observations}
                     onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                    className="text-[13px] min-h-[60px]"
+                    className="text-[0.8125rem] min-h-[3.75rem]"
                   />
                 </div>
 
@@ -459,7 +459,7 @@ export default function ContainerRepresentativesPage() {
                             {r.tipo === 'PJ' ? 'PJ' : 'PF'}
                           </StatusPill>
                         </td>
-                        <td><div className="max-w-[260px] truncate cell-strong" title={r.name || ''}>{r.name}</div></td>
+                        <td><div className="max-w-[16.25rem] truncate cell-strong" title={r.name || ''}>{r.name}</div></td>
                         <td className="whitespace-nowrap tabular-nums">{r.tipo === 'PJ' ? (r.cnpj || '-') : (r.cpf || '-')}</td>
                         <td className="whitespace-nowrap tabular-nums">{r.phone || '-'}</td>
                         <td>

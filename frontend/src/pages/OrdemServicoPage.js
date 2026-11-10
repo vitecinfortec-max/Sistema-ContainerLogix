@@ -216,9 +216,9 @@ export default function OrdemServicoPage() {
                       </td>
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{o.os_number}</td>
                       <td className="whitespace-nowrap tabular-nums">{o.opened_at ? format(new Date(o.opened_at), 'dd/MM/yyyy HH:mm') : '-'}</td>
-                      <td><div className="max-w-[220px] truncate" title={o.person_name || ''}>{o.person_name || '-'}</div></td>
+                      <td><div className="max-w-[13.75rem] truncate" title={o.person_name || ''}>{o.person_name || '-'}</div></td>
                       <td><PlateTag>{o.equipment_plate}</PlateTag></td>
-                      <td><div className="max-w-[200px] truncate" title={o.category || ''}>{o.category || '-'}</div></td>
+                      <td><div className="max-w-[12.5rem] truncate" title={o.category || ''}>{o.category || '-'}</div></td>
                       <td>
                         <StatusPill tone={STATUS_TONES[o.status] || 'slate'}>
                           {STATUS_LABELS[o.status] || o.status}

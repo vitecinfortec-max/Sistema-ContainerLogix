@@ -61,7 +61,7 @@ function SectionTable({ section }) {
               {row.map((v, i) => {
                 const tone = section.tone_col === i ? section.row_tones?.[r] : null;
                 return (
-                  <td key={i} className={cn(section.columns[i].type === 'text' ? 'min-w-[80px] max-w-[220px]' : 'whitespace-nowrap tabular-nums', alignOf(section.columns[i].type), tone && `font-semibold ${TONE_TEXT[tone] || ''}`)}>
+                  <td key={i} className={cn(section.columns[i].type === 'text' ? 'min-w-[5rem] max-w-[13.75rem]' : 'whitespace-nowrap tabular-nums', alignOf(section.columns[i].type), tone && `font-semibold ${TONE_TEXT[tone] || ''}`)}>
                     {fmtCell(v, section.columns[i].type)}
                   </td>
                 );

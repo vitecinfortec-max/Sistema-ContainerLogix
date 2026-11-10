@@ -87,8 +87,8 @@ export default function ExpenseGroupsDialog({ open, onOpenChange, onChanged }) {
               ) : (
                 <>
                   <span className={`flex-1 truncate ${g.status === 'INATIVO' ? 'text-slate-400 line-through' : ''}`}>{g.name}</span>
-                  <span className="text-[11px] text-slate-500 tabular-nums">{g.purchases} compra(s)</span>
-                  {g.status === 'INATIVO' && <StatusPill tone="slate" dot={false} className="text-[11px]">Inativo</StatusPill>}
+                  <span className="text-[0.6875rem] text-slate-500 tabular-nums">{g.purchases} compra(s)</span>
+                  {g.status === 'INATIVO' && <StatusPill tone="slate" dot={false} className="text-[0.6875rem]">Inativo</StatusPill>}
                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Renomear" title="Renomear" onClick={() => setEditing({ id: g.id, name: g.name })}>
                     <Pencil className="w-4 h-4" />
                   </Button>

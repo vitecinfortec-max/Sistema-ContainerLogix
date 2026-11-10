@@ -195,7 +195,7 @@ export default function ExpenseDashboardPage() {
                         <td className="text-right tabular-nums">{brl(g.largest)}</td>
                         <td className="text-right tabular-nums">
                           {g.variation == null ? <span className="text-slate-400">-</span> : (
-                            <StatusPill tone={g.variation > 0 ? 'red' : 'emerald'} dot={false} className="text-[11px]" title={`Período anterior: ${brl(g.previous_total)}`}>
+                            <StatusPill tone={g.variation > 0 ? 'red' : 'emerald'} dot={false} className="text-[0.6875rem]" title={`Período anterior: ${brl(g.previous_total)}`}>
                               {g.variation > 0 ? <TrendingUp className="w-3 h-3 mr-1 inline" /> : <TrendingDown className="w-3 h-3 mr-1 inline" />}
                               {g.variation > 0 ? '+' : ''}{String(g.variation).replace('.', ',')}%
                             </StatusPill>
@@ -224,7 +224,7 @@ export default function ExpenseDashboardPage() {
                         <tr key={i} title={p.observation || ''}>
                           <td className="tabular-nums whitespace-nowrap">{fmtDay(p.purchase_date)}</td>
                           <td>{p.group_name}</td>
-                          <td className="max-w-[200px] truncate">{p.supplier_name}</td>
+                          <td className="max-w-[12.5rem] truncate">{p.supplier_name}</td>
                           <td className="tabular-nums">{p.report}</td>
                           <td className="text-right tabular-nums cell-strong">{brl(p.amount)}</td>
                         </tr>
@@ -240,7 +240,7 @@ export default function ExpenseDashboardPage() {
                     <tbody>
                       {(data?.top_suppliers || []).map((x) => (
                         <tr key={x.supplier_name}>
-                          <td className="cell-strong max-w-[260px] truncate">{x.supplier_name}</td>
+                          <td className="cell-strong max-w-[16.25rem] truncate">{x.supplier_name}</td>
                           <td className="text-right tabular-nums">{x.count}</td>
                           <td className="text-right tabular-nums">{brl(x.total)}</td>
                         </tr>

@@ -226,14 +226,14 @@ export default function ReceivablesPage() {
                       <td className="whitespace-nowrap tabular-nums">{formatDay(r.due_date)}</td>
                       <td className={cn('text-right whitespace-nowrap tabular-nums', r.aging && AGING_TONES[r.aging])}>
                         {r.days_overdue ? `${r.days_overdue} dia(s)` : '-'}
-                        {r.aging_from_issue && r.days_overdue ? <div className="text-[11px] text-muted-foreground">da emissão</div> : null}
+                        {r.aging_from_issue && r.days_overdue ? <div className="text-[0.6875rem] text-muted-foreground">da emissão</div> : null}
                       </td>
                       <td className="whitespace-nowrap tabular-nums">{formatDay(r.paid_date)}</td>
                       <td>{situation(r)}</td>
                       <td className="text-right whitespace-nowrap tabular-nums cell-strong">
                         {formatMoney(r.status === 'PENDENTE' ? r.open_value : r.total_value)}
                         {r.credit_applied > 0 && (
-                          <div className="text-[11px] font-normal text-muted-foreground">
+                          <div className="text-[0.6875rem] font-normal text-muted-foreground">
                             {r.status === 'PENDENTE' ? `de ${formatMoney(r.total_value)} · ` : ''}crédito {formatMoney(r.credit_applied)}
                           </div>
                         )}

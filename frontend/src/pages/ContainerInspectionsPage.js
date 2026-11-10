@@ -255,7 +255,7 @@ export default function ContainerInspectionsPage() {
                       </td>
                       <td className="cell-strong whitespace-nowrap tabular-nums">#{inspection.inspection_number}</td>
                       <td className="font-mono whitespace-nowrap text-slate-700 dark:text-slate-200">{inspection.container_number}</td>
-                      <td><div className="max-w-[260px] truncate" title={inspection.client_name || ''}>{inspection.client_name || '-'}</div></td>
+                      <td><div className="max-w-[16.25rem] truncate" title={inspection.client_name || ''}>{inspection.client_name || '-'}</div></td>
                       <td className="hidden sm:table-cell">
                         <StatusPill tone={getPhotoCount(inspection) > 0 ? 'emerald' : 'slate'}>{getPhotoCount(inspection)}/8</StatusPill>
                       </td>
