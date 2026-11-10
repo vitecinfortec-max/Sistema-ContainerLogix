@@ -43,8 +43,11 @@ export const CFOP_OPTIONS = [
   ['7358', '7358 - Transporte (exportação)'],
 ];
 
+// toma3: 0 Remetente, 1 Expedidor, 2 Recebedor, 3 Destinatário; toma4: 4 Outros
 export const TOMADOR_OPTIONS = [
   ['0', 'Remetente'],
+  ['1', 'Expedidor'],
+  ['2', 'Recebedor'],
   ['3', 'Destinatário'],
   ['4', 'Outros (informar abaixo)'],
 ];

@@ -89,8 +89,7 @@ async def _vehicle_from_plate(plate: Optional[str], uf: str, trailer: bool) -> O
 
 
 def _contractor_of(cte: dict) -> Optional[dict]:
-    papel = cte.get("tomador_papel", 0)
-    party = {0: cte.get("remetente"), 3: cte.get("destinatario"), 4: cte.get("tomador")}.get(papel) or {}
+    party = fiscal_cte.payer_of(cte)
     if not party.get("cnpj_cpf"):
         return None
     return {"nome": party.get("nome"), "cnpj_cpf": only_digits(party.get("cnpj_cpf"))}

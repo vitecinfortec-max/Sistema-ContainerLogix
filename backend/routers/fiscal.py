@@ -102,7 +102,7 @@ async def resolve_municipalities(cte: dict, settings: dict) -> dict:
     """Completa os códigos IBGE que faltam (endereços e início/término da
     prestação) pelo nome da cidade + UF. Não altera o que já veio preenchido."""
     targets = [(settings.get("endereco") or {})]
-    for key in ("remetente", "destinatario", "tomador"):
+    for key in ("remetente", "destinatario", "tomador", "expedidor", "recebedor"):
         party = cte.get(key) or {}
         if party.get("endereco"):
             targets.append(party["endereco"])
@@ -322,6 +322,8 @@ async def list_ctes(search: Optional[str] = None, status: Optional[str] = None,
             {"remetente.nome": {"$regex": escaped, "$options": "i"}},
             {"destinatario.nome": {"$regex": escaped, "$options": "i"}},
             {"tomador.nome": {"$regex": escaped, "$options": "i"}},
+            {"expedidor.nome": {"$regex": escaped, "$options": "i"}},
+            {"recebedor.nome": {"$regex": escaped, "$options": "i"}},
             {"chave": {"$regex": escaped}},
             {"containers.numero": {"$regex": escaped, "$options": "i"}},
         ]
@@ -493,6 +495,7 @@ async def emit_cte(cte_id: str, current_user: dict = Depends(get_current_admin_u
         "ref": ref, "ambiente": ambiente, "tentativas": tentativa, "motivo": None,
         "origem": cte.get("origem"), "destino": cte.get("destino"),
         "remetente": cte.get("remetente"), "destinatario": cte.get("destinatario"), "tomador": cte.get("tomador"),
+        "expedidor": cte.get("expedidor"), "recebedor": cte.get("recebedor"),
         "emitido_por": current_user.get("name"), "emitido_em": _now_iso(),
     }
     try:

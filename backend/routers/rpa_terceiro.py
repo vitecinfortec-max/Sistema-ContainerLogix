@@ -12,6 +12,7 @@ from reports import now_brt, merge_company
 
 from shared import db, get_current_admin_user, get_company_settings, refuse_negative
 from routers.freight_payments import brt_day_range
+from fiscal_cte import payer_of
 
 api_router = APIRouter(prefix="/api")
 
@@ -237,8 +238,7 @@ async def _draft_from_order(order: dict) -> dict:
 
 
 def _cte_client(cte: dict) -> Optional[str]:
-    roles = {3: "destinatario", 4: "tomador"}
-    party = cte.get(roles.get(cte.get("tomador_papel"), "remetente")) or {}
+    party = payer_of(cte)
     return party.get("nome")
 
 

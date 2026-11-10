@@ -4437,6 +4437,8 @@ class FiscalSettingsUpdate(BaseModel):
 class CteParty(BaseModel):
     client_id: Optional[str] = None
     nome: Optional[str] = None
+    # Vai no XML (xFant) só para o remetente e o tomador "Outros"; nos demais fica no sistema
+    nome_fantasia: Optional[str] = None
     cnpj_cpf: Optional[str] = None
     ie: Optional[str] = None
     fone: Optional[str] = None
@@ -4462,13 +4464,33 @@ class CteQuantity(BaseModel):
 
 
 class CteDocument(BaseModel):
-    tipo: Literal["NFE", "OUTROS"] = "NFE"
+    """Documento originário da carga (infDoc). NFE -> infNFe (chave, PIN,
+    dPrev); NF modelo 1/1A -> infNF; OUTROS -> infOutros. O que o leiaute
+    4.00 não tem para o tipo (espécie, marca, cubagem...) fica só no sistema
+    e no espelho; peso, quantidade, cubagem e valor somam no infCarga."""
+    tipo: Literal["NFE", "NF", "OUTROS"] = "NFE"
     chave: Optional[str] = None  # NF-e: chave de acesso (44 dígitos)
-    tipo_outros: Optional[str] = "99"  # 00 Declaração, 99 Outros
+    tipo_outros: Optional[str] = "99"  # 00 Declaração, 10 Dutoviário, 59 CF-e SAT, 65 NFC-e, 99 Outros
     descricao: Optional[str] = None
     numero: Optional[str] = None
-    data_emissao: Optional[str] = None
-    valor: Optional[float] = None
+    serie: Optional[str] = None
+    data_emissao: Optional[str] = None  # YYYY-MM-DD
+    data_prevista: Optional[str] = None  # YYYY-MM-DD - previsão de entrega (dPrev)
+    natureza_carga: Optional[str] = None
+    cfop: Optional[str] = None
+    pin_suframa: Optional[str] = None
+    peso: Optional[float] = Field(default=None, ge=0)  # kg, até 4 casas
+    quantidade: Optional[float] = Field(default=None, ge=0)
+    especie: Optional[str] = None
+    marca: Optional[str] = None
+    cubagem: Optional[float] = Field(default=None, ge=0)  # m³, até 4 casas
+    valor_produtos: Optional[float] = Field(default=None, ge=0)
+    icms_base_calculo: Optional[float] = Field(default=None, ge=0)
+    icms_valor: Optional[float] = Field(default=None, ge=0)
+    icms_st_base_calculo: Optional[float] = Field(default=None, ge=0)
+    icms_st_valor: Optional[float] = Field(default=None, ge=0)
+    valor_outros: Optional[float] = Field(default=None, ge=0)
+    valor: Optional[float] = Field(default=None, ge=0)  # valor do documento
 
 
 class CteContainer(BaseModel):
@@ -4503,6 +4525,9 @@ class CteCreate(BaseModel):
     remetente: Optional[CteParty] = None
     destinatario: Optional[CteParty] = None
     tomador: Optional[CteParty] = None  # só quando tomador_papel = 4
+    # Opcionais; obrigatórios quando são o tomador (1 Expedidor, 2 Recebedor)
+    expedidor: Optional[CteParty] = None
+    recebedor: Optional[CteParty] = None
     origem: Optional[CtePlace] = None
     destino: Optional[CtePlace] = None
     valor_total: Optional[float] = None

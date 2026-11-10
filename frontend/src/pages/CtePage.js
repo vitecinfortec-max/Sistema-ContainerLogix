@@ -54,7 +54,36 @@ const SECTION_LABELS = {
 // Componentes mais usados na composição do frete (o nome vai no CT-e, até 15 caracteres)
 const COMPONENT_PRESETS = [['FRETE VALOR', 'Frete'], ['PEDAGIO', 'Pedágio'], ['SEGURO', 'Seguro'], ['OUTROS', 'Outros']];
 
-const emptyParty = () => ({ client_id: null, nome: '', cnpj_cpf: '', ie: '', fone: '', email: '', endereco: {} });
+const emptyParty = () => ({ client_id: null, nome: '', nome_fantasia: '', cnpj_cpf: '', ie: '', fone: '', email: '', endereco: {} });
+const partyFilled = (p) => !!((p?.nome || '').trim() || onlyDigits(p?.cnpj_cpf));
+
+// Documentos originários (infDoc): NF-e -> infNFe, NF modelo 1/1A -> infNF,
+// Outros -> infOutros. O que o leiaute não tem para o tipo fica no sistema e
+// no espelho; peso, quantidade, cubagem e valor somam no infCarga.
+const DOC_TYPES = [['NFE', 'NF-e'], ['NF', 'NF modelo 1/1A'], ['OUTROS', 'Outros']];
+const DOC_TYPE_SHORT = { NFE: 'NF-e', NF: 'NF 1/1A', OUTROS: 'Outros' };
+const OUTROS_TYPES = [['99', 'Outros'], ['00', 'Declaração'], ['10', 'Dutoviário'], ['59', 'CF-e SAT'], ['65', 'NFC-e']];
+const DOC_QTY_FIELDS = ['peso', 'quantidade', 'cubagem'];  // até 4 casas
+const DOC_MONEY_FIELDS = ['valor_produtos', 'icms_base_calculo', 'icms_valor', 'icms_st_base_calculo', 'icms_st_valor', 'valor_outros', 'valor'];
+const emptyDocument = (tipo = 'NFE') => ({
+  tipo, chave: '', tipo_outros: '99', descricao: '', numero: '', serie: '', data_emissao: '', data_prevista: '',
+  natureza_carga: '', cfop: '', pin_suframa: '', especie: '', marca: '',
+  ...Object.fromEntries([...DOC_QTY_FIELDS, ...DOC_MONEY_FIELDS].map((k) => [k, ''])),
+});
+// Documento com algum dado (linhas vazias não vão para o CT-e)
+const docFilled = (d) => (d.tipo === 'NFE' ? !!onlyDigits(d.chave) : !!((d.numero || '').trim() || (d.descricao || '').trim()));
+// Totais da grade: os mesmos de fiscal_cte.document_totals no backend
+const documentTotals = (docs) => {
+  const sum = (k) => docs.filter(docFilled).reduce((acc, d) => acc + (toNumber(d[k]) || 0), 0);
+  return { peso: sum('peso'), quantidade: sum('quantidade'), cubagem: sum('cubagem'), valor: sum('valor') };
+};
+// infQ: as somas da grade (KG, UNIDADE, M3) substituem as linhas manuais da mesma unidade
+const DOC_QUANTITY_ROWS = [['peso', '01', 'PESO BRUTO'], ['quantidade', '03', 'UNIDADE'], ['cubagem', '00', 'CUBAGEM']];
+const quantitiesFromDocs = (docs) => {
+  const totals = documentTotals(docs);
+  return DOC_QUANTITY_ROWS.filter(([k]) => totals[k] > 0).map(([k, unidade, tipo_medida]) => ({ unidade, tipo_medida, quantidade: totals[k] }));
+};
+const fmtQty = (v) => Number(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
 const emptyDriver = () => ({ driver_id: null, nome: '', cpf: '' });
 const emptyToll = () => ({ pago_por: 'EMITENTE', tipo: '01', fornecedor_nome: '', fornecedor_cnpj: '', numero_comprovante: '', valor: '' });
 const normPlate = (v) => String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -80,6 +109,8 @@ function buildEmpty(settings) {
     remetente: emptyParty(),
     destinatario: emptyParty(),
     tomador: emptyParty(),
+    expedidor: emptyParty(),
+    recebedor: emptyParty(),
     // Início/fim da prestação seguem as cidades do remetente e do destinatário
     percurso_auto: true,
     origem: { cidade: '', uf: '' },
@@ -93,7 +124,7 @@ function buildEmpty(settings) {
     produto_predominante: settings?.produto_predominante || 'CONTAINER',
     outras_caracteristicas: '',
     quantidades: [{ unidade: '01', tipo_medida: 'PESO BRUTO', quantidade: '' }],
-    documentos: [{ tipo: 'NFE', chave: '', tipo_outros: '99', descricao: '', numero: '', data_emissao: '', valor: '' }],
+    documentos: [],
     containers: [],
     observacoes: '',
     motorista: emptyDriver(),
@@ -102,6 +133,16 @@ function buildEmpty(settings) {
     ...insuranceDefaults(settings),
     vales_pedagio: [],
   };
+}
+
+// Documento salvo (ou lido do XML) -> linha da grade, com números em texto pt-BR.
+// Documento antigo (só chave, ou só descrição/valor) ganha os campos em branco.
+function docToForm(d) {
+  const out = { ...emptyDocument(d?.tipo || 'NFE') };
+  Object.entries(d || {}).forEach(([k, v]) => { if (v !== null && v !== undefined) out[k] = v; });
+  DOC_QTY_FIELDS.forEach((k) => { out[k] = toInput(d?.[k]); });
+  DOC_MONEY_FIELDS.forEach((k) => { out[k] = toMoneyInput(d?.[k]); });
+  return out;
 }
 
 const sameCity = (place, endereco) => (place?.cidade || '').trim().toUpperCase() === (endereco?.cidade || '').trim().toUpperCase()
@@ -121,6 +162,8 @@ function toForm(doc, settings) {
     remetente: party(doc.remetente),
     destinatario: party(doc.destinatario),
     tomador: party(doc.tomador),
+    expedidor: party(doc.expedidor),
+    recebedor: party(doc.recebedor),
     percurso_auto: (!origem.cidade && !destino.cidade)
       || (sameCity(origem, doc.remetente?.endereco) && sameCity(destino, doc.destinatario?.endereco)),
     origem,
@@ -132,7 +175,7 @@ function toForm(doc, settings) {
     valor_carga: toMoneyInput(doc.valor_carga),
     componentes: (doc.componentes || []).map((c) => ({ ...c, valor: toMoneyInput(c.valor) })),
     quantidades: (doc.quantidades?.length ? doc.quantidades : base.quantidades).map((q) => ({ ...q, quantidade: toInput(q.quantidade) })),
-    documentos: (doc.documentos?.length ? doc.documentos : base.documentos).map((d) => ({ ...base.documentos[0], ...d, valor: toMoneyInput(d.valor) })),
+    documentos: (doc.documentos || []).map(docToForm),
     containers: doc.containers || [],
     observacoes: doc.observacoes || '',
     motorista: { ...emptyDriver(), ...(doc.motorista || {}), cpf: doc.motorista?.cpf ? formatCnpjCpf(doc.motorista.cpf) : '' },
@@ -153,7 +196,7 @@ const placeOf = (party) => {
   const e = party?.endereco || {};
   return { cidade: e.cidade || '', uf: e.uf || '', codigo_municipio: e.codigo_municipio || null };
 };
-const payerOf = (f) => ({ 0: f.remetente, 3: f.destinatario, 4: f.tomador })[f.tomador_papel];
+const payerOf = (f) => ({ 0: f.remetente, 1: f.expedidor, 2: f.recebedor, 3: f.destinatario, 4: f.tomador })[f.tomador_papel];
 
 /**
  * Preenchimentos automáticos a cada alteração do formulário: percurso pelos
@@ -192,13 +235,14 @@ function mergeXml(current, items, { settings, clients }) {
     // tipo/chave/numero são do CT-e de origem, não do novo
     const { tipo, chave, numero, nfes: keys, ...c } = ctes[0];
     if (ctes.length > 1) warnings.push(`Mais de um CT-e no arquivo: usado o nº ${numero || '-'}`);
-    if (!['0', '3', '4'].includes(c.tomador_papel)) warnings.push('Tomador do CT-e original era expedidor/recebedor: confira o pagador do frete');
     const doc = toForm({
       ...c,
-      tomador_papel: ['0', '3', '4'].includes(c.tomador_papel) ? c.tomador_papel : '0',
+      tomador_papel: ['0', '1', '2', '3', '4'].includes(c.tomador_papel) ? c.tomador_papel : '0',
       remetente: byCnpj(c.remetente),
       destinatario: byCnpj(c.destinatario),
       tomador: c.tomador ? byCnpj(c.tomador) : null,
+      expedidor: c.expedidor ? byCnpj(c.expedidor) : null,
+      recebedor: c.recebedor ? byCnpj(c.recebedor) : null,
       cfop: c.cfop || current.cfop,
       icms_cst: c.icms_cst || current.icms_cst,
       componentes: c.componentes.filter((x) => x.nome),
@@ -221,32 +265,24 @@ function mergeXml(current, items, { settings, clients }) {
     const others = fresh.filter((n) => onlyDigits(n.remetente?.cnpj_cpf) !== onlyDigits(ref.remetente?.cnpj_cpf)
       || onlyDigits(n.destinatario?.cnpj_cpf) !== onlyDigits(ref.destinatario?.cnpj_cpf));
     if (others.length) warnings.push(`${others.length} NF-e com remetente ou destinatário diferente da primeira`);
-    const peso = fresh.reduce((sum, n) => sum + n.peso_bruto, 0);
-    const valor = fresh.reduce((sum, n) => sum + n.valor, 0);
-    let quantidades = f.quantidades;
-    if (peso > 0) {
-      const i = quantidades.findIndex((q) => q.unidade === '01');
-      const add = (q) => ({ ...q, quantidade: toInput(Math.round(((toNumber(q.quantidade) || 0) + peso) * 1000) / 1000) });
-      quantidades = i >= 0
-        ? quantidades.map((q, j) => (j === i ? add(q) : q))
-        : [...quantidades, add({ unidade: '01', tipo_medida: 'PESO BRUTO', quantidade: '' })];
-    }
+    // Peso, volumes e valor de cada nota vão na própria linha da grade (somam no infCarga)
+    const fromNfe = (n) => docToForm({
+      tipo: 'NFE', chave: n.chave, numero: n.numero, serie: n.serie, data_emissao: n.data_emissao,
+      natureza_carga: (n.produto || '').slice(0, 60).toUpperCase(), cfop: n.cfop,
+      peso: n.peso_bruto || null, quantidade: n.quantidade || null, especie: n.especie, marca: n.marca,
+      valor_produtos: n.valor_produtos, icms_base_calculo: n.icms_base_calculo, icms_valor: n.icms_valor,
+      icms_st_base_calculo: n.icms_st_base_calculo, icms_st_valor: n.icms_st_valor, valor: n.valor,
+    });
     f = {
       ...f,
       remetente: blank(f.remetente) && ref.remetente ? byCnpj(ref.remetente) : f.remetente,
       destinatario: blank(f.destinatario) && ref.destinatario ? byCnpj(ref.destinatario) : f.destinatario,
       // Modalidade do frete na nota: 0 = por conta do remetente, 1 = do destinatário
       tomador_papel: newParties && ({ 0: '0', 1: '3' })[ref.mod_frete] ? ({ 0: '0', 1: '3' })[ref.mod_frete] : f.tomador_papel,
-      documentos: [
-        ...f.documentos.filter((d) => (d.tipo === 'NFE' ? onlyDigits(d.chave) : (d.descricao || d.numero))),
-        ...fresh.map((n) => ({ ...buildEmpty().documentos[0], chave: n.chave })),
-      ],
-      valor_carga: toMoneyInput((toNumber(f.valor_carga) || 0) + valor),
-      quantidades,
+      documentos: [...f.documentos.filter(docFilled), ...fresh.map(fromNfe)],
       produto_predominante: (f.produto_predominante || '').trim() || (ref.produto || '').slice(0, 60).toUpperCase(),
     };
   }
-  if (!f.documentos.length) f = { ...f, documentos: buildEmpty().documentos };
   return { form: f, ctes: ctes.length ? 1 : 0, nfes: fresh.length, warnings };
 }
 
@@ -266,6 +302,26 @@ function cnpjCpfOk(value) {
   return dv(d.slice(0, 12), w1) === Number(d[12]) && dv(d.slice(0, 13), [6, ...w1]) === Number(d[13]);
 }
 
+/** Regras de um documento da grade (as mesmas do backend). */
+function docDialogIssues(d) {
+  const issues = [];
+  if (d.tipo === 'NFE') {
+    if (!accessKeyOk(d.chave, '55')) issues.push('chave de acesso inválida (44 dígitos, confira o dígito verificador)');
+  } else if (d.tipo === 'NF') {
+    if (!(d.numero || '').trim()) issues.push('informe o número da NF');
+    if (!(d.serie || '').trim()) issues.push('informe a série da NF');
+    if (!d.data_emissao) issues.push('informe a data de emissão');
+    if (!/^\d{4}$/.test(onlyDigits(d.cfop))) issues.push('informe o CFOP da NF (4 dígitos)');
+    if (!(toNumber(d.valor) > 0)) issues.push('informe o valor do documento');
+  } else {
+    if ((d.tipo_outros || '99') === '99' && !(d.descricao || '').trim()) issues.push('informe a descrição');
+    if (!(d.numero || '').trim() && !(d.descricao || '').trim()) issues.push('informe o número ou a descrição');
+  }
+  const pin = (d.pin_suframa || '').trim();
+  if (pin && (pin.length < 2 || pin.length > 9)) issues.push('PIN SUFRAMA deve ter de 2 a 9 caracteres');
+  return issues;
+}
+
 /** Conferência local antes de transmitir (as mesmas regras do backend, sem ir à Sefaz). */
 function validateCte(f, settings) {
   const issues = [];
@@ -278,6 +334,10 @@ function validateCte(f, settings) {
 
   const parties = [['Remetente', f.remetente], ['Destinatário', f.destinatario]];
   if (f.tomador_papel === '4') parties.push(['Tomador', f.tomador]);
+  // Expedidor e recebedor: opcionais; obrigatórios quando são o tomador
+  [['1', 'Expedidor', f.expedidor], ['2', 'Recebedor', f.recebedor]].forEach(([code, label, p]) => {
+    if (f.tomador_papel === code || partyFilled(p)) parties.push([label, p]);
+  });
   parties.forEach(([label, p]) => {
     const e = p?.endereco || {};
     if ((p?.nome || '').trim().length < 2) add('envolvidos', `${label}: informe o nome / razão social`);
@@ -291,22 +351,20 @@ function validateCte(f, settings) {
     if ((p?.cidade || '').trim().length < 2 || !p?.uf) add('envolvidos', `${label}: informe a cidade e a UF`);
   });
 
-  if (!(f.produto_predominante || '').trim()) add('carga', 'Informe o produto predominante');
-  if (!f.quantidades.some((q) => toNumber(q.quantidade) > 0)) add('carga', 'Informe ao menos uma quantidade da carga (ex.: peso bruto)');
+  const natureza = f.documentos.find((d) => docFilled(d) && (d.natureza_carga || '').trim());
+  if (!(f.produto_predominante || '').trim() && !natureza) add('carga', 'Informe o produto predominante (ou a natureza da carga nos documentos)');
+  const fromDocs = quantitiesFromDocs(f.documentos);
+  if (!fromDocs.length && !f.quantidades.some((q) => toNumber(q.quantidade) > 0)) {
+    add('carga', 'Informe ao menos uma quantidade da carga (peso nos documentos ou nas quantidades)');
+  }
   const keys = [];
-  let docs = 0;
-  f.documentos.forEach((d, i) => {
-    if (d.tipo === 'NFE' && onlyDigits(d.chave)) {
-      docs += 1;
-      keys.push(onlyDigits(d.chave));
-      if (!accessKeyOk(d.chave, '55')) add('documentos', `NF-e ${i + 1}: chave inválida (44 dígitos, confira o dígito verificador)`);
-    }
-    if (d.tipo === 'OUTROS' && (d.descricao || d.numero)) {
-      docs += 1;
-      if (d.tipo_outros === '99' && !(d.descricao || '').trim()) add('documentos', `Documento ${i + 1}: informe a descrição`);
-    }
+  const docs = f.documentos.filter(docFilled);
+  docs.forEach((d, idx) => {
+    const n = idx + 1;
+    docDialogIssues(d).forEach((msg) => add('documentos', `Documento ${n} (${DOC_TYPE_SHORT[d.tipo]}): ${msg}`));
+    if (d.tipo === 'NFE') keys.push(onlyDigits(d.chave));
   });
-  if (!docs) add('documentos', 'Informe ao menos um documento transportado (chave da NF-e ou outro documento)');
+  if (!docs.length) add('documentos', 'Informe ao menos um documento transportado (NF-e, NF modelo 1/1A ou outro documento)');
   if (new Set(keys).size !== keys.length) add('documentos', 'A mesma chave de NF-e aparece mais de uma vez');
 
   const total = toNumber(f.valor_total) || 0;
@@ -345,6 +403,8 @@ function toPayload(form) {
     remetente: party(form.remetente),
     destinatario: party(form.destinatario),
     tomador: papel === 4 ? party(form.tomador) : null,
+    expedidor: papel === 1 || partyFilled(form.expedidor) ? party(form.expedidor) : null,
+    recebedor: papel === 2 || partyFilled(form.recebedor) ? party(form.recebedor) : null,
     origem: form.origem,
     destino: form.destino,
     valor_total: toNumber(form.valor_total),
@@ -356,17 +416,23 @@ function toPayload(form) {
     produto_predominante: (form.produto_predominante || '').trim(),
     outras_caracteristicas: (form.outras_caracteristicas || '').trim() || null,
     quantidades: form.quantidades.filter((q) => toNumber(q.quantidade)).map((q) => ({ ...q, quantidade: toNumber(q.quantidade) })),
-    documentos: form.documentos
-      .filter((d) => (d.tipo === 'NFE' ? (d.chave || '').replace(/\D/g, '') : (d.descricao || d.numero)))
-      .map((d) => ({
+    documentos: form.documentos.filter(docFilled).map((d) => {
+      const text = (v) => (v || '').trim() || null;
+      const out = {
         tipo: d.tipo,
-        chave: d.tipo === 'NFE' ? (d.chave || '').replace(/\D/g, '') : null,
+        chave: d.tipo === 'NFE' ? onlyDigits(d.chave) : null,
         tipo_outros: d.tipo === 'OUTROS' ? (d.tipo_outros || '99') : null,
-        descricao: d.tipo === 'OUTROS' ? (d.descricao || '').trim() || null : null,
-        numero: d.tipo === 'OUTROS' ? (d.numero || '').trim() || null : null,
-        data_emissao: d.tipo === 'OUTROS' ? d.data_emissao || null : null,
-        valor: d.tipo === 'OUTROS' ? toNumber(d.valor) : null,
-      })),
+        descricao: d.tipo === 'OUTROS' ? text(d.descricao) : null,
+        numero: text(d.numero), serie: text(d.serie),
+        data_emissao: d.data_emissao || null, data_prevista: d.data_prevista || null,
+        natureza_carga: text(d.natureza_carga) && d.natureza_carga.trim().toUpperCase(),
+        cfop: onlyDigits(d.cfop) || null, pin_suframa: text(d.pin_suframa),
+        especie: text(d.especie), marca: text(d.marca),
+      };
+      DOC_QTY_FIELDS.forEach((k) => { const n = toNumber(d[k]); out[k] = n === null ? null : Math.round(n * 10000) / 10000; });
+      DOC_MONEY_FIELDS.forEach((k) => { const n = toNumber(d[k]); out[k] = n === null ? null : Math.round(n * 100) / 100; });
+      return out;
+    }),
     containers: form.containers.filter((c) => (c.numero || '').trim()).map((c) => ({ numero: c.numero.trim().toUpperCase(), lacre: (c.lacre || '').trim() || null })),
     observacoes: (form.observacoes || '').trim() || null,
     motorista: (form.motorista?.nome || '').trim()
@@ -394,7 +460,7 @@ function toPayload(form) {
  * digitado); endereço e contato ficam recolhidos e só abrem sozinhos quando
  * o endereço está incompleto.
  */
-function PartyFields({ title, value, onChange, clients, onClientCreated, testId }) {
+function PartyFields({ title, value, onChange, clients, onClientCreated, testId, required = true, note }) {
   const [open, setOpen] = useState(null);
   const v = value || emptyParty();
   const e = v.endereco || {};
@@ -404,6 +470,7 @@ function PartyFields({ title, value, onChange, clients, onClientCreated, testId 
     onChange({
       client_id: client.id,
       nome: client.name || '',
+      nome_fantasia: client.trade_name || '',
       cnpj_cpf: client.cnpj ? formatCnpjCpf(client.cnpj) : '',
       ie: client.state_registration || '',
       fone: client.phone || '',
@@ -418,7 +485,7 @@ function PartyFields({ title, value, onChange, clients, onClientCreated, testId 
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2" data-testid={testId}>
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-        <Field label={title} required className="md:col-span-6">
+        <Field label={title} required={required} hint={note} className="md:col-span-6">
           <WithQuickAdd kind="client" testId={testId ? `${testId}-quick-add` : undefined}
             initial={{ name: v.nome, cnpj: v.cnpj_cpf }}
             onCreated={(client) => { if (onClientCreated) onClientCreated(client); pick(client); }}>
@@ -432,7 +499,7 @@ function PartyFields({ title, value, onChange, clients, onClientCreated, testId 
             />
           </WithQuickAdd>
         </Field>
-        <Field label="CPF/CNPJ" required className="md:col-span-3">
+        <Field label="CPF/CNPJ" required={required} className="md:col-span-3">
           <Input value={v.cnpj_cpf || ''} onChange={(ev) => set('cnpj_cpf', formatCnpjCpf(ev.target.value))} className="font-mono" />
         </Field>
         <Field label="Inscrição Estadual (ou ISENTO)" className="md:col-span-3">
@@ -451,10 +518,13 @@ function PartyFields({ title, value, onChange, clients, onClientCreated, testId 
       {expanded && (
         <div className="space-y-3 pt-1">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <Field label="Nome fantasia">
+              <Input value={v.nome_fantasia || ''} maxLength={60} onChange={(ev) => set('nome_fantasia', ev.target.value)} data-testid={testId ? `${testId}-fantasia` : undefined} />
+            </Field>
             <Field label="Telefone">
               <Input value={v.fone || ''} onChange={(ev) => set('fone', ev.target.value)} />
             </Field>
-            <Field label="E-mail" className="md:col-span-3">
+            <Field label="E-mail" className="md:col-span-2">
               <Input value={v.email || ''} onChange={(ev) => set('email', ev.target.value)} />
             </Field>
           </div>
@@ -475,6 +545,160 @@ function RowRemove({ onClick }) {
 
 const Section = (props) => <IssueSection idPrefix="cte" {...props} />;
 
+// Número digitado em pt-BR: só dígitos e uma vírgula, com no máximo `places` casas
+const decimalInput = (raw, places) => {
+  let s = String(raw || '').replace(/[^\d,]/g, '');
+  const i = s.indexOf(',');
+  if (i >= 0) s = s.slice(0, i + 1) + s.slice(i + 1).replace(/,/g, '').slice(0, places);
+  return s;
+};
+const fmtDate = (v) => (v && v.length >= 10 ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : '');
+
+// Campos de cada tipo que vão no XML do CT-e (o resto fica no sistema e no espelho)
+const XML_FIELDS = {
+  NFE: ['chave', 'pin_suframa', 'data_prevista'],
+  NF: ['numero', 'serie', 'data_emissao', 'cfop', 'peso', 'pin_suframa', 'data_prevista', 'valor_produtos',
+    'icms_base_calculo', 'icms_valor', 'icms_st_base_calculo', 'icms_st_valor', 'valor'],
+  OUTROS: ['tipo_outros', 'descricao', 'numero', 'data_emissao', 'valor', 'data_prevista'],
+};
+const CARGO_FIELDS = ['peso', 'quantidade', 'cubagem', 'valor'];  // somam no infCarga
+
+/** Janela de inclusão/edição de um documento originário da carga. */
+function DocumentDialog({ editing, otherKeys, onSave, onClose }) {
+  const [draft, setDraft] = useState(null);
+  const [tried, setTried] = useState(false);
+  useEffect(() => { setDraft(editing ? { ...editing.value } : null); setTried(false); }, [editing]);
+  if (!editing || !draft) return null;
+  const d = draft;
+  const set = (patch) => setDraft((prev) => ({ ...prev, ...patch }));
+  const key = onlyDigits(d.chave);
+  const keyOk = d.tipo === 'NFE' && accessKeyOk(key, '55');
+  const duplicate = d.tipo === 'NFE' && key && otherKeys.includes(key);
+  const issues = [...docDialogIssues(d), ...(duplicate ? ['esta chave de NF-e já está no CT-e'] : [])];
+  const xml = XML_FIELDS[d.tipo] || [];
+  const label = (text, field, required) => (
+    <span className="inline-flex items-center gap-1">
+      {text}{required && ' *'}
+      {xml.includes(field) && <span className="rounded bg-primary/10 px-1 text-[0.625rem] font-semibold text-primary" title="Vai no XML do CT-e">XML</span>}
+      {CARGO_FIELDS.includes(field) && <span className="rounded bg-slate-100 px-1 text-[0.625rem] font-semibold text-slate-500 dark:bg-slate-800" title="Soma nos totais da carga (infCarga)">Σ</span>}
+    </span>
+  );
+  const num = (field, text, places) => (
+    <Field label={label(text, field)}>
+      <Input inputMode="decimal" value={d[field] || ''} className="text-right tabular-nums" data-testid={`cte-doc-${field}`}
+        onChange={(e) => set({ [field]: decimalInput(e.target.value, places) })} />
+    </Field>
+  );
+  const changeKey = (value) => {
+    const k = onlyDigits(value).slice(0, 44);
+    const patch = { chave: k };
+    // Chave válida: número e série saem da própria chave (posições 23-25 e 26-34)
+    if (k.length === 44 && accessKeyOk(k, '55')) {
+      if (!(d.numero || '').trim()) patch.numero = String(Number(k.slice(25, 34)));
+      if (!(d.serie || '').trim()) patch.serie = String(Number(k.slice(22, 25)));
+    }
+    set(patch);
+  };
+  const save = () => {
+    setTried(true);
+    if (!issues.length) onSave({ ...d, chave: d.tipo === 'NFE' ? key : '' });
+  };
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-3xl" data-testid="cte-doc-dialog">
+        <DialogHeader>
+          <DialogTitle>{editing.index === null ? 'Incluir documento' : `Documento ${editing.index + 1}`}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Field label="Tipo *">
+              <Select value={d.tipo} onValueChange={(v) => set({ tipo: v })}>
+                <SelectTrigger data-testid="cte-doc-tipo"><SelectValue /></SelectTrigger>
+                <SelectContent>{DOC_TYPES.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+              </Select>
+            </Field>
+            {d.tipo === 'OUTROS' && (
+              <Field label={label('Tipo do documento', 'tipo_outros', true)}>
+                <Select value={d.tipo_outros || '99'} onValueChange={(v) => set({ tipo_outros: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{OUTROS_TYPES.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
+                </Select>
+              </Field>
+            )}
+            {d.tipo === 'OUTROS' && (
+              <Field label={label('Descrição', 'descricao', (d.tipo_outros || '99') === '99')} className="col-span-2">
+                <Input value={d.descricao || ''} maxLength={100} onChange={(e) => set({ descricao: e.target.value })} data-testid="cte-doc-descricao" />
+              </Field>
+            )}
+          </div>
+          {d.tipo === 'NFE' && (
+            <Field label={label('Chave de acesso NF-e (44 dígitos)', 'chave', true)}
+              hint={!key ? undefined : keyOk ? 'Chave válida' : key.length < 44 ? `${key.length}/44 dígitos` : 'Chave inválida: confira os dígitos'}>
+              <div className="relative">
+                <Input value={d.chave || ''} onChange={(e) => changeKey(e.target.value)} className={`font-mono pr-8 ${key.length === 44 && !keyOk ? 'border-red-400' : ''}`} data-testid="cte-doc-chave" />
+                {keyOk && <CheckCircle2 className="absolute right-2.5 top-2.5 w-4 h-4 text-emerald-600" />}
+                {key.length === 44 && !keyOk && <AlertTriangle className="absolute right-2.5 top-2.5 w-4 h-4 text-red-500" />}
+              </div>
+            </Field>
+          )}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Field label={label(d.tipo === 'NFE' ? 'Nº NF-e' : 'Número', 'numero', d.tipo === 'NF')}>
+              <Input value={d.numero || ''} maxLength={20} onChange={(e) => set({ numero: e.target.value })} data-testid="cte-doc-numero" />
+            </Field>
+            <Field label={label('Série', 'serie', d.tipo === 'NF')}>
+              <Input value={d.serie || ''} maxLength={3} onChange={(e) => set({ serie: e.target.value })} data-testid="cte-doc-serie" />
+            </Field>
+            <Field label={label('Data de emissão', 'data_emissao', d.tipo === 'NF')}>
+              <Input type="date" value={d.data_emissao || ''} onChange={(e) => set({ data_emissao: e.target.value })} data-testid="cte-doc-emissao" />
+            </Field>
+            <Field label={label('Previsão de entrega', 'data_prevista')}>
+              <Input type="date" value={d.data_prevista || ''} onChange={(e) => set({ data_prevista: e.target.value })} />
+            </Field>
+            <Field label={label('Natureza da carga', 'natureza_carga')} className="col-span-2">
+              <Input value={d.natureza_carga || ''} maxLength={60} onChange={(e) => set({ natureza_carga: e.target.value.toUpperCase() })} data-testid="cte-doc-natureza" />
+            </Field>
+            <Field label={label('CFOP', 'cfop', d.tipo === 'NF')}>
+              <Input value={d.cfop || ''} inputMode="numeric" onChange={(e) => set({ cfop: onlyDigits(e.target.value).slice(0, 4) })} data-testid="cte-doc-cfop" />
+            </Field>
+            <Field label={label('PIN SUFRAMA', 'pin_suframa')}>
+              <Input value={d.pin_suframa || ''} maxLength={9} onChange={(e) => set({ pin_suframa: e.target.value.trim() })} />
+            </Field>
+            {num('peso', 'Peso (kg)', 4)}
+            {num('quantidade', 'Quantidade', 4)}
+            <Field label="Espécie">
+              <Input value={d.especie || ''} maxLength={30} onChange={(e) => set({ especie: e.target.value.toUpperCase() })} data-testid="cte-doc-especie" />
+            </Field>
+            <Field label="Marca">
+              <Input value={d.marca || ''} maxLength={30} onChange={(e) => set({ marca: e.target.value.toUpperCase() })} />
+            </Field>
+            {num('cubagem', 'Cubagem (m³)', 4)}
+            {num('valor_produtos', 'Valor do produto', 2)}
+            {num('icms_base_calculo', 'BC de ICMS', 2)}
+            {num('icms_valor', 'Valor do ICMS', 2)}
+            {num('icms_st_base_calculo', 'BC de ICMS-ST', 2)}
+            {num('icms_st_valor', 'Valor ICMS-ST', 2)}
+            {num('valor_outros', 'Outros', 2)}
+            {num('valor', 'Valor do documento', 2)}
+          </div>
+          <p className="text-xs text-slate-500">
+            <span className="rounded bg-primary/10 px-1 font-semibold text-primary">XML</span> vai no XML do CT-e para este tipo de documento ·{' '}
+            <span className="rounded bg-slate-100 px-1 font-semibold dark:bg-slate-800">Σ</span> soma nos totais da carga. Os demais campos ficam no sistema e saem no espelho.
+          </p>
+          {tried && issues.length > 0 && (
+            <ul className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300" data-testid="cte-doc-issues">
+              {issues.map((msg) => <li key={msg}>• {msg}</li>)}
+            </ul>
+          )}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button type="button" onClick={save} data-testid="cte-doc-save"><Save className="w-4 h-4 mr-1.5" /> Salvar documento</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function CtePage() {
   const navigate = useNavigate();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -491,6 +715,8 @@ export default function CtePage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(buildEmpty());
+  // Documento aberto na janela de edição: { index (null = novo), value }
+  const [docEdit, setDocEdit] = useState(null);
   const [formKey, setFormKey] = useState(0);
   const [emitted, setEmitted] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -814,10 +1040,28 @@ export default function CtePage() {
   const total = toNumber(form.valor_total) || 0;
   const icmsRate = ICMS_WITH_RATE.includes(form.icms_cst) ? (toNumber(form.icms_aliquota) || 0) : 0;
   const icmsValue = Math.round(total * icmsRate) / 100;
-  const nfeCount = form.documentos.filter((d) => d.tipo === 'NFE' && onlyDigits(d.chave)).length;
-  const otherDocCount = form.documentos.filter((d) => d.tipo === 'OUTROS' && (d.descricao || d.numero)).length;
+  const filledDocs = form.documentos.filter(docFilled);
+  const docTotals = documentTotals(form.documentos);
+  // Quantidades da grade (KG, UNIDADE, M3) mandam sobre as manuais da mesma unidade
+  const docQuantities = quantitiesFromDocs(form.documentos);
+  const docUnits = new Set(docQuantities.map((q) => q.unidade));
+  const effectiveQuantities = [...docQuantities, ...form.quantidades.filter((q) => !docUnits.has(q.unidade))];
   // Peso bruto total pelas quantidades em KG e TON
-  const pesoKg = form.quantidades.reduce((sum, q) => sum + (toNumber(q.quantidade) || 0) * ({ '01': 1, '02': 1000 }[q.unidade] || 0), 0);
+  // (as da grade já são número; as manuais são texto pt-BR)
+  const qtyValue = (q) => (typeof q.quantidade === 'number' ? q.quantidade : (toNumber(q.quantidade) || 0));
+  const pesoKg = effectiveQuantities.reduce((sum, q) => sum + qtyValue(q) * ({ '01': 1, '02': 1000 }[q.unidade] || 0), 0);
+  const docsSummary = DOC_TYPES.map(([t, l]) => [filledDocs.filter((d) => d.tipo === t).length, t === 'OUTROS' ? 'outro(s)' : l])
+    .filter(([n]) => n).map(([n, l]) => `${n} ${l}`).join(' + ');
+  const saveDocument = (doc) => {
+    const index = docEdit.index;
+    update((prev) => ({
+      ...prev,
+      documentos: index === null ? [...prev.documentos.filter(docFilled), doc] : prev.documentos.map((d, i) => (i === index ? doc : d)),
+      // Sem produto predominante: a natureza da carga do documento
+      produto_predominante: (prev.produto_predominante || '').trim() || (doc.natureza_carga || '').trim(),
+    }));
+    setDocEdit(null);
+  };
   const placeLabel = (p) => (p?.cidade ? `${p.cidade}/${p.uf}` : '-');
   const emitting = busy === 'emit' || busy === 'wait';
 
@@ -1084,6 +1328,13 @@ export default function CtePage() {
                 <Section id="envolvidos" title="Envolvidos" count={issuesIn('envolvidos')}>
                   <PartyFields title="Remetente" value={form.remetente} onChange={(v) => set('remetente', v)} clients={clients} onClientCreated={addClient} testId="cte-remetente" />
                   <PartyFields title="Destinatário" value={form.destinatario} onChange={(v) => set('destinatario', v)} clients={clients} onClientCreated={addClient} testId="cte-destinatario" />
+                  {/* Opcionais (<exped>/<receb>); obrigatórios quando são o pagador do frete */}
+                  <PartyFields title="Expedidor" value={form.expedidor} onChange={(v) => set('expedidor', v)} clients={clients} onClientCreated={addClient}
+                    testId="cte-expedidor" required={form.tomador_papel === '1'}
+                    note={form.tomador_papel === '1' ? 'Pagador do frete' : 'Opcional: quem entrega a carga ao transportador'} />
+                  <PartyFields title="Recebedor" value={form.recebedor} onChange={(v) => set('recebedor', v)} clients={clients} onClientCreated={addClient}
+                    testId="cte-recebedor" required={form.tomador_papel === '2'}
+                    note={form.tomador_papel === '2' ? 'Pagador do frete' : 'Opcional: quem recebe a carga do transportador'} />
                   {form.tomador_papel === '4' && (
                     <PartyFields title="Tomador (outro)" value={form.tomador} onChange={(v) => set('tomador', v)} clients={clients} onClientCreated={addClient} testId="cte-tomador-outros" />
                   )}
@@ -1195,72 +1446,102 @@ export default function CtePage() {
                   </div>
                 </Section>
 
-                <Section id="documentos" title={`Documentos${nfeCount + otherDocCount ? ` (${nfeCount} NF-e${otherDocCount ? ` + ${otherDocCount} outro(s)` : ''})` : ''}`} count={issuesIn('documentos')}
+                <Section id="documentos" title={`Documentos${docsSummary ? ` (${docsSummary})` : ''}`} count={issuesIn('documentos')}
                   actions={(
                     <>
-                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'NFE', chave: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> NF-e</Button>
-                      <Button type="button" variant="outline" size="sm" onClick={() => addRow('documentos', { tipo: 'OUTROS', tipo_outros: '99', descricao: '', numero: '', data_emissao: '', valor: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Outro documento</Button>
+                      {DOC_TYPES.map(([t, l]) => (
+                        <Button key={t} type="button" variant="outline" size="sm" onClick={() => setDocEdit({ index: null, value: emptyDocument(t) })} data-testid={`cte-doc-add-${t}`}>
+                          <Plus className="w-3.5 h-3.5 mr-1" /> {t === 'OUTROS' ? 'Outro documento' : l}
+                        </Button>
+                      ))}
                     </>
                   )}>
-                  {form.documentos.map((d, i) => {
-                    const key = onlyDigits(d.chave);
-                    const keyState = d.tipo !== 'NFE' || !key ? null : accessKeyOk(key, '55') ? 'ok' : key.length < 44 ? 'short' : 'bad';
-                    return (
-                      <div key={i} className="flex gap-2 items-end">
-                        {d.tipo === 'NFE' ? (
-                          <Field label="NF-e - Chave de acesso (44 dígitos)" className="flex-1"
-                            hint={keyState === 'ok' ? `NF-e nº ${Number(key.slice(25, 34))} · série ${Number(key.slice(22, 25))}` : keyState === 'short' ? `${key.length}/44 dígitos` : keyState === 'bad' ? 'Chave inválida: confira os dígitos' : undefined}>
-                            <div className="relative">
-                              <Input value={d.chave || ''} onChange={(e) => setRow('documentos', i, { chave: onlyDigits(e.target.value).slice(0, 44) })}
-                                className={`font-mono pr-8 ${keyState === 'bad' ? 'border-red-400' : ''}`} data-testid={`cte-nfe-${i}`} />
-                              {keyState === 'ok' && <CheckCircle2 className="absolute right-2.5 top-2.5 w-4 h-4 text-emerald-600" />}
-                              {keyState === 'bad' && <AlertTriangle className="absolute right-2.5 top-2.5 w-4 h-4 text-red-500" />}
-                            </div>
-                          </Field>
-                        ) : (
-                          <>
-                            <Field label="Tipo" className="w-36">
-                              <Select value={d.tipo_outros || '99'} onValueChange={(v) => setRow('documentos', i, { tipo_outros: v })}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="99">Outros</SelectItem>
-                                  <SelectItem value="00">Declaração</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </Field>
-                            <Field label="Descrição" className="flex-1">
-                              <Input value={d.descricao || ''} maxLength={100} onChange={(e) => setRow('documentos', i, { descricao: e.target.value })} />
-                            </Field>
-                            <Field label="Número" className="w-32">
-                              <Input value={d.numero || ''} maxLength={20} onChange={(e) => setRow('documentos', i, { numero: e.target.value })} />
-                            </Field>
-                            <Field label="Emissão" className="w-40">
-                              <Input type="date" value={d.data_emissao || ''} onChange={(e) => setRow('documentos', i, { data_emissao: e.target.value })} />
-                            </Field>
-                            <Field label="Valor (R$)" className="w-32">
-                              <Input inputMode="decimal" value={d.valor || ''} onChange={(e) => setRow('documentos', i, { valor: e.target.value.replace(/[^\d,.]/g, '') })} />
-                            </Field>
-                          </>
-                        )}
-                        <RowRemove onClick={() => removeRow('documentos', i)} />
-                      </div>
-                    );
-                  })}
+                  {filledDocs.length === 0 ? (
+                    <p className="text-xs text-slate-500" data-testid="cte-docs-empty">Nenhum documento. Inclua as NF-e (ou importe o XML), as NF modelo 1/1A ou outros documentos da carga.</p>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                      <table className="w-full text-[0.8125rem]" data-testid="cte-docs-grid">
+                        <thead className="bg-slate-50 text-xs text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold">Tipo</th>
+                            <th className="px-3 py-2 text-left font-semibold">Chave / Número</th>
+                            <th className="px-3 py-2 text-left font-semibold">Série</th>
+                            <th className="px-3 py-2 text-left font-semibold">Emissão</th>
+                            <th className="px-3 py-2 text-left font-semibold">Natureza / Espécie</th>
+                            <th className="px-3 py-2 text-right font-semibold">Peso (kg)</th>
+                            <th className="px-3 py-2 text-right font-semibold">Qtd.</th>
+                            <th className="px-3 py-2 text-right font-semibold">m³</th>
+                            <th className="px-3 py-2 text-right font-semibold">Valor (R$)</th>
+                            <th className="px-2 py-2" aria-label="Ações" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {form.documentos.map((d, i) => {
+                            if (!docFilled(d)) return null;
+                            const key = onlyDigits(d.chave);
+                            const problems = docDialogIssues(d);
+                            return (
+                              <tr key={i} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer dark:border-slate-800 dark:hover:bg-slate-800/50"
+                                onClick={() => setDocEdit({ index: i, value: d })} data-testid={`cte-doc-row-${i}`}>
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  {DOC_TYPE_SHORT[d.tipo]}
+                                  {problems.length > 0 && <span title={problems.join('; ')}><AlertTriangle className="inline w-3.5 h-3.5 ml-1 text-amber-500" /></span>}
+                                </td>
+                                <td className="px-3 py-2 font-mono text-xs">
+                                  {d.tipo === 'NFE' ? <span className="whitespace-nowrap">{key}</span> : <span className="font-sans">{[d.numero, d.descricao].filter(Boolean).join(' · ')}</span>}
+                                  {d.tipo === 'NFE' && d.numero && <span className="block font-sans text-slate-500">NF-e nº {d.numero}</span>}
+                                </td>
+                                <td className="px-3 py-2">{d.serie || '-'}</td>
+                                <td className="px-3 py-2 whitespace-nowrap">{fmtDate(d.data_emissao) || '-'}</td>
+                                <td className="px-3 py-2"><div className="max-w-[12rem] truncate" title={[d.natureza_carga, d.especie, d.marca].filter(Boolean).join(' · ')}>{[d.natureza_carga, d.especie].filter(Boolean).join(' · ') || '-'}</div></td>
+                                <td className="px-3 py-2 text-right tabular-nums">{d.peso ? fmtQty(toNumber(d.peso)) : '-'}</td>
+                                <td className="px-3 py-2 text-right tabular-nums">{d.quantidade ? fmtQty(toNumber(d.quantidade)) : '-'}</td>
+                                <td className="px-3 py-2 text-right tabular-nums">{d.cubagem ? fmtQty(toNumber(d.cubagem)) : '-'}</td>
+                                <td className="px-3 py-2 text-right tabular-nums">{d.valor ? fmtMoney(toNumber(d.valor)) : '-'}</td>
+                                <td className="px-2 py-1 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-primary" aria-label="Editar documento"
+                                    onClick={() => setDocEdit({ index: i, value: d })}><Pencil className="w-3.5 h-3.5" /></Button>
+                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" aria-label="Excluir documento"
+                                    onClick={() => removeRow('documentos', i)} data-testid={`cte-doc-remove-${i}`}><Trash2 className="w-3.5 h-3.5" /></Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-200">
+                          <tr data-testid="cte-docs-totals">
+                            <td className="px-3 py-2" colSpan={5}>Totais ({filledDocs.length} documento{filledDocs.length > 1 ? 's' : ''})</td>
+                            <td className="px-3 py-2 text-right tabular-nums">{fmtQty(docTotals.peso)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums">{fmtQty(docTotals.quantidade)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums">{fmtQty(docTotals.cubagem)}</td>
+                            <td className="px-3 py-2 text-right tabular-nums">{fmtMoney(docTotals.valor)}</td>
+                            <td />
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                  <DocumentDialog editing={docEdit} onClose={() => setDocEdit(null)} onSave={saveDocument}
+                    otherKeys={form.documentos.filter((d, i) => d.tipo === 'NFE' && i !== docEdit?.index).map((d) => onlyDigits(d.chave)).filter(Boolean)} />
                 </Section>
 
                 <Section id="carga" title="Totais da carga transportada" count={issuesIn('carga')}>
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-x-6 gap-y-4">
                     <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-4 gap-3 content-start">
                       <Field label="Peso (kg)">
-                        <Input value={pesoKg ? pesoKg.toLocaleString('pt-BR') : '0'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-peso-kg" />
+                        <Input value={pesoKg ? fmtQty(pesoKg) : '0'} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-peso-kg" />
                       </Field>
                       <Field label="Peso (ton)">
                         <Input value={(pesoKg / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 3 })} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" />
                       </Field>
-                      <Field label="Valor total (R$)" className="col-span-2">
-                        <Input inputMode="decimal" value={form.valor_carga} onChange={(e) => set('valor_carga', e.target.value.replace(/[^\d,.]/g, ''))} className="text-right" data-testid="cte-valor-carga" />
+                      <Field label="Valor total (R$)" className="col-span-2" hint={docTotals.valor > 0 ? 'Soma do valor dos documentos' : undefined}>
+                        {docTotals.valor > 0 ? (
+                          <Input value={docTotals.valor.toFixed(2).replace('.', ',')} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-valor-carga" />
+                        ) : (
+                          <Input inputMode="decimal" value={form.valor_carga} onChange={(e) => set('valor_carga', decimalInput(e.target.value, 2))} className="text-right" data-testid="cte-valor-carga" />
+                        )}
                       </Field>
-                      <Field label="Produto predominante" required className="col-span-2">
+                      <Field label="Produto predominante" required className="col-span-2" hint="Em branco: a natureza da carga do primeiro documento">
                         <Input value={form.produto_predominante} onChange={(e) => set('produto_predominante', e.target.value.toUpperCase())} maxLength={60} />
                       </Field>
                       <Field label="Outras características" className="col-span-2">
@@ -1272,8 +1553,17 @@ export default function CtePage() {
                         <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Quantidades <span className="text-red-500">*</span></p>
                         <Button type="button" variant="outline" size="sm" onClick={() => addRow('quantidades', { unidade: '01', tipo_medida: 'PESO BRUTO', quantidade: '' })}><Plus className="w-3.5 h-3.5 mr-1" /> Quantidade</Button>
                       </div>
+                      {docQuantities.map((q) => (
+                        <div key={`doc-${q.unidade}`} className="flex gap-2 items-center" data-testid={`cte-qtd-doc-${q.unidade}`}>
+                          <span className="w-28 text-sm text-slate-600 dark:text-slate-300">{(UNIDADE_OPTIONS.find(([v]) => v === q.unidade) || [])[1]}</span>
+                          <span className="flex-1 min-w-0 text-sm text-slate-600 dark:text-slate-300">{q.tipo_medida} <span className="text-xs text-slate-400">(soma dos documentos)</span></span>
+                          <span className="w-32 text-right text-sm font-medium tabular-nums">{fmtQty(q.quantidade)}</span>
+                          <span className="w-9" />
+                        </div>
+                      ))}
                       {form.quantidades.map((q, i) => (
-                        <div key={i} className="flex gap-2">
+                        <div key={i} className={`flex gap-2 ${docUnits.has(q.unidade) ? 'opacity-50' : ''}`}
+                          title={docUnits.has(q.unidade) ? 'Substituída pela soma dos documentos' : undefined}>
                           <Select value={q.unidade} onValueChange={(v) => setRow('quantidades', i, { unidade: v })}>
                             <SelectTrigger className="w-28" aria-label="Unidade"><SelectValue /></SelectTrigger>
                             <SelectContent>{UNIDADE_OPTIONS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>

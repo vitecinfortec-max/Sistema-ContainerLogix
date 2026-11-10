@@ -333,10 +333,10 @@ def generate_cte_preview_pdf(cte: dict, settings: dict, company: dict = None) ->
     # ---------- Envolvidos ----------
     _party_box(d, X0, y, half, "Remetente", cte.get("remetente"))
     y = _party_box(d, X0 + half, y, half, "Destinatário", cte.get("destinatario"))
-    _party_box(d, X0, y, half, "Expedidor", None)
-    y = _party_box(d, X0 + half, y, half, "Recebedor", None)
+    _party_box(d, X0, y, half, "Expedidor", cte.get("expedidor"))
+    y = _party_box(d, X0 + half, y, half, "Recebedor", cte.get("recebedor"))
 
-    tomador = {0: cte.get("remetente"), 3: cte.get("destinatario"), 4: cte.get("tomador")}.get(papel) or {}
+    tomador = fiscal_cte.payer_of(cte)
     te = tomador.get("endereco") or {}
     th = 32
     d.rect(X0, y, W, th)
@@ -353,12 +353,11 @@ def generate_cte_preview_pdf(cte: dict, settings: dict, company: dict = None) ->
     y += th
 
     # ---------- Carga ----------
-    d.field(X0, y, W * 0.45, 20, "PRODUTO PREDOMINANTE",
-            cte.get("produto_predominante") or settings.get("produto_predominante") or "", size=7.5)
+    d.field(X0, y, W * 0.45, 20, "PRODUTO PREDOMINANTE", fiscal_cte.predominant_product(cte, settings), size=7.5)
     d.field(X0 + W * 0.45, y, W * 0.3, 20, "OUTRAS CARACTERÍSTICAS DA CARGA", cte.get("outras_caracteristicas") or "", size=7.5)
-    d.field(X0 + W * 0.75, y, W * 0.25, 20, "VALOR TOTAL DA MERCADORIA", _num(cte.get("valor_carga")), size=8, bold=True, align="right")
+    d.field(X0 + W * 0.75, y, W * 0.25, 20, "VALOR TOTAL DA MERCADORIA", _num(fiscal_cte.cargo_value(cte)), size=8, bold=True, align="right")
     y += 20
-    quantidades = (cte.get("quantidades") or [])[:4]
+    quantidades = fiscal_cte.cargo_quantities(cte)[:4]
     qw = W / 5
     d.field(X0, y, qw, 20, "QTD CARGA", f"{len(cte.get('containers') or [])} container(s)" if cte.get("containers") else "", size=7)
     for i in range(4):
@@ -405,35 +404,53 @@ def generate_cte_preview_pdf(cte: dict, settings: dict, company: dict = None) ->
 
     # ---------- Documentos originários ----------
     y = d.band(y, "DOCUMENTOS ORIGINÁRIOS")
+    # Uma linha por documento (NF-e, NF 1/1A ou outros) com os dados da grade
+    # do CT-e - inclusive os que não vão no XML (espécie, marca, cubagem) - e
+    # os totais que vão no infCarga.
     dh = 80
-    docs = []
+    cols = [("TP DOC.", 0.06, "left"), ("CHAVE / DESCRIÇÃO", 0.30, "left"), ("SÉRIE/NRO.", 0.10, "left"),
+            ("EMISSÃO", 0.08, "left"), ("ESPÉCIE", 0.08, "left"), ("MARCA", 0.08, "left"),
+            ("PESO (KG)", 0.08, "right"), ("QTD.", 0.06, "right"), ("M³", 0.06, "right"), ("VALOR", 0.10, "right")]
+    rows = []
     for doc in cte.get("documentos") or []:
-        if doc.get("tipo") == "NFE":
-            key = fiscal_cte.only_digits(doc.get("chave"))
-            docs.append(("NFe", key, f"NF: {key[25:34]}" if len(key) == 44 else "", ""))
+        tipo = doc.get("tipo")
+        key = fiscal_cte.only_digits(doc.get("chave"))
+        if tipo == "NFE":
+            label, desc = "NFe", _chave_fmt(key) if len(key) == 44 else key
+            nro = doc.get("numero") or (key[25:34].lstrip("0") if len(key) == 44 else "")
+        elif tipo == "NF":
+            label, desc, nro = "NF 1/1A", doc.get("natureza_carga") or "", doc.get("numero") or ""
         else:
-            docs.append(("Outros", doc.get("descricao") or "", doc.get("numero") or "",
-                         _num(doc["valor"]) if doc.get("valor") else ""))
-    per_col = 6
-    for col in range(2):
-        cx = X0 + half * col
-        d.rect(cx, y, half, dh)
-        d.label(cx, y + 1, "TP DOC.")
-        d.label(cx + 24, y + 1, "CHAVE / CNPJ-CPF EMITENTE / DESCRIÇÃO")
-        d.label(cx + half * 0.70, y + 1, "SÉRIE/NRO.")
-        d.label(cx + half * 0.88, y + 1, "VALOR")
-        for row in range(per_col):
-            idx = col * per_col + row
-            if idx >= len(docs):
-                break
-            tp, desc, nro, val = docs[idx]
-            ry = y + 10 + row * 10
-            d.text(cx, ry, 26, tp, size=6.3)
-            d.text(cx + 22, ry, half * 0.70 - 22, desc, size=6.3)
-            d.text(cx + half * 0.70, ry, half * 0.16, nro, size=6.3)
-            d.text(cx + half * 0.86, ry, half * 0.14, val, size=6.3, align="right")
-    if len(docs) > 2 * per_col:
-        d.text(X0, y + dh - 9, W, f"+ {len(docs) - 2 * per_col} documento(s) não exibido(s) no espelho", size=6, align="right")
+            label, desc, nro = "Outros", doc.get("descricao") or "", doc.get("numero") or ""
+        serie = doc.get("serie") or ""
+        emissao = doc.get("data_emissao") or ""
+        if len(emissao) >= 10:
+            emissao = f"{emissao[8:10]}/{emissao[5:7]}/{emissao[:4]}"
+        rows.append([label, desc, f"{serie}/{nro}" if serie and nro else (nro or serie), emissao,
+                     doc.get("especie") or "", doc.get("marca") or "",
+                     _qty(doc["peso"]) if doc.get("peso") else "", _qty(doc["quantidade"]) if doc.get("quantidade") else "",
+                     _qty(doc["cubagem"]) if doc.get("cubagem") else "", _num(doc["valor"]) if doc.get("valor") else ""])
+    d.rect(X0, y, W, dh)
+    max_rows = 6
+    cx = X0
+    for i, (label, frac, align) in enumerate(cols):
+        cw = W * frac
+        d.label(cx, y + 1, label)
+        for r, row in enumerate(rows[:max_rows]):
+            d.text(cx, y + 9 + r * 9, cw, row[i], size=6, align=align)
+        cx += cw
+    totals = fiscal_cte.document_totals(cte)
+    if rows:
+        ty = y + dh - 11
+        c.setLineWidth(0.4)
+        c.line(X0, PAGE_H - ty, X0 + W, PAGE_H - ty)
+        extra = f"+ {len(rows) - max_rows} documento(s) não exibido(s) · " if len(rows) > max_rows else ""
+        d.text(X0, ty + 1.5, W * 0.70, f"{extra}TOTAIS ({len(rows)} documento(s))", size=6, bold=True, align="right")
+        tx = X0 + W * 0.70
+        for key, frac, fmt in (("peso", 0.08, _qty), ("quantidade", 0.06, _qty), ("cubagem", 0.06, _qty),
+                               ("valor", 0.10, _num)):
+            d.text(tx, ty + 1.5, W * frac, fmt(totals[key]) if totals[key] else "", size=6, bold=True, align="right")
+            tx += W * frac
     y += dh
 
     # ---------- Observações (como vão no CT-e) ----------

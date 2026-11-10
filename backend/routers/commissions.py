@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 from models import (CommissionAdvanceCreate, CommissionBatchCreate, CommissionEntryCreate, CommissionFromCtesRequest,
                     CommissionPayRequest)
 from reports import BRT_TZ, format_currency, generate_commission_statement_pdf
+from fiscal_cte import payer_of  # quem paga o frete do CT-e (tomador_papel)
 from shared import db, get_company_settings, get_current_active_user, round_money
 
 api_router = APIRouter(prefix="/api")
@@ -22,9 +23,6 @@ DOCUMENT_TYPES = {"CTE": "CT-e", "NF": "Nota fiscal", "FATURA": "Fatura", "OUTRO
 STATUSES = {"PENDENTE", "PAGO"}
 # Adiantamento: a descontar até entrar na baixa de um pagamento
 ADVANCE_STATUS = {"PENDENTE": "PENDENTE", "PAGO": "DESCONTADO"}
-# Quem paga o frete do CT-e (tomador_papel) e onde está o cadastro dele
-CTE_PAYER = {0: "remetente", 3: "destinatario", 4: "tomador"}
-
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -203,7 +201,7 @@ async def commission_cte_candidates(start_date: Optional[str] = None, end_date: 
         day = _cte_day(cte)
         if (start and day < start) or (end and day > end):
             continue
-        payer = cte.get(CTE_PAYER.get(int(cte.get("tomador_papel") or 0), "remetente")) or {}
+        payer = payer_of(cte)
         client = by_id.get(payer.get("client_id")) or by_doc.get(_digits(payer.get("cnpj_cpf")))
         link = links.get(client["id"]) if client else None
         out.append({

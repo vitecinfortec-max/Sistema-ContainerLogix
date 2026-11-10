@@ -41,17 +41,32 @@ function parseNfe(doc) {
   const inf = first(doc, 'infNFe');
   const chave = text(doc, 'chNFe') || (inf?.getAttribute('Id') || '').replace(/^NFe/, '');
   const transp = first(inf, 'transp');
+  const ide = first(inf, 'ide');
+  const tot = first(inf, 'ICMSTot');
+  const vols = all(transp, 'vol');
+  const firstProd = first(first(inf, 'det'), 'prod');
   return {
     tipo: 'NFE',
     chave,
-    numero: text(first(inf, 'ide'), 'nNF'),
+    numero: text(ide, 'nNF'),
+    serie: text(ide, 'serie'),
+    data_emissao: (text(ide, 'dhEmi') || text(ide, 'dEmi')).slice(0, 10),
     remetente: party(first(inf, 'emit'), 'enderEmit'),
     destinatario: party(first(inf, 'dest'), 'enderDest'),
     // 0 = frete por conta do emitente (remetente), 1 = do destinatário
     mod_frete: text(transp, 'modFrete'),
-    valor: num(text(first(inf, 'ICMSTot'), 'vNF')),
-    peso_bruto: all(transp, 'vol').reduce((sum, v) => sum + num(text(v, 'pesoB')), 0),
-    produto: text(first(first(inf, 'det'), 'prod'), 'xProd'),
+    valor: num(text(tot, 'vNF')),
+    valor_produtos: num(text(tot, 'vProd')),
+    icms_base_calculo: num(text(tot, 'vBC')),
+    icms_valor: num(text(tot, 'vICMS')),
+    icms_st_base_calculo: num(text(tot, 'vBCST')),
+    icms_st_valor: num(text(tot, 'vST')),
+    cfop: text(firstProd, 'CFOP'),
+    peso_bruto: vols.reduce((sum, v) => sum + num(text(v, 'pesoB')), 0),
+    quantidade: vols.reduce((sum, v) => sum + num(text(v, 'qVol')), 0),
+    especie: text(vols[0], 'esp'),
+    marca: text(vols[0], 'marca'),
+    produto: text(firstProd, 'xProd'),
   };
 }
 
@@ -71,6 +86,8 @@ function parseCte(doc) {
     remetente: party(first(inf, 'rem'), 'enderReme'),
     destinatario: party(first(inf, 'dest'), 'enderDest'),
     tomador: first(ide, 'toma4') ? party(first(ide, 'toma4'), 'enderToma') : null,
+    expedidor: party(first(inf, 'exped'), 'enderExped'),
+    recebedor: party(first(inf, 'receb'), 'enderReceb'),
     origem: { cidade: text(ide, 'xMunIni'), uf: text(ide, 'UFIni'), codigo_municipio: text(ide, 'cMunIni') || null },
     destino: { cidade: text(ide, 'xMunFim'), uf: text(ide, 'UFFim'), codigo_municipio: text(ide, 'cMunFim') || null },
     valor_total: num(text(first(inf, 'vPrest'), 'vTPrest')),

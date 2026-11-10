@@ -85,6 +85,10 @@ def provider(monkeypatch, api):
     return fake
 
 
+# Chave de NF-e válida: modelo 55 e dígito verificador certo (módulo 11)
+NFE_KEY = "23261111222333000181550010001553091123456781"  # modelo 55
+
+
 SETTINGS = {
     "ambiente": "homologacao", "cnpj": "11.222.333/0001-81", "ie": "06.123.456-7", "razao_social": "Empresa Teste Ltda",
     "email": "fiscal@teste.local", "crt": 3, "rntrc": "12345678", "cte_serie": 1,
@@ -108,7 +112,7 @@ def _cte_body(**extra):
         "destino": {"cidade": "Fortaleza", "uf": "CE"},
         "valor_total": 1500.0, "componentes": [{"nome": "FRETE", "valor": 1500.0}],
         "quantidades": [{"unidade": "01", "tipo_medida": "PESO BRUTO", "quantidade": 25000}],
-        "documentos": [{"tipo": "NFE", "chave": "2" * 44}],
+        "documentos": [{"tipo": "NFE", "chave": NFE_KEY}],
         "containers": [{"numero": "MSCU1234565", "lacre": "L123"}],
     }
     body.update(extra)
@@ -468,7 +472,7 @@ def test_payload_fields_exist_in_focus_documentation():
                             endereco={**SETTINGS["endereco"], "codigo_municipio": "2304400", "complemento": "Sala 1"})
     for papel in (0, 3, 4):
         for cst in ("00", "41", "51", "60", "90", "SN"):
-            for doc in ({"tipo": "NFE", "chave": "2" * 44},
+            for doc in ({"tipo": "NFE", "chave": NFE_KEY},
                         {"tipo": "OUTROS", "tipo_outros": "99", "descricao": "Container vazio", "numero": "7",
                          "data_emissao": "2026-10-26", "valor": 10}):
                 body = _full_body(tomador_papel=papel, icms_cst=cst, icms_aliquota=12, documentos=[doc])

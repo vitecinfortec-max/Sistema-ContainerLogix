@@ -19,6 +19,17 @@ UF_CODES = {
 }
 
 TOMADOR_LABELS = {0: "Remetente", 1: "Expedidor", 2: "Recebedor", 3: "Destinatário", 4: "Outros"}
+# Onde fica, no CT-e, o cadastro de quem paga o frete (tomador_papel)
+TOMADOR_KEYS = {0: "remetente", 1: "expedidor", 2: "recebedor", 3: "destinatario", 4: "tomador"}
+
+
+def payer_of(cte: dict) -> dict:
+    """Participante tomador do serviço (quem paga o frete)."""
+    try:
+        papel = int(cte.get("tomador_papel") or 0)
+    except (TypeError, ValueError):
+        papel = 0
+    return cte.get(TOMADOR_KEYS.get(papel, "remetente")) or {}
 
 # Status da Focus NFe -> status do CT-e no sistema
 PROVIDER_STATUS = {
@@ -57,6 +68,62 @@ def _first_email(value):
     return None
 
 
+def access_key_ok(key, modelo: str = None) -> bool:
+    """Chave de acesso de 44 dígitos com o dígito verificador (módulo 11) e,
+    se informado, o modelo do documento (posições 21-22; NF-e = 55)."""
+    digits = only_digits(key)
+    if len(digits) != 44 or (modelo and digits[20:22] != modelo):
+        return False
+    total, weight = 0, 2
+    for d in reversed(digits[:43]):
+        total += int(d) * weight
+        weight = 2 if weight == 9 else weight + 1
+    rest = total % 11
+    return int(digits[43]) == (0 if rest < 2 else 11 - rest)
+
+
+def _filled(party: dict) -> bool:
+    party = party or {}
+    return bool(_text(party.get("nome")) or only_digits(party.get("cnpj_cpf")))
+
+
+# Quantidades da carga (infQ) que a grade de documentos soma
+DOC_QUANTITIES = (("peso", "01", "PESO BRUTO", "Peso"), ("quantidade", "03", "UNIDADE", "Quantidade"),
+                  ("cubagem", "00", "CUBAGEM", "Cubagem"))
+
+
+def document_totals(cte: dict) -> dict:
+    """Totais da grade de documentos: peso (kg), quantidade, cubagem (m³) e valor."""
+    totals = {"peso": 0.0, "quantidade": 0.0, "cubagem": 0.0, "valor": 0.0}
+    for doc in cte.get("documentos") or []:
+        for key in totals:
+            totals[key] += float(doc.get(key) or 0)
+    return {k: round(v, 4 if k != "valor" else 2) for k, v in totals.items()}
+
+
+def cargo_quantities(cte: dict) -> list:
+    """infQ: as somas da grade (KG, UNIDADE, M3) substituem as linhas manuais
+    da mesma unidade; as outras unidades (TON, LITROS...) seguem como estão."""
+    totals = document_totals(cte)
+    from_docs = [{"unidade": unit, "tipo_medida": label, "quantidade": totals[key]}
+                 for key, unit, label, _ in DOC_QUANTITIES if totals[key] > 0]
+    replaced = {q["unidade"] for q in from_docs}
+    manual = [q for q in cte.get("quantidades") or [] if str(q.get("unidade") or "01").zfill(2) not in replaced]
+    return from_docs + manual
+
+
+def cargo_value(cte: dict):
+    """vCarga: soma do valor dos documentos; sem valores na grade, o informado à mão."""
+    total = document_totals(cte)["valor"]
+    return total if total > 0 else cte.get("valor_carga")
+
+
+def predominant_product(cte: dict, settings: dict) -> str:
+    """proPred: o informado no CT-e, senão a natureza da carga do primeiro documento."""
+    natureza = next((_text(d.get("natureza_carga")) for d in cte.get("documentos") or [] if _text(d.get("natureza_carga"))), "")
+    return _text(cte.get("produto_predominante")) or natureza or _text(settings.get("produto_predominante"))
+
+
 def _municipality_ok(code, uf) -> bool:
     code = only_digits(code)
     return len(code) == 7 and UF_CODES.get((uf or "").upper()) == int(code[:2])
@@ -91,8 +158,10 @@ def validate(cte: dict, settings: dict) -> list:
     parties = [("Remetente", "remetente"), ("Destinatário", "destinatario")]
     if papel == 4:
         parties.append(("Tomador", "tomador"))
-    elif papel in (1, 2):
-        errors.append("Tomador Expedidor/Recebedor ainda não é suportado: use Remetente, Destinatário ou Outros")
+    # Expedidor e recebedor são opcionais; obrigatórios quando são o tomador
+    for code, label, key in ((1, "Expedidor", "expedidor"), (2, "Recebedor", "recebedor")):
+        if papel == code or _filled(cte.get(key)):
+            parties.append((label, key))
     for label, key in parties:
         party = cte.get(key) or {}
         if len(_text(party.get("nome"))) < 2:
@@ -138,11 +207,12 @@ def validate(cte: dict, settings: dict) -> list:
     if (ibs_cst or ibs_class) and not (re.fullmatch(r"\d{3}", ibs_cst) and re.fullmatch(r"\d{6}", ibs_class)):
         errors.append("Configuração Fiscal: IBS/CBS exige CST (3 dígitos) e Classificação Tributária (6 dígitos)")
 
-    if not _text(cte.get("produto_predominante") or settings.get("produto_predominante")):
-        errors.append("Informe o Produto Predominante da carga")
-    if not cte.get("quantidades"):
+    if not predominant_product(cte, settings):
+        errors.append("Informe o Produto Predominante da carga (ou a natureza da carga nos documentos)")
+    quantidades = cargo_quantities(cte)
+    if not quantidades:
         errors.append("Informe ao menos uma quantidade da carga (ex.: peso bruto)")
-    for q in cte.get("quantidades") or []:
+    for q in quantidades:
         if float(q.get("quantidade") or 0) <= 0:
             errors.append("Quantidade da carga deve ser maior que zero")
             break
@@ -150,11 +220,32 @@ def validate(cte: dict, settings: dict) -> list:
     documentos = cte.get("documentos") or []
     if not documentos:
         errors.append("Informe ao menos um documento transportado (chave da NF-e ou outro documento)")
-    for doc in documentos:
-        if doc.get("tipo") == "NFE" and len(only_digits(doc.get("chave"))) != 44:
-            errors.append("Chave de NF-e deve ter 44 dígitos")
-        if doc.get("tipo") == "OUTROS" and not _text(doc.get("descricao")) and doc.get("tipo_outros", "99") == "99":
-            errors.append("Outro documento: informe a descrição")
+    keys = []
+    for i, doc in enumerate(documentos, start=1):
+        tipo = doc.get("tipo")
+        if tipo == "NFE":
+            key = only_digits(doc.get("chave"))
+            if not access_key_ok(key, "55"):
+                errors.append(f"Documento {i}: chave de NF-e inválida (44 dígitos, confira o dígito verificador)")
+            keys.append(key)
+        elif tipo == "NF":
+            if not _text(doc.get("numero")):
+                errors.append(f"Documento {i}: informe o número da NF")
+            if not _text(doc.get("serie")):
+                errors.append(f"Documento {i}: informe a série da NF")
+            if not doc.get("data_emissao"):
+                errors.append(f"Documento {i}: informe a data de emissão da NF")
+            if not re.fullmatch(r"\d{4}", only_digits(doc.get("cfop"))):
+                errors.append(f"Documento {i}: informe o CFOP da NF (4 dígitos)")
+            if _money(doc.get("valor")) <= 0:
+                errors.append(f"Documento {i}: informe o valor da NF")
+        elif tipo == "OUTROS" and not _text(doc.get("descricao")) and doc.get("tipo_outros", "99") == "99":
+            errors.append(f"Documento {i}: informe a descrição do outro documento")
+        pin = _text(doc.get("pin_suframa"))
+        if pin and not (2 <= len(pin) <= 9):
+            errors.append(f"Documento {i}: PIN SUFRAMA deve ter de 2 a 9 caracteres")
+    if len(set(keys)) != len(keys):
+        errors.append("A mesma chave de NF-e aparece mais de uma vez")
 
     motorista = cte.get("motorista") or {}
     if only_digits(motorista.get("cpf")) and len(only_digits(motorista.get("cpf"))) != 11:
@@ -222,6 +313,9 @@ def _party(party: dict, suffix: str) -> dict:
     if ie:
         out[f"inscricao_estadual_{suffix}"] = "ISENTO" if ie == "ISENTO" else only_digits(ie)
     out[f"nome_{suffix}"] = _text(party.get("nome"), 60)
+    # xFant só existe no leiaute para o remetente e o tomador "Outros"
+    if suffix in ("remetente", "tomador") and len(_text(party.get("nome_fantasia"))) >= 2:
+        out[f"nome_fantasia_{suffix}"] = _text(party.get("nome_fantasia"), 60)
     fone = only_digits(party.get("fone"))
     if 6 <= len(fone) <= 14:
         out[f"telefone_{suffix}"] = fone
@@ -296,6 +390,62 @@ def _cargo_units(containers: list) -> list:
     return units
 
 
+def _date(value) -> str:
+    return str(value)[:10] if value else ""
+
+
+def _document(doc: dict):
+    """Um documento originário no formato da Focus: (item, grupo). Só vai o
+    que o leiaute 4.00 tem para o tipo; o resto fica no sistema e no espelho.
+      NFE    -> nfes (infNFe): chave, PIN, dPrev
+      NF     -> nfs (infNF, modelo 01 = NF 1/1A): série, número, emissão,
+                bases/valores de ICMS e ST, produtos, total, CFOP, peso, PIN, dPrev
+      OUTROS -> outros_documentos (infOutros): tipo, descrição, número, emissão, valor, dPrev"""
+    tipo = doc.get("tipo")
+    pin = _text(doc.get("pin_suframa"), 9)
+    if tipo == "NFE":
+        item = {"chave_nfe": only_digits(doc.get("chave"))}
+        if pin:
+            item["pin_suframa"] = pin
+        if _date(doc.get("data_prevista")):
+            item["data_prevista"] = _date(doc.get("data_prevista"))
+        return item, "nfes"
+    if tipo == "NF":
+        # No infNF as bases e valores são obrigatórios: sem valor, vai 0,00
+        item = {
+            "modelo": "01",
+            "serie": _text(doc.get("serie"), 3),
+            "numero": _text(doc.get("numero"), 20),
+            "data_emissao": _date(doc.get("data_emissao")),
+            "valor_base_calculo_icms": _dec(doc.get("icms_base_calculo")),
+            "valor_total_icms": _dec(doc.get("icms_valor")),
+            "valor_base_calculo_icms_st": _dec(doc.get("icms_st_base_calculo")),
+            "valor_icms_st": _dec(doc.get("icms_st_valor")),
+            "valor_produtos": _dec(doc.get("valor_produtos")),
+            "valor": _dec(doc.get("valor")),
+            "cfop": only_digits(doc.get("cfop"))[:4],
+        }
+        if float(doc.get("peso") or 0) > 0:
+            item["peso"] = _dec(doc.get("peso"), 3)
+        if pin:
+            item["pin_suframa"] = pin
+        if _date(doc.get("data_prevista")):
+            item["previsao_entrega"] = _date(doc.get("data_prevista"))
+        return item, "nfs"
+    item = {"tipo_documento": str(doc.get("tipo_outros") or "99").zfill(2)}
+    if _text(doc.get("descricao")):
+        item["descricao_documento"] = _text(doc.get("descricao"), 100)
+    if _text(doc.get("numero")):
+        item["numero"] = _text(doc.get("numero"), 100)
+    if _date(doc.get("data_emissao")):
+        item["data_emissao"] = _date(doc.get("data_emissao"))
+    if doc.get("valor") is not None:
+        item["valor"] = _dec(doc.get("valor"))
+    if _date(doc.get("data_prevista")):
+        item["data_prevista"] = _date(doc.get("data_prevista"))
+    return item, "outros_documentos"
+
+
 def emission_datetime(now: datetime = None) -> str:
     now = (now or datetime.now(timezone.utc)).astimezone(BRT)
     return now.strftime("%Y-%m-%dT%H:%M:%S-03:00")
@@ -359,6 +509,10 @@ def build_payload(cte: dict, settings: dict, now: datetime = None) -> dict:
     payload.update(_party(cte.get("destinatario") or {}, "destinatario"))
     if papel == 4:
         payload.update(_party(cte.get("tomador") or {}, "tomador"))
+    # <exped> e <receb>: opcionais, obrigatórios quando são o tomador
+    for code, key in ((1, "expedidor"), (2, "recebedor")):
+        if papel == code or _filled(cte.get(key)):
+            payload.update(_party(cte.get(key) or {}, key))
 
     payload["valor_total"] = _dec(total)
     payload["valor_receber"] = _dec(receber)
@@ -369,40 +523,30 @@ def build_payload(cte: dict, settings: dict, now: datetime = None) -> dict:
     payload.update(_icms(cst, total, aliquota))
     payload.update(_ibs_cbs(settings, total))
 
-    payload["produto_predominante"] = _text(cte.get("produto_predominante") or settings.get("produto_predominante"), 60)
-    if cte.get("valor_carga") is not None:
-        payload["valor_total_carga"] = _dec(cte.get("valor_carga"))
+    # infCarga: produto predominante, valor e quantidades somam a grade de documentos
+    payload["produto_predominante"] = _text(predominant_product(cte, settings), 60)
+    valor_carga = cargo_value(cte)
+    if valor_carga is not None:
+        payload["valor_total_carga"] = _dec(valor_carga)
     if _text(cte.get("outras_caracteristicas")):
         payload["outras_caracteristicas_carga"] = _text(cte.get("outras_caracteristicas"), 40)
     payload["quantidades"] = [{
         "codigo_unidade_medida": str(q.get("unidade") or "01").zfill(2),
         "tipo_medida": _text(q.get("tipo_medida"), 20) or "PESO BRUTO",
         "quantidade": _dec(q.get("quantidade"), 4),
-    } for q in cte.get("quantidades") or []]
+    } for q in cargo_quantities(cte)]
 
     # Containers vão como unidades de carga do primeiro documento transportado
     units = _cargo_units(cte.get("containers"))
-    nfes, outros = [], []
+    groups = {"nfes": [], "nfs": [], "outros_documentos": []}
     for doc in cte.get("documentos") or []:
-        if doc.get("tipo") == "NFE":
-            item, target = {"chave_nfe": only_digits(doc.get("chave"))}, nfes
-        else:
-            item, target = {"tipo_documento": str(doc.get("tipo_outros") or "99").zfill(2)}, outros
-            if _text(doc.get("descricao")):
-                item["descricao_documento"] = _text(doc.get("descricao"), 100)
-            if _text(doc.get("numero")):
-                item["numero"] = _text(doc.get("numero"), 100)
-            if doc.get("data_emissao"):
-                item["data_emissao"] = str(doc["data_emissao"])[:10]
-            if doc.get("valor") is not None:
-                item["valor"] = _dec(doc.get("valor"))
-        if units and not nfes and not outros:
+        item, target = _document(doc)
+        if units and not any(groups.values()):
             item["unidades_carga"] = units
-        target.append(item)
-    if nfes:
-        payload["nfes"] = nfes
-    if outros:
-        payload["outros_documentos"] = outros
+        groups[target].append(item)
+    for target, items in groups.items():
+        if items:
+            payload[target] = items
 
     obs = _text(" | ".join(n for n in [_text(cte.get("observacoes")), *trip_notes(cte)] if n), 2000)
     if obs:
