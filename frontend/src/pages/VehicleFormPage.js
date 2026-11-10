@@ -37,7 +37,7 @@ const buildEmptyVehicleForm = () => ({
   plate: '', renavam: '', chassis: '', model: '', brand: '', year: '', model_year: '', color: '', asset_code: '',
   vehicle_type: '', category: '', load_capacity: '', axle_count: '', body_type: '', fuel_type: '', tank_capacity: '',
   fuel_target_km_l: '', engine_power: '', tare_weight: '', gross_weight: '',
-  crlv_number: '', crlv_expiry: '', licensing_expiry: '', tachograph_expiry: '', inspection_date: '', inspection_expiry: '',
+  crlv_number: '', crlv_expiry: '', licensing_expiry: '', tachograph_expiry: '', inspection_date: '', inspection_expiry: '', insurance_expiry: '',
   owner_type: '', ownership_status: '', transport_company: '', status: 'ATIVO', observations: '', driver_id: '',
   document_attachments: [],
 });
@@ -153,6 +153,7 @@ export default function VehicleFormPage() {
         tachograph_expiry: form.tachograph_expiry || null,
         inspection_date: form.inspection_date || null,
         inspection_expiry: form.inspection_expiry || null,
+        insurance_expiry: form.insurance_expiry || null,
         owner_type: form.owner_type || null,
         ownership_status: form.ownership_status || null,
         transport_company: form.transport_company || null,
@@ -258,6 +259,7 @@ export default function VehicleFormPage() {
                 {T({ name: 'tachograph_expiry', label: 'Vencimento do tacógrafo', type: 'date' })}
                 {T({ name: 'inspection_date', label: 'Data da vistoria', type: 'date' })}
                 {T({ name: 'inspection_expiry', label: 'Validade da vistoria', type: 'date' })}
+                {T({ name: 'insurance_expiry', label: 'Vencimento do seguro', type: 'date' })}
               </div>
               <Field label="Documentos anexados (CRLV...)">
                 <DocumentAttachments value={form.document_attachments} onChange={(v) => onChange('document_attachments', v)} />

@@ -147,7 +147,7 @@ const DEFAULT_SHORTCUT_IDS = [
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [alerts, setAlerts] = useState({ over_30: 0, over_60: 0, over_90: 0, maintenance_due_soon: 0, maintenance_overdue: 0, tank_low: false });
+  const [alerts, setAlerts] = useState({ over_30: 0, over_60: 0, over_90: 0, maintenance_due_soon: 0, maintenance_overdue: 0, tank_low: false, fleet: [] });
   const [userShortcuts, setUserShortcuts] = useState(DEFAULT_SHORTCUT_IDS);
   const [showEditor, setShowEditor] = useState(false);
   const [editorSelection, setEditorSelection] = useState([]);
@@ -193,6 +193,7 @@ export default function DashboardPage() {
         maintenance_due_soon: response.data.maintenance_due_soon || 0,
         maintenance_overdue: response.data.maintenance_overdue || 0,
         tank_low: !!response.data.tank_low,
+        fleet: response.data.fleet || [],
       });
     } catch (error) {
       console.error('Erro ao carregar alertas:', error);
@@ -238,7 +239,7 @@ export default function DashboardPage() {
   const availableShortcuts = ALL_SHORTCUTS.filter((s) => isModuleEnabled(s.moduleKey) && (!s.adminOnly || isAdmin));
   const pinnedShortcuts = availableShortcuts.filter((s) => userShortcuts.includes(s.id));
   const activeShortcuts = pinnedShortcuts.filter((s) => shortcutFilter === 'all' || s.kind === shortcutFilter);
-  const alertCount = alerts.over_30 + alerts.over_60 + alerts.over_90 + alerts.maintenance_due_soon + alerts.maintenance_overdue + (alerts.tank_low ? 1 : 0);
+  const alertCount = alerts.over_30 + alerts.over_60 + alerts.over_90 + alerts.maintenance_due_soon + alerts.maintenance_overdue + (alerts.tank_low ? 1 : 0) + alerts.fleet.length;
 
   const currentMonth = format(new Date(), 'MMMM', { locale: ptBR });
   const capitalizedMonth = currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1);
@@ -365,6 +366,11 @@ export default function DashboardPage() {
                       Tanque de combustível abaixo do mínimo
                     </AlertPill>
                   )}
+                  {alerts.fleet.map((a) => (
+                    <AlertPill key={a.key} tone={a.tone} icon={FileCheck} onClick={() => navigate(a.path)} testId={`alert-${a.key}`}>
+                      {a.title}
+                    </AlertPill>
+                  ))}
                   {alerts.maintenance_overdue > 0 && (
                     <AlertPill tone="red" icon={Wrench} onClick={() => navigate('/fleet/hodometro')} testId="alert-maintenance-overdue">
                       {alerts.maintenance_overdue} veículo{alerts.maintenance_overdue > 1 ? 's' : ''} com manutenção vencida

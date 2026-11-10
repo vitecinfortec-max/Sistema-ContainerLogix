@@ -51,6 +51,7 @@ const VEHICLE_DOCS = [
   ['licensing_expiry', 'Licenciamento'],
   ['tachograph_expiry', 'Tacógrafo'],
   ['inspection_expiry', 'Vistoria'],
+  ['insurance_expiry', 'Seguro'],
 ];
 const DOC_ALERT_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -411,7 +412,7 @@ export default function FleetPage() {
               <StatCard label="Veículos" value={allVehicles.length} icon={Car} tone="blue" hint="cadastrados" />
               <StatCard label="Ativos" value={allVehicles.filter((v) => v.status === 'ATIVO').length} icon={CheckCircle2} tone="emerald" hint="em operação" />
               <StatCard label="Documentos a vencer" value={docsSoonCount} icon={Clock} tone="amber" hint={`em até ${DOC_ALERT_DAYS} dias`} testId="vehicle-docs-soon" />
-              <StatCard label="Documentos vencidos" value={docsExpiredCount} icon={AlertTriangle} tone="red" hint="CRLV, licenciamento, tacógrafo, vistoria" testId="vehicle-docs-expired" />
+              <StatCard label="Documentos vencidos" value={docsExpiredCount} icon={AlertTriangle} tone="red" hint="CRLV, licenciamento, tacógrafo, vistoria, seguro" testId="vehicle-docs-expired" />
             </StatGrid>
 
             <FilterCard hasFilters={!!(vehicleSearch || vehicleTypeFilter || vehicleStatusFilter)} onClear={clearVehicleSearch}>

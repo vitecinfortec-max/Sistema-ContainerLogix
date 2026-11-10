@@ -310,7 +310,8 @@ function LayoutFrame({ children }) {
             over_60: res.data.yard_over_60_days || 0,
             over_90: res.data.yard_over_90_days || 0,
           });
-          setFinancialAlerts(res.data.financial || []);
+          // Financeiro (só admin) + vencimentos de documentos da frota e CNH
+          setFinancialAlerts([...(res.data.financial || []), ...(res.data.fleet || [])]);
         }
       } catch (err) {
         // Falha ao buscar alertas não deve quebrar a navegação — só não mostra o aviso

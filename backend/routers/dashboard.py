@@ -14,6 +14,7 @@ from models import DailyMovementPoint, DailyBillingPoint, DriverRankingEntry, Da
 from reports import today_brt, BRT_OFFSET
 from shared import db, get_current_active_user
 from routers.financial_alerts import build_financial_alerts
+from routers.fleet_alerts import build_fleet_alerts
 from routers.frota import get_all_vehicle_maintenance_status
 from routers.fuel_supply import _compute_tank_level
 from routers.movements import _movement_response
@@ -295,10 +296,12 @@ async def global_search(q: str, current_user: dict = Depends(get_current_active_
 async def get_alerts_summary(current_user: dict = Depends(get_current_active_user)):
     """Resumo leve de alertas - usado pelo sino do topo e pelo card 'Alertas do
     Sistema' do dashboard (containers parados no pátio há mais de 30/60/90 dias).
-    Administradores recebem também os alertas financeiros (cheques e faturas)."""
+    Administradores recebem também os alertas financeiros (cheques e faturas).
+    'fleet' traz os documentos de veículos e CNHs vencidos ou vencendo."""
     yard = await get_yard_control(current_user=current_user)
     user = await db.users.find_one({"id": current_user["sub"]}, {"_id": 0, "role": 1}) or {}
     financial = await build_financial_alerts() if user.get("role") == "admin" else []
+    fleet = await build_fleet_alerts()
     maintenance = await get_all_vehicle_maintenance_status()
     tank = await _compute_tank_level()
     return {
@@ -309,4 +312,5 @@ async def get_alerts_summary(current_user: dict = Depends(get_current_active_use
         'maintenance_overdue': sum(1 for m in maintenance if m['status'] == 'OVERDUE'),
         'tank_low': bool(tank and tank['status'] == 'LOW'),
         'financial': financial,
+        'fleet': fleet,
     }

@@ -2,6 +2,7 @@
 vencidas, só para administradores e só dos módulos contratados."""
 from datetime import timedelta
 
+import shared
 from routers.checks import _today
 
 
@@ -37,6 +38,7 @@ def test_operator_and_disabled_modules(api):
     _seed(api)
     assert api.get("/api/alerts/summary", as_user="operator").json()["financial"] == []
     api.run(api.db.module_config.insert_one({"disabled_modules": ["financeiro.controle_cheque"]}))
+    shared.invalidate_module_config_cache()  # a chamada acima (alertas da frota) já guardou a config em cache
     keys = [a["key"] for a in api.get("/api/alerts/summary").json()["financial"]]
     assert keys == ["invoices_overdue"]
 

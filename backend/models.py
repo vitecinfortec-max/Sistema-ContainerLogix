@@ -1398,6 +1398,7 @@ class Vehicle(BaseModel):
     tachograph_expiry: Optional[str] = None
     inspection_date: Optional[str] = None
     inspection_expiry: Optional[str] = None
+    insurance_expiry: Optional[str] = None  # Vencimento do seguro do veículo
     document_attachments: Optional[List[str]] = None
     owner_type: Optional[str] = None  # PROPRIA, TERCEIRIZADO, AUTONOMO
     ownership_status: Optional[str] = None  # PROPRIO, ALUGADO, AGREGADO
@@ -1440,6 +1441,7 @@ class VehicleCreate(BaseModel):
     tachograph_expiry: Optional[str] = None
     inspection_date: Optional[str] = None
     inspection_expiry: Optional[str] = None
+    insurance_expiry: Optional[str] = None  # Vencimento do seguro do veículo
     document_attachments: Optional[List[str]] = None
     owner_type: Optional[str] = None
     ownership_status: Optional[str] = None
@@ -1475,6 +1477,7 @@ class VehicleUpdate(BaseModel):
     tachograph_expiry: Optional[str] = None
     inspection_date: Optional[str] = None
     inspection_expiry: Optional[str] = None
+    insurance_expiry: Optional[str] = None  # Vencimento do seguro do veículo
     document_attachments: Optional[List[str]] = None
     owner_type: Optional[str] = None
     ownership_status: Optional[str] = None
@@ -1512,6 +1515,7 @@ class VehicleResponse(BaseModel):
     tachograph_expiry: Optional[str] = None
     inspection_date: Optional[str] = None
     inspection_expiry: Optional[str] = None
+    insurance_expiry: Optional[str] = None  # Vencimento do seguro do veículo
     document_attachments: Optional[List[str]] = None
     owner_type: Optional[str] = None
     ownership_status: Optional[str] = None
