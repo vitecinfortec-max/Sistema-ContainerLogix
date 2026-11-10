@@ -84,7 +84,8 @@ import {
   Hourglass,
   FileBadge,
   Percent,
-  Building2
+  Building2,
+  AlertOctagon
 } from 'lucide-react';
 import { Suspense, createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageSkeleton } from './DataPage';
@@ -147,6 +148,7 @@ const PAGE_TITLES = {
   '/estoque/entrega-epi': "Entrega de EPI's",
   '/estoque/relatorio': 'Relatórios do Estoque',
   '/loading-orders': 'Ordem de Carregamento',
+  '/transport-occurrences': 'Ocorrências de Transporte',
   '/fiscal/cte': 'CT-e',
   '/fiscal/mdfe': 'MDF-e',
   '/fiscal/configuracao': 'Configuração Fiscal',
@@ -432,7 +434,7 @@ function LayoutFrame({ children }) {
   const isRhActive = location.pathname === '/rh' || location.pathname.startsWith('/rh/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/revisoes') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isAbastecimentoActive = location.pathname.startsWith('/fleet/abastecimento') || location.pathname.startsWith('/fleet/ordem-abastecimento') || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
-  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/veiculos') || location.pathname.startsWith('/loading-orders') || location.pathname === '/freight-routes' || location.pathname === '/freight-payments' || location.pathname.startsWith('/fiscal/');
+  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/veiculos') || location.pathname.startsWith('/loading-orders') || location.pathname.startsWith('/transport-occurrences') || location.pathname === '/freight-routes' || location.pathname === '/freight-payments' || location.pathname.startsWith('/fiscal/');
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/audit-log' || location.pathname === '/modules' || location.pathname === '/plataforma' || location.pathname === '/tank-settings';
   const isOperacionalActive = location.pathname.startsWith('/loading-schedules') || location.pathname.startsWith('/delivery-status') || location.pathname.startsWith('/port-services') || location.pathname === '/reports/port-services' || location.pathname === '/reports/port-service-shifts' || location.pathname === '/reports/vehicle-results';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
@@ -706,6 +708,7 @@ function LayoutFrame({ children }) {
     { path: '/fleet', label: 'Cadastro de Veículo', icon: Car, moduleKey: 'frota.veiculos' },
     { path: '/fleet/rpa-terceiro', label: 'Contrato de Frete', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
     { path: '/loading-orders', label: 'Ordem de Carregamento', icon: PackageCheck, moduleKey: 'operacional.ordem_carregamento' },
+    { path: '/transport-occurrences', label: 'Ocorrências', icon: AlertOctagon, moduleKey: 'operacional.ocorrencias_transporte' },
     { path: '/freight-routes', label: 'Rota', icon: Route, moduleKey: 'cadastro.rota' },
     { path: '/freight-payments', label: 'Pagamento Frete', icon: HandCoins, moduleKey: 'financeiro.pagamento_frete' },
     // CT-e: módulo "sob contratação" (nasce desligado; o dono liga por empresa em
@@ -812,6 +815,8 @@ function LayoutFrame({ children }) {
     if (location.pathname.startsWith('/fleet/veiculos/')) return 'Editar Veículo';
     if (location.pathname === '/loading-orders/new') return 'Nova Ordem de Carregamento';
     if (location.pathname.startsWith('/loading-orders/')) return 'Editar Ordem de Carregamento';
+    if (location.pathname === '/transport-occurrences/new') return 'Nova Ocorrência';
+    if (location.pathname.startsWith('/transport-occurrences/')) return 'Editar Ocorrência';
     if (location.pathname === '/unit-segregation/new') return 'Nova Segregação de Unidade';
     if (location.pathname.startsWith('/unit-segregation/')) return 'Editar Segregação de Unidade';
     if (location.pathname === '/repair-estimates/new') return 'Novo Orçamento de Reparo';

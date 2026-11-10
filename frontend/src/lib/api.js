@@ -836,6 +836,28 @@ export const api = {
   deleteLoadingOrder: (id) => axios.delete(`${API}/loading-orders/${id}`),
   getLoadingOrderPDF: (id) => axios.get(`${API}/loading-orders/${id}/pdf`, { responseType: 'blob' }),
 
+  // Ocorrências de Transporte
+  getTransportOccurrenceTypes: () => axios.get(`${API}/transport-occurrence-types`),
+  createTransportOccurrenceType: (data) => axios.post(`${API}/transport-occurrence-types`, data),
+  updateTransportOccurrenceType: (id, data) => axios.put(`${API}/transport-occurrence-types/${id}`, data),
+  deleteTransportOccurrenceType: (id) => axios.delete(`${API}/transport-occurrence-types/${id}`),
+  getTransportOccurrences: (params) => axios.get(`${API}/transport-occurrences`, { params }),
+  getTransportOccurrence: (id) => axios.get(`${API}/transport-occurrences/${id}`),
+  createTransportOccurrence: (data) => axios.post(`${API}/transport-occurrences`, data),
+  updateTransportOccurrence: (id, data) => axios.put(`${API}/transport-occurrences/${id}`, data),
+  deleteTransportOccurrence: (id) => axios.delete(`${API}/transport-occurrences/${id}`),
+  uploadTransportOccurrencePhoto: (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/transport-occurrences/${id}/photos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteTransportOccurrencePhoto: (id, photoId) => axios.delete(`${API}/transport-occurrences/${id}/photos/${photoId}`),
+  getTransportOccurrenceReport: (params) => axios.get(`${API}/reports/transport-occurrences`, { params }),
+  getTransportOccurrenceReportPdf: (params) => axios.get(`${API}/reports/transport-occurrences/pdf`, { params, responseType: 'blob' }),
+  getTransportOccurrenceReportExcel: (params) => axios.get(`${API}/reports/transport-occurrences/excel`, { params, responseType: 'blob' }),
+
   // Fiscal (CT-e pela Focus NFe)
   getFiscalSettings: () => axios.get(`${API}/fiscal/settings`),
   updateFiscalSettings: (data) => axios.put(`${API}/fiscal/settings`, data),

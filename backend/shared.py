@@ -557,6 +557,7 @@ MODULE_CATALOG = [
         {"key": "operacional.relatorio_servico_portuario", "label": "Relatório de Serviço Portuário"},
         {"key": "operacional.conferencia_turnos", "label": "Conferência de Turnos"},
         {"key": "operacional.custo_faturamento_veiculo", "label": "Custo e Faturamento por Veículo"},
+        {"key": "operacional.ocorrencias_transporte", "label": "Ocorrências de Transporte"},
     ]},
     {"key": "estoque", "label": "Almoxarifado", "items": [
         {"key": "estoque.almoxarifado", "label": "Almoxarifado"},
@@ -661,6 +662,9 @@ PATH_MODULE_MAP = [
     ("/api/os-categories", "frota.cadastro_categoria"),
     ("/api/fuel-supply-orders", "frota.ordem_abastecimento"),
     ("/api/loading-orders", "operacional.ordem_carregamento"),
+    ("/api/transport-occurrence-types", "operacional.ocorrencias_transporte"),
+    ("/api/transport-occurrences", "operacional.ocorrencias_transporte"),
+    ("/api/reports/transport-occurrences", "operacional.ocorrencias_transporte"),
     ("/api/warehouses", "estoque.almoxarifado"),
     ("/api/product-families", "estoque.familia_produto"),
     ("/api/service-families", "estoque.familia_servico"),

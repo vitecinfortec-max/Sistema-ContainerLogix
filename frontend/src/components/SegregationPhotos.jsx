@@ -14,15 +14,15 @@ export const photoSrc = (photo) => photo.preview || api.getFileUrl(photo.url);
 // Miniaturas do container + botão da câmera. `photos`: as já salvas e as que
 // ainda serão enviadas ({ preview }); capture="environment" abre a câmera
 // traseira no celular.
-export function ContainerPhotos({ photos, busy, canEdit, onAdd, onRemove, onOpen, testId }) {
+export function ContainerPhotos({ photos, busy, canEdit, onAdd, onRemove, onOpen, testId, alt = 'Foto do container', max = MAX_PHOTOS_PER_CONTAINER }) {
   const inputRef = useRef(null);
-  const full = photos.length >= MAX_PHOTOS_PER_CONTAINER;
+  const full = photos.length >= max;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {photos.map((photo, index) => (
         <div key={photo.id} className="relative">
           <button type="button" title="Ampliar foto" aria-label="Ampliar foto" onClick={() => onOpen(index)} className="block">
-            <img src={photoSrc(photo)} alt="Foto do container" className="w-12 h-12 object-cover rounded border border-slate-200 dark:border-slate-700" />
+            <img src={photoSrc(photo)} alt={alt} className="w-12 h-12 object-cover rounded border border-slate-200 dark:border-slate-700" />
           </button>
           {canEdit && (
             <button

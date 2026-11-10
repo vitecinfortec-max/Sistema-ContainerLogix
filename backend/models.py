@@ -4703,3 +4703,29 @@ class LoginNoticeCreate(BaseModel):
     start_date: Optional[str] = None  # AAAA-MM-DD; vazio = desde já
     end_date: Optional[str] = None  # AAAA-MM-DD; vazio = sem fim
     active: bool = True
+
+
+# ==================== TRANSPORTE - OCORRÊNCIAS ====================
+# Atraso, avaria, sinistro, multa... durante o transporte. Ligação opcional
+# com Ordem de Carregamento, veículo e motorista; os tipos são um cadastro
+# editável (routers/transport_occurrences.py).
+TRANSPORT_OCCURRENCE_STATUS = ["ABERTA", "RESOLVIDA"]
+
+
+class TransportOccurrenceTypeCreate(BaseModel):
+    name: str
+    active: bool = True
+
+
+class TransportOccurrenceCreate(BaseModel):
+    type_id: str
+    occurred_date: str  # YYYY-MM-DD
+    occurred_time: Optional[str] = None  # HH:MM
+    loading_order_id: Optional[str] = None
+    vehicle_id: Optional[str] = None
+    driver_id: Optional[str] = None
+    location: Optional[str] = None
+    description: str
+    cost: Optional[float] = Field(default=None, ge=0)  # prejuízo/custo da ocorrência (R$)
+    status: str = "ABERTA"
+    resolution: Optional[str] = None  # o que foi feito para resolver

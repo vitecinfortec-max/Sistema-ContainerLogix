@@ -106,6 +106,7 @@ const ALL_SHORTCUTS = [
   { id: 'cte', label: 'Emissão de CT-e', icon: FileCheck, path: '/fiscal/cte', kind: 'tool', moduleKey: 'fiscal.cte' },
   { id: 'mdfe', label: 'Manifesto (MDF-e)', icon: Truck, path: '/fiscal/mdfe', kind: 'tool', moduleKey: 'fiscal.mdfe' },
   { id: 'loading-orders', label: 'Ordem de Carregamento', icon: PackageCheck, path: '/loading-orders', kind: 'tool', moduleKey: 'operacional.ordem_carregamento' },
+  { id: 'transport-occurrences', label: 'Ocorrências de Transporte', icon: AlertTriangle, path: '/transport-occurrences', kind: 'tool', moduleKey: 'operacional.ocorrencias_transporte' },
   { id: 'loading-schedules', label: 'Programação de Carregamento', icon: Calendar, path: '/loading-schedules', kind: 'tool', moduleKey: 'operacional.programacao_carregamento' },
   { id: 'freight-contract', label: 'Contrato de Frete', icon: FileText, path: '/fleet/rpa-terceiro', kind: 'tool', moduleKey: 'financeiro.rpa_terceiro' },
   { id: 'vehicles', label: 'Lista de Veículos', icon: Car, path: '/fleet', kind: 'tool', moduleKey: 'frota.veiculos' },

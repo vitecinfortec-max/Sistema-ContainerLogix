@@ -58,6 +58,7 @@ from routers.ordem_servico import api_router as ordem_servico_router
 from routers.fuel_supply import api_router as fuel_supply_router
 from routers.loading_orders import api_router as loading_orders_router
 from routers.freight_routes import api_router as freight_routes_router
+from routers.transport_occurrences import api_router as transport_occurrences_router
 from routers.freight_payments import api_router as freight_payments_router
 from routers.gratifications import api_router as gratifications_router
 from routers.service_providers import api_router as service_providers_router
@@ -342,6 +343,7 @@ app.include_router(ordem_servico_router)
 app.include_router(fuel_supply_router)
 app.include_router(loading_orders_router)
 app.include_router(freight_routes_router)
+app.include_router(transport_occurrences_router)
 app.include_router(freight_payments_router)
 app.include_router(gratifications_router)
 app.include_router(service_providers_router)

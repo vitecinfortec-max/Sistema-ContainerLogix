@@ -135,6 +135,8 @@ const ReportsServiceOrdersPage = lazyPage(() => import('./pages/ReportsServiceOr
 const FuelSupplyOrderPage = lazyPage(() => import('./pages/FuelSupplyOrderPage'));
 const LoadingOrderPage = lazyPage(() => import('./pages/LoadingOrderPage'));
 const LoadingOrderFormPage = lazyPage(() => import('./pages/LoadingOrderFormPage'));
+const TransportOccurrencesPage = lazyPage(() => import('./pages/TransportOccurrencesPage'));
+const TransportOccurrenceFormPage = lazyPage(() => import('./pages/TransportOccurrenceFormPage'));
 const CtePage = lazyPage(() => import('./pages/CtePage'));
 const FiscalSettingsPage = lazyPage(() => import('./pages/FiscalSettingsPage'));
 const MdfePage = lazyPage(() => import('./pages/MdfePage'));
@@ -447,6 +449,30 @@ function App() {
             element={
               <ProtectedRoute moduleKey="operacional.ordem_carregamento">
                 <LoadingOrderFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/transport-occurrences"
+            element={
+              <ProtectedRoute moduleKey="operacional.ocorrencias_transporte">
+                <TransportOccurrencesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/transport-occurrences/new"
+            element={
+              <ProtectedRoute moduleKey="operacional.ocorrencias_transporte">
+                <TransportOccurrenceFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/transport-occurrences/:id/edit"
+            element={
+              <ProtectedRoute moduleKey="operacional.ocorrencias_transporte">
+                <TransportOccurrenceFormPage />
               </ProtectedRoute>
             }
           />
