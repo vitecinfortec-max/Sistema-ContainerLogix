@@ -64,6 +64,7 @@ const BillingPage = lazyPage(() => import('./pages/BillingPage'));
 const AccountsPayablePage = lazyPage(() => import('./pages/AccountsPayablePage'));
 const AccountsPayableFormPage = lazyPage(() => import('./pages/AccountsPayableFormPage'));
 const ChartOfAccountsPage = lazyPage(() => import('./pages/ChartOfAccountsPage'));
+const CashFlowPage = lazyPage(() => import('./pages/CashFlowPage'));
 const ContainerInspectionsPage = lazyPage(() => import('./pages/ContainerInspectionsPage'));
 const NewContainerInspectionPage = lazyPage(() => import('./pages/NewContainerInspectionPage'));
 const ContainerInspectionDetailPage = lazyPage(() => import('./pages/ContainerInspectionDetailPage'));
@@ -862,6 +863,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.contas_pagar">
                 <AccountsPayableFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/cash-flow"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.fluxo_caixa">
+                <CashFlowPage />
               </ProtectedRoute>
             }
           />

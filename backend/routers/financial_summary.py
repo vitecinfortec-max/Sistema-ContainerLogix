@@ -34,7 +34,11 @@ def _line(key, label, module, docs, value_of, day_of=None, note=None):
     return {"key": key, "label": label, "module": module, "docs": docs, "value_of": value_of, "day_of": day_of, "note": note}
 
 
-async def build_financial_summary(date_from: Optional[str], date_to: Optional[str]) -> dict:
+async def build_cash_lines() -> dict:
+    """As linhas de entrada/saída (com a data de cada lançamento) e de posição
+    a receber/a pagar de todos os módulos contratados. Usado pelo Resumo
+    Financeiro e pelo Fluxo de Caixa (routers/cash_flow.py), para os dois
+    sempre baterem."""
     disabled = await get_disabled_modules()
     enabled = lambda module: not is_module_disabled(module, disabled)
 
@@ -141,6 +145,12 @@ async def build_financial_summary(date_from: Optional[str], date_to: Optional[st
         _line("client_credit_balance", "Saldo de crédito de clientes", "financeiro.credito_cliente", credit_accounts,
               lambda d: (d.get("balance_cents") or 0) / 100, note="já recebido; será abatido em faturas ou devolvido"),
     ]
+    return {"inflows": inflows, "outflows": outflows, "receivable": receivable, "payable": payable}
+
+
+async def build_financial_summary(date_from: Optional[str], date_to: Optional[str]) -> dict:
+    lines = await build_cash_lines()
+    inflows, outflows, receivable, payable = lines["inflows"], lines["outflows"], lines["receivable"], lines["payable"]
 
     def resolve(lines, use_period):
         out = []

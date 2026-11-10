@@ -841,6 +841,10 @@ export const api = {
   getLoadingOrderPDF: (id) => axios.get(`${API}/loading-orders/${id}/pdf`, { responseType: 'blob' }),
 
   // Ocorrências de Transporte
+  getCashFlow: (params) => axios.get(`${API}/cash-flow`, { params }),
+  getCashFlowPdf: (params) => axios.get(`${API}/cash-flow/pdf`, { params, responseType: 'blob' }),
+  getCashFlowExcel: (params) => axios.get(`${API}/cash-flow/excel`, { params, responseType: 'blob' }),
+  updateCashFlowSettings: (data) => axios.put(`${API}/cash-flow/settings`, data),
   getChartAccounts: () => axios.get(`${API}/chart-accounts`),
   createChartAccount: (data) => axios.post(`${API}/chart-accounts`, data),
   updateChartAccount: (id, data) => axios.put(`${API}/chart-accounts/${id}`, data),

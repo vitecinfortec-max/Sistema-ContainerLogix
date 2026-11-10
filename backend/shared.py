@@ -539,6 +539,7 @@ MODULE_CATALOG = [
     {"key": "financeiro", "label": "Financeiro", "items": [
         {"key": "financeiro.faturas", "label": "Faturas"},
         {"key": "financeiro.contas_pagar", "label": "Contas a Pagar"},
+        {"key": "financeiro.fluxo_caixa", "label": "Fluxo de Caixa"},
         {"key": "financeiro.credito_cliente", "label": "Crédito de Cliente"},
         {"key": "financeiro.invoice_internacional", "label": "Invoice Internacional"},
         {"key": "financeiro.relatorio_faturamento", "label": "Relatório de Faturamento"},
@@ -653,6 +654,7 @@ PATH_MODULE_MAP = [
     ("/api/reports/billing", "financeiro.relatorio_faturamento"),
     ("/api/invoices", "financeiro.faturas"),
     ("/api/payables", "financeiro.contas_pagar"),
+    ("/api/cash-flow", "financeiro.fluxo_caixa"),
     ("/api/reports/payables", "financeiro.contas_pagar"),
     ("/api/chart-accounts", "financeiro.contas_pagar"),
     ("/api/cost-centers", "financeiro.contas_pagar"),
