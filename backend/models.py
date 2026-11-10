@@ -4774,3 +4774,61 @@ class DriverSettlementCreate(BaseModel):
 class DriverSettlementClose(BaseModel):
     closed: bool
     date: Optional[str] = None  # YYYY-MM-DD; vazio = hoje
+
+
+# ==================== ORDEM DE SERVIÇO - PORTO x CLIENTE ====================
+# Entrega/coleta de container CHEIO direto entre o porto e o cliente, sem
+# passar pelo terminal. Coleção própria (port_client_orders), separada da
+# Ordem de Carregamento: não gera EIR, não movimenta pátio nem estoque, e o
+# número do container é livre (não é conferido contra cadastro/estoque).
+
+PORT_CLIENT_OPERATION_TYPES = ("ENTREGA", "COLETA")
+PORT_CLIENT_STATUSES = ("ABERTA", "EM_TRANSITO", "CONCLUIDA", "CANCELADA")
+
+
+class PortClientOrderCreate(BaseModel):
+    operation_type: Literal["ENTREGA", "COLETA"]
+    status: Literal["ABERTA", "EM_TRANSITO", "CONCLUIDA", "CANCELADA"] = "ABERTA"
+    client_id: Optional[str] = None
+    client_name: str
+    port_terminal_id: Optional[str] = None
+    port_terminal_name: str
+    client_address: Optional[str] = None
+    container_number: str
+    container_size: Optional[str] = None  # 20 | 40 | 45
+    container_type: Optional[str] = None  # DRY | HC | REEFER | OPEN TOP | FLAT RACK | TANK
+    booking: Optional[str] = None
+    bl: Optional[str] = None
+    freight_value: float
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
+    truck_plate: Optional[str] = None
+    trailer_plate: Optional[str] = None
+    scheduled_at: Optional[str] = None  # 'AAAA-MM-DDTHH:MM', horário de Brasília (digitado)
+    completed_at: Optional[str] = None  # idem
+    observations: Optional[str] = None
+
+
+class PortClientOrderUpdate(BaseModel):
+    operation_type: Optional[Literal["ENTREGA", "COLETA"]] = None
+    status: Optional[Literal["ABERTA", "EM_TRANSITO", "CONCLUIDA", "CANCELADA"]] = None
+    client_id: Optional[str] = None
+    client_name: Optional[str] = None
+    port_terminal_id: Optional[str] = None
+    port_terminal_name: Optional[str] = None
+    client_address: Optional[str] = None
+    container_number: Optional[str] = None
+    container_size: Optional[str] = None
+    container_type: Optional[str] = None
+    booking: Optional[str] = None
+    bl: Optional[str] = None
+    freight_value: Optional[float] = None
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_cpf: Optional[str] = None
+    truck_plate: Optional[str] = None
+    trailer_plate: Optional[str] = None
+    scheduled_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    observations: Optional[str] = None

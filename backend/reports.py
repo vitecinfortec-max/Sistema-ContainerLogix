@@ -6184,3 +6184,204 @@ def generate_vehicle_results_report_excel(data: dict, date_from=None, date_to=No
     except Exception as e:
         logger.error(f"Error generating vehicle results Excel: {e}")
         return _xl_error_workbook()
+
+
+# ==================== RELATÓRIO TABULAR GENÉRICO (PDF + EXCEL) ====================
+# Os relatórios da Ordem de Serviço - Porto x Cliente montam UM modelo de dados
+# (colunas tipadas, linhas com valores crus, linha de total e quadro de totais)
+# e os dois geradores abaixo só formatam esse modelo. Assim o total que a tela
+# mostra, o do PDF e o do Excel saem do mesmo cálculo e não têm como divergir.
+#
+# report = {
+#   "title": str, "filters_text": str,
+#   "summary": [(rótulo, texto)],                 # indicadores do topo
+#   "sections": [{
+#       "title": str | None, "sheet": str,       # título no PDF / aba no Excel
+#       "columns": [{"label", "type", "weight", "xl_width"}],
+#       "rows": [[valor, ...]],                  # valores crus, conforme o tipo
+#       "row_tones": [tom | None], "tone_col": int | None,
+#       "total": [valor | None, ...] | None,     # linha TOTAL (já somada)
+#       "total_label": str,
+#       "empty_message": str,
+#   }],
+#   "totals": [(rótulo, valor, tipo)],           # quadro de totais no fim
+# }
+# Tipos: text, int, money, date ('AAAA-MM-DD'), datetime ('AAAA-MM-DDTHH:MM',
+# horário de Brasília), pct (número em %), month ('AAAA-MM').
+
+_TABULAR_XL_FORMATS = {'money': 'R$ #,##0.00', 'date': XL_DATE, 'datetime': XL_DATETIME, 'int': '0', 'pct': '+0.0%;-0.0%;0.0%'}
+
+
+def tabular_fmt(value, col_type):
+    """Valor formatado como aparece no PDF (e na tela)."""
+    if value is None or value == '':
+        return '-'
+    if col_type == 'money':
+        return format_currency(value, 'BRL')
+    if col_type == 'int':
+        return _fmt_int(value)
+    if col_type == 'date':
+        return fmt_date_local(value)
+    if col_type == 'datetime':
+        return fmt_datetime(value)
+    if col_type == 'pct':
+        return f"{value:+.1f}%".replace('.', ',')
+    if col_type == 'month':
+        try:
+            year, month = str(value).split('-')[:2]
+            return f"{month}/{year}"
+        except ValueError:
+            return str(value)
+    return str(value)
+
+
+def _tabular_xl_value(value, col_type):
+    if value is None or value == '':
+        return None
+    if col_type in ('date', 'datetime'):
+        return _xl_date(value)
+    if col_type == 'pct':
+        return value / 100
+    if col_type == 'month':
+        return tabular_fmt(value, 'month')
+    return value
+
+
+def _tabular_total_label_index(total):
+    """Coluna onde vai o rótulo "TOTAL": a vizinha à esquerda do primeiro valor."""
+    first_value = next((i for i, v in enumerate(total) if v is not None), len(total))
+    return max(first_value - 1, 0)
+
+
+def _tabular_align(col):
+    if col['type'] in ('money', 'int', 'pct'):
+        return 'right'
+    if col['type'] in ('date', 'datetime', 'month'):
+        return 'center'
+    return 'left'
+
+
+def generate_tabular_report_pdf(report: dict, company: dict = None) -> bytes:
+    c = merge_company(company)
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=10*mm, leftMargin=10*mm,
+                            topMargin=12*mm, bottomMargin=15*mm)
+    styles = getSampleStyleSheet()
+    elements = list(_build_pdf_header(styles, download_logo(company), report['title'],
+                                      generation_info=report.get('filters_text'), company=company, content_width=doc.width))
+    if report.get('summary'):
+        elements.extend(_build_pdf_summary(report['summary'], doc.width))
+
+    cell = _pdf_cell_factory(styles, font_size=7.5)
+    for section in report['sections']:
+        if section.get('title'):
+            elements.extend(_pdf_section_title(section['title'], doc.width))
+        columns = section['columns']
+        rows = section['rows']
+        if not rows:
+            elements.append(_pdf_empty_state(section.get('empty_message') or 'Nenhuma ordem encontrada para os filtros selecionados.', doc.width))
+            continue
+
+        tones = section.get('row_tones') or []
+        tone_col = section.get('tone_col')
+        data = [_pdf_header_cells([col['label'] for col in columns], font_size=7.5)]
+        for r_idx, row in enumerate(rows):
+            tone = tones[r_idx] if r_idx < len(tones) else None
+            line = []
+            for i, (value, col) in enumerate(zip(row, columns)):
+                if tone and i == tone_col:
+                    line.append(cell(None, _tabular_align(col), markup=_pdf_tone_markup(tabular_fmt(value, col['type']), tone)))
+                else:
+                    line.append(cell(tabular_fmt(value, col['type']), _tabular_align(col)))
+            data.append(line)
+        total = section.get('total')
+        if total:
+            label_idx = _tabular_total_label_index(total)
+            line = []
+            for i, (value, col) in enumerate(zip(total, columns)):
+                if value is not None:
+                    line.append(cell(tabular_fmt(value, col['type']), _tabular_align(col), bold=True))
+                elif i == label_idx:
+                    line.append(cell(section.get('total_label') or 'TOTAL', 'right', bold=True))
+                else:
+                    line.append('')
+            data.append(line)
+        weight_sum = sum(col.get('weight', 1) for col in columns)
+        widths = [doc.width * col.get('weight', 1) / weight_sum for col in columns]
+        table = Table(data, colWidths=widths, repeatRows=1)
+        table.setStyle(TableStyle(_pdf_table_style(total_row=bool(total))))
+        elements.append(table)
+
+    if report.get('totals'):
+        elements.append(Spacer(1, 10))
+        elements.append(_pdf_totals_box([(label, tabular_fmt(value, t)) for label, value, t in report['totals']], doc.width, width=260))
+
+    footer = _make_pdf_footer(c['name'])
+    doc.build(elements, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()
+
+
+def generate_tabular_report_excel(report: dict, company: dict = None) -> bytes:
+    """Uma aba por seção, no padrão das planilhas do sistema (cabeçalho
+    congelado, R$ e dd/mm/aaaa como formato de célula). A linha TOTAL grava o
+    valor já calculado (não fórmula): é o mesmo número do PDF e da tela, e
+    respeita a regra de não somar ordens canceladas."""
+    from openpyxl.utils import get_column_letter
+    try:
+        c = merge_company(company)
+        wb = Workbook()
+        wb.remove(wb.active)
+        logo = download_logo(company)
+        filters_text = report.get('filters_text') or ''
+        stats_text = '   •   '.join(f"{label}: {value}" for label, value in (report.get('summary') or []))
+        for s_idx, section in enumerate(report['sections']):
+            ws = wb.create_sheet((section.get('sheet') or 'Relatório')[:31])
+            columns = section['columns']
+            data_rows = [[_tabular_xl_value(v, col['type']) for v, col in zip(row, columns)] for row in section['rows']]
+            widths = {get_column_letter(2 + i): col.get('xl_width', 14) for i, col in enumerate(columns)}
+            fmts = {i: _TABULAR_XL_FORMATS[col['type']] for i, col in enumerate(columns) if col['type'] in _TABULAR_XL_FORMATS}
+            centers = {i for i, col in enumerate(columns) if col['type'] in ('date', 'datetime', 'month')}
+            main_title = report['title'] + (f" ({section['title']})" if section.get('title') else '')
+            sheet_title = f"{main_title} - {filters_text}" if filters_text else main_title
+            _bsoft_style_excel(
+                ws, sheet_title, stats_text, [col['label'] for col in columns], data_rows, widths,
+                center_cols=centers, number_fmt_cols=fmts, stats_text=stats_text or None,
+                company_name=c['name'], logo_buffer=logo, company=company, autofilter=True,
+                empty_message=section.get('empty_message') or 'Nenhuma ordem encontrada para os filtros selecionados.',
+            )
+            if section.get('tone_col') is not None and section.get('row_tones'):
+                _xl_color_column(ws, section['tone_col'], section['row_tones'])
+            last_row = 9 + max(len(data_rows), 1) - 1
+            last_col = 2 + len(columns) - 1
+            total = section.get('total')
+            if total and data_rows:
+                last_row += 1
+                soft = _xl_fill(BRAND_SOFT)
+                border = Border(top=Side(style='medium', color=BRAND_BAR), bottom=Side(style='thin', color=BRAND_LINE))
+                label_idx = _tabular_total_label_index(total)
+                for i, (value, col) in enumerate(zip(total, columns)):
+                    cell = ws.cell(row=last_row, column=2 + i)
+                    cell.fill = soft
+                    cell.border = border
+                    cell.font = Font(name='Calibri', size=10, bold=True, color=BRAND_DARK)
+                    cell.alignment = Alignment(horizontal='right', vertical='center')
+                    if value is not None:
+                        cell.value = _tabular_xl_value(value, col['type'])
+                        if col['type'] in _TABULAR_XL_FORMATS:
+                            cell.number_format = _TABULAR_XL_FORMATS[col['type']]
+                    elif i == label_idx:
+                        cell.value = (section.get('total_label') or 'TOTAL') + ':'
+                ws.row_dimensions[last_row].height = 20
+            if report.get('totals') and s_idx == 0:
+                first_label_col = max(2, last_col - 2)
+                end = _xl_totals(ws, last_row + 2, first_label_col, last_col - 1, last_col,
+                                 [(label, _tabular_xl_value(value, t), _TABULAR_XL_FORMATS.get(t, 'General'))
+                                  for label, value, t in report['totals']])
+                last_row = end - 1
+            ws.print_area = f"A1:{get_column_letter(last_col)}{last_row}"
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        return buffer.getvalue()
+    except Exception as e:
+        logger.error(f"Error generating tabular Excel: {e}")
+        return _xl_error_workbook()

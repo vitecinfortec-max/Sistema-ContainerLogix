@@ -57,6 +57,7 @@ from routers.rpa_terceiro import api_router as rpa_terceiro_router
 from routers.ordem_servico import api_router as ordem_servico_router
 from routers.fuel_supply import api_router as fuel_supply_router
 from routers.loading_orders import api_router as loading_orders_router
+from routers.port_client_orders import api_router as port_client_orders_router
 from routers.freight_routes import api_router as freight_routes_router
 from routers.transport_occurrences import api_router as transport_occurrences_router
 from routers.driver_settlements import api_router as driver_settlements_router
@@ -343,6 +344,7 @@ app.include_router(rpa_terceiro_router)
 app.include_router(ordem_servico_router)
 app.include_router(fuel_supply_router)
 app.include_router(loading_orders_router)
+app.include_router(port_client_orders_router)
 app.include_router(freight_routes_router)
 app.include_router(transport_occurrences_router)
 app.include_router(driver_settlements_router)
@@ -571,6 +573,11 @@ async def prepare_database():
         "hr_contracts", "hr_payslips", "hr_payroll_runs", "hr_vacations", "hr_occurrences", "hr_documents", "hr_time_bank",
     ):
         await db[collection_name].create_index("id")
+    # Ordem de Serviço - Porto x Cliente: listagem e relatórios filtram pela data prevista
+    await db.port_client_orders.create_index("id")
+    await db.port_client_orders.create_index("order_number")
+    await db.port_client_orders.create_index([("scheduled_at", 1), ("status", 1)])
+    await db.port_client_orders.create_index("client_id")
     # Crédito de Cliente: um saldo por cliente (a baixa usa $inc condicionado
     # nele - dois documentos do mesmo cliente furariam essa trava).
     try:

@@ -139,6 +139,8 @@ const TransportOccurrencesPage = lazyPage(() => import('./pages/TransportOccurre
 const TransportOccurrenceFormPage = lazyPage(() => import('./pages/TransportOccurrenceFormPage'));
 const DriverSettlementsPage = lazyPage(() => import('./pages/DriverSettlementsPage'));
 const DriverSettlementFormPage = lazyPage(() => import('./pages/DriverSettlementFormPage'));
+const PortClientOrderPage = lazyPage(() => import('./pages/PortClientOrderPage'));
+const PortClientReportsPage = lazyPage(() => import('./pages/PortClientReportsPage'));
 const CtePage = lazyPage(() => import('./pages/CtePage'));
 const FiscalSettingsPage = lazyPage(() => import('./pages/FiscalSettingsPage'));
 const MdfePage = lazyPage(() => import('./pages/MdfePage'));
@@ -499,6 +501,22 @@ function App() {
             element={
               <ProtectedRoute adminOnly moduleKey="operacional.acerto_motorista">
                 <DriverSettlementFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/port-client-orders"
+            element={
+              <ProtectedRoute moduleKey="operacional.os_porto_cliente">
+                <PortClientOrderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/port-client-orders/reports"
+            element={
+              <ProtectedRoute moduleKey="operacional.relatorio_os_porto_cliente">
+                <PortClientReportsPage />
               </ProtectedRoute>
             }
           />

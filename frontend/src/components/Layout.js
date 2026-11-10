@@ -87,7 +87,8 @@ import {
   Building2,
   AlertOctagon,
   Star,
-  Handshake
+  Handshake,
+  FileBarChart
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Suspense, createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -154,6 +155,8 @@ const PAGE_TITLES = {
   '/loading-orders': 'Ordem de Carregamento',
   '/transport-occurrences': 'Ocorrências de Transporte',
   '/driver-settlements': 'Acerto de Motorista',
+  '/port-client-orders': 'Ordem de Serviço – Porto x Cliente',
+  '/port-client-orders/reports': 'Relatórios Porto x Cliente',
   '/fiscal/cte': 'CT-e',
   '/fiscal/mdfe': 'MDF-e',
   '/fiscal/configuracao': 'Configuração Fiscal',
@@ -459,7 +462,7 @@ function LayoutFrame({ children }) {
   const isRhActive = location.pathname === '/rh' || location.pathname.startsWith('/rh/');
   const isManutencaoActive = (location.pathname === '/fleet' && fleetTab === 'revisions') || location.pathname.startsWith('/fleet/revisoes') || location.pathname.startsWith('/fleet/ordem-servico') || location.pathname === '/fleet/checklist' || location.pathname === '/fleet/hodometro' || location.pathname === '/fleet/controle-media' || isManutencaoCadastroActive || isManutencaoRelatorioActive;
   const isAbastecimentoActive = location.pathname.startsWith('/fleet/abastecimento') || location.pathname.startsWith('/fleet/ordem-abastecimento') || location.pathname === '/fleet/nivel-tanque' || location.pathname === '/reports/fuel-supply';
-  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/veiculos') || location.pathname.startsWith('/loading-orders') || location.pathname.startsWith('/transport-occurrences') || location.pathname.startsWith('/driver-settlements') || location.pathname === '/freight-routes' || location.pathname === '/freight-payments' || location.pathname.startsWith('/fiscal/');
+  const isTransporteActive = (location.pathname === '/fleet' && fleetTab !== 'revisions') || location.pathname.startsWith('/fleet/rpa-terceiro') || location.pathname.startsWith('/fleet/veiculos') || location.pathname.startsWith('/loading-orders') || location.pathname.startsWith('/transport-occurrences') || location.pathname.startsWith('/driver-settlements') || location.pathname === '/freight-routes' || location.pathname === '/freight-payments' || location.pathname.startsWith('/port-client-orders') || location.pathname.startsWith('/fiscal/');
   const isOpcoesSistemaActive = location.pathname === '/users' || location.pathname === '/audit-log' || location.pathname === '/modules' || location.pathname === '/plataforma' || location.pathname === '/tank-settings';
   const isOperacionalActive = location.pathname.startsWith('/loading-schedules') || location.pathname.startsWith('/delivery-status') || location.pathname.startsWith('/port-services') || location.pathname === '/reports/port-services' || location.pathname === '/reports/port-service-shifts' || location.pathname === '/reports/vehicle-results';
   const isFlexTankActive = location.pathname === '/flex-tank' || location.pathname.startsWith('/flex-tank/');
@@ -736,6 +739,8 @@ function LayoutFrame({ children }) {
     { path: '/transport-occurrences', label: 'Ocorrências', icon: AlertOctagon, moduleKey: 'operacional.ocorrencias_transporte' },
     // Acerto de Motorista: mexe com o dinheiro do motorista - só administrador (a rota também é adminOnly)
     ...(isAdmin ? [{ path: '/driver-settlements', label: 'Acerto de Motorista', icon: Handshake, moduleKey: 'operacional.acerto_motorista' }] : []),
+    { path: '/port-client-orders', label: 'OS – Porto x Cliente', icon: Container, moduleKey: 'operacional.os_porto_cliente' },
+    { path: '/port-client-orders/reports', label: 'Relatórios Porto x Cliente', icon: FileBarChart, moduleKey: 'operacional.relatorio_os_porto_cliente' },
     { path: '/freight-routes', label: 'Rota', icon: Route, moduleKey: 'cadastro.rota' },
     { path: '/freight-payments', label: 'Pagamento Frete', icon: HandCoins, moduleKey: 'financeiro.pagamento_frete' },
     // CT-e: módulo "sob contratação" (nasce desligado; o dono liga por empresa em

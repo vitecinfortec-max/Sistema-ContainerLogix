@@ -870,6 +870,16 @@ export const api = {
   closeDriverSettlement: (id, closed, date) => axios.put(`${API}/driver-settlements/${id}/close`, { closed, date: date || null }),
   getDriverSettlementPdf: (id) => axios.get(`${API}/driver-settlements/${id}/pdf`, { responseType: 'blob' }),
 
+  // Ordem de Serviço - Porto x Cliente (sem EIR / sem movimentação de pátio)
+  getPortClientOrders: (params) => axios.get(`${API}/port-client-orders`, { params }),
+  getPortClientOrderNextNumber: () => axios.get(`${API}/port-client-orders/next-number`),
+  createPortClientOrder: (data) => axios.post(`${API}/port-client-orders`, data),
+  updatePortClientOrder: (id, data) => axios.put(`${API}/port-client-orders/${id}`, data),
+  deletePortClientOrder: (id) => axios.delete(`${API}/port-client-orders/${id}`),
+  getPortClientOrderPDF: (id) => axios.get(`${API}/port-client-orders/${id}/pdf`, { responseType: 'blob' }),
+  getPortClientReport: (kind, params) => axios.get(`${API}/reports/port-client-orders/${kind}`, { params }),
+  downloadPortClientReport: (kind, format, params) => axios.get(`${API}/reports/port-client-orders/${kind}/${format}`, { params, responseType: 'blob' }),
+
   // Fiscal (CT-e pela Focus NFe)
   getFiscalSettings: () => axios.get(`${API}/fiscal/settings`),
   updateFiscalSettings: (data) => axios.put(`${API}/fiscal/settings`, data),
