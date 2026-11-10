@@ -15,6 +15,7 @@ from models import (
 from shared import db, get_current_admin_user, get_company_settings
 from routers.movements import _parse_filter_day
 from reports import BRT_TZ
+from period_lock import ensure_period_open
 from reports import (
     merge_company, generate_freight_payment_report_pdf, generate_freight_payment_report_excel,
     generate_freight_payment_receipt_pdf,
@@ -360,6 +361,8 @@ async def mark_freight_payments_paid_batch(
     if len(driver_ids) != 1 or not next(iter(driver_ids)):
         raise HTTPException(status_code=400, detail="Todos os lançamentos selecionados devem ser do mesmo motorista")
 
+    await ensure_period_open(datetime.now(timezone.utc), what="Pagamento Frete pago")  # baixa com a data de hoje
+
     first = payments[0]
     batch_number = await get_next_freight_payment_batch_number()
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -476,6 +479,8 @@ async def update_freight_payment_status(
         raise HTTPException(status_code=404, detail="Pagamento Frete não encontrado")
 
     old_status = payment.get('status', 'PENDENTE')
+    if old_status != status:
+        await ensure_period_open(payment.get('created_at'), payment.get('paid_at'), what="Pagamento Frete")
     update_data = {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}
     if old_status == 'PAGO' and status != 'PAGO':
         update_data['paid_at'] = None
@@ -510,6 +515,7 @@ async def update_freight_payment(payment_id: str, data: FreightPaymentUpdate, cu
         raise HTTPException(status_code=404, detail="Pagamento Frete não encontrado")
     if payment.get('status') != 'PENDENTE':
         raise HTTPException(status_code=400, detail="Só é possível editar um lançamento Pendente")
+    await ensure_period_open(payment.get('created_at'), what="Pagamento Frete")
 
     changes = {}
     update_data = {}

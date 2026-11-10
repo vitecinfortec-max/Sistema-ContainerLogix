@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from models import CHECK_PHOTO_SIDES, CHECK_STATUS_OPTIONS, CheckCreate, CheckStatusUpdate, CheckResponse
 from reports import BRT_TZ, merge_company
+from period_lock import ensure_period_open
 from routers.movements import _parse_filter_day
 from shared import (
     db, get_current_admin_user, get_company_settings, load_logo_buffer,
@@ -305,6 +306,7 @@ async def get_check(check_id: str, current_user: dict = Depends(get_current_admi
 @api_router.post("/checks", response_model=CheckResponse)
 async def create_check(data: CheckCreate, current_user: dict = Depends(get_current_admin_user)):
     fields = _validate_check(data)
+    await ensure_period_open(fields["issue_date"], what="Cheque emitido")
     await _ensure_not_duplicate(fields)
     now = datetime.now(timezone.utc).isoformat()
     by_name = current_user.get("name", "Sistema")
@@ -328,12 +330,13 @@ async def create_check(data: CheckCreate, current_user: dict = Depends(get_curre
 
 @api_router.put("/checks/{check_id}", response_model=CheckResponse)
 async def update_check(check_id: str, data: CheckCreate, current_user: dict = Depends(get_current_admin_user)):
-    check = await db.checks.find_one({"id": check_id}, {"_id": 0, "status": 1})
+    check = await db.checks.find_one({"id": check_id}, {"_id": 0, "status": 1, "issue_date": 1})
     if not check:
         raise HTTPException(status_code=404, detail="Cheque não encontrado")
     if check["status"] != "EMITIDO":
         raise HTTPException(status_code=400, detail="Só é possível editar cheque emitido. Volte o status para Emitido antes de editar.")
     fields = _validate_check(data)
+    await ensure_period_open(check.get("issue_date"), fields["issue_date"], what="Cheque emitido")
     await _ensure_not_duplicate(fields, exclude_id=check_id)
     fields["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.checks.update_one({"id": check_id}, {"$set": fields})
@@ -373,6 +376,13 @@ async def update_check_status(check_id: str, data: CheckStatusUpdate, current_us
         update["return_reason"] = reason
         note = reason
 
+    # Compensação: vale o dia da compensação (a antiga, se está sendo
+    # desfeita, e a nova); cancelar ou reativar mexe na emissão
+    lock_dates = [check.get("compensation_date"), update["compensation_date"]]
+    if "CANCELADO" in (current, data.status):
+        lock_dates.append(check["issue_date"])
+    await ensure_period_open(*lock_dates, what="Cheque")
+
     now = datetime.now(timezone.utc).isoformat()
     update["updated_at"] = now
     await db.checks.update_one(
@@ -384,9 +394,10 @@ async def update_check_status(check_id: str, data: CheckStatusUpdate, current_us
 
 @api_router.delete("/checks/{check_id}")
 async def delete_check(check_id: str, current_user: dict = Depends(get_current_admin_user)):
-    check = await db.checks.find_one({"id": check_id}, {"_id": 0, "status": 1})
+    check = await db.checks.find_one({"id": check_id}, {"_id": 0, "status": 1, "issue_date": 1})
     if not check:
         raise HTTPException(status_code=404, detail="Cheque não encontrado")
+    await ensure_period_open(check.get("issue_date"), what="Cheque emitido")
     # Compensado/devolvido é movimento real na conta: fica como registro
     if check["status"] in ("COMPENSADO", "DEVOLVIDO"):
         raise HTTPException(status_code=400, detail=f"Cheque {STATUS_LABELS[check['status']].lower()} não pode ser excluído. Volte para Emitido antes, se foi engano.")

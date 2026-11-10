@@ -80,6 +80,7 @@ class CompanySettings(BaseModel):
     logo_filename: Optional[str] = None
     accent_color: Optional[str] = None  # "#RRGGBB": destaque nas telas, PDFs, Excel e e-mails (ver branding.py)
     auto_booking_prefix: Optional[str] = None  # Se preenchido, Booking/Ref. de Ordens de Carregamento tipo Entrega é gerado automaticamente (ex: "TLL" -> TLL00001, TLL00002...)
+    financial_lock_date: Optional[str] = None  # YYYY-MM-DD: fechamento do financeiro (ver period_lock.py)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class CompanySettingsUpdate(BaseModel):
@@ -96,6 +97,7 @@ class CompanySettingsUpdate(BaseModel):
     logo_filename: Optional[str] = None
     accent_color: Optional[str] = None
     auto_booking_prefix: Optional[str] = None
+    financial_lock_date: Optional[str] = None  # "" reabre todo o período
 
 DRIVER_STATUS_OPTIONS = ["ATIVO", "INATIVO", "BLOQUEADO"]
 

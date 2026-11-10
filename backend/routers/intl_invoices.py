@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from models import IntlInvoiceCreate
 from reports import merge_company
+from period_lock import ensure_period_open
 
 from shared import db, get_current_admin_user, get_company_settings, round_money
 
@@ -126,7 +127,8 @@ async def create_intl_invoice(
     current_user: dict = Depends(get_current_admin_user)
 ):
     """Cria uma nova invoice internacional"""
-    
+    await ensure_period_open(data.issue_date, what="Invoice internacional emitida")
+
     items_data, subtotal = _build_items(data)
     total = subtotal
 
@@ -195,7 +197,12 @@ async def update_intl_invoice_status(
     """Atualiza o status de uma invoice internacional"""
     if status not in ["EMITIDA", "PAGA", "CANCELADA"]:
         raise HTTPException(status_code=400, detail="Status inválido")
-    
+    invoice = await db.intl_invoices.find_one({"id": invoice_id}, {"_id": 0, "status": 1, "issue_date": 1})
+    # A invoice não guarda o dia do pagamento: só pagar é livre; cancelar,
+    # reativar ou desfazer um pagamento mexe no período da emissão
+    if invoice and invoice.get("status") != status and status != "PAGA":
+        await ensure_period_open(invoice.get("issue_date"), what="Invoice internacional emitida")
+
     result = await db.intl_invoices.update_one(
         {"id": invoice_id},
         {"$set": {"status": status, "updated_at": datetime.now(timezone.utc).isoformat()}}
@@ -210,6 +217,9 @@ async def update_intl_invoice_status(
 @api_router.delete("/intl-invoices/{invoice_id}")
 async def delete_intl_invoice(invoice_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Exclui uma invoice internacional"""
+    invoice = await db.intl_invoices.find_one({"id": invoice_id}, {"_id": 0, "issue_date": 1})
+    if invoice:
+        await ensure_period_open(invoice.get("issue_date"), what="Invoice internacional emitida")
     result = await db.intl_invoices.delete_one({"id": invoice_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Invoice não encontrada")
@@ -227,6 +237,7 @@ async def update_intl_invoice(
         raise HTTPException(status_code=404, detail="Invoice não encontrada")
     if invoice.get('status') == 'CANCELADA':
         raise HTTPException(status_code=400, detail="Invoice cancelada não pode ser editada")
+    await ensure_period_open(invoice.get("issue_date"), data.issue_date, what="Invoice internacional emitida")
 
     items_data, subtotal = _build_items(data)
     total = subtotal

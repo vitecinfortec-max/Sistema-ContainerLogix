@@ -11,6 +11,7 @@ from models import (
     PortServiceBillingBatch, PortServiceBillingBatchCreate, PortServiceBillingBatchUpdate,
     PortServiceBillingBatchResponse,
 )
+from period_lock import ensure_period_open
 from reports import (
     today_brt,
     _build_pdf_header, _make_pdf_footer, merge_company, format_currency,
@@ -640,6 +641,7 @@ async def create_port_service_billing_batch(
     create+update_many já usado por POST /invoices."""
     if not data.service_ids:
         raise HTTPException(status_code=400, detail="Selecione pelo menos um Serviço Portuário")
+    await ensure_period_open(datetime.now(timezone.utc), what="Fatura de Serviço Portuário")  # emitida hoje
 
     services = await db.port_services.find(
         {"id": {"$in": data.service_ids}}, {"_id": 0}
@@ -717,6 +719,7 @@ async def update_port_service_billing_batch(
         raise HTTPException(status_code=404, detail="Fatura de Serviço Portuário não encontrada")
     if batch['status'] == 'CANCELADO':
         raise HTTPException(status_code=400, detail="Fatura cancelada não pode ser editada")
+    await ensure_period_open(batch.get('created_at'), batch.get('paid_at'), what="Fatura de Serviço Portuário")
 
     update_data = {}
     discount_value = batch.get('discount_value') or 0
@@ -775,6 +778,12 @@ async def update_port_service_billing_batch_status(
 
     update_data = {"status": status}
     update_data["paid_at"] = datetime.now(timezone.utc) if status == "PAGO" else None
+    if status != batch['status']:
+        # Baixa: vale o dia do pagamento; cancelar mexe na receita do mês da emissão
+        lock_dates = [batch.get('paid_at'), update_data["paid_at"]]
+        if status == 'CANCELADO':
+            lock_dates.append(batch.get('created_at'))
+        await ensure_period_open(*lock_dates, what="Fatura de Serviço Portuário")
     await db.port_service_billing_batches.update_one({"id": batch_id}, {"$set": update_data})
 
     if status == "CANCELADO":

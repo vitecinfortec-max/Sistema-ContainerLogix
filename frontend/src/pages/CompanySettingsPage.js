@@ -29,7 +29,8 @@ const EMPTY_FORM = {
   pix_key: '',
   logo_filename: '',
   accent_color: '',
-  auto_booking_prefix: ''
+  auto_booking_prefix: '',
+  financial_lock_date: ''
 };
 
 export default function CompanySettingsPage() {
@@ -432,6 +433,29 @@ export default function CompanySettingsPage() {
                 />
                 <p className="text-[12px] text-slate-500 dark:text-slate-400">
                   Se preenchido (ex: "TLL"), toda Ordem de Carregamento do tipo Entrega passa a gerar o Booking/Ref. sozinha, em sequência (TLL00001, TLL00002...). Deixe em branco para continuar preenchendo manualmente.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-slate-200 dark:border-slate-700 shadow-none">
+            <CardHeader className="py-3 px-4 border-b border-slate-100 dark:border-slate-800">
+              <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">Fechamento do Financeiro</CardTitle>
+              <CardDescription className="text-[12px]">Trava os lançamentos financeiros de meses já fechados com a contabilidade</CardDescription>
+            </CardHeader>
+            <CardContent className="p-4">
+              <div className="max-w-sm space-y-1.5">
+                <Label htmlFor="financial_lock_date" className="block">Período fechado até</Label>
+                <Input
+                  id="financial_lock_date"
+                  type="date"
+                  data-testid="company-financial-lock-date-input"
+                  value={formData.financial_lock_date || ''}
+                  onChange={(e) => setFormData({ ...formData, financial_lock_date: e.target.value })}
+                  disabled={!isAdmin}
+                />
+                <p className="text-[12px] text-slate-500 dark:text-slate-400">
+                  Faturas, cheques, prestações de contas, pagamentos de frete, diárias, faturamento portuário, invoices internacionais e créditos de cliente com data até este dia não podem mais ser incluídos, alterados nem excluídos, por ninguém. Recebimentos e baixas feitos depois desta data continuam liberados. Para corrigir algo, volte a data, corrija e feche de novo. Deixe em branco para não travar nada.
                 </p>
               </div>
             </CardContent>

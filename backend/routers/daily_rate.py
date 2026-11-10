@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from models import DailyRateRequestItem, DailyRateRequestCreate, DailyRateRequestResponse, DailyRatePaidItemsUpdate
 from reports import merge_company, short_person_name
+from period_lock import ensure_period_open
 
 from shared import db, get_current_admin_user, get_company_settings, parse_datetime_value, load_logo_buffer
 
@@ -85,6 +86,17 @@ def _set_items_paid(request: dict, paid_by_index: dict, now: str) -> dict:
     elif request.get("status") != "PAGO" or not request.get("paid_at"):
         update["paid_at"] = max(item["paid_at"] for item in items)
     return update
+
+
+def _paid_dates(request: dict) -> list:
+    """Data de pagamento de cada item (motorista), na ordem dos itens."""
+    return [item_paid_at(request, item) for item in request.get("items") or []]
+
+
+async def _ensure_payment_dates_open(before: list, after: list) -> None:
+    """Pagamento marcado ou desmarcado: vale o dia do pagamento, o antigo e o novo."""
+    changed = [d for old, new in zip(before, after) if old != new for d in (old, new)]
+    await ensure_period_open(*changed, what="Pagamento de diária")
 
 
 @api_router.get("/daily-rate-requests")
@@ -180,6 +192,7 @@ async def update_daily_rate_request(request_id: str, data: DailyRateRequestCreat
         raise HTTPException(status_code=400, detail="Só é possível editar solicitação pendente. Volte o status para Pendente antes de editar.")
     if any(item_is_paid(daily_request, item) for item in daily_request.get("items") or []):
         raise HTTPException(status_code=400, detail="Esta solicitação tem motorista já pago. Desmarque o pagamento antes de editar.")
+    await ensure_period_open(daily_request.get("created_at"), what="Solicitação de diária")
 
     items_data, total_value = _build_daily_rate_items(data)
 
@@ -201,6 +214,7 @@ async def delete_daily_rate_request(request_id: str, current_user: dict = Depend
     daily_request = await db.daily_rate_requests.find_one({"id": request_id})
     if not daily_request:
         raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
+    await ensure_period_open(daily_request.get("created_at"), *_paid_dates(daily_request), what="Solicitação de diária")
 
     await db.daily_rate_requests.delete_one({"id": request_id})
     return {"message": "Solicitação de diária excluída com sucesso"}
@@ -216,6 +230,10 @@ async def update_daily_rate_request_status(request_id: str, new_status: str, cur
     if not daily_request:
         raise HTTPException(status_code=404, detail="Solicitação de diária não encontrada")
 
+    if "CANCELADO" in (new_status, daily_request.get("status")) and new_status != daily_request.get("status"):
+        await ensure_period_open(daily_request.get("created_at"), what="Solicitação de diária")
+    paid_before = _paid_dates(daily_request)
+    paid_at_before = daily_request.get("paid_at")
     now = datetime.now(timezone.utc).isoformat()
     items = daily_request.get("items") or []
     if new_status == "CANCELADO":
@@ -226,6 +244,12 @@ async def update_daily_rate_request_status(request_id: str, new_status: str, cur
     else:
         update = {"status": new_status, "updated_at": now,
                   "paid_at": (daily_request.get("paid_at") or now) if new_status == "PAGO" else None}
+    if new_status == "CANCELADO":
+        pass  # já conferido pela data da solicitação, acima
+    elif items:
+        await _ensure_payment_dates_open(paid_before, [i["paid_at"] if i["paid"] else None for i in update["items"]])
+    else:
+        await _ensure_payment_dates_open([paid_at_before], [update.get("paid_at")])
     await db.daily_rate_requests.update_one({"id": request_id}, {"$set": update})
 
     return {"message": "Status atualizado"}
@@ -244,7 +268,9 @@ async def update_daily_rate_paid_items(request_id: str, data: DailyRatePaidItems
     if not data.indexes or any(i < 0 or i >= len(items) for i in data.indexes):
         raise HTTPException(status_code=400, detail="Item inválido")
 
+    paid_before = _paid_dates(daily_request)
     update = _set_items_paid(daily_request, {i: data.paid for i in data.indexes}, datetime.now(timezone.utc).isoformat())
+    await _ensure_payment_dates_open(paid_before, [i["paid_at"] if i["paid"] else None for i in update["items"]])
     await db.daily_rate_requests.update_one({"id": request_id}, {"$set": update})
     return await db.daily_rate_requests.find_one({"id": request_id}, {"_id": 0})
 

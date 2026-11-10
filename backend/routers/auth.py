@@ -2,7 +2,7 @@ import asyncio
 from html import escape
 import os
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -289,6 +289,11 @@ async def update_company_settings(data: CompanySettingsUpdate, current_user: dic
         if not re.fullmatch(r"[A-Z0-9/-]{1,10}", prefix):
             raise HTTPException(status_code=400, detail="O prefixo do Booking deve ter só letras, números, - ou / (até 10, sem espaços)")
         changes['auto_booking_prefix'] = prefix
+    if changes.get('financial_lock_date'):
+        try:
+            changes['financial_lock_date'] = date.fromisoformat(changes['financial_lock_date'][:10]).isoformat()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Data de fechamento do financeiro inválida")
     if changes.get('email') and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", changes['email']):
         raise HTTPException(status_code=400, detail="Email da empresa inválido")
     changes['updated_at'] = datetime.now(timezone.utc).isoformat()

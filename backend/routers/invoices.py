@@ -14,6 +14,7 @@ from models import (
 
 from shared import db, get_current_admin_user, get_company_settings, parse_datetime_value, round_money
 from reports import BRT_TZ
+from period_lock import ensure_period_open
 
 api_router = APIRouter(prefix="/api")
 
@@ -185,6 +186,8 @@ async def create_invoice(
 ):
     """Cria uma nova fatura a partir das movimentações selecionadas"""
     
+    await ensure_period_open(datetime.now(timezone.utc), what="Fatura")  # emitida hoje
+
     # IDs repetidos na seleção contam uma vez só
     movement_ids = list(dict.fromkeys(invoice_input.movement_ids))
     if not movement_ids:
@@ -387,6 +390,12 @@ async def update_invoice_status(
         update["paid_date"] = received.isoformat()
     else:
         update["paid_date"] = None
+    # Baixa: vale a data do recebimento (fatura de período fechado pode ser
+    # paga depois); cancelar mexe na receita do mês da emissão
+    lock_dates = [invoice['created_at']] if status == 'CANCELADO' and old_status != 'CANCELADO' else []
+    if update["paid_date"] != invoice.get('paid_date'):
+        lock_dates += [invoice.get('paid_date'), update["paid_date"]]
+    await ensure_period_open(*lock_dates, what="Fatura")
     await db.invoices.update_one({"id": invoice_id}, {"$set": update})
 
     if old_status != status or update["paid_date"] != invoice.get('paid_date'):
@@ -426,6 +435,7 @@ async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current
         raise HTTPException(status_code=404, detail="Fatura não encontrada")
     if invoice.get('status') == 'CANCELADO':
         raise HTTPException(status_code=400, detail="Fatura cancelada não pode ser editada")
+    await ensure_period_open(invoice['created_at'], invoice.get('paid_date'), what="Fatura")
 
     # Preparar dados para atualização e rastrear mudanças
     update_data = {}
@@ -670,7 +680,8 @@ async def delete_invoice(invoice_id: str, current_user: dict = Depends(get_curre
     invoice = await db.invoices.find_one({"id": invoice_id}, {"_id": 0})
     if not invoice:
         raise HTTPException(status_code=404, detail="Fatura não encontrada")
-    
+    await ensure_period_open(invoice['created_at'], invoice.get('paid_date'), what="Fatura")
+
     if invoice.get('credit_applied') and (invoice.get('status') or 'PENDENTE') != 'CANCELADO':
         from routers.client_credits import return_invoice_credit
         await return_invoice_credit(invoice, None, f"Fatura #{invoice['invoice_number']} excluída", current_user)

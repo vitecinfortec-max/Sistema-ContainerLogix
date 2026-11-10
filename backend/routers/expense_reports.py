@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 
 from models import ExpenseGroupCreate, ExpenseReportPurchase, ExpenseReportCreate, ExpenseReportResponse, ExpenseReportSettlement
 from reports import now_brt
+from period_lock import ensure_period_open
 
 from shared import (
     db, get_current_admin_user, get_company_settings, validate_and_read_upload,
@@ -244,6 +245,7 @@ async def get_expense_report(report_id: str, current_user: dict = Depends(get_cu
 @api_router.post("/expense-reports", response_model=ExpenseReportResponse)
 async def create_expense_report(data: ExpenseReportCreate, current_user: dict = Depends(get_current_admin_user)):
     """Cria nova prestação de contas"""
+    await ensure_period_open(data.period_end, what="Prestação de contas com período até")
     seq, formatted = await get_next_expense_report_number()
 
     purchases_data = await resolve_expense_report_purchases(data.purchases)
@@ -284,6 +286,7 @@ async def update_expense_report(report_id: str, data: ExpenseReportCreate, curre
 
     if existing["status"] == "CONCLUIDA":
         raise HTTPException(status_code=400, detail="Prestação de contas concluída não pode ser editada. Reabra antes de editar.")
+    await ensure_period_open(existing.get("period_end"), data.period_end, what="Prestação de contas com período até")
 
     # Preserva os recibos já anexados a cada lançamento, casando por item_id
     existing_by_id = {p["item_id"]: p for p in existing.get("purchases", [])}
@@ -315,6 +318,9 @@ async def update_expense_report(report_id: str, data: ExpenseReportCreate, curre
 @api_router.delete("/expense-reports/{report_id}")
 async def delete_expense_report(report_id: str, current_user: dict = Depends(get_current_admin_user)):
     """Exclui prestação de contas"""
+    report = await db.expense_reports.find_one({"id": report_id}, {"_id": 0, "period_end": 1, "settled_at": 1})
+    if report:
+        await ensure_period_open(report.get("period_end"), report.get("settled_at"), what="Prestação de contas com período até")
     result = await db.expense_reports.delete_one({"id": report_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Prestação de contas não encontrada")
@@ -333,6 +339,9 @@ async def update_expense_report_status(report_id: str, status: str, current_user
         raise HTTPException(status_code=400, detail="Status inválido")
     if status == "EM_ANDAMENTO" and await db.expense_reports.find_one({"id": report_id, "settled_at": {"$nin": [None, ""]}}):
         raise HTTPException(status_code=400, detail="O saldo desta prestação já foi acertado. Desfaça o acerto antes de reabrir.")
+    report = await db.expense_reports.find_one({"id": report_id}, {"_id": 0, "period_end": 1})
+    if report:
+        await ensure_period_open(report.get("period_end"), what="Prestação de contas com período até")
 
     result = await db.expense_reports.update_one(
         {"id": report_id},
@@ -365,6 +374,7 @@ async def update_expense_report_settlement(report_id: str, data: ExpenseReportSe
         update = {"settled_at": day, "settled_by_name": current_user.get("name", "Sistema")}
     else:
         update = {"settled_at": None, "settled_by_name": None}
+    await ensure_period_open(report.get("settled_at"), update["settled_at"], what="Acerto de prestação de contas")
     update["updated_at"] = datetime.now(timezone.utc).isoformat()
     await db.expense_reports.update_one({"id": report_id}, {"$set": update})
     return await db.expense_reports.find_one({"id": report_id}, {"_id": 0})

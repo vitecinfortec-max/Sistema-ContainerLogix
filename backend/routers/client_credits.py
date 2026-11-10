@@ -9,6 +9,7 @@ from list_filters import combine, day_query, text_query
 from models import CLIENT_CREDIT_PAYMENT_METHODS, ClientCreditApply, ClientCreditCreate, ClientCreditReverse
 from period_reports import Column, Section, MONEY, DAY, INT, pdf_response, excel_response, period_text
 from reports import BRT_TZ, format_currency
+from period_lock import ensure_period_open
 from shared import db, get_current_admin_user, parse_datetime_value
 
 api_router = APIRouter(prefix="/api")
@@ -375,6 +376,7 @@ async def create_entry(data: ClientCreditCreate, current_user: dict = Depends(ge
     if data.payment_method and data.payment_method not in CLIENT_CREDIT_PAYMENT_METHODS:
         raise HTTPException(status_code=400, detail="Forma de pagamento inválida")
     day = _parse_day(data.entry_date)
+    await ensure_period_open(day.isoformat(), what="Lançamento de crédito do cliente")
     client = await _get_client(data.client_id)
     sign = SIGN[data.entry_type]
     await _move_balance(client, sign * cents)
@@ -391,6 +393,7 @@ async def apply_credit(data: ClientCreditApply, current_user: dict = Depends(get
     totalmente coberta passa a Paga na data informada."""
     client = await _get_client(data.client_id)
     day = _parse_day(data.entry_date)
+    await ensure_period_open(day.isoformat(), what="Baixa com crédito do cliente")
     allocations = [(a.invoice_id, _cents(a.amount)) for a in data.allocations if _cents(a.amount) > 0]
     services = []
     for s in data.services:
@@ -467,6 +470,8 @@ async def reverse_entry(entry_id: str, data: ClientCreditReverse, current_user: 
         raise HTTPException(status_code=400, detail="Este lançamento já foi estornado")
 
     if entry["entry_type"] == "USO":
+        # Estornar a baixa reabre a fatura que ela quitou naquele dia
+        await ensure_period_open(entry.get("entry_date"), what="Baixa com crédito do cliente")
         inv = await db.invoices.find_one({"id": entry["invoice_id"]}, {"_id": 0})
         if inv and (inv.get("status") or "PENDENTE") == "PAGO" and not inv.get("paid_by_credit"):
             raise HTTPException(status_code=400, detail=f"A fatura #{inv['invoice_number']} foi paga por outro meio: volte-a para Pendente antes de estornar o crédito")
