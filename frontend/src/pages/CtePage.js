@@ -789,6 +789,9 @@ export default function CtePage() {
   const [pisoOptions, setPisoOptions] = useState(null);
   const [pisoCalc, setPisoCalc] = useState(null);
   const pisoRef = useRef(null);
+  // Força um novo cálculo (ex.: tabela ANTT cadastrada em outra aba): ao voltar
+  // para a janela e ao recalcular a distância pela rota
+  const [pisoTick, setPisoTick] = useState(0);
   const editable = !editingId || CTE_EDITABLE.includes(form.status || 'RASCUNHO');
   const pisoFrete = Math.round((compositionTotal(form.composicao) - (toNumber(form.composicao?.PEDAGIO) || 0)) * 100) / 100;
   const pisoResult = editable ? pisoCalc : (form.frete_minimo_calc || null);
@@ -835,7 +838,13 @@ export default function CtePage() {
     }, 400);
     return () => pisoRef.current && clearTimeout(pisoRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialogOpen, editable, fm.tabela, fm.tipo_carga, fm.eixos, fm.distancia_km, fm.retorno_vazio, fm.distancia_retorno_km]);
+  }, [dialogOpen, editable, pisoTick, fm.tabela, fm.tipo_carga, fm.eixos, fm.distancia_km, fm.retorno_vazio, fm.distancia_retorno_km]);
+  useEffect(() => {
+    if (!dialogOpen) return undefined;
+    const onFocus = () => setPisoTick((n) => n + 1);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [dialogOpen]);
 
   // Eixos da composição pelos veículos do CT-e (cavalo + carretas), se cadastrados
   const suggestedAxles = useMemo(() => {
@@ -845,6 +854,47 @@ export default function CtePage() {
     return found.reduce((sum, v) => sum + Number(v.axle_count), 0);
   }, [form.veiculo_placa, form.reboque_placas, vehicles]);
   const setMinFreight = (patch) => update((prev) => ({ ...prev, frete_minimo: { ...(prev.frete_minimo || emptyMinFreight()), ...patch } }));
+
+  // Distância pela rota entre o início e o fim da prestação (IBGE + OSRM,
+  // gratuitos, com cache no servidor). Sozinha só quando o campo está vazio;
+  // o botão "Calcular pela rota" refaz a qualquer momento.
+  const [routeInfo, setRouteInfo] = useState(null); // { km, fonte } | { erro }
+  const [routeBusy, setRouteBusy] = useState(false);
+  const routePairRef = useRef('');
+  const routeKey = [form.origem?.cidade, form.origem?.uf, form.destino?.cidade, form.destino?.uf].join('|');
+  const fetchRouteDistance = async ({ force = false } = {}) => {
+    const o = form.origem || {};
+    const d = form.destino || {};
+    if (!o.cidade || !o.uf || !d.cidade || !d.uf) {
+      if (force) toast.error('Informe as cidades de início e fim da prestação (Envolvidos)');
+      return;
+    }
+    setRouteBusy(true);
+    try {
+      const r = await api.getRoadDistance({
+        origem_cidade: o.cidade, origem_uf: o.uf, destino_cidade: d.cidade, destino_uf: d.uf,
+        ...(o.codigo_municipio ? { origem_codigo: o.codigo_municipio } : {}),
+        ...(d.codigo_municipio ? { destino_codigo: d.codigo_municipio } : {}),
+      });
+      setRouteInfo({ km: r.data.km, fonte: r.data.fonte });
+      setMinFreight({ distancia_km: toInput(r.data.km) });
+      setPisoTick((n) => n + 1);
+    } catch (e) {
+      setRouteInfo({ erro: apiErrorMessage(e, 'Não foi possível calcular a distância pela rota') });
+      if (force) toast.error(apiErrorMessage(e, 'Não foi possível calcular a distância pela rota'));
+    } finally {
+      setRouteBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (!dialogOpen) { routePairRef.current = ''; return; }
+    if (!editable) return;
+    if (routePairRef.current === routeKey) return;
+    routePairRef.current = routeKey;
+    setRouteInfo(null);
+    if (!toNumber(form.frete_minimo?.distancia_km)) fetchRouteDistance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dialogOpen, editable, routeKey]);
 
   // Container: ao sair do número, sugere tamanho, tipo e tara do último registro no Gate
   const suggestContainer = (index) => {
@@ -1827,7 +1877,13 @@ export default function CtePage() {
                         <SelectContent>{(pisoOptions?.eixos || [2, 3, 4, 5, 6, 7, 9]).map((n) => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}</SelectContent>
                       </Select>
                     </Field>
-                    <Field label="Distância (km)" className="md:col-span-2">
+                    <Field label="Distância (km)" className="md:col-span-2"
+                      hint={editable ? (
+                        <button type="button" className="text-primary hover:underline disabled:opacity-50" onClick={() => fetchRouteDistance({ force: true })}
+                          disabled={routeBusy} data-testid="cte-piso-rota">
+                          {routeBusy ? 'Calculando…' : 'Calcular pela rota'}
+                        </button>
+                      ) : undefined}>
                       <Input inputMode="decimal" value={fm.distancia_km || ''} onChange={(e) => setMinFreight({ distancia_km: decimalInput(e.target.value, 2) })}
                         className="text-right tabular-nums" disabled={!editable} data-testid="cte-piso-distancia" />
                     </Field>
@@ -1851,6 +1907,13 @@ export default function CtePage() {
                       <Input value={fmtMoney(pisoFrete)} readOnly className="bg-slate-50 dark:bg-slate-800 text-right tabular-nums" data-testid="cte-piso-frete" />
                     </Field>
                   </div>
+                  {routeInfo && editable && (
+                    <p className={`text-xs ${routeInfo.erro ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500'}`} data-testid="cte-piso-rota-info">
+                      {routeInfo.erro
+                        ? `${routeInfo.erro}. Informe a distância à mão.`
+                        : `Distância pela rota: ${Number(routeInfo.km).toLocaleString('pt-BR')} km (${routeInfo.fonte}). Confira e ajuste se o trajeto real for outro.`}
+                    </p>
+                  )}
                   {pisoResult?.valor_piso != null ? (
                     <div className={`rounded-md border px-3 py-2 text-xs ${pisoAbaixo
                       ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300'
@@ -1864,8 +1927,13 @@ export default function CtePage() {
                       {pisoResult.teste && <strong> · TABELA DE TESTE, não oficial</strong>}
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-500" data-testid="cte-piso-motivo">{pisoResult?.motivo || 'Informe a tabela, o tipo de carga, os eixos e a distância.'}{' '}
-                      <a href="/fiscal/pisos-antt" target="_blank" rel="noreferrer" className="text-primary hover:underline">Tabelas ANTT</a></p>
+                    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300" data-testid="cte-piso-motivo">
+                      <AlertTriangle className="inline w-3.5 h-3.5 mr-1" />
+                      Frete mínimo não calculado: {pisoResult?.motivo || 'informe a tabela, o tipo de carga, os eixos e a distância'}.{' '}
+                      {/tabela/i.test(pisoResult?.motivo || '') && (
+                        <a href="/fiscal/pisos-antt" target="_blank" rel="noreferrer" className="font-medium underline">Cadastrar / conferir as tabelas ANTT</a>
+                      )}
+                    </p>
                   )}
                 </Section>
 

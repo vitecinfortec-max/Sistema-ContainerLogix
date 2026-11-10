@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 import antt_piso
+import geo_distancia
 from shared import db, get_current_active_user, get_current_admin_user
 
 api_router = APIRouter(prefix="/api")
@@ -73,6 +74,23 @@ async def calculate(tabela: str = "A", tipo_carga: int = antt_piso.TIPO_CARGA_PA
     params = {"tabela": tabela, "tipo_carga": tipo_carga, "eixos": eixos, "distancia_km": distancia_km,
               "retorno_vazio": retorno_vazio, "distancia_retorno_km": distancia_retorno_km}
     return antt_piso.compute(await antt_piso.resolution_for(data or date.today()), params)
+
+
+@api_router.get(BASE + "/distancia")
+async def road_distance(origem_cidade: Optional[str] = None, origem_uf: Optional[str] = None, origem_codigo: Optional[str] = None,
+                        destino_cidade: Optional[str] = None, destino_uf: Optional[str] = None, destino_codigo: Optional[str] = None,
+                        current_user: dict = Depends(get_current_active_user)):
+    """Distância rodoviária sugerida entre o início e o fim da prestação
+    (IBGE + OSRM, gratuitos; ver geo_distancia.py)."""
+    from routers.fiscal import _codigo_municipio
+    origem = geo_distancia.plain_code(origem_codigo) or await _codigo_municipio(origem_cidade, origem_uf)
+    destino = geo_distancia.plain_code(destino_codigo) or await _codigo_municipio(destino_cidade, destino_uf)
+    if not origem or not destino:
+        raise HTTPException(status_code=400, detail="Município de início ou de fim da prestação não encontrado (confira cidade e UF)")
+    try:
+        return await geo_distancia.road_distance_km(origem, destino)
+    except geo_distancia.DistanceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
 
 
 @api_router.get(BASE + "/publicacoes")

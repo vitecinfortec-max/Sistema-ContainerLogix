@@ -187,3 +187,45 @@ def test_container_info_endpoint(api, provider):  # noqa: F811
     ]))
     assert api.get("/api/ctes/container-info/mscu1234565").json() == {"tamanho": "40", "tipo": "HC", "tara": 3800.0}
     assert api.get("/api/ctes/container-info/NAOEXISTE1").json() == {}
+
+
+def _fake_geo(monkeypatch, calls, osrm_ok=True):
+    """IBGE e OSRM simulados (sem internet): conta as chamadas."""
+    import httpx
+    import geo_distancia
+    coords = {"2304400": (-3.7858, -38.528), "2312403": (-3.6006, -39.0606)}
+
+    def handler(request):
+        calls.append(request.url.host)
+        if "ibge" in request.url.host:
+            code = request.url.path.split("/")[-2]
+            lat, lon = coords[code]
+            return httpx.Response(200, json=[{"id": code, "centroide": {"latitude": lat, "longitude": lon}}])
+        if not osrm_ok:
+            return httpx.Response(503, text="indisponível")
+        return httpx.Response(200, json={"code": "Ok", "routes": [{"distance": 75227.7}]})
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(geo_distancia.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+
+
+def test_road_distance_suggestion_and_cache(api, provider, monkeypatch):  # noqa: F811
+    calls = []
+    _fake_geo(monkeypatch, calls)
+    params = {"origem_cidade": "Fortaleza", "origem_uf": "CE", "destino_cidade": "São Gonçalo do Amarante", "destino_uf": "CE"}
+    r = api.get("/api/fiscal/pisos-antt/distancia", params=params)
+    assert r.status_code == 200, r.text
+    assert r.json()["km"] == 75.2 and r.json()["cache"] is False and len(calls) == 3  # 2 IBGE + 1 OSRM
+    # Segunda vez: vem do banco, sem chamar os serviços
+    again = api.get("/api/fiscal/pisos-antt/distancia", params=params).json()
+    assert again["km"] == 75.2 and again["cache"] is True and len(calls) == 3
+    same = api.get("/api/fiscal/pisos-antt/distancia", params={**params, "destino_cidade": "Fortaleza"}).json()
+    assert same["km"] == 0.0
+    bad = api.get("/api/fiscal/pisos-antt/distancia", params={**params, "destino_cidade": "Cidade Inexistente"})
+    assert bad.status_code == 400
+
+
+def test_road_distance_service_down(api, provider, monkeypatch):  # noqa: F811
+    _fake_geo(monkeypatch, [], osrm_ok=False)
+    r = api.get("/api/fiscal/pisos-antt/distancia", params={"origem_codigo": "2304400", "destino_codigo": "2312403"})
+    assert r.status_code == 503 and "informe a distância à mão" in r.json()["detail"]

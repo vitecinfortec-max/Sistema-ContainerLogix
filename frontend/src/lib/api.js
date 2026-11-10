@@ -897,6 +897,7 @@ export const api = {
     return axios.post(`${API}/fiscal/pisos-antt/${id}/importar`, body);
   },
   calcAnttFloor: (params) => axios.get(`${API}/fiscal/pisos-antt/calcular`, { params }),
+  getRoadDistance: (params) => axios.get(`${API}/fiscal/pisos-antt/distancia`, { params }),
   getCteContainerInfo: (numero) => axios.get(`${API}/ctes/container-info/${encodeURIComponent(numero)}`),
   checkAnttPublications: () => axios.post(`${API}/fiscal/pisos-antt/verificar`),
   markAnttPublicationChecked: (id) => axios.post(`${API}/fiscal/pisos-antt/publicacoes/${encodeURIComponent(id)}/conferida`),
