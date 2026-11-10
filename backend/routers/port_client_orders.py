@@ -314,7 +314,7 @@ async def update_port_client_order(order_id: str, data: PortClientOrderUpdate, c
         settlement = await settlement_holding('client_os', order_id)
         if settlement:
             raise HTTPException(status_code=400, detail=(
-                f"Ordem está no Acerto de Motorista nº {settlement['settlement_number']}: tire-a do acerto "
+                f"Ordem está no Acerto da Viagem nº {settlement['settlement_number']}: tire-a do acerto "
                 "(ou reabra o acerto) antes de mudar o status ou o motorista."))
     if merged.get('status') == 'CONCLUIDA' and not merged.get('completed_at'):
         changes['completed_at'] = _now_local()

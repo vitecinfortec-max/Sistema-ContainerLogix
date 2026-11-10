@@ -4731,10 +4731,13 @@ class TransportOccurrenceCreate(BaseModel):
     resolution: Optional[str] = None  # o que foi feito para resolver
 
 
-# ==================== TRANSPORTE - ACERTO DE MOTORISTA ====================
+# ==================== TRANSPORTE - ACERTO DA VIAGEM ====================
+# (antes "Acerto de Motorista"; rota e coleção mantêm o nome técnico)
 # Regras em routers/driver_settlements.py
 
 DRIVER_SETTLEMENT_ADVANCE_KINDS = ["ADIANTAMENTO", "DEVOLUCAO"]
+DRIVER_SETTLEMENT_PAID_BY = ["MOTORISTA", "EMPRESA"]
+DRIVER_SETTLEMENT_EXPENSE_CATEGORIES = ["PEDAGIO", "DIARIA", "COMISSAO", "ALIMENTACAO", "OUTRAS"]
 
 
 class DriverSettlementExpense(BaseModel):
@@ -4744,6 +4747,9 @@ class DriverSettlementExpense(BaseModel):
     supplier_name: Optional[str] = None
     quantity: float = Field(default=1, gt=0)
     unit_value: float = Field(default=0, ge=0)
+    # Quem pagou: só o que o motorista pagou entra no saldo com ele; tudo entra no resultado da viagem
+    paid_by: Literal["MOTORISTA", "EMPRESA"] = "MOTORISTA"
+    category: Literal["PEDAGIO", "DIARIA", "COMISSAO", "ALIMENTACAO", "OUTRAS"] = "OUTRAS"
 
 
 class DriverSettlementTrip(BaseModel):
@@ -4766,8 +4772,10 @@ class DriverSettlementCreate(BaseModel):
     driver_id: str
     vehicle_id: Optional[str] = None
     settlement_date: str  # YYYY-MM-DD - data do documento (vale para o fechamento de período)
+    trip_start: Optional[str] = None  # YYYY-MM-DD - saída da viagem (filtra os abastecimentos)
+    trip_end: Optional[str] = None  # YYYY-MM-DD - chegada da viagem
     observations: Optional[str] = None
-    fuel_supply_ids: List[str] = Field(default_factory=list)  # só abastecimentos "Pago pelo Motorista"
+    fuel_supply_ids: List[str] = Field(default_factory=list)  # abastecimentos da viagem: interno e externo, qualquer pagamento
     trips: List[DriverSettlementTrip] = Field(default_factory=list)  # Ordens de Carregamento aprovadas
     expenses: List[DriverSettlementExpense] = Field(default_factory=list)
     advances: List[DriverSettlementAdvance] = Field(default_factory=list)

@@ -560,7 +560,7 @@ MODULE_CATALOG = [
         {"key": "operacional.conferencia_turnos", "label": "Conferência de Turnos"},
         {"key": "operacional.custo_faturamento_veiculo", "label": "Custo e Faturamento por Veículo"},
         {"key": "operacional.ocorrencias_transporte", "label": "Ocorrências de Transporte"},
-        {"key": "operacional.acerto_motorista", "label": "Acerto de Motorista"},
+        {"key": "operacional.acerto_motorista", "label": "Acerto da Viagem"},
     ]},
     {"key": "estoque", "label": "Almoxarifado", "items": [
         {"key": "estoque.almoxarifado", "label": "Almoxarifado"},

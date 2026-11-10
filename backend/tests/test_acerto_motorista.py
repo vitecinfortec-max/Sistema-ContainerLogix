@@ -1,4 +1,4 @@
-"""Acerto de Motorista: abastecimentos pagos pelo motorista + despesas +
+"""Acerto da Viagem (antes Acerto de Motorista): abastecimentos pagos pelo motorista + despesas +
 viagens com km - adiantamentos + devoluções = saldo; cada abastecimento/viagem
 em um acerto só; Fechado trava; só administrador; fechamento de período."""
 
@@ -39,8 +39,9 @@ def _body(**over):
 def test_candidates_create_and_totals(api):
     _seed(api)
     cand = api.get("/api/driver-settlements/candidates", params={"driver_id": "dr-1"}).json()
-    assert [f["id"] for f in cand["fuel_supplies"]] == ["fs-1"]  # só pago pelo motorista, só dele
-    assert cand["fuel_supplies"][0]["total"] == 610  # 600 - 10 + 20 (outras despesas)
+    # todos os abastecimentos do veículo/motorista (pago pelo motorista e faturado), não os de outro motorista
+    assert sorted(f["id"] for f in cand["fuel_supplies"]) == ["fs-1", "fs-2"]
+    assert next(f for f in cand["fuel_supplies"] if f["id"] == "fs-1")["total"] == 610  # 600 - 10 + 20 (outras despesas)
     assert [t["loading_order_id"] for t in cand["trips"]] == ["lo-1"]  # só aprovadas
 
     s = api.post("/api/driver-settlements", json=_body()).json()
@@ -52,9 +53,10 @@ def test_candidates_create_and_totals(api):
     assert s["balance"] == 610 + 31 - 500 + 50
 
     # já usados não aparecem mais pra outro acerto, mas aparecem pro próprio
-    assert api.get("/api/driver-settlements/candidates", params={"driver_id": "dr-1"}).json() == {"fuel_supplies": [], "trips": []}
+    left = api.get("/api/driver-settlements/candidates", params={"driver_id": "dr-1"}).json()
+    assert [f["id"] for f in left["fuel_supplies"]] == ["fs-2"] and left["trips"] == []
     own = api.get("/api/driver-settlements/candidates", params={"driver_id": "dr-1", "settlement_id": s["id"]}).json()
-    assert len(own["fuel_supplies"]) == 1 and len(own["trips"]) == 1
+    assert len(own["fuel_supplies"]) == 2 and len(own["trips"]) == 1  # o do acerto + o faturado ainda livre
     r = api.post("/api/driver-settlements", json=_body(trips=[], expenses=[], advances=[]))
     assert r.status_code == 400 and "Acerto nº 1" in r.json()["detail"]
 
@@ -62,7 +64,6 @@ def test_candidates_create_and_totals(api):
 def test_validation(api):
     _seed(api)
     cases = [
-        _body(fuel_supply_ids=["fs-2"]),  # faturado, não pago pelo motorista
         _body(fuel_supply_ids=["fs-3"]),  # de outro motorista
         _body(trips=[{"loading_order_id": "lo-2"}]),  # não aprovada
         _body(trips=[{"loading_order_id": "lo-1", "km_start": 500, "km_end": 400}]),
@@ -81,7 +82,7 @@ def test_close_locks_and_source_guards(api):
 
     # abastecimento/ordem acertados não podem ser apagados nem desaprovados
     r = api.delete("/api/fuel-supplies/fs-1")
-    assert r.status_code == 400 and "Acerto de Motorista nº 1" in r.json()["detail"]
+    assert r.status_code == 400 and "Acerto da Viagem nº 1" in r.json()["detail"]
     assert api.delete("/api/loading-orders/lo-1").status_code == 400
     assert api.put("/api/loading-orders/lo-1", json={"status": "CANCELADA"}).status_code == 400
 

@@ -72,7 +72,7 @@ def test_settlement_with_loading_order_and_client_os(api):
     # OS no acerto: não pode ser excluída, cancelada nem trocar de motorista
     assert api.delete(f"/api/port-client-orders/{os1['id']}").status_code == 400
     r = api.put(f"/api/port-client-orders/{os1['id']}", json={"driver_id": "dr-2", "driver_name": "Pedro"})
-    assert r.status_code == 400 and "Acerto de Motorista" in r.json()["detail"]
+    assert r.status_code == 400 and "Acerto da Viagem" in r.json()["detail"]
     # outros campos continuam editáveis
     assert api.put(f"/api/port-client-orders/{os1['id']}", json={"observations": "ok"}).status_code == 200
 

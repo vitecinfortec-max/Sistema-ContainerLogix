@@ -25,6 +25,6 @@ async def ensure_not_in_settlement(kind: str, record_id: str, action: str) -> No
         what = {"fuel": "Abastecimento", "client_os": "Ordem de Serviço - Cliente"}.get(kind, "Ordem de Carregamento")
         raise HTTPException(
             status_code=400,
-            detail=f"{what} está no Acerto de Motorista nº {settlement['settlement_number']}: "
+            detail=f"{what} está no Acerto da Viagem nº {settlement['settlement_number']}: "
                    f"tire-o do acerto (ou reabra o acerto) antes de {action}.",
         )

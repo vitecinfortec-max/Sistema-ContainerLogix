@@ -120,7 +120,7 @@ const FORM_PAGE_TITLES = {
   '/loading-schedules': ['Nova Programação de Carregamento', 'Editar Programação de Carregamento'],
   '/port-services': ['Novo Serviço Portuário', 'Editar Serviço Portuário'],
   '/expense-reports': ['Nova Prestação de Contas', 'Editar Prestação de Contas'],
-  '/driver-settlements': ['Novo Acerto de Motorista', 'Acerto de Motorista'],
+  '/driver-settlements': ['Novo Acerto da Viagem', 'Acerto da Viagem'],
   '/daily-rate-requests': ['Nova Solicitação de Diária', 'Editar Solicitação de Diária'],
   '/billing': ['Gerar Nova Fatura', 'Editar Fatura'],
   '/international-invoices': ['Nova Invoice Internacional', 'Editar Invoice Internacional'],
@@ -154,7 +154,7 @@ const PAGE_TITLES = {
   '/estoque/relatorio': 'Relatórios do Estoque',
   '/loading-orders': 'Ordem de Carregamento',
   '/transport-occurrences': 'Ocorrências de Transporte',
-  '/driver-settlements': 'Acerto de Motorista',
+  '/driver-settlements': 'Acerto da Viagem',
   '/port-client-orders': 'Ordem de Serviço - Cliente',
   '/port-client-orders/reports': 'Relatórios OS - Cliente',
   '/fiscal/cte': 'CT-e',
@@ -737,8 +737,8 @@ function LayoutFrame({ children }) {
     { path: '/fleet/rpa-terceiro', label: 'Contrato de Frete', icon: FileText, moduleKey: 'financeiro.rpa_terceiro' },
     { path: '/loading-orders', label: 'Ordem de Carregamento', icon: PackageCheck, moduleKey: 'operacional.ordem_carregamento' },
     { path: '/transport-occurrences', label: 'Ocorrências', icon: AlertOctagon, moduleKey: 'operacional.ocorrencias_transporte' },
-    // Acerto de Motorista: mexe com o dinheiro do motorista - só administrador (a rota também é adminOnly)
-    ...(isAdmin ? [{ path: '/driver-settlements', label: 'Acerto de Motorista', icon: Handshake, moduleKey: 'operacional.acerto_motorista' }] : []),
+    // Acerto da Viagem: mexe com o dinheiro do motorista - só administrador (a rota também é adminOnly)
+    ...(isAdmin ? [{ path: '/driver-settlements', label: 'Acerto da Viagem', icon: Handshake, moduleKey: 'operacional.acerto_motorista' }] : []),
     { path: '/port-client-orders', label: 'Ordem de Serviço - Cliente', icon: Container, moduleKey: 'operacional.os_porto_cliente' },
     { path: '/port-client-orders/reports', label: 'Relatórios OS - Cliente', icon: FileBarChart, moduleKey: 'operacional.relatorio_os_porto_cliente' },
     { path: '/freight-routes', label: 'Rota', icon: Route, moduleKey: 'cadastro.rota' },

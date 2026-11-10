@@ -20,7 +20,7 @@ import { downloadBlob } from '../lib/fiscal';
 import { api } from '../lib/api';
 import { apiErrorMessage } from '../lib/errors';
 import { toast } from 'sonner';
-import { Handshake, Plus, Pencil, Trash2, FileDown, Lock, LockOpen } from 'lucide-react';
+import { Handshake, Plus, Pencil, Trash2, FileDown, Lock, LockOpen, FileText, FileSpreadsheet } from 'lucide-react';
 
 export const SETTLEMENT_STATUS = { ABERTO: 'Aberto', FECHADO: 'Fechado' };
 const STATUS_TONES = { ABERTO: 'amber', FECHADO: 'emerald' };
@@ -36,6 +36,19 @@ export function BalanceText({ value, className = '' }) {
     <span className={`tabular-nums font-semibold ${pays ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'} ${className}`}
       title={pays ? 'A pagar ao motorista' : 'A devolver pelo motorista'}>
       {pays ? '' : '- '}{formatMoney(Math.abs(value))}
+    </span>
+  );
+}
+
+// Resultado da viagem: verde quando dá lucro (com a margem), vermelho no prejuízo
+export function ResultText({ value, margin, className = '' }) {
+  if (!value) return <span className={`tabular-nums text-slate-500 dark:text-slate-400 ${className}`}>{formatMoney(0)}</span>;
+  const profit = value > 0;
+  return (
+    <span className={`tabular-nums font-semibold ${profit ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'} ${className}`}
+      title={profit ? 'Lucro' : 'Prejuízo'}>
+      {profit ? '' : '- '}{formatMoney(Math.abs(value))}
+      {profit && margin != null && <span className="ml-1 text-xs font-medium">({margin.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%)</span>}
     </span>
   );
 }
@@ -173,9 +186,28 @@ export default function DriverSettlementsPage() {
     if (!single) return;
     try {
       const response = await api.getDriverSettlementPdf(single.id);
-      downloadBlob(response.data, `acerto_motorista_${single.settlement_number}.pdf`);
+      downloadBlob(response.data, `acerto_viagem_${single.settlement_number}.pdf`);
     } catch (error) {
       toast.error(apiErrorMessage(error, 'Erro ao gerar o PDF do acerto'));
+    }
+  };
+
+  // Relatório de acertos com os filtros da tela (Receita, Custo, Resultado, Margem)
+  const [reporting, setReporting] = useState(false);
+  const handleReport = async (format) => {
+    setReporting(true);
+    try {
+      const params = {};
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (statusFilter) params.status = statusFilter;
+      if (period[0]) params.date_from = period[0];
+      if (period[1]) params.date_to = period[1];
+      const response = await api.downloadDriverSettlementsReport(format, params);
+      downloadBlob(response.data, `relatorio_acertos_viagem.${format === 'pdf' ? 'pdf' : 'xlsx'}`);
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Erro ao gerar o relatório'));
+    } finally {
+      setReporting(false);
     }
   };
 
@@ -184,13 +216,23 @@ export default function DriverSettlementsPage() {
       <div className="space-y-4" data-testid="driver-settlements-page">
         <PageHeader
           icon={Handshake}
-          title="Acerto de Motorista"
-          subtitle="Abastecimentos pagos pelo motorista, despesas, viagens e adiantamentos fechando o saldo de cada um"
+          title="Acerto da Viagem"
+          subtitle="Prestação de contas da viagem: saldo com o motorista e resultado (lucro ou prejuízo) de cada acerto"
         />
 
         <FilterCard
           hasFilters={!!(searchTerm || statusFilter || period[0] || period[1])}
           onClear={() => { setSearchTerm(''); setStatusFilter(''); setPeriod(['', '']); }}
+          actions={(
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={() => handleReport('pdf')} disabled={reporting} className="h-8 text-xs gap-1.5" data-testid="settlements-report-pdf">
+                <FileText className="w-4 h-4 text-red-600" /> Relatório PDF
+              </Button>
+              <Button type="button" size="sm" onClick={() => handleReport('excel')} disabled={reporting} className="h-8 text-xs gap-1.5" data-testid="settlements-report-excel">
+                <FileSpreadsheet className="w-4 h-4" /> Relatório Excel
+              </Button>
+            </>
+          )}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <FilterField label="Nº, motorista, placa ou observação" className="sm:col-span-2">
@@ -255,11 +297,11 @@ export default function DriverSettlementsPage() {
                     <th>Data</th>
                     <th>Motorista</th>
                     <th className="hidden md:table-cell">Veículo</th>
-                    <th className="hidden lg:table-cell !text-right">Abastecimentos</th>
-                    <th className="hidden lg:table-cell !text-right">Despesas</th>
-                    <th className="hidden xl:table-cell !text-right">Adiantamentos</th>
                     <th className="hidden xl:table-cell !text-right">Km</th>
-                    <th className="!text-right">Saldo</th>
+                    <th className="hidden lg:table-cell !text-right">Receita</th>
+                    <th className="hidden lg:table-cell !text-right">Custo</th>
+                    <th className="!text-right">Resultado</th>
+                    <th className="!text-right">Saldo motorista</th>
                     <th>Situação</th>
                   </tr>
                 </thead>
@@ -279,10 +321,10 @@ export default function DriverSettlementsPage() {
                       <td className="whitespace-nowrap tabular-nums">{formatDay(s.settlement_date)}</td>
                       <td><div className="max-w-[200px] truncate">{s.driver_name}</div></td>
                       <td className="hidden md:table-cell">{s.vehicle_plate ? <PlateTag>{s.vehicle_plate}</PlateTag> : '-'}</td>
-                      <td className="hidden lg:table-cell text-right tabular-nums whitespace-nowrap">{formatMoney(s.fuel_total)}</td>
-                      <td className="hidden lg:table-cell text-right tabular-nums whitespace-nowrap">{formatMoney(s.expenses_total)}</td>
-                      <td className="hidden xl:table-cell text-right tabular-nums whitespace-nowrap">{formatMoney((s.advances_total || 0) - (s.returns_total || 0))}</td>
                       <td className="hidden xl:table-cell text-right tabular-nums">{(s.km_total || 0).toLocaleString('pt-BR')}</td>
+                      <td className="hidden lg:table-cell text-right tabular-nums whitespace-nowrap">{formatMoney(s.revenue)}</td>
+                      <td className="hidden lg:table-cell text-right tabular-nums whitespace-nowrap">{formatMoney(s.cost_total)}</td>
+                      <td className="text-right whitespace-nowrap" data-testid={`settlement-result-${s.settlement_number}`}><ResultText value={s.result} margin={s.margin} /></td>
                       <td className="text-right whitespace-nowrap"><BalanceText value={s.balance} /></td>
                       <td><StatusPill tone={STATUS_TONES[s.status] || 'slate'}>{SETTLEMENT_STATUS[s.status] || s.status}</StatusPill></td>
                     </tr>

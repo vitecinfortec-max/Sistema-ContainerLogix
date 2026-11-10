@@ -162,7 +162,7 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
         settlement = await settlement_holding("trip", order_id)
         if settlement:
             raise HTTPException(status_code=400, detail=(
-                f"Ordem está no Acerto de Motorista nº {settlement['settlement_number']}: tire-a do acerto "
+                f"Ordem está no Acerto da Viagem nº {settlement['settlement_number']}: tire-a do acerto "
                 "(ou reabra o acerto) antes de mudar a situação ou o motorista."))
 
     effective_order_type = update_data.get('order_type', existing.get('order_type'))

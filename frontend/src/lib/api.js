@@ -860,7 +860,7 @@ export const api = {
   getTransportOccurrenceReportPdf: (params) => axios.get(`${API}/reports/transport-occurrences/pdf`, { params, responseType: 'blob' }),
   getTransportOccurrenceReportExcel: (params) => axios.get(`${API}/reports/transport-occurrences/excel`, { params, responseType: 'blob' }),
 
-  // Transporte - Acerto de Motorista (só administrador)
+  // Transporte - Acerto da Viagem (só administrador; rota técnica driver-settlements)
   getDriverSettlements: (params) => axios.get(`${API}/driver-settlements`, { params }),
   getDriverSettlementCandidates: (params) => axios.get(`${API}/driver-settlements/candidates`, { params }),
   getDriverSettlement: (id) => axios.get(`${API}/driver-settlements/${id}`),
@@ -869,6 +869,7 @@ export const api = {
   deleteDriverSettlement: (id) => axios.delete(`${API}/driver-settlements/${id}`),
   closeDriverSettlement: (id, closed, date) => axios.put(`${API}/driver-settlements/${id}/close`, { closed, date: date || null }),
   getDriverSettlementPdf: (id) => axios.get(`${API}/driver-settlements/${id}/pdf`, { responseType: 'blob' }),
+  downloadDriverSettlementsReport: (format, params) => axios.get(`${API}/driver-settlements/report/${format}`, { params, responseType: 'blob' }),
 
   // Ordem de Serviço - Cliente (sem EIR / sem movimentação de pátio)
   getPortClientOrders: (params) => axios.get(`${API}/port-client-orders`, { params }),
