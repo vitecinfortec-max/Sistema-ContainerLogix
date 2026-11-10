@@ -90,6 +90,11 @@
       text-slate-500 bg-slate-50 border-b border-slate-200
       dark:text-slate-400 dark:bg-slate-800/60 dark:border-slate-700;
   }
+  /* Cabeçalho fixo: o fundo precisa ser opaco para as linhas não aparecerem
+     por baixo ao rolar (o slate-800/60 do tema escuro, já misturado). */
+  .data-table thead th {
+    @apply sticky top-0 z-[1] dark:bg-[#1b2331];
+  }
   .data-table thead th.sortable {
     @apply select-none;
   }
@@ -263,6 +268,19 @@ html[data-density="comfortable"] {
 @media screen and (min-width: 768px) and (max-height: 800px) {
   html {
     --fit: 0.97;
+  }
+}
+
+/* Listagens com rolagem própria (10/11/2026): a caixa com rolagem
+   horizontal em volta da .data-table (padrão <div className="overflow-x-auto">
+   das telas) ganha altura máxima. Assim o cabeçalho da tabela fica fixo ao
+   rolar e a barra de rolagem horizontal fica sempre à vista, sem a página
+   estourar para o lado. Só na tela do computador: no celular e na impressão
+   a tabela continua inteira. */
+@media screen and (min-width: 768px) {
+  .overflow-x-auto:has(> table.data-table) {
+    max-height: calc(100dvh - 9rem);
+    overflow: auto;
   }
 }
 

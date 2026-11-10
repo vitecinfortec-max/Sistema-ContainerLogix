@@ -273,6 +273,23 @@ export default function Layout({ children }) {
   return <LayoutFrame>{children}</LayoutFrame>;
 }
 
+// Menu lateral (10/11/2026): até 1366px de largura (notebook, ou 1920 com
+// escala de 125%/150% no Windows) ele começa recolhido, só com ícones. A
+// escolha manual fica guardada separada para tela estreita e tela larga.
+const NARROW_SCREEN_QUERY = '(max-width: 1366px)';
+const isNarrowScreen = () => typeof window.matchMedia === 'function' && window.matchMedia(NARROW_SCREEN_QUERY).matches;
+const sidebarStorageKey = () => (isNarrowScreen() ? 'sidebarOpenNarrow' : 'sidebarOpen');
+const readSidebarOpen = () => {
+  try {
+    const saved = localStorage.getItem(sidebarStorageKey());
+    if (saved !== null) return JSON.parse(saved);
+  } catch { /* sem storage */ }
+  return !isNarrowScreen();
+};
+const saveSidebarOpen = (open) => {
+  try { localStorage.setItem(sidebarStorageKey(), JSON.stringify(open)); } catch { /* sem storage */ }
+};
+
 function LayoutFrame({ children }) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -281,7 +298,10 @@ function LayoutFrame({ children }) {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen);
+  // Aberto só para escolher uma tela (clique num grupo com o menu recolhido
+  // em tela estreita): volta a recolher depois da navegação.
+  const sidebarTempOpenRef = useRef(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [movimentacoesOpen, setMovimentacoesOpen] = useState(false);
   const [cadastroOpen, setCadastroOpen] = useState(false);
@@ -408,8 +428,6 @@ function LayoutFrame({ children }) {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem('sidebarOpen');
-    if (saved !== null) setSidebarOpen(JSON.parse(saved));
     const savedMovimentacoes = localStorage.getItem('movimentacoesOpen');
     if (savedMovimentacoes !== null) setMovimentacoesOpen(JSON.parse(savedMovimentacoes));
     const savedFinanceiro = localStorage.getItem('financeiroOpen');
@@ -512,10 +530,27 @@ function LayoutFrame({ children }) {
   }, []);
 
 
+  // Passou de tela larga para estreita (ou o contrário, ex.: janela
+  // redimensionada ou monitor trocado): aplica a escolha daquela largura.
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const mq = window.matchMedia(NARROW_SCREEN_QUERY);
+    const onChange = () => { sidebarTempOpenRef.current = false; setSidebarOpen(readSidebarOpen()); };
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarTempOpenRef.current) return;
+    sidebarTempOpenRef.current = false;
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
   const toggleSidebar = () => {
     const newState = !sidebarOpen;
+    sidebarTempOpenRef.current = false;
     setSidebarOpen(newState);
-    localStorage.setItem('sidebarOpen', JSON.stringify(newState));
+    saveSidebarOpen(newState);
   };
 
   const toggleMovimentacoes = () => {
@@ -889,7 +924,8 @@ function LayoutFrame({ children }) {
   // Expand sidebar when clicking a group while collapsed
   const handleGroupClickCollapsed = (toggleFn) => {
     setSidebarOpen(true);
-    localStorage.setItem('sidebarOpen', JSON.stringify(true));
+    if (isNarrowScreen()) sidebarTempOpenRef.current = true;
+    else saveSidebarOpen(true);
     toggleFn();
   };
 
