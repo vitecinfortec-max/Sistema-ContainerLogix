@@ -24,6 +24,7 @@ from shared import (
     plate_regex,
 )
 from routers.stock import _create_stock_movement, _delete_stock_movement
+from settlement_links import ensure_not_in_settlement
 
 api_router = APIRouter(prefix="/api")
 
@@ -365,6 +366,8 @@ async def update_fuel_supply(supply_id: str, data: FuelSupplyUpdate, current_use
     existing = await db.fuel_supplies.find_one({"id": supply_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")
+    # Já acertado com o motorista: o valor do acerto não pode mudar por baixo
+    await ensure_not_in_settlement("fuel", supply_id, "alterar")
     # Campo enviado vazio (null) apaga o valor salvo: ao trocar para Tanque
     # Próprio, a tela manda fornecedor/cidade/UF vazios e antes eles ficavam
     update_data = data.model_dump(exclude_unset=True, exclude={"confirm_reading"})
@@ -377,6 +380,7 @@ async def update_fuel_supply(supply_id: str, data: FuelSupplyUpdate, current_use
 
 @api_router.delete("/fuel-supplies/{supply_id}")
 async def delete_fuel_supply(supply_id: str, current_user: dict = Depends(get_current_active_user)):
+    await ensure_not_in_settlement("fuel", supply_id, "excluir")
     result = await db.fuel_supplies.delete_one({"id": supply_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Abastecimento não encontrado")

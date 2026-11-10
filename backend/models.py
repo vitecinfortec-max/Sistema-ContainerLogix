@@ -4729,3 +4729,48 @@ class TransportOccurrenceCreate(BaseModel):
     cost: Optional[float] = Field(default=None, ge=0)  # prejuízo/custo da ocorrência (R$)
     status: str = "ABERTA"
     resolution: Optional[str] = None  # o que foi feito para resolver
+
+
+# ==================== TRANSPORTE - ACERTO DE MOTORISTA ====================
+# Regras em routers/driver_settlements.py
+
+DRIVER_SETTLEMENT_ADVANCE_KINDS = ["ADIANTAMENTO", "DEVOLUCAO"]
+
+
+class DriverSettlementExpense(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    expense_date: Optional[str] = None  # YYYY-MM-DD
+    description: str
+    supplier_name: Optional[str] = None
+    quantity: float = Field(default=1, gt=0)
+    unit_value: float = Field(default=0, ge=0)
+
+
+class DriverSettlementTrip(BaseModel):
+    loading_order_id: str
+    km_start: Optional[float] = Field(default=None, ge=0)
+    km_end: Optional[float] = Field(default=None, ge=0)
+
+
+class DriverSettlementAdvance(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    kind: str = "ADIANTAMENTO"  # ADIANTAMENTO (empresa deu ao motorista) | DEVOLUCAO (motorista devolveu)
+    number: Optional[str] = None  # nº do documento/recibo
+    advance_date: Optional[str] = None  # YYYY-MM-DD
+    amount: float = Field(gt=0)
+
+
+class DriverSettlementCreate(BaseModel):
+    driver_id: str
+    vehicle_id: Optional[str] = None
+    settlement_date: str  # YYYY-MM-DD - data do documento (vale para o fechamento de período)
+    observations: Optional[str] = None
+    fuel_supply_ids: List[str] = Field(default_factory=list)  # só abastecimentos "Pago pelo Motorista"
+    trips: List[DriverSettlementTrip] = Field(default_factory=list)  # Ordens de Carregamento aprovadas
+    expenses: List[DriverSettlementExpense] = Field(default_factory=list)
+    advances: List[DriverSettlementAdvance] = Field(default_factory=list)
+
+
+class DriverSettlementClose(BaseModel):
+    closed: bool
+    date: Optional[str] = None  # YYYY-MM-DD; vazio = hoje

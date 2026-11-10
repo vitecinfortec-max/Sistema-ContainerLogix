@@ -558,6 +558,7 @@ MODULE_CATALOG = [
         {"key": "operacional.conferencia_turnos", "label": "Conferência de Turnos"},
         {"key": "operacional.custo_faturamento_veiculo", "label": "Custo e Faturamento por Veículo"},
         {"key": "operacional.ocorrencias_transporte", "label": "Ocorrências de Transporte"},
+        {"key": "operacional.acerto_motorista", "label": "Acerto de Motorista"},
     ]},
     {"key": "estoque", "label": "Almoxarifado", "items": [
         {"key": "estoque.almoxarifado", "label": "Almoxarifado"},
@@ -665,6 +666,7 @@ PATH_MODULE_MAP = [
     ("/api/transport-occurrence-types", "operacional.ocorrencias_transporte"),
     ("/api/transport-occurrences", "operacional.ocorrencias_transporte"),
     ("/api/reports/transport-occurrences", "operacional.ocorrencias_transporte"),
+    ("/api/driver-settlements", "operacional.acerto_motorista"),
     ("/api/warehouses", "estoque.almoxarifado"),
     ("/api/product-families", "estoque.familia_produto"),
     ("/api/service-families", "estoque.familia_servico"),

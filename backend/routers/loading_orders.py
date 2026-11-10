@@ -9,6 +9,7 @@ from models import (
     LoadingOrder, LoadingOrderCreate, LoadingOrderUpdate, LoadingOrderResponse,
 )
 from shared import db, get_current_active_user, get_company_settings
+from settlement_links import ensure_not_in_settlement, settlement_holding
 from reports import fmt_datetime, merge_company, now_brt
 from routers.freight_payments import (
     create_freight_payment_for_order, cancel_pending_freight_payment_for_order, sync_pending_freight_payment_for_order,
@@ -155,6 +156,15 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
     new_status = update_data.get('status', old_status)
 
+    # Viagem já acertada com o motorista: não sai de Aprovada nem troca de motorista
+    new_driver = update_data.get('driver_id', existing.get('driver_id'))
+    if new_status != 'APROVADA' or new_driver != existing.get('driver_id'):
+        settlement = await settlement_holding("trip", order_id)
+        if settlement:
+            raise HTTPException(status_code=400, detail=(
+                f"Ordem está no Acerto de Motorista nº {settlement['settlement_number']}: tire-a do acerto "
+                "(ou reabra o acerto) antes de mudar a situação ou o motorista."))
+
     effective_order_type = update_data.get('order_type', existing.get('order_type'))
     effective_booking = update_data.get('booking', existing.get('booking'))
     if effective_order_type == 'ENTREGA' and not (effective_booking or '').strip():
@@ -194,6 +204,7 @@ async def update_loading_order(order_id: str, data: LoadingOrderUpdate, current_
 
 @api_router.delete("/loading-orders/{order_id}")
 async def delete_loading_order(order_id: str, current_user: dict = Depends(get_current_active_user)):
+    await ensure_not_in_settlement("trip", order_id, "excluir")
     result = await db.loading_orders.delete_one({"id": order_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Ordem de Carregamento não encontrada")

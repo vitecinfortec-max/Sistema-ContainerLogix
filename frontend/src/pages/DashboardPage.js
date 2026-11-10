@@ -10,7 +10,7 @@ import {
   Receipt, Truck, Users, BarChart3, DollarSign, Ship, Building2,
   ClipboardList, Check, Settings2, Trophy, Medal, Award, AlertTriangle, CheckCircle2,
   Fuel, Wrench, Clock, FileCheck, PackageCheck, FileText, Car, Clipboard, Boxes, ArrowLeftRight,
-  Calculator, HardHat, Scale, Percent, PiggyBank, FileSpreadsheet
+  Calculator, HardHat, Scale, Percent, PiggyBank, FileSpreadsheet, Handshake
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useModuleConfig } from '../context/ModuleConfigContext';
@@ -107,6 +107,7 @@ const ALL_SHORTCUTS = [
   { id: 'mdfe', label: 'Manifesto (MDF-e)', icon: Truck, path: '/fiscal/mdfe', kind: 'tool', moduleKey: 'fiscal.mdfe' },
   { id: 'loading-orders', label: 'Ordem de Carregamento', icon: PackageCheck, path: '/loading-orders', kind: 'tool', moduleKey: 'operacional.ordem_carregamento' },
   { id: 'transport-occurrences', label: 'Ocorrências de Transporte', icon: AlertTriangle, path: '/transport-occurrences', kind: 'tool', moduleKey: 'operacional.ocorrencias_transporte' },
+  { id: 'driver-settlements', label: 'Acerto de Motorista', icon: Handshake, path: '/driver-settlements', kind: 'tool', moduleKey: 'operacional.acerto_motorista', adminOnly: true },
   { id: 'loading-schedules', label: 'Programação de Carregamento', icon: Calendar, path: '/loading-schedules', kind: 'tool', moduleKey: 'operacional.programacao_carregamento' },
   { id: 'freight-contract', label: 'Contrato de Frete', icon: FileText, path: '/fleet/rpa-terceiro', kind: 'tool', moduleKey: 'financeiro.rpa_terceiro' },
   { id: 'vehicles', label: 'Lista de Veículos', icon: Car, path: '/fleet', kind: 'tool', moduleKey: 'frota.veiculos' },

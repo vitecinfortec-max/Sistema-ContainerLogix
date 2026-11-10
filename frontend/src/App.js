@@ -137,6 +137,8 @@ const LoadingOrderPage = lazyPage(() => import('./pages/LoadingOrderPage'));
 const LoadingOrderFormPage = lazyPage(() => import('./pages/LoadingOrderFormPage'));
 const TransportOccurrencesPage = lazyPage(() => import('./pages/TransportOccurrencesPage'));
 const TransportOccurrenceFormPage = lazyPage(() => import('./pages/TransportOccurrenceFormPage'));
+const DriverSettlementsPage = lazyPage(() => import('./pages/DriverSettlementsPage'));
+const DriverSettlementFormPage = lazyPage(() => import('./pages/DriverSettlementFormPage'));
 const CtePage = lazyPage(() => import('./pages/CtePage'));
 const FiscalSettingsPage = lazyPage(() => import('./pages/FiscalSettingsPage'));
 const MdfePage = lazyPage(() => import('./pages/MdfePage'));
@@ -473,6 +475,30 @@ function App() {
             element={
               <ProtectedRoute moduleKey="operacional.ocorrencias_transporte">
                 <TransportOccurrenceFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/driver-settlements"
+            element={
+              <ProtectedRoute adminOnly moduleKey="operacional.acerto_motorista">
+                <DriverSettlementsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/driver-settlements/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="operacional.acerto_motorista">
+                <DriverSettlementFormPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/driver-settlements/:id/edit"
+            element={
+              <ProtectedRoute adminOnly moduleKey="operacional.acerto_motorista">
+                <DriverSettlementFormPage />
               </ProtectedRoute>
             }
           />

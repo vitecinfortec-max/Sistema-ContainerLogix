@@ -860,6 +860,16 @@ export const api = {
   getTransportOccurrenceReportPdf: (params) => axios.get(`${API}/reports/transport-occurrences/pdf`, { params, responseType: 'blob' }),
   getTransportOccurrenceReportExcel: (params) => axios.get(`${API}/reports/transport-occurrences/excel`, { params, responseType: 'blob' }),
 
+  // Transporte - Acerto de Motorista (só administrador)
+  getDriverSettlements: (params) => axios.get(`${API}/driver-settlements`, { params }),
+  getDriverSettlementCandidates: (params) => axios.get(`${API}/driver-settlements/candidates`, { params }),
+  getDriverSettlement: (id) => axios.get(`${API}/driver-settlements/${id}`),
+  createDriverSettlement: (data) => axios.post(`${API}/driver-settlements`, data),
+  updateDriverSettlement: (id, data) => axios.put(`${API}/driver-settlements/${id}`, data),
+  deleteDriverSettlement: (id) => axios.delete(`${API}/driver-settlements/${id}`),
+  closeDriverSettlement: (id, closed, date) => axios.put(`${API}/driver-settlements/${id}/close`, { closed, date: date || null }),
+  getDriverSettlementPdf: (id) => axios.get(`${API}/driver-settlements/${id}/pdf`, { responseType: 'blob' }),
+
   // Fiscal (CT-e pela Focus NFe)
   getFiscalSettings: () => axios.get(`${API}/fiscal/settings`),
   updateFiscalSettings: (data) => axios.put(`${API}/fiscal/settings`, data),
