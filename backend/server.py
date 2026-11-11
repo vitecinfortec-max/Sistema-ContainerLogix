@@ -598,6 +598,12 @@ async def prepare_database():
     await db.fuel_supplies.create_index([("equipment_id", 1), ("supply_date", 1), ("created_at", 1)])
     # Lista paginada do Abastecimento: mais recente primeiro, com filtro por período.
     await db.fuel_supplies.create_index("supply_number")
+    # Situação do Plano de Manutenção/Revisão: maior KM e execuções por veículo
+    await db.fuel_supplies.create_index([("equipment_id", 1), ("reading", -1)])
+    await db.odometer_readings.create_index([("vehicle_id", 1), ("km", -1)])
+    await db.vehicle_revisions.create_index([("vehicle_plate", 1), ("created_at", -1)])
+    await db.maintenance_executions.create_index([("vehicle_id", 1), ("plan_id", 1), ("executed_date", -1)])
+    await db.maintenance_executions.create_index("record_id")
     await db.fuel_supplies.create_index("supply_date")
     await db.drivers.create_index("cpf")
     await db.clients.create_index("cnpj")

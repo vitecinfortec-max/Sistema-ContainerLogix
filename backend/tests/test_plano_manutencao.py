@@ -263,3 +263,24 @@ def test_record_and_plan_pdfs(api):
     for expected in ("Plano de Manutenção Preventiva", "Hodômetro atual (KM):", "Itens de troca obrigatória", "139.900", "Troca de óleo do motor"):
         assert expected in text, expected
     assert api.get("/api/maintenance-plans-status/vehicle/vh-5/pdf").status_code == 400  # fora da frota
+
+
+def test_batch_current_km_matches_single(api):
+    """O KM de todos os veículos de uma vez (usado pela Situação e pelo sino)
+    é o mesmo da busca veículo a veículo, inclusive com a placa da revisão
+    gravada com traço ou minúscula."""
+    from routers.frota import get_vehicle_current_km, get_vehicles_current_km
+    _seed(api)
+    db = api.db
+    api.run(db.fuel_supplies.insert_many([
+        {"id": "fs1", "equipment_id": "vh-1", "reading": 120_100}, {"id": "fs2", "equipment_id": "vh-2", "reading": None},
+        {"id": "fs3", "equipment_id": "vh-2", "reading": 30_000},
+    ]))
+    api.run(db.vehicle_revisions.insert_many([
+        {"id": "rv1", "vehicle_plate": "xyz-9k87", "current_km": 45_000}, {"id": "rv2", "vehicle_plate": "ABC1D23", "current_km": 1},
+    ]))
+    vehicles = api.run(db.vehicles.find({}, {"_id": 0}).to_list(None))
+    batch = api.run(get_vehicles_current_km(vehicles))
+    for v in vehicles:
+        assert batch[v["id"]] == api.run(get_vehicle_current_km(v["id"], v.get("plate"))), v["plate"]
+    assert batch["vh-1"] == 120_100 and batch["vh-2"] == 45_000

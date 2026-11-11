@@ -20,7 +20,7 @@ from reports import merge_company
 from shared import (
     db, get_current_active_user, get_company_settings, parse_datetime_value, load_logo_buffer,
     validate_and_read_upload, ALLOWED_EXTENSIONS, UPLOADS_DIR, refuse_negative,
-    format_plate, plate_regex,
+    format_plate, plate_regex, plate_key,
 )
 
 api_router = APIRouter(prefix="/api")
@@ -858,19 +858,58 @@ async def get_vehicle_current_km(vehicle_id: str, plate: Optional[str] = None) -
     return current_km
 
 
-async def _compute_vehicle_maintenance_status(vehicle: dict) -> Optional[dict]:
+async def get_vehicles_current_km(vehicles: list, with_revisions: bool = True) -> dict:
+    """O mesmo que get_vehicle_current_km, de vários veículos de uma vez: uma
+    consulta agrupada por fonte em vez de 3 por veículo (a tela do Plano de
+    Manutenção e o sino ficavam lentos com a frota inteira)."""
+    ids = [v["id"] for v in vehicles]
+    result = {vid: 0 for vid in ids}
+    if not ids:
+        return result
+    sources = [
+        (db.odometer_readings, {"vehicle_id": {"$in": ids}}, "$vehicle_id", "$km"),
+        (db.fuel_supplies, {"equipment_id": {"$in": ids}, "reading": {"$ne": None}}, "$equipment_id", "$reading"),
+    ]
+    for collection, match, key, field in sources:
+        async for row in collection.aggregate([{"$match": match}, {"$group": {"_id": key, "km": {"$max": field}}}]):
+            if row.get("km") is not None and row["_id"] in result:
+                result[row["_id"]] = max(result[row["_id"]], row["km"])
+    if with_revisions:
+        by_plate = {plate_key(v.get("plate")): v["id"] for v in vehicles if v.get("plate")}
+        async for row in db.vehicle_revisions.aggregate([{"$group": {"_id": "$vehicle_plate", "km": {"$max": "$current_km"}}}]):
+            vid = by_plate.get(plate_key(row["_id"]))
+            if vid and row.get("km") is not None:
+                result[vid] = max(result[vid], row["km"])
+    return result
+
+
+async def _latest_revisions_by_plate(plates) -> dict:
+    """Última Revisão (pela data de criação) de cada placa, numa consulta só."""
+    wanted = {plate_key(p) for p in plates if p}
+    latest = {}
+    async for rev in db.vehicle_revisions.find({}, {"_id": 0}).sort("created_at", -1):
+        key = plate_key(rev.get("vehicle_plate"))
+        if key in wanted and key not in latest:
+            latest[key] = rev
+    return latest
+
+
+async def _compute_vehicle_maintenance_status(vehicle: dict, revision: Optional[dict] = None,
+                                             current_km: Optional[float] = None) -> Optional[dict]:
     """Calcula a situação de manutenção de um veículo a partir da última Revisão
     registrada e do maior KM conhecido (revisão, hodômetro ou abastecimento).
-    Retorna None se não houver dado suficiente (sem revisão ou sem nenhum next_*_km preenchido)."""
+    Retorna None se não houver dado suficiente (sem revisão ou sem nenhum next_*_km preenchido).
+    `revision` e `current_km` já buscados (lista de veículos) evitam consultas por veículo."""
     plate = (vehicle.get("plate") or "").upper()
     if not plate:
         return None
 
-    revision = await db.vehicle_revisions.find_one(
-        {"vehicle_plate": {"$regex": plate_regex(plate, exact=True), "$options": "i"}},
-        {"_id": 0},
-        sort=[("created_at", -1)]
-    )
+    if revision is None:
+        revision = await db.vehicle_revisions.find_one(
+            {"vehicle_plate": {"$regex": plate_regex(plate, exact=True), "$options": "i"}},
+            {"_id": 0},
+            sort=[("created_at", -1)]
+        )
     if not revision:
         return None
 
@@ -881,7 +920,9 @@ async def _compute_vehicle_maintenance_status(vehicle: dict) -> Optional[dict]:
     # Todos os itens que vencem nesse mesmo KM (ex: óleo e filtro juntos)
     next_due_items = [NEXT_KM_LABELS.get(f, f) for km, f in due if km == next_due_km]
 
-    current_km = max(revision.get("current_km") or 0, await get_vehicle_current_km(vehicle["id"]))
+    if current_km is None:
+        current_km = await get_vehicle_current_km(vehicle["id"])
+    current_km = max(revision.get("current_km") or 0, current_km)
 
     km_remaining = next_due_km - current_km
     if km_remaining <= 0:
@@ -910,9 +951,14 @@ async def get_all_vehicle_maintenance_status() -> list:
         {"_id": 0, "id": 1, "plate": 1, "model": 1}
     ).to_list(None)
 
+    revisions = await _latest_revisions_by_plate(v.get("plate") for v in vehicles)
+    kms = await get_vehicles_current_km(vehicles, with_revisions=False)
     results = []
     for vehicle in vehicles:
-        status = await _compute_vehicle_maintenance_status(vehicle)
+        revision = revisions.get(plate_key(vehicle.get("plate")))
+        if not revision:
+            continue
+        status = await _compute_vehicle_maintenance_status(vehicle, revision=revision, current_km=kms[vehicle["id"]])
         if status:
             results.append(status)
     return results

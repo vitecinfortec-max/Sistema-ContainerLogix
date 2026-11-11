@@ -29,7 +29,7 @@ from pymongo.errors import DuplicateKeyError
 from branding import email_layout
 from models import MaintenanceExecutionCreate, MaintenancePlanCreate, MaintenancePlanSettings, MaintenanceRecordCreate
 from reports import BRT_TZ, download_logo, merge_company
-from routers.frota import get_vehicle_current_km, get_vehicle_types
+from routers.frota import get_vehicle_types, get_vehicles_current_km
 from shared import db, get_company_settings, get_current_active_user, get_current_admin_user, get_disabled_modules, is_module_disabled
 from tenancy import sender_email
 
@@ -215,17 +215,23 @@ async def compute_plan_status(vehicle_id: Optional[str] = None, plan_id: Optiona
     ).sort("plate", 1).to_list(None)
 
     today = _today()
+    # Tudo de uma vez (execuções e KM de todos os veículos), não uma consulta por veículo
+    kms = await get_vehicles_current_km(vehicles)
+    executions_by_vehicle = {}
+    async for execution in db.maintenance_executions.find(
+        {"vehicle_id": {"$in": [v["id"] for v in vehicles]}, "plan_id": {"$in": [p["id"] for p in plans]}}, {"_id": 0}
+    ).sort([("executed_date", -1), ("created_at", -1)]):
+        executions_by_vehicle.setdefault(execution["vehicle_id"], []).append(execution)
     rows = []
     for vehicle in vehicles:
         vehicle_plans = [p for p in plans if vehicle.get("vehicle_type") in p["vehicle_types"]]
-        executions = await db.maintenance_executions.find(
-            {"vehicle_id": vehicle["id"], "plan_id": {"$in": [p["id"] for p in vehicle_plans]}}, {"_id": 0}
-        ).sort([("executed_date", -1), ("created_at", -1)]).to_list(None)
+        plan_ids = {p["id"] for p in vehicle_plans}
+        executions = [e for e in executions_by_vehicle.get(vehicle["id"], []) if e["plan_id"] in plan_ids]
         last_by_item = {}
         for execution in executions:
             last_by_item.setdefault((execution["plan_id"], execution["item_id"]), execution)
         known_km = [e["km"] for e in executions if e.get("km") is not None]
-        current_km = max([await get_vehicle_current_km(vehicle["id"], vehicle.get("plate")), *known_km])
+        current_km = max([kms[vehicle["id"]], *known_km])
         for plan in vehicle_plans:
             for item in plan["items"]:
                 row = _item_status(item, last_by_item.get((plan["id"], item["id"])), current_km, today)
@@ -265,6 +271,7 @@ async def get_plan_fleet(current_user: dict = Depends(get_current_active_user)):
         {"status": {"$ne": "INATIVO"}, "in_maintenance_plan": True},
         {"_id": 0, "id": 1, "plate": 1, "model": 1, "brand": 1, "vehicle_type": 1},
     ).sort("plate", 1).to_list(None)
+    kms = await get_vehicles_current_km(vehicles)
     out = []
     for vehicle in vehicles:
         items = [
@@ -272,7 +279,7 @@ async def get_plan_fleet(current_user: dict = Depends(get_current_active_user)):
              "interval_km": i.get("interval_km"), "interval_days": i.get("interval_days")}
             for p in plans if vehicle.get("vehicle_type") in p["vehicle_types"] for i in p["items"]
         ]
-        out.append({**vehicle, "items": items, "current_km": await get_vehicle_current_km(vehicle["id"], vehicle.get("plate"))})
+        out.append({**vehicle, "items": items, "current_km": kms[vehicle["id"]]})
     return out
 
 
