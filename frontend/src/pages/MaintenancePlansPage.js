@@ -4,7 +4,7 @@ import Layout from '../components/Layout';
 import PageHeader from '../components/PageHeader';
 import {
   StatCard, StatGrid, FilterCard, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider, ToolbarPrimary,
-  StatusPill, PlateTag, EmptyState,
+  StatusPill, PlateTag, EmptyState, TablePagination, usePagination,
 } from '../components/DataPage';
 import { Field } from '../components/FormKit';
 import { Button } from '../components/ui/button';
@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useAuth } from '../context/AuthContext';
 import { useConfirm } from '../hooks/useConfirm';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useUrlState } from '../hooks/useUrlState';
 import { api } from '../lib/api';
 import { apiErrorMessage } from '../lib/errors';
@@ -227,11 +228,14 @@ function StatusTab({ plans, isAdmin }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [planFilter]);
 
-  const visible = useMemo(() => {
-    const term = searchTerm.trim().toUpperCase();
-    return rows.filter((r) => (!statusFilter || r.status === statusFilter)
-      && (!term || `${r.vehicle_plate} ${r.vehicle_model || ''} ${r.item_name}`.toUpperCase().includes(term)));
-  }, [rows, statusFilter, searchTerm]);
+  // A frota inteira x itens do plano passa fácil de mil linhas: a busca espera
+  // uma pausa na digitação e a tabela desenha 50 por página (clicar numa linha
+  // redesenhava todas).
+  const debouncedTerm = useDebouncedValue(searchTerm.trim().toUpperCase());
+  const visible = useMemo(() => rows.filter((r) => (!statusFilter || r.status === statusFilter)
+    && (!debouncedTerm || `${r.vehicle_plate} ${r.vehicle_model || ''} ${r.item_name}`.toUpperCase().includes(debouncedTerm))),
+  [rows, statusFilter, debouncedTerm]);
+  const { pageItems, paginationProps } = usePagination(visible, { pageSize: 50, resetKey: `${statusFilter}|${planFilter}|${debouncedTerm}` });
   const single = visible.find((r) => rowKey(r) === selected) || null;
   const toggle = (key) => setSelected((prev) => (prev === key ? null : key));
 
@@ -287,6 +291,7 @@ function StatusTab({ plans, isAdmin }) {
       <DataCard
         title="Situação por veículo"
         count={visible.length.toLocaleString('pt-BR')}
+        footer={<TablePagination {...paginationProps} />}
         toolbar={(
           <Toolbar
             selectedCount={single ? 1 : 0}
@@ -328,7 +333,7 @@ function StatusTab({ plans, isAdmin }) {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((r) => {
+                {pageItems.map((r) => {
                   const key = rowKey(r);
                   const isSelected = selected === key;
                   return (
