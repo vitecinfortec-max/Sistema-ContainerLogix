@@ -29,6 +29,8 @@ GROUPS = {"day": "Dia", "week": "Semana", "month": "Mês"}
 # Posições a receber/a pagar do Resumo Financeiro que o previsto já cobre (pelo
 # vencimento) ou que não são dinheiro a entrar/sair (crédito já recebido)
 DATED_KEYS = {"invoices_open", "checks_open", "payables_open", "receivable_titles_open", "client_credit_balance"}
+PARTLY_DATED = {"invoices_open": "Faturas em aberto sem vencimento",
+                "port_open": "Faturamento Portuário pendente sem vencimento"}
 MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 
 
@@ -93,6 +95,9 @@ async def _forecast_events(today: date) -> list:
     if enabled("financeiro.faturas"):
         async for inv in db.invoices.find({"status": {"$in": ["PENDENTE", None]}, "due_date": {"$nin": [None, ""]}}, {"_id": 0}):
             add(inv["due_date"], "ENTRADA", "Faturas a receber", _describe(inv), (inv.get("total_value") or 0) - (inv.get("credit_applied") or 0))
+    if enabled("financeiro.faturamento_portuario"):
+        async for b in db.port_service_billing_batches.find({"status": "PENDENTE", "due_date": {"$nin": [None, ""]}}, {"_id": 0, "service_ids": 0}):
+            add(b["due_date"], "ENTRADA", "Faturamento Portuário", _describe(b), b.get("net_total", b.get("total_value")))
     if enabled("financeiro.contas_receber"):
         async for t in db.receivable_titles.find({"status": "ABERTO"}, {"_id": 0}):
             label = f"Nº {t['receivable_number']}" + (f" - {t['installment']}/{t['installments_total']}" if (t.get("installments_total") or 1) > 1 else "")
@@ -113,12 +118,14 @@ def _undated(lines: dict) -> dict:
     for line in lines["receivable"]:
         if not line["docs"]:
             continue
-        docs = [d for d in line["docs"] if not d.get("due_date")] if line["key"] == "invoices_open" else line["docs"]
-        if line["key"] in DATED_KEYS and line["key"] != "invoices_open":
+        # Faturas e Faturamento Portuário: só as sem vencimento (as com vencimento estão no previsto)
+        partly_dated = line["key"] in PARTLY_DATED
+        docs = [d for d in line["docs"] if not d.get("due_date")] if partly_dated else line["docs"]
+        if line["key"] in DATED_KEYS and not partly_dated:
             continue
         total = _r(sum(line["value_of"](d) or 0 for d in docs))
         if docs and total:
-            label = "Faturas em aberto sem vencimento" if line["key"] == "invoices_open" else line["label"]
+            label = PARTLY_DATED.get(line["key"], line["label"])
             receive.append({"label": label, "count": len(docs), "total": total})
     for line in lines["payable"]:
         if not line["docs"] or line["key"] in DATED_KEYS:

@@ -1,8 +1,8 @@
 """Alertas financeiros do sino do topo (só para administradores): cheques
 vencidos sem compensar, cheques vencendo nos próximos dias, cheques devolvidos,
-faturas vencidas, divergências entre Ordens de Coleta e Pagamento Frete e
-prestações de contas abertas há muito tempo e contas a pagar vencidas ou
-vencendo. Módulo não contratado pelo
+faturas vencidas (inclusive as de Serviço Portuário), divergências entre Ordens
+de Coleta e Pagamento Frete, prestações de contas abertas há muito tempo e
+contas a pagar vencidas ou vencendo. Módulo não contratado pelo
 cliente não gera alerta."""
 from datetime import datetime, timedelta
 
@@ -65,25 +65,29 @@ async def build_financial_alerts() -> list:
                     "tone": tone,
                 })
 
+    overdue_query = {"status": {"$in": ["PENDENTE", None]}, "due_date": {"$lt": today_iso, "$nin": [None, ""]}}
+    count, total, oldest = 0, 0.0, None
     if not is_module_disabled("financeiro.faturas", disabled):
-        count, total, oldest = 0, 0.0, None
-        cursor = db.invoices.find(
-            {"status": {"$in": ["PENDENTE", None]}, "due_date": {"$lt": today_iso, "$nin": [None, ""]}},
-            {"_id": 0, "total_value": 1, "credit_applied": 1, "due_date": 1},
-        )
+        cursor = db.invoices.find(overdue_query, {"_id": 0, "total_value": 1, "credit_applied": 1, "due_date": 1})
         async for inv in cursor:
             count += 1
             total += (inv.get("total_value") or 0) - (inv.get("credit_applied") or 0)
             oldest = min(oldest or inv["due_date"], inv["due_date"])
-        if count:
-            days = (today - datetime.fromisoformat(oldest[:10]).date()).days
-            alerts.append({
-                "key": "invoices_overdue",
-                "title": f"{_plural(count, 'fatura vencida', 'faturas vencidas')} sem recebimento",
-                "description": f"Total de {_brl(total)} · a mais antiga venceu há {_plural(days, 'dia', 'dias')}",
-                "path": "/reports/receivables",
-                "tone": "red",
-            })
+    if not is_module_disabled("financeiro.faturamento_portuario", disabled):
+        cursor = db.port_service_billing_batches.find(overdue_query, {"_id": 0, "net_total": 1, "total_value": 1, "due_date": 1})
+        async for b in cursor:
+            count += 1
+            total += b["net_total"] if b.get("net_total") is not None else (b.get("total_value") or 0)
+            oldest = min(oldest or b["due_date"], b["due_date"])
+    if count:
+        days = (today - datetime.fromisoformat(oldest[:10]).date()).days
+        alerts.append({
+            "key": "invoices_overdue",
+            "title": f"{_plural(count, 'fatura vencida', 'faturas vencidas')} sem recebimento",
+            "description": f"Total de {_brl(total)} · a mais antiga venceu há {_plural(days, 'dia', 'dias')}",
+            "path": "/reports/receivables",
+            "tone": "red",
+        })
 
     if not is_module_disabled("financeiro.pagamento_frete", disabled) and not is_module_disabled("operacional.ordem_carregamento", disabled):
         since = (today - timedelta(days=FREIGHT_CHECK_DAYS)).isoformat()

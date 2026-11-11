@@ -94,7 +94,7 @@ async def _source_docs(source: str, query_status: Optional[str], client_name: Op
         async for b in db.port_service_billing_batches.find(query, {"_id": 0, "service_ids": 0}):
             total = b.get("net_total", b.get("total_value")) or 0
             out.append({"id": b["id"], "number_label": str(b["batch_number"]), "client_name": b["client_name"],
-                        "issue": _brt_day(b.get("created_at")), "due": None, "paid": _brt_day(b.get("paid_at")),
+                        "issue": _brt_day(b.get("created_at")), "due": _iso_day(b.get("due_date")), "paid": _brt_day(b.get("paid_at")),
                         "total_value": total, "credit_applied": 0, "open_value": total, "is_open": b["status"] == "PENDENTE"})
     elif source == "VENDA":
         # Venda sem valor combinado ainda não tem o que receber

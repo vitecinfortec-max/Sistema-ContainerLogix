@@ -17,6 +17,7 @@ import { Anchor, Search, Eye, FileText, FileSpreadsheet, Pencil, Printer, X, Che
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { apiErrorMessage } from '../lib/errors';
+import { todayISO } from '../lib/dates';
 
 const fmtMoney = (v) => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -27,6 +28,9 @@ const BATCH_STATUS_OPTIONS = [
 ];
 
 const getBatchStatusBadge = (status) => BATCH_STATUS_OPTIONS.find(s => s.value === status) || BATCH_STATUS_OPTIONS[0];
+
+// Em aberto e com o vencimento já passado
+const isOverdue = (batch) => batch.status === 'PENDENTE' && !!batch.due_date && batch.due_date < todayISO();
 
 const fmtDate = (d) => {
   if (!d) return '-';
@@ -58,6 +62,7 @@ export default function PortServiceBillingPage() {
   const [generating, setGenerating] = useState(false);
   const [discountValue, setDiscountValue] = useState('');
   const [batchObservations, setBatchObservations] = useState('');
+  const [dueDate, setDueDate] = useState('');
 
   // Lista de Faturas
   const [batches, setBatches] = useState([]);
@@ -74,6 +79,7 @@ export default function PortServiceBillingPage() {
   const [editMode, setEditMode] = useState(false);
   const [editDiscount, setEditDiscount] = useState('');
   const [editObservations, setEditObservations] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
@@ -163,12 +169,14 @@ export default function PortServiceBillingPage() {
         period_to: dateTo || null,
         discount_value: discountNumber,
         observations: batchObservations || null,
+        due_date: dueDate || null,
       });
       toast.success('Fatura de Serviço Portuário gerada com sucesso!');
       setCandidates(prev => prev.filter(c => !selectedIds.has(c.id)));
       setSelectedIds(new Set());
       setDiscountValue('');
       setBatchObservations('');
+      setDueDate('');
       setPagination(prev => ({ ...prev, page: 1 }));
       loadBatches();
     } catch (error) {
@@ -209,6 +217,7 @@ export default function PortServiceBillingPage() {
     setEditMode(false);
     setEditDiscount(String(batch.discount_value || 0));
     setEditObservations(batch.observations || '');
+    setEditDueDate(batch.due_date || '');
     setLoadingBatchServices(true);
     try {
       const response = await api.getPortServiceBillingBatchServices(batch.id);
@@ -232,6 +241,7 @@ export default function PortServiceBillingPage() {
       const response = await api.updatePortServiceBillingBatch(selectedBatch.id, {
         discount_value: newDiscount,
         observations: editObservations || null,
+        due_date: editDueDate,
       });
       toast.success('Fatura atualizada com sucesso!');
       setSelectedBatch(response.data);
@@ -379,7 +389,17 @@ export default function PortServiceBillingPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <FilterField label="Vencimento">
+                    <Input
+                      type="date"
+                      min={todayISO()}
+                      className="h-9 text-sm"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      data-testid="port-service-invoice-due-date-input"
+                    />
+                  </FilterField>
                   <FilterField label="Desconto (R$)">
                     <Input
                       type="number"
@@ -462,6 +482,7 @@ export default function PortServiceBillingPage() {
                     <th>Período</th>
                     <th className="!text-right">Serviços</th>
                     <th className="!text-right">Valor total</th>
+                    <th>Vencimento</th>
                     <th>Status</th>
                     <th>Criado em</th>
                   </tr>
@@ -485,7 +506,10 @@ export default function PortServiceBillingPage() {
                         <td className="whitespace-nowrap tabular-nums">{fmtPeriod(batch.period_from, batch.period_to)}</td>
                         <td className="text-right tabular-nums">{batch.item_count}</td>
                         <td className="text-right whitespace-nowrap tabular-nums cell-strong">{fmtMoney(batch.net_total ?? batch.total_value)}</td>
-                        <td><StatusPill tone={badge.tone}>{badge.label}</StatusPill></td>
+                        <td className={`whitespace-nowrap tabular-nums ${isOverdue(batch) ? 'text-destructive font-semibold' : ''}`} title={isOverdue(batch) ? 'Vencida' : undefined}>
+                          {fmtDate(batch.due_date)}
+                        </td>
+                        <td><StatusPill tone={isOverdue(batch) ? 'red' : badge.tone}>{isOverdue(batch) ? 'Vencida' : badge.label}</StatusPill></td>
                         <td className="whitespace-nowrap tabular-nums">
                           {batch.created_at && format(new Date(batch.created_at), 'dd/MM/yyyy', { locale: ptBR })}
                         </td>
@@ -582,16 +606,33 @@ export default function PortServiceBillingPage() {
                 </div>
               </div>
 
-              <div className="bg-muted/50 p-3 rounded">
-                <p className="text-sm text-muted-foreground mb-1">Observações</p>
-                {editMode ? (
-                  <Input
-                    value={editObservations}
-                    onChange={(e) => setEditObservations(e.target.value)}
-                  />
-                ) : (
-                  <p className="font-medium">{selectedBatch.observations || '-'}</p>
-                )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-muted/50 p-3 rounded">
+                  <p className="text-sm text-muted-foreground mb-1">Vencimento</p>
+                  {editMode ? (
+                    <Input
+                      type="date"
+                      value={editDueDate}
+                      onChange={(e) => setEditDueDate(e.target.value)}
+                      data-testid="edit-port-service-invoice-due-date"
+                    />
+                  ) : (
+                    <p className={`font-medium ${isOverdue(selectedBatch) ? 'text-destructive' : ''}`}>
+                      {fmtDate(selectedBatch.due_date)}{isOverdue(selectedBatch) ? ' (vencida)' : ''}
+                    </p>
+                  )}
+                </div>
+                <div className="bg-muted/50 p-3 rounded sm:col-span-2">
+                  <p className="text-sm text-muted-foreground mb-1">Observações</p>
+                  {editMode ? (
+                    <Input
+                      value={editObservations}
+                      onChange={(e) => setEditObservations(e.target.value)}
+                    />
+                  ) : (
+                    <p className="font-medium">{selectedBatch.observations || '-'}</p>
+                  )}
+                </div>
               </div>
 
               <div>

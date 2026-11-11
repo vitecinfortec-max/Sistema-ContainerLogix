@@ -2374,6 +2374,28 @@ def generate_port_services_report_excel(services: list, company: dict = None, re
         return _xl_error_workbook()
 
 
+def _fmt_iso_day(value) -> str:
+    """'YYYY-MM-DD' -> 'DD/MM/YYYY' ('-' quando vazio)."""
+    if not value:
+        return '-'
+    try:
+        return datetime.strptime(str(value)[:10], '%Y-%m-%d').strftime('%d/%m/%Y')
+    except ValueError:
+        return str(value)
+
+
+def _port_billing_issue_day(batch: dict) -> str:
+    """Dia da emissão (created_at no fuso de Brasília) da Fatura de Serviço Portuário."""
+    created = batch.get('created_at')
+    if not created:
+        return '-'
+    if isinstance(created, str):
+        created = datetime.fromisoformat(created.replace('Z', '+00:00'))
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return created.astimezone(BRT_TZ).strftime('%d/%m/%Y')
+
+
 def _format_port_service_period(batch: dict) -> str:
     """Formata period_from/period_to (YYYY-MM-DD) da fatura como
     'DD/MM/YYYY a DD/MM/YYYY', com fallback pra quando um dos dois (ou
@@ -2410,6 +2432,7 @@ def generate_port_service_invoice_excel(batch: dict, services: list, company: di
         stats_text = (
             f"Período: {_format_port_service_period(batch)}   •   Serviços: {_fmt_int(batch.get('item_count', len(services)))}"
             f"   •   Valor total: {format_currency(net_total, 'BRL')}"
+            f"   •   Vencimento: {_fmt_iso_day(batch.get('due_date'))}"
         )
 
         _bsoft_style_excel(
@@ -3192,6 +3215,8 @@ def generate_port_service_invoice_pdf(batch: dict, services: list, company: dict
         ("Cliente", batch.get('client_name') or '-', 2),
         ("Período", _format_port_service_period(batch)),
         ("Serviços", _fmt_int(batch.get('item_count', len(services)))),
+        ("Emissão", _port_billing_issue_day(batch)),
+        ("Vencimento", _fmt_iso_day(batch.get('due_date'))),
     ], doc.width, cols=4))
     elements.append(Spacer(1, 10))
 

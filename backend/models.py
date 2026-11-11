@@ -2543,6 +2543,7 @@ class PortServiceBillingBatch(BaseModel):
     period_from: Optional[str] = None  # YYYY-MM-DD
     period_to: Optional[str] = None  # YYYY-MM-DD
 
+    due_date: Optional[str] = None  # YYYY-MM-DD, vencimento (base do Contas a Receber)
     status: str = "PENDENTE"  # PENDENTE, PAGO, CANCELADO
     paid_at: Optional[datetime] = None
     observations: Optional[str] = None
@@ -2561,13 +2562,16 @@ class PortServiceBillingBatchCreate(BaseModel):
     period_to: Optional[str] = None
     discount_value: Optional[float] = 0
     observations: Optional[str] = None
+    due_date: Optional[str] = None
 
 
 class PortServiceBillingBatchUpdate(BaseModel):
-    """Edição pós-criação - só desconto e observação (a lista de serviços
-    fica fixa depois de gerada, pra não desencontrar a baixa já feita)."""
+    """Edição pós-criação - só desconto, observação e vencimento (a lista de
+    serviços fica fixa depois de gerada, pra não desencontrar a baixa já feita).
+    Vencimento "" apaga."""
     discount_value: Optional[float] = None
     observations: Optional[str] = None
+    due_date: Optional[str] = None
 
 
 class PortServiceBillingBatchResponse(BaseModel):
@@ -2582,6 +2586,7 @@ class PortServiceBillingBatchResponse(BaseModel):
     net_total: float = 0
     period_from: Optional[str] = None
     period_to: Optional[str] = None
+    due_date: Optional[str] = None
     status: str
     paid_at: Optional[datetime] = None
     observations: Optional[str] = None

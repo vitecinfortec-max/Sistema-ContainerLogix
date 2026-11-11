@@ -12,14 +12,16 @@ from models import (
     PortServiceBillingBatchResponse,
 )
 from period_lock import ensure_period_open
+from routers.invoices import _parse_due_date
 from reports import (
+    BRT_TZ,
     today_brt,
     _build_pdf_header, _make_pdf_footer, merge_company, format_currency,
     generate_port_services_report_pdf, generate_port_services_report_excel,
     generate_port_service_invoice_pdf, generate_port_service_invoice_excel,
     generate_port_service_shifts_pdf, generate_port_service_shifts_excel,
 )
-from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, load_logo_buffer, refuse_negative
+from shared import db, get_current_active_user, get_current_admin_user, get_company_settings, load_logo_buffer, refuse_negative, parse_datetime_value
 
 api_router = APIRouter(prefix="/api")
 
@@ -680,6 +682,7 @@ async def create_port_service_billing_batch(
         net_total=net_total,
         period_from=data.period_from,
         period_to=data.period_to,
+        due_date=_parse_due_date(data.due_date, datetime.now(BRT_TZ).date()),
         observations=data.observations,
         created_by=current_user['sub'],
         created_by_name=current_user['name'],
@@ -710,7 +713,7 @@ async def update_port_service_billing_batch(
     data: PortServiceBillingBatchUpdate,
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Edita desconto/observação de uma fatura já gerada - a lista de
+    """Edita desconto/observação/vencimento de uma fatura já gerada - a lista de
     serviços fica fixa (não é reaberta pra adicionar/remover), pra não
     desencontrar a baixa já feita em cada Serviço Portuário. Bloqueado pra
     fatura CANCELADA (estado final, congelado)."""
@@ -733,6 +736,9 @@ async def update_port_service_billing_batch(
         update_data['net_total'] = round(batch['total_value'] - discount_value, 2)
     if data.observations is not None:
         update_data['observations'] = data.observations
+    if data.due_date is not None:
+        issued = parse_datetime_value(batch['created_at']).astimezone(BRT_TZ).date()
+        update_data['due_date'] = _parse_due_date(data.due_date, issued)
 
     if update_data:
         update_data['updated_at'] = datetime.now(timezone.utc)

@@ -98,3 +98,67 @@ def test_files_and_admin_only(api):
     assert "Alfa" in values and "Erro ao gerar Contas a Receber." not in values
     assert api.get("/api/reports/receivables/pdf", params={"client_name": "ninguém"}).content[:4] == b"%PDF"
     assert api.get("/api/reports/receivables", as_user="operator").status_code == 403
+
+
+def _port_batch(api, client_name, value, due_date=None, discount=0):
+    from test_operacional import _client, _port_service
+    client = _client(api, client_name)
+    service = _port_service(api, client, value=value)
+    r = api.post("/api/port-services/billing-batches", json={
+        "client_id": client["id"], "client_name": client["name"], "service_ids": [service["id"]],
+        "due_date": due_date, "discount_value": discount,
+    })
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_port_batch_due_date(api):
+    batch = _port_batch(api, "Porto Um", 500, due_date=_day(15))
+    assert batch["due_date"] == _day(15)
+    url = f"/api/port-services/billing-batches/{batch['id']}"
+    assert api.put(url, json={"due_date": _day(5)}).json()["due_date"] == _day(5)
+    r = api.put(url, json={"due_date": _day(-1)})
+    assert r.status_code == 400 and "vencimento" in r.json()["detail"]
+    assert api.put(url, json={"due_date": ""}).json()["due_date"] is None
+    # editar só a observação não mexe no vencimento
+    api.put(url, json={"due_date": _day(5)})
+    assert api.put(url, json={"observations": "ok"}).json()["due_date"] == _day(5)
+    assert api.get(f"{url}/pdf").content[:4] == b"%PDF"
+    assert api.get(f"{url}/excel").content[:2] == b"PK"
+
+    r = api.post("/api/port-services/billing-batches", json={"client_id": "x", "client_name": "x", "service_ids": ["x"], "due_date": "31/12/2026"})
+    assert r.status_code in (400, 404)
+
+
+def test_port_batches_in_receivables_and_alert(api):
+    _stored(api, 1, "Alfa", 100, -10, due_offset=5)
+    port = _port_batch(api, "Porto Um", 500, due_date=_day(10), discount=50)
+    api.run(api.db.port_service_billing_batches.update_one({"id": port["id"]}, {"$set": {"due_date": _day(-3)}}))
+
+    data = api.get("/api/reports/receivables").json()
+    rows = {(r["source"], r["number_label"]): r for r in data["rows"]}
+    row = rows[("PORTUARIO", str(port["batch_number"]))]
+    assert row["due_date"] == _day(-3) and row["aging_from_issue"] is False
+    assert row["open_value"] == 450 and row["days_overdue"] == 3 and row["aging"] == "d1_30"
+    assert data["summary"]["open_total"] == 550 and data["summary"]["overdue_total"] == 450
+
+    alerts = {a["key"]: a for a in api.get("/api/alerts/summary").json()["financial"]}
+    assert "R$ 450,00" in alerts["invoices_overdue"]["description"]
+
+    # Fluxo de Caixa: com vencimento vai para o previsto (atrasada entra hoje); sem vencimento fica à parte
+    no_due = _port_batch(api, "Porto Tres", 200)
+    flow = api.get("/api/cash-flow", params={"date_from": _day(-1), "date_to": _day(5)}).json()
+    assert flow["summary"]["forecast_in"] == 100 + 450
+    assert {"label": "Faturamento Portuário pendente sem vencimento", "count": 1, "total": 200} in flow["undated"]["receivable"]
+    api.put(f"/api/port-services/billing-batches/{no_due['id']}/status", params={"status": "CANCELADO"})
+
+    assert api.put(f"/api/port-services/billing-batches/{port['id']}/status", params={"status": "PAGO"}).status_code == 200
+    paid = [r for r in api.get("/api/reports/receivables", params={"status": "PAGO"}).json()["rows"] if r["source"] == "PORTUARIO"]
+    assert paid[0]["paid_date"] == _day(0) and paid[0]["total_value"] == 450
+
+    # cancelada não entra
+    other = _port_batch(api, "Porto Dois", 300)
+    api.put(f"/api/port-services/billing-batches/{other['id']}/status", params={"status": "CANCELADO"})
+    assert all(r["client_name"] != "Porto Dois" for r in api.get("/api/reports/receivables").json()["rows"])
+    assert api.get("/api/reports/receivables/pdf").content[:4] == b"%PDF"
+    assert api.get("/api/reports/receivables/excel").content[:2] == b"PK"
