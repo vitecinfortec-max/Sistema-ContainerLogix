@@ -15,6 +15,7 @@ from models import (
 from shared import db, get_current_admin_user, get_company_settings, parse_datetime_value, round_money
 from reports import BRT_TZ
 from period_lock import ensure_period_open
+from chart_links import account_links
 
 api_router = APIRouter(prefix="/api")
 
@@ -37,6 +38,10 @@ def _invoice_response(inv: dict) -> InvoiceResponse:
         credit_applied=inv.get('credit_applied') or 0,
         open_value=round_money((inv.get('total_value') or 0) - (inv.get('credit_applied') or 0)),
         paid_by_credit=bool(inv.get('paid_by_credit')),
+        account_id=inv.get('account_id'),
+        account_name=inv.get('account_name'),
+        cost_center_id=inv.get('cost_center_id'),
+        cost_center_name=inv.get('cost_center_name'),
         created_at=parse_datetime_value(inv['created_at']),
         user_name=inv['user_name'],
     )
@@ -230,6 +235,7 @@ async def create_invoice(
         total_value=total_value,
         notes=invoice_input.notes,
         due_date=_parse_due_date(invoice_input.due_date, datetime.now(BRT_TZ).date()),
+        **await account_links(invoice_input.account_id, invoice_input.cost_center_id),
         created_by=current_user['sub'],
         user_name=current_user['name']
     )
@@ -462,6 +468,16 @@ async def update_invoice(invoice_id: str, invoice_update: InvoiceUpdate, current
         if new_due != invoice.get('due_date'):
             changes['due_date'] = {'from': invoice.get('due_date'), 'to': new_due}
             update_data['due_date'] = new_due
+    # Plano de Contas / Centro de Custo: None mantém, "" tira
+    if invoice_update.account_id is not None or invoice_update.cost_center_id is not None:
+        links = await account_links(
+            invoice.get('account_id') if invoice_update.account_id is None else invoice_update.account_id,
+            invoice.get('cost_center_id') if invoice_update.cost_center_id is None else invoice_update.cost_center_id,
+        )
+        for field in ('account_name', 'cost_center_name'):
+            if links[field] != invoice.get(field):
+                changes[field] = {'from': invoice.get(field), 'to': links[field]}
+        update_data.update(links)
     
     # Processar movimentações. Primeiro valida o resultado final inteiro, sem
     # gravar nada; só depois aplica. Antes cada passo já gravava, e um erro no

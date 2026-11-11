@@ -28,7 +28,7 @@ MAX_DAYS = 400
 GROUPS = {"day": "Dia", "week": "Semana", "month": "Mês"}
 # Posições a receber/a pagar do Resumo Financeiro que o previsto já cobre (pelo
 # vencimento) ou que não são dinheiro a entrar/sair (crédito já recebido)
-DATED_KEYS = {"invoices_open", "checks_open", "payables_open", "client_credit_balance"}
+DATED_KEYS = {"invoices_open", "checks_open", "payables_open", "receivable_titles_open", "client_credit_balance"}
 MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 
 
@@ -93,6 +93,10 @@ async def _forecast_events(today: date) -> list:
     if enabled("financeiro.faturas"):
         async for inv in db.invoices.find({"status": {"$in": ["PENDENTE", None]}, "due_date": {"$nin": [None, ""]}}, {"_id": 0}):
             add(inv["due_date"], "ENTRADA", "Faturas a receber", _describe(inv), (inv.get("total_value") or 0) - (inv.get("credit_applied") or 0))
+    if enabled("financeiro.contas_receber"):
+        async for t in db.receivable_titles.find({"status": "ABERTO"}, {"_id": 0}):
+            label = f"Nº {t['receivable_number']}" + (f" - {t['installment']}/{t['installments_total']}" if (t.get("installments_total") or 1) > 1 else "")
+            add(t.get("due_date"), "ENTRADA", "Contas a Receber", " · ".join(x for x in (label, t.get("client_name"), t.get("description")) if x), t.get("amount"))
     if enabled("financeiro.contas_pagar"):
         async for p in db.payables.find({"status": "ABERTO"}, {"_id": 0}):
             label = f"Nº {p['payable_number']}" + (f" - {p['installment']}/{p['installments_total']}" if (p.get("installments_total") or 1) > 1 else "")

@@ -134,7 +134,7 @@ const ALL_SHORTCUTS = [
   { id: 'report-fuel', label: 'Rel. Abastecimento', icon: Fuel, path: '/reports/fuel-supply', kind: 'report', moduleKey: 'frota.relatorio_abastecimento' },
   { id: 'report-services', label: 'Rel. Ordens de Serviço', icon: Wrench, path: '/reports/service-orders', kind: 'report', moduleKey: 'frota.relatorio_servicos' },
   { id: 'report-stock', label: 'Rel. do Estoque', icon: FileSpreadsheet, path: '/estoque/relatorio', kind: 'report', moduleKey: 'estoque.relatorio' },
-  { id: 'receivables', label: 'Contas a Receber', icon: PiggyBank, path: '/reports/receivables', kind: 'report', moduleKey: 'financeiro.faturas', adminOnly: true },
+  { id: 'receivables', label: 'Contas a Receber', icon: PiggyBank, path: '/reports/receivables', kind: 'report', moduleKey: 'financeiro.contas_receber', adminOnly: true },
   { id: 'financial-summary', label: 'Resumo Financeiro', icon: Scale, path: '/financial-summary', kind: 'report', moduleKey: 'financeiro', adminOnly: true },
 ];
 

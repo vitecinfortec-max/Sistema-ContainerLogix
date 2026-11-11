@@ -63,6 +63,7 @@ from routers.transport_occurrences import api_router as transport_occurrences_ro
 from routers.driver_settlements import api_router as driver_settlements_router
 from routers.maintenance_plans import api_router as maintenance_plans_router
 from routers.payables import api_router as payables_router
+from routers.receivable_titles import api_router as receivable_titles_router
 from routers.cash_flow import api_router as cash_flow_router
 from routers.freight_payments import api_router as freight_payments_router
 from routers.gratifications import api_router as gratifications_router
@@ -354,6 +355,7 @@ app.include_router(transport_occurrences_router)
 app.include_router(driver_settlements_router)
 app.include_router(maintenance_plans_router)
 app.include_router(payables_router)
+app.include_router(receivable_titles_router)
 app.include_router(cash_flow_router)
 app.include_router(freight_payments_router)
 app.include_router(gratifications_router)
@@ -604,6 +606,9 @@ async def prepare_database():
     await db.vehicle_revisions.create_index([("vehicle_plate", 1), ("created_at", -1)])
     await db.maintenance_executions.create_index([("vehicle_id", 1), ("plan_id", 1), ("executed_date", -1)])
     await db.maintenance_executions.create_index("record_id")
+    # Contas a Receber (títulos avulsos): lista por vencimento, alertas e painel
+    await db.receivable_titles.create_index([("status", 1), ("due_date", 1)])
+    await db.receivable_titles.create_index("group_id")
     await db.fuel_supplies.create_index("supply_date")
     await db.drivers.create_index("cpf")
     await db.clients.create_index("cnpj")

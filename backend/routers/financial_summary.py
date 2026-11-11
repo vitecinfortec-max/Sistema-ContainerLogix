@@ -70,6 +70,8 @@ async def build_cash_lines() -> dict:
     purchases = await find("container_purchases", {}, "gestao_container.compra")
     payables_paid = await find("payables", {"status": "PAGO"}, "financeiro.contas_pagar")
     payables_open = await find("payables", {"status": "ABERTO"}, "financeiro.contas_pagar")
+    titles_received = await find("receivable_titles", {"status": "RECEBIDO"}, "financeiro.contas_receber")
+    titles_open = await find("receivable_titles", {"status": "ABERTO"}, "financeiro.contas_receber")
     credit_entries = await find("client_credit_entries", {}, "financeiro.credito_cliente")
     credit_accounts = await find("client_credit_accounts", {}, "financeiro.credito_cliente")
 
@@ -104,6 +106,8 @@ async def build_cash_lines() -> dict:
               lambda d: d.get("net_total", d.get("total_value")), lambda d: _day(d.get("paid_at"))),
         _line("container_sales", "Vendas de container recebidas", "gestao_container.venda", sales_received,
               lambda d: d.get("received_value") if d.get("received_value") is not None else d.get("sale_value"), lambda d: _day(d.get("received_at"))),
+        _line("receivable_titles", "Contas a receber recebidas (avulsas)", "financeiro.contas_receber", titles_received,
+              lambda d: d.get("paid_amount"), lambda d: d.get("paid_date")),
         _line("client_credits", "Créditos de clientes recebidos", "financeiro.credito_cliente", credit_in,
               lambda d: net(d), lambda d: d.get("entry_date"), note="adiantamentos: abatidos depois nas faturas, que contam só o restante"),
     ]
@@ -132,6 +136,7 @@ async def build_cash_lines() -> dict:
         _line("port_open", "Faturamento Portuário pendente", "financeiro.faturamento_portuario", port_open, lambda d: d.get("net_total", d.get("total_value"))),
         _line("sales_open", "Vendas de container a receber", "gestao_container.venda", sales_open,
               lambda d: (d.get("sale_value") or 0) - (d.get("received_value") or 0)),
+        _line("receivable_titles_open", "Contas a receber em aberto (avulsas)", "financeiro.contas_receber", titles_open, lambda d: d.get("amount")),
     ]
     payable = [
         _line("payables_open", "Contas a pagar em aberto", "financeiro.contas_pagar", payables_open, lambda d: d.get("amount")),

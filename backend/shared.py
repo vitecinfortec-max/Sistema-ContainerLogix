@@ -538,6 +538,7 @@ MODULE_CATALOG = [
     ]},
     {"key": "financeiro", "label": "Financeiro", "items": [
         {"key": "financeiro.faturas", "label": "Faturas"},
+        {"key": "financeiro.contas_receber", "label": "Contas a Receber"},
         {"key": "financeiro.contas_pagar", "label": "Contas a Pagar"},
         {"key": "financeiro.fluxo_caixa", "label": "Fluxo de Caixa"},
         {"key": "financeiro.credito_cliente", "label": "Crédito de Cliente"},
@@ -656,10 +657,11 @@ PATH_MODULE_MAP = [
     ("/api/payables", "financeiro.contas_pagar"),
     ("/api/cash-flow", "financeiro.fluxo_caixa"),
     ("/api/reports/payables", "financeiro.contas_pagar"),
-    ("/api/chart-accounts", "financeiro.contas_pagar"),
-    ("/api/cost-centers", "financeiro.contas_pagar"),
+    ("/api/receivable-titles", "financeiro.contas_receber"),
+    # /api/chart-accounts e /api/cost-centers ficam sem módulo: servem ao Contas a
+    # Pagar, ao Contas a Receber e às Faturas (as rotas já são só de administrador)
     ("/api/client-credits", "financeiro.credito_cliente"),
-    ("/api/reports/receivables", "financeiro.faturas"),
+    ("/api/reports/receivables", "financeiro.contas_receber"),
     ("/api/intl-invoices", "financeiro.invoice_internacional"),
     ("/api/daily-rate-requests", "financeiro.diaria"),
     ("/api/reports/daily-rates", "financeiro.diaria"),

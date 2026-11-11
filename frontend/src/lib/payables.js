@@ -32,6 +32,16 @@ export const payableLabel = (p) => `Nº ${p.payable_number}${p.installments_tota
 
 export const payableStatus = (p) => (p.status === 'ABERTO' && p.overdue ? 'VENCIDO' : p.status);
 
+// Contas a Receber: títulos avulsos (backend/routers/receivable_titles.py)
+export const RECEIVABLE_STATUS = {
+  ABERTO: { label: 'Em aberto', tone: 'blue' },
+  VENCIDO: { label: 'Vencido', tone: 'red' },
+  RECEBIDO: { label: 'Recebido', tone: 'emerald' },
+  CANCELADO: { label: 'Cancelado', tone: 'slate' },
+};
+
+export const receivableLabel = (t) => `Nº ${t.receivable_number}${t.installments_total > 1 ? ` - ${t.installment}/${t.installments_total}` : ''}`;
+
 // Mesmo dia do mês seguinte; dia 31 em mês curto cai no último dia dele
 export function addMonths(iso, months) {
   const [y, m, d] = iso.split('-').map(Number);

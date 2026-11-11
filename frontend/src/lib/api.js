@@ -871,6 +871,19 @@ export const api = {
   getPayablesReport: (params) => axios.get(`${API}/reports/payables`, { params }),
   getPayablesReportPdf: (params) => axios.get(`${API}/reports/payables/pdf`, { params, responseType: 'blob' }),
   getPayablesReportExcel: (params) => axios.get(`${API}/reports/payables/excel`, { params, responseType: 'blob' }),
+  getReceivableTitle: (id) => axios.get(`${API}/receivable-titles/${id}`),
+  createReceivableTitle: (data) => axios.post(`${API}/receivable-titles`, data),
+  updateReceivableTitle: (id, data) => axios.put(`${API}/receivable-titles/${id}`, data),
+  deleteReceivableTitle: (id, wholeGroup = false) => axios.delete(`${API}/receivable-titles/${id}`, { params: { whole_group: wholeGroup } }),
+  receiveReceivableTitles: (data) => axios.post(`${API}/receivable-titles/receive`, data),
+  unreceiveReceivableTitle: (id) => axios.post(`${API}/receivable-titles/${id}/unreceive`),
+  cancelReceivableTitle: (id, cancelled) => axios.post(`${API}/receivable-titles/${id}/cancel`, { cancelled }),
+  uploadReceivableTitleAttachment: (id, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axios.post(`${API}/receivable-titles/${id}/attachments`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  deleteReceivableTitleAttachment: (id, attachmentId) => axios.delete(`${API}/receivable-titles/${id}/attachments/${attachmentId}`),
   getMaintenancePlans: () => axios.get(`${API}/maintenance-plans`),
   getMaintenancePlan: (id) => axios.get(`${API}/maintenance-plans/${id}`),
   createMaintenancePlan: (data) => axios.post(`${API}/maintenance-plans`, data),

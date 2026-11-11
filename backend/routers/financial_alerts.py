@@ -12,6 +12,7 @@ from shared import db, get_disabled_modules, is_module_disabled
 from routers.checks import DUE_SOON_DAYS
 from routers.freight_reports import build_freight_reconciliation
 from routers.payables import build_payable_alerts
+from routers.receivable_titles import build_receivable_title_alerts
 
 FREIGHT_CHECK_DAYS = 90  # janela da conferência Ordens x Pagamento Frete
 EXPENSE_OPEN_DAYS = 30   # prestação de contas em andamento há mais que isso
@@ -113,5 +114,8 @@ async def build_financial_alerts() -> list:
 
     if not is_module_disabled("financeiro.contas_pagar", disabled):
         alerts += await build_payable_alerts()
+
+    if not is_module_disabled("financeiro.contas_receber", disabled):
+        alerts += await build_receivable_title_alerts()
 
     return alerts

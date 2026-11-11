@@ -39,6 +39,38 @@ import { useFormRoute } from '../hooks/useFormRoute';
 import { FormPage, FormActions } from '../components/FormKit';
 const ITEMS_PER_PAGE = 15;
 
+// Plano de Contas (só contas de receita) e Centro de Custo da fatura, opcionais.
+// Sem acesso ao plano de contas (lista vazia), os campos nem aparecem.
+function AccountCenterFields({ accounts, centers, value, onChange, testIdPrefix }) {
+  if (!accounts.length && !centers.length) return null;
+  const accountOptions = accounts.filter((a) => (a.kind === 'RECEITA' && a.active) || a.id === value.account_id);
+  const centerOptions = centers.filter((c) => c.active || c.id === value.cost_center_id);
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-[36rem]">
+      <div className="space-y-1.5">
+        <Label className="block">Plano de contas (opcional)</Label>
+        <Select value={value.account_id || 'NONE'} onValueChange={(v) => onChange({ ...value, account_id: v === 'NONE' ? '' : v })}>
+          <SelectTrigger className="h-9" data-testid={`${testIdPrefix}-account`}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NONE">Sem conta</SelectItem>
+            {accountOptions.map((a) => <SelectItem key={a.id} value={a.id}>{a.code} {a.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="block">Centro de custo (opcional)</Label>
+        <Select value={value.cost_center_id || 'NONE'} onValueChange={(v) => onChange({ ...value, cost_center_id: v === 'NONE' ? '' : v })}>
+          <SelectTrigger className="h-9" data-testid={`${testIdPrefix}-center`}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="NONE">Sem centro de custo</SelectItem>
+            {centerOptions.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 const INVOICE_STATUS_OPTIONS = [
   { value: 'PENDENTE', label: 'Pendente', tone: 'amber' },
   { value: 'PAGO', label: 'Pago', tone: 'emerald' },
@@ -89,6 +121,9 @@ export default function BillingPage() {
   const [clients, setClients] = useState([]);
   const [invoiceNotes, setInvoiceNotes] = useState('');
   const [invoiceDueDate, setInvoiceDueDate] = useState('');
+  const [invoiceLinks, setInvoiceLinks] = useState({ account_id: '', cost_center_id: '' });
+  const [chartAccounts, setChartAccounts] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
   // Marcar como paga pede o dia do recebimento: { invoiceId, date }
   const [payDialog, setPayDialog] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -113,7 +148,9 @@ export default function BillingPage() {
     client_name: '',
     client_cnpj: '',
     notes: '',
-    due_date: ''
+    due_date: '',
+    account_id: '',
+    cost_center_id: ''
   });
   const [saving, setSaving] = useState(false);
   const [editMovements, setEditMovements] = useState([]); // Movimentações atuais da fatura
@@ -136,6 +173,8 @@ export default function BillingPage() {
 
   useEffect(() => {
     loadClients();
+    api.getChartAccounts().then((r) => setChartAccounts(r.data || [])).catch(() => {});
+    api.getCostCenters().then((r) => setCostCenters(r.data || [])).catch(() => {});
   }, []);
 
   const [period, setPeriod] = useState(['', '']);
@@ -202,6 +241,7 @@ export default function BillingPage() {
     setClientSearchQuery('');
     setInvoiceNotes('');
     setInvoiceDueDate('');
+    setInvoiceLinks({ account_id: '', cost_center_id: '' });
     setAddedMovements([]);
     setUnbilledMovements([]);
     setTargetClientName('');
@@ -382,7 +422,9 @@ export default function BillingPage() {
         client_cnpj: getSelectedClientCnpj(),
         movement_ids: Array.from(selectedMovements),
         notes: invoiceNotes || null,
-        due_date: invoiceDueDate || null
+        due_date: invoiceDueDate || null,
+        account_id: invoiceLinks.account_id || null,
+        cost_center_id: invoiceLinks.cost_center_id || null
       });
       
       toast.success('Fatura gerada com sucesso!');
@@ -403,7 +445,9 @@ export default function BillingPage() {
       client_name: invoice.client_name || '',
       client_cnpj: invoice.client_cnpj || '',
       notes: invoice.notes || '',
-      due_date: invoice.due_date || ''
+      due_date: invoice.due_date || '',
+      account_id: invoice.account_id || '',
+      cost_center_id: invoice.cost_center_id || ''
     });
     setMovementsToAdd(new Set());
     setMovementsToRemove(new Set());
@@ -616,6 +660,12 @@ export default function BillingPage() {
       items.push(changes.due_date.from !== undefined
         ? `Vencimento: ${formatDay(changes.due_date.from)} → ${formatDay(changes.due_date.to)}`
         : `Vencimento: ${formatDay(changes.due_date)}`);
+    }
+    if (changes.account_name) {
+      items.push(`Plano de contas: ${changes.account_name.from || 'sem conta'} → ${changes.account_name.to || 'sem conta'}`);
+    }
+    if (changes.cost_center_name) {
+      items.push(`Centro de custo: ${changes.cost_center_name.from || 'sem centro'} → ${changes.cost_center_name.to || 'sem centro'}`);
     }
     if (changes.paid_date && changes.paid_date.to) {
       items.push(`Recebida em ${formatDay(changes.paid_date.to)}`);
@@ -1077,6 +1127,10 @@ export default function BillingPage() {
                 </div>
 
                 <div className="mt-4">
+                  <AccountCenterFields accounts={chartAccounts} centers={costCenters} value={invoiceLinks} onChange={setInvoiceLinks} testIdPrefix="invoice" />
+                </div>
+
+                <div className="mt-4">
                   <Label className="mb-1.5 block">Observações (opcional)</Label>
                   <Textarea
                     value={invoiceNotes}
@@ -1140,6 +1194,12 @@ export default function BillingPage() {
                   onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
                 />
               </div>
+
+              <AccountCenterFields
+                accounts={chartAccounts} centers={costCenters} testIdPrefix="edit-invoice"
+                value={{ account_id: editFormData.account_id, cost_center_id: editFormData.cost_center_id }}
+                onChange={(links) => setEditFormData({ ...editFormData, ...links })}
+              />
 
               <div className="space-y-1.5">
                 <Label htmlFor="edit-notes" className="block">Observações</Label>
@@ -1564,6 +1624,12 @@ export default function BillingPage() {
                     {formatDay(selectedInvoice.due_date)}{isOverdue(selectedInvoice) ? ' (vencida)' : ''}
                   </p>
                 </div>
+                {(selectedInvoice.account_name || selectedInvoice.cost_center_name) && (
+                  <div>
+                    <Label className="text-xs text-slate-500 dark:text-slate-400">Plano de contas · Centro de custo</Label>
+                    <p className="font-medium">{selectedInvoice.account_name || '-'} · {selectedInvoice.cost_center_name || '-'}</p>
+                  </div>
+                )}
                 {selectedInvoice.paid_date && (
                   <div>
                     <Label className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">

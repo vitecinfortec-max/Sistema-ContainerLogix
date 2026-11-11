@@ -14,13 +14,59 @@ import { api } from '../lib/api';
 import { apiErrorMessage } from '../lib/errors';
 import { todayISO } from '../lib/dates';
 import {
-  PAYABLE_STATUS, PAYMENT_METHODS, RECURRENCE, buildInstallments, formatDay, formatMoney, parseMoney, payableLabel, payableStatus,
+  PAYABLE_STATUS, PAYMENT_METHODS, RECEIVABLE_STATUS, RECURRENCE, buildInstallments, formatDay, formatMoney, parseMoney,
+  payableLabel, payableStatus, receivableLabel,
 } from '../lib/payables';
 import { toast } from 'sonner';
-import { Wallet, FileText, CalendarDays, Paperclip, Upload, Trash2, Download, Plus, Lock } from 'lucide-react';
+import { Wallet, PiggyBank, FileText, CalendarDays, Paperclip, Upload, Trash2, Download, Plus, Lock } from 'lucide-react';
 
 const MAX_ATTACHMENTS = 5; // mesmo limite do servidor (routers/payables.py)
 const ATTACH_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp';
+
+// O mesmo formulário lança conta a pagar (fornecedor, conta de despesa) e
+// título a receber avulso (cliente, conta de receita): só mudam a API e os textos.
+const KINDS = {
+  payable: {
+    icon: Wallet, listPath: '/accounts-payable', editPath: (id) => `/accounts-payable/${id}/edit`,
+    get: api.getPayable, create: api.createPayable, update: api.updatePayable,
+    upload: api.uploadPayableAttachment, removeAttachment: api.deletePayableAttachment,
+    loadParties: () => api.getSuppliers(), partyLabel: 'Fornecedor', partyTestId: 'payable-supplier',
+    accountKind: 'DESPESA', numberField: 'payable_number', settled: 'PAGO',
+    statuses: PAYABLE_STATUS, statusOf: payableStatus, label: payableLabel,
+    t: {
+      newTitle: 'Nova conta a pagar', editTitle: 'Conta a pagar', section: 'Conta',
+      editHint: 'Cada parcela é alterada à parte; paga ou cancelada fica só para consulta',
+      newHint: 'Conta única, parcelada (divide o total) ou recorrente (repete o valor todo mês)',
+      required: 'Preencha o fornecedor, a descrição e a data do documento', loadError: 'Erro ao carregar a conta',
+      updated: 'Conta atualizada', created: (n, k) => (k > 1 ? `Conta Nº ${n} lançada em ${k} parcelas` : `Conta Nº ${n} lançada`),
+      uploadLater: 'Abra a conta e envie de novo.', saveError: 'Erro ao salvar a conta',
+      maxAttachments: `No máximo ${MAX_ATTACHMENTS} anexos por conta`,
+      settledAs: 'Paga em', settledHint: 'Para alterar, estorne o pagamento na lista.', cancelled: 'Conta cancelada. Para alterar, reative na lista.',
+      groupSettled: 'paga', groupCancelled: 'cancelada', documentHint: 'NF, boleto, contrato...',
+      attachLabel: 'Anexar boleto ou nota', attachHint: 'PDF ou foto do boleto, da nota ou do recibo', save: 'Lançar conta',
+    },
+  },
+  receivable: {
+    icon: PiggyBank, listPath: '/reports/receivables?source=TITULO', editPath: (id) => `/accounts-receivable/${id}/edit`,
+    get: api.getReceivableTitle, create: api.createReceivableTitle, update: api.updateReceivableTitle,
+    upload: api.uploadReceivableTitleAttachment, removeAttachment: api.deleteReceivableTitleAttachment,
+    loadParties: () => api.getClients(), partyLabel: 'Cliente', partyTestId: 'receivable-client',
+    accountKind: 'RECEITA', numberField: 'receivable_number', settled: 'RECEBIDO',
+    statuses: RECEIVABLE_STATUS, statusOf: payableStatus, label: receivableLabel,
+    t: {
+      newTitle: 'Novo título a receber', editTitle: 'Título a receber', section: 'Título',
+      editHint: 'Cada parcela é alterada à parte; recebida ou cancelada fica só para consulta',
+      newHint: 'Receita que não passa por Fatura: aluguel, reembolso, venda de sucata... Única, parcelada ou recorrente',
+      required: 'Preencha o cliente, a descrição e a data do documento', loadError: 'Erro ao carregar o título',
+      updated: 'Título atualizado', created: (n, k) => (k > 1 ? `Título Nº ${n} lançado em ${k} parcelas` : `Título Nº ${n} lançado`),
+      uploadLater: 'Abra o título e envie de novo.', saveError: 'Erro ao salvar o título',
+      maxAttachments: `No máximo ${MAX_ATTACHMENTS} anexos por título`,
+      settledAs: 'Recebido em', settledHint: 'Para alterar, estorne o recebimento na lista.', cancelled: 'Título cancelado. Para alterar, reative na lista.',
+      groupSettled: 'recebida', groupCancelled: 'cancelada', documentHint: 'Contrato, recibo, nota...',
+      attachLabel: 'Anexar contrato ou recibo', attachHint: 'PDF ou foto do contrato, da nota ou do recibo', save: 'Lançar título',
+    },
+  },
+};
 
 const emptyForm = () => ({
   supplier_id: '', supplier_name: '', description: '', document_number: '', issue_date: todayISO(),
@@ -31,12 +77,16 @@ const emptyForm = () => ({
   due_date: '',
 });
 
-// Nova conta (/accounts-payable/new) e edição de uma parcela (/accounts-payable/:id/edit)
-export default function AccountsPayableFormPage() {
+// Nova conta (/accounts-payable/new) e edição de uma parcela (/accounts-payable/:id/edit);
+// com kind="receivable", o mesmo para títulos a receber (/accounts-receivable/...).
+// No formulário o fornecedor/cliente fica em supplier_id/supplier_name; vai para a API com o nome certo.
+export default function AccountsPayableFormPage({ kind = 'payable' }) {
+  const K = KINDS[kind];
+  const party = (data) => (kind === 'payable' ? { id: data.supplier_id, name: data.supplier_name } : { id: data.client_id, name: data.client_name });
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
-  const backToList = () => navigate('/accounts-payable');
+  const backToList = () => navigate(K.listPath);
   const { confirm, ConfirmDialog } = useConfirm();
   const fileRef = useRef(null);
 
@@ -52,28 +102,28 @@ export default function AccountsPayableFormPage() {
   const [centers, setCenters] = useState([]);
 
   useEffect(() => {
-    api.getSuppliers().then((r) => setSuppliers(Array.isArray(r.data) ? r.data : (r.data.items || []))).catch(() => setSuppliers([]));
+    K.loadParties().then((r) => setSuppliers(Array.isArray(r.data) ? r.data : (r.data.items || []))).catch(() => setSuppliers([]));
     api.getChartAccounts().then((r) => setAccounts(r.data || [])).catch(() => {});
     api.getCostCenters().then((r) => setCenters(r.data || [])).catch(() => {});
     if (!isEdit) return;
-    api.getPayable(id)
+    K.get(id)
       .then(({ data }) => {
         setRecord(data);
         setForm({
           ...emptyForm(),
-          supplier_id: data.supplier_id || '', supplier_name: data.supplier_name || '', description: data.description,
+          supplier_id: party(data).id || '', supplier_name: party(data).name || '', description: data.description,
           document_number: data.document_number || '', issue_date: data.issue_date, account_id: data.account_id || '',
           cost_center_id: data.cost_center_id || '', notes: data.notes || '', due_date: data.due_date,
           amount: String(data.amount).replace('.', ','),
         });
       })
       .catch((error) => {
-        toast.error(apiErrorMessage(error, 'Erro ao carregar a conta'));
+        toast.error(apiErrorMessage(error, K.t.loadError));
         backToList();
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, kind]);
 
   const onChange = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
   const readOnly = isEdit && record && record.status !== 'ABERTO';
@@ -87,17 +137,20 @@ export default function AccountsPayableFormPage() {
   const changeInstallment = (index, field, value) => setInstallments((prev) => prev.map((inst, i) => (i === index ? { ...inst, [field]: value } : inst)));
   const installmentsTotal = installments.reduce((sum, i) => sum + (parseMoney(i.amount) || 0), 0);
 
-  // Contas de receita não entram em Contas a Pagar; a que já está na conta continua aparecendo
-  const accountOptions = accounts.filter((a) => (a.kind === 'DESPESA' && a.active) || a.id === form.account_id);
+  // Só contas do tipo certo (despesa a pagar, receita a receber); a que já está no título continua aparecendo
+  const accountOptions = accounts.filter((a) => (a.kind === K.accountKind && a.active) || a.id === form.account_id);
   const centerOptions = centers.filter((c) => c.active || c.id === form.cost_center_id);
 
   const handleSubmit = async () => {
     if (!form.supplier_name.trim() || !form.description.trim() || !form.issue_date) {
-      toast.error('Preencha o fornecedor, a descrição e a data do documento');
+      toast.error(K.t.required);
       return;
     }
+    const partyFields = kind === 'payable'
+      ? { supplier_id: form.supplier_id || null, supplier_name: form.supplier_name }
+      : { client_id: form.supplier_id || null, client_name: form.supplier_name };
     const common = {
-      supplier_id: form.supplier_id || null, supplier_name: form.supplier_name, description: form.description,
+      ...partyFields, description: form.description,
       document_number: form.document_number, issue_date: form.issue_date,
       account_id: form.account_id || null, cost_center_id: form.cost_center_id || null, notes: form.notes,
     };
@@ -109,24 +162,24 @@ export default function AccountsPayableFormPage() {
           toast.error('Informe o vencimento e o valor');
           return;
         }
-        await api.updatePayable(id, { ...common, due_date: form.due_date, amount });
-        toast.success('Conta atualizada');
+        await K.update(id, { ...common, due_date: form.due_date, amount });
+        toast.success(K.t.updated);
       } else {
         const list = installments.map((i) => ({ due_date: i.due_date, amount: parseMoney(i.amount) }));
         if (list.length === 0 || list.some((i) => !i.due_date || !(i.amount > 0))) {
           toast.error('Informe o valor e o vencimento das parcelas');
           return;
         }
-        const { data } = await api.createPayable({ ...common, recurrence: form.recurrence, installments: list });
-        toast.success(data.length > 1 ? `Conta Nº ${data[0].payable_number} lançada em ${data.length} parcelas` : `Conta Nº ${data[0].payable_number} lançada`);
+        const { data } = await K.create({ ...common, recurrence: form.recurrence, installments: list });
+        toast.success(K.t.created(data[0][K.numberField], data.length));
         // Os anexos escolhidos vão para a 1ª parcela
-        const results = await Promise.allSettled(staged.map((file) => api.uploadPayableAttachment(data[0].id, file)));
+        const results = await Promise.allSettled(staged.map((file) => K.upload(data[0].id, file)));
         const failed = results.filter((r) => r.status === 'rejected').length;
-        if (failed > 0) toast.error(`${failed} anexo(s) não foram enviados. Abra a conta e envie de novo.`);
+        if (failed > 0) toast.error(`${failed} anexo(s) não foram enviados. ${K.t.uploadLater}`);
       }
       backToList();
     } catch (error) {
-      toast.error(apiErrorMessage(error, 'Erro ao salvar a conta'));
+      toast.error(apiErrorMessage(error, K.t.saveError));
     } finally {
       setSaving(false);
     }
@@ -137,7 +190,7 @@ export default function AccountsPayableFormPage() {
   const addAttachment = async (file) => {
     if (!file) return;
     if (attachments.length >= MAX_ATTACHMENTS) {
-      toast.error(`No máximo ${MAX_ATTACHMENTS} anexos por conta`);
+      toast.error(K.t.maxAttachments);
       return;
     }
     if (!isEdit) {
@@ -146,7 +199,7 @@ export default function AccountsPayableFormPage() {
     }
     setAttachBusy(true);
     try {
-      const { data } = await api.uploadPayableAttachment(id, file);
+      const { data } = await K.upload(id, file);
       setRecord(data);
     } catch (error) {
       toast.error(apiErrorMessage(error, 'Erro ao enviar o anexo'));
@@ -163,7 +216,7 @@ export default function AccountsPayableFormPage() {
     if (!(await confirm(`Remover o anexo "${attachment.name}"?`))) return;
     setAttachBusy(true);
     try {
-      const { data } = await api.deletePayableAttachment(id, attachment.id);
+      const { data } = await K.removeAttachment(id, attachment.id);
       setRecord(data);
     } catch (error) {
       toast.error(apiErrorMessage(error, 'Erro ao remover o anexo'));
@@ -175,17 +228,17 @@ export default function AccountsPayableFormPage() {
   const downloadAttachment = (attachment) => api.downloadFile(attachment.url, attachment.name.replace(/\.[a-z0-9]+$/i, ''))
     .catch(() => toast.error('Erro ao baixar o anexo'));
 
-  const status = record ? payableStatus(record) : null;
+  const status = record ? K.statusOf(record) : null;
 
   return (
     <Layout>
       <div className="max-w-5xl mx-auto space-y-4" data-testid="accounts-payable-form-page">
         <PageHeader
           backTo={backToList}
-          icon={Wallet}
-          title={isEdit ? `Conta a pagar ${record ? payableLabel(record) : ''}` : 'Nova conta a pagar'}
-          subtitle={isEdit ? 'Cada parcela é alterada à parte; paga ou cancelada fica só para consulta' : 'Conta única, parcelada (divide o total) ou recorrente (repete o valor todo mês)'}
-          actions={status && <StatusPill tone={PAYABLE_STATUS[status].tone}>{PAYABLE_STATUS[status].label}</StatusPill>}
+          icon={K.icon}
+          title={isEdit ? `${K.t.editTitle} ${record ? K.label(record) : ''}` : K.t.newTitle}
+          subtitle={isEdit ? K.t.editHint : K.t.newHint}
+          actions={status && <StatusPill tone={K.statuses[status].tone}>{K.statuses[status].label}</StatusPill>}
         />
 
         {loading ? (
@@ -196,9 +249,9 @@ export default function AccountsPayableFormPage() {
               <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200" data-testid="payable-read-only">
                 <Lock className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                  {record.status === 'PAGO'
-                    ? `Paga em ${formatDay(record.paid_date)} · ${formatMoney(record.paid_amount)} · ${PAYMENT_METHODS[record.payment_method] || record.payment_method}${record.interest ? ` · juros ${formatMoney(record.interest)}` : ''}${record.discount ? ` · desconto ${formatMoney(record.discount)}` : ''}. Para alterar, estorne o pagamento na lista.`
-                    : 'Conta cancelada. Para alterar, reative na lista.'}
+                  {record.status === K.settled
+                    ? `${K.t.settledAs} ${formatDay(record.paid_date)} · ${formatMoney(record.paid_amount)} · ${PAYMENT_METHODS[record.payment_method] || record.payment_method}${record.interest ? ` · juros ${formatMoney(record.interest)}` : ''}${record.discount ? ` · desconto ${formatMoney(record.discount)}` : ''}. ${K.t.settledHint}`
+                    : K.t.cancelled}
                 </span>
               </div>
             )}
@@ -207,19 +260,19 @@ export default function AccountsPayableFormPage() {
             )}
 
             <fieldset disabled={readOnly} className="space-y-4">
-              <FormSection title="Conta" icon={FileText}>
+              <FormSection title={K.t.section} icon={FileText}>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <Field label="Fornecedor" required className="col-span-2" hint="Escolha do cadastro ou digite só o nome.">
+                  <Field label={K.partyLabel} required className="col-span-2" hint="Escolha do cadastro ou digite só o nome.">
                     <Autocomplete
                       value={form.supplier_name}
                       onChange={(v) => setForm((prev) => ({ ...prev, supplier_name: v, supplier_id: '' }))}
                       onSelect={(s) => setForm((prev) => ({ ...prev, supplier_name: s.name, supplier_id: s.id }))}
                       options={suppliers}
                       displayField="name"
-                      testId="payable-supplier"
+                      testId={K.partyTestId}
                     />
                   </Field>
-                  <Field label="Nº do documento" hint="NF, boleto, contrato...">
+                  <Field label="Nº do documento" hint={K.t.documentHint}>
                     <Input value={form.document_number} onChange={(e) => onChange('document_number', e.target.value)} data-testid="payable-document" />
                   </Field>
                   <Field label="Data do documento" required>
@@ -265,17 +318,17 @@ export default function AccountsPayableFormPage() {
                     </div>
                     {record?.group?.length > 1 && (
                       <div>
-                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Parcelas do lançamento Nº {record.payable_number}</p>
+                        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Parcelas do lançamento Nº {record[K.numberField]}</p>
                         <div className="flex flex-wrap gap-2">
                           {record.group.map((g) => (
                             <button
                               key={g.id}
                               type="button"
-                              onClick={() => g.id !== record.id && navigate(`/accounts-payable/${g.id}/edit`)}
+                              onClick={() => g.id !== record.id && navigate(K.editPath(g.id))}
                               className={`rounded-md border px-2.5 py-1.5 text-left text-xs tabular-nums ${g.id === record.id ? 'border-primary bg-primary/10' : 'border-slate-200 dark:border-slate-700 hover:border-primary/60'}`}
                             >
                               <span className="font-semibold">{g.installment}/{record.installments_total}</span> · {formatDay(g.due_date)} · {formatMoney(g.amount)}
-                              <span className="block text-slate-500 dark:text-slate-400">{g.status === 'PAGO' ? `paga ${formatDay(g.paid_date)}` : g.status === 'CANCELADO' ? 'cancelada' : 'em aberto'}</span>
+                              <span className="block text-slate-500 dark:text-slate-400">{g.status === K.settled ? `${K.t.groupSettled} ${formatDay(g.paid_date)}` : g.status === 'CANCELADO' ? K.t.groupCancelled : 'em aberto'}</span>
                             </button>
                           ))}
                         </div>
@@ -336,13 +389,13 @@ export default function AccountsPayableFormPage() {
                     onChange={(e) => { addAttachment(e.target.files?.[0]); e.target.value = ''; }} data-testid="payable-attachment-input" />
                   <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}
                     disabled={attachBusy || saving || attachments.length >= MAX_ATTACHMENTS} data-testid="payable-attach-btn">
-                    {attachments.length ? <Plus className="w-4 h-4 mr-1" /> : <Upload className="w-4 h-4 mr-1" />} Anexar boleto ou nota
+                    {attachments.length ? <Plus className="w-4 h-4 mr-1" /> : <Upload className="w-4 h-4 mr-1" />} {K.t.attachLabel}
                   </Button>
                 </>
               )}
             >
               {attachments.length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">PDF ou foto do boleto, da nota ou do recibo{isEdit ? '' : '. No lançamento parcelado, os anexos ficam na 1ª parcela'}.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{K.t.attachHint}{isEdit ? '' : '. No lançamento parcelado, os anexos ficam na 1ª parcela'}.</p>
               ) : (
                 <ul className="divide-y divide-slate-100 dark:divide-slate-800">
                   {attachments.map((a) => (
@@ -367,7 +420,7 @@ export default function AccountsPayableFormPage() {
               <Button type="button" variant="outline" onClick={backToList}>{readOnly ? 'Voltar' : 'Cancelar'}</Button>
               {!readOnly && (
                 <Button type="button" onClick={handleSubmit} disabled={saving || attachBusy} data-testid="payable-save-btn">
-                  {saving ? 'Salvando...' : isEdit ? 'Salvar alterações' : 'Lançar conta'}
+                  {saving ? 'Salvando...' : isEdit ? 'Salvar alterações' : K.t.save}
                 </Button>
               )}
             </FormActions>

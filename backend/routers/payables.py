@@ -17,6 +17,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
+from chart_links import account_links
 from list_filters import combine, text_query
 from models import ChartAccountCreate, CostCenterCreate, PayableCancel, PayableCreate, PayablePay, PayableUpdate
 from period_lock import ensure_period_open
@@ -49,6 +50,8 @@ DEFAULT_ACCOUNTS = [
     ("2.12", "Tarifas bancárias e juros", "DESPESA"), ("2.99", "Outras despesas", "DESPESA"),
 ]
 DEFAULT_COST_CENTERS = ["Administrativo", "Terminal", "Frota / Transporte", "Oficina"]
+# Quem guarda account_id/cost_center_id (e o nome): renomear propaga, excluir é barrado
+ACCOUNT_USERS = {"payables": "contas a pagar", "receivable_titles": "contas a receber", "invoices": "faturas"}
 
 
 def _now() -> str:
@@ -130,15 +133,17 @@ async def update_chart_account(account_id: str, data: ChartAccountCreate, curren
         raise HTTPException(status_code=404, detail="Conta não encontrada")
     fields = await _clean_account(data, account_id)
     await db.chart_accounts.update_one({"id": account_id}, {"$set": fields})
-    # Os títulos guardam o nome: renomear vale para os antigos também
-    await db.payables.update_many({"account_id": account_id}, {"$set": {"account_name": f"{fields['code']} {fields['name']}"}})
+    # Os títulos e as faturas guardam o nome: renomear vale para os antigos também
+    for collection in ACCOUNT_USERS:
+        await db[collection].update_many({"account_id": account_id}, {"$set": {"account_name": f"{fields['code']} {fields['name']}"}})
     return await db.chart_accounts.find_one({"id": account_id}, {"_id": 0})
 
 
 @api_router.delete("/chart-accounts/{account_id}")
 async def delete_chart_account(account_id: str, current_user: dict = Depends(get_current_admin_user)):
-    if await db.payables.find_one({"account_id": account_id}):
-        raise HTTPException(status_code=400, detail="Esta conta já foi usada em contas a pagar. Desative em vez de excluir.")
+    for collection, what in ACCOUNT_USERS.items():
+        if await db[collection].find_one({"account_id": account_id}):
+            raise HTTPException(status_code=400, detail=f"Esta conta já foi usada em {what}. Desative em vez de excluir.")
     result = await db.chart_accounts.delete_one({"id": account_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
@@ -173,14 +178,16 @@ async def update_cost_center(center_id: str, data: CostCenterCreate, current_use
         raise HTTPException(status_code=404, detail="Centro de custo não encontrado")
     name = await _clean_center(data, center_id)
     await db.cost_centers.update_one({"id": center_id}, {"$set": {"name": name, "active": data.active}})
-    await db.payables.update_many({"cost_center_id": center_id}, {"$set": {"cost_center_name": name}})
+    for collection in ACCOUNT_USERS:
+        await db[collection].update_many({"cost_center_id": center_id}, {"$set": {"cost_center_name": name}})
     return await db.cost_centers.find_one({"id": center_id}, {"_id": 0})
 
 
 @api_router.delete("/cost-centers/{center_id}")
 async def delete_cost_center(center_id: str, current_user: dict = Depends(get_current_admin_user)):
-    if await db.payables.find_one({"cost_center_id": center_id}):
-        raise HTTPException(status_code=400, detail="Este centro de custo já foi usado em contas a pagar. Desative em vez de excluir.")
+    for collection, what in ACCOUNT_USERS.items():
+        if await db[collection].find_one({"cost_center_id": center_id}):
+            raise HTTPException(status_code=400, detail=f"Este centro de custo já foi usado em {what}. Desative em vez de excluir.")
     result = await db.cost_centers.delete_one({"id": center_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Centro de custo não encontrado")
@@ -191,23 +198,12 @@ async def delete_cost_center(center_id: str, current_user: dict = Depends(get_cu
 
 async def _links(supplier_id, supplier_name, account_id, cost_center_id) -> dict:
     """Confere os vínculos e devolve os nomes que o título guarda."""
-    fields = {"supplier_id": None, "supplier_name": _clean(supplier_name),
-              "account_id": None, "account_name": None, "cost_center_id": None, "cost_center_name": None}
+    fields = {"supplier_id": None, "supplier_name": _clean(supplier_name), **await account_links(account_id, cost_center_id)}
     if supplier_id:
         supplier = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0, "id": 1, "name": 1})
         if not supplier:
             raise HTTPException(status_code=400, detail="Fornecedor não encontrado")
         fields["supplier_id"], fields["supplier_name"] = supplier["id"], supplier["name"]
-    if account_id:
-        account = await db.chart_accounts.find_one({"id": account_id}, {"_id": 0})
-        if not account:
-            raise HTTPException(status_code=400, detail="Conta do plano de contas não encontrada")
-        fields["account_id"], fields["account_name"] = account["id"], f"{account['code']} {account['name']}"
-    if cost_center_id:
-        center = await db.cost_centers.find_one({"id": cost_center_id}, {"_id": 0})
-        if not center:
-            raise HTTPException(status_code=400, detail="Centro de custo não encontrado")
-        fields["cost_center_id"], fields["cost_center_name"] = center["id"], center["name"]
     return fields
 
 

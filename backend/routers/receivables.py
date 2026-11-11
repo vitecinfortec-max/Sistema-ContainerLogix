@@ -9,7 +9,11 @@ from fastapi.responses import StreamingResponse
 
 from reports import BRT_TZ, merge_company
 from routers.movements import _parse_filter_day
-from shared import db, get_current_admin_user, get_company_settings, load_logo_buffer, parse_datetime_value
+from routers.receivable_titles import label as title_label
+from shared import (
+    db, get_current_admin_user, get_company_settings, get_disabled_modules, is_module_disabled, load_logo_buffer,
+    parse_datetime_value,
+)
 
 api_router = APIRouter(prefix="/api")
 logger = logging.getLogger(__name__)
@@ -27,7 +31,7 @@ AGING_BUCKETS = [  # (chave, rótulo, de, até) em dias de atraso
     ("d90", "Mais de 90 dias", 91, None),
 ]
 AGING_LABELS = {key: label for key, label, _, _ in AGING_BUCKETS}
-STATUS_LABELS = {"PENDENTE": "Em aberto", "PAGO": "Recebida"}
+STATUS_LABELS = {"PENDENTE": "Em aberto", "PAGO": "Recebido"}
 DATE_FIELD_LABELS = {"issue": "Emissão", "due": "Vencimento", "paid": "Recebimento"}
 
 
@@ -44,54 +48,131 @@ def _fmt_day(value) -> str:
     return (value if isinstance(value, date) else date.fromisoformat(value)).strftime("%d/%m/%Y")
 
 
-async def build_receivables(status=None, client_name=None, date_field="issue", date_from=None, date_to=None) -> dict:
-    query = {"status": {"$in": ["PENDENTE", "PAGO", None]}}
-    if status == "PENDENTE":
-        query["status"] = {"$in": ["PENDENTE", None]}
-    elif status == "PAGO":
-        query["status"] = "PAGO"
-    if client_name:
-        query["client_name"] = {"$regex": re.escape(client_name.strip()), "$options": "i"}
+SOURCE_LABELS = {"FATURA": "Fatura", "PORTUARIO": "Faturamento Portuário", "VENDA": "Venda de container", "TITULO": "Título avulso"}
+SOURCE_MODULES = {"FATURA": "financeiro.faturas", "PORTUARIO": "financeiro.faturamento_portuario",
+                  "VENDA": "gestao_container.venda", "TITULO": "financeiro.contas_receber"}
+
+
+def _brt_day(value) -> Optional[date]:
+    return parse_datetime_value(value).astimezone(BRT_TZ).date() if value else None
+
+
+def _iso_day(value) -> Optional[date]:
+    return date.fromisoformat(value[:10]) if value else None
+
+
+def _status_query(wanted, open_value, paid_value):
+    if wanted == "open":
+        return open_value
+    if wanted == "paid":
+        return paid_value
+    return {"$in": [*(open_value["$in"] if isinstance(open_value, dict) else [open_value]), paid_value]}
+
+
+async def _source_docs(source: str, query_status: Optional[str], client_name: Optional[str]) -> list:
+    """Os documentos de uma origem, já no formato comum do painel."""
+    name_regex = {"$regex": re.escape(client_name.strip()), "$options": "i"} if client_name else None
+    wanted = {"PENDENTE": "open", "PAGO": "paid"}.get(query_status)
+    out = []
+    if source == "FATURA":
+        query = {"status": _status_query(wanted, {"$in": ["PENDENTE", None]}, "PAGO")}
+        if name_regex:
+            query["client_name"] = name_regex
+        async for inv in db.invoices.find(query, {"_id": 0, "movement_ids": 0}):
+            total = inv.get("total_value") or 0
+            out.append({"id": inv["id"], "invoice_number": inv["invoice_number"], "number_label": str(inv["invoice_number"]),
+                        "client_name": inv["client_name"], "client_cnpj": inv.get("client_cnpj"),
+                        "issue": _brt_day(inv["created_at"]), "due": _iso_day(inv.get("due_date")), "paid": _iso_day(inv.get("paid_date")),
+                        "total_value": total, "credit_applied": inv.get("credit_applied") or 0,
+                        "open_value": total - (inv.get("credit_applied") or 0),
+                        "is_open": (inv.get("status") or "PENDENTE") == "PENDENTE",
+                        "account_name": inv.get("account_name"), "cost_center_name": inv.get("cost_center_name")})
+    elif source == "PORTUARIO":
+        query = {"status": _status_query(wanted, "PENDENTE", "PAGO")}
+        if name_regex:
+            query["client_name"] = name_regex
+        async for b in db.port_service_billing_batches.find(query, {"_id": 0, "service_ids": 0}):
+            total = b.get("net_total", b.get("total_value")) or 0
+            out.append({"id": b["id"], "number_label": str(b["batch_number"]), "client_name": b["client_name"],
+                        "issue": _brt_day(b.get("created_at")), "due": None, "paid": _brt_day(b.get("paid_at")),
+                        "total_value": total, "credit_applied": 0, "open_value": total, "is_open": b["status"] == "PENDENTE"})
+    elif source == "VENDA":
+        # Venda sem valor combinado ainda não tem o que receber
+        query = {"status": _status_query(wanted, "PENDENTE", "RECEBIDO"), "sale_value": {"$gt": 0}}
+        if name_regex:
+            query["representative_name"] = name_regex
+        async for sale in db.container_sales.find(query, {"_id": 0}):
+            total, received = sale.get("sale_value") or 0, sale.get("received_value") or 0
+            is_open = sale["status"] == "PENDENTE"
+            out.append({"id": sale["id"], "number_label": sale.get("container_number") or "-",
+                        "client_name": sale.get("representative_name") or "Venda de container",
+                        "issue": _brt_day(sale.get("created_at")), "due": None, "paid": _brt_day(sale.get("received_at")),
+                        "total_value": total if is_open else (received or total), "credit_applied": 0,
+                        "open_value": total - received, "is_open": is_open})
+    elif source == "TITULO":
+        query = {"status": _status_query(wanted, "ABERTO", "RECEBIDO")}
+        if name_regex:
+            query["client_name"] = name_regex
+        async for t in db.receivable_titles.find(query, {"_id": 0, "attachments": 0}):
+            is_open = t["status"] == "ABERTO"
+            out.append({"id": t["id"], "number_label": title_label(t), "client_name": t["client_name"],
+                        "description": t.get("description"),
+                        "issue": _iso_day(t["issue_date"]), "due": _iso_day(t.get("due_date")), "paid": _iso_day(t.get("paid_date")),
+                        "total_value": t["amount"] if is_open else (t.get("paid_amount") or t["amount"]), "credit_applied": 0,
+                        "open_value": t["amount"], "is_open": is_open,
+                        "account_name": t.get("account_name"), "cost_center_name": t.get("cost_center_name")})
+    return out
+
+
+async def build_receivables(status=None, client_name=None, date_field="issue", date_from=None, date_to=None, source=None) -> dict:
+    """O painel Contas a Receber: Faturas, Faturamento Portuário, Venda de
+    Container e títulos avulsos (de cada módulo contratado), no mesmo formato."""
     day_from = _parse_filter_day(date_from, "date_from") if date_from else None
     day_to = _parse_filter_day(date_to, "date_to") if date_to else None
-
-    invoices = await db.invoices.find(query, {"_id": 0, "movement_ids": 0}).to_list(None)
+    disabled = await get_disabled_modules()
+    sources = [s for s in SOURCE_LABELS if (not source or s == source) and not is_module_disabled(SOURCE_MODULES[s], disabled)]
     today = datetime.now(BRT_TZ).date()
 
     rows = []
-    for inv in invoices:
-        issue = parse_datetime_value(inv["created_at"]).astimezone(BRT_TZ).date()
-        due = date.fromisoformat(inv["due_date"]) if inv.get("due_date") else None
-        paid = date.fromisoformat(inv["paid_date"]) if inv.get("paid_date") else None
-        ref = {"issue": issue, "due": due, "paid": paid}[date_field]
-        if (day_from or day_to) and ref is None:
-            continue
-        if (day_from and ref < day_from) or (day_to and ref > day_to):
-            continue
-        is_open = (inv.get("status") or "PENDENTE") == "PENDENTE"
-        row = {
-            "id": inv["id"],
-            "invoice_number": inv["invoice_number"],
-            "client_name": inv["client_name"],
-            "client_cnpj": inv.get("client_cnpj"),
-            "issue_date": issue.isoformat(),
-            "due_date": due.isoformat() if due else None,
-            "paid_date": paid.isoformat() if paid else None,
-            "total_value": round(inv.get("total_value") or 0, 2),
-            # Crédito de Cliente já usado: em aberto conta só o que falta
-            "credit_applied": round(inv.get("credit_applied") or 0, 2),
-            "open_value": round((inv.get("total_value") or 0) - (inv.get("credit_applied") or 0), 2) if is_open else 0,
-            "status": "PENDENTE" if is_open else "PAGO",
-            "days_overdue": None,
-            "aging": None,
-            "aging_from_issue": False,
-            "days_to_receive": (paid - issue).days if paid else None,
-        }
-        if is_open:
-            days = (today - (due or issue)).days
-            row.update(days_overdue=max(days, 0), aging=_bucket(days), aging_from_issue=due is None)
-        rows.append(row)
-    rows.sort(key=lambda r: (r["status"] != "PENDENTE", -(r["days_overdue"] or 0), r["invoice_number"]))
+    for src in sources:
+        for doc in await _source_docs(src, status, client_name):
+            issue, due, paid = doc["issue"], doc["due"], doc["paid"]
+            ref = {"issue": issue, "due": due, "paid": paid}[date_field]
+            if (day_from or day_to) and ref is None:
+                continue
+            if (day_from and ref < day_from) or (day_to and ref > day_to):
+                continue
+            is_open = doc["is_open"]
+            row = {
+                "id": doc["id"],
+                "source": src,
+                "source_label": SOURCE_LABELS[src],
+                "invoice_number": doc.get("invoice_number"),
+                "number_label": doc["number_label"],
+                "client_name": doc["client_name"],
+                "client_cnpj": doc.get("client_cnpj"),
+                "description": doc.get("description"),
+                "account_name": doc.get("account_name"),
+                "cost_center_name": doc.get("cost_center_name"),
+                "issue_date": issue.isoformat() if issue else None,
+                "due_date": due.isoformat() if due else None,
+                "paid_date": paid.isoformat() if paid else None,
+                "total_value": round(doc["total_value"], 2),
+                # Crédito de Cliente já usado: em aberto conta só o que falta
+                "credit_applied": round(doc["credit_applied"], 2),
+                "open_value": round(doc["open_value"], 2) if is_open else 0,
+                "status": "PENDENTE" if is_open else "PAGO",
+                "days_overdue": None,
+                "aging": None,
+                "aging_from_issue": False,
+                "days_to_receive": (paid - issue).days if paid and issue else None,
+            }
+            if is_open:
+                days = (today - (due or issue or today)).days
+                row.update(days_overdue=max(days, 0), aging=_bucket(days), aging_from_issue=due is None)
+            rows.append(row)
+    order = list(SOURCE_LABELS)
+    rows.sort(key=lambda r: (r["status"] != "PENDENTE", -(r["days_overdue"] or 0), order.index(r["source"]), r["number_label"].zfill(12)))
 
     aging = {key: {"label": label, "count": 0, "total": 0.0} for key, label, _, _ in AGING_BUCKETS}
     clients = {}
@@ -135,6 +216,7 @@ async def build_receivables(status=None, client_name=None, date_field="issue", d
 
 STATUS_PATTERN = "^(PENDENTE|PAGO)$"
 DATE_FIELD_PATTERN = "^(issue|due|paid)$"
+SOURCE_PATTERN = "^(FATURA|PORTUARIO|VENDA|TITULO)$"
 
 
 @api_router.get("/reports/receivables")
@@ -144,14 +226,18 @@ async def get_receivables(
     date_field: str = Query("issue", pattern=DATE_FIELD_PATTERN),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    source: Optional[str] = Query(None, pattern=SOURCE_PATTERN),
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Contas a Receber: faturas em aberto e recebidas, com atraso por faixa e por cliente"""
-    return await build_receivables(status, client_name, date_field, date_from, date_to)
+    """Contas a Receber: o que está em aberto e o que foi recebido (Faturas,
+    Faturamento Portuário, Venda de Container e títulos avulsos), com atraso por faixa e por cliente"""
+    return await build_receivables(status, client_name, date_field, date_from, date_to, source)
 
 
-def _report_subtitle(status, client_name, date_field, date_from, date_to) -> str:
-    parts = [STATUS_LABELS.get(status, "Em aberto e recebidas")]
+def _report_subtitle(status, client_name, date_field, date_from, date_to, source=None) -> str:
+    parts = [STATUS_LABELS.get(status, "Em aberto e recebidos")]
+    if source:
+        parts.append(f"Origem: {SOURCE_LABELS[source]}")
     if client_name:
         parts.append(f"Cliente: {client_name}")
     if date_from or date_to:
@@ -166,6 +252,7 @@ async def get_receivables_pdf(
     date_field: str = Query("issue", pattern=DATE_FIELD_PATTERN),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    source: Optional[str] = Query(None, pattern=SOURCE_PATTERN),
     current_user: dict = Depends(get_current_admin_user)
 ):
     from reportlab.lib.pagesizes import A4, landscape
@@ -177,7 +264,7 @@ async def get_receivables_pdf(
         _pdf_header_cells, _pdf_cell_factory, _pdf_table_style, _pdf_empty_state, _pdf_narrow_table,
     )
 
-    data = await build_receivables(status, client_name, date_field, date_from, date_to)
+    data = await build_receivables(status, client_name, date_field, date_from, date_to, source)
     s = data["summary"]
     company = merge_company(await get_company_settings())
     buffer = io.BytesIO()
@@ -188,11 +275,11 @@ async def get_receivables_pdf(
 
     elements = list(_build_pdf_header(
         styles, load_logo_buffer(company), "Contas a Receber",
-        generation_info=_report_subtitle(status, client_name, date_field, date_from, date_to), company=company, content_width=width,
+        generation_info=_report_subtitle(status, client_name, date_field, date_from, date_to, source), company=company, content_width=width,
     ))
     avg = s["avg_days_to_receive"]
     elements.append(_pdf_info_grid([
-        ("Faturas", _fmt_int(s["count"])),
+        ("Títulos", _fmt_int(s["count"])),
         ("Em aberto", money(s["open_total"])),
         ("Vencido", money(s["overdue_total"])),
         ("Recebido", money(s["paid_total"])),
@@ -205,17 +292,17 @@ async def get_receivables_pdf(
     cell = _pdf_cell_factory(styles, font_size=7.5)
     if not data["rows"]:
         elements.append(Spacer(1, 10))
-        elements.append(_pdf_empty_state("Nenhuma fatura encontrada com esses filtros.", width))
+        elements.append(_pdf_empty_state("Nada a receber encontrado com esses filtros.", width))
     else:
         if s["open_total"]:
             elements.extend(_pdf_section_title("Em aberto por tempo de atraso", width))
-            aging_rows = [_pdf_header_cells(["Faixa", "Faturas", "Valor"], font_size=7.5)]
+            aging_rows = [_pdf_header_cells(["Faixa", "Títulos", "Valor"], font_size=7.5)]
             for a in s["aging"]:
                 aging_rows.append([cell(a["label"]), cell(_fmt_int(a["count"]), "center"), cell(money(a["total"]), "right", bold=True)])
             elements.append(_pdf_narrow_table(aging_rows, [130, 60, 100], width))
 
         elements.extend(_pdf_section_title("Por cliente", width))
-        client_rows = [_pdf_header_cells(["Cliente", "Faturas", "Em aberto", "Vencido", "Recebido"], font_size=7.5)]
+        client_rows = [_pdf_header_cells(["Cliente", "Títulos", "Em aberto", "Vencido", "Recebido"], font_size=7.5)]
         for c in data["clients"]:
             client_rows.append([cell(c["client_name"], bold=True), cell(_fmt_int(c["count"]), "center"),
                                 cell(money(c["open"]), "right"), cell(money(c["overdue"]), "right"), cell(money(c["paid"]), "right")])
@@ -226,25 +313,25 @@ async def get_receivables_pdf(
         table.setStyle(TableStyle(_pdf_table_style(total_row=True)))
         elements.append(table)
 
-        elements.extend(_pdf_section_title("Faturas", width))
-        detail = [_pdf_header_cells(["Nº", "Cliente", "Emissão", "Vencimento", "Atraso", "Recebida em", "Situação", "Valor"], font_size=7.5)]
+        elements.extend(_pdf_section_title("Títulos", width))
+        detail = [_pdf_header_cells(["Origem", "Nº", "Cliente", "Emissão", "Vencimento", "Atraso", "Recebido em", "Situação", "Valor"], font_size=7.5)]
         for r in data["rows"]:
             if r["status"] == "PENDENTE":
                 late = f"{r['days_overdue']} dia(s)" if r["days_overdue"] else "-"
                 if r["aging_from_issue"] and r["days_overdue"]:
                     late += " (emissão)"
-                situation = AGING_LABELS[r["aging"]] if r["aging"] == "current" else "Vencida"
+                situation = AGING_LABELS[r["aging"]] if r["aging"] == "current" else "Vencido"
             else:
-                late, situation = "-", "Recebida"
+                late, situation = "-", "Recebido"
             if r["credit_applied"]:
                 situation += f" (crédito {money(r['credit_applied'])})"
             detail.append([
-                cell(r["invoice_number"], "center", bold=True), cell(r["client_name"]), cell(_fmt_day(r["issue_date"]), "center"),
+                cell(r["source_label"]), cell(r["number_label"], "center", bold=True), cell(r["client_name"]), cell(_fmt_day(r["issue_date"]), "center"),
                 cell(_fmt_day(r["due_date"]), "center"), cell(late, "center"), cell(_fmt_day(r["paid_date"]), "center"),
                 cell(situation, "center"), cell(money(r["open_value"] if r["status"] == "PENDENTE" else r["total_value"]), "right", bold=True),
             ])
         scale = width / 760
-        table = Table(detail, colWidths=[w * scale for w in [45, 245, 70, 70, 85, 75, 75, 95]], repeatRows=1)
+        table = Table(detail, colWidths=[w * scale for w in [80, 60, 190, 62, 62, 72, 68, 76, 90]], repeatRows=1)
         table.setStyle(TableStyle(_pdf_table_style()))
         elements.append(table)
 
@@ -261,6 +348,7 @@ async def get_receivables_excel(
     date_field: str = Query("issue", pattern=DATE_FIELD_PATTERN),
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    source: Optional[str] = Query(None, pattern=SOURCE_PATTERN),
     current_user: dict = Depends(get_current_admin_user)
 ):
     from openpyxl import Workbook
@@ -269,45 +357,46 @@ async def get_receivables_excel(
         XL_DATE, format_currency, download_logo,
     )
 
-    data = await build_receivables(status, client_name, date_field, date_from, date_to)
+    data = await build_receivables(status, client_name, date_field, date_from, date_to, source)
     s = data["summary"]
     try:
         company = await get_company_settings()
         wb = Workbook()
         ws = wb.active
         ws.title = "Contas a Receber"
-        headers = ["Nº Fatura", "Cliente", "CNPJ", "Emissão", "Vencimento", "Dias de atraso", "Faixa", "Recebida em", "Situação", "Valor"]
+        headers = ["Origem", "Nº", "Cliente", "CNPJ", "Emissão", "Vencimento", "Dias de atraso", "Faixa", "Recebido em", "Situação", "Valor"]
         rows = []
         for r in data["rows"]:
             is_open = r["status"] == "PENDENTE"
             rows.append([
-                r["invoice_number"], r["client_name"], r["client_cnpj"] or "-", _xl_date(r["issue_date"]),
+                r["source_label"], r["number_label"], r["client_name"], r["client_cnpj"] or "-",
+                _xl_date(r["issue_date"]) if r["issue_date"] else "-",
                 _xl_date(r["due_date"]) if r["due_date"] else "-",
                 (r["days_overdue"] if is_open else None),
                 (AGING_LABELS[r["aging"]] + (" (emissão)" if r["aging_from_issue"] else "")) if is_open else "-",
                 _xl_date(r["paid_date"]) if r["paid_date"] else "-",
-                ("A vencer" if r["aging"] == "current" else "Vencida") if is_open else "Recebida",
+                ("A vencer" if r["aging"] == "current" else "Vencido") if is_open else "Recebido",
                 r["open_value"] if is_open else r["total_value"],
             ])
-        stats = (f"{_report_subtitle(status, client_name, date_field, date_from, date_to)}   •   Em aberto: {format_currency(s['open_total'], 'BRL')}"
+        stats = (f"{_report_subtitle(status, client_name, date_field, date_from, date_to, source)}   •   Em aberto: {format_currency(s['open_total'], 'BRL')}"
                  f"   •   Vencido: {format_currency(s['overdue_total'], 'BRL')}   •   Recebido: {format_currency(s['paid_total'], 'BRL')}")
         _bsoft_style_excel(
             ws, "Contas a Receber", stats, headers, rows,
-            {'B': 10, 'C': 36, 'D': 20, 'E': 12, 'F': 12, 'G': 13, 'H': 22, 'I': 13, 'J': 12, 'K': 15},
-            center_cols={0, 2, 3, 4, 5, 6, 7, 8},
-            number_fmt_cols={3: XL_DATE, 4: XL_DATE, 7: XL_DATE, 9: 'R$ #,##0.00'},
+            {'B': 20, 'C': 12, 'D': 34, 'E': 20, 'F': 12, 'G': 12, 'H': 13, 'I': 22, 'J': 13, 'K': 12, 'L': 15},
+            center_cols={0, 1, 3, 4, 5, 6, 7, 8, 9},
+            number_fmt_cols={4: XL_DATE, 5: XL_DATE, 8: XL_DATE, 10: 'R$ #,##0.00'},
             stats_text=stats, company_name=merge_company(company)['name'], logo_buffer=download_logo(company),
-            company=company, autofilter=True, empty_message="Nenhuma fatura encontrada com esses filtros.",
+            company=company, autofilter=True, empty_message="Nada a receber encontrado com esses filtros.",
         )
-        tones = {"Recebida": "emerald", "Vencida": "red", "A vencer": "amber"}
-        _xl_color_column(ws, 8, [tones.get(row[8]) for row in rows])
+        tones = {"Recebido": "emerald", "Vencido": "red", "A vencer": "amber"}
+        _xl_color_column(ws, 9, [tones.get(row[9]) for row in rows])
         totals_row = 9 + max(len(rows), 1) + 1
         aging_rows = [(a["label"], a["total"]) for a in s["aging"] if a["count"]]
-        last_row = _xl_totals(ws, totals_row, 8, 10, 11, aging_rows + [
+        last_row = _xl_totals(ws, totals_row, 9, 11, 12, aging_rows + [
             ("Total em aberto", s["open_total"]),
             ("Total recebido", s["paid_total"]),
         ])
-        _xl_extend_print_area(ws, 'K', last_row)
+        _xl_extend_print_area(ws, 'L', last_row)
         buffer = io.BytesIO()
         wb.save(buffer)
         content = buffer.getvalue()

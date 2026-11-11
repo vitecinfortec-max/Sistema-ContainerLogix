@@ -867,6 +867,22 @@ function App() {
             }
           />
           <Route
+            path="/accounts-receivable/new"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.contas_receber">
+                <AccountsPayableFormPage kind="receivable" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/accounts-receivable/:id/edit"
+            element={
+              <ProtectedRoute adminOnly moduleKey="financeiro.contas_receber">
+                <AccountsPayableFormPage kind="receivable" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/cash-flow"
             element={
               <ProtectedRoute adminOnly moduleKey="financeiro.fluxo_caixa">
@@ -1181,7 +1197,7 @@ function App() {
           <Route
             path="/reports/receivables"
             element={
-              <ProtectedRoute adminOnly moduleKey="financeiro.faturas">
+              <ProtectedRoute adminOnly moduleKey="financeiro.contas_receber">
                 <ReceivablesPage />
               </ProtectedRoute>
             }

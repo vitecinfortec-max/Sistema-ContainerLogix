@@ -6,23 +6,16 @@ import {
   StatCard, StatGrid, FilterCard, PeriodFilterFields, FilterField, SearchInput, DataCard, Toolbar, ToolbarButton, ToolbarDivider,
   ToolbarPrimary, StatusPill, EmptyState, TablePagination,
 } from '../components/DataPage';
-import { Field } from '../components/FormKit';
 import PeriodReportDialog from '../components/PeriodReportDialog';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Textarea } from '../components/ui/textarea';
+import PaymentDialog from '../components/PaymentDialog';
 import { Checkbox } from '../components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useConfirm } from '../hooks/useConfirm';
 import { useUrlState } from '../hooks/useUrlState';
 import { api } from '../lib/api';
 import { apiErrorMessage } from '../lib/errors';
-import { todayISO } from '../lib/dates';
-import {
-  PAYABLE_STATUS, PAYMENT_METHODS, formatDay, formatMoney, parseMoney, payableLabel, payableStatus,
-} from '../lib/payables';
+import { PAYABLE_STATUS, formatDay, formatMoney, payableLabel, payableStatus } from '../lib/payables';
 import { toast } from 'sonner';
 import {
   Wallet, Plus, Pencil, Trash2, CheckCircle2, Undo2, Ban, FileBarChart, ListTree, AlertTriangle, CalendarClock, CalendarDays, Paperclip,
@@ -34,94 +27,6 @@ const STATUS_FILTERS = {
 const DATE_FIELDS = { due_date: 'Vencimento', paid_date: 'Pagamento', issue_date: 'Emissão' };
 // Os selects do relatório não aceitam valor vazio: "Todas" vai como ALL e sai aqui
 const reportParams = (params) => Object.fromEntries(Object.entries(params).filter(([, v]) => v !== 'ALL'));
-
-// Baixa de uma ou várias contas: data, forma e, pagando uma só, juros e desconto
-function PayDialog({ items, onOpenChange, onPaid }) {
-  const single = items.length === 1;
-  const [form, setForm] = useState({ paid_date: todayISO(), payment_method: 'PIX', interest: '', discount: '', payment_notes: '' });
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (items.length) setForm({ paid_date: todayISO(), payment_method: 'PIX', interest: '', discount: '', payment_notes: '' });
-  }, [items]);
-
-  const amount = items.reduce((sum, p) => sum + (p.amount || 0), 0);
-  const interest = single ? parseMoney(form.interest) || 0 : 0;
-  const discount = single ? parseMoney(form.discount) || 0 : 0;
-  const total = amount + interest - discount;
-
-  const save = async () => {
-    if (Number.isNaN(interest) || Number.isNaN(discount) || interest < 0 || discount < 0) {
-      toast.error('Juros ou desconto inválido');
-      return;
-    }
-    if (total <= 0) {
-      toast.error('O desconto não pode ser maior que o valor da conta');
-      return;
-    }
-    setSaving(true);
-    try {
-      const { data } = await api.payPayables({
-        ids: items.map((p) => p.id), paid_date: form.paid_date, payment_method: form.payment_method,
-        interest, discount, payment_notes: form.payment_notes,
-      });
-      toast.success(data.paid === 1 ? 'Conta paga' : `${data.paid} contas pagas`);
-      onOpenChange(false);
-      onPaid();
-    } catch (error) {
-      toast.error(apiErrorMessage(error, 'Erro ao registrar o pagamento'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={items.length > 0} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{single ? 'Pagar conta' : `Pagar ${items.length} contas`}</DialogTitle>
-          <DialogDescription>
-            {single ? `${payableLabel(items[0])} · ${items[0].supplier_name || ''} · vence ${formatDay(items[0].due_date)}` : 'Todas recebem a mesma data e forma de pagamento.'}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="form-dense grid grid-cols-2 gap-3">
-          <Field label="Data do pagamento" required>
-            <Input type="date" value={form.paid_date} max={todayISO()} onChange={(e) => setForm({ ...form, paid_date: e.target.value })} data-testid="pay-date" />
-          </Field>
-          <Field label="Forma de pagamento" required>
-            <Select value={form.payment_method} onValueChange={(v) => setForm({ ...form, payment_method: v })}>
-              <SelectTrigger data-testid="pay-method"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(PAYMENT_METHODS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </Field>
-          {single && (
-            <>
-              <Field label="Juros / multa (R$)">
-                <Input inputMode="decimal" value={form.interest} onChange={(e) => setForm({ ...form, interest: e.target.value })} data-testid="pay-interest" />
-              </Field>
-              <Field label="Desconto (R$)">
-                <Input inputMode="decimal" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} data-testid="pay-discount" />
-              </Field>
-            </>
-          )}
-          <Field label="Observação" className="col-span-2">
-            <Textarea rows={2} value={form.payment_notes} onChange={(e) => setForm({ ...form, payment_notes: e.target.value })} />
-          </Field>
-        </div>
-        <div className="flex items-center justify-between rounded-md bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm">
-          <span className="text-slate-500 dark:text-slate-400">Valor pago</span>
-          <span className="font-semibold tabular-nums" data-testid="pay-total">{formatMoney(total)}</span>
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button type="button" onClick={save} disabled={saving} data-testid="pay-save-btn">{saving ? 'Salvando...' : 'Confirmar pagamento'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export default function AccountsPayablePage() {
   const navigate = useNavigate();
@@ -385,7 +290,7 @@ export default function AccountsPayablePage() {
         </DataCard>
       </div>
 
-      <PayDialog items={paying} onOpenChange={(open) => !open && setPaying([])} onPaid={() => { setSelectedIds(new Set()); load(); }} />
+      <PaymentDialog items={paying} onOpenChange={(open) => !open && setPaying([])} onDone={() => { setSelectedIds(new Set()); load(); }} />
 
       <PeriodReportDialog
         open={reportOpen}

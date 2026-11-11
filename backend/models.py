@@ -1085,6 +1085,11 @@ class Invoice(BaseModel):
     paid_date: Optional[str] = None  # Dia em que foi marcada como paga (YYYY-MM-DD)
     credit_applied: float = 0  # Crédito do cliente já usado nesta fatura (ver routers/client_credits.py)
     paid_by_credit: bool = False  # Quitada pelo crédito (estornar o crédito reabre a fatura)
+    # Plano de Contas (RECEITA) e Centro de Custo - opcionais, guardam o nome (ver routers/payables.py)
+    account_id: Optional[str] = None
+    account_name: Optional[str] = None
+    cost_center_id: Optional[str] = None
+    cost_center_name: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
     user_name: str
@@ -1095,12 +1100,16 @@ class InvoiceCreate(BaseModel):
     movement_ids: List[str]
     notes: Optional[str] = None
     due_date: Optional[str] = None
+    account_id: Optional[str] = None
+    cost_center_id: Optional[str] = None
 
 class InvoiceUpdate(BaseModel):
     client_name: Optional[str] = None
     client_cnpj: Optional[str] = None
     notes: Optional[str] = None
     due_date: Optional[str] = None  # "" apaga o vencimento
+    account_id: Optional[str] = None  # "" tira a conta
+    cost_center_id: Optional[str] = None  # "" tira o centro de custo
     movement_ids_to_add: Optional[List[str]] = None
     movement_ids_to_remove: Optional[List[str]] = None
 
@@ -1118,6 +1127,10 @@ class InvoiceResponse(BaseModel):
     credit_applied: float = 0
     open_value: float = 0  # total - crédito usado (o que falta receber, se Pendente)
     paid_by_credit: bool = False
+    account_id: Optional[str] = None
+    account_name: Optional[str] = None
+    cost_center_id: Optional[str] = None
+    cost_center_name: Optional[str] = None
     created_at: datetime
     user_name: str
 
@@ -4994,6 +5007,39 @@ class PayablePay(BaseModel):
 
 class PayableCancel(BaseModel):
     cancelled: bool
+
+
+class ReceivableTitleCreate(BaseModel):
+    """Título a receber avulso (aluguel, reembolso, venda de sucata...): o que
+    não passa por Fatura, Faturamento Portuário nem Venda de Container."""
+    description: str
+    client_id: Optional[str] = None  # do cadastro de Cliente
+    client_name: Optional[str] = None  # ou só o nome, sem cadastro
+    document_number: Optional[str] = None
+    issue_date: str  # YYYY-MM-DD
+    account_id: Optional[str] = None  # Plano de Contas (RECEITA)
+    cost_center_id: Optional[str] = None
+    recurrence: Literal["UNICA", "PARCELADA", "RECORRENTE"] = "UNICA"
+    installments: List[PayableInstallmentIn]
+    notes: Optional[str] = None
+
+
+class ReceivableTitleUpdate(BaseModel):
+    """Altera uma parcela (só em aberto)."""
+    description: str
+    client_id: Optional[str] = None
+    client_name: Optional[str] = None
+    document_number: Optional[str] = None
+    issue_date: str
+    due_date: str
+    amount: float = Field(gt=0)
+    account_id: Optional[str] = None
+    cost_center_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class ReceivableTitleReceive(PayablePay):
+    """Baixa: os mesmos campos do pagamento do Contas a Pagar."""
 
 
 class MaintenanceRecordItem(BaseModel):
