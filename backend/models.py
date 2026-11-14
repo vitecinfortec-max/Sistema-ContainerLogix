@@ -575,6 +575,9 @@ class ContainerMovementResponse(BaseModel):
     billed_at: Optional[datetime] = None  # Data/hora do faturamento
     created_at: datetime
     user_name: Optional[str] = None
+    # Só no relatório de Estoque Atual: "SEGREGADO - Cliente (Nº X)" quando o
+    # container está reservado numa Segregação de Unidade ativa
+    segregation_note: Optional[str] = None
 
 class DailyMovementPoint(BaseModel):
     date: str  # YYYY-MM-DD

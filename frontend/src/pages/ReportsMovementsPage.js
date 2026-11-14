@@ -10,11 +10,12 @@ import { Input } from '../components/ui/input';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'sonner';
-import { FileText, FileSpreadsheet, X, BarChart3, Mail, List, LogIn, LogOut, Package } from 'lucide-react';
+import { FileText, FileSpreadsheet, X, BarChart3, Mail, List, LogIn, LogOut, Package, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 import { BarsChart, CHART_COLORS, dailyChartData } from '../components/Charts';
 import { toLocalDay } from '../lib/dates';
-
+
+
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
 function yesterdayISO() {
@@ -349,7 +350,11 @@ export default function ReportsMovementsPage() {
         <StatGrid>
           <StatCard label="Movimentações" value={(preview.stats?.total ?? 0).toLocaleString('pt-BR')} icon={List} tone="blue" hint={hasFilters ? 'com os filtros atuais' : 'no relatório'} testId="report-preview-total" />
           <StatCard label="Entradas" value={(preview.stats?.entries ?? 0).toLocaleString('pt-BR')} icon={LogIn} tone="primary" />
-          <StatCard label="Saídas" value={(preview.stats?.exits ?? 0).toLocaleString('pt-BR')} icon={LogOut} tone="amber" />
+          {filterType === 'ESTOQUE' ? (
+            <StatCard label="Segregados" value={(preview.stats?.segregated ?? 0).toLocaleString('pt-BR')} icon={Lock} tone="red" hint="reservados em Segregação de Unidade" testId="report-preview-segregated" />
+          ) : (
+            <StatCard label="Saídas" value={(preview.stats?.exits ?? 0).toLocaleString('pt-BR')} icon={LogOut} tone="amber" />
+          )}
           <StatCard label="Cheios / vazios" value={`${(preview.stats?.full ?? 0).toLocaleString('pt-BR')} / ${(preview.stats?.empty ?? 0).toLocaleString('pt-BR')}`} icon={Package} tone="emerald" />
         </StatGrid>
 
@@ -388,6 +393,7 @@ export default function ReportsMovementsPage() {
                     <th>Cliente</th>
                     <th>Armador</th>
                     <th>Motorista</th>
+                    {filterType === 'ESTOQUE' && <th>Observação</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -410,6 +416,13 @@ export default function ReportsMovementsPage() {
                       <td><div className="max-w-[12.5rem] truncate" title={m.client_name || ''}>{m.client_name || '-'}</div></td>
                       <td><div className="max-w-[8.75rem] truncate" title={m.shipping_line || ''}>{m.shipping_line || '-'}</div></td>
                       <td><div className="max-w-[11.25rem] truncate" title={m.driver_name || ''}>{m.driver_name || '-'}</div></td>
+                      {filterType === 'ESTOQUE' && (
+                        <td>
+                          {m.segregation_note
+                            ? <StatusPill tone="red"><span className="max-w-[15rem] truncate" title={m.segregation_note}>{m.segregation_note}</span></StatusPill>
+                            : '-'}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

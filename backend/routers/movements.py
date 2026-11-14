@@ -70,6 +70,7 @@ def _movement_response(m: dict) -> ContainerMovementResponse:
         billed_at=parse_datetime_value(m['billed_at']) if m.get('billed_at') else None,
         created_at=parse_datetime_value(m['created_at']),
         user_name=m.get('user_name', m.get('created_by_name', '')),
+        segregation_note=m.get('segregation_note'),
     )
 
 

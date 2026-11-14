@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta, date
 from typing import Optional, List
 import io
 import logging
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -66,11 +67,38 @@ async def _get_current_stock_movements(status_filter: Optional[str] = None, clie
     return movements
 
 
+def _container_key(number: Optional[str]) -> str:
+    """Número do container sem traço/espaço e sem o dígito verificador, para
+    casar a reserva com a EIR digitadas em formatos diferentes."""
+    key = re.sub(r'[^A-Z0-9]', '', (number or '').upper())
+    return key[:10] if re.fullmatch(r'[A-Z]{4}[0-9]{6}[0-9]?', key) else key
+
+
+async def _mark_segregated(movements: list) -> None:
+    """Marca `segregation_note` nos containers em estoque que estão reservados
+    numa Segregação de Unidade ATIVA e ainda não foram retirados."""
+    if not movements:
+        return
+    reserved = {}
+    async for seg in db.unit_segregations.find(
+        {"status": "ATIVO"}, {"_id": 0, "segregation_number": 1, "client_name": 1, "items": 1},
+    ):
+        for item in seg.get('items') or []:
+            if item.get('retrieved'):
+                continue
+            reserved.setdefault(_container_key(item.get('container_number')), seg)
+    for m in movements:
+        seg = reserved.get(_container_key(m.get('container_number')))
+        if seg:
+            m['segregation_note'] = f"SEGREGADO - {seg.get('client_name') or ''} (Nº {seg.get('segregation_number')})"
+
+
 async def _report_movements(operation_type, status_filter, client_name, date_from, date_to) -> list:
     """Movimentações do Relatório de Movimentação com os filtros da tela - a
     mesma lista vai pro PDF, pro Excel e pra prévia."""
     if operation_type == "ESTOQUE":
         movements = await _get_current_stock_movements(status_filter, client_name)
+        await _mark_segregated(movements)
     else:
         query = {}
         if operation_type:
@@ -104,6 +132,7 @@ async def preview_movements_report(
         "exits": sum(1 for m in movements if m.get('operation_type') == 'SAIDA'),
         "full": sum(1 for m in movements if m.get('status') == 'CHEIO'),
         "empty": sum(1 for m in movements if m.get('status') == 'VAZIO'),
+        "segregated": sum(1 for m in movements if m.get('segregation_note')),
     }
     start = (page - 1) * per_page
     return {
@@ -140,7 +169,7 @@ async def download_pdf_report(
         report_title += f" - Cliente: {client_name}"
     
     company = await get_company_settings()
-    pdf_buffer = generate_pdf_report(movements, report_title, company=company)
+    pdf_buffer = generate_pdf_report(movements, report_title, company=company, show_observation=operation_type == "ESTOQUE")
 
     return StreamingResponse(
         io.BytesIO(pdf_buffer),
@@ -172,7 +201,7 @@ async def download_excel_report(
         report_title += f" - Cliente: {client_name}"
     
     company = await get_company_settings()
-    excel_buffer = generate_excel_report(movements, report_title, company=company)
+    excel_buffer = generate_excel_report(movements, report_title, company=company, show_observation=operation_type == "ESTOQUE")
 
     return StreamingResponse(
         io.BytesIO(excel_buffer),

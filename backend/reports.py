@@ -783,7 +783,7 @@ def _fmt_manufacture_date(m: dict) -> str:
     return f"{value[5:7]}/{value[:4]}" if len(value) >= 7 else '-'
 
 
-def generate_pdf_report(movements: list, report_title: str = "Relatório de Movimentações", company: dict = None, show_container_value: bool = True) -> bytes:
+def generate_pdf_report(movements: list, report_title: str = "Relatório de Movimentações", company: dict = None, show_container_value: bool = True, show_observation: bool = False) -> bytes:
     """
     Relatório de Movimentações/Entradas/Saídas/Estoque Atual no padrão visual
     dos documentos do sistema: cabeçalho (_build_pdf_header), faixa de
@@ -792,6 +792,8 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
 
     show_container_value: inclui as colunas Valor do Container e Fabricação -
     desligado no envio automático por e-mail aos clientes (scheduled_reports).
+    show_observation: coluna Observação com o aviso de container segregado
+    (`segregation_note`) - usada no relatório de Estoque Atual da tela.
     """
     c = merge_company(company)
     buffer = io.BytesIO()
@@ -831,6 +833,8 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
             ("Saídas", _fmt_int(total_exits)),
         ]
     summary += [("Cheios", _fmt_int(total_full)), ("Vazios", _fmt_int(total_empty))]
+    if show_observation:
+        summary.append(("Segregados", _fmt_int(sum(1 for m in movements if m.get('segregation_note')))))
     elements.extend(_build_pdf_summary(summary, doc.width))
 
     # ========== TABELA ==========
@@ -857,6 +861,11 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
     ]
     if show_container_value:
         header_labels += ['Valor Container', 'Fabricação']
+    if show_observation:
+        # No Estoque Atual a coluna Status (Cheio/Vazio, já somada nos
+        # indicadores) dá lugar à Observação; o Tipo continua
+        del header_labels[9]
+        header_labels.append('Observação')
     data = [_pdf_header_cells(header_labels)]
 
     for m in movements:
@@ -894,13 +903,23 @@ def generate_pdf_report(movements: list, report_title: str = "Relatório de Movi
                 cell(_fmt_container_value(m), centered=True),
                 cell(_fmt_manufacture_date(m), centered=True),
             ]
+        if show_observation:
+            del row[9]
+            note = m.get('segregation_note')
+            row.append(cell(None, markup=f'<font color="#B91C1C"><b>{xml_escape(note)}</b></font>') if note else cell(''))
         data.append(row)
 
     # Larguras somam a área útil real da página (doc.width em A4 paisagem, ~785pt);
     # colunas de texto mais longo (Motorista, Transportadora, Terminal de
     # Origem) têm mais espaço pra reduzir a quantidade de quebra de linha.
-    if show_container_value:
+    if show_container_value and show_observation:
+        # Sem a coluna Status; a Observação (70) completa com um pouco de
+        # Motorista, Armador, Booking e Valor
+        col_widths = [30, 62, 44, 60, 56, 40, 40, 69, 56, 40, 30, 48, 44, 50, 46, 70]
+    elif show_container_value:
         col_widths = [30, 62, 44, 60, 70, 42, 42, 69, 50, 38, 40, 30, 60, 48, 54, 46]
+    elif show_observation:
+        col_widths = [30, 70, 44, 60, 86, 46, 46, 83, 62, 40, 30, 66, 52, 70]
     else:
         col_widths = [30, 70, 44, 60, 105, 46, 46, 96, 62, 38, 40, 30, 66, 52]
 
@@ -1799,7 +1818,7 @@ def generate_delivery_status_excel(status: dict, company: dict = None) -> bytes:
         return _xl_error_workbook()
 
 
-def generate_excel_report(movements: list, report_title: str = "Relatório de Movimentações", company: dict = None) -> bytes:
+def generate_excel_report(movements: list, report_title: str = "Relatório de Movimentações", company: dict = None, show_observation: bool = False) -> bytes:
     """Generate Excel report following Bsoft template style."""
     try:
         c = merge_company(company)
@@ -1826,6 +1845,8 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
                 f"   •   Saídas: {_fmt_int(total_exits)}"
             )
         stats_text += f"   •   Cheios: {_fmt_int(total_full)}   •   Vazios: {_fmt_int(total_empty)}"
+        if show_observation:
+            stats_text += f"   •   Segregados: {_fmt_int(sum(1 for m in movements if m.get('segregation_note')))}"
 
         # Headers matching template (16 columns)
         headers = [
@@ -1859,14 +1880,17 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
                 # Texto com a moeda (não número): o relatório mistura R$ e US$
                 _fmt_container_value(m),
                 _fmt_manufacture_date(m)
-            ])
+            ] + ([m.get('segregation_note') or ''] if show_observation else []))
 
-        # 16 colunas: B a Q
+        # 16 colunas: B a Q (+ Observação em R no Estoque Atual)
         col_widths = {
             'B': 9, 'C': 16, 'D': 10, 'E': 15, 'F': 32, 'G': 11,
             'H': 11, 'I': 26, 'J': 20, 'K': 9, 'L': 12,
             'M': 8, 'N': 16, 'O': 13, 'P': 16, 'Q': 11
         }
+        if show_observation:
+            headers.append('Observação')
+            col_widths['R'] = 40
 
         # Centralizadas: ID Trans.(0), Data/Hora(1), Tipo(2), Status(9), Tamanho(10), Tara(11), Fabricação(15)
         center_cols = {0, 1, 2, 9, 10, 11, 15}
@@ -1894,6 +1918,8 @@ def generate_excel_report(movements: list, report_title: str = "Relatório de Mo
             ws.cell(row=row_num, column=4).font = entry_font if m.get('operation_type') == 'ENTRADA' else exit_font
             if m.get('status') == 'CHEIO':
                 ws.cell(row=row_num, column=11).font = full_font
+            if show_observation and m.get('segregation_note'):
+                ws.cell(row=row_num, column=18).font = Font(name='Calibri', size=10, bold=True, color='B91C1C')
 
         # ========== SAÍDAS POR BOOKING (resumo no final da planilha) ==========
         booking_counts = {}
