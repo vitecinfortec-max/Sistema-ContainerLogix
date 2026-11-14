@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from models import (
     OrdemServico, OrdemServicoCreate, OrdemServicoUpdate, OrdemServicoResponse, OSCategory,
-    OSCategoryCreate, OSCategoryResponse, DailyServiceOrderPoint
+    OSCategoryCreate, OSCategoryResponse, DailyServiceOrderPoint, OS_FINAL_STATUSES
 )
 from reports import (
     today_brt, fmt_datetime, service_orders_total,
@@ -126,6 +126,114 @@ def _validate_os_numbers(values: dict):
         refuse_negative(item, _OS_ITEM_LABELS)
 
 
+_OS_STATUS_LABELS = {'ABERTO': 'Aberto', 'ANDAMENTO': 'Em Andamento', 'FECHADO': 'Fechado', 'CANCELADO': 'Cancelado'}
+_OS_PRIORITY_LABELS = {'ALTA': 'Alta', 'MEDIA': 'Média', 'BAIXA': 'Baixa'}
+_OS_TYPE_LABELS = {'INTERNO': 'Interno', 'EXTERNO': 'Externo'}
+
+# Campos que entram no histórico, na ordem da tela. Os ids e tipos
+# (equipment_id, person_type...) ficam de fora: o nome/placa ao lado já
+# mostra a troca.
+_OS_HISTORY_FIELDS = {
+    "status": "Status", "priority": "Prioridade", "os_type": "Tipo", "category": "Categoria",
+    "equipment_plate": "Equipamento (Placa)", "appropriation_plate": "Apropriação",
+    "person_name": "Pessoa", "person_doc": "CPF/CNPJ", "contact_value": "Telefone",
+    "address": "Endereço", "city": "Cidade", "state": "UF", "is_retorno": "Retorno",
+    "opened_at": "Abertura", "budget_at": "Orçamento", "approved_at": "Aprovação",
+    "forecast_close_at": "Prev. Fechamento", "closed_at": "Fechamento", "requires_pt": "Exige PT?",
+    "supervisor_name": "Supervisor", "technician_name": "Técnico", "helper_name": "Ajudante",
+    "reading_initial": "Leitura Inicial", "reading_final": "Leitura Final",
+    "description": "Detalhamento da Demanda", "associated_actions": "Ações Associadas",
+    "closure_remark": "Parecer de Encerramento", "observations": "Observação",
+    "products": "Produtos", "services": "Serviços",
+}
+_OS_DATETIME_FIELDS = {"opened_at", "budget_at", "approved_at", "forecast_close_at", "closed_at"}
+
+
+def _os_fmt_number(v) -> str:
+    try:
+        text = f"{float(v or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except (TypeError, ValueError):
+        return str(v)
+    return text[:-3] if text.endswith(",00") else text
+
+
+def _os_history_text(field: str, value) -> str:
+    """Valor como aparece no histórico ('' = vazio)."""
+    if field in ("products", "services"):
+        parts = []
+        for it in value or []:
+            it = it if isinstance(it, dict) else it.model_dump()
+            desc = (it.get('description') or '').strip() or '(sem descrição)'
+            unit = f" {it.get('unit')}" if it.get('unit') else ''
+            text = f"{desc} - {_os_fmt_number(it.get('quantity'))}{unit} x R$ {_os_fmt_number(it.get('unit_price'))}"
+            if float(it.get('discount') or 0):
+                text += f" (desc. R$ {_os_fmt_number(it.get('discount'))})"
+            parts.append(text)
+        return "; ".join(parts)
+    if value is None or value == '':
+        return ''
+    if isinstance(value, bool):
+        return 'Sim' if value else 'Não'
+    if field == 'status':
+        return _OS_STATUS_LABELS.get(value, str(value))
+    if field == 'priority':
+        return _OS_PRIORITY_LABELS.get(value, str(value))
+    if field == 'os_type':
+        return _OS_TYPE_LABELS.get(value, str(value))
+    if field in ("reading_initial", "reading_final"):
+        return _os_fmt_number(value)
+    if field in _OS_DATETIME_FIELDS:
+        m = re.match(r"^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?", str(value))
+        if m:
+            y, mo, d, hh, mm = m.groups()
+            return f"{d}/{mo}/{y}" + (f" {hh}:{mm}" if hh else '')
+    return str(value).strip()
+
+
+def _os_changes(old: dict, new: dict) -> list:
+    """O que muda de `old` para `new` (só os campos presentes em `new`)."""
+    changes = []
+    for field, label in _OS_HISTORY_FIELDS.items():
+        if field not in new:
+            continue
+        before = _os_history_text(field, old.get(field))
+        after = _os_history_text(field, new.get(field))
+        if before != after:
+            changes.append({"field": field, "label": label, "old": before, "new": after})
+    return changes
+
+
+def _os_history_entry(action: str, current_user: dict, changes: Optional[list] = None) -> dict:
+    return {
+        "at": datetime.now(timezone.utc).isoformat(),
+        "user_id": current_user.get("sub"),
+        "user_name": current_user.get("name"),
+        "action": action,
+        "changes": changes or [],
+    }
+
+
+def _os_status_action(status: Optional[str]) -> str:
+    return {"FECHADO": "FINALIZADA", "CANCELADO": "CANCELADA"}.get(status, "ALTERADA")
+
+
+def _os_fill_closed_at(values: dict, existing: Optional[dict] = None):
+    """Fechou sem informar o Fechamento: usa a data e hora de agora."""
+    if values.get('status') == 'FECHADO' and not (values.get('closed_at') or (existing or {}).get('closed_at')):
+        values['closed_at'] = now_brt().strftime('%Y-%m-%dT%H:%M')
+
+
+def _refuse_if_os_final(os_doc: dict, action: str):
+    """OS Fechada ou Cancelada fica congelada (pedido do usuário em
+    14/11/2026): nada de editar, excluir ou dar nova saída de estoque."""
+    if os_doc.get('status') in OS_FINAL_STATUSES:
+        situation = 'fechada' if os_doc.get('status') == 'FECHADO' else 'cancelada'
+        raise HTTPException(
+            status_code=409,
+            detail=f"A OS Nº {os_doc.get('os_number')} está {situation} e não pode mais ser {action}.",
+        )
+
+
 @api_router.post("/ordem-servico", response_model=OrdemServicoResponse)
 async def create_ordem_servico(data: OrdemServicoCreate, current_user: dict = Depends(get_current_active_user)):
     _validate_os_numbers(data.model_dump())
@@ -138,11 +246,17 @@ async def create_ordem_servico(data: OrdemServicoCreate, current_user: dict = De
     )
     next_num = counter["seq"]
 
+    values = data.model_dump()
+    _os_fill_closed_at(values)
+    history = [_os_history_entry("CRIADA", current_user)]
+    if values.get('status') in OS_FINAL_STATUSES:
+        history.append(_os_history_entry(_os_status_action(values['status']), current_user))
     os_obj = OrdemServico(
         os_number=next_num,
-        **data.model_dump(),
+        **values,
         created_by=current_user["sub"],
-        created_by_name=current_user["name"]
+        created_by_name=current_user["name"],
+        history=history,
     )
     doc = os_obj.model_dump()
     doc["created_at"] = os_obj.created_at.isoformat()
@@ -155,17 +269,37 @@ async def update_ordem_servico(os_id: str, data: OrdemServicoUpdate, current_use
     existing = await db.ordem_servico.find_one({"id": os_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Ordem de Serviço não encontrada")
+    _refuse_if_os_final(existing, "alterada")
     update_data = {k: v for k, v in data.model_dump(exclude_unset=True).items() if v is not None}
     _validate_os_numbers(update_data)
+    _os_fill_closed_at(update_data, existing)
+    changes = _os_changes(existing, update_data)
+    if not changes:
+        # Nada mudou: não grava e não suja o histórico
+        return _os_serialize(existing)
+    new_status = update_data.get('status', existing.get('status'))
+    action = _os_status_action(new_status) if new_status != existing.get('status') else "ALTERADA"
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    await db.ordem_servico.update_one({"id": os_id}, {"$set": update_data})
+    # O filtro de status impede gravar por cima de quem finalizou a OS
+    # enquanto esta edição estava aberta.
+    result = await db.ordem_servico.update_one(
+        {"id": os_id, "status": {"$nin": list(OS_FINAL_STATUSES)}},
+        {"$set": update_data, "$push": {"history": _os_history_entry(action, current_user, changes)}},
+    )
+    if result.matched_count == 0:
+        current = await db.ordem_servico.find_one({"id": os_id}, {"_id": 0}) or existing
+        _refuse_if_os_final(current, "alterada")
+        raise HTTPException(status_code=404, detail="Ordem de Serviço não encontrada")
     updated = await db.ordem_servico.find_one({"id": os_id}, {"_id": 0})
     return _os_serialize(updated)
 
 
 @api_router.delete("/ordem-servico/{os_id}")
 async def delete_ordem_servico(os_id: str, current_user: dict = Depends(get_current_active_user)):
-    result = await db.ordem_servico.delete_one({"id": os_id})
+    existing = await db.ordem_servico.find_one({"id": os_id}, {"_id": 0, "status": 1, "os_number": 1})
+    if existing:
+        _refuse_if_os_final(existing, "excluída")
+    result = await db.ordem_servico.delete_one({"id": os_id, "status": {"$nin": list(OS_FINAL_STATUSES)}})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Ordem de Serviço não encontrada")
     return {"message": "Ordem de Serviço removida"}

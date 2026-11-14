@@ -20,7 +20,7 @@ from models import (
     StockValueByWarehousePoint, DailyStockLedgerPoint,
     StockEntry, StockEntryResponse,
     StockMovement, StockMovementCreate, StockMovementUpdate, StockMovementResponse, StockMovementItem,
-    Supplier, PayableInstallmentIn,
+    Supplier, PayableInstallmentIn, OS_FINAL_STATUSES,
 )
 from shared import (
     db, get_current_active_user, get_company_settings, validate_and_read_upload, refuse_negative,
@@ -996,8 +996,10 @@ async def reverse_stock_entry_import(entry_id: str, current_user: dict = Depends
 
 # ==================== MOVIMENTAÇÃO DE ESTOQUE (ENTRADA/SAÍDA MANUAL) ====================
 
-def _stock_movement_serialize(doc: dict, epi_numbers: Optional[dict] = None) -> dict:
-    """`epi_numbers`: {id da movimentação: nº da Entrega de EPI que a gerou}."""
+def _stock_movement_serialize(doc: dict, epi_numbers: Optional[dict] = None, closed_os: Optional[dict] = None) -> dict:
+    """`epi_numbers`: {id da movimentação: nº da Entrega de EPI que a gerou}.
+    `closed_os`: OS finalizadas ({id: documento}), para marcar a movimentação
+    vinculada a uma delas como travada."""
     out = {**doc}
     out.pop('_id', None)
     if isinstance(out.get('created_at'), str):
@@ -1005,6 +1007,7 @@ def _stock_movement_serialize(doc: dict, epi_numbers: Optional[dict] = None) -> 
     if isinstance(out.get('updated_at'), str):
         out['updated_at'] = datetime.fromisoformat(out['updated_at'])
     out['total_value'] = round(sum(float(i.get('total_value') or 0) for i in (out.get('items') or [])), 2)
+    out['purpose_os_closed'] = out.get('purpose_type') == 'OS' and out.get('purpose_os_id') in (closed_os or {})
     epi_number = (epi_numbers or {}).get(out.get('id'))
     if epi_number is not None:
         # Entregas antigas não gravaram a origem na movimentação
@@ -1045,6 +1048,50 @@ def _refuse_if_generated_by_tank(movement: dict, action: str):
             status_code=409,
             detail=f"Esta saída foi gerada pelo {movement.get('origin_label') or 'Reabastecimento do Tanque'}. "
                    f"Para {action}, use a tela Nível do Tanque.",
+        )
+
+
+async def _closed_os_ids(os_ids) -> dict:
+    """Das OS informadas, as que já foram finalizadas: {id: documento}."""
+    ids = [i for i in set(os_ids) if i]
+    if not ids:
+        return {}
+    out = {}
+    async for o in db.ordem_servico.find(
+        {"id": {"$in": ids}, "status": {"$in": list(OS_FINAL_STATUSES)}},
+        {"_id": 0, "id": 1, "os_number": 1, "status": 1},
+    ):
+        out[o['id']] = o
+    return out
+
+
+def _os_closed_detail(os_doc: dict) -> str:
+    situation = 'fechada' if os_doc.get('status') == 'FECHADO' else 'cancelada'
+    return f"A OS Nº {os_doc.get('os_number')} está {situation}"
+
+
+async def _refuse_exit_for_closed_os(data) -> None:
+    """OS finalizada (Fechada ou Cancelada) não aceita mais saída de estoque."""
+    if data.operation_type != 'SAIDA' or data.purpose_type != 'OS' or not data.purpose_os_id:
+        return
+    closed = (await _closed_os_ids([data.purpose_os_id])).get(data.purpose_os_id)
+    if closed:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{_os_closed_detail(closed)} e não aceita mais saída de estoque.",
+        )
+
+
+async def _refuse_if_linked_os_closed(movement: dict, action: str) -> None:
+    """A movimentação de uma OS finalizada fica como estava - mexer nela
+    mudaria o material de uma OS que não pode mais ser alterada."""
+    if movement.get('purpose_type') != 'OS' or not movement.get('purpose_os_id'):
+        return
+    closed = (await _closed_os_ids([movement['purpose_os_id']])).get(movement['purpose_os_id'])
+    if closed:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{_os_closed_detail(closed)}: a movimentação dela não pode mais ser {action}.",
         )
 
 
@@ -1218,16 +1265,21 @@ async def _update_stock_movement(movement_id: str, data: StockMovementUpdate, cu
 
 @api_router.post("/stock/movements", response_model=StockMovementResponse)
 async def create_stock_movement(data: StockMovementCreate, current_user: dict = Depends(get_current_active_user)):
+    await _refuse_exit_for_closed_os(data)
     return await _create_stock_movement(data, current_user)
 
 
 @api_router.put("/stock/movements/{movement_id}", response_model=StockMovementResponse)
 async def update_stock_movement(movement_id: str, data: StockMovementUpdate, current_user: dict = Depends(get_current_active_user)):
-    existing = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0, "id": 1, "origin": 1, "origin_label": 1})
+    existing = await db.stock_movements.find_one(
+        {"id": movement_id}, {"_id": 0, "id": 1, "origin": 1, "origin_label": 1, "purpose_type": 1, "purpose_os_id": 1},
+    )
     if not existing:
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
     await _refuse_if_generated_by_epi(existing, "alterar")
     _refuse_if_generated_by_tank(existing, "alterar")
+    await _refuse_if_linked_os_closed(existing, "alterada")
+    await _refuse_exit_for_closed_os(data)
     return await _update_stock_movement(movement_id, data, current_user)
 
 
@@ -1241,6 +1293,7 @@ async def delete_stock_movement(movement_id: str, current_user: dict = Depends(g
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
     await _refuse_if_generated_by_epi(existing, "excluir")
     _refuse_if_generated_by_tank(existing, "excluir")
+    await _refuse_if_linked_os_closed(existing, "excluída")
     await _delete_stock_movement(movement_id, current_user)
     return {"message": "Movimentação excluída e saldo do estoque acertado"}
 
@@ -1309,7 +1362,8 @@ async def get_stock_movements(
             query["$or"].append({"movement_number": int(search.lstrip('#'))})
     items = await db.stock_movements.find(query, {"_id": 0}).sort("movement_number", -1).to_list(None)
     epi_numbers = await _epi_numbers_for([i['id'] for i in items])
-    return [_stock_movement_serialize(i, epi_numbers) for i in items]
+    closed_os = await _closed_os_ids([i.get('purpose_os_id') for i in items if i.get('purpose_type') == 'OS'])
+    return [_stock_movement_serialize(i, epi_numbers, closed_os) for i in items]
 
 
 @api_router.get("/stock/movements/{movement_id}", response_model=StockMovementResponse)
@@ -1317,7 +1371,8 @@ async def get_stock_movement(movement_id: str, current_user: dict = Depends(get_
     doc = await db.stock_movements.find_one({"id": movement_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Movimentação de Estoque não encontrada")
-    return _stock_movement_serialize(doc, await _epi_numbers_for([movement_id]))
+    closed_os = await _closed_os_ids([doc.get('purpose_os_id')] if doc.get('purpose_type') == 'OS' else [])
+    return _stock_movement_serialize(doc, await _epi_numbers_for([movement_id]), closed_os)
 
 
 @api_router.get("/stock/movements/{movement_id}/pdf")

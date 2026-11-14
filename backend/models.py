@@ -3054,6 +3054,12 @@ class OSItem(BaseModel):
     total: float = 0.0  # quantity * unit_price - discount
 
 
+# Status em que a OS está finalizada: não aceita mais edição nem saída de
+# estoque vinculada (pedido do usuário em 14/11/2026, para evitar mexer numa
+# OS já encerrada).
+OS_FINAL_STATUSES = ("FECHADO", "CANCELADO")
+
+
 class OrdemServico(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
@@ -3121,6 +3127,12 @@ class OrdemServico(BaseModel):
     # ===== Produtos e Serviços =====
     products: List[OSItem] = []
     services: List[OSItem] = []
+
+    # ===== Histórico =====
+    # Cada gravação da OS: {at (ISO UTC), user_id, user_name, action
+    # (CRIADA | ALTERADA | FINALIZADA | CANCELADA), changes: [{field, label,
+    # old, new}]}. Só o servidor escreve aqui - não está no OrdemServicoCreate.
+    history: List[dict] = []
 
     # ===== Controle =====
     created_by: str
@@ -4112,6 +4124,8 @@ class StockMovementUpdate(StockMovementCreate):
 
 class StockMovementResponse(StockMovement):
     total_value: float = 0.0
+    # A OS da Finalidade já foi finalizada: a movimentação não muda mais
+    purpose_os_closed: bool = False
 
 
 # ==================== ENTREGA DE EPI'S ====================

@@ -17,7 +17,8 @@ import { WithQuickAdd } from '../components/QuickCreate';
 import { CityStateFields } from '../components/AddressFields';
 import { api } from '../lib/api';
 import { toast } from 'sonner';
-import { Plus, Trash2, Save, FileText, CalendarClock, Users, Gauge, AlignLeft, Package, Wrench } from 'lucide-react';
+import { Plus, Trash2, Save, FileText, CalendarClock, Users, Gauge, AlignLeft, Package, Wrench, History, Lock } from 'lucide-react';
+import { useConfirm } from '../hooks/useConfirm';
 import { nowLocalInput } from '../lib/dates';
 import { formatPlate } from '../lib/masks';
 import { apiErrorMessage } from '../lib/errors';
@@ -37,6 +38,16 @@ const formatAddress = (details) => {
 
 const asList = (r) => r.data?.items || r.data || [];
 
+// Fechada ou Cancelada: a OS fica só para consulta (o servidor também recusa)
+const FINAL_STATUSES = ['FECHADO', 'CANCELADO'];
+
+const fmtDateTime = (iso) => {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
 // Nova OS (/fleet/ordem-servico/new) e edição (/fleet/ordem-servico/:id/edit)
 export default function OrdemServicoFormPage() {
   const { id } = useParams();
@@ -54,6 +65,12 @@ export default function OrdemServicoFormPage() {
   const [osCategories, setOsCategories] = useState([]);
   const [productCatalog, setProductCatalog] = useState([]);
   const [serviceCatalog, setServiceCatalog] = useState([]);
+  // Status gravado no servidor (não o do formulário): decide se a OS trava
+  const [savedStatus, setSavedStatus] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [legacyInfo, setLegacyInfo] = useState(null);
+  const { confirm, ConfirmDialog } = useConfirm();
+  const locked = isEdit && FINAL_STATUSES.includes(savedStatus);
 
   // Pessoa/Supervisor/Técnico/Ajudante buscam nos cadastros de Motorista +
   // Funcionário combinados (unificados na tela /cadastro) - _type marca de
@@ -85,6 +102,9 @@ export default function OrdemServicoFormPage() {
       api.getOrdemServico(id)
         .then(({ data: d }) => {
           setOsNumber(d.os_number);
+          setSavedStatus(d.status);
+          setHistory(d.history || []);
+          setLegacyInfo({ created_at: d.created_at, created_by_name: d.created_by_name, updated_at: d.updated_at });
           setForm({
             ...buildEmpty(),
             ...d,
@@ -131,6 +151,15 @@ export default function OrdemServicoFormPage() {
   const servicesTotal = (form.services || []).reduce((a, i) => a + Number(i.total || 0), 0);
 
   const handleSave = async () => {
+    if (locked) return;
+    if (FINAL_STATUSES.includes(form.status)) {
+      const verb = form.status === 'FECHADO' ? 'fechada' : 'cancelada';
+      const ok = await confirm(
+        `Depois de ${verb}, a OS não poderá mais ser editada nem excluída, e não aceitará mais saída de estoque. Deseja continuar?`,
+        form.status === 'FECHADO' ? 'Finalizar Ordem de Serviço' : 'Cancelar Ordem de Serviço',
+      );
+      if (!ok) return;
+    }
     setSaving(true);
     try {
       const toItem = (i) => ({
@@ -167,7 +196,7 @@ export default function OrdemServicoFormPage() {
       <div className="max-w-6xl mx-auto space-y-4" data-testid="os-form-page">
         <PageHeader
           icon={FileText}
-          title={isEdit ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}
+          title={locked ? 'Ordem de Serviço' : isEdit ? 'Editar Ordem de Serviço' : 'Nova Ordem de Serviço'}
           subtitle="Manutenção da frota"
           meta={osNumber !== null && <Badge variant="outline" className="text-primary border-primary/30">Nº {osNumber}</Badge>}
           backTo={LIST_PATH}
@@ -177,6 +206,17 @@ export default function OrdemServicoFormPage() {
           <PageSkeleton />
         ) : (
           <div className="space-y-4">
+            {locked && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-200" data-testid="os-locked-banner">
+                <Lock className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>
+                  Esta OS está <strong>{savedStatus === 'FECHADO' ? 'fechada' : 'cancelada'}</strong> e fica apenas para consulta:
+                  não pode mais ser editada nem receber saída de estoque.
+                </span>
+              </div>
+            )}
+            {/* fieldset desabilitado trava todos os campos e botões de uma vez */}
+            <fieldset disabled={locked} className="space-y-4 min-w-0">
             <FormSection title="Dados da O.S." icon={FileText}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <SelectField label="Prioridade *" value={form.priority} onChange={(v) => onChange('priority', v)} options={[['ALTA', 'Alta'], ['MEDIA', 'Média'], ['BAIXA', 'Baixa']]} testid="os-priority" />
@@ -349,17 +389,74 @@ export default function OrdemServicoFormPage() {
               <TotalBox label="Total serviços" value={servicesTotal} />
               <TotalBox label="Valor total" value={productsTotal + servicesTotal} highlight />
             </div>
+            </fieldset>
+
+            {isEdit && <HistorySection history={history} legacyInfo={legacyInfo} />}
 
             <FormActions sticky>
-              <Button type="button" variant="outline" onClick={backToList} data-testid="os-cancel">Cancelar</Button>
-              <Button type="button" onClick={handleSave} disabled={saving} data-testid="os-save">
-                <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : isEdit ? 'Atualizar OS' : 'Salvar OS'}
-              </Button>
+              <Button type="button" variant="outline" onClick={backToList} data-testid="os-cancel">{locked ? 'Voltar' : 'Cancelar'}</Button>
+              {!locked && (
+                <Button type="button" onClick={handleSave} disabled={saving} data-testid="os-save">
+                  <Save className="w-4 h-4 mr-2" />{saving ? 'Salvando...' : isEdit ? 'Atualizar OS' : 'Salvar OS'}
+                </Button>
+              )}
             </FormActions>
           </div>
         )}
       </div>
+      <ConfirmDialog />
     </Layout>
+  );
+}
+
+const HISTORY_ACTIONS = {
+  CRIADA: ['Criada', 'text-blue-700 dark:text-blue-300'],
+  ALTERADA: ['Alterada', 'text-slate-700 dark:text-slate-300'],
+  FINALIZADA: ['Fechada', 'text-emerald-700 dark:text-emerald-300'],
+  CANCELADA: ['Cancelada', 'text-red-700 dark:text-red-300'],
+};
+
+// Cada gravação da OS, da mais recente para a mais antiga, com data, hora,
+// usuário e o que mudou (de -> para).
+function HistorySection({ history, legacyInfo }) {
+  const entries = [...(history || [])].reverse();
+  return (
+    <FormSection title="Histórico de alterações" icon={History}>
+      {entries.length === 0 ? (
+        <div className="text-[0.75rem] text-slate-500 dark:text-slate-400 space-y-1" data-testid="os-history-empty">
+          <p>Criada em {fmtDateTime(legacyInfo?.created_at)}{legacyInfo?.created_by_name ? ` por ${legacyInfo.created_by_name}` : ''}.</p>
+          {legacyInfo?.updated_at && <p>Última alteração em {fmtDateTime(legacyInfo.updated_at)}.</p>}
+          <p>Esta OS é anterior ao histórico detalhado: as próximas alterações aparecerão aqui.</p>
+        </div>
+      ) : (
+        <ol className="space-y-2" data-testid="os-history">
+          {entries.map((h, idx) => {
+            const [label, tone] = HISTORY_ACTIONS[h.action] || [h.action, 'text-slate-700 dark:text-slate-300'];
+            return (
+              <li key={`${h.at}-${idx}`} className="rounded border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2">
+                <div className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                  <span className="tabular-nums font-medium text-slate-800 dark:text-slate-200">{fmtDateTime(h.at)}</span>
+                  <span className={`font-semibold ${tone}`}>{label}</span>
+                  {h.user_name && <span className="text-slate-500 dark:text-slate-400">por {h.user_name}</span>}
+                </div>
+                {(h.changes || []).length > 0 && (
+                  <ul className="mt-1 space-y-0.5 text-[0.75rem] text-slate-600 dark:text-slate-400">
+                    {h.changes.map((c) => (
+                      <li key={c.field} className="break-words">
+                        <span className="font-medium text-slate-700 dark:text-slate-300">{c.label}:</span>{' '}
+                        <span className="line-through decoration-slate-400">{c.old || '(vazio)'}</span>
+                        {' → '}
+                        <span>{c.new || '(vazio)'}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </FormSection>
   );
 }
 

@@ -15,8 +15,9 @@ import { api } from '../lib/api';
 import { toast } from 'sonner';
 import { useConfirm } from '../hooks/useConfirm';
 import { format } from 'date-fns';
-import { Plus, Pencil, Trash2, FileText, Printer, Clock, Wrench, Wallet } from 'lucide-react';
-
+import { Plus, Pencil, Trash2, FileText, Printer, Clock, Wrench, Wallet, Eye } from 'lucide-react';
+
+
 import { useUrlState } from '../hooks/useUrlState';
 import { apiErrorMessage } from '../lib/errors';
 const STATUS_TONES = {
@@ -26,6 +27,8 @@ const STATUS_TONES = {
   CANCELADO: 'red',
 };
 const STATUS_LABELS = { ABERTO: 'Aberto', ANDAMENTO: 'Em Andamento', FECHADO: 'Fechado', CANCELADO: 'Cancelado' };
+// Fechada ou Cancelada: só consulta, sem edição nem exclusão
+const FINAL_STATUSES = ['FECHADO', 'CANCELADO'];
 
 const fmtMoney = (v) =>
   Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -116,6 +119,7 @@ export default function OrdemServicoPage() {
   };
 
   const singleSelectedOS = selectedIds.size === 1 ? list.find((o) => o.id === [...selectedIds][0]) : null;
+  const selectedLocked = FINAL_STATUSES.includes(singleSelectedOS?.status);
 
   return (
     <Layout>
@@ -163,9 +167,9 @@ export default function OrdemServicoPage() {
               selectedCount={selectedIds.size}
               primary={<ToolbarPrimary icon={Plus} label="Nova OS" onClick={() => navigate('/fleet/ordem-servico/new')} testId="os-new-btn" />}
             >
-              <ToolbarButton icon={Pencil} label="Editar" tone="blue" onClick={() => singleSelectedOS && navigate(`/fleet/ordem-servico/${singleSelectedOS.id}/edit`)} disabled={!singleSelectedOS} />
+              <ToolbarButton icon={selectedLocked ? Eye : Pencil} label={selectedLocked ? 'Visualizar (OS finalizada)' : 'Editar'} tone="blue" onClick={() => singleSelectedOS && navigate(`/fleet/ordem-servico/${singleSelectedOS.id}/edit`)} disabled={!singleSelectedOS} />
               <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedOS && downloadPDF(singleSelectedOS.id, singleSelectedOS.os_number)} disabled={!singleSelectedOS} />
-              <ToolbarButton icon={Trash2} label="Excluir" tone="red" onClick={() => singleSelectedOS && handleDelete(singleSelectedOS.id, singleSelectedOS.os_number)} disabled={!singleSelectedOS} />
+              <ToolbarButton icon={Trash2} label={selectedLocked ? 'Excluir: OS finalizada' : 'Excluir'} tone="red" onClick={() => singleSelectedOS && handleDelete(singleSelectedOS.id, singleSelectedOS.os_number)} disabled={!singleSelectedOS || selectedLocked} />
             </Toolbar>
           )}
           footer={<TablePagination {...paginationProps} />}

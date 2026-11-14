@@ -104,8 +104,12 @@ export default function StockMovementsPage() {
   const loadVehicles = async () => {
     try { const r = await api.getVehicles({ per_page: 1000 }); setVehicles(r.data?.items || r.data || []); } catch (e) { /* ignore */ }
   };
+  // OS Fechada ou Cancelada não aceita mais saída de estoque: fica fora da lista
   const loadOrdensServico = async () => {
-    try { const r = await api.getOrdensServico({}); setOrdensServico(r.data || []); } catch (e) { /* ignore */ }
+    try {
+      const r = await api.getOrdensServico({});
+      setOrdensServico((r.data || []).filter((o) => !['FECHADO', 'CANCELADO'].includes(o.status)));
+    } catch (e) { /* ignore */ }
   };
 
   const onChange = (field, val) => setForm((p) => ({ ...p, [field]: val }));
@@ -356,7 +360,9 @@ export default function StockMovementsPage() {
   // A saída gerada por uma Entrega de EPI só muda pela própria entrega
   // Saídas geradas pela Entrega de EPI ou pelo Reabastecer Tanque só mudam por lá
   const lockedBy = { EPI: "a tela Entrega de EPI's", TANQUE: 'a tela Nível do Tanque' }[singleSelectedMovement?.origin];
-  const lockedByEpi = !!lockedBy;
+  // A movimentação de uma OS já finalizada também não muda mais
+  const lockedByOs = !!singleSelectedMovement?.purpose_os_closed;
+  const lockedByEpi = !!lockedBy || lockedByOs;
 
   const handleDelete = async () => {
     const movement = singleSelectedMovement;
@@ -590,9 +596,9 @@ export default function StockMovementsPage() {
                 selectedCount={selectedIds.size}
                 primary={<ToolbarPrimary icon={Plus} label="Nova movimentação" onClick={() => goNew()} testId="stock-movement-new-btn" />}
               >
-                <ToolbarButton icon={Pencil} label={lockedBy ? `Editar: use ${lockedBy}` : 'Editar'} tone="blue" onClick={() => singleSelectedMovement && goEdit(singleSelectedMovement.id)} disabled={!singleSelectedMovement || lockedByEpi} testId="stock-movement-edit-btn" />
+                <ToolbarButton icon={Pencil} label={lockedByOs ? 'Editar: OS finalizada' : lockedBy ? `Editar: use ${lockedBy}` : 'Editar'} tone="blue" onClick={() => singleSelectedMovement && goEdit(singleSelectedMovement.id)} disabled={!singleSelectedMovement || lockedByEpi} testId="stock-movement-edit-btn" />
                 <ToolbarButton icon={Printer} label="Baixar PDF" tone="emerald" onClick={() => singleSelectedMovement && downloadPDF(singleSelectedMovement.id, singleSelectedMovement.movement_number)} disabled={!singleSelectedMovement} testId="stock-movement-pdf-btn" />
-                <ToolbarButton icon={Trash2} label={lockedBy ? `Excluir: use ${lockedBy}` : 'Excluir (acerta o saldo do estoque)'} tone="red" onClick={handleDelete} disabled={!singleSelectedMovement || lockedByEpi || deleting} testId="stock-movement-delete-btn" />
+                <ToolbarButton icon={Trash2} label={lockedByOs ? 'Excluir: OS finalizada' : lockedBy ? `Excluir: use ${lockedBy}` : 'Excluir (acerta o saldo do estoque)'} tone="red" onClick={handleDelete} disabled={!singleSelectedMovement || lockedByEpi || deleting} testId="stock-movement-delete-btn" />
               </Toolbar>
             )}
           >
